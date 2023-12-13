@@ -240,7 +240,7 @@ PYBIND11_MODULE(lillymol, m)
                   },
                   "Returns true if internal datastructures ok"
                 )
-                .def("natoms", static_cast<int (Molecule::*)()const>(&Molecule::natoms), "Number atoms in molecule")
+                .def("natoms", static_cast<int (Molecule::*)()const>(&Molecule::natoms), "Number explicit atoms in molecule")
                 .def("natoms",
                   [](const Molecule& m, atomic_number_t z) {
                     return m.natoms(z);

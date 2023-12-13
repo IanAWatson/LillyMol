@@ -1529,6 +1529,7 @@ class __attribute__((visibility("default"))) Molecule : private resizable_array_
 
   int remove_atom(atom_number_t);
   int remove_atoms(Set_of_Atoms&);
+  template <typename T> int    remove_atoms(const T *);
   // Remove any atoms set in to_remove.
   int remove_atoms(const int* to_remove);
   // Remove those atoms for which to_remove[i] == flag

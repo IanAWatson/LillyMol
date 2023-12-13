@@ -989,6 +989,8 @@ maybe_deuterium_or_tritium(const char * smiles,
   Parsing an atom enclosed in a square bracket
 */
 
+//#define DEBUG_PARSE_SMILES_TOKEN
+
 int
 parse_smiles_token (const char * smiles,
                     int characters_to_process,
@@ -1041,6 +1043,8 @@ parse_smiles_token (const char * smiles,
       tmp = element_from_long_smiles_string(smiles, characters_to_process, e);
     else  
       tmp = element_from_smiles_string(smiles, characters_to_process, e);
+
+    // cerr << "atomic_symbols_can_have_arbitrary_length " << atomic_symbols_can_have_arbitrary_length << " tmp " << tmp << '\n';
 
     if (0 == tmp && characters_to_process > 1 && ']' == smiles[1])     
       tmp = maybe_deuterium_or_tritium(smiles, e, atomic_mass);
@@ -1732,7 +1736,7 @@ valid_end_of_smiles_character(int last_token)
   return 1;
 }
 
-//#define DEBUG_BUILD_FROM_SMILES
+// #define DEBUG_BUILD_FROM_SMILES
 
 int
 Molecule::_build_from_smiles(const char * smiles,
@@ -2328,9 +2332,15 @@ Molecule::_build_from_smiles (const char * smiles, int nchars,
 int
 Molecule::_build_from_smiles (const char * smiles, int nchars)
 {
+  assert(nchars >= 0);
+
   resize (0);
 
-  assert(nchars > 0);
+  if (nchars == 0) {
+    _molecule_name.resize(0);
+    return 1;
+  }
+
 
   if ('.' != smiles[0])
     ;

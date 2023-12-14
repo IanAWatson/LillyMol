@@ -149,10 +149,10 @@ JLCXX_MODULE define_julia_module(jlcxx::Module& mod)
   ;
 
   mod.add_bits<BondType>("BondType", jlcxx::julia_type("CppEnum"));
-  mod.set_const("SINGLE", kSingleBond);
-  mod.set_const("DOUBLE", kDoubleBond);
-  mod.set_const("TRIPLE", kTripleBond);
-  mod.set_const("AROMATIC", kAromaticBond);
+  mod.set_const("SINGLE_BOND", kSingleBond);
+  mod.set_const("DOUBLE_BOND", kDoubleBond);
+  mod.set_const("TRIPLE_BOND", kTripleBond);
+  mod.set_const("AROMATIC_BOND", kAromaticBond);
     
   mod.add_bits<FileType>("FileType", jlcxx::julia_type("CppEnum"));
   mod.set_const("SMI", FILE_TYPE_SMI);
@@ -290,6 +290,14 @@ JLCXX_MODULE define_julia_module(jlcxx::Module& mod)
     .method("strongly_fused_ring_neighbours", &Ring::strongly_fused_ring_neighbours)
     .method("contains_bond", &Ring::contains_bond)
     .method("contains_both", &Ring::contains_both)
+    .method("is_fused_to",
+      [](const Ring& r, const jlcxx::BoxedValue<Ring>& boxed_ring)->bool{
+        const Ring& unboxed_ring = jlcxx::unbox<Ring&>(boxed_ring);
+        std::cerr << "unboxed_ring " << unboxed_ring.ring_number() << " size " << unboxed_ring.size() << '\n';
+        std::cerr << &unboxed_ring << '\n';
+        return r.is_fused_to(&unboxed_ring);
+      }
+    )
 
     .method("is_fused",
       [](const Ring& r)->bool{
@@ -1048,7 +1056,46 @@ JLCXX_MODULE define_julia_module(jlcxx::Module& mod)
       }
     )
     .method("atom", &Molecule::atom)
+    .method("set_atomic_number!",
+      [](Molecule& m, atom_number_t zatom, atomic_number_t q) {
+        return m.set_atomic_number(zatom, q);
+      }
+    )
+    .method("occursin",
+      [](const std::string& s, const Molecule& m)->bool {
+        const Element* e = get_element_from_symbol_no_case_conversion(s.data(), s.size());
+        if (e == nullptr) {
+          return false;
+        }
+        for (const Atom* a : m) {
+          if (a->element() == e) {
+            return true;
+          }
+        }
+        return false;
+      }
+    )
+    .method("contains",
+      [](const Molecule& m, const std::string& s)->bool {
+        const Element* e = get_element_from_symbol_no_case_conversion(s.data(), s.size());
+        if (e == nullptr) {
+          return false;
+        }
+        for (const Atom* a : m) {
+          if (a->element() == e) {
+            return true;
+          }
+        }
+        return false;
+      }
+    )
 
+    .method("set_bond_type_between_atoms!",
+      [](Molecule& m, atom_number_t a1, atom_number_t a2, BondType bt) {
+        //std::cerr << "Ttyoe will be " << BtypeEnumToBtype(bt) << '\n';
+        return m.set_bond_type_between_atoms(a1, a2, BtypeEnumToBtype(bt));
+      }
+    )
     .method("change_to_graph_form",
       [](Molecule& m) {
         return m.change_to_graph_form();

@@ -222,6 +222,15 @@ JLCXX_MODULE define_julia_module(jlcxx::Module& mod)
     // Does not work
     // LoadError: No appropriate factory for type St16initializer_listIiE
     //.constructor<std::initializer_list<atom_number_t>>()
+    .constructor([] (jlcxx::ArrayRef<int64_t,1> args) {
+        std::vector<int64_t> tmp;
+        tmp.reserve(args.size());
+        for (auto a : args) {
+          tmp.push_back(a);
+        }
+        return new Set_of_Atoms(tmp);
+      }
+    )
     .method("contains", &Set_of_Atoms::contains)
     .method("push!",
       [](Set_of_Atoms& s, atom_number_t zextra) {
@@ -682,6 +691,7 @@ JLCXX_MODULE define_julia_module(jlcxx::Module& mod)
 
   mod.add_type<Molecule>("Molecule")
     .constructor<>()
+    .constructor<Molecule>()
     .method("ok",
       [](const Molecule& m)->bool{
         return m.ok();
@@ -708,39 +718,39 @@ JLCXX_MODULE define_julia_module(jlcxx::Module& mod)
         return m.z(a);
       }
     )
-    .method("setx",
+    .method("setx!",
       [](Molecule& m, atom_number_t a, float x){
         return m.setx(a, x);
       }
     )
-    .method("setx",
+    .method("setx!",
       [](Molecule& m, atom_number_t a, double x) {
         return m.setx(a, x);
       }
     )
-    .method("sety",
+    .method("sety!",
       [](Molecule& m, atom_number_t a, float y){
         return m.sety(a, y);
       }
     )
-    .method("sety",
+    .method("sety!",
       [](Molecule& m, atom_number_t a, double y){
         return m.sety(a, y);
       }
     )
-    .method("setz",
+    .method("setz!",
       [](Molecule& m, atom_number_t a, float z){
         return m.setz(a, z);
       }
     )
-    .method("setz",
+    .method("setz!",
       [](Molecule& m, atom_number_t a, double z){
         return m.setz(a, z);
       }
     )
-    .method("setxyz", &Molecule::setz)
+    .method("setxyz!", &Molecule::setz)
 
-    .method("add_bond",
+    .method("add_bond!",
       [](Molecule& m, atom_number_t a1, atom_number_t a2, BondType bt)->bool{
         return m.add_bond(a1, a2, BtypeEnumToBtype(bt));
       }
@@ -763,6 +773,31 @@ JLCXX_MODULE define_julia_module(jlcxx::Module& mod)
     .method("isotope",
       [](const Molecule& m, atom_number_t a){
         return m.isotope(a);
+      }
+    )
+    .method("set_isotope!",
+      [](Molecule& m, atom_number_t zatom, isotope_t iso)->bool {
+        return m.set_isotope(zatom, iso);
+      }
+    )
+    .method("set_isotopes!",
+      [](Molecule& m, const Set_of_Atoms& s, isotope_t iso) {
+        return m.set_isotope(s, iso);
+      }
+    )
+    .method("number_isotopic_atoms",
+      [](const Molecule& m) {
+        return m.number_isotopic_atoms();
+      }
+    )
+    .method("number_isotopic_atoms",
+      [](const Molecule& m, const isotope_t iso) {
+        return m.number_isotopic_atoms(iso);
+      }
+    )
+    .method("remove_isotopes!",
+      [](Molecule& m) {
+        return m.transform_to_non_isotopic_form();
       }
     )
     .method("number_formally_charged_atoms", &Molecule::number_formally_charged_atoms)
@@ -869,6 +904,7 @@ JLCXX_MODULE define_julia_module(jlcxx::Module& mod)
         return m.in_same_ring_system(a1, a2);
       }
     )
+    .method("number_ring_systems", &Molecule::number_ring_systems)
     .method("ring_membership",
       [](Molecule& m)->std::vector<int>{
         const int* r = m.ring_membership();
@@ -1141,12 +1177,24 @@ JLCXX_MODULE define_julia_module(jlcxx::Module& mod)
         m.add_molecule(&rhs);
       }
     )
+    .method("add_atom!",
+      [](Molecule& m, atomic_number_t z)->bool {
+        const Element* e = get_element_from_atomic_number(z);
+        if (e == nullptr) {
+          return false;
+        }
+
+        m.add(e);
+
+        return true;
+      }
+    )
     .method("has_partial_charges",
       [](const Molecule& m)->bool{
         return m.has_partial_charges();
       }
     )
-    .method("set_formal_charge",
+    .method("set_formal_charge!",
       [](Molecule& m, atom_number_t a, formal_charge_t q) {
         return m.set_formal_charge(a, q);
       }
@@ -1176,34 +1224,39 @@ JLCXX_MODULE define_julia_module(jlcxx::Module& mod)
         return m.delete_fragment(frag);
       }
     )
-    .method("remove_fragment_containing_atom",
+    .method("remove_fragment_containing_atom!",
       [](Molecule& m, atom_number_t a) {
         return m.remove_fragment_containing_atom(a);
       }
     )
-    .method("remove_all",
+    .method("remove_all!",
       [](Molecule& m, atomic_number_t z) {
         return m.remove_all(z);
       }
     )
-    .method("remove_all_non_natural_elements", &Molecule::remove_all_non_natural_elements)
+    .method("remove_all_non_natural_elements!", &Molecule::remove_all_non_natural_elements)
     .method("valence_ok",
       [](Molecule& m)->bool{
         return m.valence_ok();
       }
     )
-    .method("remove_explicit_hydrogens", &Molecule::remove_explicit_hydrogens)
+    .method("remove_explicit_hydrogens!", &Molecule::remove_explicit_hydrogens)
     .method("chop", &Molecule::chop)
-    .method("remove_bonds_to_atom",
+    .method("remove_bonds_to_atom!",
       [](Molecule& m, atom_number_t a) {
         return m.remove_bonds_to_atom(a);
       }
     )
-    .method("remove_bond", &Molecule::remove_bond)
-    .method("remove_bond_between_atoms", &Molecule::remove_bond_between_atoms)
-    .method("remove_all_bonds", &Molecule::remove_all_bonds)
+    .method("remove_bond!", &Molecule::remove_bond)
+    .method("remove_bond_between_atoms!", &Molecule::remove_bond_between_atoms)
+    .method("remove_all_bonds!", &Molecule::remove_all_bonds)
     .method("molecular_weight",
       [](const Molecule& m) {
+        return m.molecular_weight();
+      }
+    )
+    .method("amw",
+      [](const Molecule& m)->molecular_weight_t {
         return m.molecular_weight();
       }
     )
@@ -1236,6 +1289,14 @@ JLCXX_MODULE define_julia_module(jlcxx::Module& mod)
         std::unique_ptr<int[]> f = m.fragment_membership();
         std::copy(f.get(), f.get() + m.natoms(), fragm.data());
         return 1;
+      }
+    )
+    .method("fragment_membership",
+      [](Molecule& m) -> jlcxx::ArrayRef<int32_t> {
+        std::unique_ptr<int32_t[]> f = m.fragment_membership();
+        jlcxx::ArrayRef<int32_t> result(true, f.get(), m.natoms());
+        f.release();
+        return result;
       }
     )
     .method("atoms_in_fragment", 
@@ -1316,9 +1377,9 @@ JLCXX_MODULE define_julia_module(jlcxx::Module& mod)
         return m.create_subset(subset);
       }
     )
-    .method("reduce_to_largest_fragment", &Molecule::reduce_to_largest_fragment)
-    .method("reduce_to_largest_organic_fragment", &Molecule::reduce_to_largest_organic_fragment)
-    .method("reduce_to_largest_fragment_carefully", &Molecule::reduce_to_largest_fragment_carefully)
+    .method("reduce_to_largest_fragment!", &Molecule::reduce_to_largest_fragment)
+    .method("reduce_to_largest_organic_fragment!", &Molecule::reduce_to_largest_organic_fragment)
+    .method("reduce_to_largest_fragment_carefully!", &Molecule::reduce_to_largest_fragment_carefully)
 
     .method("contains_non_periodic_table_elements",
       [](const Molecule& m)->bool {
@@ -1348,14 +1409,16 @@ JLCXX_MODULE define_julia_module(jlcxx::Module& mod)
         return m.implicit_hydrogens(a);
       }
     )
+    .method("unset_all_implicit_hydrogen_information", &Molecule::unset_all_implicit_hydrogen_information)
+    .method("remove_hydrogens_known_flag_to_fix_valence_errors", &Molecule::remove_hydrogens_known_flag_to_fix_valence_errors)
     .method("explicit_hydrogens", &Molecule::explicit_hydrogens)
     .method("hcount", &Molecule::hcount)
-    .method("make_implicit_hydrogens_explicit",
+    .method("make_implicit_hydrogens_explicit!",
       [](Molecule& m) {
         return m.make_implicit_hydrogens_explicit();
       }
     )
-    .method("move_hydrogens_to_end_of_connection_table", &Molecule::move_hydrogens_to_end_of_connection_table)
+    .method("move_hydrogens_to_end_of_connection_table!", &Molecule::move_hydrogens_to_end_of_connection_table)
     .method("pi_electrons",
       [](Molecule& m, atom_number_t a) {
         int result;
@@ -1387,9 +1450,9 @@ JLCXX_MODULE define_julia_module(jlcxx::Module& mod)
     .method("chiral_centres", &Molecule::chiral_centres)
     .method("chiral_centre_at_atom", &Molecule::chiral_centre_at_atom)
     .method("chiral_centre_in_molecule_not_indexed_by_atom_number", &Molecule::chiral_centre_in_molecule_not_indexed_by_atom_number)
-    .method("remove_chiral_centre_at_atom", &Molecule::remove_chiral_centre_at_atom)
-    .method("remove_all_chiral_centres", &Molecule::remove_all_chiral_centres)
-    .method("invert_chirality_on_atom", &Molecule::invert_chirality_on_atom)
+    .method("remove_chiral_centre_at_atom!", &Molecule::remove_chiral_centre_at_atom)
+    .method("remove_all_chiral_centres!", &Molecule::remove_all_chiral_centres)
+    .method("invert_chirality_on_atom!", &Molecule::invert_chirality_on_atom)
     .method("smarts_equivalent_for_atom",
       [](Molecule& m, atom_number_t a)->std::string{
         return m.smarts_equivalent_for_atom(a).AsString();
@@ -1401,11 +1464,11 @@ JLCXX_MODULE define_julia_module(jlcxx::Module& mod)
       }
     )
     .method("atom_map_number", &Molecule::atom_map_number)
-    .method("set_atom_map_number", &Molecule::set_atom_map_number)
+    .method("set_atom_map_number!", &Molecule::set_atom_map_number)
     .method("atom_with_atom_map_number", &Molecule::atom_with_atom_map_number)
-    .method("reset_all_atom_map_numbers", &Molecule::reset_all_atom_map_numbers)
+    .method("reset_all_atom_map_numbers!", &Molecule::reset_all_atom_map_numbers)
 
-    .method("unset_unnecessary_implicit_hydrogens_known_values", &Molecule::unset_unnecessary_implicit_hydrogens_known_values)
+    .method("unset_unnecessary_implicit_hydrogens_known_values!", &Molecule::unset_unnecessary_implicit_hydrogens_known_values)
     .method("discern_chirality_from_3d_structure", &Molecule::discern_chirality_from_3d_structure)
 
 
@@ -1414,6 +1477,7 @@ JLCXX_MODULE define_julia_module(jlcxx::Module& mod)
   mod.method("set_auto_create_new_elements", &set_auto_create_new_elements);
   mod.method("set_atomic_symbols_can_have_arbitrary_length", &set_atomic_symbols_can_have_arbitrary_length);
   mod.method("set_include_atom_map_with_smiles", &set_include_atom_map_with_smiles);
+  mod.method("set_copy_name_in_molecule_copy_constructor", &set_copy_name_in_molecule_copy_constructor);
   mod.method("returns_vector",
     [](int i, int j)->std::vector<int64_t>{
       std::vector<int64_t> result;

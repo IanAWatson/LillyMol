@@ -20,14 +20,21 @@ Set_of_Atoms::Set_of_Atoms(const Set_of_Atoms& rhs)
 }
 
 Set_of_Atoms::Set_of_Atoms(const std::initializer_list<int> l) {
-  resize(l.size());
+  reserve(l.size());
   for (auto a : l) {
     add(a);
   }
 }
 
 Set_of_Atoms::Set_of_Atoms(const std::vector<int>& l) {
-  resize(l.size());
+  reserve(l.size());
+  for (auto a : l) {
+    add(a);
+  }
+}
+
+Set_of_Atoms::Set_of_Atoms(const std::vector<int64_t>& l) {
+  reserve(l.size());
   for (auto a : l) {
     add(a);
   }

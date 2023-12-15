@@ -1950,11 +1950,9 @@ class __attribute__((visibility("default"))) Molecule : private resizable_array_
   int ez_by_geometry(atom_number_t a1, atom_number_t a2, atom_number_t a3,
                      atom_number_t a4, angle_t theta = -1.0) const;
 
-  //  This should be a template function, but the implementation goes through
-  //  qsort, and that seems to make it impossible to use templates. Therefore
-  //  we have multiple signatures
-
-  int sort(const int*, int = 1);
+  // Sorts the atoms so they are in the order in `criterion`.
+  template <typename T>
+  int sort(const T* criterion, int direction = 1);
   // Pybind need a std::vector. For simplicity assume ascending order.
   int sort(const std::vector<int>& order);
   //  int sort(const float *, int = 1);

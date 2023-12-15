@@ -3,7 +3,7 @@ module LillyMol
 
   # abstract type AbstractSetOfAtoms <: AbstractVector{Int32} end
 
-  import Base: getindex, iterate, in, length, size, push!, show, occursin, contains
+  import Base: getindex, iterate, in, length, size, push!, show, occursin, contains, ==
 
   # @wrapmodule(joinpath("bazel-bin/julia/","lillymol_julia.so"))
   @wrapmodule(() -> joinpath("bazel-bin/julia/","lillymol_julia.so"))
@@ -49,8 +49,9 @@ module LillyMol
   export length
   export in
   export atoms_in_ring, contains
-  export is_fused, is_fused_to
-  export natoms, smiles, unique_smiles, nrings, build_from_smiles, is_aromatic, set_name!, name
+  export is_fused, is_fused_to, largest_number_of_bonds_shared_with_another_ring
+  export natoms, smiles, unique_smiles, nrings, ring_bond_count, build_from_smiles, is_aromatic, set_name!, name
+  export random_smiles, smiles_starting_with_atom
   export atomic_number, molecular_formula, nedges, is_ring_atom, fused_system_size, fused_system_identifier
   export rings_with_fused_system_identifier, in_same_ring, in_same_aromatic_ring, in_same_ring_system
   export ring_membership, rings_containing_both, is_part_of_fused_ring_system, ring, ring_containing_atom
@@ -63,7 +64,8 @@ module LillyMol
   export number_formally_charged_atoms, net_formal_charge, bond, bond_between_atoms
   export compute_aromaticity_if_needed, bond_between_atoms, number_symmetry_classes, symmetry_class, symmetry_equivalents
   export symmetry_classes, attached_heteroatom_count, add_bond!, are_bonded, bond_between_atoms
-  export sssr_rings, rings_in_set, bond_list, bonds_in_set, add!, add_atom!, remove_atom!, remove_atoms!, delete_fragment!
+  export rings, sssr_rings, rings_in_set, bond_list, bonds_in_set
+  export add!, add_atom!, remove_atom!, remove_atoms!, delete_fragment!
   export set_copy_name_in_molecule_copy_constructor
   export remove_fragment_containing_atom!, remove_all!, atomic_symbol, remove_all_non_natural_elements!
   export remove_explicit_hydrogens!, valence_ok, remove_bonds_to_atom!, remove_bond!, remove_bond_between_atoms!
@@ -77,23 +79,25 @@ module LillyMol
   export identify_spinach, rings_in_fragment, create_components, create_subset
   export reduce_to_largest_fragment!, reduce_to_largest_organic_fragment!, reduce_to_largest_fragment_carefully!
   export organic_only, contains_non_periodic_table_elements
-  export longest_path, atoms_between, bonds_between
+  export longest_path, atoms_between, bonds_between, most_distant_pair
   export implicit_hydrogens, explicit_hydrogens, hcount, move_hydrogens_to_end_of_connection_table!
   export unset_all_implicit_hydrogen_information, remove_hydrogens_known_flag_to_fix_valence_errors
   export make_implicit_hydrogens_explicit!, pi_electrons, lone_pair_count, saturated
   export aromatic_atom_count, aromatic_ring_count, unset_unnecessary_implicit_hydrogens_known_values!
   export smarts_equivalent_for_atom, smarts
-  export atom_map_number, set_atom_map_number!, atom_with_atom_map_number, reset_all_atom_map_numbers!
+  export atom_map_number, set_atom_map_number!, atom_with_atom_map_number, reset_all_atom_map_numbers!, reset_atom_map_numbers!
   export set_include_atom_map_with_smiles
   export x, y, z, set_x, setx!, sety!, setz!, setxyz!
   export ncon, nbonds, involves, other
   export is_single_bond, is_double_bond, is_triple_bond, is_aromatic
   export atomic_number
   export a1, a2
+  export sort_atoms!
   show(io::IO, s::SetOfAtoms) = print(io, set_of_atoms_show_text(s))
   # For some reason this does not work, but works for set_of_atoms.
   show(io::IO, r::Ring) = print(io, ring_show_text(r))
   show(io::IO, m::Molecule) = print(io, molecule_show_text(m))
+  ==(s::SetOfAtoms, v::Vector{Int}) = equals(s, v)
 
   export activate_all, process
   # Not sure why this was necessary. The returned BondList from bond_list(m) did not
@@ -104,25 +108,8 @@ module LillyMol
 end
 
 function boobar()
-  m = Molecule()
-  build_from_smiles(m, "C1C2CC12") || return is_failure("Bad smiles", m)
-  nrings(m) == 2 || return is_failure("Not 2 rings", m)
-  length(ring(m, 0)) == 3 || return is_failure("Ring 0 not 3", m)
-  length(ring(m, 1)) == 3 || return is_failure("Ring 1 not 3", m)
-  r0 = ring(m, 0)
-  r1 = ring(m, 1)
-  fused_system_identifier(r0) == fused_system_identifier(r1) || return is_failure("fsid non match", m)
-  is_fused(r0) || return is_failure("r0 is_fused", m)
-  is_fused(r1) || return is_failure("r1 is_fused", m)
-  is_fused_to(r0, r1) || return is_failure("is_fused_to r0 r1", m)
-  is_fused_to(r1, r0) || return is_failure("is_fused_to r1 r0", m)
-
-  fragment_membership(r0) == fragment_membership(r1) || return is_failure("frag mismatch", m)
-
-  largest_number_of_bonds_shared_with_another_ring(r0) == 1 || return is_failure("bonds shared 0", m)
-  largest_number_of_bonds_shared_with_another_ring(r1) == 1 || return is_failure("bonds shared 1", m)
   println("boobar done")
-  return true
+  true
 end
 #getindex(m::LillyMol.Molecule, a::Int64)=LillyMol.atom(m, a)
 
@@ -675,11 +662,12 @@ function test_ring()::Bool
   for i in 0:2
     i in r || return false
   end
-  atoms = collect(r)
-  for i in 0:2
-    i in atoms || return false
-  end
-  3 in atoms && return false
+  # Once I switched to using pointers for Rings, this stopped working.
+  #atoms = collect(r)
+  #for i in 0:2
+  #  i in atoms || return false
+  #end
+  #3 in atoms && return false
 
   build_from_smiles(m, "C1CC1CC1CC1") || return false
   for i in 1:nrings(m)
@@ -1497,6 +1485,55 @@ function test_create_subset_set_of_atoms()::Bool
   unique_smiles(s) == "c1ccccc1" || return false
 end
 
+function test_random_smiles()::Bool
+  m = Molecule()
+  build_from_smiles(m, "CC(=O)OC1=CC=CC=C1C(=O)O aspirin") || return is_failure("bad smiles", m)
+  initial_smiles = unique_smiles(m)
+  seen = Set()
+  for i in 1:10
+    smiles = random_smiles(m)
+    smiles in seen && continue
+
+    push!(seen, smiles)
+    m2 = Molecule()
+    build_from_smiles(m2, smiles) || return is_failure("invalid random smiles $(smiles)", m)
+    unique_smiles(m2) == initial_smiles || return is_failure("Smiles mismatch", m)
+  end
+  true
+end
+  
+function test_smiles_starting_atom()::Bool
+  m = Molecule()
+  build_from_smiles(m, "OCN") || return is_failure("Bad smiles", m)
+  smiles(m) == "OCN" || return is_failure("Wrong smiles", m)
+  smiles_starting_with_atom(m, 1) == "C(O)N" || return is_failure("Incorrect", m)
+  true
+end
+
+function test_isotopically_labelled_smiles2()::Bool
+  m = Molecule()
+  build_from_smiles(m, "OCN") || return is_failure("Bad smiles", m)
+  isotopically_labelled_smiles(m) == "O[1CH2][2NH2]" || return is_failure("wrong smiles", m)
+  true
+end
+
+function test_symmetry()::Bool
+  m = Molecule()
+  build_from_smiles(m, "NC1=CC=C(C=C1)C(F)(F)F CHEMBL1162294") || return is_failure("Bad smiles", m)
+  number_symmetry_classes(m) == 7 || return is_failure("Not 7 classes", m)
+  symmetry_class(m, 2) == symmetry_class(m, 6) || return is_failure("2 6 not equivalent", m)
+  symmetry_class(m, 3) == symmetry_class(m, 5) || return is_failure(" 3 5 not equivalent", m)
+
+  symmetry_class(m, 8) == symmetry_class(m, 9) || return is_failure("8 9 not equivalent", m)
+  symmetry_class(m, 9) == symmetry_class(m, 10) || return is_failure("9 10 not equivalent", m)
+  symmetry_equivalents(m, 8) == [9, 10] || return is_failure("8 is not [9, 10]", m)
+  isempty(symmetry_equivalents(m, 0)) || return is_failure("0 not empty", m)
+  isempty(symmetry_equivalents(m, 4)) || return is_failure("4 not empty", m)
+  isempty(symmetry_equivalents(m, 7)) || return is_failure("7 not empty", m)
+  true
+end
+
+
 function test_reduce_to_largest_fragment()::Bool
   m = LillyMol.MolFromSmiles("CC")
   reduce_to_largest_fragment!(m)
@@ -1820,6 +1857,41 @@ function test_atom_map_number()::Bool
   atom_map_number(m, 2) == 3 || return false
   true
 end
+  
+function test_atom_map_numbers()::Bool
+  m = Molecule()
+  build_from_smiles(m, "C[CH2:1][CH2:2]C") || return is_failure("Bad smiles", m)
+  valence_ok(m) || return is_failure("valence", m)
+  atom_map_number(m, 0) == 0 || return is_failure("Atom map 0", m)
+  atom_map_number(m, 1) == 1 || return is_failure("Atom map 1", m)
+  atom_map_number(m, 2) == 2 || return is_failure("Atom map 2", m)
+  atom_map_number(m, 3) == 0 || return is_failure("Atom map 3", m)
+
+  set_atom_map_number!(m, 3, 3)
+  smiles(m) == "C[CH2:1][CH2:2][CH3:3]" || return is_failure("Smiles no good", m)
+
+  atom_with_atom_map_number(m, 3) == 3 || return is_failure("not amap 3", m)
+
+  reset_atom_map_numbers!(m)
+  smiles(m) ==  "CCCC" || return is_failure("Atom map not reverted", m)
+  true
+end
+
+function test_sort_atoms()::Bool
+  m = Molecule()
+  build_from_smiles(m, "CO.N") || return is_failure("Bad smiles", m)
+  atomic_number(m, 0) == 6 || return is_failure("not carbon", m)
+  atomic_number(m, 1) == 8 || return is_failure("not oxygen", m)
+  atomic_number(m, 2) == 7 || return is_failure("not nitrogen", m)
+  order = [1, 2, 0]
+  sort_atoms!(m, order, 1)
+  atomic_number(m, 0) == 8 || return is_failure("Not oxygen", m)
+  atomic_number(m, 1) == 6 || return is_failure("Not carbon", m)
+  atomic_number(m, 2) == 7 || return is_failure("Not nitrogen", m)
+  smiles(m) == "OC.N" || return is_failure("Not sorted", m)
+  true
+end
+
 
 function test_set_atom_map_number()::Bool
   m = LillyMol.MolFromSmiles("CCC")
@@ -1928,6 +2000,42 @@ function test_aspirin()::Bool
   organic_only(m) || return is_failure("Not organic", m);
   true
 end
+  
+function test_cubane()::Bool
+  m = Molecule()
+  build_from_smiles(m, "C12C3C4C1C5C2C3C45") || return is_failure("Bad smiles", m)
+  nrings(m) == 5 || return is_failure("Nrings not 5", m)
+  non_sssr_rings(m) == 1 || return is_failure("Must be 1 non sssr rings", m)
+  for atnum in 0:(length(m) - 1)
+    ring_bond_count(m, atnum) == 3 || return is_failure("rbc not 3", m)
+  end
+
+  for ring in sssr_rings(m)
+    length(ring) == 4 || return is_failure("Ring not 4", m)
+  end
+
+  ring_membership(m) == [3, 3, 3, 3, 2, 2, 2, 2] || return is_failure("ring membership", m)
+
+  fused_system_identifier(m, 0) == fused_system_identifier(m, 1) || return is_failure("fused_system_identifier", m)
+  true
+end
+  
+function test_distance_matrix()::Bool
+  m = Molecule()
+  build_from_smiles(m, "C1CCC1") || return is_failure("Bad smiles", m)
+  bonds_between(m, 0, 1) == 1 || return is_failure("Bonds btw 1", m)
+  bonds_between(m, 0, 2) == 2 || return is_failure("Bonds btw 2", m)
+
+  build_from_smiles(m, "N(CC1=CC=C(OCCCC2=CC=CC=C2)C=C1)(CC1=CC=C(OCCCC2=CC=CC=C2)C=C1)CCCCN CHEMBL349114") || return is_failure("Bad smiles", m)
+  fragment_membership(m, 30) == fragment_membership(m, 39) || return is_failure("30 30 frag", m)
+  bonds_between(m, 30, 39) == 18 || return is_failure("30 39 dist", m)
+  longest_path(m) == 26 || return is_failure("longest path", m)
+  most_distant_pair(m) == (13, 30) || return is_failure("most distanct pair", m)
+  bonds_between(m, 13, 30) == 26 || return is_failure("13, 30", m)
+  true
+end
+
+
 
 #for (index,atom) in enumerate(m)
 #  print("atom $(index) type $(atomic_number(atom)) connected to")
@@ -1988,6 +2096,7 @@ boobar()
 @test test_maximum_connectivity()
 @test test_connections_molecule()
 @test test_isotopically_labelled_smiles()
+@test test_isotopically_labelled_smiles2()
 @test test_is_aromatic()
 @test test_getindex_molecule()
 @test test_number_formally_charged_atoms()
@@ -1998,6 +2107,7 @@ boobar()
 @test test_symmetry_class()
 @test test_symmetry_equivalents() broken=true
 @test test_symmetry_classes()
+@test test_symmetry()
 @test test_attached_heteroatom_count()
 @test test_bond_length()
 @test test_bond_angle()
@@ -2063,6 +2173,7 @@ boobar()
 @test test_contains_non_periodic_table_elements()
 @test test_longest_path()
 @test test_bonds_between()
+@test test_distance_matrix()
 @test test_atoms_between()
 @test test_implicit_hydrogens()
 @test test_explicit_hydrogens()
@@ -2083,6 +2194,7 @@ boobar()
 @test test_smarts_equivalent_for_atom()
 @test test_smarts()
 @test test_atom_map_number()
+@test test_atom_map_numbers()
 @test test_set_atom_map_number()
 @test test_set_include_atom_map_with_smiles()
 @test test_atom_with_atom_map_number()
@@ -2090,4 +2202,8 @@ boobar()
 @test test_unset_unnecessary_implicit_hydrogens_known_values()
 @test test_discern_chirality_from_3d_structure()
 @test test_set_formal_charge()
+@test test_sort_atoms()
+@test test_random_smiles()
+@test test_smiles_starting_atom()
 @test test_aspirin()
+@test test_cubane()

@@ -1,8 +1,9 @@
 #include <string>
+#include <tuple>
 #include <vector>
 
 #include "jlcxx/jlcxx.hpp"
-//#include "jlcxx/stl.hpp"
+#include "jlcxx/tuple.hpp"
 
 #include "Molecule_Lib/chiral_centre.h"
 #include "Molecule_Lib/istream_and_type.h"
@@ -273,6 +274,21 @@ JLCXX_MODULE define_julia_module(jlcxx::Module& mod)
       return AtomsAsString(s, "SetOfAtoms").AsString();
     }
   );
+  mod.method("equals",
+    [](const Set_of_Atoms& s, const jlcxx::ArrayRef<int64_t> v)->bool {
+      if (s.size() != v.size()) {
+        return false;
+      }
+
+      for (uint32_t i = 0; i < s.size(); ++i) {
+        if (s[i] != v[i]) {
+          return false;
+        }
+      }
+
+      return 1;
+    }
+  );
 
   mod.add_type<Ring>("Ring")
     .constructor<>()
@@ -282,31 +298,45 @@ JLCXX_MODULE define_julia_module(jlcxx::Module& mod)
       }
     )
     .method("ring_number", &Ring::ring_number)
+    .method("atoms_in_ring",
+      [](const Ring* r) {
+        return r->number_elements();
+      }
+    )
     .method("fragment_membership", &Ring::fragment_membership)
     .method("fused_system_identifier", &Ring::fused_system_identifier)
     .method("fused_ring_neighbours", &Ring::fused_ring_neighbours)
     .method("fused_neighbour", &Ring::fused_neighbour)
-    .method("largest_number_of_bonds_shared_with_another_ring", &Ring::largest_number_of_bonds_shared_with_another_ring)
     .method("strongly_fused_ring_neighbours", &Ring::strongly_fused_ring_neighbours)
     .method("contains_bond", &Ring::contains_bond)
     .method("contains_both", &Ring::contains_both)
     .method("is_fused_to",
-      [](const Ring& r, const jlcxx::BoxedValue<Ring>& boxed_ring)->bool{
-        const Ring& unboxed_ring = jlcxx::unbox<Ring&>(boxed_ring);
-        std::cerr << "unboxed_ring " << unboxed_ring.ring_number() << " size " << unboxed_ring.size() << '\n';
+      [](const Ring* r, const jlcxx::BoxedValue<Ring*>& boxed_ring)->bool{
+        const Ring* unboxed_ring = jlcxx::unbox<Ring*>(boxed_ring);
+        std::cerr << "unboxed_ring " << unboxed_ring->ring_number() << " size " << unboxed_ring->size() << '\n';
         std::cerr << &unboxed_ring << '\n';
-        return r.is_fused_to(&unboxed_ring);
+        return r->is_fused_to(unboxed_ring);
+      }
+    )
+    .method("is_fused_to",
+      [](const Ring* r, const Ring* other)->bool {
+        return r->is_fused_to(other);
       }
     )
 
     .method("is_fused",
-      [](const Ring& r)->bool{
-        return r.is_fused();
+      [](const Ring* r)->bool{
+        return r->is_fused();
       }
     )
     .method("is_aromatic",
-      [](const Ring& r)->bool{
-        return r.is_aromatic();
+      [](const Ring* r)->bool{
+        return r->is_aromatic();
+      }
+    )
+    .method("largest_number_of_bonds_shared_with_another_ring",
+      [](const Ring* r) {
+        return r->largest_number_of_bonds_shared_with_another_ring();
       }
     )
     .method("contains",
@@ -315,12 +345,12 @@ JLCXX_MODULE define_julia_module(jlcxx::Module& mod)
       }
     )
     .method("ring_show_text",
-      [](const Ring& r)->std::string{
-        IWString result = AtomsAsString(r, "Ring");
-        if (r.is_aromatic()) {
+      [](const Ring* r)->std::string{
+        IWString result = AtomsAsString(*r, "Ring");
+        if (r->is_aromatic()) {
           result << " arom";
         }
-        if (r.is_fused()) {
+        if (r->is_fused()) {
           result << " fused";
         }
         return result.AsString();
@@ -930,8 +960,8 @@ JLCXX_MODULE define_julia_module(jlcxx::Module& mod)
       }
     )
     .method("ring",
-      [](Molecule& m, int rnum)->Ring{
-        return *m.ringi(rnum);
+      [](Molecule& m, int rnum)->const Ring*{
+        return m.ringi(rnum);
       }
     )
     .method("ring_containing_atom",
@@ -945,6 +975,14 @@ JLCXX_MODULE define_julia_module(jlcxx::Module& mod)
     )
 
     .method("sssr_rings",
+      [](Molecule& m)->SetOfRings{
+        SetOfRings result(m.sssr_rings());
+        return result;
+      }
+    )
+
+    // Same as sssr_rings
+    .method("rings",
       [](Molecule& m)->SetOfRings{
         SetOfRings result(m.sssr_rings());
         return result;
@@ -1032,6 +1070,11 @@ JLCXX_MODULE define_julia_module(jlcxx::Module& mod)
     .method("random_smiles", 
       [](Molecule& m)->std::string{
         return m.random_smiles().AsString();
+      }
+    )
+    .method("smiles_starting_with_atom", 
+      [](Molecule& m, atom_number_t zatom)->std::string{
+        return m.smiles_starting_with_atom(zatom).AsString();
       }
     )
     .method("unique_kekule_smiles", 
@@ -1451,6 +1494,28 @@ JLCXX_MODULE define_julia_module(jlcxx::Module& mod)
         return result;
       }
     )
+    .method("most_distant_pair",
+      [](Molecule& m)->std::tuple<int, int> {
+        atom_number_t a1 = INVALID_ATOM_NUMBER;
+        atom_number_t a2 = INVALID_ATOM_NUMBER;
+        int longest_distance = 0;
+        const int matoms = m.natoms();
+        for (int i = 0; i < matoms; ++i) {
+          for (int j = i + 1; j < matoms; ++j) {
+            if (m.fragment_membership(i) != m.fragment_membership(j)) {
+              continue;
+            }
+            const int d = m.bonds_between(i, j);
+            if (d > longest_distance) {
+              a1 = i;
+              a2 = j;
+              longest_distance = d;
+            }
+          }
+        }
+        return std::make_tuple(a1, a2);
+      }
+    )
     .method("implicit_hydrogens",
       [](Molecule& m, atom_number_t a) {
         return m.implicit_hydrogens(a);
@@ -1514,9 +1579,16 @@ JLCXX_MODULE define_julia_module(jlcxx::Module& mod)
     .method("set_atom_map_number!", &Molecule::set_atom_map_number)
     .method("atom_with_atom_map_number", &Molecule::atom_with_atom_map_number)
     .method("reset_all_atom_map_numbers!", &Molecule::reset_all_atom_map_numbers)
+    .method("reset_atom_map_numbers!", &Molecule::reset_all_atom_map_numbers)
 
     .method("unset_unnecessary_implicit_hydrogens_known_values!", &Molecule::unset_unnecessary_implicit_hydrogens_known_values)
     .method("discern_chirality_from_3d_structure", &Molecule::discern_chirality_from_3d_structure)
+
+    .method("sort_atoms!",
+      [](Molecule& m, jlcxx::ArrayRef<int64_t> order, int direction){
+        return m.sort(order.data(), direction);
+      }
+    )
 
 
   ;

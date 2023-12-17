@@ -2,6 +2,8 @@
 #include <tuple>
 #include <vector>
 
+#include "Eigen/Core"
+
 #include "jlcxx/jlcxx.hpp"
 #include "jlcxx/tuple.hpp"
 
@@ -96,6 +98,9 @@ class ResizableArrayHolder {
     ResizableArrayHolder(const resizable_array_p<T>& rhs) : _ref(rhs) {
     }
 
+    uint32_t length() const {
+      return _ref.size();
+    }
     const T& operator[](int ndx) const {
       return *_ref[ndx];
     }
@@ -113,10 +118,17 @@ class SetOfRings : public ResizableArrayHolder<Ring> {
   public:
     SetOfRings(const resizable_array_p<Ring>& r) : ResizableArrayHolder<Ring>(r) {
     }
-    uint32_t length() const {
-      return _ref.size();
-    }
     const Ring* operator[](int ndx) const {
+      return _ref[ndx];
+    }
+};
+
+class SetOfChiralCentres : public ResizableArrayHolder<Chiral_Centre> {
+  private:
+  public:
+    SetOfChiralCentres(const resizable_array_p<Chiral_Centre>& r) : ResizableArrayHolder<Chiral_Centre>(r) {
+    }
+    const Chiral_Centre* operator[](int ndx) const {
       return _ref[ndx];
     }
 };
@@ -181,13 +193,13 @@ JLCXX_MODULE define_julia_module(jlcxx::Module& mod)
     .constructor<atom_number_t>()
     .method("centre",
       [](const Chiral_Centre& c)->atom_number_t{
-        return c.a();
+        return c.centre();
       }
     )
     .method("centre",
       [](const jlcxx::BoxedValue<const Chiral_Centre>& boxed_chiral_centre)->atom_number_t{
       const Chiral_Centre& c = jlcxx::unbox<const Chiral_Centre&>(boxed_chiral_centre);
-      return c.a();
+      return c.centre();
       }
     )
     .method("top_front", &Chiral_Centre::top_front)
@@ -219,6 +231,13 @@ JLCXX_MODULE define_julia_module(jlcxx::Module& mod)
       }
     )
   ;
+
+  mod.method("is_chiral_implicit_hydrogen",
+    [](int c)->bool {
+      return IsChiralImplicitHydrogen(c);
+    },
+    "True if chiral connection is an implicit hydrogen"
+  );
 
   mod.add_type<Set_of_Atoms>("SetOfAtoms")
     .constructor<>()
@@ -692,6 +711,24 @@ JLCXX_MODULE define_julia_module(jlcxx::Module& mod)
     )
   ;
 
+  mod.add_type<SetOfChiralCentres>("SetOfChiralCentres")
+    .method("size",
+      [](const SetOfChiralCentres& s) {
+        return s.size();
+      }
+    )
+    .method("internal_items_in_set",
+      [](const SetOfChiralCentres& s) {
+        return s.size();
+      }
+    )
+    .method("items_in_set",
+      [] (const SetOfChiralCentres& s) {
+        return s.size();
+      }
+    )
+  ;
+
   mod.set_override_module(jl_base_module);
   mod.method("getindex",
     [](const SetOfRings& r, int i)->const Ring*{
@@ -799,6 +836,59 @@ JLCXX_MODULE define_julia_module(jlcxx::Module& mod)
       }
     )
     .method("setxyz!", &Molecule::setz)
+    // Maybe it would be more efficient to just extract the values atom at a time
+    // and not do a transpose.
+    .method("get_coordinates",
+      [](const Molecule& m)-> jlcxx::ArrayRef<float, 2> {
+        const int matoms = m.natoms();
+        std::unique_ptr<float[]> coords = m.GetCoords();
+
+        typedef Eigen::Matrix<float, Eigen::Dynamic, 3> myvector;
+        Eigen::Map<myvector, Eigen::Aligned> as_eigen(coords.get(), matoms, 3);
+        as_eigen.transposeInPlace();
+
+        static constexpr bool kJuliaOwned = true;
+        jlcxx::ArrayRef<float, 2> result(kJuliaOwned, coords.get(), matoms, 3);
+        coords.release();
+        return result;
+      }
+    )
+    // Remember matrix ordering
+    .method("set_xyz!",
+      [](Molecule& m, const jlcxx::ArrayRef<float, 2> coords) {
+        const int matoms = m.natoms();
+        for (int i = 0; i < matoms; ++i) {
+          m.setx(i, coords[i]);
+          m.sety(i, coords[matoms + i]);
+          m.setz(i, coords[matoms + matoms + i]);
+        }
+      }
+    )
+    .method("dihedral_scan",
+      [](Molecule& m, atom_number_t a2, atom_number_t a3, double delta, double bump_check) -> jlcxx::ArrayRef<float, 3> {
+        const int matoms = m.natoms();
+        std::vector<std::unique_ptr<float[]>> b = m.DihedralScan(a2, a3, delta, bump_check);
+
+        int nconf = b.size();
+        std::unique_ptr<float[]> tmp = std::make_unique<float[]>(nconf * matoms * 3);
+
+        for (int i = 0; i < nconf; ++i) {
+          float* start = tmp.get() + i * matoms;
+          for (int j = 0; j < matoms; ++j) {
+            start[j] = b[i].get()[j * matoms];
+            start[matoms + j] = b[i].get()[j * matoms + 1];
+            start[matoms + matoms + j] = b[i].get()[j * matoms + 2];
+          }
+        }
+
+        constexpr int kJuliaOwned = true;
+
+        jlcxx::ArrayRef<float, 3> result(kJuliaOwned, tmp.get(), nconf * matoms * 3);
+        tmp.release();
+
+        return result;
+      }
+    )
 
     .method("add_bond!",
       [](Molecule& m, atom_number_t a1, atom_number_t a2, BondType bt)->bool{
@@ -808,11 +898,6 @@ JLCXX_MODULE define_julia_module(jlcxx::Module& mod)
     .method("are_bonded",
       [](const Molecule& m, atom_number_t a1, atom_number_t a2)->bool{
         return m.are_bonded(a1, a2);
-      }
-    )
-    .method("has_formal_charges",
-      [](const Molecule& m)->bool {
-        return m.has_formal_charges();
       }
     )
     .method("formal_charge",
@@ -852,6 +937,13 @@ JLCXX_MODULE define_julia_module(jlcxx::Module& mod)
     )
     .method("number_formally_charged_atoms", &Molecule::number_formally_charged_atoms)
     .method("net_formal_charge", &Molecule::net_formal_charge)
+    .method("number_formal_charges", &Molecule::number_formally_charged_atoms)
+    .method("has_formal_charges", 
+      [](const Molecule& m)->bool {
+        return m.has_formal_charges();
+      },
+      "True if the molecule has any formal charges"
+    )
 
     .method("set_name!",
       [](Molecule& m, const std::string& s) {
@@ -1603,7 +1695,13 @@ JLCXX_MODULE define_julia_module(jlcxx::Module& mod)
         return m.saturated(a);
       }
     )
-    .method("chiral_centres", &Molecule::chiral_centres)
+    .method("chiral_centres",
+      [](Molecule& m) -> SetOfChiralCentres {
+        SetOfChiralCentres result(m.ChiralCentres());
+        return result;
+      }
+    )
+    .method("number_chiral_centres", &Molecule::chiral_centres)
     .method("chiral_centre_at_atom", &Molecule::chiral_centre_at_atom)
     .method("chiral_centre_in_molecule_not_indexed_by_atom_number", &Molecule::chiral_centre_in_molecule_not_indexed_by_atom_number)
     .method("remove_chiral_centre_at_atom!", &Molecule::remove_chiral_centre_at_atom)
@@ -1659,6 +1757,13 @@ JLCXX_MODULE define_julia_module(jlcxx::Module& mod)
   mod.unset_override_module();
 
   mod.method("MolFromSmiles",
+    [](const std::string& smiles)->Molecule{
+      Molecule result;
+      result.build_from_smiles(smiles);
+      return result;
+    }
+  );
+  mod.method("LillyMolFromSmiles",
     [](const std::string& smiles)->Molecule{
       Molecule result;
       result.build_from_smiles(smiles);

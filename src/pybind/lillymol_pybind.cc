@@ -128,6 +128,24 @@ RingToString(const Ring& r) {
   return std::string(result.data(), result.size());
 }
 
+static int
+ToScaffold(Molecule& m) {
+  const int matoms = m.natoms();
+  if (matoms <= 3) {
+    return 0;
+  }
+  if (m.nrings() == 0) {
+    return 0;
+  }
+  std::unique_ptr<int[]> spinach = std::make_unique<int[]>(matoms);
+  m.identify_spinach(spinach.get());
+  if (std::count(spinach.get(), spinach.get() + matoms, 0) == matoms) {
+    return 0;
+  }
+
+  return m.remove_atoms(spinach.get(), 1);
+}
+
 enum BondType {
   kUnknown = 0,
   kSingleBond = 1,
@@ -568,7 +586,7 @@ PYBIND11_MODULE(lillymol, m)
                 )
                 .def("to_scaffold",
                   [](Molecule& m) {
-                    return m.ToScaffold();
+                    return ToScaffold(m);
                   },
                   "Convert to scaffold"
                 )

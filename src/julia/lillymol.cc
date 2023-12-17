@@ -12,6 +12,8 @@
 #include "Molecule_Lib/smiles.h"
 #include "Molecule_Lib/standardise.h"
 
+#include "Molecule_Tools/xlogp.h"
+
 namespace lillymol_julia {
 
 std::string
@@ -114,8 +116,8 @@ class SetOfRings : public ResizableArrayHolder<Ring> {
     uint32_t length() const {
       return _ref.size();
     }
-    const Ring& operator[](int ndx) const {
-      return *_ref[ndx];
+    const Ring* operator[](int ndx) const {
+      return _ref[ndx];
     }
 };
 
@@ -660,12 +662,22 @@ JLCXX_MODULE define_julia_module(jlcxx::Module& mod)
 
     mod.set_override_module(jl_base_module);
     mod.method("getindex",
-      [](const Atom& a, int i)->Bond{
+      [](const Atom& a, int i)->const Bond{
+        return *a[i];
+      }
+    );
+    mod.method("getindex",
+      [](Atom& a, int i)->const Bond{
         return *a[i];
       }
     );
     mod.unset_override_module();
   ;
+  mod.method("internal_get_item",
+    [](const Atom& a, int64_t ndx)->const Bond* {
+      return a[ndx];
+    }
+  );
 
   mod.add_type<SetOfRings>("SetOfRings")
     .method("size",
@@ -682,7 +694,7 @@ JLCXX_MODULE define_julia_module(jlcxx::Module& mod)
 
   mod.set_override_module(jl_base_module);
   mod.method("getindex",
-    [](const SetOfRings& r, int i)->const Ring&{
+    [](const SetOfRings& r, int i)->const Ring*{
       return r[i];
     }
   );
@@ -916,6 +928,16 @@ JLCXX_MODULE define_julia_module(jlcxx::Module& mod)
         return m.ring_bond_count(a);
       }
     )
+    .method("in_ring_of_given_size", 
+      [](Molecule& m, atom_number_t zatom, int rsize)->bool {
+        return m.in_ring_of_given_size(zatom, rsize);
+      }
+    )
+    .method("largest_ring_size", 
+      [](Molecule & m) {
+        return m.LargestRingSize();
+      }
+    )
     .method("fused_system_size",
       [](Molecule& m, atom_number_t a){
         return m.fused_system_size(a);
@@ -1144,6 +1166,11 @@ JLCXX_MODULE define_julia_module(jlcxx::Module& mod)
         return m.change_to_graph_form();
       }
     )
+    .method("to_scaffold!",
+      [](Molecule& m) {
+        return m.ToScaffold();
+      }
+    )
     .method("compute_aromaticity_if_needed", &Molecule::compute_aromaticity_if_needed)
     .method("change_to_graph_form",
       [](Molecule& m, const Mol2Graph& mol2graph) {
@@ -1262,12 +1289,29 @@ JLCXX_MODULE define_julia_module(jlcxx::Module& mod)
         return m.bond_list();
       }
     )
+    .method("bonds",
+      [](const Molecule& m)->const Bond_list& {
+        return m.bond_list();
+      }
+    )
     .method("add!",
       [](Molecule& m, const Molecule& rhs) {
         m.add_molecule(&rhs);
       }
     )
     .method("add_atom!",
+      [](Molecule& m, atomic_number_t z)->bool {
+        const Element* e = get_element_from_atomic_number(z);
+        if (e == nullptr) {
+          return false;
+        }
+
+        m.add(e);
+
+        return true;
+      }
+    )
+    .method("add!",
       [](Molecule& m, atomic_number_t z)->bool {
         const Element* e = get_element_from_atomic_number(z);
         if (e == nullptr) {
@@ -1331,7 +1375,7 @@ JLCXX_MODULE define_julia_module(jlcxx::Module& mod)
       }
     )
     .method("remove_explicit_hydrogens!", &Molecule::remove_explicit_hydrogens)
-    .method("chop", &Molecule::chop)
+    .method("chop!", &Molecule::chop)
     .method("remove_bonds_to_atom!",
       [](Molecule& m, atom_number_t a) {
         return m.remove_bonds_to_atom(a);
@@ -1619,6 +1663,16 @@ JLCXX_MODULE define_julia_module(jlcxx::Module& mod)
       Molecule result;
       result.build_from_smiles(smiles);
       return result;
+    }
+  );
+
+  mod.method("xlogp",
+    [](Molecule& m) ->std::tuple<float, bool>{
+      auto rc = xlogp::XLogP(m);
+      if (rc) {
+        return std::make_tuple<float, bool>(*rc, true);
+      }
+      return std::make_tuple<float, bool>(0.0f, false);
     }
   );
 

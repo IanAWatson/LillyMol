@@ -48,9 +48,12 @@ module LillyMol
   export iterate
   export length
   export in
+  export distance_between_atoms
   export atoms_in_ring, contains
   export is_fused, is_fused_to, largest_number_of_bonds_shared_with_another_ring
   export natoms, smiles, unique_smiles, nrings, ring_bond_count, build_from_smiles, is_aromatic, set_name!, name
+  export aromatic_smiles
+  export in_ring_of_given_size
   export random_smiles, smiles_starting_with_atom
   export atomic_number, molecular_formula, nedges, is_ring_atom, fused_system_size, fused_system_identifier
   export rings_with_fused_system_identifier, in_same_ring, in_same_aromatic_ring, in_same_ring_system
@@ -64,8 +67,8 @@ module LillyMol
   export number_formally_charged_atoms, net_formal_charge, bond, bond_between_atoms
   export compute_aromaticity_if_needed, bond_between_atoms, number_symmetry_classes, symmetry_class, symmetry_equivalents
   export symmetry_classes, attached_heteroatom_count, add_bond!, are_bonded, bond_between_atoms
-  export rings, sssr_rings, rings_in_set, bond_list, bonds_in_set
-  export add!, add_atom!, remove_atom!, remove_atoms!, delete_fragment!
+  export rings, sssr_rings, rings_in_set, bond_list, bonds, bonds_in_set
+  export add!, add_atom!, remove_atom!, remove_atoms!, delete_fragment!, chop!
   export set_copy_name_in_molecule_copy_constructor
   export remove_fragment_containing_atom!, remove_all!, atomic_symbol, remove_all_non_natural_elements!
   export remove_explicit_hydrogens!, valence_ok, remove_bonds_to_atom!, remove_bond!, remove_bond_between_atoms!
@@ -87,9 +90,11 @@ module LillyMol
   export smarts_equivalent_for_atom, smarts
   export atom_map_number, set_atom_map_number!, atom_with_atom_map_number, reset_all_atom_map_numbers!, reset_atom_map_numbers!
   export set_include_atom_map_with_smiles
+  export to_scaffold!
   export x, y, z, set_x, setx!, sety!, setz!, setxyz!
   export ncon, nbonds, involves, other
   export is_single_bond, is_double_bond, is_triple_bond, is_aromatic
+  export largest_ring_size
   export atomic_number
   export a1, a2
   export sort_atoms!
@@ -98,6 +103,9 @@ module LillyMol
   show(io::IO, r::Ring) = print(io, ring_show_text(r))
   show(io::IO, m::Molecule) = print(io, molecule_show_text(m))
   ==(s::SetOfAtoms, v::Vector{Int}) = equals(s, v)
+  # Cannot get this to work
+  # ==(Ring, v::Vector{Int}) = equals(s, v)
+  export xlogp
 
   export activate_all, process
   # Not sure why this was necessary. The returned BondList from bond_list(m) did not
@@ -105,6 +113,8 @@ module LillyMol
   # as the solution.
   getindex(blist::Union{CxxWrap.CxxWrapCore.ConstCxxRef{<:BondList}, CxxWrap.CxxWrapCore.CxxRef{<:BondList}}, ndx::Int64) =
     internal_get_item(blist, ndx)
+  getindex(atom::Union{CxxWrap.CxxWrapCore.ConstCxxRef{<:Atom}, CxxWrap.CxxWrapCore.CxxRef{<:Atom}}, ndx::Int64) =
+    internal_get_item(atom, ndx);
 end
 
 function boobar()
@@ -1284,14 +1294,12 @@ function test_remove_explicit_hydrogens()::Bool
   true
 end
 
-# Chop is not exported from base, not sure why it did not work.
-# Seldom used...
 function test_chop()::Bool
   m = LillyMol.MolFromSmiles("CN")
-  LillyMol.chop(m, 1)
+  chop!(m, 1)
   smiles(m) == "C" || return false
   build_from_smiles(m, "CNN") || return false
-  LillyMol.chop(m, 2)
+  chop!(m, 2)
   smiles(m) == "C" || return false
   true
 end
@@ -2000,6 +2008,17 @@ function test_aspirin()::Bool
   organic_only(m) || return is_failure("Not organic", m);
   true
 end
+
+function test_xlogp()::Bool
+  m = Molecule()
+  build_from_smiles(m, "CC(=O)OC1=CC=CC=C1C(=O)O aspirin") || return is_failure("Bad smiles")
+  (result, flag) = xlogp(m)
+  # This does not work:
+  # TypeError: non-boolean (CxxWrap.CxxWrapCore.CxxBool) used in boolean context
+  #flag || return is_failure("xlogp failed", m)
+  isapprox(result, 1.426, atol=0.001) || return is_failure("xlogp wrong", m)
+  true
+end
   
 function test_cubane()::Bool
   m = Molecule()
@@ -2035,16 +2054,294 @@ function test_distance_matrix()::Bool
   true
 end
 
+#      C
+#    / | \
+# C-C  |  C-C
+#    \ | /
+#      C
+#
+function test_ring_related()::Bool
+  m = Molecule()
+  build_from_smiles(m, "CC1C2C(C)C12") || return is_failure("Bad smiles", m)
+  natoms(m) == 6 || return is_failure("not 6 atoms", m)
+  natoms(m, 6) == 6 || return is_failure("not 6 carbon atoms", m)
+
+  ncon(m, 0) == 1 || return is_failure("ncon 0", m)
+  ncon(m, 1) == 3 || return is_failure("ncon 1", m)
+  ncon(m, 2) == 3 || return is_failure("ncon 2", m)
+  ncon(m, 3) == 3 || return is_failure("ncon 3", m)
+  ncon(m, 4) == 1 || return is_failure("ncon 4", m)
+  ncon(m, 5) == 3 || return is_failure("ncon 5", m)
+
+  nrings(m) == 2 || return is_failure("not 2 rings", m)
+  non_sssr_rings(m) == 0 || return is_failure("non sssr rings", m)
+  nrings(m, 0) == 0 || return is_failure("nrings 0", m)
+  nrings(m, 1) == 1 || return is_failure("nrings 1", m)
+  nrings(m, 2) == 2 || return is_failure("nrings 2", m)
+  nrings(m, 3) == 1 || return is_failure("nrings 3", m)
+  nrings(m, 4) == 0 || return is_failure("nrings 4", m)
+  nrings(m, 5) == 2 || return is_failure("nrings 5", m)
+
+  ring_bond_count(m, 0) == 0 || return is_failure("ring_bond_count 0", m)
+  ring_bond_count(m, 1) == 2 || return is_failure("ring_bond_count 1", m)
+  ring_bond_count(m, 2) == 3 || return is_failure("ring_bond_count 2", m)
+  ring_bond_count(m, 3) == 2 || return is_failure("ring_bond_count 3", m)
+  ring_bond_count(m, 4) == 0 || return is_failure("ring_bond_count 4", m)
+  ring_bond_count(m, 5) == 3 || return is_failure("ring_bond_count 5", m)
+
+  for i in 0:(natoms(m) - 1)
+    attached_heteroatom_count(m, i) == 0 || return is_failure("Attached heteroatom count", m)
+  end
+
+  is_ring_atom(m, 0) && return is_failure("0 is ring atom", m)
+  is_ring_atom(m, 1) || return is_failure("1 not ring atom", m)
+
+  in_ring_of_given_size(m, 0, 3) && return is_failure("0 in ring", m)
+  in_ring_of_given_size(m, 1, 3) || return is_failure("1 not in 3", m)
+  in_ring_of_given_size(m, 1, 4) && return is_failure("1 not in 4", m)
+  in_ring_of_given_size(m, 2, 3) || return is_failure("2 not in 3", m)
+  in_ring_of_given_size(m, 3, 3) || return is_failure("3 not in 3", m)
+  in_ring_of_given_size(m, 5, 3) || return is_failure("5 not in 3", m)
+
+  in_same_ring(m, 1, 2) || return is_failure("1 2 not in same ring", m)
+  in_same_ring(m, 1, 5) || return is_failure("1 5 not in same ring", m)
+  in_same_ring(m, 3, 2) || return is_failure("3 2 not in same ring", m)
+  in_same_ring(m, 3, 5) || return is_failure("3 5 not in same ring", m)
+  in_same_ring(m, 1, 3) && return is_failure("1 3 in same ring", m)
+
+  fused_system_identifier(m, 1) == fused_system_identifier(m, 2) || return is_failure("fsid mismatch 1, 2", m)
+  fused_system_identifier(m, 1) == fused_system_identifier(m, 3) || return is_failure("fsid mismatch 1, 3", m)
+  fused_system_identifier(m, 1) == fused_system_identifier(m, 5) || return is_failure("fsid mismatch 1, 5", m)
+  fused_system_identifier(m, 1) == fused_system_identifier(m, 5) || return is_failure("fsid mismatch 1, 5", m)
+
+  fused_system_size(m, 1) == 2 || return is_failure("fused_system_size 1", m)
+  fused_system_size(m, 0) == 0 || return is_failure("fused_system_size 0", m)
+
+  nrings(m) == 2 || return is_failure("nrings 2", m)
+  # The order of the rings should not be relied upon, so this test is
+  # possibly fragile.
+  # cannot get this to work yet.
+  # ring(m, 0) == [1, 2, 5] || return is_failure("ring0", m)
+  # ring(m, 1) == [2, 3, 5] || return is_failure("ring1", m)
+  for r in rings(m)
+    length(r) == 3 || return is_failure("Ring not 3", m)
+  end
+
+  largest_ring_size(m) == 3 || return is_failure("largest_ring_size", m)
+  number_ring_systems(m) == 1 || return is_failure("number_ring_systems". m)
+  is_spiro_fused(m, 1) && return is_failure("Spiro 1", m)
+  is_spiro_fused(m, 2) && return is_failure("Spiro 2", m)
+  return true
+end
+  
+
+function test_atom_iterator()::Bool
+  m = Molecule()
+  build_from_smiles(m, "C1CC1") || return is_failure("Bad smiles", m)
+  valence_ok(m) || return is_failure("Valence not ok", m)
+  # Iterate through all atoms in the molecule.
+  for (ndx, atom) in enumerate(m)
+    atomic_number(m, ndx - 1) == 6 || return is_failure("Not carbon", m)
+    ring_bond_count(m, ndx - 1) == 2 || return is_failure("Not 2 ring bonds", m)
+  end
+
+  build_from_smiles(m, "CC(N)(O)F") || return is_failure("Bad smiles", m)
+  # Loop through bonds connected to atom 1. Check with `m` that
+  # the atom is bonded to 1.
+  for bond in m[1] 
+    atom = other(bond, 1)
+    are_bonded(m, atom, 1) || return is_failure("Not bonded to 1", m)
+  end
+  true
+end
 
 
-#for (index,atom) in enumerate(m)
-#  print("atom $(index) type $(atomic_number(atom)) connected to")
-#  for bond in atom
-#    nbr = other(bond, index)
-#    print(" $(nbr)")
-#  end
-#  println("")
-#end
+function test_iterate_bonds()::Bool
+  m = Molecule()
+  build_from_smiles(m, "O=C1N(C(=O)N2[C@@]1([C@@H]1[C@H]([C@H]2C2=CC=CC(=C2)C)C(=O)N(C1=O)CC1=CC=CC=C1)CC)C1=CC=CC=C1 CHEMBL1434237") || return is_failure("Bad smiles", m)
+  # Count number of aromatic bonds
+  compute_aromaticity_if_needed(m)
+  aromatic_bonds = 0
+  for bond in bonds(m)
+    if is_aromatic(bond)
+      aromatic_bonds += 1
+    end
+  end
+  aromatic_bonds == 18 || return is_failure("Not 18 aromatic bond", m)
+  return true
+end
+
+function build_benzene()::Bool
+  m = Molecule()
+  for i in 1:6
+    add!(m, 6)
+  end
+
+  natoms(m) == 6 || return is_failure("Not 6 atoms", m)
+  natoms(m, 6) == 6 || return is_failure("Not 6 carbon", m)
+
+  add_bond!(m, 0, 1, SINGLE_BOND)
+  add_bond!(m, 1, 2, DOUBLE_BOND)
+  add_bond!(m, 2, 3, SINGLE_BOND)
+  add_bond!(m, 3, 4, DOUBLE_BOND)
+  add_bond!(m, 4, 5, SINGLE_BOND)
+  add_bond!(m, 5, 0, DOUBLE_BOND)
+
+  aromatic_ring_count(m) == 1 || return is_failure("Not 1 aromatic ring", m)
+  return true
+end
+
+function test_atom_iterator_and_valence()::Bool
+  m = Molecule()
+  build_from_smiles(m, "[1CH3]C(=[2CH2])#[3CH]") || return is_failure("Bad smiles", m)
+  valence_ok(m) && return is_failure("ok valence", m)
+
+  for bond in m[1]
+    o = other(bond, 1)
+    if is_single_bond(bond)
+        isotope(m, o) == 1 || return is_failure("Not isotope 1", m)
+    elseif is_double_bond(bond)
+      isotope(m, o) == 2 || return is_failure("Not isotope 2", m)
+    elseif is_triple_bond(bond)
+      isotope(m, o) == 3 || return is_triple_bond("Not isotope 3", m)
+    end
+  end
+  return true
+end
+
+function test_imidazole()::Bool
+  m = Molecule()
+  build_from_smiles(m, "N1C=NC2=CC=CC=C12") || return is_failure("Bad smiles", m)
+  compute_aromaticity_if_needed(m)
+  for ring in rings(m)
+    is_aromatic(ring) || return is_failure("benzimidazole ring not aromatic", m)
+  end
+  true
+end
+
+# Do a 'substructure search'. Generally do not do this, do an
+# actual substructure search, but this might be illustrative.
+# Identify a O=a atom pair.
+# There are many ways this could be done, and which will be most
+# efficient will depend on the molecules being examined.
+function test_find_exocyclic_bond()::Bool
+  m = Molecule()
+  build_from_smiles(m, "N1NC(=O)C=C1 CHEMBL4227850") || return is_failure("Bad smiles", m)
+  aromatic_ring_count(m) == 1 || return is_failure("Not 1 aromatic ring", m)
+
+  # Start search with singly bonded O atoms
+  found_match = 0
+  for (ndx, atom) in enumerate(m)
+    ndx = ndx - 1
+    ncon(atom) == 1 || continue
+    atomic_number(atom) == 8 || continue
+
+    # Bond to the first neighbour
+    bond = atom[0]
+    is_double_bond(bond) || continue
+    o = other(bond, ndx)
+    if is_aromatic(m, o) 
+      found_match  += 1
+    end
+  end
+
+  found_match > 0 || return is_failure("No aromatic found", m)
+
+  # Start search by looking at atoms in aromatic rings
+  found_match = 0
+  compute_aromaticity_if_needed(m)
+  for ring in sssr_rings(m)
+    is_aromatic(ring) || continue
+    for atom_number in ring
+      atom = m[atom_number]
+      ncon(atom) == 2 && continue
+
+      for bond in atom
+        is_double_bond(bond) || continue
+        o = other(bond, atom_number)
+        ncon(m, o) == 1 || continue
+        if atomic_number(m, o) == 8
+          found_match += 1
+          break
+        end
+      end
+    end
+  end
+  found_match > 0 || return is_failure("No aromat found II", m)
+
+# Start search with 3 connected aromatic atoms
+  found_match = 0
+  for (ndx, atom) in enumerate(m)
+    ndx = ndx - 1
+    ncon(atom) == 3 || continue
+
+    is_aromatic(m, ndx) || continue
+    for bond in atom
+      is_double_bond(bond) || continue
+      o = other(bond, ndx)
+      ncon(m, o) == 1 || continue
+      atomic_number(m, o) == 8 || continue
+      found_match += 1
+    end
+  end
+  found_match > 0 || return is_failure("No aromatic found III", m)
+
+  # On 50k random Chembl molecules the times for the methods are (seconds)
+  # 1 5.18
+  # 2 9.14
+  # 3 8.47
+  # In this case, the singly bonded oxygen is the best place to start
+  # since they are comparatively rare.
+  true
+end
+
+function test_scaffold()::Bool
+  m = Molecule()
+  build_from_smiles(m, "C") || return is_failure("Bad smiles")
+  to_scaffold!(m)
+  smiles(m) == "C" || return is_failure("Scaffold not C", m)
+
+  build_from_smiles(m, "O1N=C(C(=O)N2CCCC2)C=C1COC1=CC=C2N=CC=CC2=C1 CHEMBL1589003") || return is_failure("Bad smiles", m)
+  to_scaffold!(m)
+  smiles(m) == "O1N=C(CN2CCCC2)C=C1COC1=CC=C2N=CC=CC2=C1" || return is_failure("Wrong scaffold", m)
+
+  build_from_smiles(m, "O=C(N(C1=CC=C(C)C=C1)CC(=O)NCCOC)CCC(=O)NC1=CC=CC=N1 CHEMBL1576099") || return is_failure("Bad smiles", m)
+  to_scaffold!(m)
+  smiles(m) == "C(NC1=CC=CC=C1)CCCNC1=CC=CC=N1" || return is_failure("Scaffold incorrect", m)
+
+  build_from_smiles(m, "O=C1N(C(=O)C2=C1C(=CC=C2)N(=O)=O)CC(=O)N1CC2=CC=CC=C2CC1 CHEMBL2134451") || return is_failure("Bad smiles", m)
+  to_scaffold!(m)
+  smiles(m) == "C1N(CC2=C1C=CC=C2)CCN1CC2=CC=CC=C2CC1" || return is_failure("Scaffold not good", m)
+
+  build_from_smiles(m, "O=C(C1=CC=CN1CC(=O)NCC1N(CCC1)CC)C1=CC=CC=C1C CHEMBL1404612") || return is_failure("Bad Smiles", m)
+  to_scaffold!(m)
+  smiles(m) == "C(C1=CC=CN1CCNCC1NCCC1)C1=CC=CC=C1" || return is_failure("scaffold not ok", m)
+
+  build_from_smiles(m, "O=C(N1[C@H](C(=O)NC2C3=CC=CC=C3CCC2)CCC1)[C@@H](NC(=O)[C@H](C)NC)CC(=O)O CHEMBL1570483") || return is_failure("Bad smiles", m)
+  to_scaffold!(m)
+  smiles(m) == "N1[C@H](CNC2C3=CC=CC=C3CCC2)CCC1" || return is_failure("scaffold not formed ok", m)
+
+  return true
+end
+
+function test_coords()::Bool
+  m = Molecule()
+  build_from_smiles(m, "C{{0,0,0}}C{{1,1,1}}C{{2,0,0}}") || return is_failure("Bad smiles", m)
+  highest_coordinate_dimensionality(m) == 3 || return is_failure("Not 3d", m)
+  isapprox(x(m, 0), 0.0, atol=1.0e-05) || return is_failure("X not 0", m)
+  isapprox(y(m, 0), 0.0, atol=1.0e-05) || return is_failure("Y not 0", m)
+  isapprox(z(m, 0), 0.0, atol=1.0e-05) || return is_failure("Z not 0", m)
+
+  isapprox(x(m, 1), 1.0, atol=1.0e-05) || return is_failure("X not 1", m)
+  isapprox(y(m, 1), 1.0, atol=1.0e-05) || return is_failure("Y not 1", m)
+  isapprox(z(m, 1), 1.0, atol=1.0e-05) || return is_failure("Z not 1", m)
+
+  isapprox(distance_between_atoms(m, 0, 1), sqrt(3.0), atol=1.e0-5) || return is_failure("0 1 wroing distance", m)
+  isapprox(distance_between_atoms(m, 0, 2), 2.0, atol=1.e0-5) || return is_failure("0 2 wroing distance", m)
+
+  isapprox(bond_angle(m, 0, 1, 2), 1.230959, atol=1.0e-05) || return is_failure("Bad bond angle", m)
+  return true
+end
 
 boobar()
 @test test_empty_molecule()
@@ -2084,6 +2381,7 @@ boobar()
 @test test_ring()
 @test test_rings()
 @test test_ring_containing_atom()
+@test test_ring_related()
 @test test_label_atoms_by_ring_system()
 @test test_label_atoms_by_ring_system_including_spiro_fused()
 @test test_nrings_including_non_sssr_rings()
@@ -2205,5 +2503,14 @@ boobar()
 @test test_sort_atoms()
 @test test_random_smiles()
 @test test_smiles_starting_atom()
+@test test_atom_iterator()
+@test test_iterate_bonds()
+@test build_benzene()
+@test test_imidazole()
+@test test_find_exocyclic_bond()
+@test test_atom_iterator_and_valence()
+@test test_scaffold()
+@test test_coords()
+@test test_xlogp()
 @test test_aspirin()
 @test test_cubane()

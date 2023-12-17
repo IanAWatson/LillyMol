@@ -2583,3 +2583,20 @@ Molecule::LargestRingSize() {
 
   return result;
 }
+
+int
+Molecule::ToScaffold() {
+  if (_number_elements <= 3) {
+    return 0;
+  }
+  if (nrings() == 0) {
+    return 0;
+  }
+  std::unique_ptr<int[]> spinach = std::make_unique<int[]>(_number_elements);
+  identify_spinach(spinach.get());
+  if (std::count(spinach.get(), spinach.get() + _number_elements, 0) == _number_elements) {
+    return 0;
+  }
+
+  return remove_atoms(spinach.get(), 1);
+}

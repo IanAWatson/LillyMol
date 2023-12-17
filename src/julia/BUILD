@@ -6,6 +6,7 @@ cc_library (
     deps = [
         "//Molecule_Lib:iwmolecule",
         "//Molecule_Lib:moleculeio",
+        "//Molecule_Tools:xlogp_lib",
         "@libcxxwrap//:libcxxwrap",
         "@julia//:julia",
     ],

@@ -1226,6 +1226,9 @@ class __attribute__((visibility("default"))) Molecule : private resizable_array_
 
   IWString isotopically_labelled_smiles();
 
+  // Convert to scaffold form.
+  int ToScaffold();
+
   int change_to_graph_form();
   int change_to_graph_form(const Mol2Graph&);
   int set_all_bonds_to_type(bond_type_t);
@@ -2654,6 +2657,7 @@ extern distance_t DistanceBetweenAtoms(const Atom* a1, const Atom* a2);
 extern angle_t BondAngle(const Atom* a1, const Atom* a2, const Atom* a3);
 extern angle_t DihedralAngle(const Atom* a1, const Atom* a2, const Atom* a3,
                              const Atom* a4);
+
 
 namespace lillymol {
 

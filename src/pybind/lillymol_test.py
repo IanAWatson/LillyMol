@@ -608,7 +608,7 @@ class TestLillyMol(absltest.TestCase):
     m.add_bond(1, 2, BondType.DOUBLE_BOND)
     m.add_bond(2, 3, BondType.SINGLE_BOND)
     m.add_bond(3, 4, BondType.DOUBLE_BOND)
-    m.add_bond(2, 5, BondType.SINGLE_BOND)
+    m.add_bond(4, 5, BondType.SINGLE_BOND)
     m.add_bond(5, 0, BondType.DOUBLE_BOND)
     self.assertEqual(m.aromatic_ring_count(), 1)
 

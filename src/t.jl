@@ -14,8 +14,10 @@ module LillyMol
   export World
   export greet
 
-  export FileType
   export BondType, SINGLE_BOND, DOUBLE_BOND, TRIPLE_BOND, AROMATIC_BOND
+  export FileType, SMI, SDF
+  export next_molecule, molecules_read, set_connection_table_errors_allowed, connection_table_errors_encountered
+  export set_skip_first, read_only, molecules_remaining, molecules_read
 
   export Molecule, SetOfAtoms, Atom, Bond, ChemicalStandardisation, BondList, Mol2Graph, ChiralCentre
   export SetOfRings
@@ -2593,6 +2595,83 @@ function test_charge()::Bool
   return true
 end
 
+function write_smiles_tempfile(prefix::String, smiles::String)::String
+  tmpdir = Base.Filesystem.mktempdir()
+  fname = joinpath(tmpdir, "$(prefix).smi")
+  open(fname, "w") do file
+    write(file, smiles)
+  end
+
+  fname
+end
+
+function test_read_smiles()::Bool
+  m = Molecule()
+
+  smiles = "C methane\nCC ethane\nCCC propane\nC1CC1 cyclopropane\nCCCC butane\nc1ccccc1 benzene\n"
+
+  fname = write_smiles_tempfile("abc", smiles)
+
+  nsmiles = length(split(smiles, "\n")) - 1
+
+  reader = LillyMol.MoleculeReader(SMI, fname)
+
+  molecules_remaining(reader) == nsmiles || return is_failure("Wrong count remaining", m)
+
+  my_count = 0
+  while next_molecule(reader, m)
+    my_count += 1
+  end
+  my_count == molecules_read(reader) || return is_failure("Incorrect count", m)
+  molecules_read(reader) == nsmiles || return is_failure("Wrong molecule count", m)
+  true
+end
+
+function test_read_smiles_with_errors_fail()::Bool
+  m = Molecule()
+
+  smiles = "C methane\nCC ethane\nCCCQ propane\nC1CC1 cyclopropane\nCCCC butane\nc1ccccc1 benzene\n"
+
+  fname = write_smiles_tempfile("abc", smiles)
+
+  nsmiles = length(split(smiles, "\n")) - 1
+
+  reader = LillyMol.MoleculeReader(SMI, fname)
+
+  molecules_remaining(reader) == nsmiles || return is_failure("Wrong count remaining", m)
+
+  my_count = 0
+  while next_molecule(reader, m)
+    my_count += 1
+  end
+  my_count == molecules_read(reader) || return is_failure("Incorrect count", m)
+  molecules_read(reader) == 2 || return is_failure("Wrong molecule count", m)
+  true
+end
+
+function test_read_smiles_with_errors_skip()::Bool
+  m = Molecule()
+
+  smiles = "C methane\nCC ethane\nCCCQ propane\nC1CC1 cyclopropane\nCCCC butane\nc1ccccc1 benzene\n"
+
+  fname = write_smiles_tempfile("abc", smiles)
+
+  nsmiles = length(split(smiles, "\n")) - 1
+
+  reader = LillyMol.MoleculeReader(SMI, fname)
+
+  molecules_remaining(reader) == nsmiles || return is_failure("Wrong count remaining", m)
+  reader.set_connection_table_errors_allowed()
+
+  my_count = 0
+  while next_molecule(reader, m)
+    my_count += 1
+  end
+  my_count == molecules_read(reader) || return is_failure("Incorrect count", m)
+  molecules_read(reader) == (nsmiles - 1) || return is_failure("Wrong molecule count", m)
+  connection_table_errors_encountered(reader) == 1 || return is_failure("Wrong error count", m)
+  true
+end
 
 boobar()
 @test test_empty_molecule()
@@ -2775,3 +2854,6 @@ boobar()
 @test test_xlogp()
 @test test_aspirin()
 @test test_cubane()
+
+@test test_read_smiles()
+@test test_read_smiles_with_errors_fail()

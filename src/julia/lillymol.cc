@@ -34,10 +34,6 @@ struct World
 
 JLCXX_MODULE define_types_module(jlcxx::Module& types)
 {
-  types.add_bits<FileType>("FileType", jlcxx::julia_type("CppEnum"));
-  types.set_const("SMI", FILE_TYPE_SMI);
-  types.set_const("SDF", FILE_TYPE_SDF);
-
   types.add_type<World>("World")
     .constructor<const std::string&>()
     .method("set", &World::set)
@@ -168,25 +164,77 @@ JLCXX_MODULE define_julia_module(jlcxx::Module& mod)
   mod.set_const("DOUBLE_BOND", kDoubleBond);
   mod.set_const("TRIPLE_BOND", kTripleBond);
   mod.set_const("AROMATIC_BOND", kAromaticBond);
-    
+
   mod.add_bits<FileType>("FileType", jlcxx::julia_type("CppEnum"));
   mod.set_const("SMI", FILE_TYPE_SMI);
   mod.set_const("SDF", FILE_TYPE_SDF);
+    
+//  mod.add_bits<FileType>("FileType", jlcxx::julia_type("CppEnum"));
+//  mod.set_const("SMI", FILE_TYPE_SMI);
+//  mod.set_const("SDF", FILE_TYPE_SDF);
 
   mod.add_type<data_source_and_type<Molecule>>("MoleculeReader")
     .constructor<FileType, std::string&>()
-//#define NEED_CONSTRU
-#ifdef NEED_CONSTRU
     .method("next_molecule",
-      [](data_source_and_type<Molecule>& input)->std::optional<Molecule>{
-        Molecule *tmp = input.next_molecule();
-        if (tmp == nullptr) {
-          return std::nullopt;
+      [](data_source_and_type<Molecule>& input, jlcxx::BoxedValue<Molecule>& boxed_molecule)->bool{
+        Molecule& m = jlcxx::unbox<Molecule&>(boxed_molecule);
+        if (input.next_molecule(m)) {
+          return true;
         }
-        return *tmp;
+
+        return false;
       }
     )
-#endif
+    .method("next_molecule",
+      [](jlcxx::BoxedValue<data_source_and_type<Molecule>>& boxed_input, jlcxx::BoxedValue<Molecule>& boxed_molecule)->bool{
+        data_source_and_type<Molecule>& input = jlcxx::unbox<data_source_and_type<Molecule>&>(boxed_input);
+        Molecule& m = jlcxx::unbox<Molecule&>(boxed_molecule);
+        return input.next_molecule(m);
+      }
+    )
+    .method("set_connection_table_errors_allowed",
+      [](data_source_and_type<Molecule>& input) {
+        input.set_connection_table_errors_allowed(std::numeric_limits<int>::max());
+      },
+      "Allow unlimited connection table errors"
+    )
+    .method("set_connection_table_errors_allowed",
+      [](data_source_and_type<Molecule>& input, int s) {
+        input.set_connection_table_errors_allowed(s);
+      },
+      "Specify the max number of connection table errors to ignore"
+    )
+    .method("connection_table_errors_encountered",
+      [](const data_source_and_type<Molecule>& input) {
+        return input.connection_table_errors_encountered();
+      },
+      "The number of connection table errors encountered"
+    )
+    .method("set_skip_first",
+      [](data_source_and_type<Molecule>& input, int s) {
+        input.set_skip_first(s);
+      },
+      "Skip the first <s> records in the file"
+    )
+    .method("read_only",
+      [](data_source_and_type<Molecule>& input, int s) {
+        input.set_do_only(s);
+      },
+      "Only read the first <s> records"
+    )
+    .method("molecules_remaining",
+      [](data_source_and_type<Molecule>& input) {
+        return input.molecules_remaining();
+      },
+      "The number of molecules not yet read - does not work with pipes"
+    )
+
+    .method("molecules_read",
+      [](const data_source_and_type<Molecule>& input) {
+        return input.molecules_read();
+      },
+      "The number of molecules read"
+    )
   ;
 
   mod.add_type<Chiral_Centre>("ChiralCentre")

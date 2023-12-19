@@ -1,15 +1,13 @@
 cmake_minimum_required(VERSION 3.16.1)
 cmake_policy(SET CMP0077 NEW)
+#cmake_minimum_required(VERSION 3.10.2)
 project(LillyMol)
-# TODO:ianwatson get cmake working with this release
-message(FATAL_ERROR "cmake infrastructure currently not functional")
-
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 # Wrong, causes an extra level
 # set(EXECUTABLE_OUTPUT_PATH ${CMAKE_CURRENT_BINARY_DIR}/build)
-set(IW_EXTRA_LIBS protobuf snappy -lz re2)
+set(IW_EXTRA_LIBS protobuf -lz re2)
 set(CMAKE_INCLUDE_CURRENT_DIR ON)
 include_directories(${CMAKE_CURRENT_SOURCE_DIR})
 
@@ -29,11 +27,24 @@ FetchContent_MakeAvailable(googletest)
 #find_package(GTest REQUIRED CONFIG)
 endif(IWTEST)
 
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+
 FetchContent_Declare(
-  re2
-  URL https://github.com/google/re2/archive/refs/heads/main.zip
+  absl_content
+  GIT_REPOSITORY https://github.com/abseil/abseil-cpp
+  GIT_SHALLOW TRUE
 )
-FetchContent_MakeAvailable(re2)
+FetchContent_MakeAvailable(absl_content)
+add_subdirectory(absl_content)
+
+
+FetchContent_Declare(
+  re2_content
+  GIT_REPOSITORY https://github.com/google/re2.git
+  GIT_TAG 2023-09-01
+  GIT_SHALLOW TRUE
+)
+FetchContent_MakeAvailable(re2_content)
 SET(RE2_BUILD_TESTING OFF)
 include_directories(${re2_SOURCE_DIR})
 
@@ -50,17 +61,19 @@ set(SNAPPY_BUILD_BENCHMARKS OFF)
 FetchContent_MakeAvailable(snappy)
 include_directories(${snappy_SOURCE_DIR})
 
-FetchContent_Declare(
-  protobuf
-  URL https://github.com/protocolbuffers/protobuf/archive/refs/heads/master.zip
-  SOURCE_SUBDIR cmake
-  GIT_TAG main
-)
+# set(Protobuf_USE_STATIC_LIBS ON)
+# FetchContent_Declare(
+#   protobuf
+#   URL https://github.com/protocolbuffers/protobuf/archive/refs/heads/master.zip
+#   SOURCE_SUBDIR cmake
+#   GIT_TAG main
+# )
 set(protobuf_BUILD_TESTS OFF)
 #FetchContent_MakeAvailable(protobuf)
-include_directories(${protobuf_SOURCE_DIR})
+# include_directories(${protobuf_SOURCE_DIR})
+list(APPEND CMAKE_PREFIX_PATH "/home/ian/LillyMol_IWFork/third_party/protobuf")
 find_package(Protobuf REQUIRED)
-include_directories(${protobuf_INCLUDE_DIRS})
+include_directories(${protobuf_INCLUDE_DIR})
 include_directories(${CMAKE_CURRENT_BINARY_DIR})
 
 FetchContent_Declare(
@@ -68,7 +81,7 @@ FetchContent_Declare(
   GIT_REPOSITORY https://github.com/google/leveldb
 # URL https://github.com/cschuet/leveldb/archive/refs/heads/master.zip
 # URL https://github.com/google/leveldb/archive/refs/heads/main.zip
-  GIT_TAG master
+  GIT_TAG main
   GIT_SUBMODULES ""
 )
 set(LEVELDB_BUILD_TESTS OFF)
@@ -91,16 +104,16 @@ include_directories(BEFORE SYSTEM ${CMAKE_CURRENT_BINARY_DIR}/_deps/protobuf-src
 #FetchContent_MakeAvailable(clif)
 
 # crc32c uses BUILD_TESTING to enable tests
-set(CRC32C_BUILD_TESTS OFF)
-set(CRC32C_BUILD_BENCHMARKS OFF)
-set(CRC32C_USE_GLOG OFF)
-FetchContent_Declare(
-  crc32c
-  URL https://github.com/google/crc32c/archive/refs/heads/main.zip
-  GIT_TAG main
-)
-FetchContent_MakeAvailable(crc32c)
-include_directories(${crc32c_SOURCE_DIR}/include)
+# set(CRC32C_BUILD_TESTS OFF)
+# set(CRC32C_BUILD_BENCHMARKS OFF)
+# set(CRC32C_USE_GLOG OFF)
+# FetchContent_Declare(
+#   crc32c
+#   URL https://github.com/google/crc32c/archive/refs/heads/main.zip
+#   GIT_TAG main
+# )
+# FetchContent_MakeAvailable(crc32c)
+# include_directories(${crc32c_SOURCE_DIR}/include)
 #execute_process(COMMAND git submodule update --init -- ${CMAKE_CURRENT_BINARY_DIR}/_deps/crc32c-src/third_party
 #                WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR})
 

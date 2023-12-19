@@ -134,7 +134,7 @@ static int prepend_smiles_to_fragstat_proto = 0;
 // If we are writing binary protos - recommended for larger
 // datasets.
 static int write_fragstat_as_binary_proto = 0;
-static iw_tf_data_record::TFDataWriter tfdata_writer;
+iw_tf_data_record::TFDataWriter tfdata_writer;
 
 static int work_like_recap = 0;
 
@@ -214,168 +214,7 @@ static int reject_breakages_that_result_in_fragments_too_small = 0;
 static int write_smiles = 1;
 static int write_parent_smiles = 1;
 
-// We can write fragments in several forms.
-//   1. classical form, smiles one per line
-//   2. textproto, one per line
-//   3. serialized proto form.
-// This class holds that information and the associated streams.
-
-class DicerFragmentOutput {
-  private:
-    // pointer because if we need to use stdout, we need to use the
-    // constructor.
-    std::unique_ptr<IWString_and_File_Descriptor> _text_output;
-
-    // If true, we flush _text_output whenever we feel like it.
-    int _buffered_output;
-
-    iw_tf_data_record::TFDataWriter _as_tfdata;
-
-    // True if a proto needs to be formed. We will write it as either
-    // text or tfdata.
-    int _output_is_proto;
-
-    // private functions
-
-    int WriteText(const dicer_data::DicedMolecule& proto, IWString_and_File_Descriptor& output);
-    int WriteSerialized(const dicer_data::DicedMolecule& proto);
-
-  public:
-    DicerFragmentOutput();
-
-    void set_output_is_proto(int s) {
-      _output_is_proto = s;
-    }
-    int output_is_proto() const {
-      return _output_is_proto;
-    }
-
-    void set_buffered_output(int s) {
-      _buffered_output = s;
-    }
-    int buffered_output() const {
-      return _buffered_output;
-    }
-
-    void flush() {
-      if (_text_output) {
-        _text_output->flush();
-      }
-    }
-
-    // After processing a molecule do whatever flushing is needed.
-    int MaybeFlush();
-
-    int write_if_buffer_holds_more_than(uint32_t s) {
-      return _text_output->write_if_buffer_holds_more_than(s);
-    }
-
-    IWString_and_File_Descriptor& text_output() {
-      return *_text_output;
-    }
-
-    int SetUseStdout();
-
-    int SetOutputStream(IWString& fname);
-
-    int SetTFDataFname(IWString& fname);
-
-    int Write(const dicer_data::DicedMolecule& proto);
-
-    template <typename T>
-    DicerFragmentOutput& operator << (const T rhs) {
-      *_text_output << rhs;
-      return *this;
-    }
-};
-
-DicerFragmentOutput::DicerFragmentOutput() {
-  _output_is_proto = 0;
-  _buffered_output = 1;
-}
-
-int
-DicerFragmentOutput::SetUseStdout() {
-  _text_output = std::make_unique<IWString_and_File_Descriptor>(1);
-
-  return _text_output->good();
-}
-
-int
-DicerFragmentOutput::SetOutputStream(IWString& fname) {
-  _text_output = std::make_unique<IWString_and_File_Descriptor>();
-  if (! _text_output->open(fname.null_terminated_chars())) {
-    cerr << "DicerFragmentOutput::SetOutputStream:cannot open '" << fname << "'\n";
-    return 0;
-  }
-
-  return _text_output->good();
-}
-
-int
-DicerFragmentOutput::SetTFDataFname(IWString& fname) {
-  if (! _as_tfdata.Open(fname)) {
-    cerr << "DicerFragmentOutput::SetTFDataFname:cannot open '" << fname << "'\n";
-    return 0;
-  }
-
-  _output_is_proto = 1;
-
-  return 1;
-}
-
-int
-DicerFragmentOutput::Write(const dicer_data::DicedMolecule& proto) {
-  if (_text_output) {
-    return WriteText(proto, *_text_output);
-  } else {
-    return WriteSerialized(proto);
-  }
-}
-
-int
-DicerFragmentOutput::WriteText(const dicer_data::DicedMolecule& proto,
-                IWString_and_File_Descriptor& output) {
-  static google::protobuf::TextFormat::Printer printer;
-  printer.SetSingleLineMode(true);
-
-  std::string buffer;
-  if (! printer.PrintToString(proto, &buffer)) {
-    cerr << "DicerFragmentOutput::WriteTextcannot write '" << proto.ShortDebugString() << "'\n";
-    return 0;
-  }
-
-  output << buffer;
-  output << '\n';
-
-  if (_buffered_output) {
-    output.write_if_buffer_holds_more_than(8192);
-  } else {
-    output.flush();
-  }
-
-  return 1;
-}
-
-int
-DicerFragmentOutput::WriteSerialized(const dicer_data::DicedMolecule& proto) {
-  return _as_tfdata.WriteSerializedProto<dicer_data::DicedMolecule>(proto);
-}
-
-int
-DicerFragmentOutput::MaybeFlush() {
-  if (! _text_output) {
-    return 0;
-  }
-
-  if (_buffered_output) {
-    _text_output->write_if_buffer_holds_more_than(8192);
-  } else {
-    _text_output->flush();
-  }
-
-  return 1;
-}
+static int output_is_proto = 0;
 
 /*
    When viewing fragments, it is convenient to have the parent
@@ -422,9 +261,40 @@ static Molecule_Output_Object bbrk_file;
 static IWString bbrk_tag;
 static int read_bonds_to_be_broken_from_bbrk_file = 0;
 
+static int buffered_output = 1;
+
 static int check_for_lost_chirality = 0;
 
 static Atom_Typing_Specification atom_typing_specification;
+
+enum class Env {
+  kUndefined = 0,
+  kTerminal = 1,
+  kAromatic = 2,
+  kSaturatedCarbon = 3,
+  kSaturatedNitrogen = 4,
+  kSaturatedOxygen = 5,
+  kUnsaturatedCarbon = 6,
+  kUnsaturatedNitrogen = 7,
+  // This will likely never be used, since we usually
+  // do not break =O bonds.
+  kUnsaturatedOxygen = 8,
+  kAmideCarbon = 9,
+  kAmideNitrogen = 10,
+  kHalogen = 11,
+  kNitro = 12,
+  kAliphaticRingCarbon = 13,
+  kAliphaticRingNitrogen = 14,
+  // Used to size the elemements array.
+  kSize = 15,
+};
+
+// An array of the environment elements, index by the Env enum.
+// set up in InitialiseEnvironmentElements
+static const Element* env_element[static_cast<int>(Env::kSize)];
+// We need to know which atomic numbers correspond to one of the elements
+// we have added.
+static int is_env_element[HIGHEST_ATOMIC_NUMBER + 1];
 
 static Molecule_Output_Object stream_for_fully_broken_parents;
 
@@ -601,6 +471,7 @@ reset_variables()
      reject_breakages_that_result_in_fragments_too_small = 0;
      write_smiles = 1;
      write_parent_smiles = 1;
+     output_is_proto = 0;
      vf_structures_per_page = 0;
      write_smiles_and_complementary_smiles = 0;
      allow_cc_bonds_to_break = 0;
@@ -619,6 +490,7 @@ reset_variables()
      read_bonds_to_be_broken_from_bbrk_file = 0;
 	 bbrk_file.resize(0);
 	 bbrk_tag.resize(0);
+     buffered_output = 1;
      check_for_lost_chirality = 0;
      return;
 }
@@ -1020,6 +892,9 @@ class Dicer_Arguments
     // not need the usual output.
     int _write_diced_molecules;
 
+    // Rather than a (ragged) tabular output, we can write a proto.
+    int _output_is_proto = 0;
+
 // private functions
 
     int _write_fragment_and_complement (Molecule & m, const IW_Bits_Base & b,
@@ -1038,7 +913,7 @@ class Dicer_Arguments
     int _is_smallest_fragment(const IW_Bits_Base & b) const;
     void _add_new_smiles_to_global_hashes (const IWString & smiles);
 
-    int WriteAsProto(Molecule& n, int breakable_bonds, DicerFragmentOutput& output) const;
+    int WriteAsProto(Molecule& n, int breakable_bonds, IWString_and_File_Descriptor& output) const;
 
   public:
     Dicer_Arguments (int mrd);            // arg is max recursion depth
@@ -1069,7 +944,7 @@ class Dicer_Arguments
              && _current_molecule->bond_between_atoms(a3, a4)->is_aromatic();
     }
 
-    int  lower_atom_count_cutoff () const
+    int lower_atom_count_cutoff () const
     {
       return _lower_atom_count_cutoff_current_molecule;
     }
@@ -1092,6 +967,9 @@ class Dicer_Arguments
 
     void set_write_diced_molecules(int s) {
       _write_diced_molecules = s;
+    }
+    void set_output_is_proto(int s) {
+      _output_is_proto = s;
     }
 
     int max_recursion_depth_this_molecule () const
@@ -1154,7 +1032,7 @@ class Dicer_Arguments
 
     int try_more_ring_splitting ();
 
-    int write_fragments_found_this_molecule(Molecule & m, int breakable_bonds, DicerFragmentOutput & output) const;
+    int write_fragments_found_this_molecule(Molecule & m, int breakable_bonds, IWString_and_File_Descriptor & output) const;
 
     int produce_fingerprint(Molecule & m, IWString_and_File_Descriptor & output) const;
 
@@ -1197,6 +1075,8 @@ Dicer_Arguments::Dicer_Arguments(int mrd)
   _atom_type = nullptr;
 
   _write_diced_molecules = 1;
+
+  _output_is_proto = 0;
 
   // Copy from file scope value.
   _max_non_ring_atoms = max_non_ring_atoms;
@@ -2539,13 +2419,13 @@ Dicer_Arguments::is_unique(Molecule & m)
 int
 Dicer_Arguments::write_fragments_found_this_molecule(Molecule & m,
                                           int breakable_bonds,
-                                          DicerFragmentOutput & output) const
+                                          IWString_and_File_Descriptor & output) const
 {
   if (! _write_diced_molecules) {
     return 1;
   }
 
-  if (output.output_is_proto()) {
+  if (_output_is_proto) {
     return WriteAsProto(m, breakable_bonds, output);
   }
 
@@ -2586,9 +2466,30 @@ Dicer_Arguments::write_fragments_found_this_molecule(Molecule & m,
 }
 
 int
+CountOriginalAtoms(const IWString& smiles) {
+  Molecule m;
+  if (! m.build_from_smiles(smiles)) {
+    return count_atoms_in_smiles(smiles);
+  }
+
+  int rc = 0;
+  for (const Atom* a : m) {
+    if (a->element()->organic()) {
+      continue;
+    }
+    int z = a->atomic_number();
+    if (is_env_element[z]) {
+      ++rc;
+    }
+  }
+
+  return m.natoms() - rc;
+}
+
+int
 Dicer_Arguments::WriteAsProto(Molecule& m,
                               int breakable_bonds,
-                              DicerFragmentOutput& output) const {
+                              IWString_and_File_Descriptor& output) const {
   dicer_data::DicedMolecule proto;
   proto.set_name(m.name().data(), m.name().length());
   const IWString& usmi = m.unique_smiles();
@@ -2601,12 +2502,27 @@ Dicer_Arguments::WriteAsProto(Molecule& m,
 
     dicer_data::DicerFragment* frag = proto.add_fragment();
     frag->set_smi(s->data(), s->length());
-    frag->set_nat(count_atoms_in_smiles(*s));
+    if (add_environment_atoms) {
+      frag->set_nat(CountOriginalAtoms(*s));
+    } else {
+      frag->set_nat(count_atoms_in_smiles(*s));
+    }
     frag->set_n(count);
     frag->set_id(fragment_number);
   }
 
-  return output.Write(proto);
+  static google::protobuf::TextFormat::Printer printer;  
+  printer.SetSingleLineMode(true);
+
+  std::string buffer;
+  if (! printer.PrintToString(proto, &buffer)) {
+    cerr << "WriteFragmentStatisticsAsProto:cannot write '" << proto.ShortDebugString() << "'\n";
+    return 0;
+  }
+  output << buffer;
+  output << '\n';
+
+  output.write_if_buffer_holds_more_than(4096);
 
   return 1;
 }
@@ -3634,32 +3550,6 @@ do_eliminate_fragment_subset_relations()
 }
 
 
-enum class Env {
-  kUndefined = 0,
-  kTerminal = 1,
-  kAromatic = 2,
-  kSaturatedCarbon = 3,
-  kSaturatedNitrogen = 4,
-  kSaturatedOxygen = 5,
-  kUnsaturatedCarbon = 6,
-  kUnsaturatedNitrogen = 7,
-  // This will likely never be used, since we usually
-  // do not break =O bonds.
-  kUnsaturatedOxygen = 8,
-  kAmideCarbon = 9,
-  kAmideNitrogen = 10,
-  kHalogen = 11,
-  kNitro = 12,
-  kAliphaticRingCarbon = 13,
-  kAliphaticRingNitrogen = 14,
-  // Used to size the elemements array.
-  kSize = 15,
-};
-
-// An array of the environment elements, index by the Env enum.
-// set up in InitialiseEnvironmentElements
-static const Element* env_element[static_cast<int>(Env::kSize)];
-
 static int
 do_apply_atomic_number_isotopic_labels(Molecule & m,
                                        const atom_number_t j1,
@@ -3670,23 +3560,27 @@ do_apply_atomic_number_isotopic_labels(Molecule & m,
   return m.set_isotope(j1, z2);
 }
 
-static void
+static int
 do_apply_isotopic_labels (Molecule & m,
                           const atom_number_t a1,
-                          const atom_number_t a2)
+                          const atom_number_t a2,
+                          isotope_t iso)
 {
-  if (increment_isotope_for_join_points)
-  {
-    m.set_isotope(a1, m.isotope(a1) + increment_isotope_for_join_points + isotope_for_join_points);
-    m.set_isotope(a2, m.isotope(a2) + increment_isotope_for_join_points + isotope_for_join_points);
-  }
-  else
-  {
-    m.set_isotope(a1, isotope_for_join_points);
-    m.set_isotope(a2, isotope_for_join_points);
-  }
+  m.set_isotope(a1, iso);
+  m.set_isotope(a2, iso);
 
-  return;
+  return 1;
+}
+
+static int
+do_increment_isotopic_labels(Molecule& m,
+                             atom_number_t a1,
+                             atom_number_t a2,
+                             int increment) {
+  m.set_isotope(a1, m.isotope(a1) + increment);
+  m.set_isotope(a2, m.isotope(a2) + increment);
+
+  return 1;
 }
 
 // Return a result if `zatom` is singly bonded to an
@@ -4038,6 +3932,8 @@ do_add_environment_atoms(Molecule & m,
 
   m.add(env_element[ndx]);
 
+  m.unset_all_implicit_hydrogen_information(j2);
+
   return m.add_bond(m.natoms() - 1, j2, SINGLE_BOND);
 }
 
@@ -4070,10 +3966,13 @@ set_isotopes_if_needed(Molecule & m,
                        const Dicer_Arguments & dicer_args)
 {
   if (isotope_for_join_points > 0) {
-    do_apply_isotopic_labels(m, j1, j2);
-
-    return 1;
+    return do_apply_isotopic_labels(m, j1, j2, isotope_for_join_points);
   }
+
+  if (increment_isotope_for_join_points > 0) {
+    return do_increment_isotopic_labels(m, j1, j2, increment_isotope_for_join_points);
+  }
+
 
   if (apply_environment_isotopic_labels) {
     do_apply_environment_isotopic_labels(m, j1, j2);
@@ -5802,8 +5701,9 @@ Ring_Bond_Breakage::_process(Molecule & m,
 
   Molecule mcopy(m);
 
-  if (this->_is_arom)           // I don't think we want to break aromatic bonds, not sure this ever happens, besides, the code is wrong, prev does not get updated
-  {
+  // I don't think we want to break aromatic bonds, not sure this ever happens,
+  // besides, the code is wrong, prev does not get updated
+  if (this->_is_arom) {
     prev = r[0];
     for (int i = 1; i < n; prev = r[i], i++)                // first de-aromatise
     {
@@ -5857,18 +5757,9 @@ Ring_Bond_Breakage::_process(Molecule & m,
 
   //cerr << "Residual ring contains " << r.number_elements() << " " << r << endl;
 
-  if (isotope_for_join_points > 0)
-  {
-    if (increment_isotope_for_join_points)              // not implemented here
-    {
-      mcopy.set_isotope(r[0], isotope_for_join_points);
-      mcopy.set_isotope(r.last_item(), isotope_for_join_points);
-    }
-    else
-    {
-      mcopy.set_isotope(r[0], isotope_for_join_points);
-      mcopy.set_isotope(r.last_item(), isotope_for_join_points);
-    }
+  // No other type of isotope or dummy atom implemented here. Why not?
+  if (isotope_for_join_points > 0) {
+    do_apply_isotopic_labels(mcopy, r[0], r.last_item(), isotope_for_join_points);
   }
 
   mcopy.remove_atoms(r);
@@ -5939,7 +5830,7 @@ Fused_Ring_Breakage::_process(Molecule & m,
 #endif
 
   if (isotope_for_join_points > 0)
-    do_apply_isotopic_labels(mcopy, a1, a2);
+    do_apply_isotopic_labels(mcopy, a1, a2, isotope_for_join_points);
 
   if (! this->aromatic_in_parent())          // no need to check anything
     ;
@@ -6666,6 +6557,7 @@ Breakages::discard_breakages_that_result_in_fragments_too_small(Molecule & m,
     }
   }
 
+  //cerr << "Returning rc = " << rc << endl;
   return rc;
 }
 
@@ -7060,7 +6952,7 @@ add_parent_atom_count_to_global_array(const IWString & mname,
 
 static int
 dicer(Molecule & m,
-      DicerFragmentOutput & output)
+      IWString_and_File_Descriptor & output)
 {
   static bool first_call = true;
   if (first_call) {
@@ -7120,6 +7012,10 @@ dicer(Molecule & m,
   else
     dicer_args.set_lower_atom_count_cutoff(lower_atom_count_cutoff);
 
+  if (output_is_proto) {
+    dicer_args.set_output_is_proto(output_is_proto);
+  }
+
   dicer_args.set_upper_atom_count_cutoff(std::min(upper_atom_count_cutoff,
                                                   int(max_atom_fraction*m.natoms())));
 
@@ -7155,7 +7051,7 @@ dicer(Molecule & m,
   if (0 == bonds_to_break_this_molecule)
   {
     if (fingerprint_tag.length())
-      dicer_args.produce_fingerprint(m, output.text_output());
+      dicer_args.produce_fingerprint(m, output);
 
     return 1;
   }
@@ -7201,7 +7097,7 @@ dicer(Molecule & m,
       dicer_args.write_fragments_found_this_molecule(m, -1, output);
     }
     if (fingerprint_tag.length()) {
-      dicer_args.produce_fingerprint(m, output.text_output());
+      dicer_args.produce_fingerprint(m, output);
     }
 
     return 1;
@@ -7227,10 +7123,10 @@ dicer(Molecule & m,
   }
 
   if (fingerprint_tag.length())
-    dicer_args.produce_fingerprint(m, output.text_output());
+    dicer_args.produce_fingerprint(m, output);
 
   if (write_smiles_and_complementary_smiles)
-    dicer_args.write_fragments_and_complements(m, output.text_output());
+    dicer_args.write_fragments_and_complements(m, output);
 
   if (verbose)
     fragments_produced[dicer_args.fragments_found()]++;
@@ -7240,7 +7136,7 @@ dicer(Molecule & m,
 
 static int
 dicer(data_source_and_type<Molecule> & input,
-      DicerFragmentOutput & output)
+      IWString_and_File_Descriptor & output)
 {
   Molecule * m;
   while (nullptr != (m = input.next_molecule()))
@@ -7259,22 +7155,24 @@ dicer(data_source_and_type<Molecule> & input,
     current_parent_molecule = *m;
 #endif
 
-    if (!dicer(*m, output)) {
-      cerr << "dicer:error processing " << m->name() << '\n';
+    if (!dicer(*m, output))
       return 0;
-    }
 
-    if (collect_time_statistics) {
+    if (collect_time_statistics)
+    {
       clock_t t = (clock() - t0) / 1000;
 
-      // have observed this going negative at times. Presumably something wrapping
-      if (t >= 0) {
+      if (t >= 0)                      // have observed this going negative at times. Presumably something wrapping
+      {
         cerr << m->name() << " took " << t << " ms\n";
         time_acc.extra(t);
       }
     }
 
-    output.MaybeFlush();
+    if (buffered_output)
+      output.write_if_buffer_holds_more_than(8192);
+    else
+      output.flush();
   }
 
   return 1;
@@ -7282,7 +7180,7 @@ dicer(data_source_and_type<Molecule> & input,
 
 static int
 dicer_tdt_filter_(const_IWSubstring buffer,    // local copy
-                  DicerFragmentOutput & output)
+  IWString_and_File_Descriptor & output)
 {
   assert (buffer.ends_with('>'));
 
@@ -7303,7 +7201,7 @@ dicer_tdt_filter_(const_IWSubstring buffer,    // local copy
 
 static int
 dicer_tdt_filter(iwstring_data_source & input,
-                 DicerFragmentOutput & output)
+  IWString_and_File_Descriptor & output)
 {
   const_IWSubstring buffer;
 
@@ -7324,8 +7222,8 @@ dicer_tdt_filter(iwstring_data_source & input,
 }
 
 static int
-dicer_tdt_filter(const char * fname,
-                DicerFragmentOutput & output)
+dicer_tdt_filter (const char * fname,
+  IWString_and_File_Descriptor & output)
 {
   iwstring_data_source input(fname);
 
@@ -7341,25 +7239,63 @@ dicer_tdt_filter(const char * fname,
 static int
 InitialiseEnvironmentElements() {
   env_element[0] = nullptr;
+  std::fill_n(is_env_element, HIGHEST_ATOMIC_NUMBER + 1, 0);
 
-  env_element[static_cast<int>(Env::kTerminal)] = get_element_from_symbol_no_case_conversion("Te");
-  env_element[static_cast<int>(Env::kAromatic)] = get_element_from_symbol_no_case_conversion("Ar");
-  env_element[static_cast<int>(Env::kSaturatedCarbon)] = get_element_from_symbol_no_case_conversion("Cs");
-  env_element[static_cast<int>(Env::kSaturatedNitrogen)] = get_element_from_symbol_no_case_conversion("Nh");
-  env_element[static_cast<int>(Env::kSaturatedOxygen)] = get_element_from_symbol_no_case_conversion("Os");
+  const Element* e = get_element_from_symbol_no_case_conversion("Te");
+  env_element[static_cast<int>(Env::kTerminal)] = e;
+  is_env_element[e->atomic_number()] = 1;
 
-  env_element[static_cast<int>(Env::kUnsaturatedCarbon)] = get_element_from_symbol_no_case_conversion("Cu");
-  env_element[static_cast<int>(Env::kUnsaturatedNitrogen)] = get_element_from_symbol_no_case_conversion("Ne");
-  env_element[static_cast<int>(Env::kUnsaturatedOxygen)] = get_element_from_symbol_no_case_conversion("Og");
+  e = get_element_from_symbol_no_case_conversion("Ar");
+  env_element[static_cast<int>(Env::kAromatic)] = e;
+  is_env_element[e->atomic_number()] = 1;
 
-  env_element[static_cast<int>(Env::kAmideCarbon)] = get_element_from_symbol_no_case_conversion("Ac");
-  env_element[static_cast<int>(Env::kAmideNitrogen)] = get_element_from_symbol_no_case_conversion("Am");
+  e = get_element_from_symbol_no_case_conversion("Cs");
+  env_element[static_cast<int>(Env::kSaturatedCarbon)] = e;
+  is_env_element[e->atomic_number()] = 1;
 
-  env_element[static_cast<int>(Env::kHalogen)] = get_element_from_symbol_no_case_conversion("Hg");
-  env_element[static_cast<int>(Env::kNitro)] = get_element_from_symbol_no_case_conversion("No");
+  e = get_element_from_symbol_no_case_conversion("Nh");
+  env_element[static_cast<int>(Env::kSaturatedNitrogen)] = e;
+  is_env_element[e->atomic_number()] = 1;
 
-  env_element[static_cast<int>(Env::kAliphaticRingCarbon)] = get_element_from_symbol_no_case_conversion("Rb");
-  env_element[static_cast<int>(Env::kAliphaticRingNitrogen)] = get_element_from_symbol_no_case_conversion("Rn");
+  e = get_element_from_symbol_no_case_conversion("Os");
+  env_element[static_cast<int>(Env::kSaturatedOxygen)] = e;
+  is_env_element[e->atomic_number()] = 1;
+
+  e = get_element_from_symbol_no_case_conversion("Cu");
+  env_element[static_cast<int>(Env::kUnsaturatedCarbon)] = e;
+  is_env_element[e->atomic_number()] = 1;
+
+  e = get_element_from_symbol_no_case_conversion("Ne");
+  env_element[static_cast<int>(Env::kUnsaturatedNitrogen)] = e;
+  is_env_element[e->atomic_number()] = 1;
+
+  e = get_element_from_symbol_no_case_conversion("Og");
+  env_element[static_cast<int>(Env::kUnsaturatedOxygen)] = e;
+  is_env_element[e->atomic_number()] = 1;
+
+  e = get_element_from_symbol_no_case_conversion("Ac");
+  env_element[static_cast<int>(Env::kAmideCarbon)] = e;
+  is_env_element[e->atomic_number()] = 1;
+
+  e = get_element_from_symbol_no_case_conversion("Am");
+  env_element[static_cast<int>(Env::kAmideNitrogen)] = e;
+  is_env_element[e->atomic_number()] = 1;
+
+  e = get_element_from_symbol_no_case_conversion("Hg");
+  env_element[static_cast<int>(Env::kHalogen)] = e;
+  is_env_element[e->atomic_number()] = 1;
+
+  e = get_element_from_symbol_no_case_conversion("No");
+  env_element[static_cast<int>(Env::kNitro)] = e;
+  is_env_element[e->atomic_number()] = 1;
+
+  e = get_element_from_symbol_no_case_conversion("Rb");
+  env_element[static_cast<int>(Env::kAliphaticRingCarbon)] = e;
+  is_env_element[e->atomic_number()] = 1;
+  
+  e = get_element_from_symbol_no_case_conversion("Rn");
+  env_element[static_cast<int>(Env::kAliphaticRingNitrogen)] = e;
+  is_env_element[e->atomic_number()] = 1;
 
   return 1;
 }
@@ -7374,7 +7310,6 @@ display_misc_B_options (std::ostream & os)
   os << " -B xsub           do not report fragments that are exact subsets of others\n";
   os << " -B nosmi          suppress output of fragment smiles\n";
   os << " -B noparent       suppress output of parent smiles\n";
-  os << " -B proto          main output is a dicer_data.DicedMolecule proto\n";
   os << " -B time           run timing\n";
   os << " -B addq           run the -q queries in addition to the default rules\n";
   os << " -B WB=fname       write smiles of just broken molecules to <fname>\n";
@@ -7424,17 +7359,19 @@ display_dash_K_options(char flag, std::ostream & os)
 
 static int
 dicer(const char * fname, FileType input_type,
-      DicerFragmentOutput& output)
+      IWString_and_File_Descriptor & output)
 {
   assert (nullptr != fname);
 
-  if (FILE_TYPE_INVALID == input_type) {
+  if (FILE_TYPE_INVALID == input_type)
+  {
     input_type = discern_file_type_from_name(fname);
     assert (FILE_TYPE_INVALID != input_type);
   }
 
   data_source_and_type<Molecule> input(input_type, fname);
-  if (!input.good()) {
+  if (!input.good())
+  {
     cerr << prog_name << ": cannot open '" << fname << "'\n";
     return 0;
   }
@@ -7652,10 +7589,6 @@ dicer (int argc, char ** argv)
 
     if (add_environment_atoms)
       InitialiseEnvironmentElements();
-    if (increment_isotope_for_join_points && 0 == isotope_for_join_points) {
-      cerr << "Increment specified for existing isotopes, but no isotope for join points\n";
-      display_dash_i_options(cerr);
-    }
   }
 
   if (cl.option_present('r'))
@@ -7740,11 +7673,6 @@ dicer (int argc, char ** argv)
   IWString name_for_fragment_statistics_file;
 
   Fragment_Statistics_Report_Support_Specification fsrss;
-
-  DicerFragmentOutput output;
-
-  // We can write the fragments generated as binary protos.
-  int write_fragments_as_binary_protos = 0;
 
   // Too hard to check support levels since some may be numeric, some may be percentages....
 
@@ -8045,7 +7973,7 @@ dicer (int argc, char ** argv)
       }
       else if ("flush" == b)
       {
-        output.set_buffered_output(0);
+        buffered_output = 0;
         if (verbose)
           cerr << "Output flushed after each molecule\n";
       }
@@ -8062,19 +7990,11 @@ dicer (int argc, char ** argv)
         }
       }
       else if (b == "proto") {
+        output_is_proto = 1;
         write_parent_smiles = 0;
         if (verbose) {
           cerr << "Output is dicer_data::DicedMolecule textproto\n";
         }
-        output.set_output_is_proto(1);
-      }
-      else if (b == "serialized_proto") {
-        write_fragments_as_binary_protos = 1;
-        write_parent_smiles = 0;
-        if (verbose) {
-          cerr << "Will write fragments as serialised dicer_data::DicedMolecule protos\n";
-        }
-        output.set_output_is_proto(1);
       }
       else if("help" == b)
       {
@@ -8121,11 +8041,6 @@ dicer (int argc, char ** argv)
     }
 
     all_fragments.UseDefaultFeaturesUnlessSpecified();
-  }
-
-  if (write_fragments_as_binary_protos && ! cl.option_present('S')) {
-    cerr << "When writing serialized protos, must specify output file via the -S option\n";
-    return 1;
   }
 
   if (cl.option_present('P'))
@@ -8299,11 +8214,14 @@ dicer (int argc, char ** argv)
     return 3;
   }
 
-  if (write_smiles) {
-  } else if (fingerprint_tag.length()) {
-  } else if (write_smiles_and_complementary_smiles) {
-  } else if (! name_for_fragment_statistics_file.empty()) {
-  } else {
+  if (write_smiles)
+    ;
+  else if (fingerprint_tag.length())
+    ;
+  else if (write_smiles_and_complementary_smiles)
+    ;
+  else
+  {
     cerr << "NO output specified\n";
     usage(4);
   }
@@ -8444,37 +8362,44 @@ dicer (int argc, char ** argv)
 
   IW_Time tstart;
 
-  if (write_fragments_as_binary_protos) {
-    IWString fname = cl.option_value('S');
-    if (! output.SetTFDataFname(fname)) {
-      cerr << "Cannot open stream for serialized protos '" << fname << "'\n";
-      return 1;
-    }
-  } else if (cl.option_present('S')) {
-    IWString fname = cl.option_value('S');
+  IWString_and_File_Descriptor * output;
+  if (cl.option_present('S'))
+  {
+    output = new IWString_and_File_Descriptor;
+    const char * s = cl.option_value('S');
 
-    if (! output.SetOutputStream(fname)) {
-      cerr << "Cannot open output file '" << fname << "'\n";
+    if (! output->open(s))
+    {
+      cerr << "Cannot open output file '" << s << "'\n";
       return 1;
     }
-  } else {
-    output.SetUseStdout();
+  }
+  else
+  {
+    output = new IWString_and_File_Descriptor(1);
   }
 
-  for (const char * fname: cl) {
-    int rc;
+  std::unique_ptr<IWString_and_File_Descriptor> free_output(output);
+
+  int rc = 0;
+  for (int i = 0; i < cl.number_elements(); i++)
+  {
     if (function_as_filter)
-      rc = dicer_tdt_filter(fname, output);
+      rc = dicer_tdt_filter(cl[i], *output);
     else
-      rc = dicer(fname, input_type, output);
+      rc = dicer(cl[i], input_type, *output);
 
-    if (0 == rc) {
-      cerr << "Error processing '" << fname << "'\n";
-      return 1;
+    if (0 == rc)
+    {
+      rc = i + 1;
+      break;
     }
+    else
+      rc = 0;
   }
 
-  output.flush();
+  if (output->size())
+    output->flush();
 
   if (eliminate_fragment_subset_relations)
     do_eliminate_fragment_subset_relations();
@@ -8533,7 +8458,7 @@ dicer (int argc, char ** argv)
     }
   }
 
-  return 0;
+  return rc;
 }
 
 #ifndef _WIN32_

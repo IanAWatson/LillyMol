@@ -3,6 +3,8 @@ push!(LOAD_PATH, @__DIR__)
 using LillyMol
 
 function boobar()
+  m = Molecule()
+
   println("boobar done")
   true
 end
@@ -2511,6 +2513,8 @@ end
 function test_read_smiles_with_errors_fail()::Bool
   m = Molecule()
 
+  set_display_smiles_interpretation_error_messages(false)
+
   smiles = "C methane\nCC ethane\nCCCQ propane\nC1CC1 cyclopropane\nCCCC butane\nc1ccccc1 benzene\n"
 
   fname = write_smiles_tempfile("abc", smiles)
@@ -2527,11 +2531,16 @@ function test_read_smiles_with_errors_fail()::Bool
   end
   my_count == molecules_read(reader) || return is_failure("Incorrect count", m)
   molecules_read(reader) == 2 || return is_failure("Wrong molecule count", m)
+
+  set_display_smiles_interpretation_error_messages(true)
+
   true
 end
 
 function test_read_smiles_with_errors_skip()::Bool
   m = Molecule()
+
+  set_display_smiles_interpretation_error_messages(false)
 
   smiles = "C methane\nCC ethane\nCCCQ propane\nC1CC1 cyclopropane\nCCCC butane\nc1ccccc1 benzene\n"
 
@@ -2542,7 +2551,7 @@ function test_read_smiles_with_errors_skip()::Bool
   reader = LillyMol.MoleculeReader(SMI, fname)
 
   molecules_remaining(reader) == nsmiles || return is_failure("Wrong count remaining", m)
-  reader.set_connection_table_errors_allowed()
+  set_connection_table_errors_allowed(reader)
 
   my_count = 0
   while next_molecule(reader, m)
@@ -2551,6 +2560,9 @@ function test_read_smiles_with_errors_skip()::Bool
   my_count == molecules_read(reader) || return is_failure("Incorrect count", m)
   molecules_read(reader) == (nsmiles - 1) || return is_failure("Wrong molecule count", m)
   connection_table_errors_encountered(reader) == 1 || return is_failure("Wrong error count", m)
+
+  set_display_smiles_interpretation_error_messages(true)
+
   true
 end
 
@@ -2912,6 +2924,7 @@ boobar()
 
 @test test_read_smiles()
 @test test_read_smiles_with_errors_fail()
+@test test_read_smiles_with_errors_skip()
 
 # Substructure related
 @test test_query_from_smarts_ok()

@@ -108,6 +108,7 @@ module LillyMol
   export atomic_number
   export a1, a2
   export sort_atoms!
+  export set_display_smiles_interpretation_error_messages
   show(io::IO, s::SetOfAtoms) = print(io, set_of_atoms_show_text(s))
   # For some reason this does not work, but works for set_of_atoms.
   show(io::IO, r::Ring) = print(io, ring_show_text(r))

@@ -1782,6 +1782,13 @@ JLCXX_MODULE define_julia_module(jlcxx::Module& mod)
   mod.method("set_atomic_symbols_can_have_arbitrary_length", &set_atomic_symbols_can_have_arbitrary_length);
   mod.method("set_include_atom_map_with_smiles", &set_include_atom_map_with_smiles);
   mod.method("set_copy_name_in_molecule_copy_constructor", &set_copy_name_in_molecule_copy_constructor);
+  mod.method("set_display_smiles_interpretation_error_messages", 
+    [](int s) {
+      set_display_smiles_interpretation_error_messages(s);
+    },
+    "Suppress display of smiles parsing errors"
+  );
+
   mod.method("returns_vector",
     [](int i, int j)->std::vector<int64_t>{
       std::vector<int64_t> result;

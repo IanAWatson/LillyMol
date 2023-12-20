@@ -3624,11 +3624,14 @@ FileconvConfig::ParseOrganicSpecification(Command_Line& cl, char flag) {
       ok_non_organics.add(e);
 
       const Element* ele = e->element();
-      if (nullptr != ele)
+      if (nullptr != ele) {
         allowed_elements.set_allow(ele->atomic_number(), 1);
+        const_cast<Element*>(ele)->set_organic(1);
+      }
 
-      if (verbose)
+      if (verbose) {
         cerr << "ok_non_organics added '" << o << "'\n";
+      }
 
       output_organic_only = 1;
     }

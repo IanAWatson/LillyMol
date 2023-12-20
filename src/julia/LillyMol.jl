@@ -29,7 +29,7 @@ module LillyMol
   # getindex(a::Atom, b::Int)=atom.item(b)
   iterate(m::Molecule, state=0) = (state >= natoms(m) ? nothing : (m[state], state + 1))
   iterate(a::Atom, state=0) = (state >= ncon(a) ? nothing : (a[state], state + 1))
-  iterate(b::Bond, state=1) = (state == 1 ? (b.a1(), 2) : state == 2 ? (b.a2(), 2) : nothing)
+  iterate(b::Bond, state=1) = (state == 1 ? (a1(b), 2) : state == 2 ? (a2(b), 2) : nothing)
   iterate(b::BondList, state=0) = (state >= bonds_in_set(b) ? nothing : (b[state], state + 1))
   iterate(r::Ring, state=0) = (state >= length(r) ? nothing : (r[state], state + 1))
   iterate(s::SetOfAtoms, state=0) = (state >= length(s) ? nothing : (s[state], state + 1))
@@ -135,5 +135,14 @@ module LillyMol
 
   export build_from_smarts, build_from_smiles, build_from_molecule, read_proto
   export matches, substructure_search
+  export set_find_one_embedding_per_atom!, set_find_unique_embeddings_only!, set_min_matches_to_find!, set_max_matches_to_find!
+  export set_perceive_symmetry_equivalent_matches!, set_save_matched_atoms!, max_query_atoms_matched_in_search
+  export set_embeddings_can_overlap!
+  export number_embeddings, embeddings
+  iterate(r::SetOfEmbeddings, state=0) = (state >= length(r) ? nothing : (r[state], state + 1))
+  show(io::IO, s::SetOfEmbeddings) = print(io, set_of_embeddings_show_text(s))
+  export each_embedding_set_vector
 
+  in(q::SubstructureQuery, m::Molecule) = Bool(matches(q, m))
 end
+

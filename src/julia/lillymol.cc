@@ -957,6 +957,11 @@ JLCXX_MODULE define_julia_module(jlcxx::Module& mod)
         return m.set_isotope(s, iso);
       }
     )
+    .method("set_isotopes!",
+      [](Molecule& m, const Set_of_Atoms* s, isotope_t iso) {
+        return m.set_isotope(*s, iso);
+      }
+    )
     .method("number_isotopic_atoms",
       [](const Molecule& m) {
         return m.number_isotopic_atoms();
@@ -1832,7 +1837,22 @@ JLCXX_MODULE define_julia_module(jlcxx::Module& mod)
         return r.size();
       }
     )
+    .method("set_of_embeddings_show_text",
+      [](const SetOfEmbeddings& soe)->std::string {
+        IWString result;
+        result << "SetOfEmbeddings with " << soe.size() << " embeddings";
+        return result.AsString();
+      }
+    )
   ;
+
+  mod.set_override_module(jl_base_module);
+  mod.method("getindex",
+    [](const SetOfEmbeddings& s, int i)->const Set_of_Atoms*{
+      return s[i];
+    }
+  );
+  mod.unset_override_module();
 
   //jlcxx::stl::apply_stl<Molecule*>(mod);
   mod.add_type<Molecule_to_Query_Specifications>("MoleculeToQuerySpecifications")
@@ -1848,6 +1868,18 @@ JLCXX_MODULE define_julia_module(jlcxx::Module& mod)
       },
       "Iterable collection of the embeddings found during substructure search"
     )
+    .method("each_embedding_set_vector",
+      [](const Substructure_Results& sresults, int n, int value)->jlcxx::ArrayRef<int> {
+        std::unique_ptr<int[]>tmp = std::make_unique<int[]>(n);
+        std::fill_n(tmp.get(), n, 0);
+        sresults.each_embedding_set_vector(tmp.get(), value);
+
+        jlcxx::ArrayRef<int> result(true, tmp.get(), n);
+        tmp.release();
+        return result;
+      },
+      "Generate array with all matched atoms set to a fixed value"
+    )
   ;
 
   mod.add_type<Molecule_to_Match>("MoleculeToMatch")
@@ -1862,15 +1894,15 @@ JLCXX_MODULE define_julia_module(jlcxx::Module& mod)
       },
       "Name of query"
     )
-    .method("set_only_keep_matches_in_largest_fragment",
+    .method("set_only_keep_matches_in_largest_fragment!",
       [](Substructure_Query& q, bool s) {
         q.set_only_keep_matches_in_largest_fragment(s);
       },
       "Only retain matched found in the largest frgament"
     )
-    .method("set_embeddings_do_not_overlap",
+    .method("set_embeddings_can_overlap!",
       [](Substructure_Query& q, bool s) {
-        q.set_embeddings_do_not_overlap(s);
+        q.set_embeddings_do_not_overlap(!s);
       },
       "By default, embeddings can overlap"
     )
@@ -1903,17 +1935,17 @@ JLCXX_MODULE define_julia_module(jlcxx::Module& mod)
       "Write as textproto form"
     )
 
-    .method("set_find_one_embedding_per_atom", &Substructure_Query::set_find_one_embedding_per_atom)
-    .method("set_find_unique_embeddings_only", &Substructure_Query::set_find_unique_embeddings_only)
-    .method("set_min_matches_to_find", &Substructure_Query::set_min_matches_to_find)
-    .method("set_max_matches_to_find", &Substructure_Query::set_max_matches_to_find)
-    .method("set_perceive_symmetry_equivalent_matches",
+    .method("set_find_one_embedding_per_atom!", &Substructure_Query::set_find_one_embedding_per_atom)
+    .method("set_find_unique_embeddings_only!", &Substructure_Query::set_find_unique_embeddings_only)
+    .method("set_min_matches_to_find!", &Substructure_Query::set_min_matches_to_find)
+    .method("set_max_matches_to_find!", &Substructure_Query::set_max_matches_to_find)
+    .method("set_perceive_symmetry_equivalent_matches!",
       [](Substructure_Query& q, bool s)->void {
         q.set_perceive_symmetry_equivalent_matches(s);
       },
       "Symmetry related matches are found by default"
     )
-    .method("set_save_matched_atoms",
+    .method("set_save_matched_atoms!",
       [](Substructure_Query& q, bool s)->void {
         q.set_save_matched_atoms(s);
       },

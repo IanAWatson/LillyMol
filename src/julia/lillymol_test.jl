@@ -3,9 +3,6 @@ push!(LOAD_PATH, @__DIR__)
 using LillyMol
 
 function boobar()
-  q = SubstructureQuery()
-  build_from_smarts(q, "CC") || return is_failure("Bad smarts")
-  true
   println("boobar done")
   true
 end
@@ -2584,8 +2581,136 @@ query {
   build_from_smiles(m, "Fc1cc(F)ccc1") || return is_failure("Bad smiles")
   matches(q, m) || return is_failure("query does not match")
   substructure_search(q, m) == 2 || return is_failure("Wrong match count", m)
+
+  set_find_unique_embeddings_only!(q, true)
+  substructure_search(q, m) == 2 || return is_failure("Wrong unique match count", m)
+
+  set_perceive_symmetry_equivalent_matches!(q, false)
+  substructure_search(q, m) == 1 || return is_failure("Wrong symmetric match count", m)
   true
 end
+  
+function test_carbon_self_search()::Bool
+  m = Molecule()
+  build_from_smiles(m, "C methane") || return is_failure("bad smiles")
+  q = SubstructureQuery()
+  build_from_smarts(q, "C") || return is_failure("Cannot parse C smarts")
+  substructure_search(q, m) == 1 || return is_failure("Not 1 match to C", m)
+  q in m || return is_failure("C not in C", m)
+  true
+end
+
+function test_ethane_c()::Bool
+  m = Molecule()
+  build_from_smiles(m, "CC ethane") || return is_failure("Bad smiles")
+  q = SubstructureQuery()
+  build_from_smarts(q, "C") || return is_failure("Bad smarts")
+  substructure_search(q, m) == 2 || return is_failure("Not 2 matched", m)
+  set_perceive_symmetry_equivalent_matches!(q, false)
+  substructure_search(q, m) == 1 || return is_failure("Symmetry", m)
+  true
+end
+  
+function test_ethane_cc_embeddings_do_not_overlap()::Bool
+  m = Molecule()
+  build_from_smiles(m, "CC ethane") || return is_failure("Bad smiles")
+  q = SubstructureQuery()
+  build_from_smarts(q, "CC") || return is_failure("Bad smarts")
+  substructure_search(q, m) == 2 || return is_failure("Not to C in CC", m)
+  set_embeddings_can_overlap!(q, false)
+  substructure_search(q, m) == 1 || return is_failure("Overlap", m)
+  true
+end
+  
+function test_ethane_cc_find_unique_embeddings_only()::Bool
+  m = Molecule()
+  build_from_smiles(m, "CC ethane") || return is_failure("Bad smiles")
+  q = SubstructureQuery()
+  build_from_smarts(q, "CC") || return is_failure("Bad smarts")
+  substructure_search(q, m) == 2 || return is_failure("Not 2 matches", m)
+  set_find_unique_embeddings_only!(q, true)
+  substructure_search(q, m) == 1 || return is_failure("Bad count unique", m)
+  true
+end
+
+  
+function test_ethane_cc_find_one_embedding_per_atom()::Bool
+  m = Molecule()
+  build_from_smiles(m, "CC ethane") || return is_failure("bad smiles")
+  q = SubstructureQuery()
+  build_from_smarts(q, "CC") || return is_failure("Bad smarts")
+  substructure_search(q, m) == 2 || return is_failure("Not 2 matches", m)
+  set_find_one_embedding_per_atom!(q, true)
+  substructure_search(q, m) == 2 || return is_failure("not 2 after", m)
+  true
+end
+
+  
+
+function test_results_returned()::Bool
+  m = Molecule()
+  build_from_smiles(m, "CC ethane") || return is_failure("Bad smiles")
+  q = SubstructureQuery()
+  build_from_smarts(q, "CC") || return is_failure("Bad smarts")
+  sresults = SubstructureResults()
+  substructure_search(q, m, sresults) == 2 || return is_failure("Not 2 matches", m)
+
+  number_embeddings(sresults) == 2 || return is_failure("Not 2 embeddings", m)
+  # Count the number of times each atoms is matched.
+  matched = [0, 0]
+
+  for embedding in embeddings(sresults)
+    length(embedding) == 2 || return is_failure("Embedding not 2 atoms", m)
+    for a in embedding
+      matched[a + 1] += 1
+    end
+  end
+  matched == [2, 2] || return is_failure("Not t matches each", m)
+  true
+end
+
+function test_sresults_set_vector_all()::Bool
+  m = Molecule()
+  build_from_smiles(m, "Oc1c(O)c(O)c(O)c(O)c1O") || return is_failure("Bad smiles")
+  q = SubstructureQuery()
+  build_from_smarts(q, "Oc") || return is_failure("Bad smarts")
+  sresults = SubstructureResults()
+  substructure_search(q, m, sresults) == 6 || return is_failure("Not 6 matches", m)
+  v = each_embedding_set_vector(sresults, natoms(m), 2)
+  v == [2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2] || return is_failure("Vector not match", m)
+
+  true
+end
+
+function test_sresults_set_vector_partial()::Bool
+  m = Molecule()
+  build_from_smiles(m, "CNC") || return is_failure("Bad smiles")
+  q = SubstructureQuery()
+  build_from_smarts(q, "N") || return is_failure("Bad smarts")
+  sresults = SubstructureResults()
+  substructure_search(q, m, sresults) == 1 || return is_failure("Not 1 matches", m)
+  v = each_embedding_set_vector(sresults, natoms(m), 3)
+  v == [0, 3, 0] || return is_failure("Vector not match", m)
+
+  true
+end
+  
+
+function test_matched_atoms_returned()::Bool
+  m = Molecule()
+  build_from_smiles(m, "Oc1ccccc1") || return is_failure("Bad smiles")
+  q = SubstructureQuery()
+  build_from_smarts(q, "Occ") || return is_failure("Bad smarts")
+  sresults = SubstructureResults()
+  substructure_search(q, m, sresults)
+  for embedding in embeddings(sresults)
+    set_isotopes!(m, embedding, 1)
+  end
+  aromatic_smiles(m) == "[1OH][1c]1[1cH]ccc[1cH]1" || return is_failure("Not isotopically labelled", m)
+  true
+end
+
+
 
 boobar()
 @test test_empty_molecule()
@@ -2775,3 +2900,14 @@ boobar()
 # Substructure related
 @test test_query_from_smarts_ok()
 @test test_query_from_smarts_bad()
+@test test_query_from_textproto()
+@test test_carbon_self_search()
+@test test_ethane_c()
+@test test_ethane_cc_embeddings_do_not_overlap()
+@test test_ethane_cc_find_unique_embeddings_only()
+@test test_ethane_cc_find_one_embedding_per_atom()
+@test test_results_returned()
+@test test_sresults_set_vector_all()
+@test test_sresults_set_vector_partial()
+@test test_matched_atoms_returned()
+

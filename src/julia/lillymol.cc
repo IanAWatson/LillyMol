@@ -10,11 +10,16 @@
 #include "Molecule_Lib/chiral_centre.h"
 #include "Molecule_Lib/istream_and_type.h"
 #include "Molecule_Lib/molecule.h"
+#include "Molecule_Lib/molecule_to_query.h"
 #include "Molecule_Lib/path.h"
 #include "Molecule_Lib/smiles.h"
 #include "Molecule_Lib/standardise.h"
+#include "Molecule_Lib/substructure.h"
+#include "Molecule_Lib/target.h"
 
 #include "Molecule_Tools/xlogp.h"
+
+#include "julia/resizable_array_holder.h"
 
 namespace lillymol_julia {
 
@@ -82,32 +87,6 @@ BtypeEnumToBtype(const BondType btenum) {
       return NOT_A_BOND;
   }
 }
-
-// Several times we need to use a resizable_array_p of something
-
-template <typename T>
-class ResizableArrayHolder {
-  protected:
-    const resizable_array_p<T>& _ref;
-
-  public:
-    ResizableArrayHolder(const resizable_array_p<T>& rhs) : _ref(rhs) {
-    }
-
-    uint32_t length() const {
-      return _ref.size();
-    }
-    const T& operator[](int ndx) const {
-      return *_ref[ndx];
-    }
-    const T& item(int ndx) const {
-      return *_ref[ndx];
-    }
-
-    uint32_t size() const {
-      return _ref.size();
-    }
-};
 
 class SetOfRings : public ResizableArrayHolder<Ring> {
   private:
@@ -301,10 +280,14 @@ JLCXX_MODULE define_julia_module(jlcxx::Module& mod)
         return new Set_of_Atoms(tmp);
       }
     )
-    .method("contains", &Set_of_Atoms::contains)
     .method("push!",
       [](Set_of_Atoms& s, atom_number_t zextra) {
         s << zextra;
+      }
+    )
+    .method("contains",
+      [](const Set_of_Atoms& s, atom_number_t a)->bool{
+        return s.contains(a);
       }
     )
   ;
@@ -408,11 +391,6 @@ JLCXX_MODULE define_julia_module(jlcxx::Module& mod)
         return r->largest_number_of_bonds_shared_with_another_ring();
       }
     )
-    .method("contains",
-      [](const Set_of_Atoms& s, atom_number_t a)->bool{
-        return s.contains(a);
-      }
-    )
     .method("ring_show_text",
       [](const Ring* r)->std::string{
         IWString result = AtomsAsString(*r, "Ring");
@@ -446,12 +424,14 @@ JLCXX_MODULE define_julia_module(jlcxx::Module& mod)
       return a[i];
     }
   );
+#ifdef RAISES_DUPLICATE_REGISTRATION
   mod.method("getindex",
     [](const jlcxx::BoxedValue<Ring>& boxed_ring, int ndx)->atom_number_t{
       const Ring& r = jlcxx::unbox<Ring&>(boxed_ring);
       return r[ndx];
     }
   );
+#endif
 #ifdef RING_LENGTH
   mod.method("length",
     [](const Ring& r){
@@ -546,6 +526,13 @@ JLCXX_MODULE define_julia_module(jlcxx::Module& mod)
 
   mod.add_type<Chemical_Standardisation>("ChemicalStandardisation")
     .method("activate_all", &Chemical_Standardisation::activate_all)
+    .method("activate",
+      [](Chemical_Standardisation& standardise, const std::string& directive, bool verbose)->bool {
+        IWString tmp(directive);
+        return standardise.Activate(tmp, verbose);
+      },
+      "Activate specific transformation(s)"
+    )
     .method("process", 
       [](Chemical_Standardisation& s, jlcxx::BoxedValue<Molecule>& boxed_mol)->int {
         Molecule& m = jlcxx::unbox<Molecule&>(boxed_mol);
@@ -807,12 +794,14 @@ JLCXX_MODULE define_julia_module(jlcxx::Module& mod)
       return blist[i];
     }
   );
+#ifdef DOES_NOT_SEEM_NECESSARY
   mod.method("getindex",
     [](Bond_list& blist, int i)->const Bond*{
       //std::cerr << "Bond_list::getindex length " << blist.size() << " ndx " << i << '\n';
       return blist[i];
     }
   );
+#endif
   mod.unset_override_module();
 
   // Not sure why this was necessary, but for some reason the returned BondList object
@@ -1829,7 +1818,157 @@ JLCXX_MODULE define_julia_module(jlcxx::Module& mod)
     }
   );
 
+
+  // Substructre Related
+  mod.add_type<SetOfEmbeddings>("SetOfEmbeddings")
+    .constructor<>()
+    .method("size",
+      [](const SetOfEmbeddings& r) {
+        return r.size();
+      }
+    )
+    .method("items_in_set",
+      [](const SetOfEmbeddings&r) {
+        return r.size();
+      }
+    )
+  ;
+
   //jlcxx::stl::apply_stl<Molecule*>(mod);
+  mod.add_type<Molecule_to_Query_Specifications>("MoleculeToQuerySpecifications")
+    .constructor<>()
+  ;
+
+  mod.add_type<Substructure_Results>("SubstructureResults")
+    .constructor<>()
+    .method("number_embeddings", &Substructure_Results::number_embeddings)
+    .method("embeddings",
+      [](const Substructure_Results& sresults)->const SetOfEmbeddings& {
+        return sresults.embeddings();
+      },
+      "Iterable collection of the embeddings found during substructure search"
+    )
+  ;
+
+  mod.add_type<Molecule_to_Match>("MoleculeToMatch")
+    .constructor<Molecule*>()
+  ;
+
+  mod.add_type<Substructure_Query>("SubstructureQuery")
+    .constructor<>() 
+    .method("name",
+      [](const Substructure_Query& q)->std::string {
+        return q.comment().AsString();
+      },
+      "Name of query"
+    )
+    .method("set_only_keep_matches_in_largest_fragment",
+      [](Substructure_Query& q, bool s) {
+        q.set_only_keep_matches_in_largest_fragment(s);
+      },
+      "Only retain matched found in the largest frgament"
+    )
+    .method("set_embeddings_do_not_overlap",
+      [](Substructure_Query& q, bool s) {
+        q.set_embeddings_do_not_overlap(s);
+      },
+      "By default, embeddings can overlap"
+    )
+    .method("read_msi",
+      [](Substructure_Query& q, const std::string& fname)->bool {
+        IWString tmp(fname);
+        return q.read(tmp);
+      },
+      "Read query in MSI format"
+    )
+    .method("read_proto",
+      [](Substructure_Query& q, const std::string& fname)->bool {
+        IWString tmp(fname);
+        return q.ReadProto(tmp);
+      },
+      "Read query from textproto file"
+    )
+    .method("write_msi",
+      [](Substructure_Query& q, const std::string& fname)->bool {
+        IWString tmp(fname);
+        return q.write_msi(tmp);
+      },
+      "Write as MSI form"
+    )
+    .method("write_proto",
+      [](Substructure_Query& q, const std::string& fname)->bool {
+        IWString tmp(fname);
+        return q.WriteProto(tmp);
+      },
+      "Write as textproto form"
+    )
+
+    .method("set_find_one_embedding_per_atom", &Substructure_Query::set_find_one_embedding_per_atom)
+    .method("set_find_unique_embeddings_only", &Substructure_Query::set_find_unique_embeddings_only)
+    .method("set_min_matches_to_find", &Substructure_Query::set_min_matches_to_find)
+    .method("set_max_matches_to_find", &Substructure_Query::set_max_matches_to_find)
+    .method("set_perceive_symmetry_equivalent_matches",
+      [](Substructure_Query& q, bool s)->void {
+        q.set_perceive_symmetry_equivalent_matches(s);
+      },
+      "Symmetry related matches are found by default"
+    )
+    .method("set_save_matched_atoms",
+      [](Substructure_Query& q, bool s)->void {
+        q.set_save_matched_atoms(s);
+      },
+      "Searches can be faster if matched atoms are not saved, but this inhibits other functionality"
+    )
+    .method("max_query_atoms_matched_in_search", &Substructure_Query::max_query_atoms_matched_in_search)
+
+    .method("matches",
+      [](Substructure_Query& q, Molecule& m)->bool {
+        return q.substructure_search(&m) > 0;
+      },
+      "True if the query matches `m`"
+    )
+    .method("substructure_search",
+      [](Substructure_Query& q, Molecule& m)->uint32_t {
+        return q.substructure_search(&m);
+      },
+      "The number of matches to `q` in `m`"
+    )
+    .method("substructure_search",
+      [](Substructure_Query& q, Molecule& m, Substructure_Results& sresults) {
+        return q.substructure_search(m, sresults);
+      },
+      "Perform substructure search, embeddings in `sresults`"
+    )
+    .method("substructure_search",
+      [](Substructure_Query& q, Molecule_to_Match& target, Substructure_Results& sresults) {
+        return q.substructure_search(target, sresults);
+      },
+      "Perform substructure search, embeddings in `sresults`"
+    )
+
+    .method("build_from_smiles",
+      [](Substructure_Query& q, const std::string& smiles)->bool{
+        IWString tmp(smiles);
+        return q.create_from_smiles(tmp);
+      },
+      "interpret `smiles` as smarts - mostly works but there are gotcha's"
+    )
+    .method("build_from_smarts",
+      [](Substructure_Query& q, const std::string& smarts)->bool{
+        IWString tmp(smarts);
+        return q.create_from_smarts(tmp);
+      },
+      "Build query from `smarts`"
+    )
+    .method("build_from_molecule",
+      [](Substructure_Query& q, Molecule& m, Molecule_to_Query_Specifications& mqs) {
+        return q.create_from_molecule(m, mqs);
+      },
+      "Create query from molecule under control of `mqs`"
+    )
+
+
+  ;
 }
 
 

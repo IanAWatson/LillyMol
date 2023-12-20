@@ -2235,6 +2235,10 @@ class ISIS_Link_Atom : public Link_Atom
 
 extern std::ostream & operator << (std::ostream &, const ISIS_Link_Atom &);
 
+class SetOfEmbeddings : public resizable_array_p<Set_of_Atoms> {
+  private:
+  public:
+};
 /*
   We need an object to hold the results of a substructure query, as well as
   the intermediate working data used by a substructure query. This is for
@@ -2264,7 +2268,7 @@ class Substructure_Results
 
 //  During a search, each query keeps a list of the embeddings it has made. 
 
-    resizable_array_p<Set_of_Atoms> _embedding;
+    SetOfEmbeddings _embedding;
 
 //  Some programmes (fragmenter for example) need to know the identity
 //  of the Substructure_Atom matched to each atom in a molecule, so we
@@ -2388,7 +2392,7 @@ class Substructure_Results
 
     int set_embeddings(const Set_of_Atoms **, const int n);
 
-    const resizable_array_p<Set_of_Atoms>& embeddings() const { 
+    const SetOfEmbeddings& embeddings() const {
       return _embedding;
     }
 

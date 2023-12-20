@@ -371,8 +371,10 @@ LocalOptions::MaybeWriteRejection(Molecule& m,
     reject_log.write_if_buffer_holds_more_than(4096);
   }
 
-  if (rejections_output.active())
+  if (rejections_output.active()) {
+    m << " REJ " << rejection_reason;
     rejections_output.write(m);
+  }
 
   return 1;
 }

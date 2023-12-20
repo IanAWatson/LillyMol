@@ -2710,6 +2710,22 @@ function test_matched_atoms_returned()::Bool
   true
 end
 
+function test_substructure_search_as_vector()::Bool
+  m = Molecule()
+
+  build_from_smiles(m, "OC(=O)CC(=O)O") || return is_failure("Bad smiles")
+
+  q = SubstructureQuery()
+  build_from_smarts(q, "[OD1]-C=O") || return is_failure("Bad smarts")
+
+  results = substructure_search_as_vector(q, m)
+  println(results)
+  size(results) == (2, 3) || return is_failure("Wrong shape", m)
+  results[1,:] == [0, 1, 2] || return is_failure("First embedding", m)
+  results[2,:] == [6, 4, 5] || return is_failure("First embedding", m)
+  true
+end
+
 
 
 boobar()
@@ -2910,4 +2926,5 @@ boobar()
 @test test_sresults_set_vector_all()
 @test test_sresults_set_vector_partial()
 @test test_matched_atoms_returned()
+@test test_substructure_search_as_vector()
 

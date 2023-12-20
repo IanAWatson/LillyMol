@@ -142,6 +142,7 @@ module LillyMol
   iterate(r::SetOfEmbeddings, state=0) = (state >= length(r) ? nothing : (r[state], state + 1))
   show(io::IO, s::SetOfEmbeddings) = print(io, set_of_embeddings_show_text(s))
   export each_embedding_set_vector
+  export substructure_search_as_vector
 
   in(q::SubstructureQuery, m::Molecule) = Bool(matches(q, m))
 end

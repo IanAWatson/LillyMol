@@ -1,3 +1,4 @@
+#include <ranges>
 #include <string>
 #include <tuple>
 #include <vector>
@@ -1998,11 +1999,44 @@ JLCXX_MODULE define_julia_module(jlcxx::Module& mod)
       },
       "Create query from molecule under control of `mqs`"
     )
+    .method("substructure_search_as_vector",
+      [](Substructure_Query& q, Molecule& m)->jlcxx::ArrayRef<int32_t, 2>{
+        Substructure_Results sresults;
+        const int nhits = q.substructure_search(m, sresults);
+        if (nhits == 0) {
+          return jlcxx::ArrayRef<int32_t, 2>(nullptr, 0, 0);
+        }
 
+        const int matched_atoms = sresults.embedding(0)->size();
+        std::unique_ptr<int[]> tmp = std::make_unique<int[]>(nhits * matched_atoms);
 
+#ifdef WHEN_WE_HAVE_CPP20
+        for (auto [i, embedding] : std::views::enumerate(sresults.embeddings())) {
+          for (auto [j, a] : std::views::enumerate(*embedding)) {
+            tmp[j * nhits + i] = a;
+          }
+        }
+#else
+        for (int i = 0; i < nhits; ++i) {
+          const Set_of_Atoms* embedding = sresults.embedding(i);
+          for (int j = 0; j < embedding->number_elements(); ++j) {
+            tmp[j * nhits + i] = embedding->item(j);
+            // std::cerr << i << ' ' << j << " fill " << (j * matched_atoms + i) << " value " << embedding->item(j) << '\n';
+          }
+        }
+#endif
+
+        static constexpr int kJuliaOwned = true;
+
+        jlcxx::ArrayRef<int32_t, 2> result(kJuliaOwned, tmp.get(), nhits, matched_atoms);
+        tmp.release();
+        return result;
+      },
+      "Return atoms hit as a matrix"
+    )
   ;
-}
 
+}
 
 
 }  // namespace lillymol_julia

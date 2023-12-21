@@ -10,6 +10,7 @@
 
 #include "Molecule_Lib/chiral_centre.h"
 #include "Molecule_Lib/istream_and_type.h"
+#include "Molecule_Lib/iwreaction.h"
 #include "Molecule_Lib/molecule.h"
 #include "Molecule_Lib/molecule_to_query.h"
 #include "Molecule_Lib/path.h"
@@ -2043,6 +2044,131 @@ JLCXX_MODULE define_julia_module(jlcxx::Module& mod)
     )
   ;
 
+
+//#define REAGENT_ITERATOR_IMP
+#ifdef REAGENT_ITERATOR_IMP
+
+this is not working yet
+ERROR: LoadError: No appropriate factory for type 10IWReaction
+
+  mod.add_type<Reaction_Iterator>("ReactionIterator")
+    .constructor<>()
+//  .constructor<const IWReaction&>()
+    .method("initialise",
+      [](Reaction_Iterator& rit, IWReaction& rxn) {
+        return rit.initialise(rxn);
+      }
+    )
+    .method("initialise",
+      [](Reaction_Iterator& rit, const jlcxx::BoxedValue<IWReaction>& boxed_reaction)->void {
+        IWReaction& rxn = jlcxx::unbox<IWReaction&>(boxed_reaction);
+        rit.initialise(rxn);
+      }
+    )
+
+    .method("active",
+      [](const Reaction_Iterator& rxnit)->bool{
+        return rxnit.active();
+      },
+      "True if still active"
+    )
+    .method("increment",
+      [](Reaction_Iterator& rxnit) {
+        rxnit++;
+      },
+      "Move to next reagent"
+    )
+    .method("reagent", &Reaction_Iterator::reagent)
+  ;
+#endif
+
+
+  mod.add_type<Sidechain_Match_Conditions>("SidechainMatchConditions")
+    .constructor<>()
+    .method("set_make_new_reagent_for_each_hit", &Sidechain_Match_Conditions::set_make_new_reagent_for_each_hit)
+    .method("set_max_matches_to_find", &Sidechain_Match_Conditions::set_max_matches_to_find)
+    .method("set_strip_reagents_to_largest_fragment", &Sidechain_Match_Conditions::set_strip_reagents_to_largest_fragment)
+    .method("set_ignore_not_reacting", &Sidechain_Match_Conditions::set_ignore_not_reacting)
+    .method("set_find_unique_embeddings_only", &Sidechain_Match_Conditions::set_find_unique_embeddings_only)
+    .method("set_one_embedding_per_start_atom", &Sidechain_Match_Conditions::set_one_embedding_per_start_atom)
+    .method("set_ignore_symmetry_related_matches", &Sidechain_Match_Conditions::set_ignore_symmetry_related_matches)
+  ;
+
+  mod.add_type<IWReaction>("Reaction")
+    .constructor<>() 
+    .method("name",
+      [](const IWReaction& q)->std::string {
+        return q.comment().AsString();
+      },
+      "Name of reaction"
+    )
+    .method("number_reagents", &IWReaction::number_reagents)
+    .method("number_sidechains", &IWReaction::number_sidechains)
+    .method("set_one_embedding_per_start_atom", &IWReaction::set_one_embedding_per_start_atom)
+    .method("add_sicechain_reagents",
+      [](IWReaction& rxn, int sidechain, const char* fname, FileType file_type, Sidechain_Match_Conditions& smc)->bool{
+        return rxn.add_sidechain_reagents(sidechain, fname, file_type, smc);
+      },
+      "Add reagents to a sidechain"
+    )
+    .method("read_textproto",
+      [](IWReaction& rxn, const std::string& fname)->bool{
+        IWString tmp(fname);
+        return rxn.Read(tmp);
+      },
+      "read textproto reaction"
+    )
+    .method("substructure_search",
+      [](IWReaction& rxn, Molecule& m, Substructure_Results& sresults) {
+        return rxn.substructure_search(m, sresults);
+      }
+    )
+    .method("in_place_transformation",
+      [](IWReaction& rxn, Molecule& m)->bool{
+        return rxn.in_place_transformations(m);
+      },
+      "apply reaction to 'm'"
+    )
+    .method("perform_reaction",
+      [](IWReaction& rxn, Molecule& scaffold, const Set_of_Atoms* embedding, Molecule& product)->bool{
+        return rxn.perform_reaction(&scaffold, embedding, product);
+      },
+      "perform reaction"
+    )
+#ifdef CANNOT_FIGURE_OUT_OPTIONAL_IN_CXXWRAP
+    .method("perform_reaction",
+      [](IWReaction& rxn, Molecule& scaffold, const Set_of_Atoms* embedding)->std::optional<Molecule>{
+        Molecule product;
+        if (! rxn.perform_reaction(&scaffold, embedding, product)) {
+          return std::nullopt;
+        }
+        return product;
+      },
+      "Perform reaction with particular set of matched atoms"
+    )
+    .method("perform_reaction",
+      [](IWReaction& rxn, const Molecule& scaffold, const Set_of_Atoms* embedding,
+         const Reaction_Iterator& iter)->std::optional<Molecule>{
+        Molecule product;
+        if (! rxn.perform_reaction(&scaffold, embedding, iter, product)) {
+          return std::nullopt;
+        }
+        return product;
+      },
+      "generate product based on embedding and iter"
+    )
+#endif
+#ifdef ITER_LATER
+    .method("perform_reaction",
+      [](IWReaction& rxn, const Molecule& scaffold, const Set_of_Atoms* embedding,
+         const Reaction_Iterator& iter, Molecule& product)->bool{
+        return rxn.perform_reaction(&scaffold, embedding, iter, product);
+      },
+      "generate product based on embedding and iter"
+    )
+#endif
+      
+  ;
 }
 
 

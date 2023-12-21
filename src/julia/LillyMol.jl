@@ -146,5 +146,12 @@ module LillyMol
   export substructure_search_as_vector
 
   in(q::SubstructureQuery, m::Molecule) = Bool(matches(q, m))
+
+  export Reaction
+# export Sidechain_Match_Conditions
+# export ReactionIterator
+# export perform_reaction, in_place_transformation
+  export in_place_transformation
+  export read_textproto
 end
 

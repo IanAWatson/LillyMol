@@ -7,6 +7,7 @@ cc_library (
         ":resizable_array_holder",
         "//Molecule_Lib:iwmolecule",
         "//Molecule_Lib:moleculeio",
+        "//Molecule_Lib:iwreaction",
         "//Molecule_Tools:xlogp_lib",
         "@com_gitlab_libeigen_eigen//:eigen",
         "@libcxxwrap//:libcxxwrap",

@@ -2738,6 +2738,73 @@ function test_substructure_search_as_vector()::Bool
   true
 end
 
+function test_reaction1()::Bool
+  rxn_text = raw"
+scaffold {
+  smarts: \"[Pb]\"
+  change_element {
+    atom: 0
+    element: \"Au\"
+  }
+}
+"
+  fname = write_smiles_tempfile("rxn1", rxn_text)
+  rxn = Reaction()
+  read_textproto(rxn, fname) || return is_failure("Cannot read reaction")
+
+  m = Molecule()
+  build_from_smiles(m, "[Pb]") || return is_failure("Bad smiles")
+  in_place_transformation(rxn, m) == 1 || return is_failure("No reaction", m)
+  smiles(m) == "[Au]" || return is_failure("Not gold", m)
+  true
+end
+
+function test_reaction2()::Bool
+  rxn_text = raw"
+scaffold {
+  smarts: \"Cl-c\"
+  remove_atom: 0
+}
+"
+  fname = write_smiles_tempfile("rxn2", rxn_text)
+  rxn = Reaction()
+  read_textproto(rxn, fname) || return is_failure("Cannot read reaction")
+
+  m = Molecule()
+  build_from_smiles(m, "Clc1ccc(Cl)cc1") || return is_failure("Bad smiles")
+  in_place_transformation(rxn, m) == 1 || return is_failure("No reaction", m)
+  aromatic_smiles(m) == "c1ccccc1" || return is_failure("Not removed", m)
+  true
+end
+
+function test_reaction_single_reagent()::Bool
+  rxn_text = raw"
+scaffold {
+  id: 0
+  smarts: \"Cl-c\"
+  remove_atom: 0
+}
+sidechain {
+  id: 1
+  reagent: \"O\"
+  smarts: \"O\"
+  join {
+    a1: 1
+    a2: 0
+    btype: SS_SINGLE_BOND
+  }
+}
+"
+  fname = write_smiles_tempfile("rxn3", rxn_text)
+  rxn = Reaction()
+  read_textproto(rxn, fname) || return is_failure("Cannot read reaction")
+
+  m = Molecule()
+  build_from_smiles(m, "Clc1ccc(Cl)cc1") || return is_failure("Bad smiles")
+  in_place_transformation(rxn, m) == 1 || return is_failure("No reaction", m)
+  unique_smiles(m) == "Oc1ccc(O)cc1" || return is_failure("Not reacted", m)
+  true
+end
 
 
 boobar()
@@ -2940,4 +3007,8 @@ boobar()
 @test test_sresults_set_vector_partial()
 @test test_matched_atoms_returned()
 @test test_substructure_search_as_vector()
+
+@test test_reaction1()
+@test test_reaction2()
+@test test_reaction_single_reagent()
 

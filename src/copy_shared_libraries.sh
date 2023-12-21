@@ -22,7 +22,7 @@ bazel-bin/pybind/lillymol_reaction.so
 bazel-bin/pybind/lillymol_standardise.so
 bazel-bin/pybind/lillymol_tools.so
 bazel-bin/pybind/lillymol_tsubstructure.so
-bazel-bin/Molecule_Lib/*.so
+#bazel-bin/Molecule_Lib/*.so
 )
 
 for lib in "${libs[@]}" ; do

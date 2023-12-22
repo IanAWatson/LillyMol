@@ -1103,6 +1103,19 @@ cc_binary(
 )
 
 cc_binary(
+    name = "mol2SAFE",
+    srcs = [
+        "mol2SAFE.cc",
+    ],
+    deps = [
+        ":highest_ring_number",
+        "//Foundational/cmdline:iwcmdline",
+        "//Molecule_Lib:iwmolecule",
+        "//Molecule_Lib:moleculeio",
+    ],
+)
+
+cc_binary(
     name = "molecular_abstraction",
     srcs = [
         "mav2.cc",
@@ -2535,6 +2548,19 @@ cc_library(
 )
 
 cc_library(
+    name = "highest_ring_number",
+    srcs = [
+        "highest_ring_number.cc",
+    ],
+    hdrs = [
+        "highest_ring_number.h",
+    ],
+    deps = [
+        "//Foundational/iwstring",
+    ],
+)
+
+cc_library(
     name = "insight_grid",
     srcs = [
         "insight_grid.cc",
@@ -2856,6 +2882,18 @@ cc_test(
     deps = [
         ":fileconv_lib",
         "//Molecule_Lib:moleculeio",
+        "@googletest//:gtest",
+        "@googletest//:gtest_main",
+    ],
+)
+
+cc_test(
+    name = "highest_ring_number_test",
+    srcs = [
+        "highest_ring_number_test.cc",
+    ],
+    deps = [
+        ":highest_ring_number",
         "@googletest//:gtest",
         "@googletest//:gtest_main",
     ],

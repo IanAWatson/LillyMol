@@ -7,6 +7,7 @@
 
 #include "jlcxx/jlcxx.hpp"
 #include "jlcxx/tuple.hpp"
+//#include "jlcxx/stl.hpp"
 
 #include "Molecule_Lib/chiral_centre.h"
 #include "Molecule_Lib/istream_and_type.h"
@@ -110,11 +111,62 @@ class SetOfChiralCentres : public ResizableArrayHolder<Chiral_Centre> {
     }
 };
 
+// Make it convenient to extract all the ring atoms from a molecule.
+class RingAtoms {
+  private:
+    int _nrings;
+    Set_of_Atoms* _rings;
+  public:
+    RingAtoms();
+    ~RingAtoms();
+
+    int GatherRings(Molecule& m);
+
+    int nrings() const {
+      return _nrings;
+    }
+
+    const Set_of_Atoms& operator[](int ndx) const {
+      return _rings[ndx];
+    }
+};
+
+RingAtoms::RingAtoms() {
+  _nrings = 0;
+  _rings = nullptr;
+}
+
+RingAtoms::~RingAtoms() {
+  _nrings = -1;
+  delete [] _rings;
+}
+
+int
+RingAtoms::GatherRings(Molecule& m) {
+  if (_rings) {
+    delete [] _rings;
+    _rings = nullptr;
+  }
+
+  _nrings = m.nrings();
+  if (_nrings == 0) {
+    return 1;
+  }
+  _rings = new Set_of_Atoms[_nrings];
+  for (int i = 0; i < _nrings; ++i) {
+    _rings[i] = *m.ringi(i);
+  }
+
+  return _nrings;
+}
+
 
 template <typename T>
 IWString
 AtomsAsString(const T & s, const char* name) {
   IWString result;
+  std::cerr << "Generating string for soa\n";
+  std::cerr << " size " << s.size() << '\n';
   result << name << " : N=" << s.size() << " [";
   bool need_space = false;
   for (atom_number_t a : s) {
@@ -328,19 +380,26 @@ JLCXX_MODULE define_julia_module(jlcxx::Module& mod)
       return AtomsAsString(s, "SetOfAtoms").AsString();
     }
   );
+  mod.method("set_of_atoms_show_text",
+    [](const Set_of_Atoms* s)->std::string {
+      return AtomsAsString(*s, "SetOfAtoms").AsString();
+    }
+  );
   mod.method("equals",
     [](const Set_of_Atoms& s, const jlcxx::ArrayRef<int64_t> v)->bool {
+      // std::cerr << "Set of atoms equals sizes " << s.size() << " and " << v.size() << '\n';
       if (s.size() != v.size()) {
         return false;
       }
 
       for (uint32_t i = 0; i < s.size(); ++i) {
+        // std::cerr << " cmp " << s[i] << " and " << v[i] << '\n';
         if (s[i] != v[i]) {
           return false;
         }
       }
 
-      return 1;
+      return true;
     }
   );
 
@@ -419,6 +478,22 @@ JLCXX_MODULE define_julia_module(jlcxx::Module& mod)
       }
     )
   ;
+  mod.method("ring_equals_vector",
+    [](const Set_of_Atoms* s, const jlcxx::ArrayRef<int64_t> v)->bool {
+      std::cerr << "Ring equals " << s->size() << " cmp " << v.size() << '\n';
+      if (s->size() != v.size()) {
+        return false;
+      }
+
+      for (uint32_t i = 0; i < s->size(); ++i) {
+        if (s->item(i) != v[i]) {
+          return false;
+        }
+      }
+
+      return true;
+    }
+  );
 
   mod.set_override_module(jl_base_module);
   mod.method("getindex",
@@ -815,6 +890,19 @@ JLCXX_MODULE define_julia_module(jlcxx::Module& mod)
     }
   );
 
+  mod.add_type<RingAtoms>("RingAtoms")
+    .constructor<>()
+    .method("nrings", &RingAtoms::nrings)
+  ;
+
+  mod.set_override_module(jl_base_module);
+  mod.method("getindex",
+    [](const RingAtoms& rings, int ndx)->const Set_of_Atoms&{
+      return rings[ndx];
+    }
+  );
+  mod.unset_override_module();
+
   mod.add_type<Molecule>("Molecule")
     .constructor<>()
     .constructor<Molecule>()
@@ -1146,6 +1234,23 @@ JLCXX_MODULE define_julia_module(jlcxx::Module& mod)
         return result;
       }
     )
+#ifdef THIS_NEVER_WORKED
+    This almost worked, it compiles and runs, but when I try to access items in
+    the resulting vector I get an invalid address. The type showin in Julia
+    is a SetOfAtomsDereferencedA Maybe the cxxdereference macro....
+    .method("get_rings",
+      [](Molecule& m)->std::vector<Set_of_Atoms> {
+        const int nr = m.nrings();
+        std::vector<Set_of_Atoms> result(nr);
+        for (int i = 0; i < nr; ++i) {
+          result[i] = *m.ringi(i);
+        }
+
+        return result;
+      },
+      "returns a vector of vectors containing the ring atoms"
+    )
+#endif
 
     .method("label_atoms_by_ring_system",
       [](Molecule& m)->std::vector<int>{
@@ -1778,6 +1883,13 @@ JLCXX_MODULE define_julia_module(jlcxx::Module& mod)
 
 
   ;
+
+  mod.method("gather_rings",
+    [](Molecule& m, RingAtoms& ring_atoms)->int {
+      return ring_atoms.GatherRings(m);
+    },
+    "Copy the rings from `m` to `ring_atoms`"
+  );
 
   mod.method("set_auto_create_new_elements", &set_auto_create_new_elements);
   mod.method("set_atomic_symbols_can_have_arbitrary_length", &set_atomic_symbols_can_have_arbitrary_length);

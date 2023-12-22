@@ -3,8 +3,6 @@ push!(LOAD_PATH, @__DIR__)
 using LillyMol
 
 function boobar()
-  m = Molecule()
-
   println("boobar done")
   true
 end
@@ -45,6 +43,14 @@ function test_set_of_atoms()::Bool
   collect(s) == [5, 4, 3, 2, 1, 0] || return false
 
   true
+end
+
+function test_set_of_atoms_equals()::Bool
+  s = SetOfAtoms()
+  push!(s, 0)
+  push!(s, 1)
+  push!(s, 2)
+  s == [0, 1, 2] || return is_failure("soa not eq")
 end
 
 function test_empty_molecule()::Bool
@@ -2188,6 +2194,19 @@ function test_find_exocyclic_bond()::Bool
   true
 end
 
+function test_gather_rings()::Bool
+  m = Molecule()
+  build_from_smiles(m, "C1=CC=C2C(=C1)NC=N2")
+  rings = RingAtoms()
+  gather_rings(m, rings)
+  length(rings) == 2 || return is_failure("Not 2 rings", m)
+
+  rings[0] == [3, 8, 7, 6, 4] || return is_failure("Bad ring 1", m)
+  rings[1] == [0, 5, 4, 3, 2, 1] || return is_failure("Bad ring 2", m)
+
+  true
+end
+
 function test_scaffold()::Bool
   m = Molecule()
   build_from_smiles(m, "C") || return is_failure("Bad smiles")
@@ -2731,7 +2750,6 @@ function test_substructure_search_as_vector()::Bool
   build_from_smarts(q, "[OD1]-C=O") || return is_failure("Bad smarts")
 
   results = substructure_search_as_vector(q, m)
-  println(results)
   size(results) == (2, 3) || return is_failure("Wrong shape", m)
   results[1,:] == [0, 1, 2] || return is_failure("First embedding", m)
   results[2,:] == [6, 4, 5] || return is_failure("First embedding", m)
@@ -2811,6 +2829,7 @@ boobar()
 @test test_empty_molecule()
 @test test_methane()
 @test test_set_of_atoms()
+@test test_set_of_atoms_equals()
 @test test_build_from_smiles()
 @test test_copy_constructor()
 @test test_hydrogen_related()
@@ -2974,6 +2993,7 @@ boobar()
 @test test_find_exocyclic_bond()
 @test test_atom_iterator_and_valence()
 @test test_scaffold()
+@test test_gather_rings()
 @test test_coords()
 @test test_getxyz()
 @test test_setxyz()

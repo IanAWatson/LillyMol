@@ -21,7 +21,7 @@ module LillyMol
   export set_skip_first, read_only, molecules_remaining, molecules_read
 
   export Molecule, SetOfAtoms, Atom, Bond, ChemicalStandardisation, BondList, Mol2Graph, ChiralCentre
-  export SetOfRings
+  export SetOfRings, RingAtoms
   export SetOfChiralCentres
 
   # Now done in C++
@@ -35,6 +35,7 @@ module LillyMol
   iterate(s::SetOfAtoms, state=0) = (state >= length(s) ? nothing : (s[state], state + 1))
   iterate(r::SetOfRings, state=0) = (state >= length(r) ? nothing : (r[state], state + 1))
   iterate(r::SetOfChiralCentres, state=0) = (state >= length(r) ? nothing : (r[state], state + 1))
+  iterate(r::RingAtoms, state=0) = (state >= length(r) ? nothing : (r[state], state + 1))
   in(z::Int, m::Molecule) = (natoms(m, z) > 0)
   in(atom::Int, a::Atom) = involves(a, atom)
   length(m::Molecule) = natoms(m)
@@ -42,6 +43,7 @@ module LillyMol
   length(s::SetOfRings) = rings_in_set(s)
   length(s::SetOfChiralCentres) = items_in_set(s)
   length(b::BondList) = bonds_in_set(b)
+  length(r::RingAtoms) = nrings(r)
   # length(r::Ring) = size(r)
   size(m::Molecule) = natoms(m)
   size(r::Ring) = (atoms_in_ring(r),)
@@ -50,6 +52,7 @@ module LillyMol
   size(s::SetOfRings) = (rings_in_set(s),)
   size(s::SetOfChiralCentres) = (items_in_set(s),)
   size(b::BondList) = (length(b),)
+  size(r::RingAtoms) = (length(r),)
   export getindex
   export iterate
   export length
@@ -64,6 +67,8 @@ module LillyMol
   export random_smiles, smiles_starting_with_atom
   export atomic_number, molecular_formula, nedges, is_ring_atom, fused_system_size, fused_system_identifier
   export rings_with_fused_system_identifier, in_same_ring, in_same_aromatic_ring, in_same_ring_system
+  export Ring
+  export gather_rings
   export ring_membership, rings_containing_both, is_part_of_fused_ring_system, ring, ring_containing_atom
   export label_atoms_by_ring_system, label_atoms_by_ring_system_including_spiro_fused, number_ring_systems
   export nrings_including_non_sssr_rings, non_sssr_rings, non_sssr_ring, is_spiro_fused, is_halogen
@@ -114,8 +119,14 @@ module LillyMol
   show(io::IO, r::Ring) = print(io, ring_show_text(r))
   show(io::IO, m::Molecule) = print(io, molecule_show_text(m))
   ==(s::SetOfAtoms, v::Vector{Int}) = equals(s, v)
-  # Cannot get this to work
-  # ==(Ring, v::Vector{Int}) = equals(s, v)
+  ==(s::CxxWrap.CxxWrapCore.ConstCxxRef{SetOfAtoms}, v::Vector{Int}) = equals(s, v)
+
+  # None of these work. Not sure why.
+  ==(s::Ring, v::Vector{Int}) = ring_equals_vector(s, v)
+  ==(s::CxxWrap.CxxWrapCore.ConstCxxPtr{<:Ring}, v::Vector{Int}) = ring_equals_vector(s, v)
+  # Get rid of this once we figure out the ==(Ring problem...
+  export ring_equals_vector
+
   export xlogp
 
   export activate_all, process

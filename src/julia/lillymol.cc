@@ -15,6 +15,7 @@
 #include "Molecule_Lib/molecule.h"
 #include "Molecule_Lib/molecule_to_query.h"
 #include "Molecule_Lib/path.h"
+#include "Molecule_Lib/ring_data.h"
 #include "Molecule_Lib/smiles.h"
 #include "Molecule_Lib/standardise.h"
 #include "Molecule_Lib/substructure.h"
@@ -201,6 +202,18 @@ JLCXX_MODULE define_julia_module(jlcxx::Module& mod)
   mod.add_bits<FileType>("FileType", jlcxx::julia_type("CppEnum"));
   mod.set_const("SMI", FILE_TYPE_SMI);
   mod.set_const("SDF", FILE_TYPE_SDF);
+
+  mod.add_bits<lillymol::RIProperty>("RIProperty", jlcxx::julia_type("CppEnum"));
+  mod.set_const("RIP_NONE", lillymol::RIProperty::kNone);
+  mod.set_const("RIP_AROMATIC", lillymol::RIProperty::kAromatic);
+  mod.set_const("RIP_FUSED", lillymol::RIProperty::kFused);
+
+  mod.add_type<lillymol::RingInformation>("RingInformation")
+    .constructor<>()
+    .method("nrings", &lillymol::RingInformation::nrings)
+    .method("aromatic", &lillymol::RingInformation::aromatic)
+    .method("fused", &lillymol::RingInformation::fused)
+  ;
     
 //  mod.add_bits<FileType>("FileType", jlcxx::julia_type("CppEnum"));
 //  mod.set_const("SMI", FILE_TYPE_SMI);
@@ -369,6 +382,15 @@ JLCXX_MODULE define_julia_module(jlcxx::Module& mod)
   );
   mod.unset_override_module();
 
+  mod.method("soa_getindex",
+    [](const Set_of_Atoms& s, int ndx) {
+      //std::cerr << "Getting item " << ndx << " from thing with " << s.size() << " atoms\n";
+      assert(ndx >= 0 && ndx < static_cast<int>(s.size()));
+      return s[ndx];
+    },
+    "Needed to disambiguate things"
+  );
+
   mod.method("add!",
     [](Set_of_Atoms& s, atom_number_t a) {
       s.add(a);
@@ -498,6 +520,7 @@ JLCXX_MODULE define_julia_module(jlcxx::Module& mod)
   mod.set_override_module(jl_base_module);
   mod.method("getindex",
     [](const Ring& a, int i)->atom_number_t{
+      assert(i >= 0 && i < a.number_elements());
       return a[i];
     }
   );
@@ -794,11 +817,13 @@ JLCXX_MODULE define_julia_module(jlcxx::Module& mod)
     mod.set_override_module(jl_base_module);
     mod.method("getindex",
       [](const Atom& a, int i)->const Bond{
+        assert(i >= 0 && i < a.ncon());
         return *a[i];
       }
     );
     mod.method("getindex",
       [](Atom& a, int i)->const Bond{
+        assert(i >= 0 && i < a.ncon());
         return *a[i];
       }
     );
@@ -844,6 +869,7 @@ JLCXX_MODULE define_julia_module(jlcxx::Module& mod)
   mod.set_override_module(jl_base_module);
   mod.method("getindex",
     [](const SetOfRings& r, int i)->const Ring*{
+      assert(i >= 0 && i < static_cast<int>(r.size()));
       return r[i];
     }
   );
@@ -886,7 +912,7 @@ JLCXX_MODULE define_julia_module(jlcxx::Module& mod)
   // support that functionality. Do not use.
   mod.method("internal_get_item",
     [](const Bond_list& blist, int ndx)->const Bond* {
-      return blist[ndx - 1];
+      return blist[ndx];
     }
   );
 
@@ -1890,6 +1916,21 @@ JLCXX_MODULE define_julia_module(jlcxx::Module& mod)
     },
     "Copy the rings from `m` to `ring_atoms`"
   );
+
+  mod.method("gather_rings",
+    [](Molecule& m, lillymol::RingInformation& rinf, lillymol::RIProperty& properties)  {
+      return rinf.GatherRings(m, properties);
+    },
+    "Copy ring atoms and optionally ring properties from `m` to ring_information"
+  );
+
+  mod.set_override_module(jl_base_module);
+  mod.method("getindex",
+    [](const lillymol::RingInformation& rings, int ndx)->const Set_of_Atoms&{
+      return rings[ndx];
+    }
+  );
+  mod.unset_override_module();
 
   mod.method("set_auto_create_new_elements", &set_auto_create_new_elements);
   mod.method("set_atomic_symbols_can_have_arbitrary_length", &set_atomic_symbols_can_have_arbitrary_length);

@@ -2070,6 +2070,45 @@ function test_iterate_bonds()::Bool
   return true
 end
 
+function test_index_bond_list()::Bool
+  m = Molecule();
+  build_from_smiles(m, "CC=CC#C") || return is_failure("Bad smiles")
+  for (ndx, bond) in enumerate(bonds(m))
+    if ndx == 1
+       is_single_bond(bond) || return is_failure("1 not single", m)
+    elseif ndx == 2
+       is_double_bond(bond) || return is_failure("2 not double", m)
+    elseif ndx == 3
+       is_single_bond(bond) || return is_failure("2 not single", m)
+    elseif ndx == 4
+       is_triple_bond(bond) || return is_failure("3 not triple", m)
+    else
+      return is_failure("Index out of range", m)
+    end
+  end
+  true
+end
+
+function test_loop_bond_list()::Bool
+  m = Molecule()
+  build_from_smiles(m, "CC=CC#C")
+  blist = bonds(m)
+  for i in 0:(nedges(m) - 1)
+    if i == 0
+       is_single_bond(blist[i]) || return is_failure("0 not single", m)
+    elseif i == 1
+       is_double_bond(blist[i]) || return is_failure("1 not double", m)
+    elseif i == 2
+       is_single_bond(blist[i]) || return is_failure("2 not single", m)
+    elseif i == 3
+       is_triple_bond(blist[i]) || return is_failure("3 not triple", m)
+    else
+      return is_failure("Index out of range", m)
+    end
+  end
+  true
+end
+
 function build_benzene()::Bool
   m = Molecule()
   for i in 1:6
@@ -2106,6 +2145,39 @@ function test_atom_iterator_and_valence()::Bool
     end
   end
   return true
+end
+
+function test_index_atom()::Bool
+  m = Molecule()
+  # build_from_smiles("CN1C=NC2=C1C(=O)N(C(=O)N2C)C caffeine") || return is_failure("Bad smiles")
+  build_from_smiles(m, "CC(N)(O)C") || return is_failure("Bad smiles")
+  length(m[0]) == 1  || return is_failure("Atom 0 not 1 connection", m)
+  length(m[1]) == 4  || return is_failure("Atom 1 not 4 connection", m)
+  for i in 2:4
+    length(m[i]) == 1  || return is_failure("Atom $(i) not 1 connection", m)
+  end
+  # Loop through atoms atttached to atom 1
+  for i in 0:3
+    bond = m[1][i]
+    is_single_bond(bond) || return is_failure("Not single bond", m)
+
+    o = other(bond, 1)
+    if i == 0
+      o == 0 || return is_failure("0 not 0", m)
+      atomic_number(m, o) == 6 || return is_failure("0 not carbon", m)
+    elseif i == 1
+      o == 2 || return is_failure("1 not 2", m)
+      atomic_number(m, o) == 7 || return is_failure("1 not nitrogen", m)
+    elseif i == 2
+      o == 3 || return is_failure("2 not 3", m)
+      atomic_number(m, o) == 8 || return is_failure("2 not oxygen", m)
+    elseif i == 3
+      o == 4 || return is_failure("3 not 4", m)
+      atomic_number(m, o) == 6 || return is_failure("3 not carbon", m)
+    end
+  end
+
+  true
 end
 
 function test_imidazole()::Bool
@@ -2988,10 +3060,13 @@ boobar()
 @test test_smiles_starting_atom()
 @test test_atom_iterator()
 @test test_iterate_bonds()
+@test test_index_bond_list()
+@test test_loop_bond_list()
 @test build_benzene()
 @test test_imidazole()
 @test test_find_exocyclic_bond()
 @test test_atom_iterator_and_valence()
+@test test_index_atom()
 @test test_scaffold()
 @test test_gather_rings()
 @test test_coords()

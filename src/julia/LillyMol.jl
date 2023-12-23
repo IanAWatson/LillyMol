@@ -17,12 +17,14 @@ module LillyMol
 
   export BondType, SINGLE_BOND, DOUBLE_BOND, TRIPLE_BOND, AROMATIC_BOND
   export FileType, SMI, SDF
+  export RIP_AROMATIC, RIP_FUSED
   export next_molecule, molecules_read, set_connection_table_errors_allowed, connection_table_errors_encountered
   export set_skip_first, read_only, molecules_remaining, molecules_read
 
   export Molecule, SetOfAtoms, Atom, Bond, ChemicalStandardisation, BondList, Mol2Graph, ChiralCentre
   export SetOfRings, RingAtoms
   export SetOfChiralCentres
+  export RingInformation
 
   # Now done in C++
   # getindex(m::Molecule, a::Int)=atom(m, a)
@@ -36,6 +38,7 @@ module LillyMol
   iterate(r::SetOfRings, state=0) = (state >= length(r) ? nothing : (r[state], state + 1))
   iterate(r::SetOfChiralCentres, state=0) = (state >= length(r) ? nothing : (r[state], state + 1))
   iterate(r::RingAtoms, state=0) = (state >= length(r) ? nothing : (r[state], state + 1))
+  iterate(r::RingInformation, state=0) = (state >= length(r) ? nothing : (r[state], state + 1))
   in(z::Int, m::Molecule) = (natoms(m, z) > 0)
   in(atom::Int, a::Atom) = involves(a, atom)
   length(m::Molecule) = natoms(m)
@@ -44,6 +47,7 @@ module LillyMol
   length(s::SetOfChiralCentres) = items_in_set(s)
   length(b::BondList) = bonds_in_set(b)
   length(r::RingAtoms) = nrings(r)
+  length(r::RingInformation) = nrings(r)
   # length(r::Ring) = size(r)
   size(m::Molecule) = natoms(m)
   size(r::Ring) = (atoms_in_ring(r),)
@@ -155,6 +159,7 @@ module LillyMol
   show(io::IO, s::SetOfEmbeddings) = print(io, set_of_embeddings_show_text(s))
   export each_embedding_set_vector
   export substructure_search_as_vector
+  getindex(s::Union{CxxWrap.CxxWrapCore.ConstCxxRef{<:SetOfAtoms}, CxxWrap.CxxWrapCore.CxxRef{<:SetOfAtoms}}, ndx::Int64) = soa_getindex(s, ndx)
 
   in(q::SubstructureQuery, m::Molecule) = Bool(matches(q, m))
 

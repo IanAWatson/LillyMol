@@ -6,6 +6,7 @@ cc_library (
     deps = [
         ":resizable_array_holder",
         "//Molecule_Lib:iwmolecule",
+        "//Molecule_Lib:ring_data",
         "//Molecule_Lib:moleculeio",
         "//Molecule_Lib:iwreaction",
         "//Molecule_Tools:xlogp_lib",

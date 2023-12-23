@@ -38,25 +38,25 @@ function change_to_pyridone(m, ring, n_index, oh_index, oh)
   end
   ring_atoms = OffsetArray(tmp, 0:5)
   # The para exocyclic -O becomes =O
-  println("Setting bond btw $(ring[oh_index]) and $(oh)")
+  # println("Setting bond btw $(ring[oh_index]) and $(oh)")
   set_bond_type_between_atoms!(m, ring[oh_index], oh, DOUBLE_BOND)
 
   # Introduce sequence of alternating single and double bonds into `ring`,
   # beginning at the Nitrogen.
   to_place = [1, 2, 1, 1, 2, 1]
   prev = n_index
-  println("change: n_index $(n_index) oh_index $(oh_index)")
+  # println("change: n_index $(n_index) oh_index $(oh_index)")
   # i is the counter and ndx is the index into `ring`.
   for (i,ndx) in enumerate(range(n_index + 1, n_index + 6))
-    println("   i $(i) ndx $(ndx)")
+    # println("   i $(i) ndx $(ndx)")
     if ndx > 5
       ndx = ndx % 6
     end
-    println(" prev $(prev)")
-    println(" ndx $(ndx)")
-    println(" prev_atom $(ring_atoms[prev])")
-    println(" q $(ring_atoms[ndx])")
-    println("  prev $(prev) ndx $(ndx) atoms $(ring_atoms[prev]) and $(ring_atoms[ndx])")
+    # println(" prev $(prev)")
+#     println(" ndx $(ndx)")
+ #    println(" prev_atom $(ring_atoms[prev])")
+  #   println(" q $(ring_atoms[ndx])")
+   #  println("  prev $(prev) ndx $(ndx) atoms $(ring_atoms[prev]) and $(ring_atoms[ndx])")
     if to_place[i] == 1
       set_bond_type_between_atoms!(m, ring_atoms[prev], ring_atoms[ndx], SINGLE_BOND)
     else
@@ -79,59 +79,49 @@ function ring_is_four_pyridone(m, ring)
 # Look for [n] and OH in the ring
   for (ndx,a) in enumerate(ring)
     ndx = ndx - 1
+    #println("ndx $(ndx) atom $(a)")
     if atomic_number(m, a) == 7
-      if n_index >= 0
-        return
-      end
+      n_index >= 0 && return
+
       n_index = ndx
       continue
     end
 
-    println("not N ndx $(ndx) atom $(a) ring $(ring[ndx]) atomic_number $(atomic_number(m, a))")
+    # println("not N ndx $(ndx) atom $(a) ring $(ring[ndx]) atomic_number $(atomic_number(m, a))")
     # No other heteroatoms
-    if atomic_number(m, a) != 6
-      continue
-    end
+    atomic_number(m, a) != 6 && continue
 
-    if ncon(m, a) == 2
-      continue
-    end
+    ncon(m, a) == 2 && continue
 
     # Look for exocyclic double bonds and the [OD1]
-    println("iterate bonds")
     for bond in m[a]
       o = other(bond, a)
-      println("  bond to $(o)")
-      if o in ring
-        continue
-      end
+      o in ring && continue
 
-      println("SB $(is_single_bond(bond))")
-      if ! is_single_bond(bond)
-        println("Not single bond, returning")
-        return
-      end
+      # println("SB $(is_single_bond(bond))")
+      is_single_bond(bond) || continue
 
-      println("Exocyclic single bond to type $(atomic_number(m, o))")
-      if atomic_number(m, o) != 8
-        continue
-      end
-      if ncon(m, o) != 1
-        continue
-      end
-      if oh_index >= 0
-        return
-      end
+      # println("Exocyclic single bond to type $(atomic_number(m, o))")
+      atomic_number(m, o) == 8 || continue
+      ncon(m, o) == 1 || continue
+
+      oh_index >= 0 && return
+
       oh_index = ndx
       oh = o
-      println("Just set oh_index $(oh_index) oh $(oh)")
+      # println("Just set oh_index $(oh_index) oh $(oh)")
     end
   end
-
-  println("n_index $(n_index) oh_index $(oh_index) carbon $(ring[oh_index]) oh $(oh)")
   if n_index < 0 || oh_index < 0
     return
   end
+
+  # println("n_index $(n_index)")
+  # println("oh_index $(oh_index)")
+  # println("oh $(oh)")
+  # println("N atom $(ring[n_index])")
+  # println("carbon $(ring[oh_index])")
+  # println("n_index $(n_index) oh_index $(oh_index) carbon $(ring[oh_index]) oh $(oh)")
 
   # print(f'{ring} N {n_index} c-OH {oh_index} OH {oh}')
   # The two indices must be 3 apart in `ring`. 
@@ -141,39 +131,35 @@ function ring_is_four_pyridone(m, ring)
     return
   end
 
-  println("set bond btw $(ring[oh_index]) and $(oh)")
-  println("O bonded $(are_bonded(m, ring[oh_index], oh))")
+ #  println("set bond btw $(ring[oh_index]) and $(oh)")
+  # println("O bonded $(are_bonded(m, ring[oh_index], oh))")
   change_to_pyridone(m, ring, n_index, oh_index, oh)
 end
 
 function four_pyridone(m)
   compute_aromaticity_if_needed(m)
-  println("Processing $(name(m))")
+  # println("Processing $(name(m))")
 
-  rings = RingAtoms()
-  gather_rings(m, rings)
-  aromatic = Vector{Bool}()
+  save_rings = RingInformation()
+  gather_rings(m, save_rings, RIP_AROMATIC)
+  aromatic = Vector{Bool}(undef, nrings(m))
   for (ndx, r) in enumerate(rings(m))
-  aromatic[ndx] = is_aromatic(r)
+    aromatic[ndx] = is_aromatic(r)
   end
 
-  for r in rings
-    if length(r) != 6
-      continue
-    end
-    println(is_aromatic(r))
-    if ! is_aromatic(r)
-      continue
-    end
+  for (ndx, r) in enumerate(save_rings)
+    # 6 membered aromatics only
+    length(r) == 6 || continue
+    aromatic[ndx] || continue
+
     ring_is_four_pyridone(m, r)
   end
-  println("Returning four_pyridone")
+#   println("Returning four_pyridone")
 end
 
 
 function main(args)
   """Chemical standardisation expt"""
-  println(args)
   if length(args) == 0
     println(stderr, "Insufficient arguments")
     return 1
@@ -182,7 +168,7 @@ function main(args)
   m = Molecule()
   while next_molecule(reader, m)
     four_pyridone(m)
-    molecules_read(reader) > 100000 && break
+    # molecules_read(reader) > 100000 && break
   end
 end
 

@@ -15,9 +15,7 @@ using LillyMol
 #
 #  For some tasks this trade-off may be attractive.
 #"""
-#
-#from lillymol import *
-#
+
 function change_to_pyridone(m, ring, n_index, oh_index, oh)
   """Convert `ring` to 4-pyridone form
     Args:
@@ -32,11 +30,6 @@ function change_to_pyridone(m, ring, n_index, oh_index, oh)
     the ring is not changing.
   """
 
-  tmp = Vector{Int32}()
-  for i in ring
-    push!(tmp, i)
-  end
-  ring_atoms = OffsetArray(tmp, 0:5)
   # The para exocyclic -O becomes =O
   # println("Setting bond btw $(ring[oh_index]) and $(oh)")
   set_bond_type_between_atoms!(m, ring[oh_index], oh, DOUBLE_BOND)
@@ -54,13 +47,13 @@ function change_to_pyridone(m, ring, n_index, oh_index, oh)
     end
     # println(" prev $(prev)")
 #     println(" ndx $(ndx)")
- #    println(" prev_atom $(ring_atoms[prev])")
-  #   println(" q $(ring_atoms[ndx])")
-   #  println("  prev $(prev) ndx $(ndx) atoms $(ring_atoms[prev]) and $(ring_atoms[ndx])")
+ #    println(" prev_atom $(ring[prev])")
+  #   println(" q $(ring[ndx])")
+   #  println("  prev $(prev) ndx $(ndx) atoms $(ring[prev]) and $(ring[ndx])")
     if to_place[i] == 1
-      set_bond_type_between_atoms!(m, ring_atoms[prev], ring_atoms[ndx], SINGLE_BOND)
+      set_bond_type_between_atoms!(m, ring[prev], ring[ndx], SINGLE_BOND)
     else
-      set_bond_type_between_atoms!(m, ring_atoms[prev], ring_atoms[ndx], DOUBLE_BOND)
+      set_bond_type_between_atoms!(m, ring[prev], ring[ndx], DOUBLE_BOND)
     end
     prev = ndx
   end
@@ -79,7 +72,7 @@ function ring_is_four_pyridone(m, ring)
 # Look for [n] and OH in the ring
   for (ndx,a) in enumerate(ring)
     ndx = ndx - 1
-    #println("ndx $(ndx) atom $(a)")
+    # println("ndx $(ndx) atom $(a)")
     if atomic_number(m, a) == 7
       n_index >= 0 && return
 
@@ -89,7 +82,7 @@ function ring_is_four_pyridone(m, ring)
 
     # println("not N ndx $(ndx) atom $(a) ring $(ring[ndx]) atomic_number $(atomic_number(m, a))")
     # No other heteroatoms
-    atomic_number(m, a) != 6 && continue
+    atomic_number(m, a) == 6 || continue
 
     ncon(m, a) == 2 && continue
 
@@ -99,7 +92,7 @@ function ring_is_four_pyridone(m, ring)
       o in ring && continue
 
       # println("SB $(is_single_bond(bond))")
-      is_single_bond(bond) || continue
+      is_single_bond(bond) || return
 
       # println("Exocyclic single bond to type $(atomic_number(m, o))")
       atomic_number(m, o) == 8 || continue

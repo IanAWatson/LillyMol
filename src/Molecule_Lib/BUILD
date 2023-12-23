@@ -1081,3 +1081,16 @@ cc_library(
         ":iwmolecule",
     ],
 )
+
+cc_library(
+    name = "ring_data",
+    srcs = [
+        "ring_data.cc",
+    ],
+    hdrs = [
+        "ring_data.h",
+    ],
+    deps = [
+        ":iwmolecule",
+    ],
+)

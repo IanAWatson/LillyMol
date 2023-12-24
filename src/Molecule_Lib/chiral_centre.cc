@@ -2983,9 +2983,9 @@ Chiral_Centre::new_atom_numbers (const int * xref)
   return;
 }
 
-resizable_array_p<Chiral_Centre>
+SetOfChiralCentres
 Molecule::ReleaseChiralCentres() {
-  resizable_array_p<Chiral_Centre> result;
+  SetOfChiralCentres result;
   if (_chiral_centres.empty()) {
     return result;
   }
@@ -2995,7 +2995,7 @@ Molecule::ReleaseChiralCentres() {
 }
 
 int
-Molecule::SetChiralCentres(resizable_array_p<Chiral_Centre>&& from) {
+Molecule::SetChiralCentres(SetOfChiralCentres&& from) {
   _chiral_centres = std::move(from);
   return _chiral_centres.number_elements();
 }

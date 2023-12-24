@@ -102,16 +102,6 @@ class SetOfRings : public ResizableArrayHolder<Ring> {
     }
 };
 
-class SetOfChiralCentres : public ResizableArrayHolder<Chiral_Centre> {
-  private:
-  public:
-    SetOfChiralCentres(const resizable_array_p<Chiral_Centre>& r) : ResizableArrayHolder<Chiral_Centre>(r) {
-    }
-    const Chiral_Centre* operator[](int ndx) const {
-      return _ref[ndx];
-    }
-};
-
 // Make it convenient to extract all the ring atoms from a molecule.
 class RingAtoms {
   private:
@@ -1871,9 +1861,8 @@ JLCXX_MODULE define_julia_module(jlcxx::Module& mod)
       }
     )
     .method("chiral_centres",
-      [](Molecule& m) -> SetOfChiralCentres& {
-        SetOfChiralCentres result(m.ChiralCentres());
-        return result;
+      [](Molecule& m) -> const SetOfChiralCentres& {
+        return m.ChiralCentres();
       }
     )
     .method("number_chiral_centres", &Molecule::chiral_centres)

@@ -2573,13 +2573,11 @@ function test_iterate_chiral_centres()::Bool
   build_from_smiles(m, "O[C@H]1[C@@H](O)C[C@@H](N)[C@H]1O CHEMBL268037") || return is_failure("Bad smiles", m)
   number_chiral_centres(m) == 4 || return is_failure("Not 4 chiral centres", m)
   atoms = SetOfAtoms()
-  println("Just about to iterate chiral centres")
-  return true
+
   for c in chiral_centres(m)
-    println("JL: chiral centre at atom $(centre(c))")
     push!(atoms, centre(c))
   end
-  [1, 2, 5, 7] == atoms || return is_failure("Not right atoms", m)
+  atoms == [1, 2, 5, 7] || return is_failure("Not right atoms $(atoms)", m)
   true
 end
 

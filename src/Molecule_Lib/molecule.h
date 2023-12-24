@@ -30,6 +30,7 @@ class iwstring_data_source;
 #include "atom.h"
 #include "bond.h"
 #include "bond_list.h"
+#include "chiral_centre.h"
 #include "collection_template.h"
 #include "coordinates.h"
 #include "element.h"
@@ -74,6 +75,10 @@ class Set_of_Charges : public Collection_Template<charge_t> {};
 using atom_type_t = std::uint32_t;
 
 class Atom_Types : public Collection_Template<atom_type_t> {};
+
+// If it convenient to expose the Chiral_Centre's as a class.
+class SetOfChiralCentres : public resizable_array_p<Chiral_Centre> {
+};
 
 // Used during aromaticity determinations. Mostly to reduce the
 // number of arguments passed.
@@ -479,8 +484,6 @@ class Smiles_Ring_Status;
 class Tnode;
 class Ring_Number_Manager;
 
-class Chiral_Centre;
-
 /*
   We want various degrees of control over how implicit Hydrogens are added
 */
@@ -598,7 +601,8 @@ class __attribute__((visibility("default"))) Molecule : private resizable_array_
  private:
   Bond_list _bond_list;
 
-  resizable_array_p<Chiral_Centre> _chiral_centres;
+  //resizable_array_p<Chiral_Centre> _chiral_centres;
+  SetOfChiralCentres _chiral_centres;
 
   //  We may also have information about the fragment characteristics of the molecule.
   //  Only computed if needed
@@ -1852,7 +1856,7 @@ class __attribute__((visibility("default"))) Molecule : private resizable_array_
     return _chiral_centres.number_elements();
   }
 
-  const resizable_array_p<Chiral_Centre>& ChiralCentres() const {
+  const SetOfChiralCentres& ChiralCentres() const {
     return _chiral_centres;
   }
 
@@ -1886,9 +1890,9 @@ class __attribute__((visibility("default"))) Molecule : private resizable_array_
   //   auto chiral_centres = m.ReleaseChiralCentres();
   //   DoSomethingTo(m...)
   //   m.SetChiralCentres(std::move(chiral_centres));
-  resizable_array_p<Chiral_Centre> ReleaseChiralCentres();
+  SetOfChiralCentres ReleaseChiralCentres();
   // Again, just like unique_ptr, restore from an external state.
-  int SetChiralCentres(resizable_array_p<Chiral_Centre>&& from);
+  int SetChiralCentres(SetOfChiralCentres&& from);
 
   //  Set all atoms involved in a chiral centre
 

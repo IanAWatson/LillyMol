@@ -1183,6 +1183,12 @@ Molecule::first_atom_in_fragment(int f) {
 
 int
 Molecule::rings_in_fragment(int f) {
+  if (number_fragments() == 1) {
+    return nrings();
+  }
+
+  fragment_membership();
+
   assert(f >= 0);
 
   assert(f < number_fragments());

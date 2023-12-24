@@ -156,8 +156,6 @@ template <typename T>
 IWString
 AtomsAsString(const T & s, const char* name) {
   IWString result;
-  std::cerr << "Generating string for soa\n";
-  std::cerr << " size " << s.size() << '\n';
   result << name << " : N=" << s.size() << " [";
   bool need_space = false;
   for (atom_number_t a : s) {
@@ -492,7 +490,6 @@ JLCXX_MODULE define_julia_module(jlcxx::Module& mod)
   ;
   mod.method("ring_equals_vector",
     [](const Set_of_Atoms* s, const jlcxx::ArrayRef<int64_t> v)->bool {
-      std::cerr << "Ring equals " << s->size() << " cmp " << v.size() << '\n';
       if (s->size() != v.size()) {
         return false;
       }
@@ -510,15 +507,15 @@ JLCXX_MODULE define_julia_module(jlcxx::Module& mod)
   mod.set_override_module(jl_base_module);
   mod.method("getindex",
     [](const Ring& a, int i)->atom_number_t{
-      assert(i >= 0 && i < a.number_elements());
-      return a[i];
+      assert(i > 0 && i <= a.number_elements());
+      return a[i - 1];
     }
   );
 #ifdef RAISES_DUPLICATE_REGISTRATION
   mod.method("getindex",
     [](const jlcxx::BoxedValue<Ring>& boxed_ring, int ndx)->atom_number_t{
       const Ring& r = jlcxx::unbox<Ring&>(boxed_ring);
-      return r[ndx];
+      return r[ndx - 1];
     }
   );
 #endif
@@ -553,13 +550,23 @@ JLCXX_MODULE define_julia_module(jlcxx::Module& mod)
       return r.contains(atom);
     }
   );
-#endif
   mod.method("in",
     [](const jlcxx::BoxedValue<Set_of_Atoms>& boxed_set_of_atoms, atom_number_t atom){
       const Set_of_Atoms& s = jlcxx::unbox<Set_of_Atoms&>(boxed_set_of_atoms);
       return s.contains(atom);
     }
   );
+  mod.method("in",
+    [](const Ring& r, atom_number_t a) ->bool {
+      return r.contains(a);
+    }
+  );
+  mod.method("in",
+    [](const Ring* r, atom_number_t a) ->bool {
+      return r->contains(a);
+    }
+  );
+#endif
 
 #ifdef RING_SHOW_TEXT
   mod.method("ring_show_text",
@@ -742,6 +749,24 @@ JLCXX_MODULE define_julia_module(jlcxx::Module& mod)
         return b1.joins(&b2);
       }
     )
+    .method("bond_show_text",
+      [](const Bond& b) ->std::string {
+        IWString result;
+        result << b.a1();
+        if (b.is_aromatic()) {
+          result << ':';
+        } else if (b.is_single_bond()) {
+          result << '-';
+        } else if (b.is_double_bond()) {
+          result << '=';
+        } else if (b.is_triple_bond()) {
+          result << '#';
+        }
+        result << b.a2();
+
+        return result.AsString();
+      }
+    )
   ;
 
   mod.add_type<Atom>("Atom")
@@ -802,26 +827,34 @@ JLCXX_MODULE define_julia_module(jlcxx::Module& mod)
       [](const Atom& a)->bool{
         return a.fully_saturated();
       }
-    );
+    )
+    .method("atom_show_text",
+      [](const Atom& a) -> std::string {
+        IWString result;
+        result << "Atom: " << a.atomic_number() << " ncon " << a.ncon();
+        return result.AsString();
+      }
+    )
+  ;
 
     mod.set_override_module(jl_base_module);
     mod.method("getindex",
       [](const Atom& a, int i)->const Bond{
-        assert(i >= 0 && i < a.ncon());
-        return *a[i];
+        assert(i >  0 && i <= a.ncon());
+        return *a[i - 1];
       }
     );
     mod.method("getindex",
       [](Atom& a, int i)->const Bond{
-        assert(i >= 0 && i < a.ncon());
-        return *a[i];
+        assert(i > 0 && i <= a.ncon());
+        return *a[i - 1];
       }
     );
     mod.unset_override_module();
   ;
   mod.method("internal_get_item",
     [](const Atom& a, int64_t ndx)->const Bond* {
-      return a[ndx];
+      return a[ndx - 1];
     }
   );
 
@@ -863,6 +896,12 @@ JLCXX_MODULE define_julia_module(jlcxx::Module& mod)
       return r[i - 1];
     }
   );
+  mod.method("getindex",
+    [](const SetOfChiralCentres& r, int i)->const Chiral_Centre*{
+      assert(i >= 1 && i <= static_cast<int>(r.size()));
+      return r[i - 1];
+    }
+  );
   mod.unset_override_module();
 
   mod.add_type<Bond_list>("BondList")
@@ -884,7 +923,7 @@ JLCXX_MODULE define_julia_module(jlcxx::Module& mod)
   mod.method("getindex",
     [](const Bond_list& blist, int i)->const Bond*{
       //std::cerr << "Bond_list::getindex length " << blist.size() << " ndx " << i << '\n';
-      return blist[i];
+      return blist[i - 1];
     }
   );
 #ifdef DOES_NOT_SEEM_NECESSARY

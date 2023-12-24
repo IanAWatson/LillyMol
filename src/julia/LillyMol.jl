@@ -27,18 +27,14 @@ module LillyMol
   export SetOfChiralCentres
   export RingInformation
 
-  # Now done in C++
-  # getindex(m::Molecule, a::Int)=atom(m, a)
-  # getindex(a::Atom, b::Int)=atom.item(b)
   iterate(m::Molecule, state=0) = (state >= natoms(m) ? nothing : (m[state], state + 1))
-  iterate(a::Atom, state=0) = (state >= ncon(a) ? nothing : (a[state], state + 1))
+  iterate(a::Atom, state=1) = (state > ncon(a) ? nothing : (a[state], state + 1))
   iterate(b::Bond, state=1) = (state == 1 ? (a1(b), 2) : state == 2 ? (a2(b), 2) : nothing)
-  iterate(b::BondList, state=0) = (state >= bonds_in_set(b) ? nothing : (b[state], state + 1))
-  iterate(r::Ring, state=0) = (state >= length(r) ? nothing : (r[state], state + 1))
+  iterate(b::BondList, state=1) = (state > bonds_in_set(b) ? nothing : (b[state], state + 1))
+  iterate(r::Ring, state=1) = (state > length(r) ? nothing : (r[state], state + 1))
   iterate(s::SetOfAtoms, state=1) = (state > length(s) ? nothing : (s[state], state + 1))
   iterate(r::SetOfRings, state=1) = (state > length(r) ? nothing : (r[state], state + 1))
-  iterate(r::SetOfChiralCentres, state=0) = (state >= length(r) ? nothing : (r[state], state + 1))
-  # iterate(r::RingAtoms, state=0) = (state >= length(r) ? nothing : (r[state], state + 1))
+  iterate(r::SetOfChiralCentres, state=1) = (state > length(r) ? nothing : (r[state], state + 1))
   iterate(r::RingInformation, state=1) = (state > length(r) ? nothing : (r[state], state + 1))
   in(z::Int, m::Molecule) = (natoms(m, z) > 0)
   in(atom::Int, a::Atom) = involves(a, atom)
@@ -120,6 +116,8 @@ module LillyMol
   export sort_atoms!
   export set_display_smiles_interpretation_error_messages
   show(io::IO, s::SetOfAtoms) = print(io, set_of_atoms_show_text(s))
+  show(io::IO, s::Atom) = print(io, atom_show_text(s))
+  show(io::IO, s::Bond) = print(io, bond_show_text(s))
   # For some reason this does not work, but works for set_of_atoms.
   show(io::IO, r::Ring) = print(io, ring_show_text(r))
   show(io::IO, m::Molecule) = print(io, molecule_show_text(m))

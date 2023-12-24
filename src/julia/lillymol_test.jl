@@ -289,6 +289,25 @@ function test_atomic_number()::Bool
   true
 end
 
+function test_enumerate_atom()::Bool
+  m = Molecule()
+  build_from_smiles(m, "CC(=N)C") || return is_failure("Bad smiles")
+  a = m[1]
+  ncon(a) == 3 || return is_failure("Not 3 connected", m)
+  for (ndx, bond) in enumerate(a)
+    if ndx == 1
+      is_single_bond(bond) || return is_failure("1 not single", m)
+    elseif ndx == 2
+      is_double_bond(bond) || return is_failure("2 not double", m)
+    elseif ndx == 3
+      is_single_bond(bond) || return is_failure("3 not single", m)
+    else
+      return is_failure("Invalid index")
+    end
+  end
+  true
+end
+
 function test_nedges()::Bool
   mol_and_edges = Dict{String, Int}(""=>0, "[Fe]"=>0, "II"=>1, "III"=>2, "I1II1"=>3)
   for (smi,edges) in mol_and_edges
@@ -2157,21 +2176,21 @@ function test_index_atom()::Bool
     length(m[i]) == 1  || return is_failure("Atom $(i) not 1 connection", m)
   end
   # Loop through atoms atttached to atom 1
-  for i in 0:3
+  for i in 1:4
     bond = m[1][i]
     is_single_bond(bond) || return is_failure("Not single bond", m)
 
     o = other(bond, 1)
-    if i == 0
+    if i == 1
       o == 0 || return is_failure("0 not 0", m)
       atomic_number(m, o) == 6 || return is_failure("0 not carbon", m)
-    elseif i == 1
+    elseif i == 2
       o == 2 || return is_failure("1 not 2", m)
       atomic_number(m, o) == 7 || return is_failure("1 not nitrogen", m)
-    elseif i == 2
+    elseif i == 3
       o == 3 || return is_failure("2 not 3", m)
       atomic_number(m, o) == 8 || return is_failure("2 not oxygen", m)
-    elseif i == 3
+    elseif i == 4
       o == 4 || return is_failure("3 not 4", m)
       atomic_number(m, o) == 6 || return is_failure("3 not carbon", m)
     end
@@ -2208,7 +2227,7 @@ function test_find_exocyclic_bond()::Bool
     atomic_number(atom) == 8 || continue
 
     # Bond to the first neighbour
-    bond = atom[0]
+    bond = atom[1]
     is_double_bond(bond) || continue
     o = other(bond, ndx)
     if is_aromatic(m, o) 
@@ -2578,6 +2597,28 @@ function test_iterate_chiral_centres()::Bool
     push!(atoms, centre(c))
   end
   atoms == [1, 2, 5, 7] || return is_failure("Not right atoms $(atoms)", m)
+  true
+end
+
+function test_index_chiral_centres()::Bool
+  m = Molecule();
+  build_from_smiles(m, "O[C@H]1[C@@H](O)C[C@@H](N)[C@H]1O CHEMBL268037") || return is_failure("Bad smiles", m)
+  number_chiral_centres(m) == 4 || return is_failure("Not 4 chiral centres", m)
+  atoms = SetOfAtoms()
+
+  for (ndx, c) in enumerate(chiral_centres(m))
+    if ndx == 1
+      centre(c) == 1 || return is_failure("1 not 1", m)
+    elseif ndx == 2
+      centre(c) == 2 || return is_failure("2 not 2", m)
+    elseif ndx == 3
+      centre(c) == 5 || return is_failure("3 not 5", m)
+    elseif ndx == 4
+      centre(c) == 7 || return is_failure("4 not 1", m)
+    else
+      return is_failure("Invalid index $(ndx)", m)
+    end
+  end
   true
 end
 
@@ -2963,6 +3004,7 @@ boobar()
 @test test_length_molecule()
 @test test_atomic_number()
 @test test_atomic_number_in()
+@test test_enumerate_atom()
 @test test_nedges()
 @test test_molecular_formula()
 @test test_valence_ok()
@@ -3128,6 +3170,7 @@ boobar()
 @test test_chiral_implicit_hydrogen()
 @test test_invert_chirality()
 @test test_iterate_chiral_centres()
+@test test_index_chiral_centres()
 @test test_charge()
 @test test_xlogp()
 @test test_aspirin()

@@ -372,12 +372,12 @@ JLCXX_MODULE define_julia_module(jlcxx::Module& mod)
   mod.set_override_module(jl_base_module);
   mod.method("getindex",
     [](const Set_of_Atoms& s, int ndx)->atom_number_t{
-      return s[ndx];
+      return s[ndx - 1];
     }
   );
   mod.method("setindex!",
     [](Set_of_Atoms& s, int32_t value, uint64_t ndx) {
-      s[ndx] = value;
+      s[ndx - 1] = value;
     }
   );
   mod.unset_override_module();
@@ -869,8 +869,8 @@ JLCXX_MODULE define_julia_module(jlcxx::Module& mod)
   mod.set_override_module(jl_base_module);
   mod.method("getindex",
     [](const SetOfRings& r, int i)->const Ring*{
-      assert(i >= 0 && i < static_cast<int>(r.size()));
-      return r[i];
+      assert(i >= 1 && i <= static_cast<int>(r.size()));
+      return r[i - 1];
     }
   );
   mod.unset_override_module();
@@ -912,7 +912,7 @@ JLCXX_MODULE define_julia_module(jlcxx::Module& mod)
   // support that functionality. Do not use.
   mod.method("internal_get_item",
     [](const Bond_list& blist, int ndx)->const Bond* {
-      return blist[ndx];
+      return blist[ndx - 1];
     }
   );
 
@@ -924,7 +924,7 @@ JLCXX_MODULE define_julia_module(jlcxx::Module& mod)
   mod.set_override_module(jl_base_module);
   mod.method("getindex",
     [](const RingAtoms& rings, int ndx)->const Set_of_Atoms&{
-      return rings[ndx];
+      return rings[ndx - 1];
     }
   );
   mod.unset_override_module();
@@ -1871,7 +1871,7 @@ JLCXX_MODULE define_julia_module(jlcxx::Module& mod)
       }
     )
     .method("chiral_centres",
-      [](Molecule& m) -> SetOfChiralCentres {
+      [](Molecule& m) -> SetOfChiralCentres& {
         SetOfChiralCentres result(m.ChiralCentres());
         return result;
       }
@@ -1927,7 +1927,7 @@ JLCXX_MODULE define_julia_module(jlcxx::Module& mod)
   mod.set_override_module(jl_base_module);
   mod.method("getindex",
     [](const lillymol::RingInformation& rings, int ndx)->const Set_of_Atoms&{
-      return rings[ndx];
+      return rings[ndx - 1];
     }
   );
   mod.unset_override_module();
@@ -2011,10 +2011,16 @@ JLCXX_MODULE define_julia_module(jlcxx::Module& mod)
   mod.set_override_module(jl_base_module);
   mod.method("getindex",
     [](const SetOfEmbeddings& s, int i)->const Set_of_Atoms*{
-      return s[i];
+      return s[i - 1];
     }
   );
   mod.unset_override_module();
+
+  mod.method("set_of_embeddings_getindex",
+    [](const SetOfEmbeddings& s, int ndx)->const Set_of_Atoms* {
+      return s[ndx - 1];
+    }
+  );
 
   //jlcxx::stl::apply_stl<Molecule*>(mod);
   mod.add_type<Molecule_to_Query_Specifications>("MoleculeToQuerySpecifications")

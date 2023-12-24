@@ -38,7 +38,7 @@ function test_set_of_atoms()::Bool
     i in s || return false
   end
   for i in 1:6
-    s[i - 1] = 6 - i
+    s[i] = 6 - i
   end
   collect(s) == [5, 4, 3, 2, 1, 0] || return false
 
@@ -1566,9 +1566,9 @@ function test_atoms_between()::Bool
   build_from_smiles(m, "CC1CC(C)C1") || return false
   btw = atoms_between(m, 0, 4)
   length(btw) == 3 || return false
-  btw[0] == 1 || return false
-  btw[1] == 2 || return false
-  btw[2] == 3 || return false
+  btw[1] == 1 || return false
+  btw[2] == 2 || return false
+  btw[3] == 3 || return false
   true
 end
 
@@ -2093,14 +2093,14 @@ function test_loop_bond_list()::Bool
   m = Molecule()
   build_from_smiles(m, "CC=CC#C")
   blist = bonds(m)
-  for i in 0:(nedges(m) - 1)
-    if i == 0
+  for i in 1:nedges(m)
+    if i == 1
        is_single_bond(blist[i]) || return is_failure("0 not single", m)
-    elseif i == 1
-       is_double_bond(blist[i]) || return is_failure("1 not double", m)
     elseif i == 2
-       is_single_bond(blist[i]) || return is_failure("2 not single", m)
+       is_double_bond(blist[i]) || return is_failure("1 not double", m)
     elseif i == 3
+       is_single_bond(blist[i]) || return is_failure("2 not single", m)
+    elseif i == 4
        is_triple_bond(blist[i]) || return is_failure("3 not triple", m)
     else
       return is_failure("Index out of range", m)
@@ -2266,15 +2266,48 @@ function test_find_exocyclic_bond()::Bool
   true
 end
 
+#function test_gather_rings()::Bool
+#  m = Molecule()
+#  build_from_smiles(m, "C1=CC=C2C(=C1)NC=N2")
+#  rings = RingAtoms()
+#  gather_rings(m, rings)
+#  length(rings) == 2 || return is_failure("Not 2 rings", m)
+#
+#  rings[1] == [3, 8, 7, 6, 4] || return is_failure("Bad ring 1", m)
+#  rings[2] == [0, 5, 4, 3, 2, 1] || return is_failure("Bad ring 2", m)
+#
+#  true
+#end
+
 function test_gather_rings()::Bool
   m = Molecule()
   build_from_smiles(m, "C1=CC=C2C(=C1)NC=N2")
-  rings = RingAtoms()
-  gather_rings(m, rings)
+  rings = RingInformation()
+  gather_rings(m, rings, RIP_NONE)
   length(rings) == 2 || return is_failure("Not 2 rings", m)
 
-  rings[0] == [3, 8, 7, 6, 4] || return is_failure("Bad ring 1", m)
-  rings[1] == [0, 5, 4, 3, 2, 1] || return is_failure("Bad ring 2", m)
+  rings[1] == [3, 8, 7, 6, 4] || return is_failure("Bad ring 1", m)
+  rings[2] == [0, 5, 4, 3, 2, 1] || return is_failure("Bad ring 2", m)
+
+  true
+end
+
+function iterate_ring_information()::Bool
+  m = Molecule()
+  build_from_smiles(m, "C1=CC=C2C(=C1)NC=N2")
+  rings = RingInformation()
+  gather_rings(m, rings, RIP_NONE)
+  length(rings) == 2 || return is_failure("Not 2 rings", m)
+
+  for (ndx, ring) in enumerate(rings)
+    if ndx == 1
+      ring == [3, 8, 7, 6, 4] || return is_failure("Bad ring 1", m)
+    elseif ndx == 2
+      ring == [0, 5, 4, 3, 2, 1] || return is_failure("Bad ring 2", m)
+    else
+      return is_failure("Bad index")
+    end
+  end
 
   true
 end
@@ -2543,8 +2576,8 @@ function test_iterate_chiral_centres()::Bool
   println("Just about to iterate chiral centres")
   return true
   for c in chiral_centres(m)
-#   println("JL: chiral centre at atom $(centre(c))")
-#   push!(atoms, centre(c))
+    println("JL: chiral centre at atom $(centre(c))")
+    push!(atoms, centre(c))
   end
   [1, 2, 5, 7] == atoms || return is_failure("Not right atoms", m)
   true
@@ -2769,6 +2802,23 @@ function test_results_returned()::Bool
     end
   end
   matched == [2, 2] || return is_failure("Not t matches each", m)
+  true
+end
+
+function iterate_substructure_results()::Bool
+  m = Molecule()
+  build_from_smiles(m, "CCC") || return is_failure("Bad smiles")
+  q = SubstructureQuery()
+  build_from_smarts(q, "CC") || return is_failure("Bad smarts")
+  sresults = SubstructureResults()
+  substructure_search(q, m, sresults) == 4 || return is_failure("Not 4 embeddings", m)
+
+  matches = embeddings(sresults)
+  for i in 1:length(matches)
+    e = matches[i]
+    length(e) == 2 || return is_failure("Not 2 atoms in match", m)
+  end
+
   true
 end
 
@@ -3069,6 +3119,7 @@ boobar()
 @test test_index_atom()
 @test test_scaffold()
 @test test_gather_rings()
+@test iterate_ring_information()
 @test test_coords()
 @test test_getxyz()
 @test test_setxyz()
@@ -3098,6 +3149,7 @@ boobar()
 @test test_ethane_cc_find_unique_embeddings_only()
 @test test_ethane_cc_find_one_embedding_per_atom()
 @test test_results_returned()
+@test iterate_substructure_results()
 @test test_sresults_set_vector_all()
 @test test_sresults_set_vector_partial()
 @test test_matched_atoms_returned()

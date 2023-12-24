@@ -1822,3 +1822,11 @@ Molecule::_compute_fragment_information_subset(Fragment_Information& fragment_in
 
   return nf;
 }
+
+int
+Molecule::create_components(Components& components) {
+  resizable_array_p<Molecule> tmp;
+  int rc = create_components(tmp);
+  components.swap_contents(tmp);
+  return  rc;
+}

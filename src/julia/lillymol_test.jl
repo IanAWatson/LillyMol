@@ -1380,13 +1380,42 @@ end
 
 # Cannot figure out how to return a std::vector<Molecule>.
 # This will change once I figure that out.
-function test_create_components()::Bool
+function test_create_components_not_invoked()::Bool
   m = LillyMol.MolFromSmiles("CCC.C1CC1.C1CC1C2CC2")
   nf = number_fragments(m)
   nf == 3 || return false
   frags = [Molecule() for i in 1:nf]
   create_components(m, frags)
   length(frags) == 3 || return false
+  true
+end
+
+function test_create_components()::Bool
+  m = LillyMol.MolFromSmiles("CCC.C1CC1.C1CC1C2CC2")
+  nf = number_fragments(m)
+  nf == 3 || return false
+  components = Components()
+  create_components(m, components)
+  length(components) == 3 || return is_failure("Not 3 components", m)
+  for (ndx, c) in enumerate(components)
+    number_fragments(c) == 1 || return is_failure("Component not 1 frag", m)
+
+    if ndx == 1
+      smiles(c) == "CCC" || return is_failure("1 not CCC", m)
+      nrings(c) == 0 || return is_failure("1 has rings", m)
+    elseif ndx == 2
+      smiles(c) == "C1CC1" || return is_failure("2 not C1CC1", m)
+      nrings(c) == 1 || return is_failure("2 not 1 ring", m)
+    elseif ndx == 3
+      smiles(c) == "C1CC1C1CC1" || return is_failure("3 not C1CC1C2CC2", m)
+      nrings(c) == 2 || return is_failure("3 not 2 rings", m)
+    else
+      return is_failure("Invalid index")
+    end
+  end
+  for ring in rings(components[3])
+    length(ring) == 3 || return is_failure("Not 3 membered", m)
+  end
   true
 end
 
@@ -3103,7 +3132,7 @@ boobar()
 @test test_largest_fragment2()
 @test test_identify_spinach()
 @test test_rings_in_fragment()
-@test test_create_components() skip=true
+@test test_create_components()
 @test test_returns_vector()
 @test test_create_subset()
 @test test_create_subset_set_of_atoms()

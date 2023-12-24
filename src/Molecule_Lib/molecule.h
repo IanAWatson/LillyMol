@@ -80,6 +80,13 @@ class Atom_Types : public Collection_Template<atom_type_t> {};
 class SetOfChiralCentres : public resizable_array_p<Chiral_Centre> {
 };
 
+// CxxWrap works better with classes.
+class Components : public resizable_array_p<Molecule> {
+  private:
+  public:
+};
+
+
 // Used during aromaticity determinations. Mostly to reduce the
 // number of arguments passed.
 
@@ -1684,6 +1691,7 @@ class __attribute__((visibility("default"))) Molecule : private resizable_array_
   int create_components(resizable_array_p<T>&);
   int create_components(int bond_number, Molecule& m1, Molecule& m2);
   int create_components(const int* frag, resizable_array_p<Molecule>&) const;
+  int create_components(Components& components);
   int create_components_across_bonds(const int* bonds_to_remove,
                                      resizable_array_p<Molecule>&);
 

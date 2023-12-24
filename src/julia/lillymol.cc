@@ -1380,6 +1380,11 @@ JLCXX_MODULE define_julia_module(jlcxx::Module& mod)
         return m.smiles().AsString();
       }
     )
+    .method("internal_smiles",
+      [](Molecule* m)->std::string {
+        return m->smiles().AsString();
+      }
+    )
     .method("unique_smiles", 
       [](Molecule& m)->std::string{
         return m.unique_smiles().AsString();
@@ -1755,6 +1760,7 @@ JLCXX_MODULE define_julia_module(jlcxx::Module& mod)
       }
     )
     .method("rings_in_fragment", &Molecule::rings_in_fragment)
+
 //#define DOES_NOT_WORK
 #ifdef DOES_NOT_WORK
     .method("create_components",
@@ -1959,6 +1965,31 @@ JLCXX_MODULE define_julia_module(jlcxx::Module& mod)
     }
   );
   mod.unset_override_module();
+
+  mod.add_type<Components>("Components")
+    .constructor<>()
+    .method("length",
+      [](const Components& c) {
+        return c.size();
+      },
+      ""
+      )
+  ;
+
+  mod.set_override_module(jl_base_module);
+  mod.method("getindex",
+    [](const Components& components, int ndx)->Molecule*{
+      return components[ndx - 1];
+    }
+  );
+  mod.unset_override_module();
+
+  mod.method("create_components",
+    [](Molecule& m, Components& components) {
+      return m.create_components(components);
+    },
+    ""
+  );
 
   mod.method("set_auto_create_new_elements", &set_auto_create_new_elements);
   mod.method("set_atomic_symbols_can_have_arbitrary_length", &set_atomic_symbols_can_have_arbitrary_length);

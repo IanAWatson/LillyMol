@@ -26,6 +26,7 @@ module LillyMol
   # export RingAtoms
   export SetOfChiralCentres
   export RingInformation
+  export Components
 
   iterate(m::Molecule, state=0) = (state >= natoms(m) ? nothing : (m[state], state + 1))
   iterate(a::Atom, state=1) = (state > ncon(a) ? nothing : (a[state], state + 1))
@@ -36,6 +37,7 @@ module LillyMol
   iterate(r::SetOfRings, state=1) = (state > length(r) ? nothing : (r[state], state + 1))
   iterate(r::SetOfChiralCentres, state=1) = (state > length(r) ? nothing : (r[state], state + 1))
   iterate(r::RingInformation, state=1) = (state > length(r) ? nothing : (r[state], state + 1))
+  iterate(r::Components, state=1) = (state > length(r) ? nothing : (r[state], state + 1))
   in(z::Int, m::Molecule) = (natoms(m, z) > 0)
   in(atom::Int, a::Atom) = involves(a, atom)
   length(m::Molecule) = natoms(m)
@@ -140,6 +142,11 @@ module LillyMol
     internal_get_item(blist, ndx)
   getindex(atom::Union{CxxWrap.CxxWrapCore.ConstCxxRef{<:Atom}, CxxWrap.CxxWrapCore.CxxRef{<:Atom}}, ndx::Int64) =
     internal_get_item(atom, ndx);
+  # There must be another way of doing this, TODO:ianwatson investigate automatic casting.
+  smiles(m::CxxWrap.CxxWrapCore.CxxPtr{Molecule}) = internal_smiles(m)
+  rings(m::CxxWrap.CxxWrapCore.CxxPtr{Molecule}) = rings(Base.unsafe_convert(CxxWrap.CxxWrapCore.CxxRef{Molecule}, m))
+  nrings(m::CxxWrap.CxxWrapCore.CxxPtr{Molecule}) = nrings(Base.unsafe_convert(CxxWrap.CxxWrapCore.CxxRef{Molecule}, m))
+  number_fragments(m::CxxWrap.CxxWrapCore.CxxPtr{Molecule}) = number_fragments(Base.unsafe_convert(CxxWrap.CxxWrapCore.CxxRef{Molecule}, m))
 
   # Wanted to place substructure in a separate module, but could never make it work. Revisit...
   export SubstructureQuery

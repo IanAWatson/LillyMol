@@ -435,6 +435,7 @@ class Molecule_and_Embedding : public Molecule
 
   public:
     Molecule_and_Embedding ();
+    Molecule_and_Embedding (const Molecule& rhs);
 
     const Set_of_Atoms * embedding () const { return &_embedding;}
 
@@ -1218,6 +1219,7 @@ class Sidechain_Reaction_Site : public Reaction_Site
     int remove_first_reagent_no_delete();
 
     int add_reagent  (Molecule_and_Embedding * m, const Sidechain_Match_Conditions & smc);
+    int add_reagent  (const Molecule& m, const Sidechain_Match_Conditions & smc);
     int add_reagents (const char *, FileType, const Sidechain_Match_Conditions &);
     int add_reagents (data_source_and_type<Molecule_and_Embedding> &, const Sidechain_Match_Conditions &);
     int add_reagents_with_stringbuffer (const char * fname, int input_type,

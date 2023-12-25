@@ -2612,10 +2612,6 @@ function test_invert_chirality()::Bool
   return true
 end
   
-## NOt sure what is going on here. The SetOfChiralCentres object is properly
-# initialised in C++, but when it gets here it is broken. Seems like a
-# scoping problem. but then why do things like BondList and SetOfRings work
-# since they work via the same mechanism. TODO:ianwatson
 function test_iterate_chiral_centres()::Bool
   m = Molecule();
   build_from_smiles(m, "O[C@H]1[C@@H](O)C[C@@H](N)[C@H]1O CHEMBL268037") || return is_failure("Bad smiles", m)
@@ -3014,6 +3010,71 @@ sidechain {
   true
 end
 
+function test_reaction_iterator1()::Bool
+  rxn_text = raw"
+scaffold {
+  id: 0
+  smarts: \"[OH]-C(=O)-[#6]\"
+  remove_atom: 0
+}
+sidechain {
+  id: 1
+  smarts: \"[NH2]-[CX4]\"
+  join {
+    a1: 1
+    a2: 0
+    btype: SS_SINGLE_BOND
+  }
+}
+"
+  fname = write_smiles_tempfile("rxn4", rxn_text)
+  rxn = Reaction()
+  read_textproto(rxn, fname) || return is_failure("Cannot read reaction")
+
+  scaffold = Molecule()
+  build_from_smiles(scaffold, "c1cc(C(=O)O)ccc1CC(=O)O benzoic acid") || return is_failure("Bad smiles")
+
+  amine_smiles = [
+    "CC(C)N ID:EN300-18989",
+    "CCCN ID:EN300-20505",
+    "NCC=C ID:EN300-19995",
+    "NCC#C ID:EN300-21409",
+    "NCCO ID:EN300-19392",
+    "NC1CC1 ID:EN300-21353",
+    "CC(C)(C)N ID:EN300-16766",
+    "CCCCN ID:EN300-19577",
+    "CCC(C)N ID:EN300-19017"
+  ]
+
+  amines = [LillyMol.MolFromSmiles(s) for s in amine_smiles]
+
+  smc = SidechainMatchConditions()
+  [add_sidechain(rxn, 0, m, smc) for m in amines]
+   
+  sresults = SubstructureResults()
+  substructure_search(rxn, scaffold, sresults) == 2 || return is_failure("Not 2 acids", scaffold)
+
+  seen = Set{String}()
+  for embedding in embeddings(sresults)
+    iter = ReactionIterator()
+    initialise(iter, rxn)
+    # iter = ReactionIterator(rxn)
+
+    while active(iter)
+      product = Molecule()
+      perform_reaction(rxn, scaffold, embedding, iter, product) || return is_failure("Cannot perform reaction", scaffold) || break
+      usmi = unique_smiles(product)
+      usmi in seen && return is_failure("Duplicate product", product)
+      push!(seen, usmi)
+      increment!(iter)
+    end
+  end
+
+  length(seen) == 18 || return is_failure("Not 18 products", scaffold)
+
+  true
+end
+
 
 boobar()
 @test test_empty_molecule()
@@ -3228,4 +3289,5 @@ boobar()
 @test test_reaction1()
 @test test_reaction2()
 @test test_reaction_single_reagent()
+@test test_reaction_iterator1()
 

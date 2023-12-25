@@ -346,16 +346,6 @@ JLCXX_MODULE define_julia_module(jlcxx::Module& mod)
       }
     )
   ;
-#ifdef RAISES_DUPLICATE_REGISTRATON_ERROR
-  mod.set_override_module(jl_base_module);
-  mod.method("getindex",
-    [](const jlcxx::BoxedValue<const Set_of_Atoms>& boxed_atoms, int ndx)->atom_number_t{
-      const Set_of_Atoms& s = jlcxx::unbox<const Set_of_Atoms&>(boxed_atoms);
-      return s[ndx];
-    }
-  );
-  mod.unset_override_module();
-#endif
 
   mod.set_override_module(jl_base_module);
   mod.method("getindex",
@@ -511,27 +501,6 @@ JLCXX_MODULE define_julia_module(jlcxx::Module& mod)
       return a[i - 1];
     }
   );
-#ifdef RAISES_DUPLICATE_REGISTRATION
-  mod.method("getindex",
-    [](const jlcxx::BoxedValue<Ring>& boxed_ring, int ndx)->atom_number_t{
-      const Ring& r = jlcxx::unbox<Ring&>(boxed_ring);
-      return r[ndx - 1];
-    }
-  );
-#endif
-#ifdef RING_LENGTH
-  mod.method("length",
-    [](const Ring& r){
-      return r.number_elements();
-    }
-  );
-  mod.method("length",
-    [](const jlcxx::BoxedValue<Ring>& boxed_ring){
-      const Ring& r = jlcxx::unbox<Ring&>(boxed_ring);
-      return r.number_elements();
-    }
-  );
-#endif
   mod.method("length",
     [](const Set_of_Atoms& s){
       return s.number_elements();
@@ -568,34 +537,6 @@ JLCXX_MODULE define_julia_module(jlcxx::Module& mod)
   );
 #endif
 
-#ifdef RING_SHOW_TEXT
-  mod.method("ring_show_text",
-    [](const Ring& r)->std::string{
-      IWString result = AtomsAsString(r, "Ring");
-      if (r.is_aromatic()) {
-        result << " arom";
-      }
-      if (r.is_fused()) {
-        result << " fused";
-      }
-      return result.AsString();
-    }
-  );
-
-  mod.method("ring_show_text",
-    [](const jlcxx::BoxedValue<Ring>& boxed_ring)->std::string{
-      const Ring& r = jlcxx::unbox<Ring&>(boxed_ring);
-      IWString result = AtomsAsString(r, "Ring");
-      if (r.is_aromatic()) {
-        result << " arom";
-      }
-      if (r.is_fused()) {
-        result << " fused";
-      }
-      return result.AsString();
-    }
-  );
-#endif
 
 // collect not working, not sure why...
 //mod.method("collect",
@@ -1289,23 +1230,6 @@ JLCXX_MODULE define_julia_module(jlcxx::Module& mod)
         return result;
       }
     )
-#ifdef THIS_NEVER_WORKED
-    This almost worked, it compiles and runs, but when I try to access items in
-    the resulting vector I get an invalid address. The type showin in Julia
-    is a SetOfAtomsDereferencedA Maybe the cxxdereference macro....
-    .method("get_rings",
-      [](Molecule& m)->std::vector<Set_of_Atoms> {
-        const int nr = m.nrings();
-        std::vector<Set_of_Atoms> result(nr);
-        for (int i = 0; i < nr; ++i) {
-          result[i] = *m.ringi(i);
-        }
-
-        return result;
-      },
-      "returns a vector of vectors containing the ring atoms"
-    )
-#endif
 
     .method("label_atoms_by_ring_system",
       [](Molecule& m)->std::vector<int>{
@@ -1761,37 +1685,6 @@ JLCXX_MODULE define_julia_module(jlcxx::Module& mod)
     )
     .method("rings_in_fragment", &Molecule::rings_in_fragment)
 
-//#define DOES_NOT_WORK
-#ifdef DOES_NOT_WORK
-    .method("create_components",
-      [](Molecule& m, jlcxx::ArrayRef<jlcxx::BoxedValue<Molecule>> result) {
-        resizable_array_p<Molecule> components;
-        m.create_components(components);
-        std::cerr << "result size " << result.size() << '\n';
-        for (uint32_t i = 0; i < components.size(); ++i) {
-          Molecule& destination = jlcxx::unbox<Molecule>(result[i]);
-          destination = *components[i];
-        }
-        return components.size();
-      }
-    )
-#endif
-//#define DOES_NOT_WORK
-#ifdef DOES_NOT_WORK
-    .method("create_components",
-      [](Molecule& m)->jlcxx::ArrayRef<jlcxx::BoxedValue<Molecule*>> {
-        resizable_array_p<Molecule> components;
-        m.create_components(components);
-        std::cerr << "result size " << components.size() << '\n';
-        jlcxx::ArrayRef<jlcxx::BoxedValue<Molecule>> result(components.size());
-        for (uint32_t i = 0; i < components.size(); ++i) {
-          result[i] = *components[i];
-        }
-        components.resize_no_delete(0);
-        return result;
-      }
-    )
-#endif
     .method("create_subset",
       [](Molecule& m, jlcxx::ArrayRef<int64_t> subset)->Molecule{
         const int matoms = m.natoms();
@@ -2263,26 +2156,8 @@ JLCXX_MODULE define_julia_module(jlcxx::Module& mod)
   ;
 
 
-//#define REAGENT_ITERATOR_IMP
-#ifdef REAGENT_ITERATOR_IMP
-
-this is not working yet
-ERROR: LoadError: No appropriate factory for type 10IWReaction
-
   mod.add_type<Reaction_Iterator>("ReactionIterator")
     .constructor<>()
-//  .constructor<const IWReaction&>()
-    .method("initialise",
-      [](Reaction_Iterator& rit, IWReaction& rxn) {
-        return rit.initialise(rxn);
-      }
-    )
-    .method("initialise",
-      [](Reaction_Iterator& rit, const jlcxx::BoxedValue<IWReaction>& boxed_reaction)->void {
-        IWReaction& rxn = jlcxx::unbox<IWReaction&>(boxed_reaction);
-        rit.initialise(rxn);
-      }
-    )
 
     .method("active",
       [](const Reaction_Iterator& rxnit)->bool{
@@ -2298,7 +2173,6 @@ ERROR: LoadError: No appropriate factory for type 10IWReaction
     )
     .method("reagent", &Reaction_Iterator::reagent)
   ;
-#endif
 
 
   mod.add_type<Sidechain_Match_Conditions>("SidechainMatchConditions")
@@ -2328,6 +2202,16 @@ ERROR: LoadError: No appropriate factory for type 10IWReaction
         return rxn.add_sidechain_reagents(sidechain, fname, file_type, smc);
       },
       "Add reagents to a sidechain"
+    )
+    .method("add_sidechain",
+      [](IWReaction& rxn, int sidechain, const Molecule& m, Sidechain_Match_Conditions& smc)->bool {
+        Sidechain_Reaction_Site* s = rxn.sidechain(sidechain);
+        if (s == nullptr) {
+          return false;
+        }
+        return s->add_reagent(m, smc);
+      },
+      "Add a sidechain reagent"
     )
     .method("read_textproto",
       [](IWReaction& rxn, const std::string& fname)->bool{
@@ -2377,16 +2261,35 @@ ERROR: LoadError: No appropriate factory for type 10IWReaction
     )
 #endif
 #ifdef ITER_LATER
-    .method("perform_reaction",
-      [](IWReaction& rxn, const Molecule& scaffold, const Set_of_Atoms* embedding,
-         const Reaction_Iterator& iter, Molecule& product)->bool{
-        return rxn.perform_reaction(&scaffold, embedding, iter, product);
-      },
-      "generate product based on embedding and iter"
-    )
 #endif
+    ;
       
-  ;
+
+  mod.method("initialise",
+    [](Reaction_Iterator& rit, IWReaction& rxn) {
+      return rit.initialise(rxn);
+    }
+  );
+  mod.method("initialise",
+    [](Reaction_Iterator& rit, const jlcxx::BoxedValue<IWReaction>& boxed_reaction)->void {
+      IWReaction& rxn = jlcxx::unbox<IWReaction&>(boxed_reaction);
+      rit.initialise(rxn);
+    }
+  );
+  mod.method("increment!",
+    [](Reaction_Iterator& iter) {
+      iter++;
+    },
+    "maybe we could use ++"
+  );
+
+  mod.method("perform_reaction",
+    [](IWReaction& rxn, const Molecule& scaffold, const Set_of_Atoms* embedding,
+       const Reaction_Iterator& iter, Molecule& product)->bool{
+      return rxn.perform_reaction(&scaffold, embedding, iter, product);
+    },
+    "generate product based on embedding and iter"
+  );
 }
 
 

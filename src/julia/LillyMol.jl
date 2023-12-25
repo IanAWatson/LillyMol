@@ -171,10 +171,14 @@ module LillyMol
   in(q::SubstructureQuery, m::Molecule) = Bool(matches(q, m))
 
   export Reaction
-# export Sidechain_Match_Conditions
-# export ReactionIterator
-# export perform_reaction, in_place_transformation
+  export SidechainMatchConditions
+  export ReactionIterator
+  export perform_reaction, in_place_transformation
   export in_place_transformation
+  export add_sidechain
   export read_textproto
+  export initialise
+  export increment!
+  export active
 end
 

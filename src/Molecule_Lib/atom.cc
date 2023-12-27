@@ -323,7 +323,7 @@ Atom::fully_saturated() const {
 
 int
 Atom::unsaturated() const {
-  std::less<int> l;
+  std::greater<int> l;
   return _common_saturation(l);
 }
 

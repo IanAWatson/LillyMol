@@ -69,7 +69,7 @@ MoleculeFragmenter::IdentifyBreakableBonds(Molecule& m, resizable_array<int>& bo
   std::unique_ptr<int[]> status(new_int(matoms * matoms, kUnknown));
 
   if (IdentifyBreakableBonds(m, status.get())== 0) {
-    cerr << "No bonds to be broken\n";
+    //cerr << "No bonds to be broken\n";
     return 0;
   }
 

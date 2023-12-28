@@ -13,6 +13,12 @@ namespace lillymol {
 // There is no smiles interpretation.
 std::optional<int> HighestRingNumber(const IWString& smiles);
 
+// Given a SAFE smiles, identify the unbalanced ring closures.
+// by convention, the unbalanced rings that have been added are 
+// all 2 digits and will be preceded by a % sign. This makes
+// parsing easy.
+int UnbalancedRingNumbers(const IWString& smiles, resizable_array<int>& ring_numbers);
+
 }  // namespace lillymol
 
 #endif

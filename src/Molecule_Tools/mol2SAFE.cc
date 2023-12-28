@@ -8,17 +8,28 @@
 #include <iostream>
 #include <memory>
 
+#include "absl/container/flat_hash_map.h"
+
+#include "google/protobuf/text_format.h"
+#include "google/protobuf/io/zero_copy_stream.h"
+#include "google/protobuf/io/zero_copy_stream_impl.h"
+
 #define RESIZABLE_ARRAY_IWQSORT_IMPLEMENTATION
 
 #include "Foundational/cmdline/cmdline.h"
 #include "Foundational/data_source/iwstring_data_source.h"
 #include "Foundational/iwmisc/misc.h"
 #include "Foundational/iwqsort/iwqsort.h"
+#include "Foundational/iwstring/absl_hash.h"
+#include "Foundational/iwstring/iw_stl_hash_map.h"
 
 #include "Molecule_Lib/molecule.h"
+#include "Molecule_Lib/standardise.h"
 
 #include "highest_ring_number.h"
 #include "fragment_molecule.h"
+
+#include "Molecule_Tools/dicer_fragments.pb.h"
 
 namespace mol2safe {
 
@@ -84,6 +95,8 @@ class Options {
 
     int _remove_chirality = 0;
 
+    Chemical_Standardisation _chemical_standardisation;
+
     int _test_unique_smiles = 0;
     int _invalid_safe_smiles = 0;
     int _successful_test = 0;
@@ -91,14 +104,29 @@ class Options {
 
     extending_resizable_array<int> _breakable_bond_count;
 
+    IWString_and_File_Descriptor _stream_for_fragment_stats;
+
+    // When accumulating fragments, we can impose a maximum atom count limit.
+    int _max_atoms = 0;
+    // when accumulating fragments, we can impose a limit on the number of
+    // non ring atoms.
+    int _max_non_ring_atoms = 0;
+
+    absl::flat_hash_map<IWString, dicer_data::DicerFragment> _fragment;
+
     // Private functions
     int PerformTest(Molecule& m, 
                      PerMoleculeArrays& data,
                      const IWString& SAFE_smiles);
+    void AccumulateFragmentStatistics(const resizable_array_p<Molecule>& components, const IWString& parent_name);
+    void AccumulateFragmentStatistics(Molecule& m, const IWString& mname);
+
   public:
     int Initialise(Command_Line& cl);
 
     int Process(Molecule& m, int hring, IWString_and_File_Descriptor& output);
+
+    int WriteFragmentStatistics();
 
     int Report(std::ostream& output) const;
 };
@@ -106,6 +134,14 @@ class Options {
 int
 Options::Initialise(Command_Line& cl) {
   _verbose = cl.option_count('v');
+
+  if (cl.option_present('g')) {
+    if(! _chemical_standardisation.construct_from_command_line(cl, _verbose > 1))
+    {
+      cerr << "Cannot parse -g option\n";
+      return 0;
+    }
+  }
 
   if (cl.option_present('I')) {
     if (! cl.value('I', _isotope)) {
@@ -135,6 +171,41 @@ Options::Initialise(Command_Line& cl) {
     _test_unique_smiles = 1;
     if (_verbose) {
       cerr << "Will check for unique smiles match\n";
+    }
+  }
+
+  if (cl.option_present('S')) {
+    IWString fname = cl.string_value('S');
+    if (! _stream_for_fragment_stats.open(fname.null_terminated_chars())) {
+      cerr << "Cannot open stream for fragment statustics '" << fname << "'\n";
+      return 0;
+    }
+
+    if (_verbose) {
+      cerr << "Fragment statistics written to '" << fname << "'\n";
+    }
+  }
+
+  if (cl.option_present('M')) {
+    const_IWSubstring m;
+    for (int i = 0; cl.value('M', m, i); ++i) {
+      if (m.numeric_value(_max_atoms) && _max_atoms > 1) {
+        if (_verbose) {
+          cerr << "Will not accumulate fragments with more than " << _max_atoms << " atoms\n";
+        }
+      } else if (m.starts_with("maxnr=")) {
+        m.remove_leading_chars(6);
+        if (! m.numeric_value(_max_non_ring_atoms) || _max_non_ring_atoms < 1) {
+          cerr << "Invalid maxnr= specification '" << m << "'\n";
+          return 0;
+        }
+        if (_verbose) {
+          cerr << "Will not accumulate fragments with more than " << _max_non_ring_atoms << " non ring atoms\n";
+        }
+      } else {
+        cerr << "Unrecognised -M specification '" << m << "'\n";
+        return 0;
+      }
     }
   }
 
@@ -192,9 +263,6 @@ PlaceSmilesSymbol(Molecule& m,
   if (e->needs_square_brackets() || a.isotope() || a.formal_charge()) {
     square_bracket = true;
     smi << kOpenSquareBracket;
-    if (a.isotope()) {
-      smi << a.isotope();
-    }
   }
 
   e->append_smiles_symbol(smi, NOT_AROMATIC, m.isotope(zatom));
@@ -234,6 +302,8 @@ AppendSmiles(Molecule& m,
     data.atom_smarts[i].resize_keep_storage(0);
   }
 
+  resizable_array<int> ring_numbers_added;
+
   for (int i = 0; i < matoms; ++i) {
     PlaceSmilesSymbol(m, i, data.atom_smarts[i]);
     const atom_number_t initial_atom_number = InitialAtomNumber(m, i);
@@ -255,6 +325,7 @@ AppendSmiles(Molecule& m,
         data.atom_smarts[i] << '%';
       }
       data.atom_smarts[i] << data.ring_number_status[ndx];
+      ring_numbers_added << data.ring_number_status[ndx];
     }
   }
 
@@ -277,6 +348,9 @@ Options::Process(Molecule& m, int hring, IWString_and_File_Descriptor& output) {
   if (_remove_chirality) {
     m.remove_all_chiral_centres();
   }
+  if (_chemical_standardisation.active()) {
+    _chemical_standardisation.process(m);
+  }
 
   resizable_array<int> breakable_bonds;
   int nbreakable =  _fragmenter.IdentifyBreakableBonds(m, breakable_bonds);
@@ -296,6 +370,10 @@ Options::Process(Molecule& m, int hring, IWString_and_File_Descriptor& output) {
     } else {
       data.parent_smiles = m.smiles();
     }
+    data.parent_name = m.name();
+  }
+
+  if (_stream_for_fragment_stats.is_open() && data.parent_name.empty()) {
     data.parent_name = m.name();
   }
 
@@ -324,6 +402,9 @@ Options::Process(Molecule& m, int hring, IWString_and_File_Descriptor& output) {
   resizable_array_p<Molecule> components;
   m.create_components(components);
   // cerr << "Molecule generates " << components.size() << " components\n";
+  if (_stream_for_fragment_stats.is_open()) {
+    AccumulateFragmentStatistics(components, data.parent_name);
+  }
 
   static NatomsComparitor nac;
   components.iwqsort(nac);
@@ -385,6 +466,59 @@ Options::PerformTest(Molecule& m,
   return 1;
 }
 
+void
+Options::AccumulateFragmentStatistics(const resizable_array_p<Molecule>& components, const IWString& parent_name) {
+  for (Molecule* m : components) {
+    AccumulateFragmentStatistics(*m, parent_name);
+  }
+}
+
+// Return true if `m` has more than `max_non_ring_atoms`.
+int
+TooManyNonRingAtoms(Molecule& m,
+                    int max_non_ring_atoms) {
+  int count = 0;
+  int matoms = m.natoms();
+  for (int i = 0; i < matoms; ++i) {
+    if (m.ring_bond_count(i)) {
+      continue;
+    }
+
+    ++count;
+    if (count > max_non_ring_atoms) {
+      return 1;
+    }
+  }
+
+  return 0;
+}
+
+void
+Options::AccumulateFragmentStatistics(Molecule& m, const IWString& mname) {
+  if (_max_atoms > 0 && m.natoms() > _max_atoms) {
+    return;
+  }
+  if (_max_non_ring_atoms > 0 && TooManyNonRingAtoms(m, _max_non_ring_atoms)) {
+    return;
+  }
+
+  IWString usmi = m.unique_smiles();
+  auto iter = _fragment.find(usmi);
+  if (iter == _fragment.end()) {
+    dicer_data::DicerFragment proto;
+    proto.set_n(1);
+    proto.set_smi(usmi.AsString());
+    proto.set_par(mname.AsString());
+    if (_isotope) {
+      proto.set_iso(dicer_data::ATT);
+    }
+    _fragment.emplace(usmi, std::move(proto));
+  } else {
+    auto n = iter->second.n();
+    iter->second.set_n(n + 1);
+  }
+}
+
 int
 Options::Report(std::ostream& output) const {
   output << "Processed " << _molecules_read << " molecules\n";
@@ -399,6 +533,31 @@ Options::Report(std::ostream& output) const {
     output << _successful_test << " successful unique smiles matches\n";
     output << _test_failure << " smiles mismatches\n";
   }
+  return 1;
+}
+
+int
+Options::WriteFragmentStatistics() {
+  if (! _stream_for_fragment_stats.is_open()) {
+    cerr << "Options::WriteFragmentStatistics:stream not open\n";
+    return 0;
+  }
+
+  static google::protobuf::TextFormat::Printer printer;
+  printer.SetSingleLineMode(true);
+
+  std::string buffer;
+  for (const auto& [usmi, proto] : _fragment) {
+    if (! printer.PrintToString(proto, &buffer)) {
+      cerr << "Options::WriteFragmentStatistics write '" << proto.ShortDebugString() << "'\n";
+      return 0;
+    }
+
+    _stream_for_fragment_stats << buffer;
+    _stream_for_fragment_stats << '\n';
+    _stream_for_fragment_stats.write_if_buffer_holds_more_than(4096);
+  }
+
   return 1;
 }
 
@@ -455,7 +614,7 @@ Mol2SAFE(Options& options,
 
 int
 Mol2SAFE(int argc, char** argv) {
-  Command_Line cl(argc, argv, "vI:pct");
+  Command_Line cl(argc, argv, "vI:pctg:S:M:");
   if (cl.unrecognised_options_encountered()) {
     cerr << "unrecognised_options_encountered\n";
     Usage(1);
@@ -480,6 +639,10 @@ Mol2SAFE(int argc, char** argv) {
       cerr << "Error processing '" << fname << "'\n";
       return 1;
     }
+  }
+
+  if (cl.option_present('S')) {
+    options.WriteFragmentStatistics();
   }
 
   if (verbose) {

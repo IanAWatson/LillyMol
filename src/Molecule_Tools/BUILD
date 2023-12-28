@@ -1131,8 +1131,10 @@ cc_binary(
         ":highest_ring_number",
         ":fragment_molecule_lib",
         "//Foundational/cmdline:iwcmdline",
+        "//Foundational/iwstring:absl_hash",
         "//Molecule_Lib:iwmolecule",
         "//Molecule_Lib:moleculeio",
+        "@com_google_absl//absl/container:node_hash_map",
     ],
 )
 

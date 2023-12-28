@@ -74,4 +74,47 @@ HighestRingNumber(const IWString& smiles) {
   return rc;
 }
 
+int
+UnbalancedRingNumbers(const IWString& smiles, resizable_array<int>& ring_numbers) {
+
+  ring_numbers.resize_keep_storage(0);
+
+  const int nchars = smiles.length();
+
+  for (int i = 0; i < nchars; ++i) {
+    const char c = smiles[i];
+    if (std::isspace(c)) {
+      return ring_numbers.number_elements();
+    }
+
+    if (c != '%') {
+      continue;
+    }
+
+    if (i + 2 >= smiles.length()) {
+      return 0;
+    }
+
+    char s = smiles[i + 1];
+    int ring_number = 0;
+    if (s >= '0' && s <= '9') {
+      ring_number = s - '0';
+    } else {
+      return 0;
+    }
+
+    s = smiles[i + 2];
+    if (s >= '0' && s <= '9') {
+      ring_number = 10 * ring_number + s - '0';
+    } else {
+      return 0;
+    }
+
+    i += 2;
+    ring_numbers << ring_number;
+  }
+
+  return ring_numbers.number_elements();
+}
+
 }  // namespace lillymol

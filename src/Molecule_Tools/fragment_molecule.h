@@ -2,6 +2,7 @@
 #define MOLECULE_TOOLS_FRAGMENT_MOLECULE_H_
 
 #include "Foundational/iwaray/iwaray.h"
+#include "Foundational/cmdline/cmdline.h"
 #include "Molecule_Lib/molecule.h"
 #include "Molecule_Lib/substructure.h"
 #include "Molecule_Lib/target.h"
@@ -29,6 +30,9 @@ class MoleculeFragmenter {
 
   public:
     MoleculeFragmenter();
+
+    // Command line options -q and -Q are used.
+    int Initialise(Command_Line& cl);
 
     void set_add_queries_to_default_rules(int s) {
       _add_queries_to_default_rules = s;

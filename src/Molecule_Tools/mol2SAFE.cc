@@ -11,8 +11,6 @@
 #include "absl/container/flat_hash_map.h"
 
 #include "google/protobuf/text_format.h"
-#include "google/protobuf/io/zero_copy_stream.h"
-#include "google/protobuf/io/zero_copy_stream_impl.h"
 
 #define RESIZABLE_ARRAY_IWQSORT_IMPLEMENTATION
 
@@ -21,10 +19,11 @@
 #include "Foundational/iwmisc/misc.h"
 #include "Foundational/iwqsort/iwqsort.h"
 #include "Foundational/iwstring/absl_hash.h"
-#include "Foundational/iwstring/iw_stl_hash_map.h"
 
+#include "Molecule_Lib/atom_typing.h"
 #include "Molecule_Lib/molecule.h"
 #include "Molecule_Lib/standardise.h"
+#include "Molecule_Lib/substructure.h"
 
 #include "highest_ring_number.h"
 #include "fragment_molecule.h"
@@ -37,6 +36,19 @@ using std::cerr;
 
 void
 Usage(int rc) {
+  cerr << R"(Transform smiles to SAFE representations.
+Input must be a smiles file.
+ -p             write the parent molecule as well
+ -c             remove chirality
+ -l             strip to largest fragment
+ -I <iso>       place a fixed isotope on all attachment points
+ -M ...         constraints on max fragment size
+ -P <atype>     atom typing specification. If specified the isotope will be the atom type.
+ -S <fname>     write fragment statistics in dicer_data::DicerFragment textproto form
+ -g ...         standardisation options
+ -v             verbose output
+  )";
+
   ::exit(rc);
 }
 
@@ -61,6 +73,8 @@ struct PerMoleculeArrays {
     // every fragment
     int* include_atom;
 
+    uint32_t* atype = nullptr;
+
     IWString parent_smiles;
     IWString parent_name;
 
@@ -77,6 +91,12 @@ struct PerMoleculeArrays {
       ndx = RingStatusIndex(a2, a1);
       ring_number_status[ndx] = value;
     }
+
+    int StoreAtomTypes(Molecule& m, Atom_Typing_Specification& atom_typing);
+
+    uint32_t AtomType(atom_number_t zatom) const {
+      return atype[zatom];
+    }
 };
 
 
@@ -89,13 +109,19 @@ class Options {
 
     fragment_molecule::MoleculeFragmenter _fragmenter;
 
+    // We can put a fixed isotope at each attachment point.
+    // If atom typing is specified, the atom type will be the isotope
     isotope_t _isotope = 0;
 
     int _write_parent = 0;
 
     int _remove_chirality = 0;
 
+    int _reduce_to_largest_fragment = 0;
+
     Chemical_Standardisation _chemical_standardisation;
+
+    Atom_Typing_Specification _atom_typing;
 
     int _test_unique_smiles = 0;
     int _invalid_safe_smiles = 0;
@@ -115,6 +141,7 @@ class Options {
     absl::flat_hash_map<IWString, dicer_data::DicerFragment> _fragment;
 
     // Private functions
+    int Preprocess(Molecule& m);
     int PerformTest(Molecule& m, 
                      PerMoleculeArrays& data,
                      const IWString& SAFE_smiles);
@@ -143,11 +170,19 @@ Options::Initialise(Command_Line& cl) {
     }
   }
 
+  if (cl.option_present('P')) {
+    const_IWSubstring p = cl.string_value('P');
+    if (! _atom_typing.build(p)) {
+      cerr << "Invalid atom typing specification '" << p << "'\n";
+      return 1;
+    }
+  }
+
   if (cl.option_present('I')) {
     if (! cl.value('I', _isotope)) {
       cerr << "Options::Initialise:invalid isotope specification (-I)\n";
       return 0;
-    }
+    } 
     if (_verbose) {
       cerr << "Will label break points with isotope " << _isotope << '\n';
     }
@@ -157,6 +192,13 @@ Options::Initialise(Command_Line& cl) {
     _write_parent = 1;
     if (_verbose) {
       cerr << "Will write parent molecule\n";
+    }
+  }
+
+  if (cl.option_present('l')) {
+    _reduce_to_largest_fragment = 1;
+    if (_verbose) {
+      cerr << "Will reduce to the largest fragment\n";
     }
   }
 
@@ -239,6 +281,15 @@ PerMoleculeArrays::~PerMoleculeArrays() {
   delete [] atom_smarts;
   delete [] ring_number_status;
   delete [] include_atom;
+  if (atype != nullptr) {
+    delete [] atype;
+  }
+}
+
+int
+PerMoleculeArrays::StoreAtomTypes(Molecule& m, Atom_Typing_Specification& atom_typing) {
+  atype = new uint32_t[m.natoms()];
+  return atom_typing.assign_atom_types(m, atype);
 }
 
 // We need to keep track of the initial atom numbers 
@@ -344,12 +395,27 @@ AppendSmiles(Molecule& m,
 }
 
 int
-Options::Process(Molecule& m, int hring, IWString_and_File_Descriptor& output) {
+Options::Preprocess(Molecule& m) {
+  if (_reduce_to_largest_fragment) {
+    m.reduce_to_largest_fragment_carefully();
+  }
   if (_remove_chirality) {
     m.remove_all_chiral_centres();
   }
   if (_chemical_standardisation.active()) {
     _chemical_standardisation.process(m);
+  }
+
+  return 1;
+}
+
+int
+Options::Process(Molecule& m, int hring, IWString_and_File_Descriptor& output) {
+  Preprocess(m);
+
+  // Added rings are always >= 10
+  if (hring < 10) {
+    hring = 10;
   }
 
   resizable_array<int> breakable_bonds;
@@ -377,6 +443,10 @@ Options::Process(Molecule& m, int hring, IWString_and_File_Descriptor& output) {
     data.parent_name = m.name();
   }
 
+  if (_atom_typing.active()) {
+    data.StoreAtomTypes(m, _atom_typing);
+  }
+
   std::unique_ptr<Initial[]> initial = std::make_unique<Initial[]>(matoms);
   for (int i = 0; i < matoms; ++i) {
     initial[i].initial_atom_number = i;
@@ -394,6 +464,10 @@ Options::Process(Molecule& m, int hring, IWString_and_File_Descriptor& output) {
     if (_isotope) {
       m.set_isotope(a1, _isotope);
       m.set_isotope(a2, _isotope);
+    } else if (_atom_typing.active()) {
+      // Note we deliberately store the atom type of the connected atom, not the atom itself.
+      m.set_isotope(a1, data.AtomType(a2));
+      m.set_isotope(a1, data.AtomType(a1));
     }
   }
 
@@ -434,7 +508,13 @@ Options::Process(Molecule& m, int hring, IWString_and_File_Descriptor& output) {
   if (_write_parent) {
     output << data.parent_smiles << ' ' << data.parent_name << '\n';
   }
-  output << smiles << '\n';
+
+  output << smiles;
+  if (! _write_parent) {
+    output << data.parent_name;
+  }
+  output << '\n';
+
   output.write_if_buffer_holds_more_than(4096);
 
   if (_test_unique_smiles) {
@@ -502,12 +582,15 @@ Options::AccumulateFragmentStatistics(Molecule& m, const IWString& mname) {
     return;
   }
 
-  IWString usmi = m.unique_smiles();
+  // Save a copy.
+  IWString smi = m.smiles();
+
+  const IWString& usmi = m.unique_smiles();
   auto iter = _fragment.find(usmi);
   if (iter == _fragment.end()) {
     dicer_data::DicerFragment proto;
     proto.set_n(1);
-    proto.set_smi(usmi.AsString());
+    proto.set_smi(smi.AsString());
     proto.set_par(mname.AsString());
     if (_isotope) {
       proto.set_iso(dicer_data::ATT);
@@ -614,7 +697,7 @@ Mol2SAFE(Options& options,
 
 int
 Mol2SAFE(int argc, char** argv) {
-  Command_Line cl(argc, argv, "vI:pctg:S:M:");
+  Command_Line cl(argc, argv, "vI:pcltg:S:M:P:");
   if (cl.unrecognised_options_encountered()) {
     cerr << "unrecognised_options_encountered\n";
     Usage(1);

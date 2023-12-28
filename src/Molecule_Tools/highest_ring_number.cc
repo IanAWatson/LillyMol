@@ -117,4 +117,51 @@ UnbalancedRingNumbers(const IWString& smiles, resizable_array<int>& ring_numbers
   return ring_numbers.number_elements();
 }
 
+int
+IsotopeToRingOpening(const IWString& smiles, int& ring_number, IWString& new_smiles) {
+  static constexpr char kOpenSquareBracket = '[';
+  static constexpr char kCloseSquareBracket = ']';
+
+  const int nchars = smiles.length();
+
+  new_smiles.make_room_for_extra_items(nchars + 6);
+
+  int rc = 0;
+
+  // Set to true if the atom just parsed was an isotope.
+  bool previous_atom_was_isotope = false;
+  for (int i = 0; i < nchars; ++i) {
+    const char c = smiles[i];
+    if (std::isspace(c)) {
+      return rc;
+    }
+
+    if (c == kOpenSquareBracket) {
+      if (i != nchars - 1 && std::isdigit(smiles[i + 1])) {
+        previous_atom_was_isotope = true;
+      } else {
+        previous_atom_was_isotope = false;
+      }
+
+      new_smiles << c;
+      continue;
+    }
+
+    else if (c == kCloseSquareBracket) {
+      new_smiles << c;
+      if (previous_atom_was_isotope) {
+        new_smiles << '%' << ring_number;
+        ++ring_number;
+        previous_atom_was_isotope = false;
+        ++rc;
+      }
+      continue;
+    } else {
+      new_smiles << c;
+    }
+  }
+
+  return rc;
+}
+
 }  // namespace lillymol

@@ -79,6 +79,32 @@ INSTANTIATE_TEST_SUITE_P(UnbalancedRingNumbersTester, UnbalancedRingNumbersTeste
   SmilesUnbalanced{"c1%11%10", 2, {11, 10}}
 ));
 
+struct SmilesToRingOpenings {
+  IWString smiles;
+  int ring_number;
+  int expected_rc;
+  IWString expected_smiles;
+};
+
+class TestIsotopeToRingOpening : public testing::TestWithParam<SmilesToRingOpenings> {
+  protected:
+    int ring_number;
+    IWString new_smiles;
+};
+
+TEST_P(TestIsotopeToRingOpening, TestIsotopeToRingOpening) {
+  const auto& params = GetParam();
+  ring_number = params.ring_number;
+  EXPECT_EQ(IsotopeToRingOpening(params.smiles, ring_number, new_smiles), params.expected_rc);
+  EXPECT_EQ(new_smiles, params.expected_smiles) << "smiles wrong " << params.expected_smiles << ' ' << new_smiles;
+}
+INSTANTIATE_TEST_SUITE_P(TestIsotopeToRingOpening, TestIsotopeToRingOpening, testing::Values(
+  SmilesToRingOpenings{"ABC", 10, 0, "ABC"},
+  SmilesToRingOpenings{"A[2B]C", 10, 1, "A[2B]%10C"},
+  SmilesToRingOpenings{"A[2B][3C]C", 20, 2, "A[2B]%20[3C]%21C"},
+  SmilesToRingOpenings{"A[B][3C]C", 20, 1, "A[B][3C]%20C"},
+  SmilesToRingOpenings{"A[B][33C]C", 20, 1, "A[B][33C]%20C"}
+));
 
 }  // namespace
 

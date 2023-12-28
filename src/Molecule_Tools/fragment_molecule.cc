@@ -21,10 +21,27 @@ MoleculeFragmenter::MoleculeFragmenter() {
   _break_carbon_carbon_bonds = 0;
 }
 
+int
+MoleculeFragmenter::Initialise(Command_Line& cl) {
+  int verbose = cl.option_present('v');
+  if (! process_queries(cl, _to_break, verbose, 'q')) {
+    cerr << "MoleculeFragmenter::Initialise:canot process to break queries (-q)\n";
+    return 0;
+  }
+
+  if (! process_queries(cl, _never_break, verbose, 'Q')) {
+    cerr << "MoleculeFragmenter::Initialise:canot process never break queries (-Q)\n";
+    return 0;
+  }
+
+  return 1;
+}
+
 constexpr int kUnknown = 0;
 constexpr int kCanBreak = 1;
 constexpr int kDoNotBreak = 2;
 
+// All bonds implied by the matched atoms are marked with `flag` in `status`.
 int
 IdentifyMatchingBonds(Molecule_to_Match& target,
                        resizable_array_p<Substructure_Query>& query,
@@ -43,16 +60,19 @@ IdentifyMatchingBonds(Molecule_to_Match& target,
       if (e->size() < 2) {
         continue;
       }
-      atom_number_t a1 = e->item(0);
-      atom_number_t a2 = e->item(1);
-      const Bond* b = target.molecule()->bond_between_atoms(a1, a2);
-      if (b == nullptr) {
-        cerr << "IdentifyBreakableBonds::Matched atoms not bonded " << target.molecule()->name() << '\n';
-        continue;
+      const int eatoms = e->number_elements();
+      for (int i = 0; i < eatoms; ++i) {
+        atom_number_t a1 = e->item(i);
+        for (int j = i + 1; j < eatoms; ++j) {
+          atom_number_t a2 = e->item(j);
+          if (! target.molecule()->are_bonded(a1, a2)) {
+            continue;
+          }
+          status[a1 * matoms + a2] = flag;
+          status[a2 * matoms + a1] = flag;
+          ++rc;
+        }
       }
-      status[a1 * matoms + a2] = flag;
-      status[a2 * matoms + a1] = flag;
-      ++rc;
     }
   }
 

@@ -19,6 +19,11 @@ std::optional<int> HighestRingNumber(const IWString& smiles);
 // parsing easy.
 int UnbalancedRingNumbers(const IWString& smiles, resizable_array<int>& ring_numbers);
 
+// Given a smiles with isotopic labels, convert those to ring openings.
+// [nnnC]C becomes [nnnC]%rC where `r` is derived from `ring_number`
+// Note that `new_smiles` will be appended to.
+int IsotopeToRingOpening(const IWString& smiles, int& ring_number, IWString& new_smiles);
+
 }  // namespace lillymol
 
 #endif

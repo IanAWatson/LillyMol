@@ -54,6 +54,7 @@ local_install(
         ":medchemwizard",
         ":mkfrag",
         ":mol2qry",
+        ":mol2SAFE",
         ":molecular_abstraction",
         ":molecular_grid",
         ":molecular_merge",
@@ -2610,6 +2611,7 @@ cc_library(
         "highest_ring_number.h",
     ],
     deps = [
+        "//Foundational/iwmisc",
         "//Foundational/iwstring",
     ],
 )

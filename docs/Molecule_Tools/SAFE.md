@@ -1,6 +1,6 @@
 # SAFE
 Following the very insightful work of [Noutahi et. al](https://arxiv.org/pdf/2310.10773.pdf)
-LillyMol includes a utility for converting from smiles to SAFE form. This uses bond breaking
+LillyMol includes a utility for converting from smiles to SAFE form. This implementation uses bond breaking
 rules based on dicer fragment formation rules.
 
 ## HOWTO
@@ -29,17 +29,17 @@ Input must be a smiles file.
  -y             re-use ring numbers in generated ring numbers
  -I <iso>       place a fixed isotope on all attachment points
  -P <atype>     atom typing specification. If specified the isotope will be the atom type.
+ -S <fname>     write fragment statistics in dicer_data::DicerFragment textproto form
  -M ...         constraints on max fragment size
  -M <n>         fragments can contain no more than <n> atoms
  -M maxnr=<n>   the maximum number of non-ring atoms that can be in a fragment
- -S <fname>     write fragment statistics in dicer_data::DicerFragment textproto form
  -g ...         standardisation options
  -z             ignore connection table errors on input
  -v             verbose output
 ```
 ## Options
 ### -p
-Write the parent molecule in addition to the SAFE form. For example
+Write the parent molecule in addition to the SAFE form. Output might look like
 ```
 C1=CN=C(C=N1)NS(=O)(=O)C1=CC=CC=C1 CHEMBL596295
 N%10S%11(=O)=O.C%111=CC=CC=C1.C1=CN=C%10C=N1
@@ -55,7 +55,7 @@ it might be best to just discard all chiral information.
 Discard likely salts. Generally desirable.
 
 ### -y
-By default, the tool will not re-use ring numbers, but it is almost certainly desirable to 
+By default, the tool will not re-use ring numbers, but it is likely desirable to 
 minimise the number of ring opening and closing numbers used. Use the `-y` option to enable
 re-use of ring numbers. This represents a small run-time penalty, while possibly making
 the resulting strings more useful.
@@ -80,15 +80,6 @@ The atom type is the atom type of the atom from which the atom with the isotope 
 detached, This can then facilitate subsequent precise reconstruction based on SMART
 fragments.
 
-### -M
-Unless constrained, mol2SAFE will generate arbitrary sized fragments, which may not
-be required. I found the combination
-```
--M maxnr=10 -M 16
-```
-useful. This also has the very desirable effect of limiting the number of fragments
-generated.
-
 ### -S <fname>
 Write a summary of the fragments encountered. This is a dicerdata::DicerFragment
 textproto form. Typical entries might look like
@@ -109,6 +100,26 @@ Where whcih was generated from
 mol2SAFE -I 1 -S /tmp/Sfile -y -M maxnr=10 -M 16 -c -v chembl.smi
 ```
 
+### -M
+This only applies with the -S option is specified.
+Unless constrained, mol2SAFE will generates and accumulates arbitrary sized fragments,
+which may not be desirable. We can limit the size of the fragments written via the `-S`
+option with the `-M` option. Specifying a number imposes a limit on the overall
+size of fragments accumulated. But what is often found in cases like this is that
+having a larger number in order to accommodate certain ring systems is desirable,
+this may then enable processing of long chain fragments. So the construct `-M maxnr=nn`
+is also available, which allows a constraint on the number of non ring atoms. I have
+found the following combination useful.
+```
+-M maxnr=10 -M 16
+```
+In this case the largest fragment contains 16 atoms, but within that constraint,
+fragments containing more than 10 non-ring atoms will be discarded.
+
+This also has the very desirable effect of limiting the number of fragments
+generated. When doing frgament replacement, it is usually desirable to use
+well precedented fragments as replacements.
+
 ### -g
 Apply chemical standardisation to the incoming molecules. Generally this will be
 desirable since the default fragmentation scheme built into mol2SAFE works best
@@ -119,6 +130,9 @@ that all Nitro groups are represented in their `O=N=O` form, rather than O=[N+]-
 with the latter form, the `N-O` bond will be broken. Avoid this by adding the `-g all` option,
 which will transform the molecules into LillyMol standardised form
 [standardise](/docs/Molecule_Lib/chemical_standardisation.md).
+
+Note too that one of the transformations
+performed is to remove explicit Hydrogen atoms, which will also likely be desirable.
 
 ### -z
 Ignore connection table errors in the input. LillyMol may be unable to read

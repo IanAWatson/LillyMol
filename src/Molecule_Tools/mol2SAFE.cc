@@ -45,10 +45,10 @@ Input must be a smiles file.
  -y             re-use ring numbers in generated ring numbers
  -I <iso>       place a fixed isotope on all attachment points
  -P <atype>     atom typing specification. If specified the isotope will be the atom type.
+ -S <fname>     write fragment statistics in dicer_data::DicerFragment textproto form
  -M ...         constraints on max fragment size
  -M <n>         fragments can contain no more than <n> atoms
  -M maxnr=<n>   the maximum number of non-ring atoms that can be in a fragment
- -S <fname>     write fragment statistics in dicer_data::DicerFragment textproto form
  -g ...         standardisation options
  -z             ignore connection table errors on input
  -t             test the unique smiles of the parent against that formed from the SAFE representation.

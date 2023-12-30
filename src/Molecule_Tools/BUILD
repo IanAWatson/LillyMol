@@ -549,26 +549,6 @@ cc_binary(
 )
 
 cc_binary(
-    name = "dicer2",
-    srcs = [
-        "dicer2.cc",
-    ],
-    deps = [
-        ":dicer_lib",
-        "dicer_fragments_cc_proto",
-        "//Foundational/accumulator",
-        "//Foundational/cmdline_v2",
-        "//Foundational/iwaray",
-        "//Foundational/iwmisc",
-        "//Foundational/iwmisc:sparse_fp_creator",
-        "//Molecule_Lib:iwmolecule",
-        "//Molecule_Lib:moleculeio",
-        "//Molecule_Lib:substructure_cc_proto",
-        "@com_google_protobuf//:protobuf",
-    ],
-)
-
-cc_binary(
     name = "dicer_fragment_overlap",
     srcs = [
         "dicer_fragment_overlap.cc",
@@ -1781,23 +1761,6 @@ cc_library(
         "//visibility:public",
     ],
     deps = [
-        "//Molecule_Lib:iwmolecule",
-    ],
-)
-
-cc_library(
-    name = "dicer_lib",
-    srcs = [
-        "dicer_lib.cc",
-    ],
-    hdrs = [
-        "dicer_lib.h",
-    ],
-    visibility = [
-        "//visibility:public",
-    ],
-    deps = [
-        ":dicer_fragments_cc_proto",
         "//Molecule_Lib:iwmolecule",
     ],
 )

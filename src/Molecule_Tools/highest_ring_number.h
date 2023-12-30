@@ -24,6 +24,25 @@ int UnbalancedRingNumbers(const IWString& smiles, resizable_array<int>& ring_num
 // Note that `new_smiles` will be appended to.
 int IsotopeToRingOpening(const IWString& smiles, int& ring_number, IWString& new_smiles);
 
+// when assigning ring numbers in SAFE smiles the default behaviour is to just use
+// a sequential ring number for each join. This class keeps track of which rings
+// have been opened and closed and can re-use ring numbers.
+class RingNumberControl {
+  private:
+    const int _max_rings;
+
+    // For each ring number, is it allocated or free.
+    int* _issued;
+    int _next_ring_number;
+
+  public:
+    RingNumberControl(int lowest_ring_number, int max_rings);
+    ~RingNumberControl();
+
+    int GetRing();
+    void OkToReuse(int ring_number);
+};
+
 }  // namespace lillymol
 
 #endif

@@ -196,6 +196,71 @@ SuppressGuainidine(Molecule& m,
 
   return rc;
 }
+
+// `nh` is the Nitrogen in a N=C bond with `carbon` the other end.
+int
+SuppressAmidine(Molecule& m,
+                atom_number_t nh,
+                atom_number_t carbon,
+                int* status) {
+  const Atom& a = m[carbon];
+  atom_number_t singly_bonded_nitrogen = INVALID_ATOM_NUMBER;
+  for (const Bond * b : a) {
+    atom_number_t o = b->other(carbon);
+    if (o == nh) {
+      continue;
+    }
+    const Atom& n = m[o];
+    if (n.atomic_number() != 7) {
+      continue;
+    }
+    if (n.ncon() != 1) {
+      continue;
+    }
+    singly_bonded_nitrogen = o;
+  }
+
+  if (singly_bonded_nitrogen == INVALID_ATOM_NUMBER) {
+    return 0;
+  }
+
+  const int matoms = m.natoms();
+
+  status[carbon * matoms + singly_bonded_nitrogen] = status[singly_bonded_nitrogen * matoms + carbon] = kDoNotBreak;
+  status[carbon * matoms + nh] = status[nh * matoms + carbon] = kDoNotBreak;
+
+  return 1;
+}
+
+// Suppress terminal amidine
+// Start by looking for the N= atom, then explore around the carbon.
+int
+SuppressAmidine(Molecule& m,
+                int* status) {
+  int rc = 0;
+
+  const int matoms = m.natoms();
+  for (int i = 0; i < matoms; ++i) {
+    const Atom& a = m[i];
+    if (a.atomic_number() != 7) {
+      continue;
+    }
+    if (a.ncon() != 1) {
+      continue;
+    }
+
+    const Bond* b = a[0];
+    if (! b->is_double_bond()) {
+      continue;
+    }
+
+    atom_number_t carbon = b->other(i);
+    rc += SuppressAmidine(m, i, carbon, status);
+  }
+
+  return rc;
+}
+
 // If `carbon` is CF3, CCl3 or t-butyl, update the entries in `status` to `flag`.
 int
 IsCf3(Molecule& m,
@@ -283,7 +348,11 @@ MoleculeFragmenter::IdentifyBreakableBonds(Molecule& m, int* status) {
   }
 
   if (nitrogen_count >= 3) {
-    SuppressGuainidine(m, status);
+    int n = SuppressGuainidine(m, status);
+    nitrogen_count -= (3 * n); 
+  }
+  if (nitrogen_count >= 2) {
+    SuppressAmidine(m, status);
   }
 
   m.compute_aromaticity_if_needed();

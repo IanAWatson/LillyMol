@@ -106,6 +106,32 @@ INSTANTIATE_TEST_SUITE_P(TestIsotopeToRingOpening, TestIsotopeToRingOpening, tes
   SmilesToRingOpenings{"A[B][33C]C", 20, 1, "A[B][33C]%20C"}
 ));
 
+TEST(TestRingNumberControl, TestSequential) {
+  RingNumberControl rnc(1, 3);
+  EXPECT_EQ(rnc.GetRing(), 1);
+  EXPECT_EQ(rnc.GetRing(), 2);
+  EXPECT_EQ(rnc.GetRing(), 3);
+  rnc.OkToReuse(3);
+  EXPECT_EQ(rnc.GetRing(), 3);
+  rnc.OkToReuse(3);
+  EXPECT_EQ(rnc.GetRing(), 3);
+  rnc.OkToReuse(1);
+  EXPECT_EQ(rnc.GetRing(), 1);
+}
+
+TEST(TestRingNumberControl, TestLowestRingNUmber) {
+  RingNumberControl rnc(10, 10);
+  EXPECT_EQ(rnc.GetRing(), 10);
+  EXPECT_EQ(rnc.GetRing(), 11);
+  rnc.OkToReuse(11);
+  rnc.OkToReuse(10);
+  EXPECT_EQ(rnc.GetRing(), 10);
+  EXPECT_EQ(rnc.GetRing(), 11);
+  EXPECT_EQ(rnc.GetRing(), 12);
+  rnc.OkToReuse(10);
+  EXPECT_EQ(rnc.GetRing(), 10);
+}
+
 }  // namespace
 
 }  // namespace lillymol

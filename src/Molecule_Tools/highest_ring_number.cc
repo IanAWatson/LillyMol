@@ -1,10 +1,13 @@
 #include <cctype>
 #include <optional>
 
+#include "Foundational/iwmisc/misc.h"
 #include "Foundational/iwstring/iwstring.h"
 
+#include "highest_ring_number.h"
 
 namespace lillymol {
+
 std::optional<int>
 HighestRingNumber(const IWString& smiles) {
   if (smiles.empty()) {
@@ -162,6 +165,32 @@ IsotopeToRingOpening(const IWString& smiles, int& ring_number, IWString& new_smi
   }
 
   return rc;
+}
+
+RingNumberControl::RingNumberControl(int lowest_ring_number, int max_rings) : _max_rings(max_rings) {
+  _issued = new_int(lowest_ring_number + 1 + max_rings + 1);
+  _next_ring_number = lowest_ring_number;
+}
+
+RingNumberControl::~RingNumberControl() {
+  delete[] _issued;
+}
+
+int
+RingNumberControl::GetRing() {
+  int rc = _next_ring_number;
+  _issued[_next_ring_number] = 1;
+  ++_next_ring_number;
+  for (; _issued[_next_ring_number]; ++_next_ring_number) {
+  }
+
+  return rc;
+}
+
+void
+RingNumberControl::OkToReuse(int ring_number) {
+  _issued[ring_number] = 0;
+  _next_ring_number = ring_number;
 }
 
 }  // namespace lillymol

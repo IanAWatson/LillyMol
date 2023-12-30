@@ -21,6 +21,7 @@
 #include "Foundational/iwstring/absl_hash.h"
 
 #include "Molecule_Lib/atom_typing.h"
+#include "Molecule_Lib/etrans.h"
 #include "Molecule_Lib/molecule.h"
 #include "Molecule_Lib/standardise.h"
 #include "Molecule_Lib/substructure.h"
@@ -51,6 +52,7 @@ Input must be a smiles file.
  -M maxnr=<n>   the maximum number of non-ring atoms that can be in a fragment
  -g ...         standardisation options
  -z             ignore connection table errors on input
+ -T ...         Element transformations - suggest '-T Br=Cl -T I=Cl'
  -t             test the unique smiles of the parent against that formed from the SAFE representation.
                 This only works if chirality is removed and isotopes NOT added.
  -v             verbose output
@@ -136,6 +138,8 @@ class Options {
   int _remove_chirality = 0;
 
   int _reduce_to_largest_fragment = 0;
+
+  Element_Transformations _etrans;
 
   Chemical_Standardisation _chemical_standardisation;
 
@@ -241,6 +245,13 @@ Options::Initialise(Command_Line& cl) {
     _remove_chirality = 1;
     if (_verbose) {
       cerr << "Will remove chirality from input molecules\n";
+    }
+  }
+
+  if (cl.option_present('T')) {
+    if (! _etrans.construct_from_command_line(cl, _verbose, 'T')) {
+      cerr << "Cannot initialise element transformations (-T)\n";
+      return 0;
     }
   }
 
@@ -489,6 +500,9 @@ Options::Preprocess(Molecule& m) {
   }
   if (_chemical_standardisation.active()) {
     _chemical_standardisation.process(m);
+  }
+  if (_etrans.active()) {
+    _etrans.process(m);
   }
 
   return 1;
@@ -786,7 +800,7 @@ Mol2SAFE(Options& options, const char* fname, IWString_and_File_Descriptor& outp
 
 int
 Mol2SAFE(int argc, char** argv) {
-  Command_Line cl(argc, argv, "vI:pcltg:S:M:P:yz");
+  Command_Line cl(argc, argv, "vI:pcltg:S:M:P:yzT:");
   if (cl.unrecognised_options_encountered()) {
     cerr << "unrecognised_options_encountered\n";
     Usage(1);

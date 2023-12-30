@@ -11,11 +11,12 @@ will generate the SAFE representation for each input molecule.
 
 ## Performance
 Performance seems reasonable. Processing 2.18M molecules (max 50 heavy
-atoms) from Chembl, takes 167 seconds, or 13k per second on hardware
+atoms) from Chembl, takes less than 2 minutes, or 19k per second on hardware
 ```
 model name      : Intel(R) Core(TM) i7-8700K CPU @ 3.70GHz
 ```
-from 2017.
+from 2017. This rises to over 3 minutes if fragment statistics are accumumalated
+with the `-S` option below.
 
 ## Usage
 
@@ -35,6 +36,9 @@ Input must be a smiles file.
  -M maxnr=<n>   the maximum number of non-ring atoms that can be in a fragment
  -g ...         standardisation options
  -z             ignore connection table errors on input
+ -T ...         Element transformations - suggest '-T Br=Cl -T I=Cl'
+ -t             test the unique smiles of the parent against that formed from the SAFE representation.
+                This only works if chirality is removed and isotopes NOT added.
  -v             verbose output
 ```
 ## Options
@@ -95,7 +99,7 @@ iso: ATT smi: "[1CH]1=C2C3(OCCN2N=C1)COC3" par: "CHEMBL3954592" n: 1
 iso: ATT smi: "[1NH2+]1CCC2(CC1)C1=C(C=CC=C1)CCN2" par: "CHEMBL1183307" n: 4 
 iso: ATT smi: "C1=C2C3C(C=C1)[1CH]=[1CH]N3[1CH2]CO2" par: "CHEMBL4439452" n: 1 
 ```
-Where whcih was generated from
+Where which was generated from
 ```
 mol2SAFE -I 1 -S /tmp/Sfile -y -M maxnr=10 -M 16 -c -v chembl.smi
 ```
@@ -140,3 +144,29 @@ certain aromatic smiles, due to differing rules about aromaticity. By default,
 processing ceases once a connection table error is encountered. If the `-z`
 option is used, the unreadable smiles is ignored.
 
+### -T 
+Element transformation options. In most QSAR datasets it will not be
+advantageous to differentiate among the heavy halogens, so considering
+I, Br and Cl to be equivalent will often be beneficial
+```
+-T I=Cl -T Br=Cl
+```
+does this
+
+### -t
+This is a testing option. In order to ensure correctness of the result,
+the resulting SAFE form can be interpreted as a molecule, and that can
+be compared with the starting molecule. If the SAFE transformation has been 
+implemented correctly, it should yield the same molecule. For the
+Chembl dataset being used for testing, this is the case.
+
+Note that in order for this to work, chirality must be removed and
+no isotopes applied.
+
+```
+mol2SAFE -t -v file.smi
+```
+should do it.
+### -v
+Verbose output. If this is in effect, statistics on overall
+data generation will be reported, otherwise the tool operates silently.

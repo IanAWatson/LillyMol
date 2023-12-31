@@ -66,7 +66,7 @@ class TestLillyMol(absltest.TestCase):
     self.assertEqual(m.explicit_hydrogens(0), 0)
     self.assertEqual(m.isotope(0), 0)
     self.assertTrue(m.valence_ok())
-    self.assertEqual(m.highest_coordinate_dimensionality(), 1)
+    self.assertEqual(m.highest_coordinate_dimensionality(), 0)
 
   def test_copy_constructor(self):
     m1 = Molecule()
@@ -265,6 +265,27 @@ class TestLillyMol(absltest.TestCase):
     self.assertGreaterEqual(to_remove, 0)
     m.delete_fragment(to_remove)
     self.assertEqual(m.smiles(), "CC.CC")
+
+  def test_saturated(self):
+    m = Molecule()
+    self.assertTrue(m.build_from_smiles("CC=CC#CCc1ccccc1"))
+    self.assertTrue(m.saturated(0))
+    self.assertFalse(m.saturated(1))
+    self.assertFalse(m.saturated(2))
+    self.assertFalse(m.saturated(3))
+    self.assertFalse(m.saturated(4))
+    self.assertFalse(m.saturated(6))
+
+  def test_unsaturation(self):
+    m = Molecule()
+    self.assertTrue(m.build_from_smiles("CC=CC#CCc1ccccc1"))
+    self.assertEqual(m.unsaturation(0), 0)
+    self.assertEqual(m.unsaturation(1), 1)
+    self.assertEqual(m.unsaturation(2), 1)
+    self.assertEqual(m.unsaturation(3), 2)
+    self.assertEqual(m.unsaturation(4), 2)
+    self.assertEqual(m.unsaturation(5), 0)
+    self.assertEqual(m.unsaturation(6), 1)
 
   def test_remove_atom(self):
     m = Molecule()

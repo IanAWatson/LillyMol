@@ -3,7 +3,7 @@ module LillyMol
 
   # abstract type AbstractSetOfAtoms <: AbstractVector{Int32} end
 
-  import Base: getindex, iterate, in, length, size, push!, show, occursin, contains, ==
+  import Base: getindex, iterate, in, length, size, push!, show, occursin, contains, ==, eachindex
 
   so_file = joinpath("bazel-bin/julia/", "lillymol_julia.so")
   #@wrapmodule(() -> joinpath("bazel-bin/julia/", "lillymol_julia.so"))
@@ -56,10 +56,14 @@ module LillyMol
   size(s::SetOfChiralCentres) = (items_in_set(s),)
   size(b::BondList) = (length(b),)
   #size(r::RingAtoms) = (length(r),)
+  eachindex(m::Molecule) = 0:(length(m) - 1)
+  eachindex(s::SetOfEmbeddings) = 1:(length(s) - 1)
+  eachindex(s::CxxWrap.CxxWrapCore.ConstCxxRef{SetOfEmbeddings}) = 1:(length(s) - 1)
   export getindex
   export iterate
   export length
   export in
+  export eachindex
   export distance_between_atoms
   export atoms_in_ring, contains
   export is_fused, is_fused_to, largest_number_of_bonds_shared_with_another_ring
@@ -102,7 +106,7 @@ module LillyMol
   export longest_path, atoms_between, bonds_between, most_distant_pair
   export implicit_hydrogens, explicit_hydrogens, hcount, move_hydrogens_to_end_of_connection_table!
   export unset_all_implicit_hydrogen_information, remove_hydrogens_known_flag_to_fix_valence_errors
-  export make_implicit_hydrogens_explicit!, pi_electrons, lone_pair_count, saturated
+  export make_implicit_hydrogens_explicit!, pi_electrons, lone_pair_count, saturated, unsaturation
   export aromatic_atom_count, aromatic_ring_count, unset_unnecessary_implicit_hydrogens_known_values!
   export smarts_equivalent_for_atom, smarts
   export atom_map_number, set_atom_map_number!, atom_with_atom_map_number, reset_all_atom_map_numbers!, reset_atom_map_numbers!

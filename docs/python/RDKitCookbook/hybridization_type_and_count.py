@@ -12,6 +12,8 @@ def hybridization(unsaturation:int)->str:
   return ["SP3", "SP2", "SP"][unsaturation]
 
 m = MolFromSmiles("CN1C=NC2=C1C(=O)N(C(=O)N2C)C#C")
+
+# Accumulate the number of atoms with each hybridization type.
 total = defaultdict(int)
 
 for i in range(0, len(m)):

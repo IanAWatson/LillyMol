@@ -98,7 +98,7 @@ class SetOfRings : public ResizableArrayHolder<Ring> {
     SetOfRings(const resizable_array_p<Ring>& r) : ResizableArrayHolder<Ring>(r) {
     }
     const Ring* operator[](int ndx) const {
-      return _ref[ndx];
+      return _ref[ndx - 1];
     }
 };
 

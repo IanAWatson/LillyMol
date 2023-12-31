@@ -11,8 +11,10 @@ end
 
 function main()
   m = LillyMol.MolFromSmiles("CN1C=NC2=C1C(=O)N(C(=O)N2C)CC#C")
+
+  # Accumulate the number of atoms with each hybridization type.
   total = DefaultDict{String, Integer}(0)
-  for i in 0:(natoms(m) - 1)
+  for i in eachindex(m)
     total[hybridization(unsaturation(m, i))] += 1
   end
 

@@ -109,7 +109,7 @@ cc_library (
 
 new_local_repository(
     name = "pybind11",
-    path = "/lrlhps/data/c3tk/dev/virtenv/gc3tk-env/include",
+    path = "/home/ian/venv_3.11/lib/python3.11/site-packages/pybind11/include",
     build_file_content = """
 cc_library (
     name = "pybind11",
@@ -129,7 +129,7 @@ cc_library (
 # local needs.
 new_local_repository(
     name = "python",
-    path = "/lrlhps/data/c3tk/dev/virtenv/gc3tk-env/include/python3.11",
+    path = "/home/ian/third_party/PYTHON3.11/include/python3.11",
     build_file_content = """
 cc_library(
     name = "python",

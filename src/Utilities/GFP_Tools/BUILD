@@ -33,6 +33,7 @@ local_install(
         ":gfp_spread_omp",
         ":gfp_spread_standard",
         ":gfp_svmfp_score",
+        ":gfp_svmfp_score.v2",
         ":gfp_svmfp_score_tbb",
         ":gfp_to_descriptors",
         ":gfp_to_descriptors_multiple",
@@ -625,6 +626,28 @@ cc_binary(
         "//Foundational/iwmisc:normalisation",
         "//Foundational/iwmisc:sparse_fp_creator",
         "//Foundational/iwqsort",
+        "//Utilities/GFP_Tools:gfp",
+    ],
+)
+
+cc_binary(
+    name = "gfp_svmfp_score.v2",
+    srcs = [
+        "gfp_svmfp_score.v2.cc",
+    ],
+    deps = [
+        ":gfp_bit_subset",
+        ":gfp_model_cc_proto",
+        "//Foundational/accumulator",
+        "//Foundational/cmdline_v2",
+        "//Foundational/data_source:iwstring_data_source",
+        "//Foundational/iw_tdt",
+        "//Foundational/iwmisc",
+        "//Foundational/iwmisc:normalisation",
+        "//Foundational/iwmisc:sparse_fp_creator",
+        "//Foundational/iwqsort",
+        "//Utilities/General:class_label_translation_cc_proto",
+        "//Utilities/General:scaler",
         "//Utilities/GFP_Tools:gfp",
     ],
 )

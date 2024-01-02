@@ -1435,7 +1435,7 @@ OPTION: while ($argptr < @ARGV)
   }
   elsif ($opt eq "-D2F")
   {
-    my $descriptors_to_fingerprint = find_executable('descriptors_to_fingerprint.sh');
+    my $descriptors_to_fingerprint = find_executable('descriptors_to_fingerprint');
 
     $d2f_string .= "|${descriptors_to_fingerprint} -f ";
     my $tmp = $ARGV[$argptr++];
@@ -2600,7 +2600,7 @@ my $catsp_cmd_pipe;
 
 if ($catsp)
 {
-  my $catsp_exe = find_executable("jwcats");
+  my $catsp_exe = find_executable("jwcats.sh");
 
   my $tag = "NCCATSP";
 
@@ -2639,7 +2639,7 @@ my $cats_cmd_pipe;
 
 if ($cats)
 {
-  my $cats_exe = find_executable("jwcats");
+  my $cats_exe = find_executable("jwcats.sh");
 
   my $tag = "NCCATS";
   my $cats_cmd = "${cats_exe} -E autocreate";

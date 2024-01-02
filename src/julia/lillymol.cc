@@ -98,7 +98,7 @@ class SetOfRings : public ResizableArrayHolder<Ring> {
     SetOfRings(const resizable_array_p<Ring>& r) : ResizableArrayHolder<Ring>(r) {
     }
     const Ring* operator[](int ndx) const {
-      return _ref[ndx - 1];
+      return _ref[ndx];
     }
 };
 
@@ -457,10 +457,15 @@ JLCXX_MODULE define_julia_module(jlcxx::Module& mod)
         IWString result = AtomsAsString(*r, "Ring");
         if (r->is_aromatic()) {
           result << " arom";
+        } else {
+          result << " aliph";
         }
         if (r->is_fused()) {
           result << " fused";
         }
+        result << " frag " << r->fragment_membership();
+        result << " fsid " << r->fused_system_identifier();
+        result << " fused " << r->is_fused();
         return result.AsString();
       }
     )
@@ -470,10 +475,15 @@ JLCXX_MODULE define_julia_module(jlcxx::Module& mod)
         IWString result = AtomsAsString(r, "Ring");
         if (r.is_aromatic()) {
           result << " arom";
+        } else {
+          result << " aliph";
         }
         if (r.is_fused()) {
           result << " fused";
         }
+        result << " frag " << r.fragment_membership();
+        result << " fsid " << r.fused_system_identifier();
+        result << " fused " << r.is_fused();
         return result.AsString();
       }
     )
@@ -581,23 +591,23 @@ JLCXX_MODULE define_julia_module(jlcxx::Module& mod)
     
   mod.add_type<Bond>("Bond")
     .method("a1",
-      [](const Bond& b) {
+      [](const Bond& b)->int64_t {
         return b.a1();
       }
     )
     .method("a1",
-      [](const jlcxx::BoxedValue<const Bond>& boxed_bond) {
+      [](const jlcxx::BoxedValue<const Bond>& boxed_bond)->int64_t {
         const Bond& b = jlcxx::unbox<const Bond&>(boxed_bond);
         return b.a1();
       }
     )
     .method("a2",
-      [](const Bond& b) {
+      [](const Bond& b)->int64_t {
         return b.a2();
       }
     )
     .method("a2",
-      [](const jlcxx::BoxedValue<const Bond>& boxed_bond) {
+      [](const jlcxx::BoxedValue<const Bond>& boxed_bond)->int64_t {
         const Bond& b = jlcxx::unbox<const Bond&>(boxed_bond);
         return b.a2();
       }
@@ -666,6 +676,11 @@ JLCXX_MODULE define_julia_module(jlcxx::Module& mod)
     .method("nrings",
       [](const Bond& b) {
         return b.nrings();
+      }
+    )
+    .method("nrings",
+      [](const Bond* b) {
+        return b->nrings();
       }
     )
     .method("bond_number", &Bond::bond_number)
@@ -857,6 +872,7 @@ JLCXX_MODULE define_julia_module(jlcxx::Module& mod)
   mod.set_override_module(jl_base_module);
   mod.method("getindex",
     [](const SetOfRings& r, int i)->const Ring*{
+      // std::cerr << "getindex SetOfRings item " << i << " cmp " << r.size() << '\n';
       assert(i >= 1 && i <= static_cast<int>(r.size()));
       return r[i - 1];
     }
@@ -1037,7 +1053,7 @@ JLCXX_MODULE define_julia_module(jlcxx::Module& mod)
       }
     )
 
-    .method("add_bond!",
+    .method("jl_add_bond!",
       [](Molecule& m, atom_number_t a1, atom_number_t a2, BondType bt)->bool{
         return m.add_bond(a1, a2, BtypeEnumToBtype(bt));
       }
@@ -1110,7 +1126,14 @@ JLCXX_MODULE define_julia_module(jlcxx::Module& mod)
     .method("molecule_show_text",
       [](Molecule& m)->std::string{
         IWString result;
-        result << m.name() << ' ' << m.natoms() << " atoms\n";
+        result << m.name() << ' ' << m.natoms() << " atoms";
+        return result.AsString();
+      }
+    )
+    .method("molecule_show_text",
+      [](Molecule* m)->std::string {
+        IWString result;
+        result << m->name() << ' ' << m->natoms() << " atoms";
         return result.AsString();
       }
     )
@@ -1538,11 +1561,16 @@ JLCXX_MODULE define_julia_module(jlcxx::Module& mod)
         return m.bond_list();
       }
     )
-    .method("bonds",
+    .method("jl_bonds",
       [](const Molecule& m)->const Bond_list& {
         return m.bond_list();
       }
     )
+//  .method("bonds",
+//    [](const Molecule* m)->const Bond_list& {
+//      return m->bond_list();
+//    }
+//  )
     .method("add!",
       [](Molecule& m, const Molecule& rhs) {
         m.add_molecule(&rhs);
@@ -1896,8 +1924,8 @@ JLCXX_MODULE define_julia_module(jlcxx::Module& mod)
 
   mod.set_override_module(jl_base_module);
   mod.method("getindex",
-    [](const Components& components, int ndx)->Molecule*{
-      return components[ndx - 1];
+    [](const Components& components, int ndx)->Molecule&{
+      return *components[ndx - 1];
     }
   );
   mod.unset_override_module();
@@ -1905,6 +1933,20 @@ JLCXX_MODULE define_julia_module(jlcxx::Module& mod)
   mod.method("create_components",
     [](Molecule& m, Components& components) {
       return m.create_components(components);
+    },
+    ""
+  );
+  mod.method("create_components_internal",
+    [](Molecule& m, Components& components) {
+      return m.create_components(components);
+    },
+    ""
+  );
+  mod.method("jl_create_components",
+    [](Molecule& m)->Components {
+      Components result;
+      m.create_components(result);
+      return result;
     },
     ""
   );

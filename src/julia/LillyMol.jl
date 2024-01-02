@@ -126,7 +126,9 @@ module LillyMol
   show(io::IO, s::Bond) = print(io, bond_show_text(s))
   # For some reason this does not work, but works for set_of_atoms.
   show(io::IO, r::Ring) = print(io, ring_show_text(r))
+  show(io::IO, r::CxxWrap.CxxWrapCore.ConstCxxPtr{Ring}) = print(io, ring_show_text(r))
   show(io::IO, m::Molecule) = print(io, molecule_show_text(m))
+  show(io::IO, m::CxxWrap.CxxWrapCore.CxxPtr{Molecule}) = print(io, molecule_show_text(m))
   ==(s::SetOfAtoms, v::Vector{Int}) = equals(s, v)
   ==(s::CxxWrap.CxxWrapCore.ConstCxxRef{SetOfAtoms}, v::Vector{Int}) = equals(s, v)
 
@@ -151,6 +153,20 @@ module LillyMol
   rings(m::CxxWrap.CxxWrapCore.CxxPtr{Molecule}) = rings(Base.unsafe_convert(CxxWrap.CxxWrapCore.CxxRef{Molecule}, m))
   nrings(m::CxxWrap.CxxWrapCore.CxxPtr{Molecule}) = nrings(Base.unsafe_convert(CxxWrap.CxxWrapCore.CxxRef{Molecule}, m))
   number_fragments(m::CxxWrap.CxxWrapCore.CxxPtr{Molecule}) = number_fragments(Base.unsafe_convert(CxxWrap.CxxWrapCore.CxxRef{Molecule}, m))
+# @cxxdereference bonds(m::Molecule)=jl_bonds(m)
+  function bonds(m::CxxWrap.reference_type_union(Molecule))
+    m = CxxWrap.dereference_argument(m)
+    jl_bonds(m)
+  end
+# @cxxdereference create_components(m:Molecule) = jl_create_components(m)
+  function create_components(m::CxxWrap.reference_type_union(Molecule))
+    m = CxxWrap.dereference_argument(m)
+    jl_create_components(m)
+  end
+  function add_bond!(m::CxxWrap.reference_type_union(Molecule), a1::Integer, a2::Integer, btype::BondType)
+    m = CxxWrap.dereference_argument(m)
+    jl_add_bond!(m, a1, a2, btype)
+  end
 
   # Wanted to place substructure in a separate module, but could never make it work. Revisit...
   export SubstructureQuery

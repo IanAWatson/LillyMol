@@ -14,3 +14,26 @@ for atom_number in [0, 1, 2, 3, 4, 5]:
 
 for component in mol.create_components():
   print(component)
+
+def create_fragments(mol:Molecule):
+  mol.compute_aromaticity_if_needed()
+  print(mol.smiles())
+  breakable_bonds = []
+
+  for bond in mol.bonds():
+    if bond.nrings():
+      continue
+    if not bond.is_single_bond():
+      continue
+    breakable_bonds.append(bond)
+
+  for bond in breakable_bonds:
+    mol.remove_bond_between_atoms(bond.a1(), bond.a2())
+    for component in mol.create_components():
+      create_fragments(component);
+    mol.add_bond(bond.a1(), bond.a2(), SINGLE_BOND)
+
+mol = MolFromSmiles("CC1=CN=C(C(=C1OC)C)CS(=O)C2=NC3=C([N-]2)C=CC(=C3)OC")
+create_fragments(mol)
+
+

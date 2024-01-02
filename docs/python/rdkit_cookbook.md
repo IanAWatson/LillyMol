@@ -125,14 +125,19 @@ for embedding in sresults:
 ```
 
 ## Create Fragments
+In Lillymol the way to do this is with command line tool [dicer](/docs/Molecule_Tools/dicer.md),
+which offers a lot of flexibility and performance, and addresses the recursive
+fragment creation problem. In any situation where molecular fragmentation
+was needed, `dicer` would be the tool to use.
+
 The case used in the RDKit Cookbook is conceptually different from
 how such things would typically be processed in LillyMol. This example
-needs to be converted to atom numbers, because if we remove a bond number,
-that may invalidate any exisitng bond numbers.
+needs to be converted to atom numbers, because if we remove a bond by number,
+that may invalidate any exisitng bond numbers - inside a Molecule the
+bonds are stored as a vector of bonds, so removing any one can
+invalidate previous atom numbers.
 
-So this example is re-cast to use atom numbers. There is no library
-function to perform this operation, although clearly it would be
-straightforward.
+This code seems to recreate what is done.
 ```
 from lillymol import *
 
@@ -152,7 +157,31 @@ for component in mol.create_components():
   print(component)
 ```
 
-When molecules
-are broken, that is typically the result of a substructure search and
-things can be done by atom numbers, not bond numbers. 
+A simple recusrive version of fragment breaking below generates 74 thousand
+fragments from the starting molecule below.
 ```
+
+def create_fragments(mol:Molecule):
+  mol.compute_aromaticity_if_needed()
+  print(mol.smiles())
+  breakable_bonds = []
+
+  for bond in mol.bonds():
+    if bond.nrings():
+      continue
+    if not bond.is_single_bond():
+      continue
+    breakable_bonds.append(bond)
+
+  for bond in breakable_bonds:
+    mol.remove_bond_between_atoms(bond.a1(), bond.a2())
+    for component in mol.create_components():
+      create_fragments(component);
+    mol.add_bond(bond.a1(), bond.a2(), SINGLE_BOND)
+
+mol = MolFromSmiles("CC1=CN=C(C(=C1OC)C)CS(=O)C2=NC3=C([N-]2)C=CC(=C3)OC")
+create_fragments(mol)
+```
+takes 0.7 seconds. The reason for the large number of fragments is that the
+molecule contains 9 breakable bonds.
+

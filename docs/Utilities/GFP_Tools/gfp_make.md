@@ -75,9 +75,9 @@ A linear fingerprint might be specified as
 ```
 which is a linear path fingerprint, max length 8, and with an atom typing
 that is
-. aromaticity
-. hcount
-. compressed atomic number
+* aromaticity
+* hcount
+* compressed atomic number
 which then undergoes 1 round of Morgan type shell expansion. In effect this
 fingerprint descrives a tube rather than a path. Similarly the Atom Pair
 fingerprint can have atom types that have undergone round(s) of shell expansion
@@ -93,3 +93,4 @@ being a combination of
 which then undergoes one round of shell expansion.
 
 See [atom typing](/docs/Molecule_Lib/atom_typing.md)
+

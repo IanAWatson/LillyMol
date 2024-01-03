@@ -238,6 +238,8 @@ cmd = "#{gfp_to_svm_lite} #{f} #{l} -C #{mdir}/#{bit_xref} -A #{train_activity} 
 if cmdline.option_present('p')
   support = cmdline.value('p')
   cmd = "#{cmd} -p #{support}"
+else
+  cmd = "#{cmd} -p 2"
 end
 
 train_svml = "#{mdir}/train.svml"

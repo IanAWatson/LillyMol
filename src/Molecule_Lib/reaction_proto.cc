@@ -2,6 +2,9 @@
 #include <iostream>
 #include <memory>
 
+#include "google/protobuf/io/zero_copy_stream_impl_lite.h"
+#include "google/protobuf/text_format.h"
+
 #include "Foundational/iwmisc/misc.h"
 #include "Foundational/iwmisc/proto_support.h"
 
@@ -21,9 +24,9 @@ WriteError(const char * message, const P & proto)
   return 0;
 }
 
+template <typename P>
 int
-Match_Conditions::ConstructFromProto(const ReactionProto::MatchConditions& proto)
-{
+Match_Conditions::ConstructFromProto(const P& proto) {
   if (proto.has_ignore_not_reacting())
     _ignore_not_reacting = proto.ignore_not_reacting();
   if (proto.has_find_unique_embeddings())
@@ -43,13 +46,8 @@ Match_Conditions::ConstructFromProto(const ReactionProto::MatchConditions& proto
 }
 
 int
-Scaffold_Match_Conditions::ConstructFromProto(const ReactionProto::ScaffoldMatchConditions& proto)
-{
-  if (! proto.has_match_conditions())
-    return WriteError("Scaffold_Match_Conditions::ConstructFromProto:no match conditions", proto);
-
-  if (!Match_Conditions::ConstructFromProto(proto.match_conditions()))
-    return WriteError("Scaffold_Match_Conditions::ConstructFromProto:invalid match conditions", proto);
+Scaffold_Match_Conditions::ConstructFromProto(const ReactionProto::ScaffoldMatchConditions& proto) {
+  Match_Conditions::ConstructFromProto(proto);
 
   _enumerate_scaffold_hits_individually  = proto.enumerate_scaffold_hits_individually();
   _combinatorial_expansion_of_scaffold_hits = proto.combinatorial_expansion_of_scaffold_hits();
@@ -58,13 +56,8 @@ Scaffold_Match_Conditions::ConstructFromProto(const ReactionProto::ScaffoldMatch
 }
 
 int
-Sidechain_Match_Conditions::ConstructFromProto(const ReactionProto::SidechainMatchConditions& proto)
-{
-  if (! proto.has_match_conditions())
-    return WriteError("Sidechain_Match_Conditions::ConstructFromProto:no match conditions", proto);
-
-  if (!Match_Conditions::ConstructFromProto(proto.match_conditions()))
-    return WriteError("Sidechain_Match_Conditions::ConstructFromProto:invalid match conditions", proto);
+Sidechain_Match_Conditions::ConstructFromProto(const ReactionProto::SidechainMatchConditions& proto) {
+  Match_Conditions::ConstructFromProto(proto);
 
   _make_new_reagent_for_each_hit = proto.make_new_reagent_for_each_hit();
   _max_matches_to_find = proto.max_matches_to_find();
@@ -703,6 +696,27 @@ ProtoFromQueryFile(const std::string& qfile,
   return *maybe_query;
 }
 
+// Query constraints and queries have been read, and the _match_conditions
+// variable has been filled. Some values from match_conditions need
+// to be propagated to the Substructure_Query objects.
+template <typename M>
+int
+Reaction_Site::InitialiseQueryConstraints(const M& match_conditions) {
+  for (Substructure_Query* q : _queries) {
+    if (match_conditions.find_unique_embeddings_only()) {
+      q->set_find_unique_embeddings_only(1);
+    }
+    if (match_conditions.one_embedding_per_start_atom()) {
+      q->set_find_one_embedding_per_atom(1);
+    }
+    if (match_conditions.ignore_symmetry_related_matches()) {
+      q->set_do_not_perceive_symmetry_equivalent_matches(1);
+    }
+  }
+
+  return 1;
+}
+
 template <typename P>
 int
 Reaction_Site::ConstructFromProto(const P& proto, const IWString& fname)
@@ -913,9 +927,20 @@ Scaffold_Reaction_Site::ConstructFromProto(const ReactionProto::ScaffoldReaction
     _unique_id = 0;
   }
 
+  // Han 2024.
+  // The initial implementation of match_conditions with textproto input did not
+  // properly process the match_conditions, so the default was never seen. Set it.
+  if (! proto.has_match_conditions()) {
+    _match_conditions.set_find_unique_embeddings_only(0);
+  } else if (! _match_conditions.ConstructFromProto(proto.match_conditions())) {
+    return WriteError("Reaction_Site::ConstructFromProto:invalid match conditions", proto);
+  }
+
   if (!Reaction_Site::ConstructFromProto(proto, fname)) {
     return WriteError("ScaffoldReactionSite::ConstructFromProto:invalid Reaction_Site", proto);
   }
+
+  InitialiseQueryConstraints<Scaffold_Match_Conditions>(_match_conditions);
 
   return 1;
 }
@@ -929,8 +954,20 @@ Sidechain_Reaction_Site::ConstructFromProto(const ReactionProto::SidechainReacti
 
   _unique_id = proto.id();
 
-  if (!Reaction_Site::ConstructFromProto(proto, fname))
-      return WriteError("ScaffoldReactionSite::ConstructFromProto:invalid Reaction_Site", proto);
+  // Han 2024.
+  // The initial implementation of match_conditions with textproto input did not
+  // properly process the match_conditions, so the default was never seen. Set it.
+  if (! proto.has_match_conditions()) {
+    _match_conditions.set_find_unique_embeddings_only(0);
+  } else if ( ! _match_conditions.ConstructFromProto(proto.match_conditions())) {
+    return WriteError("Reaction_Site::ConstructFromProto:invalid match conditions", proto);
+  }
+
+  if (!Reaction_Site::ConstructFromProto(proto, fname)) {
+    return WriteError("ScaffoldReactionSite::ConstructFromProto:invalid Reaction_Site", proto);
+  }
+
+  InitialiseQueryConstraints<Sidechain_Match_Conditions>(_match_conditions);
 
   for (const auto& inter_particle_bond : proto.join()) {
     std::unique_ptr<Inter_Particle_Bond> ipb(new Inter_Particle_Bond);
@@ -942,10 +979,6 @@ Sidechain_Reaction_Site::ConstructFromProto(const ReactionProto::SidechainReacti
   // TODO:ianwatson
   // Need to check to make sure that any _inter_particle_bonds bonds do NOT
   // involve atoms that are being removed. That is a silent bug right now.
-
-  if (proto.has_match_conditions() &&
-      ! _match_conditions.ConstructFromProto(proto.match_conditions()))
-    return WriteError("Reaction_Site::ConstructFromProto:invalid match conditions", proto);
 
   for (const auto& no_reaction : proto.no_reaction()) {
     std::unique_ptr<No_Reaction> nrxn(new No_Reaction);
@@ -1173,4 +1206,15 @@ ReactionCipStereo::ConstructFromProto(ReactionProto::CipStereoReaction const& pr
   }
 
   return 1;
+}
+
+int
+IWReaction::ConstructFromTextProto(const std::string& textproto, const IWString& file_name) {
+  ReactionProto::Reaction proto;
+  if (!google::protobuf::TextFormat::ParseFromString(textproto, &proto)) {
+    cerr << "IWReaction:ConstructFromTextProto:cannot parse text proto " << textproto << '\n';
+    return 0;
+  }
+
+  return ConstructFromProto(proto, file_name);
 }

@@ -202,3 +202,54 @@ print(largest.aromatic_smiles())
 
 ## Sidechain Core Enumeration
 Generally this can be done most conveniently at the command line with [trxn](/docs/Molecule_Tools/trxn.md).
+Smirks support in LillyMol covers most simple cases, but there are limitations. In the case of this
+reaction, in order to have the `*` atoms removed, they must be assigned atom labels.
+```
+from lillymol import *
+from lillymol_query import *
+from lillymol_reaction import *
+
+core = MolFromSmiles("*c1c(C)cccc1O")
+sidechain = MolFromSmiles("CN*")
+
+rxn = Reaction()
+rxn.construct_from_smirks("[c:1][#0:3].[#0:4][*:2]>>[*:1]-[*:2]")
+
+products = rxn.perform_reaction(core, sidechain)
+for product in products:
+  print(product.unique_smiles())
+```
+Rather than smirks, the reaction can be constructed from a textproto reaction specification.
+```
+rxn_text = '''
+scaffold {
+  id: 0
+  smarts: "[#0]c"
+  remove_atom: 0
+}
+sidechain {
+  id: 1
+  smarts: "[#0]*"
+  remove_atom: 0
+  join {
+    a1: 1
+    a2: 1
+    btype: SS_SINGLE_BOND
+  }
+}
+'''
+rxn = Reaction()
+rxn.construct_from_textproto(rxn_text)
+
+products = rxn.perform_reaction(core, sidechain)
+for product in products:
+  print(product.unique_smiles())
+```
+yields the same results. The textproto reaction specification is much more
+verbose, but very precise and directive in what changes are performed. And
+of course, query files can be re-used for reactions this way.
+
+Reaction objects in LillyMol were originally designed to process combinatorial
+libraries, so they naturally accommodate the idea of adding multiple
+sidechains to a scaffold - library enumeration would typically involve
+processing one scaffold at a time, adding all sidechains to it.

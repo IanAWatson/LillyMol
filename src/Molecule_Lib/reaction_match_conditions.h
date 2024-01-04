@@ -41,7 +41,9 @@ class Match_Conditions
 
     Match_Conditions & operator = (const Match_Conditions &);
 
-    int ConstructFromProto(const ReactionProto::MatchConditions& proto);
+    // The two classes that inherit from this class use this to initialise
+    // common settings.
+    template <typename P> int ConstructFromProto(const P& proto);
 
     int verbose () const { return _verbose;}
     void set_verbose (int v) { _verbose = v;}

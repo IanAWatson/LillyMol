@@ -16,7 +16,7 @@
 using std::cerr;
 using std::endl;
 
-static int smirks_lost_atom_means_remove_frgment = 0;
+static int smirks_lost_atom_means_remove_frgment = 1;
 
 void
 set_smirks_lost_atom_means_remove_frgment(int s)

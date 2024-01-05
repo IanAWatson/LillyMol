@@ -157,11 +157,12 @@ fragment selection. When given `-f help` the following menu appears
   -f smarts:smt  keep smallest frag which matches smarts
   -f ALL:smt     keep all fragments that match smarts <smarts>
   -f rm:smt      remove all fragments that match <smarts>
-  -f saltfile=<file> smiles file of known salts - always removed even
-                     if the largest fragment
+  -f saltfile=<file> smiles file of known salts - always removed even if the largest fragment
   -f parentfile=<file> file of known parent molecules - never removed as salts
+  -f nochirals   ignore chirality when processing a saltfile
   -f kmfok       compare known salts and parents by molecular formula only - not unique smiles
   -f kpallsalt   do not change a molecule if every fragment is a known salt
+  -f noxorganic do NOT discard non organic fragments when saltfile present.
   -f rmxt=<n>    discard molecules with >1 fragment with more than n atoms
   -f rmxt        discard molecules with >1 fragment with more than 16 atoms
   -f sfs         sort fragments by size
@@ -244,6 +245,12 @@ This can be very efficient in some cases, but generally obscure use only.
 
 ### -f kpallsalt
 Do not change a molecule if every fragment is a known salt.
+
+### -f noxorganic
+By default, when a saltfile is specified, non organic fragments are
+automatically removed. This inhibits that step. Note that you can
+over-ride what is condidered organic via `-E O:B` which tells
+fileconv that for this invocation, Boron is to be considered organic.
 
 ### -f rmxt=\<n\> 
 discard molecules with >1 fragment with more than `\<n\>` atoms. This is a 

@@ -26,6 +26,7 @@ PYBIND11_MAKE_OPAQUE(std::vector<int>);
 #include "Molecule_Lib/molecule.h"
 #include "Molecule_Lib/mol2graph.pb.h"
 #include "Molecule_Lib/path.h"
+#include "Molecule_Lib/rotbond_common.h"
 #include "Molecule_Lib/smiles.h"
 #include "Molecule_Lib/substructure.h"
 
@@ -1592,5 +1593,19 @@ PYBIND11_MODULE(lillymol, m)
     },
     "xlogp"
   );
+
+  // Rotatable bonds.
+  py::enum_<quick_rotbond::QuickRotatableBonds::RotBond> (m, "RotBond")
+    .value("UNDEFINED", quick_rotbond::QuickRotatableBonds::RotBond::kUndefined)
+    .value("QUICK", quick_rotbond::QuickRotatableBonds::RotBond::kQuick)
+    .value("EXPENSIVE", quick_rotbond::QuickRotatableBonds::RotBond::kExpensive)
+    .export_values();
+  ;
+
+  py::class_<quick_rotbond::QuickRotatableBonds>(m, "RotatableBonds")
+    .def(py::init<>())
+    .def("rotatable_bonds", &quick_rotbond::QuickRotatableBonds::Process)
+    .def("set_calculation_type", &quick_rotbond::QuickRotatableBonds::set_calculation_type)
+  ;
 
 }

@@ -915,5 +915,20 @@ class TestLillyMol(absltest.TestCase):
     self.assertTrue(m.build_from_smiles("CC(=O)OC1=CC=CC=C1C(=O)O aspirin"))
     self.assertAlmostEqual(xlogp(m), 1.426)
 
+  def test_rotbond(self):
+    m = Molecule()
+    self.assertTrue(m.build_from_smiles("CC"))
+    rotbond_calc = RotatableBonds()
+    rotbond_calc.set_calculation_type(EXPENSIVE)
+    self.assertEqual(rotbond_calc.rotatable_bonds(m), 0)
+    self.assertTrue(m.build_from_smiles("CCC"))
+    self.assertEqual(rotbond_calc.rotatable_bonds(m), 0)
+    self.assertTrue(m.build_from_smiles("CC(F)(F)F"))
+    self.assertEqual(rotbond_calc.rotatable_bonds(m), 0)
+    self.assertTrue(m.build_from_smiles("CCCC"))
+    self.assertEqual(rotbond_calc.rotatable_bonds(m), 1)
+    self.assertTrue(m.build_from_smiles("C1CC1C"))
+    self.assertEqual(rotbond_calc.rotatable_bonds(m), 0)
+
 if __name__ == '__main__':
   absltest.main()

@@ -930,6 +930,7 @@ cc_binary(
     ],
     deps = [
         ":nearneighbours_cc_proto",
+        "//Foundational/accumulator",
         "//Foundational/cmdline:iwcmdline",
         "//Foundational/data_source:iwtfdata_record",
         "//Foundational/iwmisc",

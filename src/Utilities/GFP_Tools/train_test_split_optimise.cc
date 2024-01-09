@@ -114,6 +114,8 @@ class Needle {
     void SetZeroNbrDistances(uint32_t* nbrdist, uint32_t max_distance) const;
 
     void WriteNbrs(std::ostream& output) const;
+
+    float ClosestDistance() const;
 };
 
 Needle::Needle() {
@@ -216,6 +218,15 @@ Needle::WriteNbrs(std::ostream& output) const {
   }
 }
 
+float
+Needle::ClosestDistance() const {
+  if (_number_nbrs == 0) {
+    return 101.0;
+  }
+
+  return _nbrs[0]._dist;
+}
+
 class Optimise {
   private:
     int _verbose;
@@ -256,6 +267,9 @@ class Optimise {
     std::string* _smiles;
     std::string* _name;
 
+    // Keep track of how many times each needle appears in train.
+    int* _times_in_train;
+
     IWString _stem;
 
     Report_Progress _report_progress;
@@ -274,6 +288,8 @@ class Optimise {
 
     uint64_t RecomputeCurrentScore();
 
+    float AveDistanceAcrossSplit() const;
+
     std::tuple<uint32_t, uint32_t> ChooseTwo();
 
     int MakeSplit(int split);
@@ -285,6 +301,7 @@ class Optimise {
     int WriteSubset(int train, IWString_and_File_Descriptor& output) const;
     int WriteCrossSplitSummary(IWString& fname) const;
     int WriteCrossSplitSummary(IWString_and_File_Descriptor& output) const;
+    void AccumulateStats();
 
   public:
     Optimise();
@@ -297,6 +314,8 @@ class Optimise {
     int ReadFingerprints(const char* fname);
 
     int Doit();
+
+    int Report(std::ostream& output) const;
 };
 
 Optimise::Optimise() {
@@ -314,6 +333,7 @@ Optimise::Optimise() {
 
   _smiles = nullptr;
   _name = nullptr;
+  _times_in_train = nullptr;
 
   std::random_device rd;
   _rng.seed(rd());
@@ -329,6 +349,8 @@ Optimise::~Optimise() {
   if (_name != nullptr) {
     delete [] _name;
   }
+
+  delete [] _times_in_train;
 }
 
 int
@@ -619,6 +641,7 @@ Optimise::ReadNeighbours(const char* fname,
   _needle = new Needle[_number_needles];
   _smiles = new std::string[_number_needles];
   _name = new std::string[_number_needles];
+  _times_in_train = new_int(_number_needles);
 
   _uniform = std::make_unique<std::uniform_int_distribution<uint32_t>>(0, _number_needles - 1);
 
@@ -630,7 +653,10 @@ Optimise::ReadNeighbours(const char* fname,
     }
 
     _smiles[ndx] = needle->smiles();
-    _name[ndx] = needle->name();
+    // Do not store multi-token names, truncate to first token.
+    IWString tmp = needle->name();
+    tmp.truncate_at_first(' ');
+    _name[ndx] = tmp.AsString();
     if (!_needle[ndx].Build(*needle, id_to_ndx, _upper_distance_threshold)) {
       cerr << "Optimise::ReadNeighbours:cannot process " << needle->ShortDebugString() << "\n";
       return 0;
@@ -699,8 +725,9 @@ Optimise::MakeSplit(int split) {
   RandomSplit();
   uint64_t score = RecomputeCurrentScore();
   const uint64_t starting_score = score;
+  const float across_split = AveDistanceAcrossSplit();
   if (_verbose) {
-    cerr << "Split " << split << " starting score " << score << '\n';
+    cerr << "Split " << split << " starting score " << score << " ave dist " << across_split << '\n';
   }
 
   std::unique_ptr<uint32_t[]> id_dist = std::make_unique<uint32_t[]>(_number_needles);
@@ -829,11 +856,22 @@ Optimise::MakeSplit(int split) {
   if (_verbose) {
     RecomputeCurrentScore();
     cerr << "Writing split " << split << " score " << score << " computed " << _current_score << " diff " << (score - _current_score) << '\n';
-    cerr << "starting_score " << starting_score << " score " << _current_score << " improvement " << (_current_score - starting_score) << '\n';
+    cerr << "starting_score " << starting_score << " score " << _current_score << " improvement " << (_current_score - starting_score) << " across split " << AveDistanceAcrossSplit() << '\n';
     cerr << "Split " << split << " accepted " << steps_accepted << " of " << _nopt << " steps\n";
   }
 
+  AccumulateStats();
+
   return WriteSplit(split);
+}
+
+void
+Optimise::AccumulateStats() {
+  for (uint32_t i = 0; i < _number_needles; ++i) {
+    if (_needle[i].in_train()) {
+      ++_times_in_train[i];
+    }
+  }
 }
 
 int
@@ -922,7 +960,6 @@ Optimise::WriteCrossSplitSummary(IWString& fname) const {
 int
 Optimise::WriteCrossSplitSummary(IWString_and_File_Descriptor& output) const {
   extending_resizable_array<int> count;
-  Accumulator_Int<uint64_t> acc;
   for (uint32_t i = 0; i < _number_needles; ++i) {
     int itrain = _needle[i].in_train();
     for (uint32_t j = i + 1; j < _number_needles; ++j) {
@@ -931,21 +968,53 @@ Optimise::WriteCrossSplitSummary(IWString_and_File_Descriptor& output) const {
       }
       uint32_t d = DistanceOrMax(i, j);
       ++count[d];
-      acc.extra(d);
     }
   }
 
   constexpr char kSep = ' ';
 
+  output << "Dist" << kSep << "Count" << kSep << "Cumulative" << '\n';
+
+  uint32_t sum = 0;
   for (int i = 0; i < count.number_elements(); ++i) {
     if (count[i]) {
-      output << i << kSep << count[i] << '\n';
+      sum += count[i];
+      output << iwmisc::Fraction<float>(i, 100) << kSep << count[i] << kSep << sum << '\n';
     }
   }
 
-  cerr << acc.average() << '\n';
-
   return 1;
+}
+
+float
+Optimise::AveDistanceAcrossSplit() const {
+  Accumulator_Int<uint64_t> acc;
+  for (uint64_t i = 0; i < _number_needles; ++i) {
+    const int itrain = _needle[i].in_train();
+    for (uint64_t j = i + 1; j <_number_needles; ++j) {
+      if (_needle[j].in_train() == itrain) {
+        continue;
+      }
+      uint32_t d = DistanceOrMax(i, j);
+      acc.extra(d);
+    }
+  }
+
+  return acc.average();
+}
+
+int
+Optimise::Report(std::ostream& output) const {
+  static constexpr char kSep = ' ';
+
+  output << "generated " << _nsplits << " splits\n";
+  output << "ID" << kSep << "TimesInTrain" << kSep << "NNDist" << '\n';
+
+  for (uint32_t i = 0; i < _number_needles; ++i) {
+    output << _name[i] << kSep << _times_in_train[i] << kSep << (_needle[i].ClosestDistance() / 100.0f) << '\n';
+  }
+
+  return output.good();
 }
 
 int
@@ -984,6 +1053,10 @@ Main(int argc, char** argv) {
   }
 
   optimise.Doit();
+
+  if (verbose) {
+    optimise.Report(cerr);
+  }
 
   return 0;
 }

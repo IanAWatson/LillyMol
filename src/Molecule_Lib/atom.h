@@ -267,6 +267,7 @@ class __attribute__((visibility("default"))) Atom : public resizable_array<Bond*
 
   int fully_saturated() const;  // nbonds() == ncon)
   int unsaturated() const;      // nbonds() < ncon()
+  int unsaturation() const;
 
   const void* user_specified_void_ptr() const {
     return _user_specified_void_ptr;

@@ -377,41 +377,44 @@ DisplayDashhOptions(std::ostream& output) {
 void
 DisplayfOptions(int rc) {
   // clang-format off
-  cerr << "  -f large       trim to largest fragment (can abbreviate to '-f l')\n";
-  cerr << "  -f alarge      determine largest fragment. Keep all fragments with that number of atoms\n";
-  cerr << "  -f lo          trim to fragment with most organic atoms\n";
-  cerr << "  -f lod         trim to fragment with most organic atoms and desirable features\n";
-  cerr << "  -f allo        keep all organic fragments\n";
-  cerr << "  -f RMDUP       remove duplicate fragments\n";
-  cerr << "  -f rmle=nn     remove fragments with NN or fewer atoms\n";
-  cerr << "  -f Q:qfile     keep largest  frag which matches query in <qfile>\n";
-  cerr << "  -f q:qfile     keep smallest frag which matches query in <qfile>\n";
-  cerr << "  -f Q:F:file    keep largest  frag which matches queries in <file>\n";
-  cerr << "  -f q:F:file    keep smallest frag which matches queries in <file>\n";
-  cerr << "  -f SMARTS:smt  keep largest  frag which matches smarts\n";
-  cerr << "  -f smarts:smt  keep smallest frag which matches smarts\n";
-  cerr << "  -f ALL:smt     keep all fragments that match smarts <smarts>\n";
-  cerr << "  -f rm:smt      remove all fragments that match <smarts>\n";
-  cerr << "  -f saltfile=<file> smiles file of known salts - always removed even\n";
-  cerr << "                     if the largest fragment\n";
-  cerr << "  -f parentfile=<file> file of known parent molecules - never removed as salts\n";
-  cerr << "  -f kmfok       compare known salts and parents by molecular formula only - not unique smiles\n";
-  cerr << "  -f kpallsalt   do not change a molecule if every fragment is a known salt\n";
-  cerr << "  -f rmxt=<n>    discard molecules with >1 fragment with more than n atoms\n";
-  cerr << "  -f rmxt        discard molecules with >1 fragment with more than 16 atoms\n";
-  cerr << "  -f sfs         sort fragments by size\n";
-  cerr << "  -f dmxt=<d>    discard molecules where largest fragments differ by <d> atoms or fewer\n";
-  cerr << "  -f manlf=<d>   discard molecules that have a non-largest fragment with more than <d> atoms\n";
-  cerr << "  -f klf=<d>     discard all but the <n> largest fragments\n";
-  cerr << "  -f RMF=<tag>   when processing TDT forms, write removed fragments to <tag>\n";
-  cerr << "  -f rmlarge     remove the largest fragment (arbitrary if two frags of same size\n";
-  cerr << "  -f rmlarge=<n> remove the largest <n> fragments (arbitrary if frags of the same size)\n";
-  cerr << "  -f rmsmall     remove the smallst fragment (arbitrary if two frags of same size\n";
-  cerr << "  -f rmsmall=<n> remove the smallst <n> fragments (arbitrary if frags of the same size)\n";
-  cerr << "  -f keepsmall   remove all but the smallest fragment (arbitrary if frags of the same size)\n";
-  cerr << "  -f keepsmall=<n> remove all but the smallest <n> fragments\n";
-  cerr << "  -f <number>    remove fragments so that all written molecules\n";
-  cerr << "                 have no more than <number> fragments\n";
+  cerr << R"(
+ -f large       trim to largest fragment (can abbreviate to '-f l')
+ -f alarge      determine largest fragment. Keep all fragments with that number of atoms
+ -f lo          trim to fragment with most organic atoms
+ -f lod         trim to fragment with most organic atoms and desirable features
+ -f allo        keep all organic fragments
+ -f RMDUP       remove duplicate fragments
+ -f rmle=nn     remove fragments with NN or fewer atoms
+ -f Q:qfile     keep largest  frag which matches query in <qfile>
+ -f q:qfile     keep smallest frag which matches query in <qfile>
+ -f Q:F:file    keep largest  frag which matches queries in <file>
+ -f q:F:file    keep smallest frag which matches queries in <file>
+ -f SMARTS:smt  keep largest  frag which matches smarts
+ -f smarts:smt  keep smallest frag which matches smarts
+ -f ALL:smt     keep all fragments that match smarts <smarts>
+ -f rm:smt      remove all fragments that match <smarts>
+ -f saltfile=<file> smiles file of known salts - always removed even if the largest fragment
+ -f parentfile=<file> file of known parent molecules - never removed as salts
+ -f xchirals    ignore chirality when processing a saltfile
+ -f kmfok       compare known salts and parents by molecular formula only - not unique smiles
+ -f kpallsalt   do not change a molecule if every fragment is a known salt
+ -f noxorganic do NOT discard non organic fragments when saltfile present.
+ -f rmxt=<n>    discard molecules with >1 fragment with more than n atoms
+ -f rmxt        discard molecules with >1 fragment with more than 16 atoms
+ -f sfs         sort fragments by size
+ -f dmxt=<d>    discard molecules where largest fragments differ by <d> atoms or fewer
+ -f manlf=<d>   discard molecules that have a non-largest fragment with more than <d> atoms
+ -f klf=<d>     discard all but the <n> largest fragments
+ -f RMF=<tag>   when processing TDT forms, write removed fragments to <tag>
+ -f rmlarge     remove the largest fragment (arbitrary if two frags of same size
+ -f rmlarge=<n> remove the largest <n> fragments (arbitrary if frags of the same size)
+ -f rmsmall     remove the smallst fragment (arbitrary if two frags of same size
+ -f rmsmall=<n> remove the smallst <n> fragments (arbitrary if frags of the same size)
+ -f keepsmall   remove all but the smallest fragment (arbitrary if frags of the same size)
+ -f keepsmall=<n> remove all but the smallest <n> fragments
+ -f <number>    remove fragments so that all written molecules
+                have no more than <number> fragments
+)";
   // clang-format on
 
 
@@ -4486,8 +4489,9 @@ FileconvConfig::GetFragmentSpecifications(Command_Line& cl) {
       } else if ("RMDUP" == f) {
         remove_duplicate_fragments = 1;
 
-        if (verbose)
+        if (verbose) {
           cerr << "Will remove duplicate fragments\n";
+        }
       } else if (f.starts_with("saltfile=")) {
         f.remove_leading_chars(9);
         if (!known_fragment_data.read_known_salts(f)) {
@@ -4502,10 +4506,18 @@ FileconvConfig::GetFragmentSpecifications(Command_Line& cl) {
         }
       } else if ("kmfok" == f) {
         known_fragment_data.set_only_check_molecular_formula(1);
+        if (verbose) {
+          cerr << "Will only consider the molecular formula when processing the saltfile\n";
+        }
       } else if ("kpallsalt" == f) {
         known_fragment_data.set_remove_everything_if_all_fragments_match(0);
         if (verbose)
           cerr << "Will not change molecule consisting of all salts\n";
+      } else if (f == "noxorganic" ) {
+        known_fragment_data.set_remove_non_organics(0);
+        if (verbose) {
+          cerr << "Will NOT discard non organic fragments when saltfile specified\n";
+        }
       } else if (f.starts_with("rmxt=")) {
         f.remove_leading_chars(5);
 

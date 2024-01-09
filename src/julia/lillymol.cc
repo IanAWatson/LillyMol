@@ -457,10 +457,15 @@ JLCXX_MODULE define_julia_module(jlcxx::Module& mod)
         IWString result = AtomsAsString(*r, "Ring");
         if (r->is_aromatic()) {
           result << " arom";
+        } else {
+          result << " aliph";
         }
         if (r->is_fused()) {
           result << " fused";
         }
+        result << " frag " << r->fragment_membership();
+        result << " fsid " << r->fused_system_identifier();
+        result << " fused " << r->is_fused();
         return result.AsString();
       }
     )
@@ -470,10 +475,15 @@ JLCXX_MODULE define_julia_module(jlcxx::Module& mod)
         IWString result = AtomsAsString(r, "Ring");
         if (r.is_aromatic()) {
           result << " arom";
+        } else {
+          result << " aliph";
         }
         if (r.is_fused()) {
           result << " fused";
         }
+        result << " frag " << r.fragment_membership();
+        result << " fsid " << r.fused_system_identifier();
+        result << " fused " << r.is_fused();
         return result.AsString();
       }
     )
@@ -581,23 +591,23 @@ JLCXX_MODULE define_julia_module(jlcxx::Module& mod)
     
   mod.add_type<Bond>("Bond")
     .method("a1",
-      [](const Bond& b) {
+      [](const Bond& b)->int64_t {
         return b.a1();
       }
     )
     .method("a1",
-      [](const jlcxx::BoxedValue<const Bond>& boxed_bond) {
+      [](const jlcxx::BoxedValue<const Bond>& boxed_bond)->int64_t {
         const Bond& b = jlcxx::unbox<const Bond&>(boxed_bond);
         return b.a1();
       }
     )
     .method("a2",
-      [](const Bond& b) {
+      [](const Bond& b)->int64_t {
         return b.a2();
       }
     )
     .method("a2",
-      [](const jlcxx::BoxedValue<const Bond>& boxed_bond) {
+      [](const jlcxx::BoxedValue<const Bond>& boxed_bond)->int64_t {
         const Bond& b = jlcxx::unbox<const Bond&>(boxed_bond);
         return b.a2();
       }
@@ -668,6 +678,11 @@ JLCXX_MODULE define_julia_module(jlcxx::Module& mod)
         return b.nrings();
       }
     )
+    .method("nrings",
+      [](const Bond* b) {
+        return b->nrings();
+      }
+    )
     .method("bond_number", &Bond::bond_number)
     .method("either_atom_set_in_array", &Bond::either_atom_set_in_array)
     .method("atoms",
@@ -712,15 +727,28 @@ JLCXX_MODULE define_julia_module(jlcxx::Module& mod)
 
   mod.add_type<Atom>("Atom")
     // .constructor<jlcxx::cxxint_t>(true) // with finalizer
-    .method("valence_ok", &Atom::valence_ok)
+    .method("valence_ok", 
+      [](Atom& a)->bool {
+        return a.valence_ok();
+      },
+      "True if the valence is OK"
+    )
+    // It is unfortunate that the valence_ok method is non const.
+    .method("valence_ok", 
+      [](const Atom& a)->bool {
+        Atom* me = const_cast<Atom*>(&a);
+        return me->valence_ok();
+      },
+      "True if the valence is OK"
+    )
     .method("ncon",
-      [](const Atom& a) {
+      [](const Atom& a)->int64_t {
         return a.ncon();
       }
     )
     .method("isotope", &Atom::isotope)
     .method("lone_pair_count",
-      [](Atom&a){
+      [](Atom&a)->int64_t{
         int lp;
         if (a.lone_pair_count(lp)) {
           return lp;
@@ -729,12 +757,12 @@ JLCXX_MODULE define_julia_module(jlcxx::Module& mod)
       }
     )
     .method("nbonds",
-      [](const Atom& a) {
+      [](const Atom& a)->int64_t {
         return a.nbonds();
       }
     )
     .method("nbonds",
-      [](Atom& a) {
+      [](Atom& a)->int64_t {
         return a.nbonds();
       }
     )
@@ -748,7 +776,12 @@ JLCXX_MODULE define_julia_module(jlcxx::Module& mod)
         return a.is_bonded_to(o);
       }
     )
-    .method("is_halogen", &Atom::is_halogen)
+    .method("is_halogen",
+      [](const Atom& a)->bool {
+        return a.is_halogen();
+      },
+      "True if the underlying element is a halogen"
+    )
     .method("atomic_number", &Atom::atomic_number)
     .method("atomic_symbol",
       [](const Atom& a)->std::string{
@@ -768,6 +801,12 @@ JLCXX_MODULE define_julia_module(jlcxx::Module& mod)
       [](const Atom& a)->bool{
         return a.fully_saturated();
       }
+    )
+    .method("unsaturation", 
+      [](const Atom& a)->int64_t {
+        return a.unsaturation();
+      },
+      "nbonds() - ncon()"
     )
     .method("atom_show_text",
       [](const Atom& a) -> std::string {
@@ -806,7 +845,7 @@ JLCXX_MODULE define_julia_module(jlcxx::Module& mod)
       }
     )
     .method("rings_in_set",
-      [](const SetOfRings&r) {
+      [](const SetOfRings&r)->int64_t {
         return r.size();
       }
     )
@@ -814,17 +853,17 @@ JLCXX_MODULE define_julia_module(jlcxx::Module& mod)
 
   mod.add_type<SetOfChiralCentres>("SetOfChiralCentres")
     .method("size",
-      [](const SetOfChiralCentres& s) {
+      [](const SetOfChiralCentres& s)->int64_t {
         return s.size();
       }
     )
     .method("internal_items_in_set",
-      [](const SetOfChiralCentres& s) {
+      [](const SetOfChiralCentres& s)->int64_t {
         return s.size();
       }
     )
     .method("items_in_set",
-      [] (const SetOfChiralCentres& s) {
+      [] (const SetOfChiralCentres& s)->int64_t {
         return s.size();
       }
     )
@@ -833,6 +872,7 @@ JLCXX_MODULE define_julia_module(jlcxx::Module& mod)
   mod.set_override_module(jl_base_module);
   mod.method("getindex",
     [](const SetOfRings& r, int i)->const Ring*{
+      // std::cerr << "getindex SetOfRings item " << i << " cmp " << r.size() << '\n';
       assert(i >= 1 && i <= static_cast<int>(r.size()));
       return r[i - 1];
     }
@@ -849,7 +889,7 @@ JLCXX_MODULE define_julia_module(jlcxx::Module& mod)
     .constructor<>()
   ;
   mod.method("bonds_in_set",
-    [](const Bond_list& b) {
+    [](const Bond_list& b)->int64_t {
       return b.size();
     }
   );
@@ -1013,7 +1053,7 @@ JLCXX_MODULE define_julia_module(jlcxx::Module& mod)
       }
     )
 
-    .method("add_bond!",
+    .method("jl_add_bond!",
       [](Molecule& m, atom_number_t a1, atom_number_t a2, BondType bt)->bool{
         return m.add_bond(a1, a2, BtypeEnumToBtype(bt));
       }
@@ -1024,7 +1064,7 @@ JLCXX_MODULE define_julia_module(jlcxx::Module& mod)
       }
     )
     .method("formal_charge",
-      [](const Molecule& m, atom_number_t a){
+      [](const Molecule& m, atom_number_t a)->int64_t{
         return m.formal_charge(a);
       }
     )
@@ -1049,17 +1089,17 @@ JLCXX_MODULE define_julia_module(jlcxx::Module& mod)
       }
     )
     .method("number_isotopic_atoms",
-      [](const Molecule& m) {
+      [](const Molecule& m)->int64_t {
         return m.number_isotopic_atoms();
       }
     )
     .method("number_isotopic_atoms",
-      [](const Molecule& m, const isotope_t iso) {
+      [](const Molecule& m, const isotope_t iso)->int64_t {
         return m.number_isotopic_atoms(iso);
       }
     )
     .method("remove_isotopes!",
-      [](Molecule& m) {
+      [](Molecule& m)->int64_t {
         return m.transform_to_non_isotopic_form();
       }
     )
@@ -1086,7 +1126,14 @@ JLCXX_MODULE define_julia_module(jlcxx::Module& mod)
     .method("molecule_show_text",
       [](Molecule& m)->std::string{
         IWString result;
-        result << m.name() << ' ' << m.natoms() << " atoms\n";
+        result << m.name() << ' ' << m.natoms() << " atoms";
+        return result.AsString();
+      }
+    )
+    .method("molecule_show_text",
+      [](Molecule* m)->std::string {
+        IWString result;
+        result << m->name() << ' ' << m->natoms() << " atoms";
         return result.AsString();
       }
     )
@@ -1098,17 +1145,17 @@ JLCXX_MODULE define_julia_module(jlcxx::Module& mod)
       }
     )
     .method("natoms",
-      [](const Molecule& m)->int{
+      [](const Molecule& m)->int64_t{
         return m.natoms();
       }
     )
     .method("natoms",
-      [](const Molecule& m, atomic_number_t z)->int {
+      [](const Molecule& m, atomic_number_t z)->int64_t {
         return m.natoms(z);
       }
     )
     .method("natoms",
-      [](const Molecule& m, std::string& asymbol)->int{
+      [](const Molecule& m, std::string& asymbol)->int64_t{
         return m.natoms(asymbol.c_str());
       }
     )
@@ -1124,17 +1171,17 @@ JLCXX_MODULE define_julia_module(jlcxx::Module& mod)
       }
     )
     .method("nrings",
-      [](Molecule& m) {
+      [](Molecule& m)->int64_t {
         return m.nrings();
       }
     )
     .method("nrings",
-      [](Molecule& m, atom_number_t a) {
+      [](Molecule& m, atom_number_t a)->int64_t {
         return m.nrings(a);
       }
     )
     .method("nrings",
-      [](Molecule& m, atom_number_t a, int rsize) {
+      [](Molecule& m, atom_number_t a, int rsize)->int64_t {
         return m.nrings(a, rsize);
       }
     )
@@ -1144,7 +1191,7 @@ JLCXX_MODULE define_julia_module(jlcxx::Module& mod)
       }
     )
     .method("ring_bond_count", 
-      [](Molecule& m, atom_number_t a) {
+      [](Molecule& m, atom_number_t a)->int64_t {
         return m.ring_bond_count(a);
       }
     )
@@ -1154,18 +1201,18 @@ JLCXX_MODULE define_julia_module(jlcxx::Module& mod)
       }
     )
     .method("largest_ring_size", 
-      [](Molecule & m) {
+      [](Molecule & m)->int64_t {
         return m.LargestRingSize();
       }
     )
     .method("fused_system_size",
-      [](Molecule& m, atom_number_t a){
+      [](Molecule& m, atom_number_t a)->int64_t {
         return m.fused_system_size(a);
       }
     )
     .method("rings_with_fused_system_identifier", &Molecule::rings_with_fused_system_identifier)
     .method("fused_system_identifier",
-      [](Molecule& m, atom_number_t a) {
+      [](Molecule& m, atom_number_t a)->int64_t {
         return m.fused_system_identifier(a);
       }
     )
@@ -1269,12 +1316,12 @@ JLCXX_MODULE define_julia_module(jlcxx::Module& mod)
       }
     )
     .method("ncon",
-      [](const Molecule& m, atom_number_t a) {
+      [](const Molecule& m, atom_number_t a)->int64_t {
         return m.ncon(a);
       }
     )
     .method("nbonds",
-      [](const Molecule& m, atom_number_t a) {
+      [](const Molecule& m, atom_number_t a)->int64_t {
         return m.nbonds(a);
       }
     )
@@ -1514,11 +1561,16 @@ JLCXX_MODULE define_julia_module(jlcxx::Module& mod)
         return m.bond_list();
       }
     )
-    .method("bonds",
+    .method("jl_bonds",
       [](const Molecule& m)->const Bond_list& {
         return m.bond_list();
       }
     )
+//  .method("bonds",
+//    [](const Molecule* m)->const Bond_list& {
+//      return m->bond_list();
+//    }
+//  )
     .method("add!",
       [](Molecule& m, const Molecule& rhs) {
         m.add_molecule(&rhs);
@@ -1798,6 +1850,7 @@ JLCXX_MODULE define_julia_module(jlcxx::Module& mod)
         return m.saturated(a);
       }
     )
+    .method("unsaturation", &Molecule::unsaturation)
     .method("chiral_centres",
       [](Molecule& m) -> const SetOfChiralCentres& {
         return m.ChiralCentres();
@@ -1871,8 +1924,8 @@ JLCXX_MODULE define_julia_module(jlcxx::Module& mod)
 
   mod.set_override_module(jl_base_module);
   mod.method("getindex",
-    [](const Components& components, int ndx)->Molecule*{
-      return components[ndx - 1];
+    [](const Components& components, int ndx)->Molecule&{
+      return *components[ndx - 1];
     }
   );
   mod.unset_override_module();
@@ -1880,6 +1933,20 @@ JLCXX_MODULE define_julia_module(jlcxx::Module& mod)
   mod.method("create_components",
     [](Molecule& m, Components& components) {
       return m.create_components(components);
+    },
+    ""
+  );
+  mod.method("create_components_internal",
+    [](Molecule& m, Components& components) {
+      return m.create_components(components);
+    },
+    ""
+  );
+  mod.method("jl_create_components",
+    [](Molecule& m)->Components {
+      Components result;
+      m.create_components(result);
+      return result;
     },
     ""
   );

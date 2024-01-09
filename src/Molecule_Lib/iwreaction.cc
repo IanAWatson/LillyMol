@@ -4844,8 +4844,9 @@ int
 Sidechain_Reaction_Site::add_reagent(Molecule_and_Embedding * m,
                                      const Sidechain_Match_Conditions & smc)
 {
-  if (smc.strip_reagents_to_largest_fragment())
+  if (smc.strip_reagents_to_largest_fragment()) {
     m->reduce_to_largest_fragment();
+  }
 
   Substructure_Results sresults;
 
@@ -4931,8 +4932,7 @@ Sidechain_Reaction_Site::add_reagent(Molecule_and_Embedding * m,
     if (_toggle_kekule_form.active() && ! m->do_toggle_kekule_form(_toggle_kekule_form))
         return 0;
 
-    if (smc.multiple_match_string().length())
-    {
+    if (smc.multiple_match_string().length()) {
       IWString tmp = m->name();
       tmp.append_with_spacer(smc.multiple_match_string());
 
@@ -5012,9 +5012,20 @@ Sidechain_Reaction_Site::add_reagent_embedding_identified (Molecule_and_Embeddin
 }
 
 int
-Sidechain_Reaction_Site::empty_reagents_array ()
+Sidechain_Reaction_Site::empty_reagents_array()
 {
   _reagents.resize_keep_storage(0);
+
+  return 1;
+}
+
+int
+Sidechain_Reaction_Site::remove_last_reagent() {
+  if (_reagents.empty()) {
+    return 0;
+  }
+
+  _reagents.chop();
 
   return 1;
 }
@@ -6440,47 +6451,70 @@ IWReaction::determine_matched_atoms(Molecule & m,
   return _determine_matched_atoms_checking_inactives(m, sresults);
 }
 
-#ifdef THIS_WAS_A_BAD_IDEA
 int
-IWReaction::perform_reaction(Molecule & m,
-                             Molecule_Output_Object & output)
-{
-  Substructure_Results sresults;
-
-  int nhits = substructure_search(m);
-
-  if (0 == nhits)
+IWReaction::add_sidechain_reagent(int sidechain, Molecule& reagent,
+                        const Sidechain_Match_Conditions& smc) {
+  if (sidechain >= _sidechains.number_elements()) {
+    cerr << "IWReaction::add_sidechain_reagment:invalid sidechain " << sidechain << '\n';
     return 0;
-
-  for (int i = 0; i < nhits; i++)
-  {
-    perform_reaction(m, sresults.embedding(i), output);
   }
 
-  return 1;
+  return _sidechains[sidechain]->add_reagent(reagent, smc);
+}
+
+std::optional<std::vector<Molecule>>
+IWReaction::perform_reaction(Molecule& scaffold, Molecule& sidechain) {
+  std::vector<Molecule> products;
+
+  if (_sidechains.size() != 1) {
+    return std::nullopt;
+  }
+
+  Substructure_Results scaffold_results;
+  if (this->substructure_search(scaffold, scaffold_results) == 0) {
+    return std::nullopt;
+  }
+
+  int n = scaffold_results.number_embeddings();
+  products.resize(n);
+
+  // Add the reagent to the sidechain, will be removed below.
+  Sidechain_Match_Conditions smc;
+  if (! _sidechains[0]->add_reagent(sidechain, smc)) {
+    return std::nullopt;
+  }
+
+  int ndx = 0;
+
+  for (const Set_of_Atoms* scaffold_embedding : scaffold_results.embeddings()) {
+    if (! perform_reaction(&scaffold, scaffold_embedding, products[ndx])) {
+      return std::nullopt;
+    }
+    ++ndx;
+  }
+
+  _sidechains[0]->remove_last_reagent();
+
+  return products;
 }
 
 int
-IWReaction::perform_reaction(Molecule & m,
-                             const Set_of_Atoms * embedding,
-                             Molecule_Output_Object & output)
-{ 
-  Reaction_Iterator iter;
-
-  iter.initialise(*this);
-
-  for (iter.initialise(*this); iter.active(); iter++)
-  {
-    Molecule result;
-    if (! perform_reaction(&m, embedding, iter, result))
-      return 0;
-
-    output.write(result);
+IWReaction::perform_reaction(Molecule & scaffold, resizable_array_p<Molecule> & products) {
+  Substructure_Results sresults;
+  if (! this->substructure_search(scaffold, sresults)) {
+    return 0;
   }
 
-  return output.good();
+  for (const Set_of_Atoms* embedding : sresults.embeddings()) {
+    std::unique_ptr<Molecule> product = std::make_unique<Molecule>();
+    if (! perform_reaction(&scaffold, embedding, *product)) {
+      return products.size();
+    }
+    products << product.release();
+  }
+
+  return products.size();
 }
-#endif
 
 /*int
 Reaction_Site::_do_toggle_kekule_form (Molecule & m,

@@ -1008,42 +1008,6 @@ Molecule::nrings_including_non_sssr_rings (atom_number_t a)
   return rc;
 }
 
-/*int
-Molecule::saturated (atom_number_t a) 
-{
-  assert (ok_atom_number (a));
-
-  formal_charge_t fc = formal_charge (a);
-
-  const Element * e = elementi (a);
-  int nv = e->normal_valence() + fc;    // the number of bonds available
-
-  int acon = ncon (a) + implicit_hydrogens (a);
-
-  if (acon < nv)
-    return 0;
-
-  if (acon == e->normal_valence())
-    return 1;
-
-  if (acon > e->normal_valence())
-  {
-    int alt = number_alternate_valences;
-    for (int i = 0; i < number_alternate_valences; i++)
-    {
-      int j = e->alternate_valence (i) + fc;
-      if (acon < j)
-        return 0;
-      if (acon == j)
-        return 1;
-    }
-  }
-
-// If we come out here, connectivity is higher than all known valences.
-
-  return 1;    // assume saturated
-}*/
-
 int
 Molecule::experimental_sssr()
 {

@@ -53,3 +53,44 @@ We see that in the above example, temperature is satisfying the first requiremen
 while maccskeys and iwfp the second. The order in which various tools are added
 to the pipeline is hard coded within the logic of gfp_make, and is not meaningful.
 
+`gfp_make` supports a great many fingerprint types, most of which are generated
+by executables available within LillyMol. Some of those are desribed here.
+
+## Atom Typing
+The concept of the shape/kind of fingerprint, and the atom typing used to describe
+the atoms are orthogonal concepts. Therefore, for many fingerprints, the shape
+of the fingerprint can be combined with a separate atom typing specification. Generally
+these will be of the form
+```
+-EC3:AY
+```
+In this case, an Extended Connectivity (Morgan) type fingerprint (radius 3) is generated. The
+atom typing is `UST:AY` (see [atom typing](/docs/Molecule_Lib/atom_typing.md). In
+this particular case, the type comprises two atomic properties, aromaticity
+and compressed atomic number.
+
+A linear fingerprint might be specified as
+```
+-IW8:AHY1
+```
+which is a linear path fingerprint, max length 8, and with an atom typing
+that is
+* aromaticity
+* hcount
+* compressed atomic number
+which then undergoes 1 round of Morgan type shell expansion. In effect this
+fingerprint descrives a tube rather than a path. Similarly the Atom Pair
+fingerprint can have atom types that have undergone round(s) of shell expansion
+thereby describing dumbell shaped motifs
+```
+-AP10:CPY1
+```
+is an atom pair fingerprint, up to 10 bonds apart, and with the atom property
+being a combination of
+. number of connections
+. pi electrons
+. compressed atomic number
+which then undergoes one round of shell expansion.
+
+See [atom typing](/docs/Molecule_Lib/atom_typing.md)
+

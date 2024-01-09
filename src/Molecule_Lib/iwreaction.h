@@ -3,6 +3,7 @@
 
 #include <assert.h>
 #include <iostream>
+#include <optional>
 #include <random>
 #include <string>
 
@@ -1010,6 +1011,8 @@ class Reaction_Site : public Substructure_Query
 
     int _determine_matched_atoms_checking_inactives (Molecule & m, Substructure_Results & sresults);
 
+    template <typename M> int InitialiseQueryConstraints(const M& match_condtions);
+
 
   public:
     Reaction_Site ();
@@ -1124,6 +1127,7 @@ class Reaction_Site : public Substructure_Query
 class Scaffold_Reaction_Site : public Reaction_Site
 {
   protected:
+    Scaffold_Match_Conditions _match_conditions;
 
   protected:
 
@@ -1228,7 +1232,8 @@ class Sidechain_Reaction_Site : public Reaction_Site
     int add_reagent_embedding_identified  (Molecule_and_Embedding * m, const Sidechain_Match_Conditions & smc);
     Molecule_and_Embedding * reagent (int r) const { return _reagents[r];}
 
-    int empty_reagents_array ();
+    int empty_reagents_array();
+    int remove_last_reagent();
 
     int check_internal_consistency (int, int, const resizable_array<int> &, const resizable_array<int> &);
 
@@ -1364,8 +1369,6 @@ class IWReaction : public Scaffold_Reaction_Site
 //  Passed to all the sidechains
 
     int _make_implicit_hydrogens_explicit;
-
-    Scaffold_Match_Conditions _match_conditions;
 
     void * _user_specified_void_ptr;
 
@@ -1561,6 +1564,8 @@ class IWReaction : public Scaffold_Reaction_Site
     // Add reagents to a sidechain.
     int add_sidechain_reagents(int sidechain, const char* fname,
                      FileType file_type, const Sidechain_Match_Conditions& smc);
+    int add_sidechain_reagent(int sidechain, Molecule& reagent,
+                        const Sidechain_Match_Conditions& smc);
 
     int number_sidechains_with_reagents () const;
 
@@ -1576,6 +1581,8 @@ class IWReaction : public Scaffold_Reaction_Site
     // The `file_name` argument is needed in case there are files referenced in the proto, and one
     // possibility is that those files are assumed to be in the same directory as `proto`.
     int ConstructFromProto(const ReactionProto::Reaction& proto, const IWString& file_name);
+
+    int ConstructFromTextProto(const std::string& textproto, const IWString& dirname);
 
     // Read a reaction from `fname`.
     // Unfortunately there is currently not a variant that takes
@@ -1647,6 +1654,11 @@ class IWReaction : public Scaffold_Reaction_Site
                           Molecule &);
 
     int perform_reaction (Molecule &, resizable_array_p<Molecule> &);
+
+    // react scaffold and sidechain if the number of embeddings found in sidechain is one.
+    // returns a match for every scaffold match
+    std::optional<std::vector<Molecule>> perform_reaction(Molecule& scaffold, Molecule& sidechain);
+
 //  int perform_reaction (Molecule & m, Molecule_Output_Object &);
 //  int perform_reaction (Molecule & m, const Set_of_Atoms * embedding, Molecule_Output_Object &);
 

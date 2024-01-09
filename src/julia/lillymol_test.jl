@@ -211,7 +211,7 @@ function test_isotopes()::Bool
   hcount(m, 3) == 0 || return is_failure("h on atom 3", m)
   hcount(m, 4) == 3 || return is_failure("should be ch3", m)
 
-  for i in 0:(length(m) - 1)
+  for i in eachindex(m)
     unset_all_implicit_hydrogen_information(m, i)
   end
 
@@ -349,6 +349,15 @@ function test_valence_ok()::Bool
   valence_ok(m) && return false
   build_from_smiles(m, "CC(C)(C)(C)(C)(C)(C)(C)(C)(C)C") || return false
   valence_ok(m) && return false
+  true
+end
+
+function test_atom_valence_ok()::Bool
+  m = Molecule()
+  build_from_smiles(m, "C=F") || return is_failure("Bad smiles")
+  valence_ok(m) && return is_failure("Valence not bad", m)
+  valence_ok(m[0]) || return is_failure("Atom 0 bad", m)
+  valence_ok(m[1]) && return is_failure("Atom 1 good", m)
   true
 end
 
@@ -677,7 +686,7 @@ end
 
 function test_nrings_including_non_sssr_rings()::Bool
   m = LillyMol.MolFromSmiles("C12C3C4C1C5C2C3C45")
-  for i in 0:(natoms(m) - 1)
+  for i in eachindex(m)
     nrings_including_non_sssr_rings(m, i) == 3 || return false
   end
   true
@@ -1972,7 +1981,7 @@ function test_cubane()::Bool
   build_from_smiles(m, "C12C3C4C1C5C2C3C45") || return is_failure("Bad smiles", m)
   nrings(m) == 5 || return is_failure("Nrings not 5", m)
   non_sssr_rings(m) == 1 || return is_failure("Must be 1 non sssr rings", m)
-  for atnum in 0:(length(m) - 1)
+  for atnum in eachindex(m)
     ring_bond_count(m, atnum) == 3 || return is_failure("rbc not 3", m)
   end
 
@@ -2036,7 +2045,7 @@ function test_ring_related()::Bool
   ring_bond_count(m, 4) == 0 || return is_failure("ring_bond_count 4", m)
   ring_bond_count(m, 5) == 3 || return is_failure("ring_bond_count 5", m)
 
-  for i in 0:(natoms(m) - 1)
+  for i in eachindex(m)
     attached_heteroatom_count(m, i) == 0 || return is_failure("Attached heteroatom count", m)
   end
 
@@ -2878,7 +2887,7 @@ function iterate_substructure_results()::Bool
   substructure_search(q, m, sresults) == 4 || return is_failure("Not 4 embeddings", m)
 
   matches = embeddings(sresults)
-  for i in 1:length(matches)
+  for i in eachindex(matches)
     e = matches[i]
     length(e) == 2 || return is_failure("Not 2 atoms in match", m)
   end
@@ -3098,6 +3107,7 @@ boobar()
 @test test_nedges()
 @test test_molecular_formula()
 @test test_valence_ok()
+@test test_atom_valence_ok()
 @test test_standardise()
 @test test_nrings()
 @test test_nrings_atom()

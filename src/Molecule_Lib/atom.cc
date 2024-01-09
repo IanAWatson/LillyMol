@@ -327,6 +327,12 @@ Atom::unsaturated() const {
   return _common_saturation(l);
 }
 
+int
+Atom::unsaturation() const {
+  int nb = nbonds();
+  return nb - _number_elements;
+}
+
 template <typename T>
 int
 Atom::_common_saturation(const T& comparitor) const {

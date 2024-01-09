@@ -1852,6 +1852,8 @@ class __attribute__((visibility("default"))) Molecule : private resizable_array_
   //  int add_aromaticity_to_bonds();
 
   int saturated(atom_number_t) const;
+  // The difference between ncon() and nbonds().
+  int unsaturation(atom_number_t zatom) const;
 
   //  Construct a molecule based on a given subset of a molecule
 

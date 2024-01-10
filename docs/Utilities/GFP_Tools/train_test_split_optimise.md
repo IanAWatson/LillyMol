@@ -5,7 +5,7 @@ splits that optimise the distances between the training and test splits. When bu
 these kinds of splits will often be the most difficult to predict.
 
 ## Algorithm
-You specify the fraction of the dataset that will be in the training set via the `-f` option.
+Specify the fraction of the dataset that will be in the training set via the `-f` option.
 Each split starts with a random split of the data. Items are randomly shifted as needed in
 order to get the precise number of items in each split.
 
@@ -31,7 +31,7 @@ The process involves three steps.
 1. Run `gfp_nearneighbours_single_file` to find all neighbours within a given distance
 2. Convert the resulting nearest neighbour file to TFDataRecord format - eventually
 this will not be necessary.
-3. Run train_test_split_optimise on that data.
+3. Run train_test_split_optimise on the TFDataRecord file.
 
 Specifically this might look like
 
@@ -48,7 +48,7 @@ nn2proto -v -T all.tfdata all.nn
 ```
 This is fast. Eventually `gfp_nearneighbours_single_file` will be able to
 generate this file directly. The resulting file is still quite large, 98MB
-for the dataset used for testing here. Reduce the maximum distance in order
+for the 3.1k dataset used for testing here. Reduce the maximum distance in order
 to keep the size down. For standard `.gfp` fingerprints, a distance of
 0.45 is almost certainly too large and unnecessary.
 

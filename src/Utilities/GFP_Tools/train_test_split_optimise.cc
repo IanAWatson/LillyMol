@@ -1,7 +1,5 @@
 // Use the results of a nearest neighbour calculation to optimize
-// one or more train/test splits.
-// In its current state this is not working. Needs debugging.
-//  TODO:ianwatson fix this.
+// the distances across a train/test split one or more train/test splits.
 
 #include <stdlib.h>
 
@@ -44,6 +42,7 @@ Usage(int rc) {
   cerr << " -f <train_fraction> fraction of data in the train split\n";
   cerr << " -n <nsplit>         number of splits needed\n";
   cerr << " -S <stem>           write splits to <stem>, <stem>R and <stem>E\n";
+  // Interesting/necessary idea, TODO:ianwatson figure something out.
   //cerr << " -s ...              stratified sampling...\n";
   cerr << " -o <nopt>           number of optimisation steps to try per split\n";
   cerr << " -t <sec>            run each split for <sec> seconds\n";
@@ -58,7 +57,8 @@ Usage(int rc) {
 
 // Neighbour information consists of an ID and an integer distance.
 struct Nbr {
-  // This will be the index of this neighbour into the overall array of needles.
+  // This will be the index of this neighbour into the overall array of needles,
+  // which is external to this class.
   uint32_t _id;
   // This value could be narrower, even uint8_t would be fine.
   uint32_t _dist;
@@ -109,14 +109,14 @@ class Needle {
       return _nbrs[ndx]._dist;
     }
 
-    int64_t InvertTrain();
-
     void SetNbrDistances(uint32_t* nbrdist, uint32_t max_distance) const;
     void SetNbrDistances(uint32_t* nbrdist) const;
-    void SetZeroNbrDistances(uint32_t* nbrdist, uint32_t max_distance) const;
 
     void WriteNbrs(std::ostream& output) const;
 
+    // The distance of the nearest neighbour. If no neighbours, 101.0 is returned.
+    // Note that the discretised distance is returned, the caller will need to convert
+    // to a distance value in [0,1].
     float ClosestDistance() const;
 };
 
@@ -141,6 +141,10 @@ DistanceToInt(float d) {
   return static_cast<uint32_t>(d * 100.0f) + 1;
 }
 
+// Since neighbours store their id's as indices, we need a mapping
+// from names to indices `id_to_ndx`.
+// `upper_distance_limit` does not work, not sure why, it breaks
+// the optimisation.
 int
 Needle::Build(const nnbr::NearNeighbours& proto,
               const std::unordered_map<std::string, uint32_t>& id_to_ndx,
@@ -213,18 +217,7 @@ Needle::SetNbrDistances(uint32_t* nbrdist, uint32_t max_distance) const {
 }
 #endif
 
-void
-Needle::SetZeroNbrDistances(uint32_t* nbrdist, uint32_t max_distance) const {
-  for (uint32_t i = 0; i < _number_nbrs; ++i) {
-    const Nbr& nbr = _nbrs[i];
-    uint32_t id = nbr._id;
-    if (nbrdist[id] == max_distance) {
-    } else {
-      nbrdist[nbr._id] = 0;
-    }
-  }
-}
-
+// Used for debugging.
 void
 Needle::WriteNbrs(std::ostream& output) const {
   output << "train " << _train << '\n';
@@ -242,17 +235,21 @@ Needle::ClosestDistance() const {
   return _nbrs[0]._dist;
 }
 
+// Handle the overall optimisation of train/test splits.
 class Optimise {
   private:
     int _verbose;
 
+    // The number of splits to form, the -n option.
     int _nsplits;
 
     uint32_t _number_needles;
     Needle* _needle;
 
+    // Does not work, do not used.
     float _upper_distance_threshold;
 
+    // The -f option.
     float _fraction_train;
 
     std::mt19937 _rng;
@@ -265,8 +262,10 @@ class Optimise {
     // Therefore use 64 bit int.
     uint64_t _current_score;
 
+    // The number of optimisation steps per split, the -o option.
     uint32_t _nopt;
 
+    // If running for a fixed time per split, the -t option.
     uint32_t _seconds;
 
     // For each pair of items where we know a distance, store that.
@@ -285,8 +284,10 @@ class Optimise {
     // Keep track of how many times each needle appears in train.
     int* _times_in_train;
 
+    // The file name stem for the output files, the -S option.
     IWString _stem;
 
+    // Activated by the -r option.
     Report_Progress _report_progress;
 
   // Private functions.
@@ -647,7 +648,7 @@ Optimise::ChooseTwo() {
 
 uint32_t
 Optimise::ReadNeighbours(const char* fname,
-                            const std::unordered_map<std::string, uint32_t>& id_to_ndx) {
+                         const std::unordered_map<std::string, uint32_t>& id_to_ndx) {
   iw_tf_data_record::TFDataReader reader;
   if (! reader.Open(fname)) {
     cerr << "Optimise::ReadNeighbours:cannot open '" << fname << "'\n";
@@ -722,6 +723,7 @@ BreakForTime(std::time_t tzero, uint32_t seconds) {
   return (std::time(nullptr) - tzero) >= seconds;
 }
 
+// Generate _nsplits splits.
 int
 Optimise::Doit() {
   for (int i = 0; i < _nsplits; ++i) {
@@ -731,6 +733,7 @@ Optimise::Doit() {
   return 1;
 }
 
+// Return a signed diff between two unsigned numbers.
 int64_t
 Diff(const uint64_t v1, const uint64_t v2) {
   if (v1 > v2) {
@@ -756,6 +759,7 @@ Optimise::MakeSplit(int split) {
             " ave dist " << across_split << " at max " << number_at_max << '\n';
   }
 
+  // FIrst split, write the random split.
   if (split == 0) {
     WriteRandomSplitStatus();
   }
@@ -903,6 +907,7 @@ Optimise::MakeSplit(int split) {
   return WriteSplit(split);
 }
 
+// Accumulate how many times each item appears in the training split.
 void
 Optimise::AccumulateStats() {
   for (uint32_t i = 0; i < _number_needles; ++i) {
@@ -912,6 +917,8 @@ Optimise::AccumulateStats() {
   }
 }
 
+// Write the various split files, train and test identifiers, and smiles files.
+// Distribution file as well.
 int
 Optimise::WriteSplit(int split) const {
   IWString fname;
@@ -1048,6 +1055,8 @@ Optimise::AveDistanceAcrossSplit() const {
   return acc.average();
 }
 
+// Return the average distance of cross-split pairs that are not at the
+// maximum distance, and the number that are at the maximum distance.
 std::tuple<float, uint32_t>
 Optimise::AveDistNumberMax() const {
   Accumulator_Int<uint64_t> acc;

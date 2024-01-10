@@ -48,7 +48,8 @@ Usage(int rc) {
   cerr << " -o <nopt>           number of optimisation steps to try per split\n";
   cerr << " -t <sec>            run each split for <sec> seconds\n";
   cerr << " -r <n>              report progress every <n> steps\n";
-  cerr << " -T <dist>           discard neighbours <dist>\n";
+//  enable once I figure out why this does not work.
+//  cerr << " -T <dist>           discard neighbours <dist>\n";
   cerr << " -v                  verbose output\n";
 // clang-format on
   
@@ -111,6 +112,7 @@ class Needle {
     int64_t InvertTrain();
 
     void SetNbrDistances(uint32_t* nbrdist, uint32_t max_distance) const;
+    void SetNbrDistances(uint32_t* nbrdist) const;
     void SetZeroNbrDistances(uint32_t* nbrdist, uint32_t max_distance) const;
 
     void WriteNbrs(std::ostream& output) const;
@@ -158,7 +160,7 @@ Needle::Build(const nnbr::NearNeighbours& proto,
     }
 
     if (ok_nbrs == 0) {
-      ok_nbrs = 1;
+      return 1;
     }
   }
 
@@ -184,6 +186,18 @@ Needle::Build(const nnbr::NearNeighbours& proto,
   return 1;
 }
 
+
+// For each neighbour update the distance stored in `nbrdist`
+void
+Needle::SetNbrDistances(uint32_t* nbrdist) const {
+  for (uint32_t i = 0; i < _number_nbrs; ++i) {
+    const Nbr& nbr = _nbrs[i];
+    uint32_t id = nbr._id;
+    nbrdist[id] = nbr._dist;
+  }
+}
+
+#ifdef NO_LONGER_USED
 // For each neighbour update the distance stored in `nbrdist`
 void
 Needle::SetNbrDistances(uint32_t* nbrdist, uint32_t max_distance) const {
@@ -197,6 +211,7 @@ Needle::SetNbrDistances(uint32_t* nbrdist, uint32_t max_distance) const {
     }
   }
 }
+#endif
 
 void
 Needle::SetZeroNbrDistances(uint32_t* nbrdist, uint32_t max_distance) const {
@@ -289,6 +304,7 @@ class Optimise {
     uint64_t RecomputeCurrentScore();
 
     float AveDistanceAcrossSplit() const;
+    std::tuple<float, uint32_t> AveDistNumberMax() const;
 
     std::tuple<uint32_t, uint32_t> ChooseTwo();
 
@@ -301,6 +317,7 @@ class Optimise {
     int WriteSubset(int train, IWString_and_File_Descriptor& output) const;
     int WriteCrossSplitSummary(IWString& fname) const;
     int WriteCrossSplitSummary(IWString_and_File_Descriptor& output) const;
+    int WriteRandomSplitStatus() const;
     void AccumulateStats();
 
   public:
@@ -714,6 +731,14 @@ Optimise::Doit() {
   return 1;
 }
 
+int64_t
+Diff(const uint64_t v1, const uint64_t v2) {
+  if (v1 > v2) {
+    return v1 - v2;
+  }
+  return - static_cast<int64_t>(v2 - v1);
+}
+
 // Starting with a random split, optimize it and write when done.
 int
 Optimise::MakeSplit(int split) {
@@ -725,14 +750,20 @@ Optimise::MakeSplit(int split) {
   RandomSplit();
   uint64_t score = RecomputeCurrentScore();
   const uint64_t starting_score = score;
-  const float across_split = AveDistanceAcrossSplit();
+  const auto [across_split, number_at_max] = AveDistNumberMax();
   if (_verbose) {
-    cerr << "Split " << split << " starting score " << score << " ave dist " << across_split << '\n';
+    cerr << "Split " << split << " starting score " << score <<
+            " ave dist " << across_split << " at max " << number_at_max << '\n';
+  }
+
+  if (split == 0) {
+    WriteRandomSplitStatus();
   }
 
   std::unique_ptr<uint32_t[]> id_dist = std::make_unique<uint32_t[]>(_number_needles);
 
   uint32_t steps_accepted = 0;
+  uint32_t last_successful_switch = 0;
 #ifdef DEBUG_MAKE_SPLIT
   cerr << "Will perform " << _nopt << " optimisations\n";
   for (int i = 0; i < _number_needles; ++i) {
@@ -755,7 +786,7 @@ Optimise::MakeSplit(int split) {
 #endif
 
     std::fill_n(id_dist.get(), _number_needles, _max_distance);
-    _needle[i1].SetNbrDistances(id_dist.get(), _max_distance);
+    _needle[i1].SetNbrDistances(id_dist.get());
 #ifdef DEBUG_MAKE_SPLIT
     cerr << "After setting needle1 ";
     for (uint32_t q = 0; q < _number_needles; ++q) {
@@ -785,7 +816,7 @@ Optimise::MakeSplit(int split) {
 #endif
 
     std::fill_n(id_dist.get(), _number_needles, _max_distance);
-    _needle[i2].SetNbrDistances(id_dist.get(), _max_distance);
+    _needle[i2].SetNbrDistances(id_dist.get());
 #ifdef DEBUG_MAKE_SPLIT
     cerr << "After setting needle2 ";
     for (uint32_t q = 0; q < _number_needles; ++q) {
@@ -822,7 +853,9 @@ Optimise::MakeSplit(int split) {
 #endif
 
     if (_report_progress() && j > 0) {
-      cerr << split << ' ' << j << " score " << new_score << " cmp " << starting_score << " accepted " << steps_accepted << " " << iwmisc::Fraction<float>(steps_accepted, j) << '\n';
+      cerr << split << ' ' << j << " score " << new_score << " cmp " << starting_score <<
+      " accepted " << steps_accepted << " " << iwmisc::Fraction<float>(steps_accepted, j) << 
+      " last successful " << last_successful_switch << '\n';
     }
 
     // Heuristics to stop this being checked too often.
@@ -843,6 +876,7 @@ Optimise::MakeSplit(int split) {
     if (new_score > score) {
       score = new_score;
       ++steps_accepted;
+      last_successful_switch = j;
       continue;
     }
     // Worse, revert.
@@ -855,8 +889,12 @@ Optimise::MakeSplit(int split) {
 
   if (_verbose) {
     RecomputeCurrentScore();
-    cerr << "Writing split " << split << " score " << score << " computed " << _current_score << " diff " << (score - _current_score) << '\n';
-    cerr << "starting_score " << starting_score << " score " << _current_score << " improvement " << (_current_score - starting_score) << " across split " << AveDistanceAcrossSplit() << '\n';
+    cerr << "Writing split " << split << " score " << score << " computed " << _current_score << " diff " << Diff(score, _current_score) << '\n';
+
+    const auto [across_split, number_at_max] = AveDistNumberMax();
+    cerr << "starting_score " << starting_score << " score " << _current_score <<
+            " improvement " << Diff(_current_score, starting_score) <<
+            " across split " << AveDistanceAcrossSplit() << " at max " << number_at_max << '\n';
     cerr << "Split " << split << " accepted " << steps_accepted << " of " << _nopt << " steps\n";
   }
 
@@ -897,6 +935,13 @@ Optimise::WriteSplit(int split) const {
   WriteCrossSplitSummary(fname);
 
   return 1;
+}
+
+int
+Optimise::WriteRandomSplitStatus() const {
+  IWString fname;
+  fname << _stem << "_stats_rand.txt";
+  return WriteCrossSplitSummary(fname);
 }
 
 int
@@ -1001,6 +1046,29 @@ Optimise::AveDistanceAcrossSplit() const {
   }
 
   return acc.average();
+}
+
+std::tuple<float, uint32_t>
+Optimise::AveDistNumberMax() const {
+  Accumulator_Int<uint64_t> acc;
+  uint64_t number_max = 0;
+  for (uint64_t i = 0; i < _number_needles; ++i) {
+    const int itrain = _needle[i].in_train();
+    for (uint64_t j = i + 1; j <_number_needles; ++j) {
+      if (_needle[j].in_train() == itrain) {
+        continue;
+      }
+      uint32_t d = DistanceOrMax(i, j);
+      if (d == _max_distance) {
+        ++number_max;
+      } else {
+        acc.extra(d);
+      }
+    }
+  }
+
+  return std::tuple(acc.average(), number_max);
+
 }
 
 int

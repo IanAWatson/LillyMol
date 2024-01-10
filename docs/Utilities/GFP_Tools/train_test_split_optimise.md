@@ -36,7 +36,7 @@ this will not be necessary.
 Specifically this might look like
 
 ```
-gfp_nearneighbours_single_file -T 0.45 -v /tmp/all.gfp > /tmp/all.nn
+gfp_nearneighbours_single_file -T 0.45 -v all.gfp > all.nn
 ```
 where we select a distance of 0.45. For typical gfp fingerprints, this is a long
 distance, and perhaps a shorter value would be better. On the 3100 molecule
@@ -57,11 +57,11 @@ That is fine, they will always be hard to predict, and will presumably
 help the optimisation, by being able to be on either side of the train/test
 divide.
 
-Then to run train_test_split_optimise that might look like
+running `train_test_split_optimise` might look like
 ```
 train_test_split_optimise -S split -f 0.5 -n 10 -o 200000 -r 10000 -v all.tfdata
 ```
-We are asking for 10 splits, `-n 10`, each with a 50/50 split between
+We are asking for 10 splits, `-n 10`, each with a 50/50 split (`-f 0.5`) between
 train and test. In order to generate each split, a random split is generated.
 Items are transferred in order to get the precise number needed in train and test.
 Then 200k optimisation steps are taken. With this particular dataset, this
@@ -200,7 +200,7 @@ Writing split 0 score 115646849 computed 115646849 diff 0
 starting_score 113170036 score 115646849 improvement 2476813 across split 46.8876 at max 2406506
 Split 0 accepted 2208 of 200000 steps
 ```
-We see that no changes were accepted in the last 10 optimisations, so 200k optimisation
+We see that no changes were accepted in the last 10k optimisations, so 200k optimisation
 steps were not necessary for this split. Other splits did record successful switches close
 to 200k steps, and one never made a change after 176k switches. Unpredictable. Run time
 is attractive, so let it run.
@@ -215,3 +215,8 @@ for the optimisation. So as the dataset is read, nearest neighbours beyond the `
 option are discarded. While this seems reasonable, for reasons I do not yet understand
 it breaks the internal optimisation shortcuts. Do not use.
 
+## Summary
+This tool provides a means of generating well separated trian/test splits, that
+should provide challenging conditions for model building. The distribution
+files written show substantial reductions in shorter distances between
+splits compared to random. Run times are attractive.

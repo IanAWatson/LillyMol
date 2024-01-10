@@ -15,13 +15,15 @@ The change in inter-set distances is computed, and if more favourable, the switc
 otherwise it is rejected and reversed.
 
 ## Details
-The tool becomes viable froma run-time perspective by keeping track of the neighbours of each
-item, so when two molecules are swapped from train to test, only the distances associdated with
+The tool becomes viable from a run-time perspective by keeping track of the neighbours of each
+item, so when two molecules are swapped from train to test, only the distances associated with
 those two molecules are recomputed.
 
-Generally assume that we only care about relatively short distances, and all distances beyond
+Generally we assume that we only care about relatively short distances, and all distances beyond
 some threshold are just considered "substantially different" and are all considered the same.
-This is not really necessary, but given the run-time advantages seems reasonable.
+This is not really necessary, but given the potentially large size of a complete nearest neighbour
+file, seems desirable. In the case of a 3100 item QSAR dataset used here for testing, finding
+all neighbours within 0.45 distance results in a 113MB nearest neighbour file.
 
 ## HowTo
 The process involves three steps.
@@ -45,16 +47,25 @@ To convert the text nearest neighbour file to TFDataRecord serialized protos
 nn2proto -v -T all.tfdata all.nn
 ```
 This is fast. Eventually `gfp_nearneighbours_single_file` will be able to
-generate this file directly.
+generate this file directly. The resulting file is still quite large, 98MB
+for the dataset used for testing here. Reduce the maximum distance in order
+to keep the size down. For standard `.gfp` fingerprints, a distance of
+0.45 is almost certainly too large and unnecessary.
+
+Lowering the threshold may lead to singletons, molecules with no neighbours.
+That is fine, they will always be hard to predict, and will presumably
+help the optimisation, by being able to be on either side of the train/test
+divide.
 
 Then to run train_test_split_optimise that might look like
 ```
 train_test_split_optimise -S split -f 0.5 -n 10 -o 200000 -r 10000 -v all.tfdata
 ```
 We are asking for 10 splits, `-n 10`, each with a 50/50 split between
-train and test. In order to generate each split, a random split is generated
-and 200k optimisation steps are taken. With this particular dataset, this
-calculation takes less than about 35 seconds on a 2017 consumer class cpu.
+train and test. In order to generate each split, a random split is generated.
+Items are transferred in order to get the precise number needed in train and test.
+Then 200k optimisation steps are taken. With this particular dataset, this
+calculation takes about 35 seconds on a 2017 consumer class cpu.
 
 The results are written as a number of split* files, as specified by the `-S split`
 option combination. These come in pairs, a file of identifiers, and a corresponding

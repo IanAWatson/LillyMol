@@ -239,7 +239,7 @@ class SaltFileTestP : public testing::TestWithParam<SaltFileData> {
 
 TEST_P(SaltFileTestP, SaltFileTestP) {
   const auto& params = GetParam();
-  set_ignore_all_chiral_information_on_input(0);
+  moleculeio::set_ignore_all_chiral_information_on_input(0);
 
   auto tmp_path = std::filesystem::temp_directory_path();
   auto saltfile = tmp_path.append("saltfile");
@@ -270,7 +270,7 @@ TEST_P(SaltFileTestP, SaltFileTestP) {
   argv[ndx] = const_cast<char*>(tmp.null_terminated_chars());
   ++ndx;
 
-  set_ignore_all_chiral_information_on_input(0);
+  moleculeio::set_ignore_all_chiral_information_on_input(0);
 
   Command_Line cl(argc, argv, params.options);
   // std::cerr << "Testing initial smiles " << _m.smiles() << ' ' << params.name << '\n';

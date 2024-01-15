@@ -1150,18 +1150,18 @@ MDL_Molecule::only_allow_substitutions_at_isotopic_atoms(const Molecule_to_Query
     else
       cerr << "MDL_Molecule::only_allow_substitutions_at_isotopic_atoms:no open valence in '" << name() << "', atom " << smarts_equivalent_for_atom(i) << endl;
 
-    if (must_have_substituent_at_every_isotopic_atom())
+    if (mqs.must_have_substituent_at_every_isotopic_atom())
     {
       if (0 != mad->substitution())   // already set
         ;
-      else if (isotope_count_means_extra_connections())
+      else if (mqs.isotope_count_means_extra_connections())
         mad->set_substitution(ai->ncon() + iso);
       else
         mad->set_min_ncon(ai->ncon() + 1);
     }
     else
     {
-      if (isotope_count_means_extra_connections())
+      if (mqs.isotope_count_means_extra_connections())
         mad->set_min_ncon(ai->ncon() + iso);
       else
         mad->set_min_ncon(ai->ncon());

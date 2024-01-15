@@ -2886,7 +2886,7 @@ Substructure_Atom::create_from_molecule(
 
   if (smarts_specified.length()) {
     ;
-  } else if (only_include_isotopically_labeled_atoms()) {  // ignore isotopic labels
+  } else if (mqs.only_include_isotopically_labeled_atoms()) {  // ignore isotopic labels
     ;
   } else if (mqs.substituents_only_at_isotopic_atoms()) {  // ignore isotopes
     ;
@@ -3096,7 +3096,7 @@ Substructure_Atom::create_from_molecule(
       continue;
     }
 
-    if (only_include_isotopically_labeled_atoms() && 0 == m.isotope(j)) {
+    if (mqs.only_include_isotopically_labeled_atoms() && 0 == m.isotope(j)) {
       continue;
     }
 
@@ -3152,7 +3152,7 @@ Substructure_Atom::create_from_molecule(
       continue;
     }
 
-    if (only_include_isotopically_labeled_atoms() && 0 == m.isotope(j)) {
+    if (mqs.only_include_isotopically_labeled_atoms() && 0 == m.isotope(j)) {
       continue;
     }
 
@@ -3457,7 +3457,7 @@ Single_Substructure_Query::_build_element_hits_needed(
       continue;
     }
 
-    if (only_include_isotopically_labeled_atoms() && 0 == m.isotope(i)) {
+    if (mqs.only_include_isotopically_labeled_atoms() && 0 == m.isotope(i)) {
       continue;
     }
 
@@ -3606,11 +3606,11 @@ Single_Substructure_Query::_create_from_molecule(MDL_Molecule &m,
 
   if (mqs.built_from_isis_reaction_file()) {
     ;
-  } else if (substituents_only_at_isotopic_atoms()) {
+  } else if (mqs.substituents_only_at_isotopic_atoms()) {
     m.only_allow_substitutions_at_isotopic_atoms(mqs);
   } else if (mqs.substitutions_only_at().active()) {
     m.determine_attachment_points_by_query(mqs);
-  } else if (substitutions_only_at_non_isotopic_atoms()) {
+  } else if (mqs.substituents_only_at_non_isotopic_atoms()) {
     m.only_allow_substitutions_at_non_isotopic_atoms();
   }
 
@@ -3654,7 +3654,7 @@ Single_Substructure_Query::_create_from_molecule(MDL_Molecule &m,
 
   int nf = m.number_fragments();
 
-  if (only_include_isotopically_labeled_atoms()) {
+  if (mqs.only_include_isotopically_labeled_atoms()) {
     for (int i = 0; i < nf; i++) {
       atom_number_t astart = first_isotopically_labelled_atom_in_fragment(m, i);
 
@@ -3724,7 +3724,7 @@ Single_Substructure_Query::_create_from_molecule(MDL_Molecule &m,
 
   int nr = m.number_sssr_rings();
 
-  if (only_include_isotopically_labeled_atoms()) {
+  if (mqs.only_include_isotopically_labeled_atoms()) {
     // some time put in a computation of the number of rings with isotopes - is
     // complicated by fused rings...
   } else if (nullptr != include_these_atoms) {  // again, kind of hard

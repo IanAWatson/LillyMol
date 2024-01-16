@@ -91,6 +91,23 @@ py_proto_library(
 )
 
 proto_library(
+    name = "molecule_to_query_proto",
+    srcs = [
+        "molecule_to_query.proto",
+    ],
+    deps = [
+        ":substructure_proto",
+    ],
+)
+
+cc_proto_library(
+    name = "molecule_to_query_cc_proto",
+    deps = [
+        ":molecule_to_query_proto",
+    ],
+)
+
+proto_library(
     name = "pharmacophore_proto",
     srcs = [
         "pharmacophore.proto",
@@ -373,6 +390,7 @@ cc_library(
         ":atom_type_ext_cc_proto",
         ":donor_acceptor_cc_proto",
         ":mol2graph_cc_proto",
+        ":molecule_to_query_cc_proto",
         ":pharmacophore_cc_proto",
         ":space_vector",
         ":substructure_cc_proto",

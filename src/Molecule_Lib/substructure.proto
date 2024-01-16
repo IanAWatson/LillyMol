@@ -1028,6 +1028,8 @@ message RequiredMolecularProperties {
 
   // Only search the molecule if elements_needed is satisfied.
   repeated ElementsNeeded elements_needed = 47;
+
+  repeated RequiredBond required_bond = 48;
 }
 
 // The concept of other atoms that must be somewhere near the matched

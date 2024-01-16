@@ -344,6 +344,13 @@ Set_of_Atoms::contains_atoms(const atom_number_t a1, const atom_number_t a2) con
   return 0;
 }
 
+void
+Set_of_Atoms::EachAtomIncrement(int offset) {
+  for (int i = 0; i < _number_elements; ++i) {
+    _things[i] += offset;
+  }
+}
+
 std::vector<atom_number_t>
 Set_of_Atoms::AsVector() const {
   std::vector<atom_number_t> result(_things, _things + _number_elements);

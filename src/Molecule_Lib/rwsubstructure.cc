@@ -2722,6 +2722,12 @@ Substructure_Atom::create_from_molecule(
            << smarts_specified << "'\n";
       return 0;
     }
+  } else if (mqs.convert_all_aromatic_atoms_to_generic_aromatic() && m.is_aromatic(my_atom_number)) {
+    Substructure_Atom_Specifier* a = new Substructure_Atom_Specifier;
+    a->set_aromaticity(AROMATIC);
+    _components.add(a);
+  } else if (mqs.ignore_atom_type()) {
+    // Do nothing
   } else if (e->is_in_periodic_table()) {
     if (1 == e->atomic_number() &&
         (mqs.convert_explicit_hydrogens_to_match_any_atom() ||
@@ -3700,17 +3706,17 @@ Single_Substructure_Query::_create_from_molecule(MDL_Molecule &m,
     }
   } else {
     for (int i = 0; i < nf; i++) {
-      Substructure_Atom *r = new Substructure_Atom;
+      std::unique_ptr<Substructure_Atom> r = std::make_unique<Substructure_Atom>();
 
       atom_number_t astart = m.first_atom_in_fragment(i);
 
       if (!r->create_from_molecule(m, m, astart, nullptr, mqs, tmp)) {
         cerr << "Single_Substructure_Query::_create_from_molecule:failure for fragment "
-             << i << endl;
+             << i << '\n';
         return 0;
       }
 
-      _root_atoms.add(r);
+      _root_atoms << r.release();
     }
   }
 
@@ -3885,14 +3891,14 @@ static int
 add_environment(const msi_object &msi, atom_number_t s,
                 extending_resizable_array<Substructure_Atom *> &completed,
                 resizable_array_p<Substructure_Environment> &destination) {
-  Substructure_Environment *e = new Substructure_Environment;
+  std::unique_ptr<Substructure_Environment> e = std::make_unique<Substructure_Environment>();
   if (!e->construct_from_msi_object(msi, completed, s, SINGLE_BOND)) {
     cerr << "Single_Substructure_Query::_add_environment_according_to_matched_atoms:"
             "cannot parse environment specification\n";
     return 0;
   }
 
-  destination.add(e);
+  destination << e.release();
 
   return 1;
 }
@@ -4254,10 +4260,8 @@ int
 Single_Substructure_Query::_parse_ring_specifier_object(const msi_object &msi) {
   assert(NAME_OF_RING_SPECIFIER_OBJECT == msi.name());
 
-  Substructure_Ring_Specification *r = new Substructure_Ring_Specification();
+  std::unique_ptr<Substructure_Ring_Specification> r = std::make_unique<Substructure_Ring_Specification>();
   if (!r->construct_from_msi_object(msi)) {
-    delete r;
-
     cerr << "Could not create ring specifier object from msi object\n";
     cerr << msi;
     return 0;
@@ -4271,7 +4275,7 @@ Single_Substructure_Query::_parse_ring_specifier_object(const msi_object &msi) {
     return 0;
   }
 
-  _ring_specification.add(r);
+  _ring_specification << r.release();
 
   return 1;
 }
@@ -4350,7 +4354,7 @@ Single_Substructure_Query::_construct_environment_from_msi_object(
     resizable_array_p<Substructure_Environment> &env) {
   // cerr << "Constructing env from\n" << (*msi);
 
-  Substructure_Environment *a = new Substructure_Environment();
+  std::unique_ptr<Substructure_Environment> a = std::make_unique<Substructure_Environment>();
 
   _collect_all_atoms(completed);
 
@@ -4358,11 +4362,10 @@ Single_Substructure_Query::_construct_environment_from_msi_object(
 
   if (0 == rc) {
     cerr << msi;
-    delete a;
     return 0;
   }
 
-  env.add(a);
+  env << a.release();
 
   return 1;
 }
@@ -4557,16 +4560,15 @@ Substructure_Environment::construct_from_msi_object(
 
   i = 0;
   while (nullptr != (att = msi.attribute(NAME_OF_SMILES_ATTRIBUTE, i++))) {
-    Substructure_Atom *a = new Substructure_Atom;
+    std::unique_ptr<Substructure_Atom> a = std::make_unique<Substructure_Atom>();
     a->set_unique_id(msi.object_id());
 
     if (!a->parse_smiles_specifier(att)) {
-      delete a;
       return 0;
     }
 
     //  cerr << "Build query from smiles " << (*att) << endl;
-    add(a);
+    add(a.release());
   }
 
   for (i = 0; i < nmsi; i++) {
@@ -4574,14 +4576,13 @@ Substructure_Environment::construct_from_msi_object(
 
     if (NAME_OF_QUERY_BOND_OBJECT == m.name()) {
     } else if (NAME_OF_QUERY_ATOM_OBJECT == m.name()) {
-      Substructure_Atom *a = new Substructure_Atom;
+      std::unique_ptr<Substructure_Atom> a = std::make_unique<Substructure_Atom>();
       if (!a->construct_from_msi_object(m, completed)) {
-        delete a;
         return 0;
       }
 
       if (is_root_substructure_atom(m)) {
-        add(a);
+        add(a.release());
       }
     } else {
       cerr << "Unknown msi object type in query_environment\n" << m;
@@ -5031,15 +5032,14 @@ Single_Substructure_Query::_construct_from_msi_object(const msi_object &msi,
 
       attribute_recognised[i] = 1;
     } else if (NAME_OF_SMILES_ATTRIBUTE == att->name()) {
-      Substructure_Atom *a = new Substructure_Atom;
+      std::unique_ptr<Substructure_Atom> a = std::make_unique<Substructure_Atom>();
       if (!a->parse_smiles_specifier(att)) {
-        delete a;
         cerr << "Single_Substructure_Query::_construct_from_msi_object: cannot parse '"
              << NAME_OF_SMILES_ATTRIBUTE << "'\n";
         return 0;
       }
 
-      _root_atoms.add(a);
+      _root_atoms << a.release();
     } else if (NAME_OF_SMARTS_ATTRIBUTE == att->name()) {
       const_IWSubstring smarts;
       att->value(smarts);
@@ -5087,17 +5087,16 @@ Single_Substructure_Query::_construct_from_msi_object(const msi_object &msi,
 
       attribute_recognised[i] = 1;
     } else if (NAME_OF_LINK_ATOMS_SPECIFIER == att->name()) {
-      Link_Atom *l = new Link_Atom;
+      std::unique_ptr<Link_Atom> l = std::make_unique<Link_Atom>();
 
       if (!l->construct_from_msi_attribute(att)) {
         cerr << "Single_Substructure_Query::_construct_from_msi_object:invalid link atom "
                 "specification\n";
         cerr << (*att) << endl;
-        delete l;
         return 0;
       }
 
-      _link_atom.add(l);
+      _link_atom << l.release();
       attribute_recognised[i] = 1;
     } else if (NAME_OF_DISTANCE_BETWEEN_HITS_NCHECK_ATTRIBUTE == att->name()) {
       if (!att->value(_matched_atoms_to_check_for_hits_too_close) ||
@@ -5406,30 +5405,31 @@ Single_Substructure_Query::_construct_from_msi_object(const msi_object &msi,
     }
 
     if (is_root_substructure_atom(mi)) {
-      Substructure_Atom *r = new Substructure_Atom;
+      std::unique_ptr<Substructure_Atom> r = std::make_unique<Substructure_Atom>();
 
       if (!r->construct_from_msi_object(mi, completed)) {
-        delete r;
         return 0;
       }
 
       nat++;
-      _root_atoms.add(r);
+      _root_atoms << r.release();
     } else if (_root_atoms.empty()) {
       cerr << "Single_Substructure_Query::_construct_from_msi_object: no root atoms "
               "defined\n";
       return 0;
     } else {
-      Substructure_Atom *a = new Substructure_Atom;
+      // Feb 2024. Looks like a bug. This gets silently handled then discarded. 
+      // Issue error message
+      cerr << "Non root substructure atom in query\n";
+      return 0;
+
+      std::unique_ptr<Substructure_Atom> a = std::make_unique<Substructure_Atom>();
       if (!a->construct_from_msi_object(mi, completed)) {
-        delete a;
         return 0;
       }
 
-      if (0 == a->nbonds())  // no bonds to anything already defined
-      {
+      if (0 == a->nbonds()) {  // no bonds to anything already defined
         cerr << "Non root Substructure_Atom not bonded\n";
-        delete a;
         cerr << mi;
         return 0;
       }

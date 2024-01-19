@@ -4329,8 +4329,11 @@ RequiredMolecularProperties::DiscernAttributesSpecified() {
 
 int
 NearbyAtoms::ConstructFromProto(const SubstructureSearch::NearbyAtoms& proto) {
+#ifdef DEBUG_NEARBY_ATOMS_CONSTRUCT_FROM_PROTO
   cerr << "NearbyAtoms::ConstructFromProto building from\n";
   cerr << proto.ShortDebugString() << '\n';
+#endif
+
   int nquery = proto.smarts_size() + proto.query_size() + proto.query_file_size();
   if (nquery != 1) {
     cerr << "NearbyAtoms::ConstructFromProto:must specify exactly 1 query source " << nquery << " invalid\n";
@@ -4402,7 +4405,6 @@ NearbyAtoms::ConstructFromProto(const SubstructureSearch::NearbyAtoms& proto) {
   if (proto.has_rejection()) {
     _rejection = proto.rejection();
   }
-  cerr << "Rejection set to " << _rejection << '\n';
 
   return 1;
 }

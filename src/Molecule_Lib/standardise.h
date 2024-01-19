@@ -421,6 +421,7 @@ class Chemical_Standardisation
     int  _do_transform_nitro    (Molecule &, IWStandard_Current_Molecule & current_molecule_data);
     int  _do_transform_nplus_ominus (Molecule &, IWStandard_Current_Molecule & current_molecule_data);
     int  _do_nv5_to_charge_separated(Molecule & m, IWStandard_Current_Molecule & current_molecule_data);
+    int _do_nv5_to_charge_separated(Molecule& m, atom_number_t zatom, const IWStandard_Current_Molecule& current_molecule_data);
     int  _do_transform_plus_minus   (Molecule &, IWStandard_Current_Molecule & current_molecule_data);
     int  _do_transform_n_charge_sep (Molecule &, IWStandard_Current_Molecule & current_molecule_data);
     int  _do_transform_azid_to_charge_separated (Molecule & m, IWStandard_Current_Molecule & current_molecule_data);
@@ -519,6 +520,8 @@ class Chemical_Standardisation
     int _do_transform_enol_fused(Molecule& m, IWStandard_Current_Molecule& current_molecule_data);
 
     int  _do_transform_implicit_hydrogen_known_errors (Molecule & m, IWStandard_Current_Molecule & current_molecule_data);
+
+    int _activate_nohmove_transformations();
 
     int  _process (Molecule &);
     int  _process (Molecule &, IWStandard_Current_Molecule & current_molecule_data);

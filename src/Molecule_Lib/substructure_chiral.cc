@@ -5,7 +5,6 @@
 #include "target.h"
 
 using std::cerr;
-using std::endl;
 
 Substructure_Chiral_Centre::Substructure_Chiral_Centre()
 {
@@ -40,15 +39,15 @@ Substructure_Chiral_Centre::debug_print (std::ostream & os) const
   }
 
   if (nullptr != _centre)
-    os << " centre " << _centre->unique_id() << endl;
+    os << " centre " << _centre->unique_id() << '\n';
   if (nullptr != _top_front)
-    os << " top_front " << _top_front->unique_id() << endl;
+    os << " top_front " << _top_front->unique_id() << '\n';
   if (nullptr != _top_back)
-    os << " top_back " << _top_back->unique_id() << endl;
+    os << " top_back " << _top_back->unique_id() << '\n';
   if (nullptr != _left_down)
-    os << " left_down " << _left_down->unique_id() << endl;
+    os << " left_down " << _left_down->unique_id() << '\n';
   if (nullptr != _right_down)
-    os << " right_down " << _right_down->unique_id() << endl;
+    os << " right_down " << _right_down->unique_id() << '\n';
 
   return os.good ();
 }
@@ -254,8 +253,8 @@ check_match(atom_number_t north1,
             atom_number_t se2)
 {
 #ifdef DEBUG_SUBSTURE_CHIRAL_CENTRE_IS_MATCHED
-  cerr << "check_match:checking: north1 " << north1 << " sw1 " << sw1 << " se1 " << se1 << endl;
-  cerr << "        compare with: north2 " << north2 << " sw2 " << sw2 << " se2 " << se2 << endl;
+  cerr << "check_match:checking: north1 " << north1 << " sw1 " << sw1 << " se1 " << se1 << '\n';
+  cerr << "        compare with: north2 " << north2 << " sw2 " << sw2 << " se2 " << se2 << '\n';
 #endif
 
   if (north1 == north2)
@@ -268,8 +267,8 @@ check_match(atom_number_t north1,
     return se1 == north2;
 
 #ifdef DEBUG_SUBSTURE_CHIRAL_CENTRE_IS_MATCHED
-  cerr << "check_match:no match: north1 " << north1 << " sw1 " << sw1 << " se1 " << se1 << endl;
-  cerr << "        compare with: north2 " << north2 << " sw2 " << sw2 << " se2 " << se2 << endl;
+  cerr << "check_match:no match: north1 " << north1 << " sw1 " << sw1 << " se1 " << se1 << '\n';
+  cerr << "        compare with: north2 " << north2 << " sw2 " << sw2 << " se2 " << se2 << '\n';
 #endif
 
   return 0;
@@ -326,7 +325,7 @@ Substructure_Chiral_Centre::is_matched (const Molecule * m) const
   atom_number_t centre_atom = _centre->current_hold_atom()->atom_number();
 
 #ifdef DEBUG_SUBSTURE_CHIRAL_CENTRE_IS_MATCHED
-  cerr << "Centre matched with " << centre_atom << endl;
+  cerr << "Centre matched with " << centre_atom << '\n';
 #endif
 
   const Chiral_Centre * c = m->chiral_centre_at_atom(centre_atom);
@@ -340,7 +339,7 @@ Substructure_Chiral_Centre::is_matched (const Molecule * m) const
   int matched_connections = 0;
 
 #ifdef DEBUG_SUBSTURE_CHIRAL_CENTRE_IS_MATCHED
-  cerr << " tf " << write_null_or_current_hold_atom(_top_front) << " tb " << write_null_or_current_hold_atom(_top_back) << " ld " << write_null_or_current_hold_atom(_left_down) << " rd " << write_null_or_current_hold_atom(_right_down) << endl;
+  cerr << " tf " << write_null_or_current_hold_atom(_top_front) << " tb " << write_null_or_current_hold_atom(_top_back) << " ld " << write_null_or_current_hold_atom(_left_down) << " rd " << write_null_or_current_hold_atom(_right_down) << '\n';
 #endif
 
   atom_number_t what_to_add_if_not_matched;
@@ -352,7 +351,7 @@ Substructure_Chiral_Centre::is_matched (const Molecule * m) const
   else
     what_to_add_if_not_matched = CHIRAL_CONNECTION_IS_LONE_PAIR;
 
-//cerr << "Extra is " << what_to_add_if_not_matched << endl;
+//cerr << "Extra is " << what_to_add_if_not_matched << '\n';
 
   atom_number_t tf;
   if (get_matched_atom_number(_top_front, tf, what_to_add_if_not_matched))
@@ -371,10 +370,10 @@ Substructure_Chiral_Centre::is_matched (const Molecule * m) const
     matched_connections++;
 
 #ifdef DEBUG_SUBSTURE_CHIRAL_CENTRE_IS_MATCHED
-  cerr << "Found " << matched_connections << " matched connections, compare " << _number_explicit_connections << endl;
-  cerr << "tf " << tf << " tb " << tb << " ld " << ld << " rd " << rd << endl;
+  cerr << "Found " << matched_connections << " matched connections, compare " << _number_explicit_connections << '\n';
+  cerr << "tf " << tf << " tb " << tb << " ld " << ld << " rd " << rd << '\n';
   c->debug_print(cerr);
-  cerr << _number_explicit_connections << " explicit connections, target " << c->number_connections_specified() << endl;
+  cerr << _number_explicit_connections << " explicit connections, target " << c->number_connections_specified() << '\n';
 #endif
 
   if (matched_connections != _number_explicit_connections)
@@ -446,7 +445,7 @@ Substructure_Chiral_Centre::is_matched (const Molecule * m) const
   }
 
 #ifdef DEBUG_SUBSTURE_CHIRAL_CENTRE_IS_MATCHED
-  cerr << "LINE " << __LINE__ << " tb " << tb << " tf " << tf << endl;
+  cerr << "LINE " << __LINE__ << " tb " << tb << " tf " << tf << '\n';
 #endif
 
 // At this stage, we have assembled all the matched atoms. Now just do
@@ -663,7 +662,7 @@ Single_Substructure_Query::_add_chiral_centre(const Molecule & m,
   if (zatom < 0) {
     ++unspecified;
   } else if (nullptr == (a = query_atom_with_initial_atom_number(zatom))) {
-    cerr << "Single_Substructure_Query::_add_chiral_centre:no TF atom " << zatom << endl;
+    cerr << "Single_Substructure_Query::_add_chiral_centre:no TF atom " << zatom << '\n';
     return 0;
   } else {
     tmp->set_top_front(a);
@@ -674,7 +673,7 @@ Single_Substructure_Query::_add_chiral_centre(const Molecule & m,
   if (zatom < 0) {
     ++unspecified;
   } else if (nullptr == (a = query_atom_with_initial_atom_number(zatom))) {
-    cerr << "Single_Substructure_Query::_add_chiral_centre:no TB atom " << zatom << endl;
+    cerr << "Single_Substructure_Query::_add_chiral_centre:no TB atom " << zatom << '\n';
     return 0;
   } else {
     tmp->set_top_back(a);
@@ -685,7 +684,7 @@ Single_Substructure_Query::_add_chiral_centre(const Molecule & m,
   if (zatom < 0) {
     ++unspecified;
   } else if (nullptr == (a = query_atom_with_initial_atom_number(zatom))) {
-    cerr << "Single_Substructure_Query::_add_chiral_centre:no LD atom " << zatom << endl;
+    cerr << "Single_Substructure_Query::_add_chiral_centre:no LD atom " << zatom << '\n';
     return 0;
   } else {
     tmp->set_left_down(a);
@@ -696,7 +695,7 @@ Single_Substructure_Query::_add_chiral_centre(const Molecule & m,
   if (zatom < 0) {
     ++unspecified;
   } else if (nullptr == (a = query_atom_with_initial_atom_number(zatom))) {
-    cerr << "Single_Substructure_Query::_add_chiral_centre:no RD atom " << zatom << endl;
+    cerr << "Single_Substructure_Query::_add_chiral_centre:no RD atom " << zatom << '\n';
     return 0;
   } else {
     tmp->set_right_down(a);
@@ -775,7 +774,7 @@ Single_Substructure_Query::_build_chirality_specifications_from_atom_chiral_info
 int
 Single_Substructure_Query::_build_chirality_specifications_from_atom_chiral_info(const Substructure_Atom * r)
 {
-//cerr << "_build_chirality_specifications_from_atom_chiral_info:chirality " << r->first_chirality_value_in_any_component() << endl;
+//cerr << "_build_chirality_specifications_from_atom_chiral_info:chirality " << r->first_chirality_value_in_any_component() << '\n';
   if (r->first_chirality_value_in_any_component() > 0)
   {
     if (! _build_chirality_specification_from_atom_chiral_info(r))
@@ -800,7 +799,7 @@ Single_Substructure_Query::_build_chirality_specification_from_atom_chiral_info(
 {
   assert (a->first_chirality_value_in_any_component() > 0);
 
-//cerr << "Building chirality information for atom " << a->initial_atom_number() << endl;
+//cerr << "Building chirality information for atom " << a->initial_atom_number() << '\n';
 
   Substructure_Chiral_Centre * tmp = new Substructure_Chiral_Centre;
 
@@ -815,8 +814,8 @@ Single_Substructure_Query::_build_chirality_specification_from_atom_chiral_info(
 
   if (nc < 1 || nc > 4)
   {
-    cerr << "Single_Substructure_Query::_build_chirality_specification_from_atom_chiral_info:not enough connections, nc = " << nc << endl;
-    cerr << "Atom " << a->initial_atom_number() << " children " << a->number_children() << " bonds " << a->nbonds() << " parent? " << (nullptr != p) << " ring closure bonds " << a->number_ring_closure_bonds() << endl;
+    cerr << "Single_Substructure_Query::_build_chirality_specification_from_atom_chiral_info:not enough connections, nc = " << nc << '\n';
+    cerr << "Atom " << a->initial_atom_number() << " children " << a->number_children() << " bonds " << a->nbonds() << " parent? " << (nullptr != p) << " ring closure bonds " << a->number_ring_closure_bonds() << '\n';
     return 0;
   }
 
@@ -838,7 +837,7 @@ Single_Substructure_Query::_build_chirality_specification_from_atom_chiral_info(
     ndx++;
 
 #ifdef DEBUG_BUILD_CHIRALITY_SPECIFICATION
-    cerr << "processing ring closures, ndx " << ndx << endl;
+    cerr << "processing ring closures, ndx " << ndx << '\n';
     tmp->debug_print(cerr);
 #endif
   }
@@ -856,13 +855,13 @@ Single_Substructure_Query::_build_chirality_specification_from_atom_chiral_info(
     ndx++;
 
 #ifdef DEBUG_BUILD_CHIRALITY_SPECIFICATION
-    cerr << "processing children, atom " << c->initial_atom_number() << ", ndx " << ndx << endl;
+    cerr << "processing children, atom " << c->initial_atom_number() << ", ndx " << ndx << '\n';
     tmp->debug_print(cerr);
 #endif
   }
 
 #ifdef DEBUG_BUILD_CHIRALITY_SPECIFICATION
-  cerr << "At end of processing ndx " << ndx << endl;
+  cerr << "At end of processing ndx " << ndx << '\n';
   tmp->debug_print (cerr);
 #endif
 
@@ -893,7 +892,7 @@ Single_Substructure_Query::_build_chirality_specification_from_atom_chiral_info(
   cerr << "After looking for ring closures in children\n";
   tmp->debug_print(cerr);
 
-  cerr << "Check inversion " << a->first_chirality_value_in_any_component() << endl;
+  cerr << "Check inversion " << a->first_chirality_value_in_any_component() << '\n';
 #endif
 
 /*
@@ -1055,7 +1054,7 @@ Single_Substructure_Query::_initialise_chirality_info(Substructure_Chiral_Centre
     c->set_right_down(a);
   }
 
-  cerr << "Chirality value for centre atom " << centre_query_atom->first_chirality_value_in_any_component() << endl;
+  cerr << "Chirality value for centre atom " << centre_query_atom->first_chirality_value_in_any_component() << '\n';
   if (1 == centre_query_atom->first_chirality_value_in_any_component())
     c->invert();
 

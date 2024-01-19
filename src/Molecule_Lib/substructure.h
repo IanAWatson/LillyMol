@@ -221,7 +221,7 @@ class NMAB_Token
 
 // Once the NMAB directive is parsed into NMAB_Token's, those can be transformed
 // into NMAB_Operator's.
-// If query_ is not set, then _number is interpreted as match atom count.
+// If _query is not set, then _number is interpreted as match atom count.
 // Kind of a lkudge, I did think of having a base class and virtual...
 class NMAB_Operator 
 {

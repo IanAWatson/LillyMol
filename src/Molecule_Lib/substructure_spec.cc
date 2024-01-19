@@ -12,7 +12,6 @@
 #include "tokenise_atomic_smarts.h"
 
 using std::cerr;
-using std::endl;
 
 static constexpr char kOpenBrace = '{';
 static constexpr char kCloseBrace = '}';
@@ -266,10 +265,10 @@ Substructure_Atom_Specifier::_adjust_nrings(int nr)
   if (mxnr < nr)
   {
     cerr << "Substructure_Atom_Specifier::_adjust_nrings: nrings violation\n";
-    cerr << "Perceived " << nr << " rings in query, max is " << mxnr << endl;
+    cerr << "Perceived " << nr << " rings in query, max is " << mxnr << '\n';
     if (! _nrings.adjust_to_accommodate(nr))
     {
-      cerr << "Could not adjust nr " << _nrings << endl;
+      cerr << "Could not adjust nr " << _nrings << '\n';
     }
   }
 
@@ -603,7 +602,7 @@ match_ring_sizes(const Min_Max_Specifier<int> & ring_sizes_in_query,
   cerr << "Checking '" << comment << "' ring sizes. Atom is in rings of size:\n";
   for (int i = 0; i < ring_sizes_in_molecule->number_elements(); i++)
     cerr << "   " << ring_sizes_in_molecule->item(i) <<
-         ", match = " << ring_sizes_in_query.matches(ring_sizes_in_molecule->item(i)) << endl;
+         ", match = " << ring_sizes_in_query.matches(ring_sizes_in_molecule->item(i)) << '\n';
 #endif
 
   for (const auto rs : *ring_sizes_in_molecule)
@@ -654,14 +653,14 @@ Substructure_Atom_Specifier::_match_symmetry_degree(Target_Atom & target_atom) c
   const int sa = s[a];
 
 #ifdef DEBUG_MATCH_SYMMETRY_DEGREE
-  cerr << "Atom " << a << " symmetry group " << sa << endl;
+  cerr << "Atom " << a << " symmetry group " << sa << '\n';
 #endif
 
   int symmetric_atoms = 0;
   for (int i = 0; i < matoms; ++i)
   {
 #ifdef DEBUG_MATCH_SYMMETRY_DEGREE
-    cerr << "  check atom " << i << " symmetry group " << s[i] << endl;
+    cerr << "  check atom " << i << " symmetry group " << s[i] << '\n';
 #endif
     if (sa == s[i]) {
       symmetric_atoms++;
@@ -722,7 +721,7 @@ Substructure_Atom_Specifier::_match_scaffold_bonds_attached_to_ring(Target_Atom 
     }
   }
 
-  // cerr << "Ring " << r << " has " << exocyclic_scaffold_bonds <<  " exocyclic_scaffold_bonds, match? " << _scaffold_bonds_attached_to_ring.matches(exocyclic_scaffold_bonds) << endl;
+  // cerr << "Ring " << r << " has " << exocyclic_scaffold_bonds <<  " exocyclic_scaffold_bonds, match? " << _scaffold_bonds_attached_to_ring.matches(exocyclic_scaffold_bonds) << '\n';
 
   return _scaffold_bonds_attached_to_ring.matches(exocyclic_scaffold_bonds);
 }
@@ -747,7 +746,7 @@ Substructure_Atom_Specifier::_matches(Target_Atom & target)
   if (_element.number_elements())
   {
     cerr << "Check element, target is " << target.atomic_number() <<
-            " check " << _element.number_elements() << " values, match = " << (_element.contains(target.element())) << endl;
+            " check " << _element.number_elements() << " values, match = " << (_element.contains(target.element())) << '\n';
   }
 #endif
 
@@ -766,10 +765,10 @@ Substructure_Atom_Specifier::_matches(Target_Atom & target)
 
 #ifdef DEBUG_ATOM_MATCHES
    if (_element_unique_id.number_elements())
-     cerr << "check ASHV, target " << target.element()->symbol() << " UID " << target.element_unique_id() << " check " << _element_unique_id.number_elements() << " match " << _element_unique_id.contains(target.element_unique_id()) << endl;
+     cerr << "check ASHV, target " << target.element()->symbol() << " UID " << target.element_unique_id() << " check " << _element_unique_id.number_elements() << " match " << _element_unique_id.contains(target.element_unique_id()) << '\n';
    for (int i = 0; i < _element_unique_id.number_elements(); ++i)
    {
-     cerr << ' ' << _element_unique_id[i] << endl;
+     cerr << ' ' << _element_unique_id[i] << '\n';
    }
 #endif
 
@@ -784,7 +783,7 @@ Substructure_Atom_Specifier::_matches(Target_Atom & target)
 
 #ifdef DEBUG_ATOM_MATCHES
    if (_ncon.is_set())
-     cerr << "Check ncon, target is " << target.ncon() << " match = " << _ncon.matches(target.ncon()) << endl;
+     cerr << "Check ncon, target is " << target.ncon() << " match = " << _ncon.matches(target.ncon()) << '\n';
 #endif
 
    if (_ncon.is_set())
@@ -800,7 +799,7 @@ Substructure_Atom_Specifier::_matches(Target_Atom & target)
 
 #ifdef DEBUG_ATOM_MATCHES
    if (_nbonds.is_set())
-     cerr << "Check nbonds, target is " << target.nbonds() << " match = " << _nbonds.matches(target.nbonds()) << endl;
+     cerr << "Check nbonds, target is " << target.nbonds() << " match = " << _nbonds.matches(target.nbonds()) << '\n';
 #endif
 
    if (_nbonds.is_set())
@@ -816,7 +815,7 @@ Substructure_Atom_Specifier::_matches(Target_Atom & target)
 
 #ifdef DEBUG_ATOM_MATCHES
    if (_formal_charge.is_set())
-     cerr << "Check formal charges, target = " << target.formal_charge() << endl;
+     cerr << "Check formal charges, target = " << target.formal_charge() << '\n';
 #endif
 
   if (_formal_charge.is_set())
@@ -835,9 +834,9 @@ Substructure_Atom_Specifier::_matches(Target_Atom & target)
   {
     cerr << "Check nrings. ";
     if (1 == _nrings.number_elements() && 0 == _nrings[0])
-      cerr << "Specified non ring, target is " << target.is_ring_atom() << endl;
+      cerr << "Specified non ring, target is " << target.is_ring_atom() << '\n';
     else 
-      cerr << "Nrings for target is " << target.nrings() << ", match? " << _nrings.matches(target.nrings()) << endl;
+      cerr << "Nrings for target is " << target.nrings() << ", match? " << _nrings.matches(target.nrings()) << '\n';
   }
 #endif
 
@@ -858,7 +857,7 @@ Substructure_Atom_Specifier::_matches(Target_Atom & target)
 
 #ifdef DEBUG_ATOM_MATCHES
   if (_ring_bond_count.is_set())
-    cerr << "Check _ring_bond_count, target " << target.ring_bond_count() << " matches " << _ring_bond_count.matches(target.ring_bond_count()) << endl;
+    cerr << "Check _ring_bond_count, target " << target.ring_bond_count() << " matches " << _ring_bond_count.matches(target.ring_bond_count()) << '\n';
 #endif
   if (_ring_bond_count.is_set())
   {
@@ -878,7 +877,7 @@ Substructure_Atom_Specifier::_matches(Target_Atom & target)
 
 #ifdef DEBUG_ATOM_MATCHES
   if (_hcount.is_set())
-    cerr << "Check hcount: target " << target.hcount() << " matches " << _hcount.matches(target.hcount()) << endl;
+    cerr << "Check hcount: target " << target.hcount() << " matches " << _hcount.matches(target.hcount()) << '\n';
 #endif
 
   if (_hcount.is_set())
@@ -893,7 +892,7 @@ Substructure_Atom_Specifier::_matches(Target_Atom & target)
 
 #ifdef DEBUG_ATOM_MATCHES
   if (SUBSTRUCTURE_NOT_SPECIFIED != _aromaticity)
-     cerr << "Let's try aromaticity " << _aromaticity << " vs " << target.aromaticity() << endl;
+     cerr << "Let's try aromaticity " << _aromaticity << " vs " << target.aromaticity() << '\n';
 #endif
 
   if (SUBSTRUCTURE_NOT_SPECIFIED != _aromaticity)
@@ -918,7 +917,7 @@ Substructure_Atom_Specifier::_matches(Target_Atom & target)
 #ifdef DEBUG_ATOM_MATCHES
   if (_attached_heteroatom_count.is_set())
     cerr << "Try attached heteroatom count: target =" << target.attached_heteroatom_count() << 
-            " match is " << _attached_heteroatom_count.matches(target.attached_heteroatom_count()) << endl;
+            " match is " << _attached_heteroatom_count.matches(target.attached_heteroatom_count()) << '\n';
 #endif
 
   if (_attached_heteroatom_count.is_set())
@@ -970,7 +969,7 @@ Substructure_Atom_Specifier::_matches(Target_Atom & target)
   {
     int tmp = target.nbonds() - target.ncon();
     cerr << "Try unsaturation: target =" << tmp << 
-            " match is " << _unsaturation.matches(tmp) << endl;
+            " match is " << _unsaturation.matches(tmp) << '\n';
   }
 #endif
 
@@ -1033,7 +1032,7 @@ Substructure_Atom_Specifier::_matches(Target_Atom & target)
 
 #ifdef DEBUG_ATOM_MATCHES
   if (_ring_size.is_set())
-    cerr << "Test ring sizes SET rs = " << _ring_size.is_set() << endl;
+    cerr << "Test ring sizes SET rs = " << _ring_size.is_set() << '\n';
 #endif       
 
   if (_ring_size.is_set())
@@ -1050,7 +1049,7 @@ Substructure_Atom_Specifier::_matches(Target_Atom & target)
 #ifdef DEBUG_ATOM_MATCHES
   if (_match_spinach_only >= 0)
   {
-    cerr << "Checking _match_spinach_only " << _match_spinach_only << " target.is_spinach() " << target.is_spinach() << endl;
+    cerr << "Checking _match_spinach_only " << _match_spinach_only << " target.is_spinach() " << target.is_spinach() << '\n';
   }
 #endif
 
@@ -1108,7 +1107,7 @@ Substructure_Atom_Specifier::_matches(Target_Atom & target)
 
 #ifdef DEBUG_ATOM_MATCHES
   if (_aliphatic_ring_size.is_set())
-    cerr << "Aliphatic ring sizes " << _aliphatic_ring_size.is_set() << endl;
+    cerr << "Aliphatic ring sizes " << _aliphatic_ring_size.is_set() << '\n';
 #endif
 
   if (_aliphatic_ring_size.is_set())
@@ -1124,7 +1123,7 @@ Substructure_Atom_Specifier::_matches(Target_Atom & target)
 
 #ifdef DEBUG_ATOM_MATCHES
   if (_ncon2.is_set())
-    cerr << "Check hcount, target is " << target.nrings() << endl;
+    cerr << "Check hcount, target is " << target.nrings() << '\n';
 #endif
   if (_ncon2.is_set())
   {
@@ -1173,7 +1172,7 @@ Substructure_Atom_Specifier::_matches(Target_Atom & target)
   }
 
 #ifdef DEBUG_ATOM_MATCHES
-  cerr << "Do we need to check atom type " << _atom_type << " cmp " << target.atom_type() << endl;
+  cerr << "Do we need to check atom type " << _atom_type << " cmp " << target.atom_type() << '\n';
 #endif
   if (_atom_type != 0)
   {
@@ -1193,7 +1192,7 @@ Substructure_Atom_Specifier::_matches(Target_Atom & target)
 
 #ifdef DEBUG_ATOM_MATCHES
   if (SUBSTRUCTURE_NOT_SPECIFIED != _chirality)
-    cerr << "Checking chirality " << _chirality << " vs " << target.chiral_centre() << endl;
+    cerr << "Checking chirality " << _chirality << " vs " << target.chiral_centre() << '\n';
 #endif
 
   if (SUBSTRUCTURE_NOT_SPECIFIED != _chirality)
@@ -1277,7 +1276,7 @@ Substructure_Atom_Specifier::_matches(Target_Atom & target)
 
   if (_attributes_specified != attributes_checked)
   {
-    cerr << "Oops, attributes specified = " << _attributes_specified << " processed = " << attributes_checked << endl;
+    cerr << "Oops, attributes specified = " << _attributes_specified << " processed = " << attributes_checked << '\n';
     debug_print(cerr);
     assert (nullptr == "This should not happen");
   }
@@ -1300,7 +1299,7 @@ Substructure_Atom_Specifier::matches(Target_Atom & target)
   int rc = _matches(target);
 
 #ifdef DEBUG_ATOM_MATCHES
-  cerr << "Substructure_Atom_Specifier::matches: to atom " << target.atom_number() << " match " << rc << endl;
+  cerr << "Substructure_Atom_Specifier::matches: to atom " << target.atom_number() << " match " << rc << '\n';
 #endif
 
   return rc;
@@ -1476,7 +1475,7 @@ Substructure_Atom_Specifier::_fill_min_ncon (Molecule & m,
   int bond_shortage = min_nbonds() - m.nbonds(a);
   assert (bond_shortage >= 0);
 
-// cerr << "Atom " << a << " cs = " << connection_shortage << " bs = " << bond_shortage << endl;
+// cerr << "Atom " << a << " cs = " << connection_shortage << " bs = " << bond_shortage << '\n';
   for (int i = 0; i < connection_shortage; i++)
   {
     Atom * h = new Atom(0);
@@ -1549,7 +1548,7 @@ Substructure_Atom::_extract_initial_atom_number(const_IWSubstring & mysmarts)
 
   _unique_id = _atom_map_number = znumber;
 
-//cerr << "Substructure_Atom::_extract_initial_atom_number: set " << _initial_atom_number << endl;
+//cerr << "Substructure_Atom::_extract_initial_atom_number: set " << _initial_atom_number << '\n';
 
   return 1;
 }
@@ -1874,7 +1873,7 @@ Substructure_Atom::construct_from_smarts_token(const const_IWSubstring & smarts)
       ncolon++;
 
 #ifdef DEBUG_ATOM_CONSTRUCT_FROM_SMARTS_TOKEN
-    cerr << "After '" << smarts[i] << "' paren level " << paren_level << endl;
+    cerr << "After '" << smarts[i] << "' paren level " << paren_level << '\n';
 #endif
   }
 
@@ -2084,7 +2083,7 @@ Substructure_Atom::construct_from_smarts_token(const const_IWSubstring & smarts)
       uopindex++;
 
 #ifdef DEBUG_ATOM_CONSTRUCT_FROM_SMARTS_TOKEN
-      cerr << "Unary operator is " << asc->unary_operator() << ", number results = " << _operator.number_results() << endl;
+      cerr << "Unary operator is " << asc->unary_operator() << ", number results = " << _operator.number_results() << '\n';
       _operator.debug_print(cerr);
 #endif
     }
@@ -2402,7 +2401,7 @@ Substructure_Atom_Specifier::_get_atomic_number_or_symbol(const char * smarts,
   else
   {
     int z;
-//  cerr << "FETCHING NUMBER FROM '" << smarts[0] << "', characters_to_process " << characters_to_process << endl;
+//  cerr << "FETCHING NUMBER FROM '" << smarts[0] << "', characters_to_process " << characters_to_process << '\n';
     nchars = fetch_numeric_char(smarts, z, characters_to_process);
     if (0 == nchars)
       return 0;
@@ -2415,7 +2414,7 @@ Substructure_Atom_Specifier::_get_atomic_number_or_symbol(const char * smarts,
   cerr << "After _get_atomic_number_or_symbol element unique id\n";
   for (int i = 0; i < _element_unique_id.number_elements(); ++i)
   {
-    cerr << " i = " << i << ' ' << _element_unique_id[i] << endl;
+    cerr << " i = " << i << ' ' << _element_unique_id[i] << '\n';
   }
 #endif
 
@@ -2439,7 +2438,7 @@ Substructure_Atom_Specifier::_add_element(const Element * e)
   _element.add(e);
   _element_unique_id.add(e->unique_id());
 
-  // cerr << "Substructure_Atom_Specifier::_add_element:added " << e->symbol() << " unique_id " << e->unique_id() << endl;
+  // cerr << "Substructure_Atom_Specifier::_add_element:added " << e->symbol() << " unique_id " << e->unique_id() << '\n';
    
   return 1;
 }
@@ -2878,7 +2877,7 @@ Substructure_Atom_Specifier::construct_from_smarts_token(const const_IWSubstring
         return 0;
       }
       nchars = _chirality - 1;     // there was no leading letter before the @
-//    cerr << "Chirality count " << (_chirality + 1) << ", nchars = " << nchars << endl;
+//    cerr << "Chirality count " << (_chirality + 1) << ", nchars = " << nchars << '\n';
 
       previous_token_was = SMARTS_PREVIOUS_TOKEN_CHIRALITY;
     }
@@ -3128,7 +3127,7 @@ Substructure_Atom_Specifier::construct_from_smarts_token(const const_IWSubstring
       smarts++;
     }
 
-//  cerr << "_match_spinach_only " << _match_spinach_only << endl;
+//  cerr << "_match_spinach_only " << _match_spinach_only << '\n';
   }
 
   if (fc_encountered)

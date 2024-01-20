@@ -3789,7 +3789,7 @@ namespace substructure_spec {
 int SmartsNumericQualifier(const char * input,
                        int max_chars,
                        Min_Max_Specifier<int>& result);
-int SmartsFetchNumeric(const char * string, int & value, 
+int SmartsFetchNumeric(const char * string, int nchars, int & value, 
                      int & qualifier);
 
 int

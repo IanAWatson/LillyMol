@@ -4192,7 +4192,7 @@ Chemical_Standardisation::_do_nv5_to_charge_separated(Molecule& m,
   const atomic_number_t* z = current_molecule_data.atomic_number();
   const int* ncon = current_molecule_data.ncon();
 
-  assert(m.ncon() > 1);
+  assert(m.ncon(zatom) > 1);
   cerr << "Checking bonds " << m.smarts_equivalent_for_atom(zatom) << '\n';
 
   const Atom& a = m[zatom];

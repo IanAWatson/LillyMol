@@ -1765,7 +1765,7 @@ FetchNumericFromBraces(const const_IWSubstring& token, Set_or_Unset<double>& res
   return 0;
 }
 
-//#define DEBUG_ATOM_CONSTRUCT_FROM_SMARTS_TOKEN
+#define DEBUG_ATOM_CONSTRUCT_FROM_SMARTS_TOKEN
 
 /*
   this turned out to be surprisingly difficult, and revealed some interesting
@@ -2088,20 +2088,14 @@ Substructure_Atom::construct_from_smarts_token(const const_IWSubstring& smarts) 
 
       _components.add(a.release());
 
-      // If we are not the first component, there will be an operator to add.
-      if (op != IW_LOGEXP_UNDEFINED) {
-        if (! _operator.add_operator(op)) {
+      if (asc->op() != IW_LOGEXP_UNDEFINED) {
+        if (! _operator.add_operator(asc->op())) {
           cerr << "Substructure_Atom::construct_from_smarts_token:cannot add op "
                << asc->op() << '\n';
           return 0;
         }
-      }
-
-      // Set up operator for next component. Default is high priority and.
-      if (asc->op() != IW_LOGEXP_UNDEFINED) {
-        op = asc->op();
-      } else {
-        op = IW_LOGEXP_AND;
+      } else if (_components.size() > 1) {
+        _operator.add_operator(IW_LOGEXP_AND);
       }
 
       _operator.set_unary_operator(uopindex, asc->unary_operator());
@@ -2293,7 +2287,7 @@ SmartsFetchNumeric(const char* string, int nchars, int& value, int& qualifier) {
 template <typename M>
 int
 SmartsParseRange(const char* input, int max_chars, M& result) {
-  assert(*input == open_brace);
+  assert(*input == kOpenBrace);
   std::string to_parse;
   for (int i = 0; i < max_chars; ++i) {
     to_parse += input[i];

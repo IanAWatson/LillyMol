@@ -95,6 +95,17 @@ PYBIND11_MODULE(lillymol_reaction, rxn)
       },
       "From smirks"
     )
+    .def("construct_from_textproto",
+      [](IWReaction& rxn, const std::string& textproto)->bool {
+        IWString dirname(".");  // maybe make an argument
+        if (! rxn.ConstructFromTextProto(textproto, dirname))  {
+          return false;
+        }
+
+        return true;
+      },
+      ""
+    )
     .def("number_sidechains", &IWReaction::number_sidechains, "Number of sidechains")
     .def("number_sidechains_with_reagents", &IWReaction::number_sidechains_with_reagents, "number_sidechains_with_reagents")
     .def("set_one_embedding_per_start_atom", &IWReaction::set_one_embedding_per_start_atom, "one embedding per start atom")
@@ -103,6 +114,12 @@ PYBIND11_MODULE(lillymol_reaction, rxn)
         return rxn.add_sidechain_reagents(sidechain, fname, file_type, smc);
       },
       "Add reagents to a sidechain"
+    )
+    .def("add_sidechain_reagent",
+      [](IWReaction& rxn, int sidechain, Molecule& m, const Sidechain_Match_Conditions& smc)->bool {
+        return rxn.add_sidechain_reagent(sidechain, m, smc);
+      },
+      ""
     )
     .def("substructure_search",
       [](IWReaction& rxn, Molecule& m, Substructure_Results& sresults) {
@@ -142,6 +159,14 @@ PYBIND11_MODULE(lillymol_reaction, rxn)
       },
       "generate product based on embedding and iter"
     )
+    .def("perform_reaction",
+      [](IWReaction& rxn, Molecule& scaffold, Molecule& sidechain)->std::optional<std::vector<Molecule>> {
+        return rxn.perform_reaction(scaffold, sidechain);
+      },
+      ""
+    )
       
   ;
+
+  rxn.def("set_smirks_lost_atom_means_remove_frgment", &set_smirks_lost_atom_means_remove_frgment, "atoms lost in a smirks are removed");
 }

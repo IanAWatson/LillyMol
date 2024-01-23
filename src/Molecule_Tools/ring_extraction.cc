@@ -660,7 +660,7 @@ ExtractRings::Process(Molecule& m) {
     if (m.is_aromatic(i)) {
       data.aromatic[i] = 1;
     } else {
-      data.aromatic[i] = 1;
+      data.aromatic[i] = 0;
     }
   }
 

@@ -439,6 +439,7 @@ enum IWDescr_Enum
   iwdescr_fdiffallp,
   iwdescr_harary,
   iwdescr_rotbond,
+  iwdescr_frotbond,
   iwdescr_ringatom,
   iwdescr_rhacnt,
   iwdescr_rhaf,
@@ -991,6 +992,7 @@ fill_descriptor_extremeties (Descriptor * d,
   d[iwdescr_fdiffallp].set_min_max_resolution(0.0f, 10.0f, resolution);
   d[iwdescr_harary].set_min_max_resolution(0.0f, 1.0f, resolution);
   d[iwdescr_rotbond].set_min_max_resolution(0.0f, 19.3958f, resolution);
+  d[iwdescr_frotbond].set_min_max_resolution(0.0f, 1.0f, resolution);
   d[iwdescr_ringatom].set_min_max_resolution(0.0f, 19.3958f, resolution);
   d[iwdescr_rhacnt].set_min_max_resolution(0.0f, 10.70095f, resolution);
   d[iwdescr_rhaf].set_min_max_resolution(0.0f, 1.0f, resolution);
@@ -1568,6 +1570,7 @@ allocate_descriptors()
     descriptor[iwdescr_harary].set_name("harary");
   }
   descriptor[iwdescr_rotbond].set_name("rotbond");
+  descriptor[iwdescr_frotbond].set_name("frotbond");
   descriptor[iwdescr_ringatom].set_name("ringatom");
   descriptor[iwdescr_rhacnt].set_name("rhacnt");
   descriptor[iwdescr_rhaf].set_name("rhaf");
@@ -7349,6 +7352,7 @@ compute_topological_descriptors(Molecule & m,
   descriptor[iwdescr_fdcca].set(static_cast<float>(two_connected_chain_atom) / static_cast<float>(matoms));
 
   descriptor[iwdescr_rotbond].set(static_cast<float>(rotatable_bonds));
+  descriptor[iwdescr_frotbond].set(iwmisc::Fraction<float>(rotatable_bonds, m.nedges()));
   descriptor[iwdescr_ringatom].set(static_cast<float>(ring_atom_count));
   if (ring_atom_count)
   {

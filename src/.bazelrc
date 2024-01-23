@@ -1,3 +1,5 @@
+common: --enable_bzlmod
+
 # This is probably what you want
 # build --cxxopt=-std=c++20 --copt=-march=native --cxxopt=-march=native
 

@@ -54,6 +54,7 @@ local_install(
         ":medchemwizard",
         ":mkfrag",
         ":mol2qry",
+        ":mol2SAFE",
         ":molecular_abstraction",
         ":molecular_grid",
         ":molecular_merge",
@@ -441,6 +442,7 @@ cc_binary(
         "atom_pair_fingerprint_main.cc",
     ],
     deps = [
+        ":fingerprint_writer",
         "//Foundational/iwmisc:sparse_fp_creator",
         "//Molecule_Lib:atom_pair_fingerprint",
         "//Molecule_Lib:iwmolecule",
@@ -473,6 +475,18 @@ cc_binary(
         "//Molecule_Lib:iwmolecule",
         "//Molecule_Lib:moleculeio",
         "@com_google_absl//absl/algorithm:container",
+    ],
+)
+
+cc_binary(
+    name = "bump_check",
+    srcs = [
+        "bump_check.cc",
+    ],
+    deps = [
+        "//Foundational/cmdline:iwcmdline",
+        "//Molecule_Lib:iwmolecule",
+        "//Molecule_Lib:moleculeio",
     ],
 )
 
@@ -1099,6 +1113,22 @@ cc_binary(
         "//Foundational/cmdline:iwcmdline",
         "//Molecule_Lib:iwmolecule",
         "//Molecule_Lib:moleculeio",
+    ],
+)
+
+cc_binary(
+    name = "mol2SAFE",
+    srcs = [
+        "mol2SAFE.cc",
+    ],
+    deps = [
+        ":highest_ring_number",
+        ":fragment_molecule_lib",
+        "//Foundational/cmdline:iwcmdline",
+        "//Foundational/iwstring:absl_hash",
+        "//Molecule_Lib:iwmolecule",
+        "//Molecule_Lib:moleculeio",
+        "@com_google_absl//absl/container:node_hash_map",
     ],
 )
 
@@ -1760,6 +1790,9 @@ cc_library(
         ":fingerprint_writer",
         "//Molecule_Lib:iwmolecule",
         "//Foundational/iwmisc:sparse_fp_creator",
+    ],
+    visibility = [
+        "//visibility:public",
     ],
 )
 
@@ -2535,6 +2568,34 @@ cc_library(
 )
 
 cc_library(
+    name = "fragment_molecule_lib",
+    srcs = [
+        "fragment_molecule.cc",
+    ],
+    hdrs = [
+        "fragment_molecule.h",
+    ],
+    deps = [
+        ":dicer_fragments_cc_proto",
+        "//Molecule_Lib:iwmolecule",
+    ],
+)
+
+cc_library(
+    name = "highest_ring_number",
+    srcs = [
+        "highest_ring_number.cc",
+    ],
+    hdrs = [
+        "highest_ring_number.h",
+    ],
+    deps = [
+        "//Foundational/iwmisc",
+        "//Foundational/iwstring",
+    ],
+)
+
+cc_library(
     name = "insight_grid",
     srcs = [
         "insight_grid.cc",
@@ -2856,6 +2917,31 @@ cc_test(
     deps = [
         ":fileconv_lib",
         "//Molecule_Lib:moleculeio",
+        "@googletest//:gtest",
+        "@googletest//:gtest_main",
+    ],
+)
+
+cc_test(
+    name = "fragment_molecule_test",
+    srcs = [
+        "fragment_molecule_test.cc",
+    ],
+    deps = [
+        ":fragment_molecule_lib",
+        "//Molecule_Lib:moleculeio",
+        "@googletest//:gtest",
+        "@googletest//:gtest_main",
+    ],
+)
+
+cc_test(
+    name = "highest_ring_number_test",
+    srcs = [
+        "highest_ring_number_test.cc",
+    ],
+    deps = [
+        ":highest_ring_number",
         "@googletest//:gtest",
         "@googletest//:gtest_main",
     ],

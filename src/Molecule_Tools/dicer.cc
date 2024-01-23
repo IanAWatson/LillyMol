@@ -6787,13 +6787,15 @@ Breakages::identify_bonds_to_break_hard_coded_rules(Molecule & m)
 int
 Breakages::identify_bonds_to_break (Molecule & m)
 {
-  if (0 == nq)
+  if (0 == nq) {
     return identify_bonds_to_break_hard_coded_rules(m);
+  }
 
   int rc = 0;
 
-  if (add_user_specified_queries_to_default_rules)
+  if (add_user_specified_queries_to_default_rules) {
     rc += identify_bonds_to_break_hard_coded_rules(m);
+  }
 
   Molecule_to_Match target(&m);
 
@@ -8115,7 +8117,7 @@ dicer (int argc, char ** argv)
     }
     else
     {
-      set_read_extra_text_info(1);
+      moleculeio::set_read_extra_text_info(1);
       MDL_File_Supporting_Material * mdlfs = global_default_MDL_File_Supporting_Material();
       mdlfs->set_report_unrecognised_records(0);
     }

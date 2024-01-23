@@ -43,6 +43,7 @@ The following descriptors are computed.
 | rad | shortest longest bond count between atoms |
 | mulrad | number of atoms for which rad occurs |
 | rotbond | number of rotatable bonds in the molecule |
+| frotbond | fraction of bonds that are rotatable |
 | rhacnt | ring heteroatoms |
 | rhaf | fraction of ring atoms that are heteroatoms |
 | frafus | fraction of ring atoms that are involved in ring fusions |

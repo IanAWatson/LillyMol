@@ -1599,8 +1599,13 @@ iwstats(unsigned int number_records, const IWString* chunk_title, int which_pred
     output << "Errors between " << e.minval() << " and " << e.maxval() << " ave "
            << e.average() << '\n';
     output << "Average absolute error " << ae.average() << '\n';
-    output << "RMS error " << sqrt(ae.sum_of_squares() / static_cast<double>(ae.n()))
-           << '\n';
+    if (all_outputs_have_equals_sign) {
+      write_something_identifying_the_column(predicted_column, output);
+      output << "= ";
+      output << sqrt(ae.sum_of_squares() / static_cast<double>(ae.n())) << '\n';
+    } else {
+      output << "RMS error " << sqrt(ae.sum_of_squares() / static_cast<double>(ae.n())) << '\n';
+    }
 
     if (static_cast<float>(0.0) != relative_error_threshold) {
       output << "Average Relative Error " << static_cast<float>(are.average()) << '\n';

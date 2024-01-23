@@ -1765,7 +1765,7 @@ FetchNumericFromBraces(const const_IWSubstring& token, Set_or_Unset<double>& res
   return 0;
 }
 
-#define DEBUG_ATOM_CONSTRUCT_FROM_SMARTS_TOKEN
+//#define DEBUG_ATOM_CONSTRUCT_FROM_SMARTS_TOKEN
 
 /*
   this turned out to be surprisingly difficult, and revealed some interesting

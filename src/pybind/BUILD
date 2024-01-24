@@ -41,6 +41,8 @@ cc_library(
     deps = [
         ":molecule",
         "//Molecule_Lib:iwmfingerprint",
+        "//Molecule_Lib:atom_pair_fingerprint",
+        "//Molecule_Lib:linear_fingerprint",
         "//Molecule_Lib:iwmolecule",
         "//Molecule_Lib:moleculeio",
         "//Molecule_Tools:ec_fingerprint_lib",

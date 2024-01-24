@@ -16,6 +16,11 @@ numpy vectors, containing unsigned byte values. These can be
 processed efficiently. The function `tanimoto` will compute a pair-wise
 similarity between two such objects.
 
+Note that since these fingerprints are counted, they cannot take
+advantage of hardware `popc` instructions, and will therefore
+be significantly slower than similarity calculations using
+bit values. That functionality will be introduced over time.
+
 Speed is reasonable. On CPU from 2017
 ```
 model name      : Intel(R) Core(TM) i7-8700K CPU @ 3.70GHz

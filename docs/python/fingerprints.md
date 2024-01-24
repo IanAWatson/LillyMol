@@ -1,4 +1,4 @@
-# Extended Connectivity Fingerprints
+# Fingerprints in LillyMol
 
 Eventually LillyMol python bindings will include support for the
 GFP fingerprint framework - a multi-fingerprint composite fingerprint
@@ -6,6 +6,15 @@ used extensively at Lilly.
 
 In the meantime, certain fingerprints can be constructed as counted byte
 numpy arrays. These can be used for similarity calculations.
+
+In LillyMol Molecules and Fingerprints are completely separate entities.
+Fingerprints can be generated from molecules, but once generated, they
+retain no connection to the Molecule that formed the fingerprint.
+
+For efficiency, this initial implementation returns fingerprints as
+numpy vectors, containing unsigned byte values. These can be
+processed efficiently. The function `tanimoto` will compute a pair-wise
+similarity between two such objects.
 
 Speed is reasonable. On CPU from 2017
 ```

@@ -262,6 +262,22 @@ cc_proto_library(
 )
 
 proto_library(
+    name = "molecule_filter_proto",
+    srcs = [
+        "molecule_filter.proto",
+    ],
+    deps = [
+    ],
+)
+
+cc_proto_library(
+    name = "molecule_filter_cc_proto",
+    deps = [
+        ":molecule_filter_proto",
+    ],
+)
+
+proto_library(
     name = "ligand_protein_interactions_proto",
     srcs = [
         "ligand_protein_interactions.proto",
@@ -1196,6 +1212,21 @@ cc_binary(
         "//Molecule_Lib:iwreaction",
         "//Molecule_Lib:moleculeio",
     ],
+)
+
+cc_binary(
+    name = "molecule_filter",
+    srcs = [
+        "molecule_filter.cc",
+    ],
+    deps = [
+        ":molecule_filter_cc_proto",
+        "//Foundational/cmdline:iwcmdline",
+        "//Molecule_Lib:iwmolecule",
+        "//Molecule_Lib:moleculeio",
+        "//Molecule_Tools:nvrtspsa",
+        ":xlogp_lib",
+    ]
 )
 
 cc_binary(

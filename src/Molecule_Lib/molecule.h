@@ -2581,11 +2581,10 @@ extern int set_reasonable_atomic_partial_charge_range(charge_t, charge_t);
 //extern int number_connection_table_errors_to_skip();
 //extern void set_number_connection_table_errors_to_skip(int);
 
-/*
-  Determine the number of atoms in a smiles just by examining text
-*/
-
+// Determine the number of atoms in a smiles just by examining text
 extern int count_atoms_in_smiles(const const_IWSubstring& smiles);
+// Also discern the number of rings. Does NOT handle %nn forms.
+extern int count_atoms_in_smiles(const const_IWSubstring& smiles, int& nrings);
 
 extern void set_copy_name_in_molecule_copy_constructor(int);
 

@@ -903,21 +903,21 @@ cc_binary(
     ],
 )
 
-cc_binary(
-    name = "xgbd_evaluate",
-    srcs = [
-        "xgbd_evaluate.cc",
-    ],
-    deps = [
-        ":feature_scaling_cc_proto",
-        ":scaler",
-        "//Foundational/accumulator",
-        "//Foundational/cmdline_v2",
-        "//Foundational/data_source:iwstring_data_source",
-        "//Foundational/iwmisc",
-        "//Foundational/iwstring",
-    ],
-)
+#cc_binary(
+#    name = "xgbd_evaluate",
+#    srcs = [
+#        "xgbd_evaluate.cc",
+#    ],
+#    deps = [
+#        ":feature_scaling_cc_proto",
+#        ":scaler",
+#        "//Foundational/accumulator",
+#        "//Foundational/cmdline_v2",
+#        "//Foundational/data_source:iwstring_data_source",
+#        "//Foundational/iwmisc",
+#        "//Foundational/iwstring",
+#    ],
+#)
 
 cc_test(
     name = "scaler_test",

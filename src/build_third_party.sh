@@ -183,7 +183,7 @@ fi
 
 if [[ -v BUILD_JULIA ]] ; then
   julia=$(type -P 'julia')
-  if [[ -z "${julia}" ]] then
+  if [[ -z "${julia}" ]] ; then
     echo "Julia build requested, but not in PATH. cannot continue" >&2
     exit 1
   fi

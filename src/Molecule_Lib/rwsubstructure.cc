@@ -4576,13 +4576,14 @@ Substructure_Environment::construct_from_msi_object(
 
     if (NAME_OF_QUERY_BOND_OBJECT == m.name()) {
     } else if (NAME_OF_QUERY_ATOM_OBJECT == m.name()) {
-      std::unique_ptr<Substructure_Atom> a = std::make_unique<Substructure_Atom>();
+      Substructure_Atom* a = new Substructure_Atom();
       if (!a->construct_from_msi_object(m, completed)) {
+        delete a;
         return 0;
       }
 
       if (is_root_substructure_atom(m)) {
-        add(a.release());
+        add(a);
       }
     } else {
       cerr << "Unknown msi object type in query_environment\n" << m;

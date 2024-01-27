@@ -214,15 +214,15 @@ Donor_Acceptor_Assigner::BuildFromEnvValue(const IWString & env, int verbose) {
 int
 Donor_Acceptor_Assigner::_assign_acceptors(Molecule_to_Match& target, int* isotope) {
   int na = _acceptor_queries.number_elements();
-  cerr << "There are " << na << " acceptor queries\n";
+  // cerr << "There are " << na << " acceptor queries\n";
 
   int rc = 0;
   for (int i = 0; i < na; i++) {
     Substructure_Results sresults;
 
-    cerr << "Begin seqrch " << _acceptor_queries[i]->comment() << '\n';
+    // cerr << "Begin seqrch " << _acceptor_queries[i]->comment() << '\n';
     int nhits = _acceptor_queries[i]->substructure_search(target, sresults);
-    cerr << nhits << " to query " << i << " " << isotope << '\n';
+    // cerr << nhits << " to query " << i << " " << isotope << '\n';
     if (0 == nhits) {
       continue;
     }
@@ -237,14 +237,12 @@ Donor_Acceptor_Assigner::_assign_acceptors(Molecule_to_Match& target, int* isoto
 
       atom_number_t k = embedding->item(0);
 
-      cerr << "Atom hit is " << k << '\n';
       isotope[k] = DEFAULT_ACCEPTOR_ISOTOPIC_LABEL;
     }
 
     rc += nhits;
   }
 
-  cerr << "From acceptors " << rc << '\n';
   return rc;
 }
 
@@ -301,7 +299,6 @@ Donor_Acceptor_Assigner::_assign_donors(Molecule_to_Match& target, int* isotope)
 int
 Donor_Acceptor_Assigner::_process(Molecule_to_Match& target, int* isotope) {
   int rc = _assign_acceptors(target, isotope);
-  cerr << "Acceptors assigned\n";
   rc += _assign_donors(target, isotope);
 
   return rc;
@@ -311,7 +308,6 @@ int
 Donor_Acceptor_Assigner::__process(Molecule& m, int* isotope) {
   Molecule_to_Match target(&m);
 
-  cerr << "Going to _process with Molecule_to_Match\n";
   int rc = _process(target, isotope);
 
   // cerr << "Donor_Acceptor_Assigner::__process:finished " << m.smiles() << "
@@ -335,9 +331,7 @@ int
 Donor_Acceptor_Assigner::_process(Molecule& m, int* isotope) {
   _temp_detach_hydrogens.detach_atoms(m);
 
-  cerr << "Hydrogens detached\n";
   int rc = __process(m, isotope);
-  cerr << "Reattach hydrogens\n";
 
   _temp_detach_hydrogens.reattach_atoms(m);
 
@@ -359,7 +353,6 @@ Donor_Acceptor_Assigner::process(Molecule& m, int* isotope) {
 
   set_vector(isotope, matoms, 0);
 
-  cerr << "Going to internal process\n";
   int rc = _process(m, isotope);
 
   if (i_own_the_vector) {

@@ -80,16 +80,18 @@ TestHbonds::SetUp() {
   IWString queries_dir(test_srcdir);
   queries_dir << "/../donor_acceptor_test.runfiles/donor_acceptor/";
 
+#ifdef LIST_DIRECTORY
   std::string qq(test_srcdir);
   qq += "/../donor_acceptor_test.runfiles/donor_acceptor/";
   for (auto const& dir_entry : std::filesystem::directory_iterator{qq}) {
     std::cerr << dir_entry << '\n';
   }
+#endif
 
   IWString cmd;
   cmd << "a=F:" << queries_dir << "acceptor d=" << queries_dir << "donor.qry";
   if (_bruns.build(cmd)) {
-    std::cerr << "DOnor acceptor initialised " << queries_dir << '\n';
+    // std::cerr << "DOnor acceptor initialised " << queries_dir << '\n';
   } else {
     std::cerr << "Could not build donor acceptor from '" << queries_dir << "'\n";
   }
@@ -100,15 +102,18 @@ TestHbonds::SetUp() {
 TEST_P(TestHbonds, TestBuilding) {
   const auto params = GetParam();
   ASSERT_TRUE(_mol.build_from_smiles(params.smiles));
-  std::cerr << "Built " << params.smiles << '\n';
   int q = _bruns.process(_mol);
-  std::cerr << "Return code from process " << q << '\n';
   EXPECT_EQ(_bruns.process(_mol), params.numeric_result);
-  EXPECT_EQ(_mol.aromatic_smiles(), params.result) << _mol.aromatic_smiles();
+  EXPECT_EQ(_mol.aromatic_smiles(), params.result) << _mol.aromatic_smiles() <<
+        " expected " << params.result;
 }
 INSTANTIATE_TEST_SUITE_P(TestHbonds, TestHbonds, testing::Values(
   MolResult{"CC", 0, "CC"},
-  MolResult{"CCN", 1, "CC[N3H2]"}
+  MolResult{"CCN", 2, "CC[2NH2]"},
+  MolResult{"O=CC1CCC1 CHEMBL18475", 1, "[1O]=CC1CCC1"},
+  MolResult{"CCC(O)CC CHEMBL47100", 2, "CCC([2OH])CC"},
+  MolResult{"N1C(=O)CNC1 CHEMBL30446 CHEMBL30446", 4, "[3NH]1C(=[1O])C[2NH]C1"},
+  MolResult{"C(=[1S])=NCC=C CHEMBL233248", 1, "C(=[1S])=NCC=C"}
 ));
 
 } // namespace

@@ -87,6 +87,7 @@ TEST_P(TestAlogpP, TestMolecules) {
 
   ASSERT_TRUE(_mol.build_from_smiles(params.smiles));
   _alogp.set_label_with_atom_type(1);
+  _alogp.set_use_alcohol_for_acid(1);
 
   std::optional<double> a = _alogp.LogP(_mol);
   ASSERT_NE(a, std::nullopt);
@@ -96,7 +97,7 @@ TEST_P(TestAlogpP, TestMolecules) {
         ' ' << _mol.aromatic_smiles();
   if (! params.labelled_smiles.empty()) {
     EXPECT_EQ(_mol.aromatic_smiles(), params.labelled_smiles) << params.labelled_smiles <<
-        " got " << _mol.aromatic_smiles();
+        " got " << _mol.aromatic_smiles() << ' ' << params.alogp;
   }
 }
 INSTANTIATE_TEST_SUITE_P(TestAlogpP, TestAlogpP, testing::Values(
@@ -109,7 +110,7 @@ INSTANTIATE_TEST_SUITE_P(TestAlogpP, TestAlogpP, testing::Values(
   SmilesExpected{"c1ccccc1", 1.687, ""},
   SmilesExpected{"CO", -0.392, "[3CH3][50OH]"},
   SmilesExpected{"c1ccccc1O", 1.392, "[18cH]1[18cH][18cH][18cH][18cH][23c]1[50OH]"},
-  SmilesExpected{"c1ccccc1S", 1.975, "[18cH]1[18cH][18cH][18cH][18cH][23c]1[50OH]"},
+  SmilesExpected{"c1ccccc1S", 1.975, "[18cH]1[18cH][18cH][18cH][18cH][24c]1[68SH]"},
   SmilesExpected{"c1ccccc1F", 1.826, "[18cH]1[18cH][18cH][18cH][18cH][14c]1[62F]"},
   SmilesExpected{"c1ccccc1Cl", 2.340, "[18cH]1[18cH][18cH][18cH][18cH][15c]1[63Cl]"},
   SmilesExpected{"c1ccccc1Br", 2.449, "[18cH]1[18cH][18cH][18cH][18cH][16c]1[64Br]"},
@@ -117,8 +118,14 @@ INSTANTIATE_TEST_SUITE_P(TestAlogpP, TestAlogpP, testing::Values(
   SmilesExpected{"CC(F)(F)F", 1.569, "[1CH3][4C]([62F])([62F])[62F]"},
   SmilesExpected{"COC", 0.263, "[3CH3][51O][3CH3]"},
   SmilesExpected{"C12=C(C=CC=C1)C=CN2", 2.168, "[19c]12[19c]([18cH][18cH][18cH][18cH]1)[18cH][18cH][44nH]2"},
-  SmilesExpected{"c1ccccc1c1ccccc1", 3.354, "[18cH]1[18cH][18cH][18cH][18cH][24c]1[68SH]"},
-  SmilesExpected{"OC(C)C", 0.387, "[50OH][4CH]([1CH3])[1CH3]"}
+  SmilesExpected{"c1ccccc1c1ccccc1", 3.354, "[18cH]1[18cH][18cH][18cH][18cH][20c]1[20c]1[18cH][18cH][18cH][18cH][18cH]1"},
+  SmilesExpected{"OC(C)C", 0.387, "[50OH][4CH]([1CH3])[1CH3]"},
+  SmilesExpected{"o1cccc1", 1.280, "[49o]1[18cH][18cH][18cH][18cH]1"},
+  SmilesExpected{"s1cccc1", 1.748, "[70s]1[18cH][18cH][18cH][18cH]1"},
+  SmilesExpected{"CC(=O)O", 0.091, "[1CH3][5C](=[57O])[60OH]"},
+  SmilesExpected{"CC=O", 0.205, "[1CH3][5CH]=[57O]"},
+  SmilesExpected{"CC#N", 0.530, "[1CH3][7C]#[42N]"},
+  SmilesExpected{"C1(=S)C=CSS1 CHEMBL368700", 2.539, "[50OH][4CH]([1CH3])[1CH3]"}
 ));
 
 }  // namespace

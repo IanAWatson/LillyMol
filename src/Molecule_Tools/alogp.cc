@@ -614,7 +614,11 @@ ALogP::SaturatedOxygen(PerMoleculeData& pmd, atom_number_t zatom, float& result)
 
   // O12
   if (acon == 1 && IsAcid(pmd, zatom)) {
-    result += -1.326;
+    if (_use_alcohol_for_acid) {
+      result += -0.2893;
+    } else {
+      result += -1.326;
+    }
     pmd.assigned[zatom] = kO12;
     return 1;
   }

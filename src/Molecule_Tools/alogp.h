@@ -107,6 +107,12 @@ class ALogP {
     // We can apply isotopic labels to the molecules being processed.
     int _label_with_atom_type = 0;
 
+    // Observe that the contribution for an acid oxygen is very strongly
+    // negative which seems unrealistic. If this is set, the alcohol atom
+    // constant will be used instead, which might lead to more realistic
+    // varlues.
+    int _use_alcohol_for_acid = 0;
+
     // Whether or not to display error messages.
     int _display_error_messages = 1;
 
@@ -150,6 +156,10 @@ class ALogP {
 
     void set_label_with_atom_type(int s) {
       _label_with_atom_type = s;
+    }
+
+    void set_use_alcohol_for_acid(int s) {
+      _use_alcohol_for_acid = s;
     }
 
     // Note that molecules must have formal charges assigned.

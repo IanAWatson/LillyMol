@@ -115,6 +115,8 @@ class ALogP {
     int AromaticCarbon(PerMoleculeData& pmd, atom_number_t zatom, float& result);
     int SaturatedCarbon(PerMoleculeData& pmd, atom_number_t zatom, float& result);
     int UnSaturatedCarbon(PerMoleculeData& pmd, atom_number_t zatom, float& result);
+    int SaturatedPrimaryCarbon(PerMoleculeData& pmd, atom_number_t zatom, float& result);
+    int SaturatedSecondaryCarbom(PerMoleculeData& pmd, atom_number_t zatom, float& result);
 
     int Nitrogen(PerMoleculeData& pmd, atom_number_t zatom, float& result);
     int AromaticNitrogen(PerMoleculeData& pmd, atom_number_t zatom, float& result);

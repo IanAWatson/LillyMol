@@ -17,7 +17,7 @@ struct PerMoleculeData {
   std::unique_ptr<atomic_number_t[]> z;
   int* unsaturation;
   int* aromatic;
-  int* aromatic_bond_count;
+  int* aryl_count;
   int* attached_heteroatom_count;
   int* single_bond_count;
   int* double_bond_count;
@@ -36,7 +36,7 @@ PerMoleculeData::PerMoleculeData(Molecule& m) : mol(m) {
 
   unsaturation = new_int(matoms);
   aromatic = new_int(matoms);
-  aromatic_bond_count = new_int(matoms);
+  aryl_count = new_int(matoms);
   attached_heteroatom_count = new_int(matoms);
   single_bond_count = new_int(matoms);
   double_bond_count = new_int(matoms);
@@ -84,7 +84,7 @@ PerMoleculeData::PerMoleculeData(Molecule& m) : mol(m) {
 
     for (const Bond* b : m[i]) {
       atom_number_t o = b->other(i);
-      ++aromatic_bond_count[o];
+      ++aryl_count[o];
     }
   }
 }
@@ -92,7 +92,7 @@ PerMoleculeData::PerMoleculeData(Molecule& m) : mol(m) {
 PerMoleculeData::~PerMoleculeData() {
   delete [] unsaturation;
   delete [] aromatic;
-  delete [] aromatic_bond_count;
+  delete [] aryl_count;
   delete [] attached_heteroatom_count;
   delete [] single_bond_count;
   delete [] double_bond_count;
@@ -140,7 +140,7 @@ ALogP::AromaticCarbon(PerMoleculeData& pmd, atom_number_t zatom, float& result) 
   }
 
   // C19 aromatic bridghead [c](:a)(:a):a
-  if (pmd.aromatic_bond_count[zatom] == 3) {
+  if (acon == 3 && pmd.aromatic[zatom] == 3) {
     result += 0.2955;
     pmd.assigned[zatom] = kC19;
     return 1;
@@ -232,90 +232,98 @@ ALogP::AromaticCarbon(PerMoleculeData& pmd, atom_number_t zatom, float& result) 
 }
 
 int
+ALogP::SaturatedPrimaryCarbon(PerMoleculeData& pmd, atom_number_t zatom, float& result) {
+  assert(pmd.z[zatom] == 6);
+  assert(pmd.mol.ncon(zatom) == 1);
+
+  const atom_number_t o = pmd.mol.other(zatom, 0);
+
+  if (pmd.aromatic[o]) {
+    if (pmd.aromatic[o] && pmd.z[o] == 6) {
+      result += 0.08452;
+      pmd.assigned[zatom] = kC8;
+      return kC8;
+    } else {
+      result += -0.1444;
+      pmd.assigned[zatom] = kC9;
+      return kC9;
+    }
+  } else {  // aliphatic
+    // C1
+    if (pmd.z[o] == 6) {
+      result += 0.1441;
+      pmd.assigned[zatom] = kC1;
+      return kC1;
+    } else {  // heteroatom
+      // C3 primary heteroatom
+      result += -0.2035;
+      pmd.assigned[zatom] = kC3;
+      return kC3;
+    }
+  }
+}
+
+int
+ALogP::SaturatedSecondaryCarbom(PerMoleculeData& pmd, atom_number_t zatom, float& result) {
+  assert(pmd.z[zatom] == 6);
+  const int acon = pmd.mol.ncon(zatom);
+  assert(acon == 2);
+
+  // C10 [CH2X4]a  secondary aromatic
+  if (pmd.aryl_count[zatom]) {
+    result += -0.0516;
+    pmd.assigned[zatom] = kC10;
+    return kC10;
+  }
+
+  // C1 secondary aliphatic
+  if (pmd.attached_heteroatom_count[zatom] == 0) {
+    result += 0.1441;
+    pmd.assigned[zatom] = kC1;
+    return 1;
+  }
+
+
+  // C3
+  result += -0.2035;
+  pmd.assigned[zatom] = kC3;
+  return 1;
+}
+
+int
 ALogP::SaturatedCarbon(PerMoleculeData& pmd, atom_number_t zatom, float& result) {
   const Atom& a = pmd.mol[zatom];
   const int acon = a.ncon();
 
+#ifdef NOW_BEING_HANDLED_EXERNALLY
   // C1
   if (a.ncon() == 0) {
     result += 0.1441;
     pmd.assigned[zatom] = kC1;
     return 1;
   }
+#endif
 
   const int ahc = pmd.attached_heteroatom_count[zatom];
 
-  // C8 [CH3]c primary aromatic carbon
-  if (acon == 1 && pmd.aromatic_bond_count[zatom] == 1 && ahc == 0) {
-    result += 0.08452;
-    pmd.assigned[zatom] = kC8;
-    return 1;
+  if (acon == 1) {
+    return SaturatedPrimaryCarbon(pmd, zatom, result);
   }
 
-  // C9 [CH3]c primary aromatic heteratom
-  if (acon == 1 && pmd.aromatic_bond_count[zatom] == 1 && ahc == 1) {
-    result += -0.1444;
-    pmd.assigned[zatom] = kC9;
-    return 1;
+  if (acon == 2) {
+    return SaturatedSecondaryCarbom(pmd, zatom, result);
   }
 
-  // C1 [CH3]C primary aliphatic
-  if (acon == 1 && pmd.aromatic_bond_count[zatom] == 0) {
-    result += 0.1441;
-    pmd.assigned[zatom] = kC1;
-    return 1;
-  }
-
-  // C3 [CH3][(N,O,P,S,F,Cl,Br,I)] primary heteroatom
-  if (acon == 1 && ahc == 1) {
-    result += -0.2035;
-    pmd.assigned[zatom] = kC3;
-    return 1;
-  }
-
-  // C10 [CH2X4]a  secondary aromatic
-  if (acon == 2 && pmd.aromatic_bond_count[zatom]) {
-    result += -0.0516;
-    pmd.assigned[zatom] = kC10;
-  }
-
-  // C1
-  if (acon == 1 && ahc == 0) {
-    result += 0.1441;
-    pmd.assigned[zatom] = kC1;
-    return 1;
-  }
-  // C1
-  if (acon == 2 && ahc == 0) {
-    result += 0.1441;
-    pmd.assigned[zatom] = kC1;
-    return 1;
-  }
   // C2
-  if (acon >= 3 && ahc == 0) {
+  if (ahc == 0) {
     // result += 0.0; zero contribution, no-op
     pmd.assigned[zatom] = kC2;
     return 1;
   }
-
-  // C3
-  if (acon <= 2 && ahc) {
-    result += -0.2035;
-    pmd.assigned[zatom] = kC3;
-    return 1;
-  }
   // C4
-  if (acon > 2 && ahc) {
-    result += -0.2051;
-    pmd.assigned[zatom] = kC4;
-    return 1;
-  }
-
-  if (_display_error_messages) {
-    cerr << "SaturatedCarbon::unclassified " << Diagnostic(pmd, zatom) << '\n';
-  }
-
-  return 0;
+  result += -0.2051;
+  pmd.assigned[zatom] = kC4;
+  return 1;
 }
 
 // Return the first atom number that is doubly bonded to `zatom`.
@@ -358,7 +366,7 @@ ALogP::UnSaturatedCarbon(PerMoleculeData& pmd, atom_number_t zatom, float& resul
   // At this stage the doubly bonded atom is definitely a carbon.
 
   // C6 C=C aliphatic
-  if (pmd.aromatic_bond_count[zatom] == 0) {
+  if (pmd.aryl_count[zatom] == 0) {
     result += 0.1551;
     pmd.assigned[zatom] = kC6;
     return 1;
@@ -743,12 +751,19 @@ ALogP::Sulphur(PerMoleculeData& pmd, atom_number_t zatom, float& result) {
 // [#1]OC=[#6]’, ‘[#1]OC=[#7]’, ‘[#1]OC=O’, ‘[#1]OC=S 
 int
 IsHydrogenAcid(PerMoleculeData& pmd, atom_number_t zatom) {
-  assert (pmd.z[zatom] == 8);
+  if (pmd.z[zatom] != 8) {
+    return 0;
+  }
+
   if (pmd.aromatic[zatom]) {
     return 0;
   }
 
   const atom_number_t carbon = pmd.mol.other(zatom, 0);
+  if (pmd.aromatic[carbon]) {
+    return 0;
+  }
+
   for (const Bond* b : pmd.mol[carbon]) {
     if (! b->is_double_bond()) {
       continue;
@@ -766,7 +781,9 @@ IsHydrogenAcid(PerMoleculeData& pmd, atom_number_t zatom) {
 // ‘[#1]OO’, ‘[#1]OS’
 int
 IsPeroxide(PerMoleculeData& pmd, atom_number_t zatom) {
-  assert(pmd.z[zatom] == 8);
+  if(pmd.z[zatom] != 8) {
+    return 0;
+  }
 
   const atom_number_t os = pmd.mol.other(zatom, 0);
   if (pmd.mol.ncon(os) != 2) {
@@ -798,7 +815,8 @@ IsHydrogenAmine(PerMoleculeData& pmd, atom_number_t zatom) {
   return pmd.z[o] == 7;
 }
 
-// [#1]O[CX4]’, ‘[#1]Oc’, ‘[#1]O[!(C,N,O,S)]’,
+// [#1]O[CX4]’, ‘[#1]Oc’, ‘[#1]O[#1]’, ‘[#1]O[#5]’, ‘[#1]O[#14]’, ‘[#1]O[#15]’, ‘[#1]O[#33]’,
+// ‘[#1]O[#50]’, ‘[#1][#5]’, ‘[#1][#14]’, ‘[#1][#15]’, ‘[#1][#16]’, ‘[#1][#50]
 int
 IsHydrogenAlcohol1(PerMoleculeData& pmd, atom_number_t zatom) {
   assert(pmd.z[zatom] == 8);
@@ -806,7 +824,17 @@ IsHydrogenAlcohol1(PerMoleculeData& pmd, atom_number_t zatom) {
   const atom_number_t o = pmd.mol.other(zatom, 0);
 
   // [#1]O[CX4]
-  if (pmd.z[o] == 6 && pmd.unsaturation[o]) {
+  if (pmd.z[o] == 6 && pmd.unsaturation[o] == 0) {
+    return 1;
+  }
+
+  // [#1][#16]
+  if (pmd.z[o] == 16) {
+    return 1;
+  }
+
+  // [#1][#15]
+  if (pmd.z[o] == 15) {
     return 1;
   }
 
@@ -830,6 +858,13 @@ IsHydrogenAlcohol1(PerMoleculeData& pmd, atom_number_t zatom) {
 // [#1]O[CX4]’, ‘[#1]Oc’, ‘[#1]O[!(C,N,O,S)]’, ‘[#1][!C,N,O)]
 int
 IsHydrogenAlcohol(PerMoleculeData& pmd, atom_number_t zatom) {
+  if (pmd.z[zatom] == 16) {
+    return 1;
+  }
+  if (pmd.z[zatom] == 15) {
+    return 1;
+  }
+
   if (pmd.z[zatom] == 8) {
     return IsHydrogenAlcohol1(pmd, zatom);
   }
@@ -966,6 +1001,7 @@ ALogP::LogP(Molecule& m) {
     return std::nullopt;
   }
 
+  cerr << "Label " << _label_with_atom_type << '\n';
   if (_label_with_atom_type) {
     m.set_isotopes(pmd.assigned);
   }

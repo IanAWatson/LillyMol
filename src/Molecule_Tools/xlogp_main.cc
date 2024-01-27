@@ -393,7 +393,7 @@ Options::ProcessSuccessfulCalculation(Molecule& m,
 
   if (_produce_descriptor_file) {
     AppendSpaceSuppressedName(m.name(), output);
-    output << m.name() << _output_separator << static_cast<float>(result) << '\n';
+    output << _output_separator << static_cast<float>(result) << '\n';
     output.write_if_buffer_holds_more_than(32768);
     return 1;
   }

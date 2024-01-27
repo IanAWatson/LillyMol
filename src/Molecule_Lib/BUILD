@@ -3,6 +3,11 @@ load("@com_google_protobuf//:protobuf.bzl", "py_proto_library")
 
 package(default_visibility = ["//visibility:public"])
 
+#filegroup(
+#    name = "charge_assigner_data",
+#    srcs = glob([":charge_assigner/**"]),
+#)
+
 #genrule(
 #  name = 'gfortran_iw',
 #  srcs = [
@@ -432,6 +437,32 @@ cc_library(
     ],
 )
 
+cc_library (
+    name = "charge_assigner",
+    srcs = [
+        "charge_assigner.cc",
+    ],
+    hdrs = [
+        "charge_assigner.h",
+    ],
+    deps = [
+        ":iwmolecule",
+    ],
+)
+
+cc_library (
+    name = "donor_acceptor",
+    srcs = [
+        "donor_acceptor.cc",
+    ],
+    hdrs = [
+        "donor_acceptor.h",
+    ],
+    deps = [
+        ":iwmolecule",
+    ],
+)
+
 cc_library(
     name = "moleculeio",
     srcs = [
@@ -610,6 +641,9 @@ cc_test(
     name = "donor_acceptor_test",
     srcs = [
         "donor_acceptor_test.cc",
+    ],
+    data = [
+        "@donor_acceptor//:donor_acceptor_data",
     ],
     deps = [
         ":iwmolecule",

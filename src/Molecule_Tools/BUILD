@@ -1776,6 +1776,20 @@ cc_binary(
     ],
 )
 
+cc_library(
+    name = "alogp_lib",
+    srcs = [
+        "alogp.cc",
+    ],
+    hdrs = [
+        "alogp.h",
+    ],
+    deps = [
+        "//Molecule_Lib:iwmolecule",
+        "//Molecule_Lib:moleculeio",
+    ],
+)
+
 #cc_library(
 #    name = "atomic_distance_fingerprint_lib",
 #    srcs = [
@@ -2911,6 +2925,22 @@ cc_library(
     ],
     visibility = [
         "//visibility:public",
+    ],
+)
+
+cc_test(
+    name = "alogp_test",
+    timeout = "short",
+    srcs = ["alogp_test.cc"],
+    data = [
+        "@charge_assigner//:charge_assigner_data",
+    ],
+    deps = [
+        ":alogp_lib",
+        "//Molecule_Lib:charge_assigner",
+        "//Molecule_Lib:iwmolecule",
+        "//Molecule_Lib:moleculeio",
+        "@googletest//:gtest_main",
     ],
 )
 

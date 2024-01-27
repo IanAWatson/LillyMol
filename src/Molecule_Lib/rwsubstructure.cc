@@ -5418,19 +5418,17 @@ Single_Substructure_Query::_construct_from_msi_object(const msi_object &msi,
               "defined\n";
       return 0;
     } else {
-      // Feb 2024. Looks like a bug. This gets silently handled then discarded. 
-      // Issue error message
-      cerr << "Non root substructure atom in query\n";
-      return 0;
-
-      std::unique_ptr<Substructure_Atom> a = std::make_unique<Substructure_Atom>();
+      // Here the allocated value will add itself to a parent, so we allocate a raw ptr.
+      Substructure_Atom* a = new Substructure_Atom();
       if (!a->construct_from_msi_object(mi, completed)) {
+        delete a;
         return 0;
       }
 
       if (0 == a->nbonds()) {  // no bonds to anything already defined
         cerr << "Non root Substructure_Atom not bonded\n";
         cerr << mi;
+        delete a;
         return 0;
       }
     }

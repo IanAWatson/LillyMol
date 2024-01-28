@@ -184,7 +184,9 @@ INSTANTIATE_TEST_SUITE_P(TestAlogpP, TestAlogpP, testing::Values(
   SmilesExpected{"CNC(=O)C N-METHYLACETAMIDE", -0.248, "[3CH3][35NH][5C](=[57O])[1CH3]"},
   SmilesExpected{"CNC(=O)NC 1,3-DIMETHYLUREA", -0.455, "[3CH3][35NH][5C](=[59O])[35NH][3CH3]"},
   SmilesExpected{"O=C1NN=CN1 CHEMBL1865594", -0.902, "[56O]=[25c]1[44nH][44n][18cH][44nH]1"},
-  SmilesExpected{"C1(=S)C=CSS1 CHEMBL368700", 2.539, "[44n]1[18cH][18cH][18cH][18cH][18cH]1"}
+  SmilesExpected{"C1(=O)NC=CC=C1 CHEMBL662", 0.375, "[25c]1(=[56O])[44nH][18cH][18cH][18cH][18cH]1"},
+  SmilesExpected{"O=S(=O)NCC Ethanesulfonamide", -0.878, "[25c]1(=[56O])[44nH][18cH][18cH][18cH][18cH]1"},
+  SmilesExpected{"C1(=S)C=CSS1 CHEMBL368700", 2.539, "[28c]1(=[68S])[18cH][18cH][70s][70s]1"}
 ));
 
 }  // namespace

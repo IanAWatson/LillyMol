@@ -157,7 +157,8 @@ ALogP::AromaticCarbon(PerMoleculeData& pmd, atom_number_t zatom, float& result) 
     const atom_number_t o = b->other(zatom);
 
     // C25
-    if (b->is_double_bond()) {
+    if (b->is_double_bond() &&
+        (pmd.z[o] == 6 || pmd.z[o] == 7 || pmd.z[o] == 8)) {
       result += -0.8186;
       pmd.assigned[zatom] = kC25;
       return 1;
@@ -195,42 +196,41 @@ ALogP::AromaticCarbon(PerMoleculeData& pmd, atom_number_t zatom, float& result) 
       return 1;
     }
     // C21 [c](:a)(:a)-C
-    if (pmd.z[o] == 6) {
+    if (pmd.z[o] == 6 && b->is_single_bond()) {
       result += 0.1360;
       pmd.assigned[zatom] = kC21;
       return 1;
     }
     // C22 [c](:a)(:a)-N
-    if (pmd.z[o] == 7) {
+    if (pmd.z[o] == 7 && b->is_single_bond()) {
       result += 0.4619;
       pmd.assigned[zatom] = kC22;
       return 1;
     }
     // C23 [c](:a)(:a)-O
-    if (pmd.z[o] == 8) {
+    if (pmd.z[o] == 8 && b->is_single_bond()) {
       result += 0.5437;
       pmd.assigned[zatom] = kC23;
       return 1;
     }
     // C24 [c](:a)(:a)-S
-    if (pmd.z[o] == 16) {
+    if (pmd.z[o] == 16 && b->is_single_bond()) {
       result += 0.1893;
       pmd.assigned[zatom] = kC24;
       return 1;
     }
     // C13 aromatic heteratoms [cH0]-[!(C,N,O,S,F,Cl,Br,I)]’
-    if (pmd.z[o] != 6) {
+    if (pmd.z[o] != 6 && b->is_single_bond()) {
       result +=-0.5442;
       pmd.assigned[zatom] = kC13;
       return 1;
     }
   }
 
-  if (_display_error_messages) {
-    cerr << "AromaticCarbon:unclassified " << Diagnostic(pmd, zatom) << '\n';
-  }
+  result += 0.08129;
+  pmd.assigned[zatom] = kCS;
 
-  return 0;
+  return 1;
 }
 
 int
@@ -602,7 +602,7 @@ ALogP::UnSaturatedOxygen(PerMoleculeData& pmd, atom_number_t zatom, float& resul
   }
 
   // O11 carbonyl heteroatom
-  if (pmd.attached_heteroatom_count[o] == 3) {
+  if (pmd.z[o] == 6 && pmd.attached_heteroatom_count[o] == 3) {
     result += 0.4833;
     pmd.assigned[zatom] = kO11;
     return 1;
@@ -616,8 +616,15 @@ ALogP::UnSaturatedOxygen(PerMoleculeData& pmd, atom_number_t zatom, float& resul
   }
 
   // O9 carbonyl aliphatic
-  result += -0.1526;
-  pmd.assigned[zatom] = kO9;
+  if (pmd.z[o] == 6) {
+    result += -0.1526;
+    pmd.assigned[zatom] = kO9;
+    return 1;
+  }
+
+  // OS
+  result += -0.1188;
+  pmd.assigned[zatom] = kOS;
   return 1;
 }
 

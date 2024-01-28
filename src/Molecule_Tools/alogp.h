@@ -113,6 +113,10 @@ class ALogP {
     // varlues.
     int _use_alcohol_for_acid = 0;
 
+    // When RDKit processes a charge amine, it seems to count the Hydrogen
+    // atoms for the uncharged form, 2 vs 3 for [N+H3].
+    int _rdkit_charged_nitrogen = 0;
+
     // Whether or not to display error messages.
     int _display_error_messages = 1;
 
@@ -160,6 +164,10 @@ class ALogP {
 
     void set_use_alcohol_for_acid(int s) {
       _use_alcohol_for_acid = s;
+    }
+
+    void set_rdkit_charged_nitrogen(int s) {
+      _rdkit_charged_nitrogen = s;
     }
 
     // Note that molecules must have formal charges assigned.

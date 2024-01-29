@@ -305,3 +305,33 @@ how connected the matched atoms are within the larger molecule
 For each query formed, do a match against the starting molecule. This can
 be a useful testing tool. Note that it is possible to generate queries that
 do not match the starting molecule.
+
+### -Y smtrange
+By default when smarts are written, connections at unspecified atoms might
+be written as `[D>2]`. But this is not compatible with other systems. With the
+`smtrange` option, ranges are written as `[D{3-}]` instead.
+
+## Smarts Output
+For some applications it may be convenient to create smarts rather than
+query files. Currently only a very limited number of options are supported.
+
+Activate by adding
+```
+-B /path/to/file.smt
+```
+which creates a file or smarts. This can then be consumed in `tsubstructure`
+via `-q S:file.smt`.
+
+### -s
+Only allow substitutions at isotopically labelled atoms.
+### -j
+All atoms must conserve their ring membership.
+
+Other options will be added as the need arises.
+
+Also of interest is the idea of passing the tool a partially
+filled in SubstructureQuery proto, and it would insert the `smarts`
+attribute, together with any other attributes it can compute. This would
+facilitate queries that might, for example, impose limits on the
+number of unmatched atoms, or... A great deal of flexibility opens
+up.

@@ -389,6 +389,7 @@ usage(int rc = 1)
   cerr << "  -P <fname>     serialized proto output (many queries), 'tsubstructure -q TFPROTO:file ...'\n";
   cerr << "  -p             write individual textproto files\n";
   cerr << "  -D ...         create proto query files with GeometricConstraints, '-D help' for info\n";
+  cerr << "  -B <fname>     generate smarts instead of query file\n";
   cerr << "  -Y ...         more obscure options, enter '-Y help' for info\n";
   cerr << "  -i <type>      specify input file type\n";
   display_standard_aromaticity_options(cerr);

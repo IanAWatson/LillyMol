@@ -49,6 +49,7 @@ Converts a molecule to a query file
   -p             write individual textproto files
   -b             put all queries in a single file rather than separate file for each
   -D ...         create proto query files with GeometricConstraints
+  -B <fname>     generate smarts instead of query file
   -Y ...         more obscure options, enter '-Y help' for info
   -i <type>      specify input file type
   -A <qualifier> Aromaticity, enter "-A help" for options
@@ -256,6 +257,7 @@ The `-Y` options are
  -Y ncon=n      matches must have exactly  <n> connections to unmatched atoms
  -Y min_ncon=n  matches must have at least <n> connections to unmatched atoms
  -Y max_ncon=n  matches must have at most  <n> connections to unmatched atoms
+ -Y smtrange    write smarts relationals [D>2] as RdKit ranges [D{3-}]
  -Y test        for each query formed, do a match against the starting molecule
 ```
 

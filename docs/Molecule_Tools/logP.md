@@ -43,16 +43,28 @@ version. Computing alogp for all 2.24M molecules in a recent Chembl takes
 ## XLogp Version 2
 This is version 2 of xlogp. Plans are underway to implement version 3.
 
+![AlogP](Images/compare_rdkit_xlogp.png)
+
 Timing is not quite as fast as alogp, with 20k molecules processed in
 about 0.8 seconds.
 
 ## Summary
 It is unclear just how good these atom additivity logP estimators are. See
-[xlogp.h](/Molecule_Tools/xlogp.h) where I present some data derived
-from experimental logP data. The RDKit alogp estimator seemed to be the
+[xlogp.h](/src/Molecule_Tools/xlogp.h) where I present comparisons with 
+experimental logP data. The RDKit alogp estimator seemed to be the
 worst performing of the estimators examined. The LillyMol version was
 not available at the time, but given the strong concordance between
 RDKit and Lillymol implementations, results should be similar.
+
+Generally the xlogp model exhibited better concordance with experimental.
+
+Particularly concerning was the ability of any of the estimators to
+reliably predict that a molecule's experimental logP was above 5.
+All estimators were very poor, with sensitivity values ranging
+between 12 and 15 percent - again with alogp being the worst choice.
+We do however note that Lipinski's original work was done with
+the alogp implementation in Pipeline Pilot, but we do not
+have any means of comparing that. 
 
 If you have access to experimental data, building a model will very
 likely yield a better model.

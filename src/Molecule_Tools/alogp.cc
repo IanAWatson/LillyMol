@@ -240,9 +240,9 @@ ALogP::AromaticCarbon(PerMoleculeData& pmd, atom_number_t zatom, float& result) 
   }
   // C13 aromatic heteratoms [cH0]-[!(C,N,O,S,F,Cl,Br,I)]’
   if (pmd.z[o] != 6 && b->is_single_bond()) {
-    result +=-0.5442;
+    result +=-0.5443;
     pmd.assigned[zatom] = kC13;
-    pmd.atom_value[zatom] = -0.5442;
+    pmd.atom_value[zatom] = -0.5443;
     return 1;
   }
 
@@ -467,8 +467,30 @@ ArylCount(PerMoleculeData& pmd, atom_number_t zatom) {
 int
 ALogP::AromaticNitrogen(PerMoleculeData& pmd, atom_number_t zatom, float& result) {
   // N11 Unprotonated aromatic
-  if (pmd.mol.formal_charge(zatom) == 0) {
+  const Atom& a = pmd.mol[zatom];
+
+  if (a.ncon() == 2 && pmd.formal_charge[zatom] == 0) {
     result +=  -0.3239;
+    pmd.assigned[zatom] = kN11;
+    pmd.atom_value[zatom] = -0.3239;
+    return 1;
+  }
+
+  // N1(=C2C(=N(=O)C=C1)C=CC=C2)=O CHEMBL2104626
+  // which can be written in charge separate form. RDKit
+  // assigns this as if it is the charge separated form.
+  // Probably that is what is intended in the paper.
+  // N12
+  if (a.ncon() == 3 && pmd.formal_charge[zatom] == 0 &&
+      pmd.double_bond_count[zatom] == 2) {
+    result += -1.119;
+    pmd.assigned[zatom] = kN12;
+    pmd.atom_value[zatom] = -1.119;
+    return 1;
+  }
+
+  if (pmd.formal_charge[zatom] == 0) {
+    result += -0.3239;
     pmd.assigned[zatom] = kN11;
     pmd.atom_value[zatom] = -0.3239;
     return 1;
@@ -479,6 +501,39 @@ ALogP::AromaticNitrogen(PerMoleculeData& pmd, atom_number_t zatom, float& result
   pmd.assigned[zatom] = kN12;
   pmd.atom_value[zatom] = -1.119;
   return 1;
+}
+
+// The NH2 atom in an amidine
+int
+SaturatedNitrogenIsAmidine(PerMoleculeData& pmd, atom_number_t zatom) {
+  atom_number_t carbon = pmd.mol.other(zatom, 0);
+
+  if (pmd.attached_heteroatom_count[carbon] != 2) {
+    return 0;
+  }
+  if (pmd.aromatic[carbon]) {
+    return 0;
+  }
+  if (pmd.double_bond_count[carbon] != 1) {
+    return 0;
+  }
+  if (pmd.single_bond_count[carbon] != 2) {
+    return 0;
+  }
+
+  for (const Bond* b : pmd.mol[carbon]) {
+    if (! b->is_double_bond()) {
+      continue;
+    }
+
+    atom_number_t o = b->other(carbon);
+    // Should we also check that `o` is singly bonded.
+    if (pmd.z[o] == 7) {
+      return 1;
+    }
+  }
+
+  return 0;
 }
 
 // The NH2 atom in a guanidine?
@@ -605,6 +660,14 @@ ALogP::SinglyConnectedSaturatedNitrogen(PerMoleculeData& pmd, atom_number_t zato
     return 1;
   }
 
+  if (pmd.attached_heteroatom_count[zatom] == 0 &&
+      SaturatedNitrogenIsAmidine(pmd, zatom)) {
+    result += -1.0190;
+    pmd.assigned[zatom] = kN1;
+    pmd.atom_value[zatom] = -1.0190;
+    return 1;
+  }
+
   const int vinyl = Vinyl(pmd, zatom);
 
   // We are not using a charge assigner, so we approximate a primary amine this way.
@@ -627,6 +690,14 @@ ALogP::SinglyConnectedSaturatedNitrogen(PerMoleculeData& pmd, atom_number_t zato
   // but notice that RDKit assigns N1 to a terminal amide
   if (pmd.attached_heteroatom_count[zatom] == 0 &&
       vinyl && TerminalNitrogenIsAmide(pmd, zatom)) {
+    result += -1.0190;
+    pmd.assigned[zatom] = kN1;
+    pmd.atom_value[zatom] = -1.0190;
+    return 1;
+  }
+
+  if (pmd.attached_heteroatom_count[zatom] == 1 &&
+      vinyl && IsSulfonamide(pmd, zatom)) {
     result += -1.0190;
     pmd.assigned[zatom] = kN1;
     pmd.atom_value[zatom] = -1.0190;
@@ -943,7 +1014,7 @@ ALogP::UnSaturatedOxygen(PerMoleculeData& pmd, atom_number_t zatom, float& resul
   }
 
   // O10 carbonyl aromatic
-  if (ArylCount(pmd, o)) {
+  if (pmd.attached_heteroatom_count[zatom] == 0 && ArylCount(pmd, o)) {
     result += 0.1129;
     pmd.assigned[zatom] = kO10;
     pmd.atom_value[zatom] = 0.1129;
@@ -1159,15 +1230,20 @@ ALogP::Phosphorus(PerMoleculeData& pmd, atom_number_t zatom, float& result) {
   return 1;
 }
 
+// Or nitrogen to deal with RDKit's handling of
+// S(=O)(=O)(N=S(C)CCCC)C1=CC=C(C)C=C1 CHEMBL1533581
 int
-DoublyBondedToOxygen(const Molecule& m, atom_number_t zatom) {
-  for (const Bond* b : m[zatom]) {
+DoublyBondedToOxygen(const PerMoleculeData& pmd, atom_number_t zatom) {
+  for (const Bond* b : pmd.mol[zatom]) {
     if (! b->is_double_bond()) {
       continue;
     }
 
     atom_number_t o = b->other(zatom);
-    if (m.atomic_number(o) == 8) {
+    if (pmd.z[o] == 8) {
+      return 1;
+    }
+    if (pmd.z[o] == 7) {
       return 1;
     }
   }
@@ -1196,7 +1272,7 @@ ALogP::Sulphur(PerMoleculeData& pmd, atom_number_t zatom, float& result) {
 
   // Not sure this can happen...
   // S2
-  if (pmd.mol.formal_charge(zatom)) {
+  if (pmd.formal_charge[zatom]) {
     result += -0.0024;
     pmd.assigned[zatom] = kS2;
     pmd.atom_value[zatom] = -0.0024;
@@ -1212,8 +1288,9 @@ ALogP::Sulphur(PerMoleculeData& pmd, atom_number_t zatom, float& result) {
 
 
 // [#1]OC=[#6]’, ‘[#1]OC=[#7]’, ‘[#1]OC=O’, ‘[#1]OC=S 
+// Also picks up phosphoric acids.
 int
-IsHydrogenAcid(PerMoleculeData& pmd, atom_number_t zatom) {
+ALogP::IsHydrogenAcid(PerMoleculeData& pmd, atom_number_t zatom) {
   if (pmd.z[zatom] != 8) {
     return 0;
   }
@@ -1224,6 +1301,14 @@ IsHydrogenAcid(PerMoleculeData& pmd, atom_number_t zatom) {
 
   const atom_number_t carbon = pmd.mol.other(zatom, 0);
   if (pmd.aromatic[carbon]) {
+    return 0;
+  }
+
+  // RDKit does not consider phosphoric acid H's to be acidic.
+  // An argument could be made to only consider 1 of the two
+  // to be acidic, but that would slow things down by breaking
+  // the paradigm of each atom being processed independently.
+  if (pmd.z[carbon] == 15 && _rdkit_phoshoric_acid_hydrogen) {
     return 0;
   }
 
@@ -1349,6 +1434,7 @@ IsHydroCarbon(PerMoleculeData& pmd, atom_number_t zatom) {
   return pmd.z[zatom] == 6;
 }
 
+// #define DEBUG_ADD_HYDROGEN
 int
 ALogP::AddHydrogenContributions(PerMoleculeData& pmd, float& result) {
   Molecule& m = pmd.mol;
@@ -1376,24 +1462,38 @@ ALogP::AddHydrogenContributions(PerMoleculeData& pmd, float& result) {
     // H4
     if (IsHydrogenAcid(pmd, i)) {
       result += h * 0.2980;
-      // cerr << "IsHydrogenAcid\n";
+#ifdef DEBUG_ADD_HYDROGEN
+      cerr << "IsHydrogenAcid\n";
+#endif
     } else if (IsPeroxide(pmd, i)) {   // H4
       result += h * 0.2980;
-      // cerr << "IsPeroxide\n";
+#ifdef DEBUG_ADD_HYDROGEN
+      cerr << "IsPeroxide\n";
+#endif
     } else if (IsHydrogenAmine(pmd, i)) {  // H3
       result += h * 0.2142;
-      // cerr << "IsHydrogenAmine\n";
+#ifdef DEBUG_ADD_HYDROGEN
+      cerr << "IsHydrogenAmine\n";
+#endif
     } else if (IsHydrogenAlcohol(pmd, i)) {  // H2
       result += h * -0.2677;
-      // cerr << "IsHydrogenAlcohol\n";
+#ifdef DEBUG_ADD_HYDROGEN
+      cerr << "IsHydrogenAlcohol\n";
+#endif
     } else if (IsHydroCarbon(pmd, i)) {  // H1
       result += h * 0.1230;
-      // cerr << "IsHydroCarbon\n";
+#ifdef DEBUG_ADD_HYDROGEN
+      cerr << "IsHydroCarbon\n";
+#endif
     } else {  // HS
       result += h * 0.1125;
-      // cerr << "Default\n";
+#ifdef DEBUG_ADD_HYDROGEN
+      cerr << "Default\n";
+#endif
     }
-    // cerr << " atom " << i << " h " << h << " result " << result << '\n';
+#ifdef DEBUG_ADD_HYDROGEN
+    cerr << " atom " << i << " h " << h << " result " << result << '\n';
+#endif
   }
 
   return 1;
@@ -1472,12 +1572,12 @@ ALogP::LogP(Molecule& m) {
   std::cerr << "Sum before adding hudrogens " << result << '\n';
 #endif
 
-//#define ECHO_ATOMIC_CONTRIBUTIONS
+// #define ECHO_ATOMIC_CONTRIBUTIONS
 #ifdef ECHO_ATOMIC_CONTRIBUTIONS
   float sum = 0.0f;
   for (int i = 0; i < matoms; ++i) {
-    cerr << i << ' ' << pmd.atom_value[i] << ' ' << m.smarts_equivalent_for_atom(i) << '\n';
     sum += pmd.atom_value[i];
+    cerr << i << ' ' << pmd.atom_value[i] << ' ' << m.smarts_equivalent_for_atom(i) << '\t' << sum << '\n';
   }
   cerr << "Sum " << sum << '\n';
 #endif

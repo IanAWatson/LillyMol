@@ -2,8 +2,8 @@
 
 LillyMol contains two logP estimators
 
-. xlogp version 2
-. alogp
+* xlogp version 2
+* alogp
 
 These are local implementations based on these papers.
 ```
@@ -20,16 +20,16 @@ Wang Fu Lai
 ## AlogP
 This is designed to be a faster version of the implementation available within
 RDKit. Generally results are very comparable. Across a random set of 20k
-molecules from Chembl, the correlation is 0.999, with only 18740 molecules
+molecules from Chembl, the correlation is 0.999, with 18740 molecules
 yielding identical results. Of the 1259 molecules with a difference, 964
-have a difference of 0.001, indiciting a likely numerical issue. So
+have a difference of 0.001, indicating a likely numerical issue. So
 only 295 of the 20k molecules had any difference at all.
 ```
 1259 abs diffs btw 0.001 3.881 ave 0.0908602
 ```
 Of the molecules above 0.001, the average difference is 0.385.
 
-!(AlogP)[Images/compare_rdkit_lillymol.png]
+![AlogP](Images/compare_rdkit_lillymol.png)
 
 Almost all of the significant differences can be attributed to differences
 in aromaticity perception between RDKit and LillyMol. This is of course
@@ -45,3 +45,14 @@ This is version 2 of xlogp. Plans are underway to implement version 3.
 
 Timing is not quite as fast as alogp, with 20k molecules processed in
 about 0.8 seconds.
+
+## Summary
+It is unclear just how good these atom additivity logP estimators are. See
+[xlogp.h](/Molecule_Tools/xlogp.h) where I present some data derived
+from experimental logP data. The RDKit alogp estimator seemed to be the
+worst performing of the estimators examined. The LillyMol version was
+not available at the time, but given the strong concordance between
+RDKit and Lillymol implementations, results should be similar.
+
+If you have access to experimental data, building a model will very
+likely yield a better model.

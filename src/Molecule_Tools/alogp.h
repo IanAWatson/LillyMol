@@ -117,6 +117,13 @@ class ALogP {
     // atoms for the uncharged form, 2 vs 3 for [N+H3].
     int _rdkit_charged_nitrogen = 0;
 
+    // RDKit does not classify the Hydrogens on phosphoric acids as acid.
+    // By default, we classify them as acidic, although strictly speaking,
+    // the paper does not include P in the acidic hydrogen query. But they
+    // do include Sulphur.
+    // But nobody much cares about phosphorus...
+    int _rdkit_phoshoric_acid_hydrogen = 0;
+
     // Whether or not to display error messages.
     int _display_error_messages = 1;
 
@@ -148,6 +155,7 @@ class ALogP {
 
     int Sulphur(PerMoleculeData& pmd, atom_number_t zatom, float& result);
 
+    int IsHydrogenAcid(PerMoleculeData& pmd, atom_number_t zatom);
     int AddHydrogenContributions(PerMoleculeData& pmd, float& result);
 
     std::optional<double> SingleAtomSpecialCase(Molecule& m);
@@ -169,6 +177,10 @@ class ALogP {
 
     void set_rdkit_charged_nitrogen(int s) {
       _rdkit_charged_nitrogen = s;
+    }
+
+    void set_rdkit_phoshoric_acid_hydrogen(int s) {
+      _rdkit_phoshoric_acid_hydrogen = s;
     }
 
     // Note that molecules must have formal charges assigned.

@@ -118,12 +118,13 @@ TestAlogpP::SetUp() {
   _alogp.set_label_with_atom_type(1);
   _alogp.set_use_alcohol_for_acid(1);
   _alogp.set_rdkit_charged_nitrogen(1);
+  _alogp.set_rdkit_phoshoric_acid_hydrogen(1);
 }
 
 TEST_P(TestAlogpP, TestMolecules) {
   const auto& params = GetParam();
 
-  ASSERT_TRUE(_mol.build_from_smiles(params.smiles));
+  ASSERT_TRUE(_mol.build_from_smiles(params.smiles)) << "bad smiles " << params.smiles;
 
   // _charge_assigner.process(_mol);
 
@@ -202,6 +203,21 @@ INSTANTIATE_TEST_SUITE_P(TestAlogpP, TestAlogpP, testing::Values(
   // Substantial difference from RDKit due to aromaticity differences. I think we are more correct.
   // SmilesExpected{"S(C1=NC2=C(C3=NC(C(=O)N13)CCC(=O)NCC1=CC=CO1)C=CC=C2)CC(=O)NC1=CC=C(OCC)C=C1 CHEMBL1707125", 5.561, "[5C]1(=[58O])[21c]2[21c]([5C](=[58O])[21c]3[21c]1[18cH][22c]([18cH][23c]3[52O][3CH2][1CH2][2CH]([1CH3])[1CH3])[37NH][5C](=[57O])[3CH2][39N]=[47N]#[47N])[23c]([18cH][18cH][18cH]2)[52O][3CH2][1CH2][2CH]([1CH3])[1CH3]"},
   // SmilesExpected{"[N+]12(CCCCC1)CN1C(=CC(=C(C1=N2)C(O)=O)C)C CHEMBL4764125", 5.561, "[5C]1(=[58O])[21c]2[21c]([5C](=[58O])[21c]3[21c]1[18cH][22c]([18cH][23c]3[52O][3CH2][1CH2][2CH]([1CH3])[1CH3])[37NH][5C](=[57O])[3CH2][39N]=[47N]#[47N])[23c]([18cH][18cH][18cH]2)[52O][3CH2][1CH2][2CH]([1CH3])[1CH3]"},
+  SmilesExpected{"N1(=C2C(=N(=O)C=C1)C=CC=C2)=O CHEMBL2104626", 0.107, "[45n]1([19c]2[19c]([45n](=[53O])[18cH][18cH]1)[18cH][18cH][18cH][18cH]2)=[53O]"},
+  // RDKit does not classify the Hydrogens on the P-[OH] groups as acidic. That
+  // seems wrong. Using our own value here.
+  SmilesExpected{"P(=O)(O)(O)C1=CC=CC(=C1)CP(=O)(O)O CHEMBL149333", 0.167, "[67P](=[61O])([50OH])([50OH])[13c]1[18cH][18cH][18cH][21c]([18cH]1)[10CH2][67P](=[61O])([50OH])[50OH]"},
+  SmilesExpected{"S(=O)(=O)(N=S(C)CCCC)C1=CC=C(C)C=C1 CHEMBL1533581", 2.916, "[69S](=[54O])(=[54O])([39N]=[69S]([3CH3])[3CH2][1CH2][1CH2][1CH3])[24c]1[18cH][18cH][21c]([8CH3])[18cH][18cH]1"},
+  // RDKit gets atom 0 wrong, it assigns C20 when it should be C19. Probably aromaticity.
+  SmilesExpected{"C12=C(N=C(NCC3=CC=CC=C3)NC1=NC(=N2)C(C)C)NC1=CC=C(Cl)C=C1 CHEMBL318880", 5.485, "[19c]12[22c]([44n][22c]([37NH][10CH2][21c]3[18cH][18cH][18cH][18cH][18cH]3)[44nH][19c]1[44n][21c]([44n]2)[11CH]([1CH3])[1CH3])[37NH][22c]1[18cH][18cH][15c]([63Cl])[18cH][18cH]1"},
+  SmilesExpected{"O=S(=O)(N)C1=CC=C(C(=O)C2=C(N)N=C(S2)NC2=CC=C(C=C2)S(=O)(=O)N)C=C1 CHEMBL2377821", 0.995, "[54O]=[69S](=[54O])([34NH2])[24c]1[18cH][18cH][21c]([5C](=[58O])[21c]2[22c]([36NH2])[44n][22c]([70s]2)[37NH][22c]2[18cH][18cH][24c]([18cH][18cH]2)[69S](=[54O])(=[54O])[34NH2])[18cH][18cH]1"},
+  SmilesExpected{"C1(=C(C(F)(F)F)C=CC(=N1)OC1=CC(=CC=C1)C(=N)N)OC1=CC=CC(=C1)C(=N)N CHEMBL50714", 4.253, "[23c]1([21c]([12C]([62F])([62F])[62F])[18cH][18cH][23c]([44n]1)[52O][23c]1[18cH][21c]([18cH][18cH][18cH]1)[5C](=[40NH])[34NH2])[52O][23c]1[18cH][18cH][18cH][21c]([18cH]1)[5C](=[40NH])[34NH2]"},
+  // Aromaticity differences prevent this matching RDKit (0.977)
+  SmilesExpected{"C1(C)(C)N(=C2C=CC(=CC2=N1=O)COC1=CC=C(C=C1)C=NNC(=S)NCC=C)=O CHEMBL3347314", 1.916, "[4C]1([1CH3])([1CH3])[48N](=[5C]2[6CH]=[6CH][6C](=[6CH][5C]2=[48N]1=[53O])[3CH2][52O][23c]1[18cH][18cH][21c]([18cH][18cH]1)[5CH]=[39N][35NH][5C](=[68S])[35NH][3CH2][6CH]=[6CH2])=[53O]"},
+  // Aromaticity differences prevent this matching RDKit (0.689)
+  SmilesExpected{"C(CCNCCCN)N1C(=O)C2=CC=C3C4=C(C=CC(=C24)C1=O)C(=O)N(CCCNCCCN)C3=O CHEMBL2079466", -0.2774, "[10CH2]([1CH2][3CH2][35NH][3CH2][1CH2][3CH2][34NH2])[44n]1[25c](=[56O])[19c]2[18cH][18cH][19c]3[19c]4[19c]([18cH][18cH][19c]([19c]24)[25c]1=[56O])[25c](=[56O])[44n]([10CH2][1CH2][3CH2][35NH][3CH2][1CH2][3CH2][34NH2])[25c]3=[56O]"},
+  // Aromaticity differences prevent this matching RDKit (0.220)
+  SmilesExpected{"C1=CC=CC(=C1)NC(=O)C(=O)NCC1=CC=C(O1)C=C1C(=O)N2C(=NCC2)S1 CHEMBL221991", 1.820, "[18cH]1[18cH][18cH][18cH][22c]([18cH]1)[37NH][5C](=[57O])[5C](=[57O])[35NH][10CH2][21c]1[18cH][18cH][21c]([49o]1)[26CH]=[6C]1[5C](=[57O])[40N]2[5C](=[39N][3CH2][3CH2]2)[68S]1"},
   SmilesExpected{"C1(=S)C=CSS1 CHEMBL368700", 2.539, "[28c]1(=[68S])[18cH][18cH][70s][70s]1"}
 ));
 

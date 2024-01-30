@@ -178,6 +178,7 @@ cc_binary(
         "difference_sort.cc",
     ],
     deps = [
+        "//Foundational/accumulator",
         "//Foundational/cmdline_v2:cmdline_v2",
         "//Foundational/data_source:iwstring_data_source",
         "//Foundational/iwmisc:iwmisc",

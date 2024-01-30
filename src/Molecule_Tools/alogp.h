@@ -130,6 +130,7 @@ class ALogP {
 
     int Nitrogen(PerMoleculeData& pmd, atom_number_t zatom, float& result);
     int AromaticNitrogen(PerMoleculeData& pmd, atom_number_t zatom, float& result);
+    int SinglyConnectedSaturatedNitrogen(PerMoleculeData& pmd, atom_number_t zatom, float& result);
     int SaturatedNitrogen(PerMoleculeData& pmd, atom_number_t zatom, float& result);
     int UnSaturatedNitrogen(PerMoleculeData& pmd, atom_number_t zatom, float& result);
 

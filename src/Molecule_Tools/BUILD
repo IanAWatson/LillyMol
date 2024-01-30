@@ -453,6 +453,20 @@ cc_binary(
 )
 
 cc_binary(
+    name = "alogp",
+    srcs = [
+        "alogp_main.cc",
+    ],
+    deps = [
+        ":alogp_lib",
+        "//Foundational/cmdline:iwcmdline",
+        "//Molecule_Lib:iwmfingerprint",
+        "//Molecule_Lib:iwmolecule",
+        "//Molecule_Lib:moleculeio",
+    ],
+)
+
+cc_binary(
     name = "atom_pair_fingerprint",
     srcs = [
         "atom_pair_fingerprint_main.cc",

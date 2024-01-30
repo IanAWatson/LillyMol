@@ -24,6 +24,8 @@ struct PerMoleculeData {
   int* triple_bond_count;
   formal_charge_t* formal_charge;
   int* assigned;
+  // Useful for debugging.
+  float* atom_value;
 
   PerMoleculeData(Molecule& m);
   ~PerMoleculeData();
@@ -45,6 +47,8 @@ PerMoleculeData::PerMoleculeData(Molecule& m) : mol(m) {
   std::fill_n(formal_charge, matoms, 0);
 
   assigned = new_int(matoms);
+  atom_value = new float[matoms];
+  std::fill_n(atom_value, matoms, 0.0f);
 
   for (const Bond* b : m.bond_list()) {
     atom_number_t a1 = b->a1();
@@ -101,6 +105,7 @@ PerMoleculeData::~PerMoleculeData() {
   delete [] triple_bond_count;
   delete [] formal_charge;
   delete [] assigned;
+  delete [] atom_value; 
 }
 
 // All error messages include the smarts of the problematic atom and
@@ -115,7 +120,7 @@ Diagnostic(PerMoleculeData& pmd, atom_number_t zatom) {
 
 // Return the Bond that is not aromatic
 const Bond*
-OutsideRing(Molecule& m, atom_number_t zatom) {
+NonAromaticConnection(Molecule& m, atom_number_t zatom) {
   assert(m.ncon(zatom) == 3);
   assert(m.is_aromatic(zatom));
 
@@ -137,6 +142,7 @@ ALogP::AromaticCarbon(PerMoleculeData& pmd, atom_number_t zatom, float& result) 
   // C18 [cH]
   if (acon == 2) {
     result += 0.1581;
+    pmd.atom_value[zatom] = 0.1581;
     pmd.assigned[zatom] = kC18;
     return 1;
   }
@@ -144,87 +150,100 @@ ALogP::AromaticCarbon(PerMoleculeData& pmd, atom_number_t zatom, float& result) 
   // C19 aromatic bridghead [c](:a)(:a):a
   if (acon == 3 && pmd.aromatic[zatom] == 3) {
     result += 0.2955;
+    pmd.atom_value[zatom] = 0.2955;
     pmd.assigned[zatom] = kC19;
     return 1;
   }
 
-  if (acon == 3 && pmd.mol.ring_bond_count(zatom) == 2) {
-    const Bond* b = OutsideRing(pmd.mol, zatom);
-    if (b == nullptr) {
-      cerr << "AromaticCarbon:no outside ring bond? " << Diagnostic(pmd, zatom) << '\n';
-    }
+  assert(acon == 3);
 
-    const atom_number_t o = b->other(zatom);
+  const Bond* b = NonAromaticConnection(pmd.mol, zatom);
+  if (b == nullptr) {
+    cerr << "AromaticCarbon:no outside ring bond? " << Diagnostic(pmd, zatom) << '\n';
+    return 0;
+  }
 
-    // C25
-    if (b->is_double_bond() &&
-        (pmd.z[o] == 6 || pmd.z[o] == 7 || pmd.z[o] == 8)) {
-      result += -0.8186;
-      pmd.assigned[zatom] = kC25;
-      return 1;
-    }
+  const atom_number_t o = b->other(zatom);
 
-    // C14
-    if (pmd.z[o] == 9) {
-      // result += 0.0000;  zero result not added, no-op
-      pmd.assigned[zatom] = kC14;
-      return 1;
-    }
-    // C15
-    if (pmd.z[o] == 17) {
-      result += 0.2450;
-      pmd.assigned[zatom] = kC15;
-      return 1;
-    }
-    // C16
-    if (pmd.z[o] == 35) {
-      result += 0.1980;
-      pmd.assigned[zatom] = kC16;
-      return 1;
-    }
-    // C17
-    if (pmd.z[o] == 53) {
-      result += 0.000;
-      pmd.assigned[zatom] = kC17;
-      return 1;
-    }
+  // C25
+  if (b->is_double_bond() &&
+      (pmd.z[o] == 6 || pmd.z[o] == 7 || pmd.z[o] == 8)) {
+    result += -0.8186;
+    pmd.atom_value[zatom] = -0.8186;
+    pmd.assigned[zatom] = kC25;
+    return 1;
+  }
 
-    // C20 4-aromatic [c](:a)(:a)-a
-    if (pmd.aromatic[o]) {
-      result += 0.2713;
-      pmd.assigned[zatom] = kC20;
-      return 1;
-    }
-    // C21 [c](:a)(:a)-C
-    if (pmd.z[o] == 6 && b->is_single_bond()) {
-      result += 0.1360;
-      pmd.assigned[zatom] = kC21;
-      return 1;
-    }
-    // C22 [c](:a)(:a)-N
-    if (pmd.z[o] == 7 && b->is_single_bond()) {
-      result += 0.4619;
-      pmd.assigned[zatom] = kC22;
-      return 1;
-    }
-    // C23 [c](:a)(:a)-O
-    if (pmd.z[o] == 8 && b->is_single_bond()) {
-      result += 0.5437;
-      pmd.assigned[zatom] = kC23;
-      return 1;
-    }
-    // C24 [c](:a)(:a)-S
-    if (pmd.z[o] == 16 && b->is_single_bond()) {
-      result += 0.1893;
-      pmd.assigned[zatom] = kC24;
-      return 1;
-    }
-    // C13 aromatic heteratoms [cH0]-[!(C,N,O,S,F,Cl,Br,I)]’
-    if (pmd.z[o] != 6 && b->is_single_bond()) {
-      result +=-0.5442;
-      pmd.assigned[zatom] = kC13;
-      return 1;
-    }
+  // C14
+  if (pmd.z[o] == 9) {
+    // result += 0.0000;  zero result not added, no-op
+    pmd.assigned[zatom] = kC14;
+    // pmd.atom_value[zatom] = 0.0;
+    return 1;
+  }
+  // C15
+  if (pmd.z[o] == 17) {
+    result += 0.2450;
+    pmd.assigned[zatom] = kC15;
+    pmd.atom_value[zatom] = 0.2450;
+    return 1;
+  }
+  // C16
+  if (pmd.z[o] == 35) {
+    result += 0.1980;
+    pmd.assigned[zatom] = kC16;
+    pmd.atom_value[zatom] = 0.1980;
+    return 1;
+  }
+  // C17
+  if (pmd.z[o] == 53) {
+    result += 0.000;
+    pmd.assigned[zatom] = kC17;
+    pmd.atom_value[zatom] = 0.00;
+    return 1;
+  }
+
+  // C20 4-aromatic [c](:a)(:a)-a
+  if (pmd.aromatic[o]) {
+    result += 0.2713;
+    pmd.assigned[zatom] = kC20;
+    pmd.atom_value[zatom] = 0.2713;
+    return 1;
+  }
+  // C21 [c](:a)(:a)-C
+  if (pmd.z[o] == 6 && b->is_single_bond()) {
+    result += 0.1360;
+    pmd.assigned[zatom] = kC21;
+    pmd.atom_value[zatom] = 0.1360;
+    return 1;
+  }
+  // C22 [c](:a)(:a)-N
+  if (pmd.z[o] == 7 && b->is_single_bond()) {
+    result += 0.4619;
+    pmd.assigned[zatom] = kC22;
+    pmd.atom_value[zatom] = 0.4619;
+    return 1;
+  }
+  // C23 [c](:a)(:a)-O
+  if (pmd.z[o] == 8 && b->is_single_bond()) {
+    result += 0.5437;
+    pmd.assigned[zatom] = kC23;
+    pmd.atom_value[zatom] = 0.5437;
+    return 1;
+  }
+  // C24 [c](:a)(:a)-S
+  if (pmd.z[o] == 16 && b->is_single_bond()) {
+    result += 0.1893;
+    pmd.assigned[zatom] = kC24;
+    pmd.atom_value[zatom] = 0.1893;
+    return 1;
+  }
+  // C13 aromatic heteratoms [cH0]-[!(C,N,O,S,F,Cl,Br,I)]’
+  if (pmd.z[o] != 6 && b->is_single_bond()) {
+    result +=-0.5442;
+    pmd.assigned[zatom] = kC13;
+    pmd.atom_value[zatom] = -0.5442;
+    return 1;
   }
 
   result += 0.08129;
@@ -244,10 +263,12 @@ ALogP::SaturatedPrimaryCarbon(PerMoleculeData& pmd, atom_number_t zatom, float& 
     if (pmd.aromatic[o] && pmd.z[o] == 6) {
       result += 0.08452;
       pmd.assigned[zatom] = kC8;
+      pmd.atom_value[zatom] = 0.08452;
       return kC8;
     } else {
       result += -0.1444;
       pmd.assigned[zatom] = kC9;
+      pmd.atom_value[zatom] = -0.1444;
       return kC9;
     }
   } else {  // aliphatic
@@ -255,11 +276,13 @@ ALogP::SaturatedPrimaryCarbon(PerMoleculeData& pmd, atom_number_t zatom, float& 
     if (pmd.z[o] == 6) {
       result += 0.1441;
       pmd.assigned[zatom] = kC1;
+      pmd.atom_value[zatom] = 0.1441;
       return kC1;
     } else {  // heteroatom
       // C3 primary heteroatom
       result += -0.2035;
       pmd.assigned[zatom] = kC3;
+      pmd.atom_value[zatom] = -0.2035;
       return kC3;
     }
   }
@@ -268,13 +291,13 @@ ALogP::SaturatedPrimaryCarbon(PerMoleculeData& pmd, atom_number_t zatom, float& 
 int
 ALogP::SaturatedSecondaryCarbom(PerMoleculeData& pmd, atom_number_t zatom, float& result) {
   assert(pmd.z[zatom] == 6);
-  const int acon = pmd.mol.ncon(zatom);
-  assert(acon == 2);
+  assert(pmd.mol.ncon(zatom) == 2);
 
   // C10 [CH2X4]a  secondary aromatic
   if (pmd.aryl_count[zatom]) {
     result += -0.0516;
     pmd.assigned[zatom] = kC10;
+    pmd.atom_value[zatom] = -0.0516;
     return kC10;
   }
 
@@ -282,6 +305,7 @@ ALogP::SaturatedSecondaryCarbom(PerMoleculeData& pmd, atom_number_t zatom, float
   if (pmd.attached_heteroatom_count[zatom] == 0) {
     result += 0.1441;
     pmd.assigned[zatom] = kC1;
+    pmd.atom_value[zatom] = 0.1441;
     return 1;
   }
 
@@ -289,6 +313,7 @@ ALogP::SaturatedSecondaryCarbom(PerMoleculeData& pmd, atom_number_t zatom, float
   // C3
   result += -0.2035;
   pmd.assigned[zatom] = kC3;
+  pmd.atom_value[zatom] = -0.2035;
   return 1;
 }
 
@@ -320,6 +345,7 @@ ALogP::SaturatedCarbon(PerMoleculeData& pmd, atom_number_t zatom, float& result)
   if (acon == 3 && pmd.aryl_count[zatom]) {
     result += 0.1193;
     pmd.assigned[zatom] = kC11;
+    pmd.atom_value[zatom] = 0.1193;
     return kC11;
   }
 
@@ -327,6 +353,7 @@ ALogP::SaturatedCarbon(PerMoleculeData& pmd, atom_number_t zatom, float& result)
   if (acon == 4 && pmd.aryl_count[zatom]) {
     result += -0.0967;
     pmd.assigned[zatom] = kC12;
+    pmd.atom_value[zatom] = -0.0967;
     return 1;
   }
 
@@ -334,11 +361,13 @@ ALogP::SaturatedCarbon(PerMoleculeData& pmd, atom_number_t zatom, float& result)
   if (ahc == 0) {
     // result += 0.0; zero contribution, no-op
     pmd.assigned[zatom] = kC2;
+    // pmd.atom_value[zatom] = 0.000;
     return 1;
   }
   // C4
   result += -0.2051;
   pmd.assigned[zatom] = kC4;
+  pmd.atom_value[zatom] = -0.2051;
   return 1;
 }
 
@@ -361,6 +390,7 @@ ALogP::UnSaturatedCarbon(PerMoleculeData& pmd, atom_number_t zatom, float& resul
   if (pmd.triple_bond_count[zatom]) {
     result += 0.00170;
     pmd.assigned[zatom] = kC7;
+    pmd.atom_value[zatom] = 0.00170;
     return 1;
   }
 
@@ -376,6 +406,7 @@ ALogP::UnSaturatedCarbon(PerMoleculeData& pmd, atom_number_t zatom, float& resul
   if (pmd.z[dbl] != 6) {
     result += -0.2783;
     pmd.assigned[zatom] = kC5;
+    pmd.atom_value[zatom] = -0.2783;
     return 1;
   }
 
@@ -385,12 +416,14 @@ ALogP::UnSaturatedCarbon(PerMoleculeData& pmd, atom_number_t zatom, float& resul
   if (pmd.aryl_count[zatom] == 0) {
     result += 0.1551;
     pmd.assigned[zatom] = kC6;
+    pmd.atom_value[zatom] = 0.1551;
     return 1;
   }
 
   // C26 C=C aromatic [C]()C)(a)A’, ‘[C]()C)(c)a’, ‘[CH]() C)a’, ‘[C] ) c
   result += 0.2640;
   pmd.assigned[zatom] = kC26;
+  pmd.atom_value[zatom] = 0.2640;
   return 1;
 }
 
@@ -428,12 +461,181 @@ ALogP::AromaticNitrogen(PerMoleculeData& pmd, atom_number_t zatom, float& result
   if (pmd.mol.formal_charge(zatom) == 0) {
     result +=  -0.3239;
     pmd.assigned[zatom] = kN11;
+    pmd.atom_value[zatom] = -0.3239;
     return 1;
   }
 
   // N12 protonated aromatic
   result += -1.119;
   pmd.assigned[zatom] = kN12;
+  pmd.atom_value[zatom] = -1.119;
+  return 1;
+}
+
+// The NH2 atom in a guanidine?
+int
+SaturatedNitrogenIsGuanidine(PerMoleculeData& pmd, atom_number_t zatom) {
+  atom_number_t carbon = pmd.mol.other(zatom, 0);
+
+  if (pmd.attached_heteroatom_count[carbon] != 3) {
+    return 0;
+  }
+  if (pmd.aromatic[carbon]) {
+    return 0;
+  }
+  if (pmd.double_bond_count[carbon] != 1) {
+    return 0;
+  }
+  if (pmd.single_bond_count[carbon] != 2) {
+    return 0;
+  }
+
+  for (const Bond* b : pmd.mol[zatom]) {
+    atom_number_t o = b->other(carbon);
+    if (o == zatom) {
+      continue;
+    }
+    if (pmd.z[o] != 7) {
+      return 0;
+    }
+  }
+
+  return 1;
+}
+
+// Return the number of adjacent unsaturations to `zatom` -
+// excludes aromatics.
+int
+Vinyl(const PerMoleculeData& pmd, atom_number_t zatom) {
+  int rc = 0;
+  for (const Bond* b : pmd.mol[zatom]) {
+    const atom_number_t o = b->other(zatom);
+    if (pmd.aromatic[o]) {
+      continue;
+    }
+    if (pmd.unsaturation[o]) {
+      ++rc;
+    }
+  }
+
+  return rc;
+}
+
+// Is a terminal nitrogen part of an amide. Allow sulfonamides
+int
+TerminalNitrogenIsAmide(const PerMoleculeData& pmd, atom_number_t zatom) {
+  assert(pmd.mol.ncon(zatom) == 1);
+
+  // Allow either carbon or Sulphur
+  const atom_number_t carbon = pmd.mol.other(zatom, 0);
+  if (pmd.z[carbon] == 6) {
+  } else if (pmd.z[carbon] == 16) {
+  } else {
+    return 0;
+  }
+
+  int doubly_bonded_oxygen_count = 0;
+  for (const Bond* b : pmd.mol[carbon]) {
+    if (! b->is_double_bond()) {
+      continue;
+    }
+
+    atom_number_t o = b->other(carbon);
+    if (pmd.z[o] == 8) {
+    } else if (pmd.z[o] == 16) {
+    } else {
+      continue;
+    }
+
+    ++doubly_bonded_oxygen_count;
+  }
+
+  return doubly_bonded_oxygen_count;
+}
+
+// Is zatom the N of a sulfonamide
+int
+IsSulfonamide(const PerMoleculeData& pmd, atom_number_t zatom) {
+  for (const Bond* b : pmd.mol[zatom]) {
+    const atom_number_t sulphur = b->other(zatom);
+    if (pmd.z[sulphur] != 16) {
+      continue;
+    }
+
+    if (pmd.unsaturation[sulphur] == 0) {
+      return 0;
+    }
+
+    if (pmd.attached_heteroatom_count[sulphur] < 2) {
+      return 0;
+    }
+
+    for (const Bond* b2 : pmd.mol[sulphur]) {
+      if (! b2->is_double_bond()) {
+        continue;
+      }
+      atom_number_t o = b2->other(sulphur);
+      if (pmd.z[o] == 8) {
+        return 1;
+      }
+    }
+  }
+
+  return 0;
+}
+
+int
+ALogP::SinglyConnectedSaturatedNitrogen(PerMoleculeData& pmd, atom_number_t zatom, float& result) {
+  assert(pmd.mol.ncon() == 1);
+
+  if (pmd.attached_heteroatom_count[zatom] == 0 &&
+      SaturatedNitrogenIsGuanidine(pmd, zatom)) {
+    result += -1.0190;
+    pmd.assigned[zatom] = kN1;
+    pmd.atom_value[zatom] = -1.0190;
+    return 1;
+  }
+
+  const int vinyl = Vinyl(pmd, zatom);
+
+  // We are not using a charge assigner, so we approximate a primary amine this way.
+  if (pmd.attached_heteroatom_count[zatom] == 0 &&
+      vinyl == 0) {
+    atom_number_t o = pmd.mol.other(zatom, 0);
+    if (pmd.aromatic[o]) {  // N3
+      result += -1.0270;
+      pmd.assigned[zatom] = kN3;
+      pmd.atom_value[zatom] = -1.0270;
+      return 1;
+    } else {  // N1
+      result += -1.0190;
+      pmd.assigned[zatom] = kN1;
+      pmd.atom_value[zatom] = -1.0190;
+      return 1;
+    }
+  }
+
+  // but notice that RDKit assigns N1 to a terminal amide
+  if (pmd.attached_heteroatom_count[zatom] == 0 &&
+      vinyl && TerminalNitrogenIsAmide(pmd, zatom)) {
+    result += -1.0190;
+    pmd.assigned[zatom] = kN1;
+    pmd.atom_value[zatom] = -1.0190;
+    return 1;
+  }
+
+  // N3 maybe not charged, but still adjacent to arom. Aniline
+  if (pmd.aryl_count[zatom] == 1) {
+    result += -1.0270;
+    pmd.assigned[zatom] = kN3;
+    pmd.atom_value[zatom] = -1.0270;
+    return 1;
+  }
+
+  // NS nitrogen supplemental.
+  result += -0.4806;
+  pmd.assigned[zatom] = kNS;
+  pmd.atom_value[zatom] = -0.4806;
   return 1;
 }
 
@@ -442,38 +644,25 @@ ALogP::SaturatedNitrogen(PerMoleculeData& pmd, atom_number_t zatom, float& resul
   const Atom& a = pmd.mol[zatom];
   cerr << "SaturatedNitrogen " << pmd.mol.aromatic_smiles() << '\n';
 
+  if (a.ncon() == 1) {
+    return SinglyConnectedSaturatedNitrogen(pmd, zatom, result);
+  }
+
+  const int vinyl = Vinyl(pmd, zatom);
   const int aryl = ArylCount(pmd, zatom);
 
-  cerr << "formal_charge " << pmd.formal_charge[zatom] << '\n';
-  if (a.ncon() == 1 && pmd.formal_charge[zatom] == 1) {
-    atom_number_t o = pmd.mol.other(zatom, 0);
-    if (pmd.aromatic[o]) {  // N3
-      result += -1.0270;
-      pmd.assigned[zatom] = kN3;
-      return 1;
-    } else {  // N1
-      result += -1.0190;
-      pmd.assigned[zatom] = kN1;
-      return 1;
-    }
-  }
-
-  // N3 maybe not charged, but still adjacent to arom. Aniline
-  if (a.ncon() == 1 && pmd.aryl_count[zatom] == 1) {
-    result += -1.0270;
-    pmd.assigned[zatom] = kN3;
-    return 1;
-  }
-
-  if (a.ncon() == 2 && pmd.formal_charge[zatom] == 1) {
+  if (a.ncon() == 2 && pmd.attached_heteroatom_count[zatom] == 0 &&
+     Vinyl(pmd, zatom) == 0) {
     // N4
     if (aryl) {
       result += -0.5188;
       pmd.assigned[zatom] = kN4;
+      pmd.atom_value[zatom] = -0.5188;
       return 1;
     } else {  // N2
       result += -0.7096;
       pmd.assigned[zatom] = kN2;
+      pmd.atom_value[zatom] = -0.7096;
       return 1;
     }
   }
@@ -482,6 +671,7 @@ ALogP::SaturatedNitrogen(PerMoleculeData& pmd, atom_number_t zatom, float& resul
   if (a.ncon() == 2 && pmd.aryl_count[zatom]) {
     result += -0.5188;
     pmd.assigned[zatom] = kN4;
+    pmd.atom_value[zatom] = -0.5188;
     return 1;
   }
 
@@ -489,18 +679,22 @@ ALogP::SaturatedNitrogen(PerMoleculeData& pmd, atom_number_t zatom, float& resul
   if (a.ncon() == 2 && aryl == 0) {
     result += -0.7096;
     pmd.assigned[zatom] = kN2;
+    pmd.atom_value[zatom] = -0.7096;
     return 1;
   }
 
-  if (a.ncon() == 3 && pmd.formal_charge[zatom] == 1) {
+  if (a.ncon() == 3 && pmd.attached_heteroatom_count[zatom] == 0 &&
+      Vinyl(pmd, zatom) == 0) {
     // N8
     if (aryl) {
       result += -0.4458;
       pmd.assigned[zatom] = kN8;
+      pmd.atom_value[zatom] = -0.4458;
       return 1;
     } else {  // N7
       result += -0.3187;
       pmd.assigned[zatom] = kN7;
+      pmd.atom_value[zatom] = -0.3187;
       return 1;
     }
   }
@@ -509,6 +703,52 @@ ALogP::SaturatedNitrogen(PerMoleculeData& pmd, atom_number_t zatom, float& resul
   if (a.ncon() == 3 && aryl) {
     result += -0.4458;
     pmd.assigned[zatom] = kN8;
+    pmd.atom_value[zatom] = -0.4458;
+    return 1;
+  }
+
+  // N7 but with vinyl connections.
+  if (a.ncon() == 3 && pmd.attached_heteroatom_count[zatom] == 0 &&
+      pmd.aryl_count[zatom] == 0) {
+    result += -0.3187;
+    pmd.assigned[zatom] = kN7;
+    pmd.atom_value[zatom] = -0.3187;
+    return 1;
+  }
+
+  // N7 that might be part of a sulfonamide
+  if (a.ncon() == 3 && pmd.attached_heteroatom_count[zatom] == 1 &&
+      vinyl == 1 && IsSulfonamide(pmd, zatom)) {
+    result += -0.3187;
+    pmd.assigned[zatom] = kN7;
+    pmd.atom_value[zatom] = -0.3187;
+    return 1;
+  }
+
+  // N7 with very few restrictions
+  if (a.ncon() == 3 && pmd.attached_heteroatom_count[zatom] == 1 &&
+      vinyl == 0) {
+    result += -0.3187;
+    pmd.assigned[zatom] = kN7;
+    pmd.atom_value[zatom] = -0.3187;
+    return 1;
+  }
+
+  // N7 with hardly any restriction. Note that these would probably
+  // not be charged.
+  if (a.ncon() == 3 && pmd.attached_heteroatom_count[zatom] == 1) {
+    result += -0.3187;
+    pmd.assigned[zatom] = kN7;
+    pmd.atom_value[zatom] = -0.3187;
+    return 1;
+  }
+
+  // N7 with hardly any restriction. Note that these would probably
+  // not be charged.
+  if (a.ncon() == 3 && pmd.attached_heteroatom_count[zatom] == 2) {
+    result += -0.3187;
+    pmd.assigned[zatom] = kN7;
+    pmd.atom_value[zatom] = -0.3187;
     return 1;
   }
 
@@ -516,50 +756,120 @@ ALogP::SaturatedNitrogen(PerMoleculeData& pmd, atom_number_t zatom, float& resul
     // N13
     result += -0.3396;
     pmd.assigned[zatom] = kN13;
+    pmd.atom_value[zatom] = -0.3396;
     return 1;
   }
 
   // N14
   if (pmd.formal_charge[zatom]) {
-    pmd.assigned[zatom] = kN14;
     result += 0.2887;
+    pmd.assigned[zatom] = kN14;
+    pmd.atom_value[zatom] = 0.2887;
+    return 1;
+  }
+
+  // N14
+  if (a.ncon() == 2 && pmd.unsaturation[zatom] == 3) {
+    result += 0.2887;
+    pmd.assigned[zatom] = kN14;
+    pmd.atom_value[zatom] = 0.2887;
+    return 1;
+  }
+
+  // N14
+  if (pmd.unsaturation[zatom] == 2 && a.ncon() == 1 &&
+      pmd.attached_heteroatom_count[zatom] == 1) {
+    result += 0.2887;
+    pmd.assigned[zatom] = kN14;
+    pmd.atom_value[zatom] = 0.2887;
     return 1;
   }
 
   // NS nitrogen supplemental.
   result += -0.4806;
   pmd.assigned[zatom] = kNS;
+  pmd.atom_value[zatom] = -0.4806;
   return 1;
 }
 
 int
+IsNitro(const PerMoleculeData& pmd, atom_number_t zatom) {
+  int doubly_bonded_oxygen_count = 0;
+  for (const Bond * b : pmd.mol[zatom]) {
+    if (! b->is_double_bond()) {
+      continue;
+    }
+    atom_number_t o = b->other(zatom);
+    if (pmd.z[o] == 8) {
+      ++doubly_bonded_oxygen_count;
+    }
+  }
+
+  return doubly_bonded_oxygen_count == 2;
+}
+
+int
 ALogP::UnSaturatedNitrogen(PerMoleculeData& pmd, atom_number_t zatom, float& result) {
+  const Atom& a = pmd.mol[zatom];
+
   // N9 Nitrile
-  if (pmd.triple_bond_count[zatom]) {
+  if (a.ncon() == 1 && pmd.triple_bond_count[zatom] &&
+      pmd.attached_heteroatom_count[zatom] == 0) {
     result += 0.01508;
     pmd.assigned[zatom] = kN9;
+    pmd.atom_value[zatom] = 0.01508;
     return 1;
   }
 
-  const Atom& a = pmd.mol[zatom];
+
+  // Nitro is assigned N13
+  if (a.ncon() == 3 && pmd.double_bond_count[zatom] == 2 &&
+      pmd.attached_heteroatom_count[zatom] >= 2 && IsNitro(pmd, zatom)) {
+    result += -0.3396;
+    pmd.assigned[zatom] = kN13;
+    pmd.atom_value[zatom] = -0.3396;
+    return 1;
+  }
 
   // N7 imine
   if (a.ncon() == 1 && pmd.double_bond_count[zatom] == 1) {
     result += 0.0837;
     pmd.assigned[zatom] = kN7;
+    pmd.atom_value[zatom] = 0.0837;
     return 1;
   }
 
   // N6 substituted imine
-  if (a.ncon() == 2 && pmd.double_bond_count[zatom] == 1) {
+  if (a.ncon() == 2 && pmd.double_bond_count[zatom] == 1 && pmd.triple_bond_count[zatom] == 0) {
     result += 0.1836;
     pmd.assigned[zatom] = kN6;
+    pmd.atom_value[zatom] = 0.1836;
+    return 1;
+  }
+
+  // N14 N#N=
+  if (a.ncon() == 1 && pmd.triple_bond_count[zatom] == 1 &&
+      pmd.attached_heteroatom_count[zatom]) {
+    result += 0.2887;
+    pmd.assigned[zatom] = kN14;
+    pmd.atom_value[zatom] = 0.2887;
+    return 1;
+  }
+
+  // N14 N#N=
+  if (a.ncon() == 2 && pmd.triple_bond_count[zatom] == 1 &&
+      pmd.double_bond_count[zatom] == 1 &&
+      pmd.attached_heteroatom_count[zatom]) {
+    result += 0.2887;
+    pmd.assigned[zatom] = kN14;
+    pmd.atom_value[zatom] = 0.2887;
     return 1;
   }
 
   // NS nitrogen supplemental.
   result += -0.4806;
   pmd.assigned[zatom] = kNS;
+  pmd.atom_value[zatom] = -0.4806;
   return 1;
 }
 
@@ -585,6 +895,7 @@ ALogP::UnSaturatedOxygen(PerMoleculeData& pmd, atom_number_t zatom, float& resul
   if (pmd.z[o] == 7) {
     result += 0.0335;
     pmd.assigned[zatom] = kO5;
+    pmd.atom_value[zatom] = 0.0335;
     return 1;
   }
 
@@ -592,6 +903,16 @@ ALogP::UnSaturatedOxygen(PerMoleculeData& pmd, atom_number_t zatom, float& resul
   if (pmd.z[o] == 6 && pmd.aromatic[o]) {
     result += 0.1788;
     pmd.assigned[zatom] = kO8;
+    pmd.atom_value[zatom] = 0.1788;
+    return 1;
+  }
+
+  // IAW. Copy behaviour from RDKit which assigns O6 to the oxygens in O=S=O
+  // which seems quite wrong.
+  if (pmd.z[o] == 16) {
+    result += -0.3339;
+    pmd.assigned[zatom] = kO6;
+    pmd.atom_value[zatom] = -0.3339;
     return 1;
   }
 
@@ -605,6 +926,7 @@ ALogP::UnSaturatedOxygen(PerMoleculeData& pmd, atom_number_t zatom, float& resul
   if (pmd.z[o] == 6 && pmd.attached_heteroatom_count[o] == 3) {
     result += 0.4833;
     pmd.assigned[zatom] = kO11;
+    pmd.atom_value[zatom] = 0.4833;
     return 1;
   }
 
@@ -612,6 +934,7 @@ ALogP::UnSaturatedOxygen(PerMoleculeData& pmd, atom_number_t zatom, float& resul
   if (ArylCount(pmd, o)) {
     result += 0.1129;
     pmd.assigned[zatom] = kO10;
+    pmd.atom_value[zatom] = 0.1129;
     return 1;
   }
 
@@ -619,12 +942,14 @@ ALogP::UnSaturatedOxygen(PerMoleculeData& pmd, atom_number_t zatom, float& resul
   if (pmd.z[o] == 6) {
     result += -0.1526;
     pmd.assigned[zatom] = kO9;
+    pmd.atom_value[zatom] = -0.1526;
     return 1;
   }
 
   // OS
   result += -0.1188;
   pmd.assigned[zatom] = kOS;
+  pmd.atom_value[zatom] = -0.1188;
   return 1;
 }
 
@@ -660,6 +985,21 @@ AttachedAromaticCount(PerMoleculeData& pmd, atom_number_t zatom) {
   return rc;
 }
 
+// Return true if zatom is attached to a fully saturated Nitrogen
+int
+IsNHydroxy(const PerMoleculeData& pmd, atom_number_t zatom) {
+  assert(pmd.mol.ncon(zatom) == 1);
+  atom_number_t o = pmd.mol.other(zatom, 0);
+  if (pmd.z[o] != 7) {
+    return 0;
+  }
+  if (pmd.unsaturation[o]) {
+    return 0;
+  }
+
+  return 1;
+}
+
 int
 ALogP::SaturatedOxygen(PerMoleculeData& pmd, atom_number_t zatom, float& result) {
   const Atom& a = pmd.mol[zatom];
@@ -671,9 +1011,11 @@ ALogP::SaturatedOxygen(PerMoleculeData& pmd, atom_number_t zatom, float& result)
     if (_use_alcohol_for_acid) {
       result += -0.2893;
       pmd.assigned[zatom] = kO2;
+      pmd.atom_value[zatom] = -0.2893;
     } else {
       result += -1.326;
       pmd.assigned[zatom] = kO12;
+      pmd.atom_value[zatom] = -1.326;
     }
     return 1;
   }
@@ -682,6 +1024,16 @@ ALogP::SaturatedOxygen(PerMoleculeData& pmd, atom_number_t zatom, float& result)
   if (acon == 1 && pmd.attached_heteroatom_count[zatom] == 0) {
     result += -0.2893;
     pmd.assigned[zatom] = kO2;
+    pmd.atom_value[zatom] = -0.2893;
+    return 1;
+  }
+
+  // O2 N-Hydroxy
+  if (acon == 1 && pmd.attached_heteroatom_count[zatom] == 1 &&
+     pmd.aryl_count[zatom] == 0 && IsNHydroxy(pmd, zatom)) {
+    result += -0.2893;
+    pmd.assigned[zatom] = kO2;
+    pmd.atom_value[zatom] = -0.2893;
     return 1;
   }
 
@@ -690,6 +1042,7 @@ ALogP::SaturatedOxygen(PerMoleculeData& pmd, atom_number_t zatom, float& result)
   if (acon == 2 && aac == 0) {
     result += -0.0684;
     pmd.assigned[zatom] = kO3;
+    pmd.atom_value[zatom] = -0.0684;
     return 1;
   }
 
@@ -697,6 +1050,7 @@ ALogP::SaturatedOxygen(PerMoleculeData& pmd, atom_number_t zatom, float& result)
   if (acon == 2 && aac) {
     result += -0.4195;
     pmd.assigned[zatom] = kO4;
+    pmd.atom_value[zatom] = -0.4195;
     return 1;
   }
 
@@ -706,6 +1060,7 @@ ALogP::SaturatedOxygen(PerMoleculeData& pmd, atom_number_t zatom, float& result)
     if (pmd.z[o] == 16) {
       result += -0.3339;
       pmd.assigned[zatom] = kO6;
+    pmd.atom_value[zatom] = -0.3339;
       return 1;
     }
 
@@ -714,6 +1069,7 @@ ALogP::SaturatedOxygen(PerMoleculeData& pmd, atom_number_t zatom, float& result)
     if (pmd.z[o] == 7) {
       result += 0.0335;
       pmd.assigned[zatom] = kO5;
+      pmd.atom_value[zatom] = 0.0335;
       return 1;
     }
 
@@ -721,6 +1077,7 @@ ALogP::SaturatedOxygen(PerMoleculeData& pmd, atom_number_t zatom, float& result)
     if (pmd.z[o] == 16) {
       result += -0.3339;
       pmd.assigned[zatom] = kO6;
+      pmd.atom_value[zatom] = 0.3339;
       return 1;
     }
   }
@@ -728,6 +1085,7 @@ ALogP::SaturatedOxygen(PerMoleculeData& pmd, atom_number_t zatom, float& result)
   // OS oxygen supplemental.
   result += -0.1188;
   pmd.assigned[zatom] = kOS;
+  pmd.atom_value[zatom] = -0.1188;
   return 1;
 }
 
@@ -738,6 +1096,7 @@ ALogP::Oxygen(PerMoleculeData& pmd, atom_number_t zatom, float& result) {
   if (pmd.aromatic[zatom]) {
     result += 0.1552;
     pmd.assigned[zatom] = kO1;
+    pmd.atom_value[zatom] = 0.1552;
     return 1;
   }
 
@@ -752,6 +1111,7 @@ int
 ALogP::Fluorine(PerMoleculeData& pmd, atom_number_t zatom, float& result) {
   result += 0.4202;
   pmd.assigned[zatom] = kF;
+  pmd.atom_value[zatom] = 0.4202;
   return 1;
 }
 
@@ -759,6 +1119,7 @@ int
 ALogP::Chlorine(PerMoleculeData& pmd, atom_number_t zatom, float& result) {
   result += 0.6895;
   pmd.assigned[zatom] = kCl;
+  pmd.atom_value[zatom] = 0.6895;
   return 1;
 }
 
@@ -766,6 +1127,7 @@ int
 ALogP::Bromine(PerMoleculeData& pmd, atom_number_t zatom, float& result) {
   result += 0.8456;
   pmd.assigned[zatom] = kBr;
+  pmd.atom_value[zatom] = 0.8456;
   return 1;
 }
 
@@ -773,6 +1135,7 @@ int
 ALogP::Iodine(PerMoleculeData& pmd, atom_number_t zatom, float& result) {
   result += 0.8857;
   pmd.assigned[zatom] = kI;
+  pmd.atom_value[zatom] = 0.8857;
   return 1;
 }
 
@@ -780,7 +1143,24 @@ int
 ALogP::Phosphorus(PerMoleculeData& pmd, atom_number_t zatom, float& result) {
   result += 0.8612;
   pmd.assigned[zatom] = kP;
+  pmd.atom_value[zatom] = 0.8612;
   return 1;
+}
+
+int
+DoublyBondedToOxygen(const Molecule& m, atom_number_t zatom) {
+  for (const Bond* b : m[zatom]) {
+    if (! b->is_double_bond()) {
+      continue;
+    }
+
+    atom_number_t o = b->other(zatom);
+    if (m.atomic_number(o) == 8) {
+      return 1;
+    }
+  }
+
+  return 0;
 }
 
 int
@@ -789,6 +1169,16 @@ ALogP::Sulphur(PerMoleculeData& pmd, atom_number_t zatom, float& result) {
   if (pmd.aromatic[zatom]) {
     result += 0.6237;
     pmd.assigned[zatom] = kS3;
+    pmd.atom_value[zatom] = 0.6237;
+    return 1;
+  }
+
+  // RDKit seems to apply S2 to S=O groups, which seems wrong
+  // Maybe this should be made a settable behaviour.
+  if (pmd.double_bond_count[zatom] && DoublyBondedToOxygen(pmd.mol, zatom)) {
+    result += -0.0024;
+    pmd.assigned[zatom] = kS2;
+    pmd.atom_value[zatom] = -0.0024;
     return 1;
   }
 
@@ -797,12 +1187,14 @@ ALogP::Sulphur(PerMoleculeData& pmd, atom_number_t zatom, float& result) {
   if (pmd.mol.formal_charge(zatom)) {
     result += -0.0024;
     pmd.assigned[zatom] = kS2;
+    pmd.atom_value[zatom] = -0.0024;
     return 1;
   }
 
   // S1
   result += 0.6482;
   pmd.assigned[zatom] = kS1;
+  pmd.atom_value[zatom] = 0.6482;
   return 1;
 }
 
@@ -1066,6 +1458,17 @@ ALogP::LogP(Molecule& m) {
   }
 
   std::cerr << "Sum before adding hudrogens " << result << '\n';
+
+#define ECHO_ATOMIC_CONTRIBUTIONS
+#ifdef ECHO_ATOMIC_CONTRIBUTIONS
+  float sum = 0.0f;
+  for (int i = 0; i < matoms; ++i) {
+    cerr << i << ' ' << pmd.atom_value[i] << ' ' << m.smarts_equivalent_for_atom(i) << '\n';
+    sum += pmd.atom_value[i];
+  }
+  cerr << "Sum " << sum << '\n';
+#endif
+
   if (! AddHydrogenContributions(pmd, result)) {
     return std::nullopt;
   }

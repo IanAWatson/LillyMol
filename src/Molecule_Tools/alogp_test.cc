@@ -115,8 +115,8 @@ TestAlogpP::SetUp() {
     _charge_assigner.set_apply_charges_to_molecule(1);
   }
 
-  _alogp.set_use_alcohol_for_acid(1);
   _alogp.set_label_with_atom_type(1);
+  _alogp.set_use_alcohol_for_acid(1);
   _alogp.set_rdkit_charged_nitrogen(1);
 }
 
@@ -125,7 +125,7 @@ TEST_P(TestAlogpP, TestMolecules) {
 
   ASSERT_TRUE(_mol.build_from_smiles(params.smiles));
 
-  _charge_assigner.process(_mol);
+  // _charge_assigner.process(_mol);
 
   std::optional<double> a = _alogp.LogP(_mol);
   ASSERT_NE(a, std::nullopt);
@@ -161,7 +161,7 @@ INSTANTIATE_TEST_SUITE_P(TestAlogpP, TestAlogpP, testing::Values(
   SmilesExpected{"OC(C)C isopropyl alcohol", 0.387, "[50OH][4CH]([1CH3])[1CH3]"},
   SmilesExpected{"o1cccc1 furan", 1.280, "[49o]1[18cH][18cH][18cH][18cH]1"},
   SmilesExpected{"s1cccc1 thiophene", 1.748, "[70s]1[18cH][18cH][18cH][18cH]1"},
-  SmilesExpected{"CC(=O)O acetic acid", 0.091, "[1CH3][5C](=[57O])[50O-]"},
+  SmilesExpected{"CC(=O)O acetic acid", 0.091, "[1CH3][5C](=[57O])[50OH]"},
   SmilesExpected{"CC=O acetaldehyde", 0.205, "[1CH3][5CH]=[57O]"},
   SmilesExpected{"CC#N acetonitrile", 0.530, "[1CH3][7C]#[42N]"},
   SmilesExpected{"C=C methene", 0.802, "[6CH2]=[6CH2]"},
@@ -172,20 +172,33 @@ INSTANTIATE_TEST_SUITE_P(TestAlogpP, TestAlogpP, testing::Values(
   SmilesExpected{"C=Cc1ccccc1 styrene", 2.330, "[6CH2]=[26CH][21c]1[18cH][18cH][18cH][18cH][18cH]1"},
 
   // We only get concordance with RDKit if we assume 2 Hydrogens on the N+.
-  SmilesExpected{"CN methylamine", -0.425, "[3CH3][34NH3+]"},
-  SmilesExpected{"CNC dimethyl methylamine", -0.164, "[3CH3][35NH2+][3CH3]"},
+  SmilesExpected{"CN methylamine", -0.425, "[3CH3][34NH2]"},
+  SmilesExpected{"CNC dimethyl methylamine", -0.164, "[3CH3][35NH][3CH3]"},
   SmilesExpected{"n1ccccc1 pyridine", 1.082, "[44n]1[18cH][18cH][18cH][18cH][18cH]1"},
   SmilesExpected{"[nH]1cccc1 pyrole", 1.015, "[44nH]1[18cH][18cH][18cH][18cH]1"},
   SmilesExpected{"Nc1ccccc1 aniline", 1.269, "[36NH2][22c]1[18cH][18cH][18cH][18cH][18cH]1"},
   SmilesExpected{"CNc1ccccc1 N-methylaniline", 1.728, "[3CH3][37NH][22c]1[18cH][18cH][18cH][18cH][18cH]1"},
   SmilesExpected{"CC=NC N-methylethanimine", 0.707, "[1CH3][5CH]=[39N][3CH3]"},
-  SmilesExpected{"CN(C)C trimethylamine", 0.178, "[3CH3][40NH+]([3CH3])[3CH3]"},
+  SmilesExpected{"CN(C)C trimethylamine", 0.178, "[3CH3][40N]([3CH3])[3CH3]"},
   SmilesExpected{"CN(C)c1ccccc1 N,N-dimethylaniline", 1.753, "[3CH3][41N]([3CH3])[22c]1[18cH][18cH][18cH][18cH][18cH]1"},
   SmilesExpected{"CNC(=O)C N-METHYLACETAMIDE", -0.248, "[3CH3][35NH][5C](=[57O])[1CH3]"},
   SmilesExpected{"CNC(=O)NC 1,3-DIMETHYLUREA", -0.455, "[3CH3][35NH][5C](=[59O])[35NH][3CH3]"},
   SmilesExpected{"O=C1NN=CN1 CHEMBL1865594", -0.902, "[56O]=[25c]1[44nH][44n][18cH][44nH]1"},
   SmilesExpected{"C1(=O)NC=CC=C1 CHEMBL662", 0.375, "[25c]1(=[56O])[44nH][18cH][18cH][18cH][18cH]1"},
-  SmilesExpected{"O=S(=O)NCC Ethanesulfonamide", -0.878, "[25c]1(=[56O])[44nH][18cH][18cH][18cH][18cH]1"},
+  SmilesExpected{"O=S(=O)NCC Ethanesulfonamide", -0.878, "[54O]=[69SH](=[54O])[35NH][3CH2][1CH3]"},
+  SmilesExpected{"C12=C(SNC1=O)CCNC2 CHEMBL171241", 0.082, "[21c]12[21c]([70s][44nH][25c]1=[56O])[10CH2][3CH2][35NH][10CH2]2"},
+  SmilesExpected{"C1=CC=C2C(=C1)NC=N2 benzimidazole", 1.563, "[18cH]1[18cH][18cH][19c]2[19c]([18cH]1)[44nH][18cH][44n]2"},
+  SmilesExpected{"S1C(=C(C=C1)NC(N)=N)C(=O)OC CHEMBL4299981", 0.840, "[70s]1[21c]([22c]([18cH][18cH]1)[37NH][5C]([34NH2])=[40NH])[5C](=[58O])[51O][3CH3]"},
+  SmilesExpected{"C(=O)(C1=CC=CC(=C1)Br)NCCN CHEMBL128615", 1.138, "[5C](=[58O])([21c]1[18cH][18cH][18cH][16c]([18cH]1)[64Br])[35NH][3CH2][3CH2][34NH2]"},
+  SmilesExpected{"O=N(=O)C1=CC(=CC(=C1)C(=O)N)N(=O)=O CHEMBL1437065", 0.602, "[53O]=[46N](=[53O])[22c]1[18cH][22c]([18cH][21c]([18cH]1)[5C](=[58O])[34NH2])[46N](=[53O])=[53O]"},
+  SmilesExpected{"C(=O)(C1=CC=C(C=C1)CC(C)C)NO CHEMBL439659", 2.004, "[5C](=[58O])([21c]1[18cH][18cH][21c]([18cH][18cH]1)[10CH2][2CH]([1CH3])[1CH3])[35NH][50OH]"},
+  SmilesExpected{"C1(=C(N=C(C)C2=C1N=CN(C2=C)CC)OC)C#N CHEMBL1836266", 2.236, "[21c]1([23c]([44n][21c]([8CH3])[21c]2[22c]1[39N]=[5CH][40N]([26C]2=[6CH2])[3CH2][1CH3])[52O][3CH3])[7C]#[42N]"},
+  SmilesExpected{"C12=CC(=NN1C(C)CN(C2=O)C1=CC=CC(=C1)OC)COC1=NC=C(Cl)C=C1 CHEMBL3617639", 3.741, "[21c]12[18cH][21c]([44n][44n]1[11CH]([1CH3])[3CH2][41N]([5C]2=[58O])[22c]1[18cH][18cH][18cH][23c]([18cH]1)[52O][3CH3])[10CH2][52O][23c]1[44n][18cH][15c]([63Cl])[18cH][18cH]1"},
+  SmilesExpected{"S(=O)(=O)(N(C)CC(=O)NCC1=CC=CC=N1)C1=CC(=CC=C1OC)C CHEMBL1736135", 1.336, "[69S](=[54O])(=[54O])([40N]([3CH3])[3CH2][5C](=[57O])[35NH][10CH2][21c]1[18cH][18cH][18cH][18cH][44n]1)[24c]1[18cH][21c]([18cH][18cH][23c]1[52O][3CH3])[8CH3]"},
+  SmilesExpected{"C12(C)C3(C(CC1C1CCC4=CC(=O)C=CC4(C)C1(F)C(O)C2)CN(C)O3)C(=O)COC(=O)C CHEMBL441963", 2.331, "[2C]12([1CH3])[4C]3([2CH]([1CH2][2CH]1[2CH]1[1CH2][1CH2][6C]4=[6CH][5C](=[57O])[6CH]=[6CH][2C]4([1CH3])[4C]1([62F])[4CH]([50OH])[1CH2]2)[3CH2][40N]([3CH3])[51O]3)[5C](=[57O])[3CH2][51O][5C](=[57O])[1CH3]"},
+  SmilesExpected{"C(=O)(N(NC(=O)C(C)NC(=O)C(C)NC(=O)N1CCNCC1)CC(=O)N)C1C(O1)C(=O)N(CC1=CC=CC=C1)CC1=CC=CC=C1 CHEMBL584157", -1.164, "[5C](=[57O])([40N]([35NH][5C](=[57O])[4CH]([1CH3])[35NH][5C](=[57O])[4CH]([1CH3])[35NH][5C](=[59O])[40N]1[3CH2][3CH2][35NH][3CH2][3CH2]1)[3CH2][5C](=[57O])[34NH2])[4CH]1[4CH]([51O]1)[5C](=[57O])[40N]([10CH2][21c]1[18cH][18cH][18cH][18cH][18cH]1)[10CH2][21c]1[18cH][18cH][18cH][18cH][18cH]1"},
+  SmilesExpected{"C1=C(C=CC(=C1)CN(SN1CCCCC1)N(C(=O)C1=CC(=CC(=C1)C)C)C(C)(C)C)CC CHEMBL2228842", 6.573, "[18cH]1[21c]([18cH][18cH][21c]([18cH]1)[10CH2][40N]([68S][40N]1[3CH2][1CH2][1CH2][1CH2][3CH2]1)[40N]([5C](=[58O])[21c]1[18cH][21c]([18cH][21c]([18cH]1)[8CH3])[8CH3])[4C]([1CH3])([1CH3])[1CH3])[10CH2][1CH3]"},
+  SmilesExpected{"C1(=O)C2=C(C(=O)C3=C1C=C(C=C3OCCC(C)C)NC(=O)CN=N#N)C(=CC=C2)OCCC(C)C CHEMBL4541126", 5.561, "[5C]1(=[58O])[21c]2[21c]([5C](=[58O])[21c]3[21c]1[18cH][22c]([18cH][23c]3[52O][3CH2][1CH2][2CH]([1CH3])[1CH3])[37NH][5C](=[57O])[3CH2][39N]=[47N]#[47N])[23c]([18cH][18cH][18cH]2)[52O][3CH2][1CH2][2CH]([1CH3])[1CH3]"},
   SmilesExpected{"C1(=S)C=CSS1 CHEMBL368700", 2.539, "[28c]1(=[68S])[18cH][18cH][70s][70s]1"}
 ));
 

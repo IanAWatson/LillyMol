@@ -14,6 +14,7 @@ cc_library(
         ":molecule",
         "//Molecule_Lib:iwmolecule",
         "//Molecule_Lib:moleculeio",
+        "//Molecule_Tools:alogp_lib",
         "//Molecule_Tools:xlogp_lib",
         "@pybind11",
         "@python",

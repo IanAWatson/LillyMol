@@ -915,6 +915,12 @@ class TestLillyMol(absltest.TestCase):
     self.assertTrue(m.build_from_smiles("CC(=O)OC1=CC=CC=C1C(=O)O aspirin"))
     self.assertAlmostEqual(xlogp(m), 1.426)
 
+  def test_alogp(self):
+    m = Molecule()
+    alogp = ALogP()
+    self.assertTrue(m.build_from_smiles("C(C)[C@@H](NC1=NC=C2C(=C1)C(=C(C#N)C=N2)NC1=CC(=C(F)C=C1)Cl)C1=CC=CC=C1 CHEMBL197382"))
+    self.assertAlmostEqual(alogp.logp(m), 6.601, places=3)
+
   def test_rotbond(self):
     m = Molecule()
     self.assertTrue(m.build_from_smiles("CC"))

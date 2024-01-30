@@ -31,6 +31,7 @@ PYBIND11_MAKE_OPAQUE(std::vector<int>);
 #include "Molecule_Lib/substructure.h"
 
 #include "Molecule_Tools/xlogp.h"
+#include "Molecule_Tools/alogp.h"
 
 #include "pybind/molecule.h"
 
@@ -1593,6 +1594,15 @@ PYBIND11_MODULE(lillymol, m)
     },
     "xlogp"
   );
+
+  py::class_<alogp::ALogP>(m, "ALogP")
+    .def(py::init<>())
+    .def("set_rdkit_phoshoric_acid_hydrogen", &alogp::ALogP::set_rdkit_phoshoric_acid_hydrogen,
+        "mimic RDKit in how Hydrogens on phosphoric acids are handled")
+    .def("set_use_alcohol_for_acid", &alogp::ALogP::set_use_alcohol_for_acid,
+        "mimic RDKit in how oxygen atoms in acids are handled")
+    .def("logp", &alogp::ALogP::LogP, "Compute alogp - or None")
+  ;
 
   // Rotatable bonds.
   py::enum_<quick_rotbond::QuickRotatableBonds::RotBond> (m, "RotBond")

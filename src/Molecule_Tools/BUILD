@@ -1802,6 +1802,9 @@ cc_library(
         "//Molecule_Lib:iwmolecule",
         "//Molecule_Lib:moleculeio",
     ],
+    visibility = [
+        "//visibility:public",
+    ],
 )
 
 #cc_library(

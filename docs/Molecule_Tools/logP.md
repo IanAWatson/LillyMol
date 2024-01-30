@@ -36,9 +36,13 @@ in aromaticity perception between RDKit and LillyMol. This is of course
 a much larger discussion and is not addressed here.
 
 Timing seems favorable. The computation for 20k molecules took about
-7 seconds with RDKit python, and about 0.5 seconds for the LillyMol C++
+8.6 seconds with RDKit python, and about 0.5 seconds for the LillyMol C++
 version. Computing alogp for all 2.24M molecules in a recent Chembl takes
 44 seconds.
+
+The LillyMol implementation is also available via python bindings, and
+the 20k molecules are computed in 1.1 seconds All of Chembl is processed
+in 1 minute 52 seconds, more than 2x slower than pure C++.
 
 ## XLogp Version 2
 This is version 2 of xlogp. Plans are underway to implement version 3.

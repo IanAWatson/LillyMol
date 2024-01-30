@@ -248,6 +248,7 @@ ALogP::AromaticCarbon(PerMoleculeData& pmd, atom_number_t zatom, float& result) 
 
   result += 0.08129;
   pmd.assigned[zatom] = kCS;
+  pmd.atom_value[zatom] = 0.08129;
 
   return 1;
 }
@@ -387,10 +388,18 @@ DoublyBondedTo(PerMoleculeData& pmd, atom_number_t zatom) {
 int
 ALogP::UnSaturatedCarbon(PerMoleculeData& pmd, atom_number_t zatom, float& result) {
   // C7 [CX2]#A acetylene, nitrile
-  if (pmd.triple_bond_count[zatom]) {
+  if (pmd.triple_bond_count[zatom] && pmd.formal_charge[zatom] == 0) {
     result += 0.00170;
     pmd.assigned[zatom] = kC7;
     pmd.atom_value[zatom] = 0.00170;
+    return 1;
+  }
+
+  // CS [C-]#N
+  if (pmd.formal_charge[zatom] == -1 && pmd.triple_bond_count[zatom]) {
+    result += 0.08129;
+    pmd.assigned[zatom] = kCS;
+    pmd.atom_value[zatom] = 0.08129;
     return 1;
   }
 
@@ -586,7 +595,7 @@ IsSulfonamide(const PerMoleculeData& pmd, atom_number_t zatom) {
 
 int
 ALogP::SinglyConnectedSaturatedNitrogen(PerMoleculeData& pmd, atom_number_t zatom, float& result) {
-  assert(pmd.mol.ncon() == 1);
+  assert(pmd.mol.ncon(zatom) == 1);
 
   if (pmd.attached_heteroatom_count[zatom] == 0 &&
       SaturatedNitrogenIsGuanidine(pmd, zatom)) {
@@ -642,7 +651,7 @@ ALogP::SinglyConnectedSaturatedNitrogen(PerMoleculeData& pmd, atom_number_t zato
 int
 ALogP::SaturatedNitrogen(PerMoleculeData& pmd, atom_number_t zatom, float& result) {
   const Atom& a = pmd.mol[zatom];
-  cerr << "SaturatedNitrogen " << pmd.mol.aromatic_smiles() << '\n';
+  // cerr << "SaturatedNitrogen " << pmd.mol.aromatic_smiles() << '\n';
 
   if (a.ncon() == 1) {
     return SinglyConnectedSaturatedNitrogen(pmd, zatom, result);
@@ -821,6 +830,15 @@ ALogP::UnSaturatedNitrogen(PerMoleculeData& pmd, atom_number_t zatom, float& res
     return 1;
   }
 
+  // N14 in [C-]#[N+]
+  if (a.ncon() == 2 && pmd.formal_charge[zatom] == 1 &&
+      pmd.triple_bond_count[zatom] == 1) {
+    result += 0.2887;
+    pmd.assigned[zatom] = kN14;
+    pmd.atom_value[zatom] = 0.2887;
+    return 1;
+  }
+
 
   // Nitro is assigned N13
   if (a.ncon() == 3 && pmd.double_bond_count[zatom] == 2 &&
@@ -916,12 +934,6 @@ ALogP::UnSaturatedOxygen(PerMoleculeData& pmd, atom_number_t zatom, float& resul
     return 1;
   }
 
-  if (pmd.z[o] != 6) {
-    if (_display_error_messages) {
-      cerr << "Unrecognised unsaturated oxygen " << Diagnostic(pmd, zatom) << '\n';
-    }
-  }
-
   // O11 carbonyl heteroatom
   if (pmd.z[o] == 6 && pmd.attached_heteroatom_count[o] == 3) {
     result += 0.4833;
@@ -1005,7 +1017,7 @@ ALogP::SaturatedOxygen(PerMoleculeData& pmd, atom_number_t zatom, float& result)
   const Atom& a = pmd.mol[zatom];
   const int acon = a.ncon();
 
-  cerr << "ALogP::SaturatedOxygen acid " << IsAcid(pmd, zatom) << '\n';
+  // cerr << "ALogP::SaturatedOxygen acid " << IsAcid(pmd, zatom) << '\n';
   // O12
   if (acon == 1 && IsAcid(pmd, zatom)) {
     if (_use_alcohol_for_acid) {
@@ -1357,29 +1369,31 @@ ALogP::AddHydrogenContributions(PerMoleculeData& pmd, float& result) {
     if (h == 0) {
       continue;
     }
+#ifdef DEBUG_ADD_HYDROGEN
     cerr << "atom " << i << " result so far " << result << '\n';
+#endif
 
     // H4
     if (IsHydrogenAcid(pmd, i)) {
       result += h * 0.2980;
-      cerr << "IsHydrogenAcid\n";
+      // cerr << "IsHydrogenAcid\n";
     } else if (IsPeroxide(pmd, i)) {   // H4
       result += h * 0.2980;
-      cerr << "IsPeroxide\n";
+      // cerr << "IsPeroxide\n";
     } else if (IsHydrogenAmine(pmd, i)) {  // H3
       result += h * 0.2142;
-      cerr << "IsHydrogenAmine\n";
+      // cerr << "IsHydrogenAmine\n";
     } else if (IsHydrogenAlcohol(pmd, i)) {  // H2
       result += h * -0.2677;
-      cerr << "IsHydrogenAlcohol\n";
+      // cerr << "IsHydrogenAlcohol\n";
     } else if (IsHydroCarbon(pmd, i)) {  // H1
       result += h * 0.1230;
-      cerr << "IsHydroCarbon\n";
+      // cerr << "IsHydroCarbon\n";
     } else {  // HS
       result += h * 0.1125;
-      cerr << "Default\n";
+      // cerr << "Default\n";
     }
-    cerr << " atom " << i << " h " << h << " result " << result << '\n';
+    // cerr << " atom " << i << " h " << h << " result " << result << '\n';
   }
 
   return 1;
@@ -1457,9 +1471,11 @@ ALogP::LogP(Molecule& m) {
     }
   }
 
+#ifdef DEBUG_ADD_HYDROGEN
   std::cerr << "Sum before adding hudrogens " << result << '\n';
+#endif
 
-#define ECHO_ATOMIC_CONTRIBUTIONS
+// #define ECHO_ATOMIC_CONTRIBUTIONS
 #ifdef ECHO_ATOMIC_CONTRIBUTIONS
   float sum = 0.0f;
   for (int i = 0; i < matoms; ++i) {

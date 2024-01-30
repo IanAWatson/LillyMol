@@ -1417,9 +1417,6 @@ ALogP::LogP(Molecule& m) {
     return SingleAtomSpecialCase(m);
   }
 
-  std::unique_ptr<int[]> already_done = std::make_unique<int[]>(matoms);
-  std::fill_n(already_done.get(), matoms, 0);
-
   m.compute_aromaticity_if_needed();
 
   PerMoleculeData pmd(m);
@@ -1475,7 +1472,7 @@ ALogP::LogP(Molecule& m) {
   std::cerr << "Sum before adding hudrogens " << result << '\n';
 #endif
 
-// #define ECHO_ATOMIC_CONTRIBUTIONS
+//#define ECHO_ATOMIC_CONTRIBUTIONS
 #ifdef ECHO_ATOMIC_CONTRIBUTIONS
   float sum = 0.0f;
   for (int i = 0; i < matoms; ++i) {

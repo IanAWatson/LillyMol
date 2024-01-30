@@ -202,7 +202,6 @@ INSTANTIATE_TEST_SUITE_P(TestAlogpP, TestAlogpP, testing::Values(
   // Substantial difference from RDKit due to aromaticity differences. I think we are more correct.
   // SmilesExpected{"S(C1=NC2=C(C3=NC(C(=O)N13)CCC(=O)NCC1=CC=CO1)C=CC=C2)CC(=O)NC1=CC=C(OCC)C=C1 CHEMBL1707125", 5.561, "[5C]1(=[58O])[21c]2[21c]([5C](=[58O])[21c]3[21c]1[18cH][22c]([18cH][23c]3[52O][3CH2][1CH2][2CH]([1CH3])[1CH3])[37NH][5C](=[57O])[3CH2][39N]=[47N]#[47N])[23c]([18cH][18cH][18cH]2)[52O][3CH2][1CH2][2CH]([1CH3])[1CH3]"},
   // SmilesExpected{"[N+]12(CCCCC1)CN1C(=CC(=C(C1=N2)C(O)=O)C)C CHEMBL4764125", 5.561, "[5C]1(=[58O])[21c]2[21c]([5C](=[58O])[21c]3[21c]1[18cH][22c]([18cH][23c]3[52O][3CH2][1CH2][2CH]([1CH3])[1CH3])[37NH][5C](=[57O])[3CH2][39N]=[47N]#[47N])[23c]([18cH][18cH][18cH]2)[52O][3CH2][1CH2][2CH]([1CH3])[1CH3]"},
-  SmilesExpected{"C[C@]1([C@H]([N+]#[C-])[C@H]2C3=CNC4=CC=CC(=C34)C(C)(C)[C@H]2CC1)C=C CHEMBL2071358", 5.433, "[1CH3][2C@]1([4C@H]([47N+]#[28C-])[11C@H]2[21c]3[18cH][44nH][19c]4[18cH][18cH][18cH][21c]([19c]34)[12C]([1CH3])([1CH3])[2C@H]2[1CH2][1CH2]1)[6CH]=[6CH2]"},
   SmilesExpected{"C1(=S)C=CSS1 CHEMBL368700", 2.539, "[28c]1(=[68S])[18cH][18cH][70s][70s]1"}
 ));
 

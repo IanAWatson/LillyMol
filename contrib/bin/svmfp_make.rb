@@ -330,7 +330,7 @@ else
   populate_metadata(model, fingerprints, response_name, cmdline.option_present('C'), flatten_sparse_fingerprints)
 
   model.threshold_b = get_threshold_b(model_file)
-  model.bit_subset = 'bit_xref.dat'
+  model.bit_subset = 'bit_subset.dat'
   model.bit_xref = bit_xref
   model.train_gfp = 'train.gfp'
   model.support_vectors = 'support_vectors.gfp'

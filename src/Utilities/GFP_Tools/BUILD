@@ -1,5 +1,6 @@
 load("@rules_proto//proto:defs.bzl", "proto_library")
 load("//build_deps:install.bzl", "local_install")
+load("@com_google_protobuf//:protobuf.bzl", "py_proto_library")
 
 local_install(
     name = "install",
@@ -89,6 +90,13 @@ cc_proto_library(
     name = "gfp_to_svm_lite_cc_proto",
     deps = [
         ":gfp_to_svm_lite_proto",
+    ],
+)
+
+py_proto_library(
+    name = "gfp_to_svm_lite_proto_py_proto",
+    srcs = [
+        "gfp_to_svm_lite.proto",
     ],
 )
 

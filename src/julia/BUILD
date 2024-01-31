@@ -10,6 +10,7 @@ cc_library (
         "//Molecule_Lib:moleculeio",
         "//Molecule_Lib:iwreaction",
         "//Molecule_Tools:xlogp_lib",
+        "//Molecule_Tools:alogp_lib",
         "@com_gitlab_libeigen_eigen//:eigen",
         "@libcxxwrap//:libcxxwrap",
         "@julia//:julia",

@@ -1,6 +1,5 @@
 #!/bin/bash
 here=$(dirname $0)
-echo $here
 if [[ ! -v LILLYMOL_HOME ]] ; then
   export LILLYMOL_HOME=$(dirname $(dirname $here))
 fi

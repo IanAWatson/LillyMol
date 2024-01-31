@@ -39,7 +39,9 @@ Usage(int rc) {
  -J ...      fingerprint output, enter '-J help' for info
  -f          function as a TDT filter
  -p <n>      number of bit replicates when generating fingerprint
- -Y ...      other options, enter '-Y help' for info
+ -Y ...      other ALogP options, enter '-Y help' for info
+ -l          reduce to largest fragment
+ -g ...      chemical standardisation options
  -v          verbose output
 )";
 // clang-format on
@@ -585,7 +587,7 @@ AlogPCalculation(Options& options,
 
 int
 Main(int argc, char** argv) {
-  Command_Line cl(argc, argv, "vE:H:N:T:A:lcg:i:fJ:U:Y:p:");
+  Command_Line cl(argc, argv, "vE:T:A:lcg:i:fJ:U:Y:p:");
 
   if (cl.unrecognised_options_encountered()) {
     cerr << "Unrecognised options encountered\n";

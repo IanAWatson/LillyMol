@@ -22,6 +22,7 @@
 #include "Molecule_Lib/target.h"
 
 #include "Molecule_Tools/xlogp.h"
+#include "Molecule_Tools/alogp.h"
 
 #include "julia/resizable_array_holder.h"
 
@@ -2004,6 +2005,19 @@ JLCXX_MODULE define_julia_module(jlcxx::Module& mod)
     }
   );
 
+  mod.add_type<alogp::ALogP>("alogp")
+    .method("logp",
+      [](alogp::ALogP& a, Molecule& m)->float {
+        std::optional<float> res = a.LogP(m);
+        if (! res) {
+          // Silently ignore failures for now...
+          return 0.0f;
+        }
+        return *res;
+      },
+      "Computes alogp"
+    )
+  ;
 
   // Substructre Related
   mod.add_type<SetOfEmbeddings>("SetOfEmbeddings")

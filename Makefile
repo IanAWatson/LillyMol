@@ -64,3 +64,6 @@ start_s3:
 	echo 'run s3 commannd with: aws s3 --endpoint "http://localhost:4566" <s3 command>'
 stop_s3:
 	docker-compose down
+
+install: default
+	echo "To install LillyMol set LILLYMOL_HOME and run the `install.sh` script in this directory" 

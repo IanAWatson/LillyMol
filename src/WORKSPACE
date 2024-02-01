@@ -191,7 +191,7 @@ cc_library(
 
 new_local_repository(
     name = "julia",
-    path = "/home/ian/third_party/julia-1.9.4",
+    path = "/home/ian/third_party/julia-1.10.0",
     build_file_content = """
 cc_library(
     name= "julia",

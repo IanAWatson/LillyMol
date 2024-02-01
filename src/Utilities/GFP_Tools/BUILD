@@ -117,6 +117,13 @@ cc_proto_library(
     ],
 )
 
+py_proto_library(
+    name = "nearneighbours_py_proto",
+    srcs = [
+        "nearneighbours.proto",
+    ],
+)
+
 cc_binary(
     name = "descriptor_file_to_01_fingerprints",
     srcs = [

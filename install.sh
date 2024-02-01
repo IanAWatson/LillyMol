@@ -50,3 +50,16 @@ for src in lib/*.so ; do
 done
 
 echo "Compiled Protos" >&2
+
+if [[ ! -d "${LILLYMOL_HOME}/proto" ]] ; then
+  mkdir -p "${LILLYMOL_HOME}/proto"
+fi
+
+for src in $(find src -name '*_pb2.py') ; do
+  name=$(basename $src)
+  dest="${LILLYMOL_HOME}/proto/${name}"
+  if [[ ! -s ${dest} || ${src} -nt ${dest} ]] ; then
+    cp -f $src $dest
+    echo $name
+  fi
+done

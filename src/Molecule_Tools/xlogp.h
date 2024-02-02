@@ -90,6 +90,7 @@ std::optional<double> XLogP(Molecule& m, int* status);
 // Do not use.
 
 void ForTestingSetApplyCorrections(int s);
+void TurnOffNitroxide();
 
 }  // namespace xlogp
 

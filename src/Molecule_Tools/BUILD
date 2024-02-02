@@ -3140,6 +3140,20 @@ cc_test(
     ]
 )
 
+cc_test(
+    name = "xlogp3_test",
+    srcs = [
+        "xlogp3_test.cc",
+    ],
+    deps = [
+        ":xlogp3_lib",
+        "//Molecule_Lib:iwmolecule",
+        "//Molecule_Lib:iwreaction",
+        "@googletest//:gtest_main",
+        "@googletest//:gtest",
+    ]
+)
+
 #cc_test(
 #    name = "rxn_to_openrxn_test",
 #    srcs = [

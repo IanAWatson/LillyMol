@@ -123,8 +123,11 @@ constexpr int kPositiveNitrogenJoinedN = 83;
 
 constexpr int kAmidine = 84;
 
+constexpr int kPdoubleO = 85;
+constexpr int kPdoubleS = 86;
+constexpr int kPsingleS = 87;
 // Always 1 larger than the highest defined index.
-constexpr int kMaxArrayIndex = 85;
+constexpr int kMaxArrayIndex = 88;
 
 double type_to_score[] = {
    0.0,    // 0
@@ -229,7 +232,16 @@ double type_to_score[] = {
    -1.70,  // 83
 
    // Amidine
-   -1.00   // 84
+   -1.00,   // 84
+
+   // P=O
+   -0.5,  // 85
+   // P=S 
+   3.0,   // 86
+
+   // P-S
+   -1.0  // 87
+   
 };
 
 constexpr int kFailed = -1;
@@ -285,6 +297,12 @@ ReadNewFragmentParameters(IWString& fname) {
 // By default we apply the corrections, but for testing it may be helpful
 // to be able to turn them off.
 int apply_corrections = 1;
+int apply_nitroxide = 1;
+
+void
+TurnOffNitroxide() {
+  apply_nitroxide = 0;
+}
 
 // for debugging it is helpful to get a detailed dump of what got assigned
 // to each atom.
@@ -873,6 +891,222 @@ IntraMolecularHBondCorrection(Molecule& m,
   return rc * 0.60;
 }
 
+// Return true if `zatom` is attached to an OH or [CH2][OH]
+int
+IsOh(Molecule& m, atom_number_t zatom,
+     const PerMoleculeData& per_molecule_data) {
+  for (const Bond* b : m[zatom]) {
+    const atom_number_t o = b->other(zatom);
+    if (per_molecule_data.ncon[o] == 1 &&
+        per_molecule_data.atomic_number[o] == 8) {
+      return 1;
+    }
+
+    if (per_molecule_data.ncon[o] == 2 &&
+        per_molecule_data.atomic_number[o] == 6 &&
+        per_molecule_data.ring_bond_count[o] == 0 &&
+        per_molecule_data.unsaturation[o] == 0) {
+      for (const Bond* b2 : m[o]) {
+        atom_number_t x = b2->other(o);
+        if (x == zatom) {
+          continue;
+        }
+
+        const atom_number_t o2 = b2->other(o);
+        if (per_molecule_data.atomic_number[o2] == 8 &&
+            per_molecule_data.ncon[o2] == 1) {
+          return 1;
+        }
+      }
+    }
+  }
+
+  return 0;
+}
+
+double
+Biphenyl(Molecule& m,
+      const PerMoleculeData& per_molecule_data,
+      const int* status) {
+  double rc = 0.0;
+
+  m.compute_aromaticity_if_needed();
+
+  for (const Bond* b : m.bond_list()) {
+    if (b->is_aromatic()) {
+      continue;
+    }
+
+    if (b->nrings()) {
+      continue;
+    }
+
+    atom_number_t a1 = b->a1();
+    atom_number_t a2 = b->a2();
+    if (per_molecule_data.aromatic[a1] && per_molecule_data.aromatic[a2]) {
+      rc += -0.21;
+    }
+  }
+
+  return rc;
+}
+
+
+double
+TButyl(Molecule& m,
+      const PerMoleculeData& per_molecule_data,
+      const int* status) {
+  double rc = 0.0;
+
+  const int matoms = m.natoms();
+  for (int i = 0; i < matoms; ++i) {
+    if (per_molecule_data.attached_carbons[i] != 4) {
+      continue;
+    }
+    if (per_molecule_data.atomic_number[i] != 6) {
+      continue;
+    }
+
+    int aromatic_attachment = 0;
+    int singly_connected_carbons = 0;
+    for (const Bond* b : m[i]) {
+      atom_number_t o = b->other(i);
+      if (per_molecule_data.aromatic[o]) {
+        ++aromatic_attachment;
+      } else if (per_molecule_data.ncon[o] == 1) {
+        ++singly_connected_carbons;
+      }
+    }
+
+    if (singly_connected_carbons != 3) {
+      continue;
+    }
+
+    if (aromatic_attachment) {
+      rc += -0.6;
+    } else {
+      rc += -0.1;
+    }
+  }
+
+  return rc;
+}
+
+// Observe errors with nitroxides
+double
+Nitro(Molecule& m,
+      const PerMoleculeData& per_molecule_data,
+      const int* status) {
+  double rc = 0.0;
+
+  const int matoms = m.natoms();
+  for (int i = 0; i < matoms; ++i) {
+    if (per_molecule_data.atomic_number[i] != 7) {
+      continue;
+    }
+    if (per_molecule_data.unsaturation[i] != 2) {
+      continue;
+    }
+    if (per_molecule_data.ncon[i] != 3) {
+      continue;
+    }
+
+    int doubly_bonded_oxygens = 0;
+    int aromatic_connection = 0;
+
+    for (const Bond* b : m[i]) {
+      atom_number_t o = b->other(i);
+      if (! b->is_double_bond()) {
+        if (per_molecule_data.aromatic[o]) {
+          aromatic_connection = 1;
+        }
+        continue;
+      }
+      if (per_molecule_data.atomic_number[o] != 8) {
+        continue;
+      }
+      ++doubly_bonded_oxygens;
+    }
+    if (doubly_bonded_oxygens != 2) {
+      continue;
+    }
+
+    if (aromatic_connection) {
+      rc += 0.09;
+    } else {
+      rc += -0.16;
+    }
+  }
+
+// #define DEBUG_NOTROXIDE
+#ifdef DEBUG_NOTROXIDE
+  if (rc != 0.0) {
+    cerr << m.smiles() << ' ' << m.name() << ' ' << rc << '\n';
+  }
+#endif
+
+  return rc;
+}
+
+// Look for ortho OH and C[OH] groups in `ring`.
+double
+CatecholLike(Molecule& m,
+             const Ring& ring,
+             const PerMoleculeData& per_molecule_data) {
+  int ring_size = ring.size();
+
+  int previous_was_oh = 0;
+
+  atom_number_t last_in_ring = ring.back();
+
+  if (per_molecule_data.ncon[last_in_ring] == 2) {
+    previous_was_oh = 0;
+  } else {
+    previous_was_oh = IsOh(m, last_in_ring, per_molecule_data);
+  }
+
+  int rc = 0;
+
+  for (int i = 0; i < ring_size; ++i) {
+    atom_number_t zatom = ring[i];
+
+    if (per_molecule_data.ncon[zatom] == 2) {
+      previous_was_oh = 0;
+      continue;
+    }
+
+    if (! IsOh(m, zatom, per_molecule_data)) {
+      previous_was_oh = 0;
+      continue;
+    }
+
+    if (! previous_was_oh) {
+      previous_was_oh = 1;
+      continue;
+    }
+
+    ++rc;
+    // Deliberate choice to reset - so we do not perceive too many of these.
+    previous_was_oh = 0;
+  }
+
+  return rc * 0.53;
+}
+
+// Obseve that various catechol and catechol-like things are poorly
+// predicted.
+double
+CatecholLike(Molecule& m,
+             const PerMoleculeData& per_molecule_data,
+             const int* status) {
+  double rc = 0.0;
+  for (const Ring* r : m.sssr_rings()) {
+    rc += CatecholLike(m, *r, per_molecule_data);
+  }
+
+  return rc;
+}
+
 // Note that this deliberately matches guanidine forms.
 // `n1` is the =N in an amidine or ganidine.
 bool
@@ -945,6 +1179,12 @@ Corrections(Molecule& m,
   rc += IntraMolecularHBondCorrection(m, per_molecule_data, status);
   rc += HalogenCorrection(m, per_molecule_data, status);
   rc += AmidineCorrection(m, per_molecule_data, status);
+  rc += CatecholLike(m, per_molecule_data, status);
+  rc += Nitro(m, per_molecule_data, status);
+  rc += TButyl(m, per_molecule_data, status);
+  if (apply_nitroxide) {
+    rc += Biphenyl(m, per_molecule_data, status);
+  }
 
   return rc;
 }
@@ -1667,17 +1907,64 @@ IdentifySulphur(Molecule& m,
   return rc;
 }
 
+// The atoms in `double_bond` are doubly bonded to `zatom` which is Phosphorus.
+std::optional<double>
+ClassifyUnsaturatedPhosphorus(const Molecule& m,
+                              atom_number_t zatom,
+                              const Set_of_Atoms& double_bond,
+                              const PerMoleculeData& per_molecule_data,
+                              int* status) {
+  for (const atom_number_t o : double_bond) {
+    if (per_molecule_data.atomic_number[o] == 16) {
+    }
+  }
+
+  status[zatom] = kPdoubleO;
+  return type_to_score[kPdoubleO];
+}
+
 std::optional<double>
 ClassifyPhosphorus(const Molecule& m,
                 atom_number_t zatom,
                 const PerMoleculeData& per_molecule_data,
                 int * status) {
+  atom_number_t singly_bonded_sulphur = kInvalidAtomNumber;
+  atom_number_t doubly_bonded_sulphur = kInvalidAtomNumber;
+  Set_of_Atoms double_bond, single_bond;
   for (const Bond* b : m[zatom]) {
-    if (! b->is_single_bond()) {
-      continue;
+    atom_number_t o = b->other(zatom);
+
+    if (b->is_double_bond()) {
+      double_bond << o;
+    } else {
+      single_bond << o;
     }
 
-    atom_number_t o = b->other(zatom);
+    if (per_molecule_data.atomic_number[o] != 16) {
+    } else if (b->is_single_bond()) {
+      singly_bonded_sulphur = o;
+    } else {
+      doubly_bonded_sulphur = o;
+    }
+  }
+
+  if (doubly_bonded_sulphur != kInvalidAtomNumber) {
+    status[zatom] = kPdoubleS;
+    return  type_to_score[kPdoubleS];
+  }
+
+  if (double_bond.size()) {
+    if (singly_bonded_sulphur != kInvalidAtomNumber) {
+      status[zatom] = kPsingleS;
+      return type_to_score[kPsingleS];
+    }
+
+    return ClassifyUnsaturatedPhosphorus(m, zatom, double_bond, per_molecule_data, status);
+  }
+
+  // If any of the singly bonded atoms is an oxygen, classify.
+
+  for (atom_number_t o : single_bond) {
     if (per_molecule_data.atomic_number[o] == 8) {
       status[zatom] = kPhosphorus;
       return  type_to_score[kPhosphorus];

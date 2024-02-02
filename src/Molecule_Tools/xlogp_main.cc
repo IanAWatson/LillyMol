@@ -37,6 +37,8 @@ Usage(int rc) {
   cerr << R"(Implementation of xlogp, Wang, Fu, Lai\n";
  -X <fname>  XLogP::XlogpParameters text proto with updated fragment contribution values.
  -3          use version 3 xlogp computation
+ -M          use simplistic equation from Mannhold, Poda, Ostermann and Tetek
+             logp = 1.46 + 0.11*carbon + - 0.11*heteratoms
  -J ...      fingerprint output, enter '-J help' for info
  -f          function as a TDT filter
  -y          display atom assignments - helpful for debugging
@@ -69,6 +71,8 @@ class Options {
     Element_Transformations _element_transformations;
 
     int _version3 = 0;
+
+    int _mannhold = 0;
 
     int _molecules_read = 0;
     int _successful_calculations = 0;
@@ -224,6 +228,13 @@ Options::Initialise(Command_Line& cl) {
     }
   }
 
+  if (cl.option_present('M')) {
+    _mannhold = 1;
+    if (_verbose) {
+      cerr << "Will use the simplistic version of Mannhold et al\n";
+    }
+  }
+
   if (cl.option_present('Y')) {
     const_IWSubstring y;
     for (int i = 0; cl.value('Y', y, i); ++i) {
@@ -302,7 +313,12 @@ Options::Report(std::ostream& output) const {
   }
 
   constexpr char kTab = '\t';
-  output << "xlogp" << kTab << 'N' << kTab << "Fraction\n";
+  if (_version3)  {
+    output << "xlogp3";
+  } else {
+    output << "xlogp2";
+  }
+  output << kTab << 'N' << kTab << "Fraction\n";
   for (int i = 0; i < bstop; ++i) {
     output << (-5 + i) << kTab << _bucket[i] << kTab <<
            static_cast<float>(_bucket[i]) / static_cast<float>(tot) << '\n';
@@ -481,7 +497,14 @@ Options::ProcessFailedCalculaton(Molecule& m,
 int
 Options::PerformAnyFirstMoleculeRelated(IWString_and_File_Descriptor& output) {
   if (_produce_descriptor_file) {
-    output << "Id" << _output_separator << "xlogp\n";
+    output << "Id" << _output_separator;
+    if (_version3) {
+      output << "xlogp3\n";
+    } else if (_mannhold) {
+      output << "mannhold\n";
+    } else {
+      output << "xlogp2\n";
+    }
   }
 
   return 1;
@@ -499,6 +522,10 @@ Options::Process(Molecule& m, IWString_and_File_Descriptor& output) {
   std::optional<double> x;
   if (_version3) {
     x = xlogp3::XLogP(m, status.get());
+  } else if (_mannhold) {
+    const int ncarbon = m.natoms(6);
+    const int heteroatoms = m.natoms() - ncarbon;
+    x = 1.46 + 0.11 * ncarbon - 0.11 * heteroatoms;
   } else {
     x = XLogP(m, status.get());
   }
@@ -620,7 +647,7 @@ XlogPCalculation(Options& options,
 
 int
 Main(int argc, char** argv) {
-  Command_Line cl(argc, argv, "vE:T:A:lcg:i:fJ:U:X:yY:p:3S:");
+  Command_Line cl(argc, argv, "vE:T:A:lcg:i:fJ:U:X:yY:p:3S:MC:");
 
   if (cl.unrecognised_options_encountered()) {
     cerr << "Unrecognised options encountered\n";
@@ -678,6 +705,13 @@ Main(int argc, char** argv) {
     input_type = FILE_TYPE_SMI;
   } else if (! all_files_recognised_by_suffix(cl)) {
     return 1;
+  }
+
+  if (cl.option_present('C')) {
+    const_IWSubstring c;
+    for (int i = 0; cl.value('C', c, i); ++i) {
+      TurnOffNitroxide();
+    }
   }
 
   if (cl.empty()) {

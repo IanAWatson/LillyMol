@@ -40,40 +40,40 @@ struct PerMoleculeData {
     atom_number_t Exocyclic(atom_number_t zatom) const;
     atom_number_t DoublyBonded(atom_number_t zatom) const;
 
-    int IdentifyGroups(float& result);
-    int IsCyano(atom_number_t zatom, float& result);
-    int IsDiazo(atom_number_t zatom, float& result);
-    int IsNitro(atom_number_t zatom, float& result);
-    int IsNOxide(atom_number_t zatom, float& result);
+    int IdentifyGroups(double& result);
+    int IsCyano(atom_number_t zatom, double& result);
+    int IsDiazo(atom_number_t zatom, double& result);
+    int IsNitro(atom_number_t zatom, double& result);
+    int IsNOxide(atom_number_t zatom, double& result);
 
-    int AromaticCarbon(atom_number_t zatom, float& result);
-    int SaturatedCarbonCh0(atom_number_t zatom, float& result);
-    int SaturatedCarbonCh1(atom_number_t zatom, float& result);
-    int SaturatedCarbonCh2(atom_number_t zatom, float& result);
-    int SaturatedCarbonCh3(atom_number_t zatom, float& result);
-    int UnSaturatedCarbonH2(atom_number_t zatom, float& result);
-    int UnSaturatedCarbonH1(atom_number_t zatom, float& result);
-    int UnSaturatedCarbonH0(atom_number_t zatom, float& result);
-    int SaturatedCarbon(atom_number_t zatom, float& result);
-    int UnSaturatedCarbon(atom_number_t zatom, float& result);
-    int Carbon(atom_number_t zatom, float& result);
-    int Oxygen(atom_number_t zatom, float& result);
-    int SaturatedOxygen(atom_number_t zatom, float& result);
-    int UnSaturatedOxygen(atom_number_t zatom, float& result);
-    int AromaticNitrogen5(atom_number_t zatom, float& result);
-    int AromaticNitrogen6(atom_number_t zatom, float& result);
-    int AromaticNitrogen(atom_number_t zatom, float& result);
-    int SaturatedNitrogen(atom_number_t zatom, float& result);
-    int UnSaturatedNitrogen(atom_number_t zatom, float& result);
-    int Nitrogen(atom_number_t zatom, float& result);
-    int Fluorine(atom_number_t zatom, float& result);
-    int Phosphorus(atom_number_t zatom, float& result);
-    int Sulphur(atom_number_t zatom, float& result);
-    int SaturatedSulphur(atom_number_t zatom, float& result);
-    int UnSaturatedSulphur(atom_number_t zatom, float& result);
-    int Chlorine(atom_number_t zatom, float& result);
-    int Bromine(atom_number_t zatom, float& result);
-    int Iodine(atom_number_t zatom, float& result);
+    int AromaticCarbon(atom_number_t zatom, double& result);
+    int SaturatedCarbonCh0(atom_number_t zatom, double& result);
+    int SaturatedCarbonCh1(atom_number_t zatom, double& result);
+    int SaturatedCarbonCh2(atom_number_t zatom, double& result);
+    int SaturatedCarbonCh3(atom_number_t zatom, double& result);
+    int UnSaturatedCarbonH2(atom_number_t zatom, double& result);
+    int UnSaturatedCarbonH1(atom_number_t zatom, double& result);
+    int UnSaturatedCarbonH0(atom_number_t zatom, double& result);
+    int SaturatedCarbon(atom_number_t zatom, double& result);
+    int UnSaturatedCarbon(atom_number_t zatom, double& result);
+    int Carbon(atom_number_t zatom, double& result);
+    int Oxygen(atom_number_t zatom, double& result);
+    int SaturatedOxygen(atom_number_t zatom, double& result);
+    int UnSaturatedOxygen(atom_number_t zatom, double& result);
+    int AromaticNitrogen5(atom_number_t zatom, double& result);
+    int AromaticNitrogen6(atom_number_t zatom, double& result);
+    int AromaticNitrogen(atom_number_t zatom, double& result);
+    int SaturatedNitrogen(atom_number_t zatom, double& result);
+    int UnSaturatedNitrogen(atom_number_t zatom, double& result);
+    int Nitrogen(atom_number_t zatom, double& result);
+    int Fluorine(atom_number_t zatom, double& result);
+    int Phosphorus(atom_number_t zatom, double& result);
+    int Sulphur(atom_number_t zatom, double& result);
+    int SaturatedSulphur(atom_number_t zatom, double& result);
+    int UnSaturatedSulphur(atom_number_t zatom, double& result);
+    int Chlorine(atom_number_t zatom, double& result);
+    int Bromine(atom_number_t zatom, double& result);
+    int Iodine(atom_number_t zatom, double& result);
 
   public:
     PerMoleculeData(Molecule& m);
@@ -186,6 +186,9 @@ PerMoleculeData::IsLiphphilic(int* visited) {
 
     for (const Bond* b : mol[i]) {
       atom_number_t o = b->other(i);
+      if (visited[o]) {
+        continue;
+      }
       if (conjugated[o]) {
         return 0;
       }
@@ -208,7 +211,8 @@ PerMoleculeData::IsLiphphilic(int* visited) {
     }
   }
 
-  return 0;
+  // return OK, no problems encountered.
+  return 1;
 }
 
 // The paper defines a lipophilic atom as something that
@@ -247,7 +251,7 @@ PerMoleculeData::IdentifyLipophilic() {
 }
 
 int
-PerMoleculeData::IsNitro(atom_number_t zatom, float& result) {
+PerMoleculeData::IsNitro(atom_number_t zatom, double& result) {
   if (ncon[zatom] != 3) {
     return 0;
   }
@@ -290,7 +294,7 @@ PerMoleculeData::IsNitro(atom_number_t zatom, float& result) {
 }
 
 int
-PerMoleculeData::IsCyano(atom_number_t zatom, float& result) {
+PerMoleculeData::IsCyano(atom_number_t zatom, double& result) {
   if (ncon[zatom] != 1) {
     return 0;
   }
@@ -314,7 +318,7 @@ PerMoleculeData::IsCyano(atom_number_t zatom, float& result) {
 }
 
 int
-PerMoleculeData::IsDiazo(atom_number_t zatom, float& result) {
+PerMoleculeData::IsDiazo(atom_number_t zatom, double& result) {
   if (ncon[zatom] != 2) {
     return 0;
   }
@@ -356,7 +360,7 @@ PerMoleculeData::IsDiazo(atom_number_t zatom, float& result) {
 }
 
 int
-PerMoleculeData::IsNOxide(atom_number_t zatom, float& result) {
+PerMoleculeData::IsNOxide(atom_number_t zatom, double& result) {
   if (conjugated[zatom]) {
     return 0;
   }
@@ -385,7 +389,7 @@ PerMoleculeData::IsNOxide(atom_number_t zatom, float& result) {
 // Place into the atom_assigned array any atoms that are covered by
 // the groups defined in the paper.
 int
-PerMoleculeData::IdentifyGroups(float& result) {
+PerMoleculeData::IdentifyGroups(double& result) {
   const int matoms = mol.natoms();
   int rc = 0;
   for (int i = 0; i < matoms; ++i) {
@@ -423,7 +427,7 @@ PerMoleculeData::Exocyclic(atom_number_t zatom) const {
 }
 
 int
-PerMoleculeData::AromaticCarbon(atom_number_t zatom, float& result) {
+PerMoleculeData::AromaticCarbon(atom_number_t zatom, double& result) {
   const int hcount = mol.hcount(zatom);
   if (hcount && attached_heteroatom_count[zatom] == 0) {
     atom_assigned[zatom] = kCarh;  // 20
@@ -485,7 +489,7 @@ PerMoleculeData::AromaticCarbon(atom_number_t zatom, float& result) {
 }
 
 int
-PerMoleculeData::UnSaturatedCarbonH2(atom_number_t zatom, float& result) {
+PerMoleculeData::UnSaturatedCarbonH2(atom_number_t zatom, double& result) {
   atom_assigned[zatom] = kC2hc; // 29
   result += 0.3214;
   return 1;
@@ -503,7 +507,7 @@ PerMoleculeData::DoublyBonded(atom_number_t zatom) const {
 }
 
 int
-PerMoleculeData::UnSaturatedCarbonH1(atom_number_t zatom, float& result) {
+PerMoleculeData::UnSaturatedCarbonH1(atom_number_t zatom, double& result) {
   atom_number_t o = DoublyBonded(zatom);
   assert(o != kInvalidAtomNumber);
 
@@ -538,7 +542,7 @@ PerMoleculeData::UnSaturatedCarbonH1(atom_number_t zatom, float& result) {
 }
 
 int
-PerMoleculeData::UnSaturatedCarbonH0(atom_number_t zatom, float& result) {
+PerMoleculeData::UnSaturatedCarbonH0(atom_number_t zatom, double& result) {
   atom_number_t o = DoublyBonded(zatom);
   assert(o != kInvalidAtomNumber);
 
@@ -577,7 +581,7 @@ PerMoleculeData::UnSaturatedCarbonH0(atom_number_t zatom, float& result) {
 }
 
 int
-PerMoleculeData::UnSaturatedCarbon(atom_number_t zatom, float& result) {
+PerMoleculeData::UnSaturatedCarbon(atom_number_t zatom, double& result) {
   if (ncon[zatom] == 2 && double_bond_count[zatom] == 2) {
     atom_assigned[zatom] = kC1d;  // 37
     result += -0.5879;
@@ -603,7 +607,7 @@ PerMoleculeData::UnSaturatedCarbon(atom_number_t zatom, float& result) {
 }
 
 int
-PerMoleculeData::SaturatedCarbonCh3(atom_number_t zatom, float& result) {
+PerMoleculeData::SaturatedCarbonCh3(atom_number_t zatom, double& result) {
   assert(ncon[zatom] == 1);
   if (connected_to_conjugated[zatom] && attached_heteroatom_count[zatom]) {
     atom_assigned[zatom] = kCh3XPi;  // 2
@@ -629,7 +633,7 @@ PerMoleculeData::SaturatedCarbonCh3(atom_number_t zatom, float& result) {
 }
 
 int
-PerMoleculeData::SaturatedCarbonCh2(atom_number_t zatom, float& result) {
+PerMoleculeData::SaturatedCarbonCh2(atom_number_t zatom, double& result) {
   if (connected_to_conjugated[zatom] && attached_heteroatom_count[zatom]) {
     atom_assigned[zatom] = kC32hxpi;  // 7
     result += -0.2441;
@@ -652,7 +656,7 @@ PerMoleculeData::SaturatedCarbonCh2(atom_number_t zatom, float& result) {
 }
 
 int
-PerMoleculeData::SaturatedCarbonCh1(atom_number_t zatom, float& result) {
+PerMoleculeData::SaturatedCarbonCh1(atom_number_t zatom, double& result) {
   if (connected_to_conjugated[zatom] && attached_heteroatom_count[zatom]) {
     atom_assigned[zatom] = kC3hxpi;  // 11
     result += -0.3711;
@@ -675,7 +679,7 @@ PerMoleculeData::SaturatedCarbonCh1(atom_number_t zatom, float& result) {
 }
 
 int
-PerMoleculeData::SaturatedCarbonCh0(atom_number_t zatom, float& result) {
+PerMoleculeData::SaturatedCarbonCh0(atom_number_t zatom, double& result) {
   if (connected_to_conjugated[zatom] && attached_heteroatom_count[zatom]) {
     atom_assigned[zatom] = kC3xpi;  // 15
     result += -0.5475;
@@ -698,15 +702,15 @@ PerMoleculeData::SaturatedCarbonCh0(atom_number_t zatom, float& result) {
 }
 
 int
-PerMoleculeData::SaturatedCarbon(atom_number_t zatom, float& result) {
+PerMoleculeData::SaturatedCarbon(atom_number_t zatom, double& result) {
   if (lipophilic[zatom] && ncon[zatom] == 1) {
     atom_assigned[zatom] = kLipophilicCH3; // 1
     result += 0.7896;
     return 1;
   }
   if (lipophilic[zatom] && ncon[zatom] == 2) {
-    atom_assigned[zatom] = kLipophilicCH3; // 1
-    result += 0.7896;
+    atom_assigned[zatom] = kC32h_lipo; // 6
+    result += 0.5240;
     return 1;
   }
 
@@ -727,7 +731,7 @@ PerMoleculeData::SaturatedCarbon(atom_number_t zatom, float& result) {
 }
 
 int
-PerMoleculeData::Carbon(atom_number_t zatom, float& result) {
+PerMoleculeData::Carbon(atom_number_t zatom, double& result) {
   if (aromatic[zatom]) {
     return AromaticCarbon(zatom, result);
   }
@@ -739,7 +743,7 @@ PerMoleculeData::Carbon(atom_number_t zatom, float& result) {
 }
 
 int
-PerMoleculeData::AromaticNitrogen6(atom_number_t zatom, float& result) {
+PerMoleculeData::AromaticNitrogen6(atom_number_t zatom, double& result) {
   if (attached_heteroatom_count[zatom] == 2) {
     atom_assigned[zatom] = kNarx2;  // 48
     result += -0.2167;
@@ -758,7 +762,7 @@ PerMoleculeData::AromaticNitrogen6(atom_number_t zatom, float& result) {
 }
 
 int
-PerMoleculeData::AromaticNitrogen5(atom_number_t zatom, float& result) {
+PerMoleculeData::AromaticNitrogen5(atom_number_t zatom, double& result) {
   int hcount = mol.hcount(zatom);
 
   if (hcount && attached_heteroatom_count[zatom] == 1) {
@@ -797,7 +801,7 @@ PerMoleculeData::AromaticNitrogen5(atom_number_t zatom, float& result) {
 }
 
 int
-PerMoleculeData::AromaticNitrogen(atom_number_t zatom, float& result) {
+PerMoleculeData::AromaticNitrogen(atom_number_t zatom, double& result) {
   const Ring* r = mol.ring_containing_atom(zatom);
   assert (r != nullptr);
 
@@ -864,7 +868,7 @@ DoublyBondedTo(const Molecule& m, atom_number_t zatom) {
 }
 
 int
-PerMoleculeData::UnSaturatedNitrogen(atom_number_t zatom, float& result) {
+PerMoleculeData::UnSaturatedNitrogen(atom_number_t zatom, double& result) {
   if (mol.hcount(zatom)) {
     atom_assigned[zatom] = kN2h; // 56
     result += 0.6927;
@@ -891,7 +895,7 @@ PerMoleculeData::UnSaturatedNitrogen(atom_number_t zatom, float& result) {
 }
 
 int
-PerMoleculeData::SaturatedNitrogen(atom_number_t zatom, float& result) {
+PerMoleculeData::SaturatedNitrogen(atom_number_t zatom, double& result) {
   if (IsAmide(zatom)) {
     if (ncon[zatom] == 1) {
       atom_assigned[zatom] = kNam2h;  // 39
@@ -957,7 +961,7 @@ PerMoleculeData::SaturatedNitrogen(atom_number_t zatom, float& result) {
 }
 
 int
-PerMoleculeData::Nitrogen(atom_number_t zatom, float& result) {
+PerMoleculeData::Nitrogen(atom_number_t zatom, double& result) {
   if (aromatic[zatom]) {
     return AromaticNitrogen(zatom, result);
   }
@@ -970,7 +974,7 @@ PerMoleculeData::Nitrogen(atom_number_t zatom, float& result) {
 }
 
 int
-PerMoleculeData::UnSaturatedOxygen(atom_number_t zatom, float& result) {
+PerMoleculeData::UnSaturatedOxygen(atom_number_t zatom, double& result) {
   if (attached_heteroatom_count[zatom]) {
     atom_assigned[zatom] = kO2c;  // 65
     result += 0.7148;
@@ -983,7 +987,7 @@ PerMoleculeData::UnSaturatedOxygen(atom_number_t zatom, float& result) {
 }
 
 int
-PerMoleculeData::SaturatedOxygen(atom_number_t zatom, float& result) {
+PerMoleculeData::SaturatedOxygen(atom_number_t zatom, double& result) {
   if (ncon[zatom] == 1) {
     if (connected_to_conjugated[zatom]) {
       atom_assigned[zatom] = kO3hpi;
@@ -1010,7 +1014,7 @@ PerMoleculeData::SaturatedOxygen(atom_number_t zatom, float& result) {
 }
 
 int
-PerMoleculeData::Oxygen(atom_number_t zatom, float& result) {
+PerMoleculeData::Oxygen(atom_number_t zatom, double& result) {
   if (aromatic[zatom]) {
     atom_assigned[zatom] = kOar;
     result += 0.5238;
@@ -1025,7 +1029,7 @@ PerMoleculeData::Oxygen(atom_number_t zatom, float& result) {
 }
 
 int
-PerMoleculeData::SaturatedSulphur(atom_number_t zatom, float& result) {
+PerMoleculeData::SaturatedSulphur(atom_number_t zatom, double& result) {
   if (ncon[zatom] == 1 && single_bond_count[zatom] == 1) {
     atom_assigned[zatom] = kS3h;  // 67
     result += 0.4927;
@@ -1061,7 +1065,7 @@ PerMoleculeData::DoublyBonded(atom_number_t zatom, atomic_number_t target) const
 }
 
 int
-PerMoleculeData::UnSaturatedSulphur(atom_number_t zatom, float& result) {
+PerMoleculeData::UnSaturatedSulphur(atom_number_t zatom, double& result) {
   int doubly_bonded_oxygens = DoublyBonded(zatom, 8);
 
   if (doubly_bonded_oxygens >= 2) {
@@ -1088,7 +1092,7 @@ PerMoleculeData::UnSaturatedSulphur(atom_number_t zatom, float& result) {
 }
 
 int
-PerMoleculeData::Sulphur(atom_number_t zatom, float& result) {
+PerMoleculeData::Sulphur(atom_number_t zatom, double& result) {
   if (aromatic[zatom]) {
     atom_assigned[zatom] = kSar;  // 68
     result += 1.1715;
@@ -1103,14 +1107,14 @@ PerMoleculeData::Sulphur(atom_number_t zatom, float& result) {
 }
 
 int
-PerMoleculeData::Phosphorus(atom_number_t zatom, float& result) {
+PerMoleculeData::Phosphorus(atom_number_t zatom, double& result) {
   atom_assigned[zatom] = kP3;
   result += -0.6694;
   return 1;
 }
 
 int
-PerMoleculeData::Fluorine(atom_number_t zatom, float& result) {
+PerMoleculeData::Fluorine(atom_number_t zatom, double& result) {
   atom_number_t o = first_atom_attached[zatom];
   if (conjugated[o]) {
     atom_assigned[zatom] = kFpi;
@@ -1124,7 +1128,7 @@ PerMoleculeData::Fluorine(atom_number_t zatom, float& result) {
 }
 
 int
-PerMoleculeData::Chlorine(atom_number_t zatom, float& result) {
+PerMoleculeData::Chlorine(atom_number_t zatom, double& result) {
   atom_number_t o = first_atom_attached[zatom];
   if (conjugated[o]) {
     atom_assigned[zatom] = kClpi;
@@ -1138,7 +1142,7 @@ PerMoleculeData::Chlorine(atom_number_t zatom, float& result) {
 }
 
 int
-PerMoleculeData::Bromine(atom_number_t zatom, float& result) {
+PerMoleculeData::Bromine(atom_number_t zatom, double& result) {
   atom_number_t o = first_atom_attached[zatom];
   if (conjugated[o]) {
     atom_assigned[zatom] = kBrpi;
@@ -1152,7 +1156,7 @@ PerMoleculeData::Bromine(atom_number_t zatom, float& result) {
 }
 
 int
-PerMoleculeData::Iodine(atom_number_t zatom, float& result) {
+PerMoleculeData::Iodine(atom_number_t zatom, double& result) {
   atom_number_t o = first_atom_attached[zatom];
   if (conjugated[o]) {
     atom_assigned[zatom] = kIpi;
@@ -1166,7 +1170,7 @@ PerMoleculeData::Iodine(atom_number_t zatom, float& result) {
 }
 
 int
-XLogPAtom(PerMoleculeData& pmd, atom_number_t zatom, float& result) {
+XLogPAtom(PerMoleculeData& pmd, atom_number_t zatom, double& result) {
   atomic_number_t z = pmd.z[zatom];
   if (z == 6) {
     return pmd.Carbon(zatom, result);
@@ -1211,7 +1215,7 @@ XLogP(Molecule& m, int* status) {
   PerMoleculeData pmd(m);
   pmd.atom_assigned = status;
 
-  float result = 0.0f;
+  double result = 0.0f;
   pmd.IdentifyGroups(result);
 
   for (int i = 0; i < matoms; ++i) {

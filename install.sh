@@ -21,6 +21,12 @@ for src in bin/$(uname)/* ; do
   fi
 done
 
+# Special processing for outside Lilly and svmfp models.
+if [[ $(hostname -d) =~ 'lilly.com' ]] ; then
+else
+  cp ${LILLYMOL_HOME}/bin/$(uname)/gfp_to_svm_lite_v3 ${LILLYMOL_HOME}/bin/$(uname)/gfp_to_svm_lite
+fi
+
 echo 'Scripts' >&2
 for src in contrib/bin/*.{sh,rb,py,pl} ; do
   name=$(basename $src)
@@ -33,6 +39,9 @@ done
 
 echo 'Data' >&2
 cp -r data ${LILLYMOL_HOME}
+
+echo 'Lib' >@2
+cp -f bin/lib ${LILLYMOL_HOME}/bin
 
 libdir="${LILLYMOL_HOME}/lib"
 if [[ ! -d "${libdir}" ]] ; then

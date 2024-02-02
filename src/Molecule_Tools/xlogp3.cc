@@ -99,7 +99,7 @@ PerMoleculeData::PerMoleculeData(Molecule& m) : mol(m) {
   connected_to_conjugated = new_int(matoms);
   first_atom_attached = new atom_number_t[matoms];
 
-  atom_assigned = new_int(matoms);
+  atom_assigned = nullptr;
 
   for (int i = 0; i < matoms; ++i) {
     ring_bond_count[i] = m.ring_bond_count(i);
@@ -299,7 +299,9 @@ PerMoleculeData::IsCyano(atom_number_t zatom, float& result) {
   }
 
   atom_number_t carbon = first_atom_attached[zatom];
-  if (z[carbon] != 6) {
+  if (z[carbon] == 6) {
+  } else if (z[carbon] == 7) {  // allow N#N=
+  } else {
     return 0;
   }
 
@@ -531,6 +533,7 @@ PerMoleculeData::UnSaturatedCarbonH1(atom_number_t zatom, float& result) {
   }
 
   cerr << "Unrecognised UnSaturatedCarbonH1 " << mol.smarts_equivalent_for_atom(zatom) << '\n';
+  atom_assigned[zatom] = kFailed;
   return 0;
 }
 
@@ -789,6 +792,7 @@ PerMoleculeData::AromaticNitrogen5(atom_number_t zatom, float& result) {
   }
 
   cerr << "Unrecognised aromatic 5 " << mol.smarts_equivalent_for_atom(zatom) << '\n';
+  atom_assigned[zatom] = kFailed;
   return 0;
 }
 
@@ -855,7 +859,7 @@ DoublyBondedTo(const Molecule& m, atom_number_t zatom) {
     return b->other(zatom);
   }
 
-  cerr << "Huh, no doubly bonded atom\n";
+  cerr << "Huh, no doubly bonded atom " << m.name() << ' ' << m.smarts_equivalent_for_atom(zatom) << '\n';
   return kInvalidAtomNumber;
 }
 
@@ -940,7 +944,15 @@ PerMoleculeData::SaturatedNitrogen(atom_number_t zatom, float& result) {
     return 1;
   }
 
+  // The paper does not indicate what to do for quat's. Just guess...
+  if (ncon[zatom] == 4 && mol.formal_charge(zatom) == 1) {
+    atom_assigned[zatom] = kN3;   // 47
+    result += 0.1779;
+    return 1;
+  }
+
   cerr << "Unclassified saturated Nitrogen atom " << mol.smarts_equivalent_for_atom(zatom) << '\n';
+  atom_assigned[zatom] = kFailed;
   return 0;
 }
 
@@ -1197,6 +1209,7 @@ XLogP(Molecule& m, int* status) {
   std::fill_n(status, matoms, 0);
 
   PerMoleculeData pmd(m);
+  pmd.atom_assigned = status;
 
   float result = 0.0f;
   pmd.IdentifyGroups(result);

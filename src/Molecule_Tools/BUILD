@@ -2514,6 +2514,7 @@ cc_binary(
     ],
     deps = [
         ":xlogp_lib",
+        ":xlogp3_lib",
         "//Foundational/cmdline:iwcmdline",
         "//Foundational/iwmisc:sparse_fp_creator",
         "//Molecule_Lib:iwmolecule",

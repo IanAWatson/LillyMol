@@ -17,6 +17,7 @@
 #include "Molecule_Lib/standardise.h"
 
 #include "Molecule_Tools/xlogp.h"
+#include "Molecule_Tools/xlogp3.h"
 
 namespace xlogp {
 
@@ -35,10 +36,12 @@ Usage(int rc) {
 // clang-format off
   cerr << R"(Implementation of xlogp, Wang, Fu, Lai\n";
  -X <fname>  XLogP::XlogpParameters text proto with updated fragment contribution values.
+ -3          use version 3 xlogp computation
  -J ...      fingerprint output, enter '-J help' for info
  -f          function as a TDT filter
  -y          display atom assignments - helpful for debugging
  -p <n>      number of bit replicates when generating fingerprint
+ -S <fname>  write labelled smiles to <fname>
  -Y ...      other options, enter '-Y help' for info
  -v          verbose output
 )";
@@ -64,6 +67,8 @@ class Options {
 
     // Not a part of all applications, just an example...
     Element_Transformations _element_transformations;
+
+    int _version3 = 0;
 
     int _molecules_read = 0;
     int _successful_calculations = 0;
@@ -212,6 +217,13 @@ Options::Initialise(Command_Line& cl) {
     _produce_descriptor_file = 0;
   }
 
+  if (cl.option_present('3')) {
+    _version3 = 1;
+    if (_verbose) {
+      cerr << "Will compute version 3 xlogp\n";
+    }
+  }
+
   if (cl.option_present('Y')) {
     const_IWSubstring y;
     for (int i = 0; cl.value('Y', y, i); ++i) {
@@ -240,6 +252,20 @@ Options::Initialise(Command_Line& cl) {
     }
     if (_verbose) {
       cerr << "Failed calculations written to '" << fname << "'\n";
+    }
+  }
+
+  if (cl.option_present('S')) {
+    IWString fname = cl.string_value('S');
+    if (! fname.ends_with(".smi")) {
+      fname << ".smi";
+    }
+    if (! _stream_for_labelled_molecules.open(fname.null_terminated_chars())) {
+      cerr << "Cannot open stream for labelled smiles\n";
+      return 0;
+    }
+    if (_verbose) {
+      cerr << "Labelled smiles written to '" << fname << "'\n";
     }
   }
 
@@ -391,6 +417,12 @@ Options::ProcessSuccessfulCalculation(Molecule& m,
 
   UpdateBucket(result);
 
+  if (_stream_for_labelled_molecules.active()) {
+    m.set_isotopes(status);
+    _stream_for_labelled_molecules << m.smiles() << ' ' << m.name() << '\n';
+    _stream_for_labelled_molecules.write_if_buffer_holds_more_than(4096);
+  }
+
   if (_produce_descriptor_file) {
     AppendSpaceSuppressedName(m.name(), output);
     output << _output_separator << static_cast<float>(result) << '\n';
@@ -420,10 +452,15 @@ Options::ProcessFailedCalculaton(Molecule& m,
     if (status[i] > 0) {
       continue;
     }
-    if (status[i] < 0) {
+    if (_version3 && status[i] == xlogp3::kFailed) {
       ++_failed[m.smarts_equivalent_for_atom(i)];
+      cerr << m.smiles() << ' ' << m.name() << " " << m.smarts_equivalent_for_atom(i) << '\n';
+    } else if (status[i] < 0) {
+      ++_failed[m.smarts_equivalent_for_atom(i)];
+      cerr << "NEgative status\n";
     } else if (status[i] == 0) {
       ++_unclassified[m.smarts_equivalent_for_atom(i)];
+      cerr << "Status 0 " << m.smiles() << ' ' << m.name() << ' ' << m.smarts_equivalent_for_atom(i) << '\n';
     }
   }
 
@@ -459,7 +496,12 @@ Options::Process(Molecule& m, IWString_and_File_Descriptor& output) {
   ++_molecules_read;
 
   std::unique_ptr<int[]> status(new_int(m.natoms()));
-  std::optional<double> x = XLogP(m, status.get());
+  std::optional<double> x;
+  if (_version3) {
+    x = xlogp3::XLogP(m, status.get());
+  } else {
+    x = XLogP(m, status.get());
+  }
 
   if (! x) {
     return ProcessFailedCalculaton(m, status.get());
@@ -578,7 +620,7 @@ XlogPCalculation(Options& options,
 
 int
 Main(int argc, char** argv) {
-  Command_Line cl(argc, argv, "vE:T:A:lcg:i:fJ:U:X:yY:p:");
+  Command_Line cl(argc, argv, "vE:T:A:lcg:i:fJ:U:X:yY:p:3S:");
 
   if (cl.unrecognised_options_encountered()) {
     cerr << "Unrecognised options encountered\n";

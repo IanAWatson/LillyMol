@@ -99,7 +99,11 @@ enum XlogPType {
   kCyano = 84,
   kDiazo =  85,
   kNitro = 86,
-  kNOxide = 87
+  kNOxide = 87,
+
+  kFailed = 99
+
+
 };
 
 std::optional<double> XLogP(Molecule& m);

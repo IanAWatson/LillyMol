@@ -2945,6 +2945,24 @@ cc_library(
     ],
 )
 
+cc_library(
+    name = "xlogp3_lib",
+    srcs = [
+        "xlogp3.cc",
+    ],
+    hdrs = [
+        "xlogp3.h"
+    ],
+    deps = [
+        "//Foundational/iwmisc",
+        "//Molecule_Lib:iwmolecule",
+        "//Molecule_Lib:moleculeio",
+    ],
+    visibility = [
+        "//visibility:public",
+    ],
+)
+
 cc_test(
     name = "alogp_test",
     timeout = "short",

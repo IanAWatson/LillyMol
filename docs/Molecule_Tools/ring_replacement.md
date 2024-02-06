@@ -38,7 +38,7 @@ C[1N]1C(=O)C(=O)[1N](F)C=C1 s %% CHEMBL95650 106
 C[1C]1=NN=[1C](F)N=N1 s %% CHEMBL17447 94
 C[1C]1=NN=[1C](F)N=C1 s %% CHEMBL351412 76
 ```
-![example](Images/e1.png)
+![example](docs/Molecule_Tools/Images/e1.png)
 ![composite](Images/weil_composite.png)
 
 The output consists of the smiles of the new molecule.  The name of

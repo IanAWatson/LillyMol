@@ -38,8 +38,19 @@ C[1N]1C(=O)C(=O)[1N](F)C=C1 s %% CHEMBL95650 106
 C[1C]1=NN=[1C](F)N=N1 s %% CHEMBL17447 94
 C[1C]1=NN=[1C](F)N=C1 s %% CHEMBL351412 76
 ```
-![example](/docs/Molecule_Tools/Images/e1.png)
-![composite](Images/weil_composite.png)
+![s_CHEMBL503634_1496512](Images/s_CHEMBL503634_1496512.png)
+![s_CHEMBL156037_83606](Images/s_CHEMBL156037_83606.png)
+![s_CHEMBL1171471_19926](Images/s_CHEMBL1171471_19926.png)
+![s_CHEMBL600052_10360](Images/s_CHEMBL600052_10360.png)
+![s_CHEMBL268339_7938](Images/s_CHEMBL268339_7938.png)
+![s_CHEMBL505408_6908](Images/s_CHEMBL505408_6908.png)
+![s_CHEMBL48776_1432](Images/s_CHEMBL48776_1432.png)
+![s_CHEMBL9792_918](Images/s_CHEMBL9792_918.png)
+![s_CHEMBL4543258_542](Images/s_CHEMBL4543258_542.png)
+![s_CHEMBL4466751_334](Images/s_CHEMBL4466751_334.png)
+![s_CHEMBL95650_106](Images/s_CHEMBL95650_106.png)
+![s_CHEMBL17447_94](Images/s_CHEMBL17447_94.png)
+
 
 The output consists of the smiles of the new molecule.  The name of
 the starting molecule, 's' in this case.  Then follows the name of an

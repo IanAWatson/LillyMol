@@ -924,6 +924,168 @@ IsOh(Molecule& m, atom_number_t zatom,
   return 0;
 }
 
+
+int
+IsPrimaryAmine(const Molecule& m, const PerMoleculeData& per_molecule_data,  atom_number_t zatom) {
+  const atom_number_t carbon = m.other(zatom, 0);
+  return per_molecule_data.unsaturation[carbon] == 0;
+}
+
+int
+IsAcid(const Molecule& m, const PerMoleculeData& per_molecule_data,  atom_number_t zatom) {
+  const atom_number_t carbon = m.other(zatom, 0);
+  if (per_molecule_data.atomic_number[carbon] == 6) {
+  } else if (per_molecule_data.atomic_number[carbon] == 16) {
+  } else {
+    return 0;
+  }
+
+  if (per_molecule_data.unsaturation[carbon] == 0) {
+    return 0;
+  }
+
+  for (const Bond* b : m[carbon]) {
+    if (! b->is_double_bond()) {
+      continue;
+    }
+
+    atom_number_t o = b->other(carbon);
+    if (per_molecule_data.atomic_number[o] == 8) {
+      return 1;
+    }
+    if (per_molecule_data.atomic_number[o] == 16) {
+      return 1;
+    }
+    return 0;
+  }
+
+  return 0;
+}
+
+float
+ZwitterionCorrection(Molecule& m,
+                     const PerMoleculeData& per_molecule_data,
+                     const int* status) {
+  const int matoms = m.natoms();
+
+  int got_acid = 0;
+  int got_nh2 = 0;
+  for (int i = 0; i < matoms; ++i) {
+    if (per_molecule_data.atomic_number[i] == 6) {
+      continue;
+    }
+
+    if (per_molecule_data.atomic_number[i] == 7 && per_molecule_data.ncon[i] == 1 && per_molecule_data.unsaturation[i] == 0 &&
+        per_molecule_data.attached_carbons[i] == 1 && !per_molecule_data.NbrsHavePiElectrions(m, i) &&
+        IsPrimaryAmine(m, per_molecule_data, i)) {
+      got_nh2 = 1;
+      if (got_acid) {
+        break;
+      }
+    } else if (per_molecule_data.atomic_number[i] == 8 && per_molecule_data.ncon[i] == 1 &&
+               per_molecule_data.NbrsHavePiElectrions(m, i) &&
+               IsAcid(m, per_molecule_data, i)) {
+      got_acid = 1;
+      if (got_nh2) {
+        break;
+      }
+    }
+  }
+
+  if (! got_acid || ! got_nh2) {
+    return 0;
+  }
+
+  return -0.7;
+}
+
+// The logic here is fairly straightforward. We have
+// a five membered ring that is fused.
+// The atoms must be either [cD3x3] or the =NNN= atoms.
+// Note that under WFL aromaticity, the five membered ring
+// is not aromatic.
+bool
+IsTriazole(const PerMoleculeData& per_molecule_data,
+           const Ring& ring) {
+  assert(ring.size() == 5);
+
+  int nitrogen_count = 0;
+  int unsaturated_nitrogen_count = 0;
+  for (int i = 0; i < 5; ++i) {
+    atom_number_t a = ring[i];
+    if (per_molecule_data.atomic_number[a] == 6) {
+      if (per_molecule_data.ncon[a] != 3) {
+        return false;
+      }
+      if (per_molecule_data.ring_bond_count[a] != 3) {
+        return false;
+      }
+      if (! per_molecule_data.aromatic[a]) {
+        return false;
+      }
+    } else if (per_molecule_data.atomic_number[a] != 7) {
+      return false;
+    } else {
+      ++nitrogen_count;
+      if (per_molecule_data.unsaturation[a]) {
+        ++unsaturated_nitrogen_count;
+      }
+    }
+  }
+
+  // This test is not necessary.
+  if (nitrogen_count != 3) {
+    return false;
+  }
+
+  return unsaturated_nitrogen_count == 2;
+}
+
+double
+BenzoTriazole(Molecule& m,
+      const PerMoleculeData& per_molecule_data,
+      const int* status) {
+  double rc = 0.0;
+
+  m.compute_aromaticity_if_needed();
+
+  for (const Ring* r : m.sssr_rings()) {
+    if (r->size() != 5) {
+      continue;
+    }
+    if (r->fused_ring_neighbours() != 1) {
+      continue;
+    }
+    if (r->is_aromatic()) {  // WFL aromaticity
+      continue;
+    }
+
+    const Ring* nbr = r->fused_neighbour(0);
+    if (nbr->size() != 6) {
+      continue;
+    }
+    if (! nbr->is_aromatic()) {
+      continue;
+    }
+    if (nbr->fused_ring_neighbours() != 1) {
+      continue;
+    }
+
+    if (! IsTriazole(per_molecule_data, *r)) {
+      continue;
+    }
+
+    ++rc;
+  }
+
+
+  if (rc) {
+    return 1.59;
+  }
+
+  return 0.0;
+}
+
 double
 Biphenyl(Molecule& m,
       const PerMoleculeData& per_molecule_data,
@@ -1046,6 +1208,59 @@ Nitro(Molecule& m,
 #endif
 
   return rc;
+}
+
+// There is a standardisation problem, we standardise them to O=N=C
+double
+Nitroxide(Molecule& m,
+             const PerMoleculeData& per_molecule_data,
+             const int* status) {
+  int rc = 0;
+
+  const int matoms = m.natoms();
+
+  // Look for the Nitrogen atoms
+
+  for (int i = 0; i < matoms; ++i) {
+    if (per_molecule_data.atomic_number[i] != 7) {
+      continue;
+    }
+
+    if (per_molecule_data.unsaturation[i] != 2) {
+      continue;
+    }
+
+    if (per_molecule_data.ncon[i] != 3) {
+      continue;
+    }
+
+    if (per_molecule_data.attached_carbons[i] != 2) {
+      continue;
+    }
+
+    int got_c = 0;
+    int got_o = 0;
+    for (const Bond* b : m[i]) {
+      if (! b->is_double_bond()) {
+        continue;
+      }
+
+      atom_number_t o = b->other(i);
+      if (per_molecule_data.atomic_number[o] == 6) {
+        got_c = 1;
+      } else if (per_molecule_data.atomic_number[o] == 8) {
+        got_o = 1;
+      } else {
+        break;
+      }
+    }
+
+    if (got_c && got_o) {
+      ++rc;
+    }
+  }
+
+  return rc * -2.9;
 }
 
 // Look for ortho OH and C[OH] groups in `ring`.
@@ -1177,13 +1392,17 @@ Corrections(Molecule& m,
   double rc = HydropphobicCarbonCorrection(m, per_molecule_data, status);
   rc += AminoAcidCorrection(m, per_molecule_data, status);
   rc += IntraMolecularHBondCorrection(m, per_molecule_data, status);
+  // IAW corrections.
   rc += HalogenCorrection(m, per_molecule_data, status);
   rc += AmidineCorrection(m, per_molecule_data, status);
   rc += CatecholLike(m, per_molecule_data, status);
   rc += Nitro(m, per_molecule_data, status);
   rc += TButyl(m, per_molecule_data, status);
+  rc += Biphenyl(m, per_molecule_data, status);
+  rc += BenzoTriazole(m, per_molecule_data, status);
+  rc += Nitroxide(m, per_molecule_data, status);
   if (apply_nitroxide) {
-    rc += Biphenyl(m, per_molecule_data, status);
+    rc += ZwitterionCorrection(m, per_molecule_data, status);
   }
 
   return rc;

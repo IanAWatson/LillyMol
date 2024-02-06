@@ -61,5 +61,5 @@ else
     echo "$case_id : TEST FAIL"
 fi
 
-rm -f "$out"
-rm -f err.txt
+#rm -f "$out"
+#rm -f err.txt

@@ -29,10 +29,10 @@ for the timing tests below looks like
 # Example input configuration file for molecule_filter
 
 min_natoms: 10
-max_natoms: 40
+max_natoms: 45
 
 min_nrings: 1
-max_nrings: 5
+max_nrings: 6
 
 min_heteroatom_count: 2
 
@@ -40,34 +40,35 @@ min_heteroatom_fraction: 0.0
 max_heteroatom_fraction: 0.5
 
 min_aromatic_ring_count: 1
-max_aromatic_ring_count: 4
+max_aromatic_ring_count: 5
 
 max_aliphatic_ring_count: 3
 
 max_ring_system_size: 4
+max_aromatic_rings_in_system: 3
 largest_ring_size: 7
 
 exclude_non_organic: true
 exclude_isotopes: true
 
 min_rotatable_bonds: 1
-max_rotatable_bonds: 9
+max_rotatable_bonds: 13
 
-min_tpsa: 30
+min_tpsa: 20
 max_tpsa: 160
 
-min_xlogp: 0.0
-max_xlogp: 6.0
+min_alogp: 0.0
+max_alogp: 6.0
 
 min_hba: 1
-max_hba: 10
+max_hba: 12
 
 # min_hbd: 0
 max_hbd: 6
 
 max_halogen_count: 6
 
-max_distance: 20
+max_distance: 21
 min_sp3_carbon: 1
 max_aromatic_density: 0.85
 ```
@@ -102,12 +103,12 @@ Start with 100k random molecules from chembl 33,
 ```
 
 With every property activated, and set to a value where it removes
-only a small number of molecules, the time is about 18.7 seconds, or
-about 1 Million molecules in 3 minutes.
+only a small number of molecules, the time is about 5.2 seconds, or
+about 1 Million molecules in less than a minute.
 
-Omitting the xlogp filter drops the time to just 10.8 seconds, and so
+Omitting the alogp filter drops the time to just 5.05 seconds, and so
 we see that this is the most expensive of the constraints that can 
-be imposed.
+be imposed. Using xlogp as a filter is more expensive again.
 
 Dropping any of the other constraints really does not change the
 timing that much.
@@ -116,8 +117,7 @@ On a more realistic set, the 2.1M Enamine HTS molecules
 ```
 2144530 molecules had between 3 and 63 atoms. Average 24.3974
 ```
-This is processed in 112 seconds, including an xlogp cutoff, 
-about 1.15M per second. This is substantially faster than
+This is processed in 89 seconds, including an alogp cutoff, 
+about 25k per second. This is substantially faster than
 what we saw from Chembl. This is probably largely attributable
 to the differing atom counts between the two collections, 32.9 vs 24.4.
-

@@ -25,35 +25,41 @@ message Requirements {
 
   optional int32 max_ring_system_size = 14;
 
-  optional float min_tpsa = 15;
-  optional float max_tpsa = 16;
+  optional int32 max_aromatic_rings_in_system = 15;
 
-  optional float min_xlogp = 17;
-  optional float max_xlogp = 18;
+  optional float min_tpsa = 16;
+  optional float max_tpsa = 17;
+
+  optional float min_alogp = 18;
+  optional float max_alogp = 19;
+
+  optional float min_xlogp = 20;
+  optional float max_xlogp = 21;
 
   // Lipinski definitions
-  optional int32 min_hba = 19;
-  optional int32 max_hba = 20;
-  optional int32 min_hbd = 21;
-  optional int32 max_hbd = 22;
+  optional int32 min_hba = 22;
+  optional int32 max_hba = 23;
+  optional int32 min_hbd = 24;
+  optional int32 max_hbd = 25;
 
   // Note that this does NOT span spiro fusions.
-  optional int32 largest_ring_size = 23;
+  optional int32 largest_ring_size = 26;
 
-  repeated string required_smarts = 24;
-  repeated string must_not_have_smarts = 25;
+  repeated string required_smarts = 27;
+  repeated string must_not_have_smarts = 28;
 
-  optional bool exclude_non_organic = 26;
-  optional bool exclude_isotopes = 27;
+  optional bool exclude_non_organic = 29;
+  optional bool exclude_isotopes = 30;
 
-  optional int32 max_halogen_count = 28;
+  optional int32 max_halogen_count = 31;
 
   // Longest distance between any pair of atoms.
   // Requires computation of distance matrix.
-  optional int32 max_distance = 29;
+  optional int32 max_distance = 32;
 
-  optional int32 min_sp3_carbon = 30;
+  optional int32 min_sp3_carbon = 33;
 
-  optional float max_aromatic_density = 31;
+  optional float max_aromatic_density = 34;
+
 }
 

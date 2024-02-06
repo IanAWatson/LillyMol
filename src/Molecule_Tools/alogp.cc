@@ -1499,6 +1499,80 @@ ALogP::AddHydrogenContributions(PerMoleculeData& pmd, float& result) {
   return 1;
 }
 
+int
+IsPrimaryAmine(const PerMoleculeData& pmd,  atom_number_t zatom) {
+  const atom_number_t carbon = pmd.mol.other(zatom, 0);
+  return pmd.unsaturation[carbon] == 0;
+}
+
+int
+IsAcid(const PerMoleculeData& pmd,  atom_number_t zatom) {
+  const atom_number_t carbon = pmd.mol.other(zatom, 0);
+  if (pmd.z[carbon] == 6) {
+  } else if (pmd.z[carbon] == 16) {
+  } else {
+    return 0;
+  }
+
+  if (pmd.unsaturation[carbon] == 0) {
+    return 0;
+  }
+
+  for (const Bond* b : pmd.mol[carbon]) {
+    if (! b->is_double_bond()) {
+      continue;
+    }
+
+    atom_number_t o = b->other(carbon);
+    if (pmd.z[o] == 8) {
+      return 1;
+    }
+    if (pmd.z[o] == 16) {
+      return 1;
+    }
+    return 0;
+  }
+
+  return 0;
+}
+
+int
+ALogP::AddZwitterionCorrection(PerMoleculeData& pmd, float& result) {
+  Molecule& m = pmd.mol;
+  const int matoms = m.natoms();
+
+  int got_acid = 0;
+  int got_nh2 = 0;
+  for (int i = 0; i < matoms; ++i) {
+    if (pmd.z[i] == 6) {
+      continue;
+    }
+
+    if (pmd.z[i] == 7 && pmd.mol.ncon(i) == 1 && pmd.unsaturation[i] == 0 &&
+        pmd.attached_heteroatom_count[i] == 0 && pmd.aryl_count[i] == 0 &&
+        IsPrimaryAmine(pmd, i)) {
+      got_nh2 = 1;
+      if (got_acid) {
+        break;
+      }
+    } else if (pmd.z[i] == 8 && pmd.mol.ncon(i) == 1 && pmd.aryl_count[i] == 0 &&
+               IsAcid(pmd, i)) {
+      got_acid = 1;
+      if (got_nh2) {
+        break;
+      }
+    }
+  }
+
+  if (! got_acid || ! got_nh2) {
+    return 0;
+  }
+
+  result += -0.5;
+
+  return 1;
+}
+
 std::optional<float>
 ALogP::LogP(Molecule& m) {
 
@@ -1588,6 +1662,10 @@ ALogP::LogP(Molecule& m) {
 
   if (_label_with_atom_type) {
     m.set_isotopes(pmd.assigned);
+  }
+
+  if (_add_zwitterion_correction) {
+    AddZwitterionCorrection(pmd, result);
   }
 
   return result;

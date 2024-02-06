@@ -124,6 +124,9 @@ class ALogP {
     // But nobody much cares about phosphorus...
     int _rdkit_phoshoric_acid_hydrogen = 0;
 
+    // Note that many of the worst predictions involve Zwitterionic forms.
+    int _add_zwitterion_correction = 0;
+
     // Whether or not to display error messages.
     int _display_error_messages = 1;
 
@@ -158,6 +161,8 @@ class ALogP {
     int IsHydrogenAcid(PerMoleculeData& pmd, atom_number_t zatom);
     int AddHydrogenContributions(PerMoleculeData& pmd, float& result);
 
+    int AddZwitterionCorrection(PerMoleculeData& pmd, float& result);
+
     std::optional<double> SingleAtomSpecialCase(Molecule& m);
 
   public:
@@ -181,6 +186,10 @@ class ALogP {
 
     void set_rdkit_phoshoric_acid_hydrogen(int s) {
       _rdkit_phoshoric_acid_hydrogen = s;
+    }
+
+    void set_apply_zwitterion_correction(int s) {
+      _add_zwitterion_correction = s;
     }
 
     // Note that molecules must have formal charges assigned.

@@ -17,6 +17,7 @@
 #include "Molecule_Lib/standardise.h"
 #include "Molecule_Lib/target.h"
 
+#include "Molecule_Tools/alogp.h"
 #include "Molecule_Tools/nvrtspsa.h"
 #include "Molecule_Tools/xlogp.h"
 
@@ -38,7 +39,9 @@ Usage(int rc) {
 // clang-format on
 // clang-format off
   cerr << R"(
- -c <nat>        minimum number of atoms
+ -F <fname>     textproto describing constraints on filter.
+ -c             remove chirality
+ -B <fname>     write rejected moleculed to <fname>
  -v             verbose output
   )";
 // clang-format on
@@ -58,6 +61,8 @@ class Options {
     int _reduce_to_largest_fragment = 0;
 
     int _remove_chirality = 0;
+
+    alogp::ALogP _alogp;
 
     Chemical_Standardisation _chemical_standardisation;
 
@@ -83,6 +88,7 @@ class Options {
     int _too_few_aliphatic_rings = 0;
     int _too_many_aliphatic_rings = 0;
     int _ring_system_too_large = 0;
+    int _too_many_aromatic_rings_in_system = 0;
     int _ring_too_large = 0;
     int _non_organic = 0;
     int _isotope = 0;
@@ -92,6 +98,8 @@ class Options {
     int _high_tpsa = 0;
     int _low_xlogp = 0;
     int _high_xlogp = 0;
+    int _low_alogp = 0;
+    int _high_alogp = 0;
     int _too_few_hba = 0;
     int _too_many_hba = 0;
     int _too_few_hbd = 0;
@@ -134,6 +142,10 @@ Options::Options() {
   _rotbond.set_calculation_type(quick_rotbond::QuickRotatableBonds::RotBond::kExpensive);
   set_display_psa_unclassified_atom_mesages(0);
   xlogp::SetIssueUnclassifiedAtomMessages(0);
+
+  _alogp.set_use_alcohol_for_acid(1);
+  _alogp.set_use_alcohol_for_acid(1);
+  _alogp.set_apply_zwitterion_correction(1);
 }
 
 int
@@ -244,6 +256,9 @@ Options::Report(std::ostream& output) const {
   if (_requirements.has_max_ring_system_size()) {
     output << _ring_system_too_large << " ring systems too large " << _requirements.max_ring_system_size() << '\n';
   }
+  if (_requirements.has_max_aromatic_rings_in_system()) {
+    output << _too_many_aromatic_rings_in_system << " too many aromatic rings in system " << _requirements.max_aromatic_rings_in_system() << '\n';
+  }
 
   if (_requirements.has_largest_ring_size()) {
     output << _ring_too_large << " ring too large " << _requirements.largest_ring_size() << '\n';
@@ -261,6 +276,13 @@ Options::Report(std::ostream& output) const {
   }
   if (_requirements.has_max_tpsa()) {
     output << _high_tpsa << " high TPSA " << _requirements.max_tpsa() << '\n';
+  }
+
+  if (_requirements.has_min_alogp()) {
+    output << _low_alogp << " low ALOGP " << _requirements.min_alogp() << '\n';
+  }
+  if (_requirements.has_max_alogp()) {
+    output << _high_alogp << " high ALOGP " << _requirements.max_alogp() << '\n';
   }
 
   if (_requirements.has_min_xlogp()) {
@@ -378,9 +400,11 @@ LargestFragment(const const_IWSubstring& smiles,
   return true;
 }
 
-int 
+std::tuple<int, int>
 MaxRingSystemSize(Molecule& m, std::unique_ptr<int[]>& tmp) {
   const int matoms = m.natoms();
+
+  m.compute_aromaticity_if_needed();
 
   if (! tmp) {
     tmp.reset(new int[matoms]);
@@ -393,6 +417,7 @@ MaxRingSystemSize(Molecule& m, std::unique_ptr<int[]>& tmp) {
   std::fill_n(ring_already_done.get(), nrings, 0);
 
   int max_system_size = 0;
+  int max_aromatic_rings_in_system = 0;
   for (int i = 0; i < nrings; ++i) {
     if (ring_already_done[i]) {
       continue;
@@ -403,6 +428,13 @@ MaxRingSystemSize(Molecule& m, std::unique_ptr<int[]>& tmp) {
     }
 
     int system_size = 1;
+    int aromatic_rings_in_system;
+    if (ri->is_aromatic()) {
+      aromatic_rings_in_system = 1;
+    } else {
+      aromatic_rings_in_system = 0;
+    }
+
 
     for (int j = i + 1; j < nrings; ++j) {
       if (ring_already_done[j]) {
@@ -413,14 +445,20 @@ MaxRingSystemSize(Molecule& m, std::unique_ptr<int[]>& tmp) {
       const Ring* rj = m.ringi(j);
       if (ri->fused_system_identifier() == rj->fused_system_identifier()) {
         ++system_size;
+        if (rj->is_aromatic()) {
+          ++aromatic_rings_in_system;
+        }
       }
     }
     if (system_size > max_system_size) {
       max_system_size = system_size;
     }
+    if (aromatic_rings_in_system > max_aromatic_rings_in_system) {
+      max_aromatic_rings_in_system = aromatic_rings_in_system;
+    }
   }
 
-  return max_system_size;
+  return std::make_tuple(max_system_size, max_aromatic_rings_in_system);
 }
 
 // Lifted from iwdescr.cc
@@ -565,6 +603,7 @@ Options::Process(const const_IWSubstring& line,
     }
   } else {
     matoms = count_atoms_in_smiles(smiles, nrings);
+    largest_frag = smiles;
   }
 
   if (matoms == 0) {
@@ -645,6 +684,7 @@ int
 Options::Process(Molecule& m,
                  const int matoms,
                  const int nrings) {
+  // cerr << "Processing " << m.smiles() << ' ' << m.name() << ' ' << matoms << '\n';
   if (m.natoms() != matoms) {
     cerr << "Atom count mismatch " << m.natoms() << " vs " << matoms << '\n';
   }
@@ -683,16 +723,22 @@ Options::Process(Molecule& m,
     return 0;
   }
 
+  int arc = 0;
+  int need_to_compute_aromatic_rings = 0;
   if (_requirements.has_min_aromatic_ring_count() ||
-      _requirements.has_max_aromatic_ring_count()) {
+      _requirements.has_max_aromatic_ring_count() ||
+      _requirements.has_max_aromatic_rings_in_system()) {
+    need_to_compute_aromatic_rings = 1;
+  }
 
+  if (need_to_compute_aromatic_rings) {
     // Check nrings first. If not enough rings if all were aromatic...
     if (_requirements.has_min_aromatic_ring_count() && nrings < _requirements.min_aromatic_ring_count()) {
       ++_too_few_aromatic_rings;
       return 0;
     }
 
-    const int arc = AromaticRingCount(m);
+    arc = AromaticRingCount(m);
     if (_requirements.has_min_aromatic_ring_count() && arc < _requirements.min_aromatic_ring_count()) {
       ++_too_few_aromatic_rings;
       return 0;
@@ -809,13 +855,35 @@ Options::Process(Molecule& m,
   // A temporary array that some external functions might need.
   std::unique_ptr<int[]> tmp;
 
-  if (_requirements.has_max_ring_system_size()) {
-    if (nrings > _requirements.max_ring_system_size()) {
-      int max_ring_system_size = MaxRingSystemSize(m, tmp);
-      if (_requirements.has_max_ring_system_size() && max_ring_system_size < _requirements.max_ring_system_size()) {
+  if (_requirements.has_max_ring_system_size() ||
+      _requirements.has_max_aromatic_rings_in_system()) {
+    if (nrings < _requirements.max_ring_system_size() &&
+        nrings < _requirements.max_aromatic_rings_in_system()) {
+      // no need to compute.
+    }  else {
+      const auto [max_ring_system_size, max_aromatic_rings_in_system] = MaxRingSystemSize(m, tmp);
+      if (_requirements.has_max_ring_system_size() && max_ring_system_size > _requirements.max_ring_system_size()) {
         ++_ring_system_too_large;
         return 0;
       }
+      if (_requirements.has_max_aromatic_rings_in_system() &&
+          max_aromatic_rings_in_system > _requirements.max_aromatic_rings_in_system()) {
+        ++_too_many_aromatic_rings_in_system;
+      }
+    }
+  }
+
+  if (_requirements.has_min_xlogp() || _requirements.has_max_alogp()) {
+    std::optional<double> x = _alogp.LogP(m);
+    if (! x) {
+    } else if (_requirements.has_min_alogp() && *x < _requirements.min_alogp()) {
+      ++_low_alogp;
+      return 0;
+    }
+    if (!x) {
+    } else if (_requirements.has_max_alogp() && *x > _requirements.max_alogp()) {
+      ++_high_alogp;
+      return 0;
     }
   }
 
@@ -830,7 +898,8 @@ Options::Process(Molecule& m,
       ++_low_xlogp;
       return 0;
     }
-    if (_requirements.has_max_xlogp() && *x > _requirements.max_xlogp()) {
+    if (!x) {
+    } else if (_requirements.has_max_xlogp() && *x > _requirements.max_xlogp()) {
       ++_high_xlogp;
       return 0;
     }
@@ -877,7 +946,7 @@ MoleculeFilter(Options& options,
 
 int
 MoleculeFilter(int argc, char** argv) {
-  Command_Line cl(argc, argv, "vE:H:N:A:lcg:F:B:");
+  Command_Line cl(argc, argv, "vE:A:lcg:F:B:");
 
   if (cl.unrecognised_options_encountered()) {
     cerr << "Unrecognised options encountered\n";

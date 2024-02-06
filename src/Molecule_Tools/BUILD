@@ -934,6 +934,7 @@ cc_binary(
         "qry_wcharge.h",
     ],
     deps = [
+        ":alogp_lib",
         ":iwdescr_cc_proto",
         ":nvrtspsa",
         ":partial_symmetry",
@@ -1235,11 +1236,12 @@ cc_binary(
     ],
     deps = [
         ":molecule_filter_cc_proto",
+        ":alogp_lib",
+        ":xlogp_lib",
         "//Foundational/cmdline:iwcmdline",
         "//Molecule_Lib:iwmolecule",
         "//Molecule_Lib:moleculeio",
         "//Molecule_Tools:nvrtspsa",
-        ":xlogp_lib",
     ]
 )
 

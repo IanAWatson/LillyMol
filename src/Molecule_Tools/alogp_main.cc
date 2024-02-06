@@ -251,6 +251,8 @@ Options::Initialise(Command_Line& cl) {
         if (_verbose) {
           cerr << "Will treat OH groups on phosphoric acids like RDKIt\n";
         }
+      } else if (y == "ZWIT") {
+        _alogp.set_apply_zwitterion_correction(1);
       } else {
         cerr << "Unrecognised -Y qualifier '" << y << "'\n";
         DisplayDashYOptions(cerr);

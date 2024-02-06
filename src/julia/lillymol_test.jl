@@ -1,4 +1,5 @@
 push!(LOAD_PATH, @__DIR__)
+println(LOAD_PATH)
 
 using LillyMol
 
@@ -1974,6 +1975,22 @@ function test_xlogp()::Bool
   #flag || return is_failure("xlogp failed", m)
   isapprox(result, 1.426, atol=0.001) || return is_failure("xlogp wrong", m)
   true
+end
+
+function test_alogp()::Bool
+  smiles = [
+    "S=C(NN=CC1=CC=C2OCOC2=C1)NCC(=C)C CHEMBL1989706",
+    "S1C(=C(O)N2N=C(C)N=C12)C(N1CCOCC1)C1=CC=CO1 CHEMBL1578764",
+    "O=C(OC)C1=CC(=CC(=C1)CN)NC(=O)C1=CC(=CC=C1)OC CHEMBL4904536",
+    "C1=C(C)N=C(N=C1NC1=NNC(=C1)C1CC1)NCC1=NC=CN1 CHEMBL3964210",
+    "S(=O)(=O)(N(C)CC(=O)NC1=CC(=CC=C1)OC)C1=CC=C2NC(=O)CCC2=C1 CHEMBL1513029",
+    "CCS(=O)(=O)NC1=CC=C(OC2=CN=CN=C2)C(=C1)C1=CN(C)C(=O)C2=C1C=CN2 CHEMBL3967185",
+    "C1(=CC=C2C(=C1)N=C1C(=CC(=O)C3=C1N=CC=C3)O2)C(=O)NCCCCC(N)C(=O)O CHEMBL4780009",
+    "FC1=CC=C(C(=O)C2=C(NC(=O)CC3=COC4=C3C=CC(=C4C)C)C3=C(O2)C=CC=C3)C=C1 CHEMBL1436782",
+    "S1C(=C(C2=C1CCCC2)C(=O)OCC)NC(=O)CSC1=CN(C2=C1C=CC=C2)CCNC(=O)C1=C(F)C=CC=C1F CHEMBL1438572",
+    "C(#C)C(O)C=CCCCCCCC#CC(O)C#CCCCCC=CCCCCC=CCCCCCCCCCCCCCC=CC#C CHEMBL505112"
+  ]
+
 end
   
 function test_cubane()::Bool

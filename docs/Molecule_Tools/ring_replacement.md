@@ -8,34 +8,41 @@ of what plausible variants might exist?
 
 `ring_replacement` takes a starting molecule, a database of known rings,
 and generates molecules that have the existing rings replaced by rings
-from the database. The way the database is constructed, ring sizes and
+from the database. The way the database is constructed, ring sizes, aromaticity
+and
 substitution patterns are preserved. So if the starting molecule
 is a para substituted benzene ring, the results will also be para
 substituted 6 membered aromatic rings.
 
-For example of the starting molecule is
+For example if the starting molecule is a para substituted benzene
 ```
-Clc1ccc(F)cc1 p-benzene
+Cc1ccc(F)cc1 s
 ```
 requesting replacement of the 6 membered aromatic
 ```
-ring_replacement -R rings_6a.smi p-benzene.smi
+ring_replacement -w -R rings_6a.smi p-benzene.smi
 ```
-generates 185 new molecules. The first 10 (from Chembl) of those are
+generates 33 new molecules. The first 12 (from Chembl) of those are
 ```
-Cl[1c]1cc[1c](F)cc1 p-benzene %% CHEMBL503634.6a 1496512
-Cl[1c]1c[n][1c](F)cc1 p-benzene %% CHEMBL156037.6a 83606
-Cl[1c]1[n]c[1c](F)cc1 p-benzene %% CHEMBL156037.6a 83606
-Cl[1c]1[n]c[1c](F)c[n]1 p-benzene %% CHEMBL1171471.6a 19926
-Cl[1c]1c[n][1c](F)[n]c1 p-benzene %% CHEMBL1171471.6a 19926
-Cl[1c]1[n][n][1c](F)cc1 p-benzene %% CHEMBL600052.6a 10360
-Cl[1c]1[n]c[1c](F)[n]c1 p-benzene %% CHEMBL268339.6a 7938
-Cl[1c]1cc[1n+](F)cc1 p-benzene %% CHEMBL505408.6a 6908
-Cl[1n+]1cc[1c](F)cc1 p-benzene %% CHEMBL505408.6a 6908
+C[1C]1=CC=[1C](F)C=C1 s %% CHEMBL503634 1496512
+C[1C]1=CC=[1C](F)N=C1 s %% CHEMBL156037 83606
+C[1C]1=NC=[1C](F)C=N1 s %% CHEMBL1171471 19926
+C[1C]1=NN=[1C](F)C=C1 s %% CHEMBL600052 10360
+C[1C]1=NC=[1C](F)N=C1 s %% CHEMBL268339 7938
+C[1C]1=CC=[1N+](F)C=C1 s %% CHEMBL505408 6908
+C[1C]1=CC=[1C](F)NC1=O s %% CHEMBL48776 1432
+C[1C]1=CO[1C](=CC1=O)F s %% CHEMBL9792 918
+C[1N]1C(=O)N[1C](=CC1=O)F s %% CHEMBL4543258 542
+C[1C]1=CC(=O)[1C](=CN1)F s %% CHEMBL4466751 334
+C[1N]1C(=O)C(=O)[1N](F)C=C1 s %% CHEMBL95650 106
+C[1C]1=NN=[1C](F)N=N1 s %% CHEMBL17447 94
+C[1C]1=NN=[1C](F)N=C1 s %% CHEMBL351412 76
 ```
+![1](Images/s %% CHEMBL503634 1496512.png)
+
 The output consists of the smiles of the new molecule.  The name of
-the starting molecule.  Then follows the name of an exemplar molecule,
-that contains an example of the ring that has been
+the starting molecule, 's' in this case.  Then follows the name of an
+exemplar molecule, that contains an example of the ring that has been
 inserted.  The `6a` suffix indicates that the replacement is a six
 membered aromatic.  The last token is the number of these rings found
 in the knowledge base.  The output is sorted by occurrence.
@@ -220,6 +227,7 @@ is fast enough.
 ## Ring Replacement
 Once a set of replacement rings has been assembled, those can be used to
 perform ring replacement on molecules with existing ring/ring systems.
+```
  -R <fname>    file of labelled rings created by ring_extraction
  -s <smarts>   only replace rings matched by <smarts>
  -q <query>    only replace rings matched by <query>

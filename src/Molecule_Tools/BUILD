@@ -655,6 +655,21 @@ cc_binary(
     ],
 )
 
+
+cc_binary(
+    name = "enumeration",
+    srcs = [
+        "enumeration.cc",
+    ],
+    deps = [
+        "dicer_fragments_cc_proto",
+        "//Foundational/iwmisc",
+        "//Molecule_Lib:iwmfingerprint",
+        "//Molecule_Lib:iwmolecule",
+        "//Molecule_Lib:moleculeio",
+    ],
+)
+
 cc_binary(
     name = "excise_3d_overlap",
     srcs = [

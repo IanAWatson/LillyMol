@@ -33,7 +33,7 @@ message DicerFragment {
   string par = 3;
   // the number of atoms in the fragment.
   uint32 nat = 4;
-  // The number of instances of this frgment.
+  // The number of instances of this fragment.
   uint32 n = 5;
 
   // If fragments have been assigned unique ids

@@ -65,6 +65,21 @@ cc_binary(
 )
 
 cc_binary(
+    name = "dicer2bdb",
+    srcs = [
+      "dicer2bdb.cc",
+    ],
+    tags = ["berkeleydb"],
+    deps = [
+        "//Foundational/cmdline_v2",
+        "//Foundational/data_source:iwtfdata_record",
+        "//Molecule_Tools:dicer_fragments_cc_proto",
+        "@berkeleydb",
+        "@com_google_protobuf//:protobuf",
+    ],
+)
+
+cc_binary(
     name = "in_database_bdb",
     srcs = [
         "in_database_bdb.cc",

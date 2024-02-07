@@ -161,6 +161,9 @@ class ExtractRings {
     // We can ignore rings that are too large.
     uint32_t _max_ring_size;
 
+    // By default, we write smarts that include aromaticity.
+    int _respect_aromaticity;
+
     // We can ignore ring systems containing too many rings.
     uint32_t _max_ring_system_size;
 
@@ -223,6 +226,9 @@ class ExtractRings {
     std::optional<IWString> CanonicalRingName(Molecule& m,
                         const int * ring_sys,
                         int sys) const;
+    std::optional<IWString> NonAromaticCanonicalName(Molecule& m,
+                        const int * ring_sys,
+                        int sys) const;
 
     void ChangeRingDoubleBonds(Molecule& m,
                       IWString& smt) const;
@@ -263,6 +269,7 @@ ExtractRings::ExtractRings() {
   _max_ring_size = 7;
   _max_ring_system_size = 3;
   _transform_ring_double_bonds = 0;
+  _respect_aromaticity = 1;
   _substructure_search_starting_molecule = 0;
   _substructure_search_failures = 0;
   _generate_substitution_not_specified = 0;
@@ -272,6 +279,8 @@ void
 DisplayDashXOption(std::ostream& output) {
   output << " -X sss     substructure search the starting molecule as a check\n";
   output << " -X a:A     letters assigned to aromatic and aliphatic rings\n";
+  output << " -X noarom  generate smarts that do not specify aromaticity,\n";
+  output << "            this enables replacing aromatic with aliphatic rings and vice verse\n";
 
   ::exit(0);
 }
@@ -376,6 +385,11 @@ ExtractRings::Initialise(Command_Line& cl) {
         }
         if (_verbose) {
           cerr << "aromatic suffix '" << arom_suffix << "' aliphatic suffix '" << aliph_suffix << "'\n";
+        }
+      } else if (x == "noarom") {
+        _respect_aromaticity = 0;
+        if (_verbose) {
+          cerr << "Will create aromatic agnostic replacement rings\n";
         }
       } else if (x == "help") {
         DisplayDashXOption(cerr);
@@ -699,6 +713,7 @@ ExtractRings::Process(Molecule& m) {
     if (!MakeUniqueSmiles(m, sys, data, usmi)) {
       break;
     }
+    // cerr << "Usmi '" << usmi << "'\n";
 
     // We want exocyclic atoms not present for the query, but present for the smiles.
     // We remove the atoms from ring_sys, place an isotope on the attachment points,
@@ -940,6 +955,10 @@ std::optional<IWString>
 ExtractRings::CanonicalRingName(Molecule& m,
                         const int * ring_sys,
                         int sys) const {
+  if (! _respect_aromaticity) {
+    return NonAromaticCanonicalName(m, ring_sys, sys);
+  }
+
   m.compute_aromaticity_if_needed();
 
   // Gather the rings in the system.
@@ -951,6 +970,7 @@ ExtractRings::CanonicalRingName(Molecule& m,
     if (r->size() > _max_ring_size) {
       return std::nullopt;
     }
+
     rtype.emplace_back(RType(r->number_elements(), r->is_aromatic()));
   }
 
@@ -966,6 +986,40 @@ ExtractRings::CanonicalRingName(Molecule& m,
   IWString result;
   for (const RType& r: rtype) {
     result << r;
+  }
+
+  return result;
+}
+
+std::optional<IWString>
+ExtractRings::NonAromaticCanonicalName(Molecule& m,
+                        const int * ring_sys,
+                        int sys) const {
+  // Gather the rings in the system.
+  std::vector<RType> rtype;
+  for (const Ring* r : m.sssr_rings()) {
+    if (r->count_members_set_in_array(ring_sys, sys) == 0) {
+      continue;
+    }
+    if (r->size() > _max_ring_size) {
+      return std::nullopt;
+    }
+
+    rtype.emplace_back(RType(r->number_elements(), 0));
+  }
+
+  if (rtype.size() > 1) {
+    if (rtype.size() > _max_ring_system_size) {
+      return std::nullopt;
+    }
+
+    static CompareRType cmp;
+    iwqsort(rtype.data(), rtype.size(), cmp);
+  }
+
+  IWString result;
+  for (const RType& r: rtype) {
+    result << r.rsize;
   }
 
   return result;
@@ -1097,7 +1151,13 @@ ExtractRings::GenerateSmarts(Molecule& parent,
     smt << kOpenSquareBracket;
     // this is not quite correct. If the atom is exocyclic and aliphatic here
     // it prevents matching an aromatic later. Ignore for now.
-    if (data.aromatic_in_child[i]) {
+    if (! _respect_aromaticity) {
+      // If we have an exocyclic atom, need to add something - otherwise
+      // smarts is empty.
+      if (m.ring_bond_count(i) == 0) {
+        smt << "D1";
+      }
+    } else if (data.aromatic_in_child[i]) {
       smt << 'a';
       ++aromatic_atoms_encountered;
     } else {
@@ -1107,10 +1167,19 @@ ExtractRings::GenerateSmarts(Molecule& parent,
       smt << 'x' << m.ring_bond_count(i);
     }
     // This is inefficient, we could precomute the string ring membership(s) for each atom.
+    // Avoid specifying the same ring multiple times.
+    resizable_array<uint32_t> ring_size_already_added;
     for (const Ring* r : m.sssr_rings()) {
-      if (r->contains(i)) {
-        smt << 'r' << r->size();
+      // Ring does not contain our atom, skip.
+      if (! r->contains(i)) {
+        continue;
       }
+      if (ring_size_already_added.contains(r->size())) {
+        continue;
+      }
+
+      smt << 'r' << r->size();
+      ring_size_already_added << r->size();
     }
 
     if (! include_d) {
@@ -1123,7 +1192,7 @@ ExtractRings::GenerateSmarts(Molecule& parent,
         smt << "D>" << m.ncon(i);
       }
     } else if (m.ncon(i) > 1) {
-      smt << "D" << m.ncon(i);
+      smt << 'D' << m.ncon(i);
     }
     smt << kCloseSquareBracket;
     smiles_information.set_user_specified_atomic_smarts(i, smt);
@@ -1131,6 +1200,8 @@ ExtractRings::GenerateSmarts(Molecule& parent,
 
   m.ring_membership();
 
+  // This step may not be necessary, but let's make sure.
+  // set_write_smiles_aromatic_bonds_as_colons, below, seems to cover it.
   if (aromatic_atoms_encountered) {
     for (const Bond* b : m.bond_list()) {
       if (b->nrings() == 0) {
@@ -1145,9 +1216,13 @@ ExtractRings::GenerateSmarts(Molecule& parent,
     }
   }
 
-  set_write_smiles_aromatic_bonds_as_colons(1);
+  if (_respect_aromaticity) {
+    set_write_smiles_aromatic_bonds_as_colons(1);
+  }
   m.smiles(smiles_information);
-  set_write_smiles_aromatic_bonds_as_colons(0);
+  if (_respect_aromaticity) {
+    set_write_smiles_aromatic_bonds_as_colons(0);
+  }
 
   result = smiles_information.smiles();
 

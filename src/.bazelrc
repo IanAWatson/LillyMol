@@ -1,11 +1,11 @@
 common: --enable_bzlmod
 
 # This is probably what you want
-# build --cxxopt=-std=c++20 --copt=-march=native --cxxopt=-march=native
+build --cxxopt=-std=c++20 --copt=-march=native --cxxopt=-march=native
 
 # build --cxxopt=-std=c++20 --copt=-march=core-avx2  
 # sandybridge 2011
-build --cxxopt=-std=c++20 --cxxopt=-march=sandybridge --cxxopt=-mtune=sandybridge 
+# build --cxxopt=-std=c++23 --cxxopt=-march=sandybridge --cxxopt=-mtune=sandybridge 
 
 build --enable_bzlmod --experimental_cc_shared_library
 

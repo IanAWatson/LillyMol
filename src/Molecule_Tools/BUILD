@@ -196,6 +196,20 @@ py_proto_library(
 )
 
 proto_library(
+    name = "enumeration_proto",
+    srcs = [
+        "enumeration.proto",
+    ],
+)
+
+cc_proto_library(
+    name = "enumeration_cc_proto",
+    deps = [
+        "enumeration_proto",
+    ],
+)
+
+proto_library(
     name = "iwdescr_proto",
     srcs = [
         "iwdescr.proto",
@@ -663,6 +677,7 @@ cc_binary(
     ],
     deps = [
         "dicer_fragments_cc_proto",
+        "enumeration_cc_proto",
         "//Foundational/iwmisc",
         "//Molecule_Lib:iwmfingerprint",
         "//Molecule_Lib:iwmolecule",

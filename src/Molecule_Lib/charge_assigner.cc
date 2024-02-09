@@ -1356,6 +1356,12 @@ Charge_Assigner::build(const const_IWSubstring& s) {
              << "'\n";
         return 0;
       }
+    } else if (token.starts_with("ENV=") || token.starts_with("ENV:")) {
+      token.remove_leading_chars(4);
+      if (! BuildFromEnvValue(token)) {
+        cerr << "Charge_Assigner::build:invalid ENV specification '" << token << "'\n";
+        return 0;
+      }
     } else if ("verbose" == token) {
       verbose = 1;
     } else {

@@ -51,7 +51,6 @@ C[1C]1=NN=[1C](F)N=C1 s %% CHEMBL351412 76
 ![s_CHEMBL95650_106](Images/s_CHEMBL95650_106.png)
 ![s_CHEMBL17447_94](Images/s_CHEMBL17447_94.png)
 
-
 The output consists of the smiles of the new molecule.  The name of
 the starting molecule, 's' in this case.  Then follows the name of an
 exemplar molecule, that contains an example of the ring that has been
@@ -63,7 +62,7 @@ Note that due to symmetry, many of the replacement rings are used twice.
 
 Clearly the larger the number of examples of a ring in the
 knowledge base, the higher the probability that this ring
-might be synthietically feasible. Experience tells us that rings 
+might be synthetically feasible. Experience tells us that rings 
 with low numbers of exemplars should be treated with caution.
 While some may represent real molecules that have been made,
 many seem more likely to have been drawing errors, or aspirations.
@@ -75,6 +74,18 @@ Fc1c[nH][n](Cl)so1 pbenzene %% PBCHM144506470.6a 2
 Fc1[c-][o+]c(Cl)cc1 pbenzene %% PBCHM139100082.6a 2
 ```
 are rings that have only two examples in the knowledge base.
+
+From Chembl, the most common ring system is `5a6a`, where there
+are about 4300 different 5-6 fused aromatic ring systems. There
+are several ring systems with just one instance including
+`4A4A4A`
+![4A4A4A](Images/CHEMBL4933998.png)
+and
+`4a5A7A`
+![4a5A7A](Images/CHEMBL5220269.png)
+Given that rings are only exchanged with like-rings, these are
+very unlikely to be used.
+
 
 ## Usage
 In order to make ring replacement work, two procedures are required.
@@ -122,7 +133,6 @@ cd ..
 mkdir ...
 ```
 
-
 ## Naming convention.
 We adopt an idea from smarts in that aromatic atoms are represented
 as lowercase and aliphatic as uppercase. So the file containing data
@@ -140,8 +150,11 @@ fused (or possibly spiro fused) systems consisting of a
 Such a dataitem might be
 ```
 smi: "[1CH]1=C2CCC3(CC3)OC2=N[1CH]=N1"
-     smt: "[ax2r6D3]1:[ax3r6r6D3]2:[ax2r6D2]:[ax2r6D2]:[ax4r3r6D4]3(:[ax2r3D2]:[ax2r3D2]:3):[ax2r6D2]:[ax3r6r6D3]:2:[ax2r6D2]:[ax2r6D3]:[ax2r6D2]:1"
-     id: "SCHEMBL2706866" n: 126 conn: true usmi: "O1C2(CCc3c1[n][1cH][n][1cH]3)CC2"
+     smt: "[ax2r6D3]1:[ax3r6D3]2:[ax2r6D2]:[ax2r6D2]:[ax4r3r6D4]3(:[ax2r3D2]:[ax2r3D2]:3):[ax2r6D2]:[ax3r6D3]:2:[ax2r6D2]:[ax2r6D3]:[ax2r6D2]:1"
+     id: "SCHEMBL2706866"
+     n: 126
+     conn: true
+     usmi: "O1C2(CCc3c1[n][1cH][n][1cH]3)CC2"
 ```
 which includes a spiro fused 3 membered ring.
 
@@ -155,7 +168,30 @@ are case insensitive, where the files 'rings_5a.smi' and 'rings_5A.smi' cannot
 coexist. See the '-X' option.
 
 On a fairly old computer (2014), running ring extraction on 2.2M Chembl molecules
-takes 5 minutes. Newer hardware will see that done in under 2 minutes.
+takes 5 minutes. A 2017 computer that takes 3:30 minutes.
+Newer hardware will see that done in under 3 minutes.
+
+### Aromaticity
+It can be useful to allow for the possibility of replacing an aromatic ring with
+an aliphatic ring, or vice versa. As can be seen from the smarts above,
+aromaticity is, by default, recorded in the smarts. Adding the `-X noarom`
+option to `ring_extraction`, generates smarts that do not specify the
+aromaticity of the atom, which then allows ring replacement regardless of
+aromaticity.
+
+A typical entry in the file might look like
+```
+smi: "[CH2:70]1[1NH]N=[1CH]C2=CC=CC=C12"
+     smt: "[x2r6D2]1[x2r6D>2][x2r6D2]=[x2r6D>2][x3r6D3]2:[x2r6D2]:[x2r6D2]:[x2r6D2]:[x2r6D2]:[x3r6D3]1:2"
+     id: "CHEMBL1500071.66"
+     n: 4569
+     conn: true
+     exo: "[70O]"
+     usmi: "O=c1[1nH][n][1cH]c2c1cccc2"
+```
+Note that the previous smarts had 'a' or 'A' to denote the atom's aromaticity, but this
+version leaves that unspecified, leaving the smarts able to match aromatic or aliphatic
+forms. Ring replacement does not need any changes in order to accommodate this.
 
 ## Details - TLDR, for geeks only.
 

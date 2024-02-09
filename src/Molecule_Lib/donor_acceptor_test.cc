@@ -102,7 +102,6 @@ TestHbonds::SetUp() {
 TEST_P(TestHbonds, TestBuilding) {
   const auto params = GetParam();
   ASSERT_TRUE(_mol.build_from_smiles(params.smiles));
-  int q = _bruns.process(_mol);
   EXPECT_EQ(_bruns.process(_mol), params.numeric_result);
   EXPECT_EQ(_mol.aromatic_smiles(), params.result) << _mol.aromatic_smiles() <<
         " expected " << params.result;

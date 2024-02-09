@@ -1,0 +1,6 @@
+# configuration for enumeration
+
+# If more than 10 sites in a molecule, downsample to that number
+downsample_threshold: 10
+
+charge_assigner: "ENV=/home/ian/LillyMol/data/queries/charges"

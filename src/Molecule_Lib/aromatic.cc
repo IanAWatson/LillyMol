@@ -865,8 +865,7 @@ Molecule::_determine_aromaticity(const Set_of_Atoms & p,
     if (16 == zj) {
       if (jcon == 3 && jbonds == 4 && aj->formal_charge() == 0) {
       } else if (jcon == 2 && jbonds == 3 && hcount(j) == 1) {
-      } else if ((2 == jcon && 4 == jbonds) || (2 == jcon && 3 == jbonds && 0 == aj->formal_charge()))
-      {
+      } else if ((2 == jcon && 4 == jbonds) || (2 == jcon && 3 == jbonds && 0 == aj->formal_charge())) {
         impossible_aromatic = 1;
         result = NOT_AROMATIC;
         return 1;
@@ -4110,7 +4109,7 @@ Molecule::_must_be_single_bond_between(Kekule_Temporary_Arrays & kta, atom_numbe
       0 == a->implicit_hydrogens())
     ;
   else {
-    // cerr << "Atom " << zatom << " turned off qq\n";
+    // cerr << "Atom " << zatom << ' ' << smarts_equivalent_for_atom(zatom) << " turned off qq\n";
     vary_bonds[zatom] = 0;
   }
 
@@ -4118,8 +4117,8 @@ Molecule::_must_be_single_bond_between(Kekule_Temporary_Arrays & kta, atom_numbe
       0 == c->implicit_hydrogens())
     ;
   else {
-    vary_bonds[continuation_atom] = 0;
     // cerr << "Unset continuation_atom " << continuation_atom << '\n';
+    vary_bonds[continuation_atom] = 0;
   }
 
   // We have now set PREV-ZATOM=CONTINUATION_ATOM
@@ -4358,7 +4357,7 @@ Molecule::_do_obvious_bond_order_settings(Kekule_Temporary_Arrays & kta)
 
     if (7 == z && 3 == icon && 4 == ibonds && 0 == a->formal_charge())
       ;
-    else if (2 == a->ncon() && (8 == z || 16 == z))
+    else if (2 == a->ncon() && 8 == z)
     {
       if (0 == a->formal_charge() && 0 == kekule_try_positive_nitrogen)
       {
@@ -4366,6 +4365,27 @@ Molecule::_do_obvious_bond_order_settings(Kekule_Temporary_Arrays & kta)
         continue;
       }
 
+      if (-1 == a->formal_charge())    // not sure this really exists..
+      {
+        vary_bonds[i] = 0;
+        continue;
+      }
+
+      //    Beware S+. If we ask for ->implicit_hydrogens() we may get 1, but likely it has 0
+
+      int ih;
+      if (a->implicit_hydrogens_known())
+        ih = a->implicit_hydrogens();
+      else
+        ih = 0;
+
+      if (ibonds + ih == e->normal_valence() + a->formal_charge())
+      {
+        vary_bonds[i] = 0;
+        continue;
+      }
+    }
+    else if (a->ncon() == 2 && z == 16) {
       if (-1 == a->formal_charge())    // not sure this really exists..
       {
         vary_bonds[i] = 0;
@@ -5547,7 +5567,7 @@ Molecule::_find_kekule_form(const resizable_array<const Ring *> & rings,
   int * vary_bonds = kta.vary_bonds();
 
 #ifdef DEBUG_KEKULE
-  cerr << "Into _find_kekule_form, atom " << zatom << " vary_bonds " << vary_bonds[zatom] << '\n';
+  cerr << "Into _find_kekule_form, atom " << zatom << " vary_bonds " << vary_bonds[zatom] << ' ' << smarts_equivalent_for_atom(zatom) << '\n';
 #endif
 
   if (0 == vary_bonds[zatom])
@@ -6148,7 +6168,7 @@ Molecule::_find_kekule_form(Kekule_Temporary_Arrays & kta)
     cerr << "After iteration, failures = " << failures << '\n';
     for (int i = 0; i < _number_elements; i++)
     {
-      cerr << "i = " << i << " aromatic = " << kta.aromatic_atoms()[i] << '\n';
+      cerr << "i = " << i << " aromatic = " << kta.aromatic_atoms()[i] << ' ' << smarts_equivalent_for_atom(i) << '\n';
     }
 #endif
   }

@@ -7,6 +7,8 @@
 #include <iostream>
 #include <limits>
 #include <memory>
+#include <optional>
+#include <ranges>
 #include <random>
 
 #include "google/protobuf/text_format.h"
@@ -15,18 +17,23 @@
 #include "Foundational/cmdline/cmdline.h"
 #include "Foundational/data_source/iwstring_data_source.h"
 #include "Foundational/iwmisc/misc.h"
+#include "Foundational/iwmisc/proto_support.h"
 #include "Foundational/iwstring/iw_stl_hash_set.h"
 
 #include "Molecule_Lib/aromatic.h"
+#include "Molecule_Lib/charge_assigner.h"
 #include "Molecule_Lib/etrans.h"
 #include "Molecule_Lib/istream_and_type.h"
 #include "Molecule_Lib/molecule.h"
+#include "Molecule_Lib/path.h"
+#include "Molecule_Lib/rotbond_common.h"
 #include "Molecule_Lib/rwsubstructure.h"
 #include "Molecule_Lib/substructure.h"
 #include "Molecule_Lib/standardise.h"
 #include "Molecule_Lib/target.h"
 
 #include "Molecule_Tools/dicer_fragments.pb.h"
+#include "Molecule_Tools/enumeration.pb.h"
 
 namespace substituent_enumeration {
 
@@ -56,6 +63,7 @@ in each fragment is used.
  -M <natoms>            Only use substituents with at most <matoms>
  -y <query>             Specify the atom(s) in the starting molecule to which fragments can    be added.
  -n <query>             Specify the atom(s) in the starting molecule to which fragments cannot be added.
+                        only one of either -y -r -n can be specified.
  -p                     write the parent molecule before any variants
  -Y ...                 other options, enter '-Y help' for info
 
@@ -95,6 +103,36 @@ class Fragment {
      atomic_number_t _atomic_number = kInvalidAtomicNumber;
      bool _is_halogen = false;
 
+   // Some atomic properties useful for avoiding forming
+   // undesirable adjacencies.
+     int _aromatic = 0;
+     int _ring_bond_count = 0;
+     int _single_bond_count = 0;
+     int _double_bond_count = 0;
+     int _triple_bond_count = 0;
+     int _aryl = 0;
+     int _vinyl = 0;
+     int _attached_carbon_count = 0;
+     int _attached_heteroatom_count = 0;
+     int _attached_halogen_count = 0;
+     int _attached_nitrogen_count = 0;
+     int _attached_oxygen_count = 0;
+     int _saturated = 1;
+     int _saturated_oxygen_neighbour = 0;
+     int _saturated_nitrogen_neighbour = 0;
+
+     // If this is the carbon atom of an amide, both
+     // of these will be set.
+     int _carbon_of_amide = 0;
+     int _nitrogen_of_amide = 0;
+
+     // These are whole molecule properties.
+     int _positive_charge = 0;
+     int _negative_charge = 0;
+     int _halogen_count = 0;
+
+     int _rotbonds = 0;
+
   // If this comes from a DicerFragment proto, the number
   // of instances.
      uint32_t _count = 0;
@@ -103,15 +141,22 @@ class Fragment {
      // starting molecule.
      int _aromatic_only = 0;
 
+  // private functions
+    void EstablishAtomicProperties(Molecule& m, atom_number_t zatom);
+
   public:
     Fragment();
     ~Fragment();
 
-    const Molecule* frag() const {
+    // Any caller should not change the molecule since that could
+    // invalidate stored values. But methods like nrings() are non const.
+    Molecule* frag() const {
       return _frag;
     }
 
     int SetFragment(Molecule* f);
+
+    int DetermineFormalCharges(Charge_Assigner& charge_assigner);
 
     int is_halogen() const {
       return _is_halogen;
@@ -132,15 +177,79 @@ class Fragment {
       _count = s;
     }
 
+    int rotbonds() const {
+      return _rotbonds;
+    }
+    void set_rotbonds(int s) {
+      _rotbonds = s;
+    }
+
     int aromatic_only() const {
       return _aromatic_only;
     }
     void set_aromatic_only(int s) {
       _aromatic_only = s;
     }
+
+    int saturated() const {
+      return _saturated;
+    }
+
+    int aromatic() const {
+      return _aromatic;
+    }
+    int aryl() const {
+      return _aryl;
+    }
+    int vinyl() const {
+      return _vinyl;
+    }
+
+    int saturated_heteroatom_neighbour() const {
+      if (_saturated_oxygen_neighbour) {
+        return 1;
+      }
+      if (_saturated_nitrogen_neighbour) {
+        return 1;
+      }
+
+      return 0;
+    }
+
+    int attached_carbon_count() const {
+      return _attached_carbon_count;
+    }
+    int attached_nitrogen_count() const {
+      return _attached_nitrogen_count;
+    }
+    int attached_oxygen_count() const {
+      return _attached_oxygen_count;
+    }
+
+    int positive_charge() const {
+      return _positive_charge;
+    }
+    int negative_charge() const {
+      return _negative_charge;
+    }
+    int halogens() const {
+      return _halogen_count;
+    }
+    int carbon_of_amide() const {
+      return _carbon_of_amide;
+    }
+    int nitrogen_of_amide() const {
+      return _nitrogen_of_amide;
+    }
 };
 
 Fragment::Fragment() {
+}
+
+Fragment::~Fragment() {
+  if (_frag != nullptr) {
+    delete _frag;
+  }
 }
 
 bool
@@ -189,6 +298,7 @@ Fragment::SetFragment(Molecule* f) {
     _zatom = i;
     _atomic_number = f->atomic_number(i);
     _is_halogen = IsHalogem(f->atomic_number(i));
+    EstablishAtomicProperties(*f, i);
     _frag = f;
     return 1;
   }
@@ -196,10 +306,231 @@ Fragment::SetFragment(Molecule* f) {
   return 0;
 }
 
-Fragment::~Fragment() {
-  if (_frag != nullptr) {
-    delete _frag;
+int
+CountHalogens(const Molecule& m) {
+  const int matoms = m.natoms();
+  int halogens = 0;
+  for (int i = 0; i < matoms; ++i) {
+    atomic_number_t z = m.atomic_number(i);
+    if (z < 9) {
+      continue;
+    }
+    if (z == 9 || z == 17 || z == 35 || z == 53) {
+      ++halogens;
+    }
   }
+
+  return halogens;
+}
+
+int
+Fragment::DetermineFormalCharges(Charge_Assigner& charge_assigner) {
+  const int matoms = _frag->natoms();
+
+  std::unique_ptr<formal_charge_t[]> q = std::make_unique<formal_charge_t[]>(matoms);
+  std::fill_n(q.get(), matoms, 0);
+
+  if (charge_assigner.process(*_frag, q.get()) == 0) {
+    return 1;
+  }
+
+  for (int i = 0; i < matoms; ++i) {
+    if (q[i] == 0) {
+    } else if (q[i] > 0) {
+      ++_positive_charge;
+    } else {
+      ++_negative_charge;
+    }
+  }
+
+  _halogen_count = CountHalogens(*_frag);
+
+  return 1;
+}
+
+// Examine the atoms attached to `zatom` and if any of them are saturated
+// nitrogen or oxygen atoms, update the _saturated_*_neighbour class variable.
+void
+Fragment::EstablishAtomicProperties(Molecule& m, atom_number_t zatom) {
+  // Only compute this for some atom types.
+  m.compute_aromaticity_if_needed();
+
+  _aromatic = m.is_aromatic(zatom);
+
+  // these help with amide perception.
+  int doubly_bonded_oxygen = kInvalidAtomNumber;
+  int singly_bonded_nitrogen = kInvalidAtomNumber;
+
+  for (const Bond* b : m[zatom]) {
+    if (b->nrings()) {
+      ++_ring_bond_count;
+    }
+
+    if (b->is_aromatic()) {
+      continue;
+    }
+
+    const atom_number_t o = b->other(zatom);
+    const atomic_number_t z = m.atomic_number(o);
+
+    if (b->is_single_bond()) {
+      ++_single_bond_count;
+      if (z == 7) {
+        singly_bonded_nitrogen = o;
+      }
+    } else if (b->is_double_bond()) {
+      _saturated = 0;
+      ++_double_bond_count;
+      if (z == 8) {
+        doubly_bonded_oxygen = o;
+      }
+    } else {
+      _saturated = 0;
+      ++_triple_bond_count;
+    }
+
+    const int saturated = m.saturated(o);
+
+    if (m.is_aromatic(o)) {
+      ++_aryl;
+    } else if (! saturated) {
+      ++_vinyl;
+    }
+
+    if (z == 6) {
+      ++_attached_carbon_count;
+      continue;
+    } 
+    
+    ++_attached_heteroatom_count;
+
+    if (z == 7) {
+      ++_attached_nitrogen_count;
+      if (saturated) {
+        ++_saturated_nitrogen_neighbour;
+      }
+    } else if (z == 8) {
+      ++_attached_oxygen_count;
+      if (saturated) {
+        ++_saturated_oxygen_neighbour;
+      }
+    } else if (IsHalogem(z)) {
+      ++_attached_halogen_count;
+    }
+  }
+
+  if (singly_bonded_nitrogen != kInvalidAtomNumber &&
+      doubly_bonded_oxygen != kInvalidAtomNumber) {
+    _carbon_of_amide = 1;
+  }
+}
+
+// Data we harvest from a molecule.
+struct MoleculeData {
+  int positive = 0;
+  int negative = 0;
+  int aromatic_ring_count = 0;
+  int nrings = 0;
+
+  // includes F.
+  int halogens = 0;
+  // only set if a limit on rotatable bonds is specified.
+  int rotbonds = 0;
+
+  int Initialise(Molecule& m, Charge_Assigner& charge_assigner);
+};
+
+int
+MoleculeData::Initialise(Molecule& m, Charge_Assigner& charge_assigner) {
+  m.compute_aromaticity_if_needed();
+
+  nrings = m.nrings();
+  for (const Ring* r : m.sssr_rings()) {
+    if (r->is_aromatic()) {
+      ++aromatic_ring_count;
+    }
+  }
+
+  if (charge_assigner.active()) {
+    const int matoms = m.natoms();
+
+    std::unique_ptr<formal_charge_t[]> q = std::make_unique<formal_charge_t[]>(matoms);
+    charge_assigner.process(m, q.get());
+    for (int i = 0; i < matoms; ++i) {
+      if (q[i] == 0) {
+      } else if (q[i] > 0) {
+        ++positive;
+      } else {
+        ++negative;
+      }
+    }
+  }
+
+  halogens = CountHalogens(m);
+
+  return 1;
+}
+
+
+int
+AttachedTo(const Molecule& m,
+           atom_number_t zatom,
+           atomic_number_t z) {
+  for (const Bond* b : m[zatom]) {
+    atom_number_t o = b->other(zatom);
+    if (m.atomic_number(o) == z) {
+      return 1;
+    }
+  }
+
+  return 0;
+}
+
+int
+AttachedToSaturatedON(const Molecule& m,
+                atom_number_t zatom) {
+  for (const Bond* b : m[zatom]) {
+    atom_number_t o = b->other(zatom);
+
+    const atomic_number_t zo = m.atomic_number(o);
+    if ((zo == 7 || zo == 8) && m.saturated(o)) {
+      return 1;
+    }
+  }
+
+  return 0;
+}
+
+// Return true if joining `fragment` to `m` via `zatom` would likely
+// result in formation of an NCN motif. Note that this is stricter than
+// an aminal, where the Nitrogen atoms must be saturated.
+// We need to check two cases.
+// molecule NC - N fragment
+// molecule N  - CN fragment
+// Also look for O-C-N
+//
+int
+IsNCN(Molecule& m, atom_number_t zatom, const Fragment& fragment) {
+  if (m.atomic_number(zatom) == 6 &&
+      (fragment.atomic_number() == 7 || fragment.atomic_number() == 8)) {
+    if (! m.saturated(zatom)) {
+      return 0;
+    }
+    return AttachedToSaturatedON(m, zatom);
+  } else if ((m.atomic_number(zatom) == 7 || m.atomic_number(zatom) == 8) &&
+             fragment.atomic_number() == 6) {
+    if (! fragment.saturated()) {
+      return 0;
+    }
+    if (fragment.attached_nitrogen_count()) {
+      return 1;
+    }
+    if (fragment.attached_oxygen_count()) {
+      return 1;
+    }
+  }
+
+  return 0;
 }
 
 // A class that holds all the information needed for the
@@ -211,10 +542,6 @@ class Options {
   private:
     int _verbose = 0;
 
-    int _reduce_to_largest_fragment = 0;
-
-    int _remove_chirality = 0;
-
     Chemical_Standardisation _chemical_standardisation;
 
     // Not a part of all applications, just an example...
@@ -223,45 +550,46 @@ class Options {
     // A list of fragments that are to be added.
     resizable_array_p<Fragment> _fragment;
 
-    int _min_atoms_in_fragment = 0;
-    int _max_atoms_in_fragment = std::numeric_limits<int>::max();
+    EnumerationConfig _config;
 
     // We can specify atoms where substitution is OK or
     // atoms where substitution is not allowed.
     resizable_array_p<Substructure_Query> _ok_attach;
     resizable_array_p<Substructure_Query> _no_attach;
 
-    int _write_parent = 0;
+    quick_rotbond::QuickRotatableBonds _rotbond;
+
+    // Once the new molecule is formed, we can do substructure
+    //searches to discard known problems.
+    resizable_array_p<Substructure_Query> _discard_products_containing;
+    int _product_discarded_by_query = 0;
 
     // By default, we do not check the valence of the products.
-    int _check_valence = 0;
     int _products_with_bad_valence = 0;
 
-    // Even with discarding molecules with too many reactive sites and
-    // downsampling, we can still end up with a molecule that generates
-    // too many products.
-    // Remember that this is counting the number of products formed,
-    // not the number of sites processed, so it will need to be multiplied
-    // by the size of the fragment library.
-    int _stop_generating_if_more_than = 0;
+    // Triggered by _config.stop_generating_if_more_than()
     int _stopped_for_too_many_products = 0;
 
     // Do not generate duplicates.
     IW_STL_Hash_Set _seen;
 
-    int _discard_if_too_many_sites = 0;
+    // Triggered by _config.discard_if_too_many_sites()
     int _discarded_for_too_many_sites = 0;
 
-    // Another way of dealing with large molecules is to only randomly
-    // do some of the sites. If there are too many sites, choose them 
-    // randomly to get approximately this many.
-    int _downsample_threshold = 0;
+    // triggered by _config.max_atoms_in_product();
+    int _product_too_many_atoms = 0;
+
+    // Triggered by _config.max_rings_in_product()
+    int _product_too_many_rings = 0;
+
+    // Triggered by _config.max_halogens_in_product()
+    int _product_too_many_halogens = 0;
 
     std::default_random_engine _generator;
 
     int _molecules_read = 0;
 
-    int _remove_isotopes = 0;
+    Charge_Assigner _charge_assigner;
 
     // The number of sites in each starting molecule.
     extending_resizable_array<int> _nsites;
@@ -272,9 +600,13 @@ class Options {
 
     // Private functions
 
+    int InitialiseFromProto();
+    int BuildQueries(resizable_array_p<Substructure_Query>& queries,
+                      const google::protobuf::RepeatedPtrField<std::string>& tokens);
+
     int IdentifyAttachmentPoints(Molecule& m, int * attachment_point);
     int Seen(Molecule& m);
-    int GenerateVariants(Molecule& m, atom_number_t zatom,
+    int GenerateVariants(Molecule& m, const MoleculeData& mdata, atom_number_t zatom,
                           IWString_and_File_Descriptor& output);
     int OkProperties(Molecule& m);
 
@@ -287,6 +619,12 @@ class Options {
     int ReadFragmentsAsSmiles(data_source_and_type<Molecule>& input, int aromatic_only);
 
     int OkFragment(Molecule& frag) const;
+    int ContainsRejectedSubstructure(Molecule& m);
+
+    int OkToBeCombined(Molecule& m,
+                const MoleculeData& mdata,
+                atom_number_t zatom,
+                Fragment& frag);
 
   public:
     Options();
@@ -316,9 +654,8 @@ class Options {
 
 Options::Options() {
   _verbose = 0;
-  _reduce_to_largest_fragment = 0;
-  _remove_chirality = 0;
   _molecules_read = 0;
+  _rotbond.set_calculation_type(quick_rotbond::QuickRotatableBonds::RotBond::kExpensive);
 }
 
 int
@@ -332,44 +669,67 @@ Options::Initialise(Command_Line& cl) {
     }
   }
 
+  if (cl.option_present('C')) {
+    IWString fname = cl.string_value('C');
+    std::optional<EnumerationConfig> proto =
+        iwmisc::ReadTextProtoCommentsOK<EnumerationConfig>(fname);
+    if (! proto) {
+      cerr << "Options::Initialise:cannot read config proto '" << fname << "'\n";
+      return 0;
+    }
+
+    _config = std::move(*proto);
+
+    if (! InitialiseFromProto()) {
+      cerr << "Options::Initialise:cannot initialise state from proto\n";
+      cerr << proto->ShortDebugString() << '\n';
+      return 0;
+    }
+  }
+
   if (cl.option_present('T')) {
     if (!_element_transformations.construct_from_command_line(cl, _verbose, 'T'))
       Usage(8);
   }
 
   if (cl.option_present('l')) {
-    _reduce_to_largest_fragment = 1;
+    _config.set_reduce_to_largest_fragment(true);
     if (_verbose) {
       cerr << "Will reduce to largest fragment\n";
     }
   }
 
   if (cl.option_present('c')) {
-    _remove_chirality = 1;
+    _config.set_remove_chirality(true);
     if (_verbose) {
       cerr << "Will remove all chirality\n";
     }
   }
 
   if (cl.option_present('m')) {
-    if (! cl.value('m', _min_atoms_in_fragment)) {
+    int m;
+    if (! cl.value('m', m)) {
       cerr << "Invalid min atoms in fragment (-c)\n";
       return 0;
     }
 
+    _config.set_min_atoms_in_fragment(m);
+
     if (_verbose) {
-      cerr << "Will only use fragments with at least " << _min_atoms_in_fragment << " atoms\n";
+      cerr << "Will only use fragments with at least " << m << " atoms\n";
     }
   }
 
   if (cl.option_present('M')) {
-    if (! cl.value('M', _max_atoms_in_fragment)) {
+    int m;
+    if (! cl.value('M', m)) {
       cerr << "Invalid max atoms in fragment (-c)\n";
       return 0;
     }
 
+    _config.set_max_atoms_in_fragment(m);
     if (_verbose) {
-      cerr << "Will only use fragments with at most " << _max_atoms_in_fragment << " atoms\n";
+      cerr << "Will only use fragments with at most " << m << " atoms\n";
     }
   }
 
@@ -420,12 +780,12 @@ Options::Initialise(Command_Line& cl) {
     }
 
     if (_verbose) {
-      cerr << "Defined " << _no_attach.size() << " ok queries for excluding attachment points\n";
+      cerr << "Defined " << _no_attach.size() << " queries for excluding attachment points\n";
     }
   }
 
   if (cl.option_present('p')) {
-    _write_parent = 1;
+    _config.set_write_parent(true);
     if (_verbose) {
       cerr << "Will write the parent molecule\n";
     }
@@ -435,38 +795,44 @@ Options::Initialise(Command_Line& cl) {
     IWString y;
     for (int i = 0; cl.value('Y', y, i); ++i) {
       if (y == "xiso") {
-        _remove_isotopes = 1;
+        _config.set_remove_isotopes(true);
         if (_verbose) {
           cerr << "Will remove isotopic labels from products\n";
         }
       } else if (y.starts_with("dmv=")) {
         y.remove_leading_chars(4);
-        if (! y.numeric_value(_discard_if_too_many_sites)) {
+        int d;
+        if (! y.numeric_value(d)) {
           cerr << "Invalid discard if too many sites directive 'dmv=" << y << "'\n";
           return 0;
         }
+        _config.set_discard_if_too_many_sites(d);
       } else if (y.starts_with("dns=")) {
         y.remove_leading_chars(4);
-        if (! y.numeric_value(_downsample_threshold)) {
+        uint32_t d;
+        if (! y.numeric_value(d)) {
           cerr << "Invalid downsample threshold 'dns=" << y << "'\n";
           return 0;
         }
+        _config.set_downsample_threshold(d);
         if (_verbose) {
-          cerr << "Will downsample molecules with more than " << _downsample_threshold << " sites\n";
+          cerr << "Will downsample molecules with more than " << d << " sites\n";
         }
       } else if (y == "valence") {
-        _check_valence = 1;
+        _config.set_check_valences(true);
         if (_verbose) {
           cerr << "Will discard products with bad valences\n";
         }
       } else if (y.starts_with("stop=")) {
         y.remove_leading_chars(5);
-        if (! y.numeric_value(_stop_generating_if_more_than)) {
+        uint32_t s;
+        if (! y.numeric_value(s)) {
           cerr << "Invalid stop= directive '" << y << "'\n";
           return 0;
         }
+        _config.set_stop_generating_if_more_than(s);
         if (_verbose) {
-          cerr << "Will abandon an input molecule if it generates more than " << _stop_generating_if_more_than << " products\n";
+          cerr << "Will abandon an input molecule if it generates more than " << s << " products\n";
         }
       } else if (y == "help") {
         DisplayDashYOptions(cerr);
@@ -480,18 +846,84 @@ Options::Initialise(Command_Line& cl) {
   return 1;
 }
 
+// The proto contains various things that we need to convert into our own
+// data structures, charge assigner, queries...
+int
+Options::InitialiseFromProto() {
+  if (_config.ok_attach().size()) {
+    if (! BuildQueries(_ok_attach, _config.ok_attach())) {
+      cerr << "Options::InitialiseFromProto:cannot initialise ok_attach queries\n";
+      return 0;
+    }
+  }
+
+  if (_config.no_attach().size()) {
+    if (! BuildQueries(_no_attach, _config.no_attach())) {
+      cerr << "Options::InitialiseFromProto:cannot initialise no_attach queries\n";
+      return 0;
+    }
+  }
+
+  if (_ok_attach.size() && _no_attach.size()) {
+    cerr << "Options::InitialiseFromProto:cannot have both ok attach and no attach queries\n";
+    return 0;
+  }
+
+  if (_config.has_charge_assigner()) {
+    IWString tmp(_config.charge_assigner());
+    if (! _charge_assigner.build(tmp)) {
+      cerr << "Options::InitialiseFromProto:cannot initialise charge assigner '" << tmp << "'\n";
+      return 0;
+    }
+    _charge_assigner.set_apply_charges_to_molecule(0);
+  }
+
+  if (_config.discard_products_containing_size()) {
+    if (! BuildQueries(_discard_products_containing, _config.discard_products_containing())) {
+      cerr << "Options::Initialise:cannot read queries for discards\n";
+      return 0;
+    }
+  }
+
+  return 1;
+}
+
+int
+Options::BuildQueries(resizable_array_p<Substructure_Query>& queries,
+                      const google::protobuf::RepeatedPtrField<std::string>& tokens) {
+  for (const std::string& token : tokens) {
+    IWString tmp(token);
+    if (! process_cmdline_token('*', tmp, queries, 0)) {
+      cerr << "Options::BuildQueries:cannot process '" << token << "'\n";
+      return 0;
+    }
+  }
+
+  return 1;
+}
+
 int
 Options::Report(std::ostream& output) const {
   output << "Read " << _molecules_read << " molecules\n";
   if (_discarded_for_too_many_sites) {
-    output << _discarded_for_too_many_sites << " input molecules discarded for more than " << _discard_if_too_many_sites << " sites\n";
+    output << _discarded_for_too_many_sites << " input molecules discarded for more than " << _config.discard_if_too_many_sites() << " sites\n";
   }
-  if (_check_valence) {
+  if (_config.check_valences()) {
     output << "Discarded " << _products_with_bad_valence << " products with bad valence\n";
   }
-  if (_stop_generating_if_more_than) {
-    output << _stopped_for_too_many_products << " enumerations stopped for generating " <<  _stop_generating_if_more_than << " products\n";
+  if (_config.stop_generating_if_more_than() > 0) {
+    output << _stopped_for_too_many_products << " enumerations stopped for generating " <<  _config.stop_generating_if_more_than() << " products\n";
   }
+  if (_discard_products_containing.size()) {
+    output << _product_discarded_by_query << " products discarded for hitting rejection query\n";
+  }
+  if (_config.has_max_atoms_in_product()) {
+    output << _product_too_many_atoms << " products with more than " << _config.max_atoms_in_product() << " atoms\n";
+  }
+  if (_config.has_max_rings_in_product()) {
+    output << _product_too_many_rings << " products with more than " << _config.max_rings_in_product() << " rings\n";
+  }
+
   Accumulator_Int<int> acc;
   for (int i = 0; i < _nsites.number_elements(); ++i) {
     if (_nsites[i]) {
@@ -515,11 +947,11 @@ Options::Preprocess(Molecule& m) {
     return 0;
   }
 
-  if (_reduce_to_largest_fragment) {
+  if (_config.reduce_to_largest_fragment()) {
     m.reduce_to_largest_fragment_carefully();
   }
 
-  if (_remove_chirality) {
+  if (_config.remove_chirality()) {
     m.remove_all_chiral_centres();
   }
 
@@ -545,10 +977,16 @@ Options::Process(Molecule& m,
     return 1;
   }
 
-  if (_write_parent) {
+  if (_config.write_parent()) {
     static constexpr char kSep = ' ';
 
     output << m.smiles() << kSep << m.name() << '\n';
+  }
+
+  MoleculeData mdata;
+  mdata.Initialise(m, _charge_assigner);
+  if (_config.has_max_rotbonds_in_product()) {
+    mdata.rotbonds = _rotbond.Process(m);
   }
 
   std::unique_ptr<int[]> attachment_point = std::make_unique<int[]>(matoms);
@@ -562,17 +1000,23 @@ Options::Process(Molecule& m,
   }
 
   for (int i = 0; i < matoms; ++i) {
-    if (m.hcount(i) == 0) {
+    if (m.formal_charge(i)) {
+      attachment_point[i] = 0;
+    } else if (m.hcount(i) == 0) {
       attachment_point[i] = 0;
     }
   }
 
-  const int nsites = std::count(attachment_point.get(), attachment_point.get() + matoms, 1);
+  const uint32_t nsites = std::count(attachment_point.get(), attachment_point.get() + matoms, 1);
 
   ++_nsites[nsites];
 
-  if (_discard_if_too_many_sites) {
-    if (nsites > _discard_if_too_many_sites) {
+  if (nsites == 0) {
+    return 1;
+  }
+
+  if (_config.discard_if_too_many_sites() > 0) {
+    if (nsites > _config.discard_if_too_many_sites()) {
       ++_discarded_for_too_many_sites;
       return 0;
     }
@@ -580,12 +1024,12 @@ Options::Process(Molecule& m,
   // cerr << "Processing '" << m.name() << "' nsites " << nsites << "\n";
 
   std::unique_ptr<std::bernoulli_distribution> rng;
-  if (nsites > _downsample_threshold) {
-    float fraction = iwmisc::Fraction<double>(_downsample_threshold, nsites);
+  if (nsites > _config.downsample_threshold()) {
+    float fraction = iwmisc::Fraction<double>(_config.downsample_threshold(), nsites);
     rng = std::make_unique<std::bernoulli_distribution>(fraction);
   }
 
-  int rc = 0;
+  uint32_t rc = 0;
   for (int i = 0; i < matoms; ++i) {
     if (! attachment_point[i]) {
       continue;
@@ -595,9 +1039,9 @@ Options::Process(Molecule& m,
       continue;
     }
 
-    rc += GenerateVariants(m, i, output);
+    rc += GenerateVariants(m, mdata, i, output);
 
-    if(_stop_generating_if_more_than && rc > _stop_generating_if_more_than) {
+    if(_config.has_stop_generating_if_more_than() && rc > _config.stop_generating_if_more_than()) {
       ++_stopped_for_too_many_products;
       break;
     }
@@ -665,7 +1109,9 @@ OkBondFormation(Molecule& m,
 }
 
 int
-Options::GenerateVariants(Molecule& m, atom_number_t zatom,
+Options::GenerateVariants(Molecule& m, 
+                          const MoleculeData& mdata,
+                          atom_number_t zatom,
                           IWString_and_File_Descriptor& output) {
   const int initial_matoms = m.natoms();
 
@@ -675,7 +1121,9 @@ Options::GenerateVariants(Molecule& m, atom_number_t zatom,
 
   // cerr << "For atom " << zatom << " in " << m.name() << " will generate " << _fragment.size() << " variants\n";
   int rc = 0;
-  for (const Fragment* frag : _fragment) {
+  // `frag` is actually const, but some underlying methods may call some non-cost
+  // methods on frag.frag().
+  for (Fragment* frag : _fragment) {
     if (! OkBondFormation(m, zatom, *frag)) {
       continue;
     }
@@ -684,13 +1132,20 @@ Options::GenerateVariants(Molecule& m, atom_number_t zatom,
       continue;
     }
 
+    if (!OkToBeCombined(m, mdata, zatom, *frag)) {
+      continue;
+    }
+
     Molecule mcopy(m);
     mcopy += *frag->frag();
     mcopy.add_bond(zatom, initial_matoms + frag->zatom(), SINGLE_BOND);
     mcopy.unset_all_implicit_hydrogen_information(zatom);
     mcopy.unset_all_implicit_hydrogen_information(initial_matoms + frag->zatom());
+    if (_config.has_isotope_at_join()) {
+      mcopy.set_isotope(zatom, _config.isotope_at_join());
+    }
 
-    if (_remove_isotopes) {
+    if (_config.remove_isotopes()) {
       mcopy.unset_isotopes();
     }
 
@@ -704,9 +1159,14 @@ Options::GenerateVariants(Molecule& m, atom_number_t zatom,
 
     mcopy.invalidate_smiles();
 
-    if (_check_valence && ! mcopy.valence_ok()) {
+    if (_config.check_valences() && ! mcopy.valence_ok()) {
       ++_products_with_bad_valence;
       cerr << "Bad valence " << mcopy.smiles() << ' ' << m.name() << '\n';
+      continue;
+    }
+
+    if (! _discard_products_containing.empty() &&
+        ContainsRejectedSubstructure(mcopy)) {
       continue;
     }
 
@@ -718,7 +1178,265 @@ Options::GenerateVariants(Molecule& m, atom_number_t zatom,
     ++rc;
   }
 
+  output.write_if_buffer_holds_more_than(8192);
+
   return rc;
+}
+
+int
+WouldFormAdjacentRings(Molecule& m, atom_number_t zatom,
+                  Fragment& frag) {
+  if (m.ring_bond_count(zatom) == 0) {
+    return 0;
+  }
+
+  return frag.frag()->ring_bond_count(frag.zatom());
+}
+
+int
+WouldFormBiphenyl(Molecule& m, atom_number_t zatom,
+                  Fragment& frag) {
+  if (! m.is_aromatic(zatom)) {
+    return 0;
+  }
+
+  return frag.aromatic();
+}
+
+// Looking for a Nitrogen atom being added to an aromatic
+// where the N atom has no nearby unsaturation.
+// can be either molecule -N  - a- fragment
+// can be either molecule -a  - N- fragment
+int
+WouldFormAnilineNh(Molecule& m,
+                 const MoleculeData& mdata,
+                 atom_number_t zatom,
+                 Fragment& frag) {
+  const Molecule* f = frag.frag();
+
+  // THe case of molecule-a -  N-fragment
+  if (m.is_aromatic(zatom) &&
+      frag.atomic_number() == 7 && f->ncon(frag.zatom()) == 1 &&
+      frag.saturated() && 
+      frag.aryl() == 0 && frag.vinyl() == 0) {
+    return 1;
+  }
+
+  // The case of molecule-N a- fragment
+  if (! frag.aromatic()) {
+    return 0;
+  }
+
+  if (m.atomic_number(zatom) != 7) {
+    return 0;
+  }
+  if (m.ncon(zatom) != 1) {
+    return 0;
+  }
+
+  for (const Bond* b : m[zatom]) {
+    if (! b->is_single_bond()) {
+      return 0;
+    }
+
+    atom_number_t o = b->other(zatom);
+    if (m.atomic_number(o) != 6) {
+      return 0;
+    }
+    if (! m.saturated(o)) {
+      return 0;
+    }
+  }
+
+  return 1;
+}
+
+
+// Return true if `zatom` is doubly bonded to an aliphatic carbon atom.
+int
+IsEnamineCarbon(Molecule& m, atom_number_t zatom) {
+  for (const Bond* b : m[zatom]) {
+    if (! b->is_double_bond()) {
+      continue;
+    }
+
+    atom_number_t o = b->other(zatom);
+    if (m.is_aromatic(o)) {
+      continue;
+    }
+    if (m.atomic_number(o) == 6) {
+      return 1;
+    }
+  }
+
+  return 0;
+}
+
+int
+IsCarbonOfAmide(Molecule& m, atom_number_t zatom) {
+  const Atom& a = m[zatom];
+  if (a.atomic_number() != 6) {
+    return 0;
+  }
+
+  atom_number_t singly_bonded_nitrogen = kInvalidAtomNumber;
+  atom_number_t doubly_bonded_oxygen = kInvalidAtomNumber;
+  for (const Bond* b : a) {
+    atom_number_t o = b->other(zatom);
+    if (b->is_single_bond()) {
+      if (m.atomic_number(o) == 7) {
+        singly_bonded_nitrogen = o;
+      }
+    } else if (b->is_double_bond()) {
+      if (m.atomic_number(o) == 8) {
+        doubly_bonded_oxygen = o;
+      }
+    }
+  }
+
+  if (singly_bonded_nitrogen == kInvalidAtomNumber) {
+    return 0;
+  }
+  if (doubly_bonded_oxygen == kInvalidAtomNumber) {
+    return 0;
+  }
+
+  return 1;
+}
+
+// There are several possibilities.
+// Molecule is the carbon of an amide, fragment is a nitrogen in an amide.
+// Molecule is the nitrogen in an amide, and fragment is the carbon in an amide.
+int
+AdjacentAmides(Molecule& m,
+                 const MoleculeData& mdata,
+                 atom_number_t zatom,
+                 Fragment& frag) {
+  if (frag.carbon_of_amide() && m.atomic_number(zatom) == 7) {
+    return 1;
+  } else if (frag.nitrogen_of_amide() && IsCarbonOfAmide(m, zatom)) {
+    return 1;
+  }
+
+  return 0;
+}
+
+// If zatom is doubly bonded to another carbon atom and frag
+// is a nitrogen.
+// Or the other way around
+int
+WouldFormEnamine(Molecule& m,
+                 const MoleculeData& mdata,
+                 atom_number_t zatom,
+                 Fragment& frag) {
+  if (m.atomic_number(zatom) == 6) {
+    if (m.ring_bond_count(zatom) == 0 &&
+        frag.atomic_number() == 7 &&
+        IsEnamineCarbon(m, zatom)) {
+      return 1;
+    }
+    return 0;
+  }
+
+  if (m.atomic_number(zatom) == 7 && frag.atomic_number() == 6) {
+    if (frag.saturated() || frag.aromatic()) {
+      return 0;
+    }
+    return IsEnamineCarbon(*frag.frag(), frag.zatom());
+  }
+
+  return 0;
+}
+
+// Return true if there is a positive charge in both `mdata` and `frag`.
+int
+MultiplePositiveCharges(const Molecule& m,
+                        const MoleculeData& mdata,
+                        const Fragment& frag) {
+  if (mdata.positive == 0) {
+    return 0;
+  }
+  if (frag.positive_charge() == 0) {
+    return 0;
+  }
+
+  return 1;
+}
+
+int
+Options::OkToBeCombined(Molecule& m,
+                const MoleculeData& mdata,
+                atom_number_t zatom,
+                Fragment& frag) {
+  if (_config.has_max_atoms_in_product()) {
+    uint32_t atoms_in_product = m.natoms() + frag.frag()->natoms();
+    if (atoms_in_product > _config.max_atoms_in_product()) {
+      ++_product_too_many_atoms;
+      return 0;
+    }
+  }
+  if (_config.has_max_rings_in_product()) {
+    uint32_t rings_in_product = m.nrings() + frag.frag()->nrings();
+    if (rings_in_product > _config.max_rings_in_product()) {
+      ++_product_too_many_rings;
+      return 0;
+    }
+  }
+  if (_config.has_max_halogens_in_product()) {
+    uint32_t halogens_in_product = mdata.halogens + frag.halogens();
+    if (halogens_in_product > _config.max_halogens_in_product()) {
+      ++_product_too_many_halogens;
+      return 0;
+    }
+  }
+
+  // Rotatable bonds not handled yet.
+
+  if (WouldFormBiphenyl(m, zatom, frag)) {
+    return 0;
+  }
+
+  // a more stringent test than biphenyl - if we are
+  // using this, we could omit the biphenyl test.
+  if (WouldFormAdjacentRings(m, zatom, frag)) {
+    return 0;
+  }
+
+  if (IsNCN(m, zatom, frag)) {
+    return 0;
+  }
+
+  if (WouldFormEnamine(m, mdata, zatom, frag)) {
+    return 0;
+  }
+
+  if (AdjacentAmides(m, mdata, zatom, frag)) {
+    return 0;
+  }
+
+  if (WouldFormAnilineNh(m, mdata, zatom, frag)) {
+    return 0;
+  }
+
+  if (MultiplePositiveCharges(m, mdata, frag)) {
+    return 0;
+  }
+
+  return 1;
+}
+
+int
+Options::ContainsRejectedSubstructure(Molecule& m) {
+  Molecule_to_Match target(&m);
+
+  for (Substructure_Query* q : _discard_products_containing) {
+    ++_product_discarded_by_query;
+    if (q->substructure_search(target)) {
+      return 1;
+    }
+  }
+
+  return 0;
 }
 
 int
@@ -782,6 +1500,8 @@ Options::ReadFragmentFromTextProto(const dicer_data::DicerFragment& proto, int o
     return 0;
   }
 
+  f->set_name(proto.par());
+
   if (! fragment->SetFragment(f)) {
     delete f;
     return 0;
@@ -791,23 +1511,27 @@ Options::ReadFragmentFromTextProto(const dicer_data::DicerFragment& proto, int o
     return 0;
   }
 
+  if (_charge_assigner.active()) {
+    fragment->DetermineFormalCharges(_charge_assigner);
+  }
+
   fragment->set_count(proto.n());
   fragment->set_aromatic_only(only_aromatic);
 
   _fragment << fragment.release();
   
-
   return 1;
 }
 
 int
 Options::OkFragment(Molecule& frag) const {
-  const int matoms = frag.natoms();
-  if (matoms < _min_atoms_in_fragment) {
+  const uint32_t matoms = frag.natoms();
+  if (matoms < _config.min_atoms_in_fragment()) {
     return 0;
   }
 
-  if (matoms > _max_atoms_in_fragment) {
+  if (! _config.has_max_atoms_in_fragment()) {
+  } else if (matoms > _config.max_atoms_in_fragment()) {
     return 0;
   }
 
@@ -847,6 +1571,9 @@ Options::ReadFragmentsAsSmiles(data_source_and_type<Molecule>& input, int only_a
 
   return _fragment.size();
 }
+
+// This could be expanded to include molecule_filter when/if that
+// gets turned into an API.
 int
 Options::OkProperties(Molecule& m) {
   return 1;
@@ -901,7 +1628,7 @@ SubstituentEnumeration(Options& options,
 
 int
 SubstituentEnumeration(int argc, char** argv) {
-  Command_Line cl(argc, argv, "vE:T:A:lcg:i:F:m:M:y:n:pY:");
+  Command_Line cl(argc, argv, "vE:T:A:lcg:i:F:m:M:y:n:pY:C:");
 
   if (cl.unrecognised_options_encountered()) {
     cerr << "Unrecognised options encountered\n";

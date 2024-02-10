@@ -60,6 +60,9 @@ message EnumerationConfig {
   optional uint32 max_rings_in_product = 17;
   optional uint32 max_halogens_in_product = 18;
 
+  // This is a simplistic count of the number of rotatable
+  // bonds in the molecule and the fragment. It does not account
+  // for the bond being formed likely also being rotatable.
   optional uint32 max_rotbonds_in_product = 19;
 
   // We can place an isotope on the atom in the molecule

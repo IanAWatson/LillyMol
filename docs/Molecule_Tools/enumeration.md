@@ -7,15 +7,15 @@ time, this tool is designed to make that process more efficient.
 Typically the fragments to be added will have been discovered by
 dicer, or manually curated. Given that molecules can have several
 possible sites of substitution, the numbers of
-molecules generated can escalate rapidly, and several times
-there is a need to explore a small number of changes. Many times
-it will be more efficient to do such focussed changes via a
-reaction.
+molecules generated can escalate rapidly, and many times
+there is a need to explore only a small number of changes. It
+may also be more efficient to do such focussed changes via a
+reaction. It depends.
 
 The tool goes to some effort to try and lessen the formation of
 atomic arrangements that would be undesirable. Generally, heteratoms
 are never joined, but there are also heuristics to avoid generating
-aminals and other readiliy anticipated motifs.
+aminals and other readiliy anticipated undesirable motifs.
 
 Multiple generations of additions are typically done by
 piping the ouput from one invocation into a subsequent
@@ -33,8 +33,7 @@ space is done.
 
 For example, a common workflow might be to put an isotopic label
 on each atom with an available Hydrogen atom. Restrict to just
-carbon atoms with no attached heteratoms. Then use two rounds
-of this tool to add sidechains. Use isotope 2 to mark the
+carbon atoms with no attached heteratoms. Use isotope 2 to mark the
 available atoms in the starting molecule.
 ```
 tsubstructure -s '[#6T0H>0]' -j 2 -j same -m marked -v file.smi
@@ -49,6 +48,9 @@ Note that we put isotope 1 on the join points, since `enumeration` assumes
 that the fragments will be linked via isotopes. Now we will be able to differentiate
 the molecule from the fragment when viewing the product molecules. This generates 16k
 fragments. Select only those with > 100 instances, this yields 1794, file `small.100`.
+
+Adding 7 atom fragments can be a fairly large change, so lower numbers may
+be called for.
 
 Now use enumerate to combine these two. The following textproto
 has the options
@@ -102,7 +104,29 @@ in the fragment.
 The tool has some in-built rules to avoid forming unwanted functional
 groups. These include things like aminals, biphenyls and several others.
 These could be made optional by making settings in the proto. Note
-however that the tool does not guard against formation of undesirable
+however that the tool does not fully guard against formation of undesirable
 groups. There are quite a few queries in the Lilly Medchem Rules that
-can be formed, even though the reagents do not contain those
-problematic groups.
+can be formed, even though neither component contains those
+problematic groups. 
+
+In current form, 6300 of 734k molecules generated from about 600 random
+Chembl molecules fail the Lilly Medchem Rules after enumeration, less than 1%.
+Applying the Medchem Rules after generation is comparatively expensive.
+
+It may also be a good idea to pass generated molecules through the
+synthetic precedent tool. But caution is needed. For example
+if the knowledge base used by the synthetic precedent tool is
+Chembl, and the starting molecules are Chembl molecules, you will
+definitely see unprecedented arrangements of atoms, especially
+at larger radii. Building the knowledge based with different
+collections can help, and also just focus attention on
+radius 1 misses.
+
+Adding atom typing to fragments can also be helpful with this, although
+that functionality is not enabled in this tool.
+
+
+## Summary
+This tool is used for exhaustive enumeration around a molecule of
+interest. Its use should be considered complementary to more
+"adventurous" generative tools.

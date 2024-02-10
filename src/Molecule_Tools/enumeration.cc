@@ -126,12 +126,17 @@ class Fragment {
      int _carbon_of_amide = 0;
      int _nitrogen_of_amide = 0;
 
+     // Will be true if the labelled atom is the O of an acid.
+     int _is_acid = 0;
+
      // These are whole molecule properties.
      int _positive_charge = 0;
      int _negative_charge = 0;
      int _halogen_count = 0;
 
      int _rotbonds = 0;
+
+     int _nitro_count = 0;
 
   // If this comes from a DicerFragment proto, the number
   // of instances.
@@ -143,6 +148,7 @@ class Fragment {
 
   // private functions
     void EstablishAtomicProperties(Molecule& m, atom_number_t zatom);
+    int IsAcid(Molecule& m, atom_number_t zatom);
 
   public:
     Fragment();
@@ -182,6 +188,10 @@ class Fragment {
     }
     void set_rotbonds(int s) {
       _rotbonds = s;
+    }
+
+    int is_acid() const {
+      return _is_acid;
     }
 
     int aromatic_only() const {
@@ -235,12 +245,18 @@ class Fragment {
     int halogens() const {
       return _halogen_count;
     }
+    int nitro_count() const {
+      return _nitro_count;
+    }
     int carbon_of_amide() const {
       return _carbon_of_amide;
     }
     int nitrogen_of_amide() const {
       return _nitrogen_of_amide;
     }
+
+    // Return true if the atom is a charged aromatic nitrogen.
+    int IsQuaternaryAryl();
 };
 
 Fragment::Fragment() {
@@ -324,6 +340,39 @@ CountHalogens(const Molecule& m) {
 }
 
 int
+CountNitro(Molecule& m) {
+  const int matoms = m.natoms();
+  for (int i = 0; i < matoms; ++i) {
+    const Atom& n = m[i];
+    if (n.atomic_number() != 7) {
+      continue;
+    }
+    if (n.ncon() != 3) {
+      continue;
+    }
+    if (m.ring_bond_count(i)) {
+      continue;
+    }
+
+    int doubly_bonded_oxygen_count = 0;
+    for (const Bond* b : n) {
+      if (! b->is_double_bond()) {
+        continue;
+      }
+      const atom_number_t o = b->other(i);
+      if (m.atomic_number(o) == 8) {
+        ++doubly_bonded_oxygen_count;
+      }
+    }
+    if (doubly_bonded_oxygen_count == 2) {
+      return 1;
+    }
+  }
+
+  return 0;
+}
+
+int
 Fragment::DetermineFormalCharges(Charge_Assigner& charge_assigner) {
   const int matoms = _frag->natoms();
 
@@ -346,6 +395,43 @@ Fragment::DetermineFormalCharges(Charge_Assigner& charge_assigner) {
   _halogen_count = CountHalogens(*_frag);
 
   return 1;
+}
+
+// Return true if `zatom` is the oxygen of an acid.
+int
+Fragment::IsAcid(Molecule& m, atom_number_t zatom) {
+  if (m.atomic_number(zatom) != 8) {
+    return 0;
+  }
+
+  if (m.ncon(zatom) != 1) {
+    return 0;
+  }
+  if (0 == _vinyl) {
+    return 0;
+  }
+
+  const atom_number_t carbon = m.other(zatom, 0);
+  if (m.atomic_number(carbon) == 6) {
+  } else if (m.atomic_number(carbon) == 16) {
+  } else {
+    return 0;
+  }
+
+  for (const Bond* b : m[carbon]) {
+    if (! b->is_double_bond()) {
+      continue;
+    }
+    atom_number_t o = b->other(carbon);
+    if (m.atomic_number(o) == 8) {
+      return 1;
+    }
+    if (m.atomic_number(o) == 16) {
+      return 1;
+    }
+  }
+
+  return 0;
 }
 
 // Examine the atoms attached to `zatom` and if any of them are saturated
@@ -423,6 +509,25 @@ Fragment::EstablishAtomicProperties(Molecule& m, atom_number_t zatom) {
       doubly_bonded_oxygen != kInvalidAtomNumber) {
     _carbon_of_amide = 1;
   }
+
+  _nitro_count = CountNitro(m);
+
+  _is_acid = IsAcid(m, zatom);
+}
+
+int
+Fragment::IsQuaternaryAryl() {
+  if (_frag->atomic_number(_zatom) != 7) {
+    return 0;
+  }
+  if (_frag->formal_charge(_zatom) != 1) {
+    return 0;
+  }
+  if (! _frag->is_aromatic(_zatom)) {
+    return 0;
+  }
+
+  return 1;
 }
 
 // Data we harvest from a molecule.
@@ -436,6 +541,8 @@ struct MoleculeData {
   int halogens = 0;
   // only set if a limit on rotatable bonds is specified.
   int rotbonds = 0;
+
+  int nitro_count = 0;
 
   int Initialise(Molecule& m, Charge_Assigner& charge_assigner);
 };
@@ -467,6 +574,8 @@ MoleculeData::Initialise(Molecule& m, Charge_Assigner& charge_assigner) {
   }
 
   halogens = CountHalogens(m);
+
+  nitro_count = CountNitro(m);
 
   return 1;
 }
@@ -584,6 +693,9 @@ class Options {
 
     // Triggered by _config.max_halogens_in_product()
     int _product_too_many_halogens = 0;
+
+    // Triggered by _config.max_rotbonds_in_product()
+    int _product_too_many_rotatable_bonds = 0;
 
     std::default_random_engine _generator;
 
@@ -923,6 +1035,12 @@ Options::Report(std::ostream& output) const {
   if (_config.has_max_rings_in_product()) {
     output << _product_too_many_rings << " products with more than " << _config.max_rings_in_product() << " rings\n";
   }
+  if (_config.has_max_halogens_in_product()) {
+    output << _product_too_many_halogens << " products with more than " << _config.max_halogens_in_product() << " halogen atoms\n";
+  }
+  if (_config.has_max_rotbonds_in_product()) {
+    output << _product_too_many_rotatable_bonds << " products with more than " << _config.max_rotbonds_in_product() << " rotatable bonds\n";
+  }
 
   Accumulator_Int<int> acc;
   for (int i = 0; i < _nsites.number_elements(); ++i) {
@@ -966,6 +1084,23 @@ Options::Preprocess(Molecule& m) {
   return 1;
 }
 
+// We don't put extra bonds on Carbon atoms that already have 3 connection,
+// even if they do have an available H.
+int
+Is3ConnectedCarbon(Molecule& m, atom_number_t zatom) {
+  if (m.is_aromatic(zatom)) {
+    return 0;
+  }
+
+  const Atom& a = m[zatom];
+
+  if (a.atomic_number() != 6) {
+    return 0;
+  }
+
+  return a.ncon() == 3;
+}
+
 int
 Options::Process(Molecule& m,
                  IWString_and_File_Descriptor& output) {
@@ -1003,6 +1138,8 @@ Options::Process(Molecule& m,
     if (m.formal_charge(i)) {
       attachment_point[i] = 0;
     } else if (m.hcount(i) == 0) {
+      attachment_point[i] = 0;
+    } else if (Is3ConnectedCarbon(m, i)) {
       attachment_point[i] = 0;
     }
   }
@@ -1183,6 +1320,19 @@ Options::GenerateVariants(Molecule& m,
   return rc;
 }
 
+// If the fragment is an acid and the molecule is aromatic.
+int
+WouldFormPhenolicEster(Molecule& m, 
+                const MoleculeData& mdata,
+                atom_number_t zatom,
+                Fragment& frag) {
+  if (! m.is_aromatic(zatom)) {
+    return 0;
+  }
+
+  return frag.is_acid();
+}
+
 int
 WouldFormAdjacentRings(Molecule& m, atom_number_t zatom,
                   Fragment& frag) {
@@ -1201,6 +1351,14 @@ WouldFormBiphenyl(Molecule& m, atom_number_t zatom,
   }
 
   return frag.aromatic();
+}
+
+int
+WouldContainTooManyNitros(Molecule& m, 
+                          const MoleculeData& mdata,
+                          Fragment& frag) {
+  int nnitro = mdata.nitro_count + frag.nitro_count();
+  return nnitro > 1;
 }
 
 // Looking for a Nitrogen atom being added to an aromatic
@@ -1389,10 +1547,21 @@ Options::OkToBeCombined(Molecule& m,
       return 0;
     }
   }
+  if (_config.has_max_rotbonds_in_product()) {
+    uint32_t rotbonds_in_product = mdata.rotbonds + frag.rotbonds();
+    if (rotbonds_in_product > _config.max_rotbonds_in_product()) {
+      ++_product_too_many_rotatable_bonds;
+      return 0;
+    }
+  }
 
   // Rotatable bonds not handled yet.
 
   if (WouldFormBiphenyl(m, zatom, frag)) {
+    return 0;
+  }
+
+  if (WouldContainTooManyNitros(m, mdata, frag)) {
     return 0;
   }
 
@@ -1419,6 +1588,10 @@ Options::OkToBeCombined(Molecule& m,
   }
 
   if (MultiplePositiveCharges(m, mdata, frag)) {
+    return 0;
+  }
+
+  if (WouldFormPhenolicEster(m, mdata, zatom, frag)) {
     return 0;
   }
 
@@ -1517,6 +1690,11 @@ Options::ReadFragmentFromTextProto(const dicer_data::DicerFragment& proto, int o
 
   fragment->set_count(proto.n());
   fragment->set_aromatic_only(only_aromatic);
+
+  if (fragment->IsQuaternaryAryl()) {
+    // Non fatal error.
+    return 1;
+  }
 
   _fragment << fragment.release();
   

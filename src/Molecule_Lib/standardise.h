@@ -18,8 +18,8 @@ class Chemical_Transformation
 {
   private:
     int _active;
-    int _groups_changed;
-    int _molecules_changed;
+    uint64_t _groups_changed;
+    uint64_t _molecules_changed;
 
   public:
     Chemical_Transformation ();
@@ -335,8 +335,8 @@ class Chemical_Standardisation
     int _verbose;
     int _active;
 
-    int _molecules_processed;
-    int _molecules_changed;
+    uint64_t _molecules_processed;
+    uint64_t _molecules_changed;
 
 //  Our default set of conventions
 

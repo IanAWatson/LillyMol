@@ -340,6 +340,7 @@ Molecule::mdl_add_m_formal_charge(int ntokens, const Aprop* atom_properties) {
     if (!reasonable_formal_charge_value(atom_properties[i]._property)) {
       cerr << "mdl add formal charge: unreasonable charge value "
            << atom_properties[i]._property << '\n';
+      cerr << "Perhaps you need to add '-i mfc=<n>' to increase the max allowed formal charge value\n";
       return 0;
     }
 

@@ -83,7 +83,7 @@ static IWString tag_for_hits;
   that have matched any query
 */
 
-static int stop_processing_after_this_many_molecules_matching = 0;
+static uint64_t stop_processing_after_this_many_molecules_matching = 0;
 
 /*
   Jun 2009. Want to be able to easily do a self search of a file.
@@ -246,8 +246,8 @@ display_dash_j_options()
 }
 
 int verbose = 0;
-static int molecules_read = 0;
-static int molecules_which_match = 0;
+static uint64_t molecules_read = 0;
+static uint64_t molecules_which_match = 0;
 static int print_embeddings = 0;
 
 static Report_Progress report_progress;

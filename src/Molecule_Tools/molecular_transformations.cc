@@ -29,11 +29,11 @@ using std::cerr;
 
 static int verbose = 0;
 
-static int molecules_read = 0;
+static uint64_t molecules_read = 0;
 
-static int molecules_written = 0;
+static uint64_t molecules_written = 0;
 
-static int molecules_changed = 0;
+static uint64_t molecules_changed = 0;
 
 static int enumerate_scaffold_hits_individually = 0;
 
@@ -110,8 +110,8 @@ static IW_STL_Hash_Set unique_smiles_generated_current_molecule;
 
 static int preserve_initial_aromaticity = 0;
 
-static int molecules_with_recovered_aromaticity = 0;
-static int molecules_rejected_for_aromaticity_loss = 0;
+static uint64_t molecules_with_recovered_aromaticity = 0;
+static uint64_t molecules_rejected_for_aromaticity_loss = 0;
 
 static IWString name_separator = " + ";
 static IWString reaction_reagent_separator;
@@ -128,7 +128,7 @@ static std::mt19937_64 rng(rd());
 
 static double probability_sample_reactions = 1.0;
 
-static int molecules_to_produce = 1;
+static uint64_t molecules_to_produce = 1;
 
 static int unique_products_only = 0;
 
@@ -1374,7 +1374,7 @@ Molecular_Transformations_Random_Set_Generator::process(Molecule & m,
 
   resizable_array<int> do_rxn, actually_made;
 
-  int i;
+  uint64_t i;
   for (i = 0; i < molecules_to_produce * 10; ++i)
   {
     _sor.identify_random_reactions(do_rxn);

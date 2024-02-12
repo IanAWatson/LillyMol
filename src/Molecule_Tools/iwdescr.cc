@@ -383,7 +383,7 @@ static int output_precision = 4;
 static int compute_spiro_fusions = 1;
 
 static int verbose = 0;
-static int molecules_read = 0;
+static uint64_t molecules_read = 0;
 static int molecules_with_no_rings = 0;
 
 static unsigned int alarm_time = 0;

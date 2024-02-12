@@ -28,9 +28,9 @@ namespace fileconv {
 // When fileconv is processing, there can be a number of output streams.
 struct LocalOptions {
   int verbose = 0;
-  int molecules_read = 0;
-  int molecules_changed = 0;
-  int molecules_written = 0;
+  uint64_t molecules_read = 0;
+  uint64_t molecules_changed = 0;
+  uint64_t molecules_written = 0;
   int audit_input = 0;
   int debug_print_each_molecule = 0;
 

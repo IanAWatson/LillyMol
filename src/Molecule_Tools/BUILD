@@ -1380,6 +1380,21 @@ cc_binary(
 )
 
 cc_binary(
+    name = "parsimonious_set",
+    srcs = [
+        "parsimonious_set.cc",
+    ],
+    deps = [
+        ":dicer_fragments_cc_proto",
+        "//Foundational/cmdline_v2:cmdline_v2",
+        "//Foundational/data_source:iwtfdata_record",
+        "//Foundational/iwmisc:iwmisc",
+        "//Molecule_Lib:iwmolecule",
+        "//Molecule_Lib:moleculeio",
+    ],
+)
+
+cc_binary(
     name = "pharmacophore_2d",
     srcs = [
         "pharmacophore_2d.cc",

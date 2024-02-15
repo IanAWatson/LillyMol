@@ -136,19 +136,19 @@ static extending_resizable_array<int> ring_system_size_array;
 
 //  An accumulator of the number of rings in the systems
 
-static Accumulator_Int<int> ring_system_ring_stats;
+static Accumulator_Int<uint64_t> ring_system_ring_stats;
 
 //  An accumulator of the number of atoms in the systems
 
-static Accumulator_Int<int> ring_system_atom_stats;
+static Accumulator_Int<uint64_t> ring_system_atom_stats;
 
 // Accumulator on the number of exemplars.
-static Accumulator_Int<int> acc_exemplar;
+static Accumulator_Int<uint64_t> acc_exemplar;
 // And for low numbers, we keep track of the number of instances of
 // each number of exemplars.
 static int max_exemplar_count = 20;
 
-static extending_resizable_array<int> exemplar_count;
+static extending_resizable_array<uint64_t> exemplar_count;
 
 static int bridge_across_spiro_groups = 0;
 

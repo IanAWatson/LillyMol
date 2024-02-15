@@ -4686,7 +4686,7 @@ FileconvConfig::GetFragmentSpecifications(Command_Line& cl) {
                << " fragments will be skipped\n";
       } else {
         cerr << "Unrecognised -F qualitifier '" << f << "'\n";
-        return 3;
+        return 0;
       }
     }
 
@@ -5456,7 +5456,7 @@ FileconvConfig::Build(Command_Line& cl) {
   }
 
   if (!GetFragmentSpecifications(cl)) {
-    return 1;
+    return 0;
   }
 
   if (cl.option_present('J')) {

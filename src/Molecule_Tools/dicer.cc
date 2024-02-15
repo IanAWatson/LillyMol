@@ -7377,6 +7377,7 @@ display_misc_B_options (std::ostream & os)
   os << " -B nosmi          suppress output of fragment smiles\n";
   os << " -B noparent       suppress output of parent smiles\n";
   os << " -B proto          main output is a dicer_data.DicedMolecule proto\n";
+  os << " -B serialized_proto main output is tfdatarecord of serialized dicer_data::DicedMolecule\n";
   os << " -B time           run timing\n";
   os << " -B addq           run the -q queries in addition to the default rules\n";
   os << " -B WB=fname       write smiles of just broken molecules to <fname>\n";

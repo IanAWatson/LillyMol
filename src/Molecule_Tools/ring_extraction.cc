@@ -66,6 +66,7 @@ Usage(int rc) {
   cerr << " -a                transform within ring aliphatic double bonds to type any\n";
   cerr << " -P <atype>        label atoms by atom type of exocyclic attached atom\n";
   cerr << " -X ...            more options\n";
+  cerr << " -r <n>            report progress every <n> molecules processed\n";
   cerr << " -c                remove chirality\n";
   cerr << " -g ...            chemical standardisation - enter '-g help' for info\n";
   cerr << " -l                strip to largest fragment\n";
@@ -143,7 +144,7 @@ class ExtractRings {
   private:
     int _verbose;
 
-    int _molecules_read;
+    uint64_t _molecules_read;
 
     int _reduce_to_largest_fragment;
 

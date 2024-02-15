@@ -22,8 +22,8 @@ all fragments appearing anywhere in the set.
 
 It sorts those fragments by size, largest to smallest. Then, for each fragment, it
 looks for the first molecule that exemplifies that fragment. That molecule is
-marked as selected, and for all the fragments it contains, it also marks those
-fragments as selected.
+marked as selected, and for all the fragments it contains, those fragments too
+are marked as selected.
 
 This way, we expect the smaller fragments to be filled in by the largest
 candidates as they are selected for their larger fragments.
@@ -56,13 +56,13 @@ non-ring atoms to 10 should also suppress excessively flexible long fragments.
 Again, there is no 'right' answer for how the molecules should be fragmented.
 
 ## Selection
-Once the fragmentation scheme from `dicer` is available, parsimonious_set can be used
+Once the fragmentation scheme from `dicer` is available, `parsimonious_set` can be used
 to select a subset.
 
 You must specify the number of items to be selected via the `-nsel` option, it must
 be less than the number of items in the set.
 
-The first thing the tool does is to sort the candidate molecules by atom count
+The first thing the tool does is to sort the candidate molecules by atom count,
 smallest first. The tool works by scanning the fragments, and for each fragment
 selecting the first molecule that exemplifies that fragment. By sorting, the
 smallest exemplar is chosen, which seems desirable.
@@ -78,7 +78,7 @@ or not.
 
 The `-randf` option randomises the fragments before selection. This way
 the tool will be non-deterministic. Different invocations may generate 
-beffer performing outcomes.
+worse/better outcomes.
 
 The `-sortf` option sorts the fragments by frequency - within atom count
 bands. This way, the most frequently occurring fragments should have
@@ -91,7 +91,7 @@ Run through dicer as described above. Select a 50k subset of the 200k
 ```
 parsimonious_set -nsel 50000 -sortf -v rand200k.dicer.data 
 ```
-The output consists of three tokens.
+This takes 11 seconds. The output consists of three tokens.
 
 1. smiles of the selected molecule
 2. id of the selected molecule
@@ -110,11 +110,18 @@ So on average, the 103k omitted fragments occurred in 1.47 molecules.
 If we allow the selection to select all molecules, we can then
 plot the fraction of fragments discovered as a function of the number
 of molecules selected.
+
 ![Fraction Selected](Images/fragments_covered.png)
+
 Where visually see see 66% of the fragments selected with 50k
 molecules selected.
 
-If instead a random sample of 50k molecules was selected, the
+Note too that by the time we had selected roughly 95k molecules,
+we had a set that represented all available fragments at least
+once. No further selections are needed. Given the combinatorial
+origins of this set, this is as expected.
+
+If instead, a random sample of 50k molecules was selected, the
 fraction of fragments covered is observed to be 38% - significantly
 higher than the straight line in the graph, but much lower than
 our selected line. We conclude that indeed the method generating

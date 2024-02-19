@@ -151,6 +151,7 @@ cc_binary(
         ":smi2rings_cc_proto",
         "//Foundational/cmdline:iwcmdline",
         "//Foundational/iwmisc",
+        "//Foundational/iwstring:absl_hash",
         "//Molecule_Lib:iwmolecule",
         "//Molecule_Lib:moleculeio",
         "@berkeleydb",

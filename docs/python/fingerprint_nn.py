@@ -17,7 +17,8 @@ FLAGS = flags.FLAGS
 flags.DEFINE_integer("nbrs", 10, "Number Neighbours")
 flags.DEFINE_integer("nbits", 512, "Number Neighbours")
 flags.DEFINE_string("atype", "UST:APT", "Number Neighbours")
-flags.DEFINE_boolean('verbose', False, 'Verbose output')
+flags.DEFINE_boolean("verbose", False, 'Verbose output')
+flags.DEFINE_enum("fp", "LINEAR", ["EC", "AP", "LINEAR"], "Kind of fingerprint to use")
 
 def usage():
   print("Finds nearest neighbours within a file of smiles")
@@ -33,7 +34,7 @@ def nearneighbours(mols: List[Molecule],
   """Find the `nbrs` nearest neighbours of bits[ndx]
     Args:
       mols: list of molecules - holds the names and smiles.
-      bits: numpy array of fingerprints.
+      bits: list of numpy arrays of fingerprints.
       ndx: the index in `mols` and `nds` of the needle.
       nbrs: number of neighbours of `ndx` to write.
   """
@@ -44,8 +45,8 @@ def nearneighbours(mols: List[Molecule],
   # Should be able to use a partial sort.
   order = np.argsort(dists)
 
-  # Common item printed for the needle, compute once.
-  needle = mols[ndx].smiles() + ' ' + mols[ndx].name()
+  # Print the needle.
+  print(mols[ndx].smiles() + ' ' + mols[ndx].name())
 
   # Write neighbours.
   for i in range(0, nbrs):
@@ -53,7 +54,7 @@ def nearneighbours(mols: List[Molecule],
     i = order[len(mols) - i - 1]
     if i == ndx:
       continue
-    print(needle, mols[i].smiles(), mols[i].name(), dists[i])
+    print(f"{mols[i].smiles()} {mols[i].name()} {dists[i]:.3f}")
 
 def main(argv):
   """Demo application for using EC type fingerprints for a similarity search
@@ -68,10 +69,13 @@ def main(argv):
       mols.append(mol)
   logging.info("Read %d moledules", len(mols))
 
-  # Choose which kind of fingerprint to use. Should be a command line option.
-  fp_creator = ECFingerprintCreator(FLAGS.nbits)
-  # fp_creator = AtomPairFingerprintCreator(FLAGS.nbits)
-  # fp_creator = LinearFingerprintCreator(FLAGS.nbits)
+  # Choose which kind of fingerprint to use.
+  if FLAGS.fp == "LINEAR":
+    fp_creator = LinearFingerprintCreator(FLAGS.nbits)
+  elif FLAGS.fp == "EC":
+    fp_creator = ECFingerprintCreator(FLAGS.nbits)
+  elif FLAGS.fp == "AP":
+    fp_creator = AtomPairFingerprintCreator(FLAGS.nbits)
 
   fp_creator.set_atom_type(FLAGS.atype)
 

@@ -19,6 +19,7 @@
 #include "Foundational/iwmisc/misc.h"
 #include "Foundational/iwmisc/primes.h"
 #include "Foundational/iwmisc/report_progress.h"
+#include "Foundational/iwstring/absl_hash.h"
 #include "Foundational/iwstring/iw_stl_hash_set.h"
 
 #include "db_cxx.h"
@@ -104,6 +105,11 @@ static int ring_systems_not_found_in_database = 0;
 
 static int write_rings = 1;
 
+// Rather than storing rings in the database as they are found, we can
+// cache the results and then copy that hash to the database when done.
+// This is very desirable for performance.
+static int hash_store = 0;
+
 static IWString smiles_tag("$SMI<");
 
 static int write_parent_structure = 0;
@@ -169,6 +175,37 @@ static int smiles_and_textproto = 0;
 static int full_proto_output = 0;
 
 static IWString_and_File_Descriptor stream_for_missing_ring_systems;
+
+// The programme attempts to re-use code for both the store
+// and lookup tasks as common as possible.
+// WHile it would be better to refactor this into a library,
+// we can make things a little smoother with a class that
+// holds all the output information.
+class Output {
+  private:
+    // If we are writing all rings to an output stream.
+    IWString_and_File_Descriptor* _text_output = nullptr;
+
+    // If doing lookups there will be one or more databases being
+    // queried.
+    // If we are doing a store, there will be a single database that
+    // will be updated.
+    resizable_array_p<Db> _database;
+
+    // As an optimisation during database loads, we can cache all the rings
+    // in memory and write them when done.
+    // Output will be to the first (and only) database in `_database`.
+    int _accumulate_rings = 0;
+    absl::flat_hash_map<std::string, Smi2Rings::Ring> _hash;
+
+  public:
+    Output();
+    ~Output();
+
+    void set_accumulate_rings(int s) {
+      _accumulate_rings = s;
+    }
+};
 
 /*
   When we are applying isotopic labels to the rings, we need to
@@ -1428,7 +1465,29 @@ increment_count(Db& database, Dbt& dkey, Dbt& fromdb) {
 }
 
 static int
+StoreInHash(Molecule& m,
+            const IWString& unique_smiles,
+            std::unique_ptr<absl::flat_hash_map<IWString, Smi2Rings::Ring>>& dbhash) {
+  auto iter = dbhash->find(unique_smiles);
+  if (iter != dbhash->end()) {
+    auto n = iter->second.n();
+    iter->second.set_n(n + 1);
+    return 1;
+  }
+
+  ++new_ring_systems_stored;
+
+  Smi2Rings::Ring proto;
+  proto.set_n(1);
+  proto.set_ex(m.name().data(), m.name().length());
+
+  dbhash->emplace(std::make_pair(unique_smiles, std::move(proto)));
+
+  return 1;
+}
+static int
 DoDatabaseStore(Molecule& m, PerMoleculeData& mdata, int uid,
+                std::unique_ptr<absl::flat_hash_map<IWString, Smi2Rings::Ring>>& dbhash,
                 Db& database) {
   IWString unique_smiles;
   mdata.CreateSubset(m, uid, unique_smiles);
@@ -1438,6 +1497,10 @@ DoDatabaseStore(Molecule& m, PerMoleculeData& mdata, int uid,
 #endif
   if (mdata.AlreadySeen(unique_smiles)) {
     return 1;
+  }
+
+  if (dbhash) {
+    return StoreInHash(m, unique_smiles, dbhash);
   }
 
   Dbt dkey((void*)unique_smiles.rawchars(), unique_smiles.length());
@@ -1462,7 +1525,9 @@ DoDatabaseStore(Molecule& m, PerMoleculeData& mdata, int uid,
 
 static int
 DoStore(Molecule& m, int ring_number, PerMoleculeData& mdata,
-        Db& database, IWString_and_File_Descriptor& output) {
+        Db& database,
+        std::unique_ptr<absl::flat_hash_map<IWString, Smi2Rings::Ring>>& dbhash,
+        IWString_and_File_Descriptor& output) {
   if (label_attachment_points_with_environment) {
     do_label_attachment_points_with_environment(m, mdata.in_system, ring_number,
                                                 mdata.atype);
@@ -1470,7 +1535,7 @@ DoStore(Molecule& m, int ring_number, PerMoleculeData& mdata,
       write_ring(m, mdata, ring_number, output);
     }
 
-    DoDatabaseStore(m, mdata, ring_number, database);
+    DoDatabaseStore(m, mdata, ring_number, dbhash, database);
 
     m.transform_to_non_isotopic_form();
   }
@@ -1481,7 +1546,7 @@ DoStore(Molecule& m, int ring_number, PerMoleculeData& mdata,
       write_ring(m, mdata, ring_number, output);
     }
 
-    DoDatabaseStore(m, mdata, ring_number, database);
+    DoDatabaseStore(m, mdata, ring_number, dbhash, database);
 
     m.transform_to_non_isotopic_form();
   }
@@ -1489,7 +1554,7 @@ DoStore(Molecule& m, int ring_number, PerMoleculeData& mdata,
   if (always_process_unsubstituted_ring) {
     m.transform_to_non_isotopic_form();
 
-    DoDatabaseStore(m, mdata, ring_number, database);
+    DoDatabaseStore(m, mdata, ring_number, dbhash, database);
   }
 
   return 1;
@@ -1497,12 +1562,14 @@ DoStore(Molecule& m, int ring_number, PerMoleculeData& mdata,
 
 static int
 DoLookupsOrStore(Molecule& m, int ring_number, PerMoleculeData& mdata,
-                 resizable_array_p<Db>& databases, IWString_and_File_Descriptor& output) {
+                 resizable_array_p<Db>& databases,
+                 std::unique_ptr<absl::flat_hash_map<IWString, Smi2Rings::Ring>>& dbhash,
+                 IWString_and_File_Descriptor& output) {
 
   if (lookup_in_database) {
     return DoLookups(m, ring_number, mdata, databases, output);
   } else {
-    return DoStore(m, ring_number, mdata, *databases[0], output);
+    return DoStore(m, ring_number, mdata, *databases[0], dbhash, output);
   }
 }
 
@@ -1614,6 +1681,7 @@ PerMoleculeData::MaybeAddOutsideRingAtoms(Molecule& m,
 
 static int
 smi2rings(Molecule& m, PerMoleculeData& mdata,
+          std::unique_ptr<absl::flat_hash_map<IWString, Smi2Rings::Ring>>& dbhash,
           IWString_and_File_Descriptor& output) {
   const int matoms = m.natoms();
 
@@ -1639,7 +1707,7 @@ smi2rings(Molecule& m, PerMoleculeData& mdata,
       continue;
     }
 
-    DoLookupsOrStore(m, i, mdata, databases, output);
+    DoLookupsOrStore(m, i, mdata, databases, dbhash, output);
   }
 
   if (write_non_ring_atoms) {
@@ -1969,7 +2037,9 @@ PerMoleculeData::AlreadySeen(const IWString& unique_smiles) {
 }
 
 static int
-smi2rings(Molecule& m, IWString_and_File_Descriptor& output) {
+smi2rings(Molecule& m,
+          std::unique_ptr<absl::flat_hash_map<IWString, Smi2Rings::Ring>>& dbhash,
+          IWString_and_File_Descriptor& output) {
   if (report_progress()) {
     cerr << "Read " << molecules_read << " molecules, found " << new_ring_systems_stored
          << " new ring systems\n";
@@ -2002,7 +2072,7 @@ smi2rings(Molecule& m, IWString_and_File_Descriptor& output) {
 
   mdata.IdentifyThreeConnectedAromaticSulphur(m);
 
-  return smi2rings(m, mdata, output);
+  return smi2rings(m, mdata, dbhash, output);
 }
 
 /*
@@ -2030,7 +2100,9 @@ Preprocess(Molecule& m) {
 }
 
 static int
-smi2rings(data_source_and_type<Molecule>& input, IWString_and_File_Descriptor& output) {
+smi2rings(data_source_and_type<Molecule>& input,
+          std::unique_ptr<absl::flat_hash_map<IWString, Smi2Rings::Ring>>& dbhash,
+          IWString_and_File_Descriptor& output) {
   Molecule* m;
   while (nullptr != (m = input.next_molecule()) && output.good()) {
     std::unique_ptr<Molecule> free_m(m);
@@ -2039,7 +2111,7 @@ smi2rings(data_source_and_type<Molecule>& input, IWString_and_File_Descriptor& o
 
     molecules_read++;
 
-    if (!smi2rings(*m, output)) {
+    if (!smi2rings(*m, dbhash, output)) {
       return 0;
     }
 
@@ -2050,7 +2122,9 @@ smi2rings(data_source_and_type<Molecule>& input, IWString_and_File_Descriptor& o
 }
 
 static int
-smi2rings(const char* fname, FileType input_type, IWString_and_File_Descriptor& output) {
+smi2rings(const char* fname, FileType input_type,
+          std::unique_ptr<absl::flat_hash_map<IWString, Smi2Rings::Ring>>& dbhash,
+          IWString_and_File_Descriptor& output) {
   assert(nullptr != fname);
 
   if (input_type == FILE_TYPE_INVALID) {
@@ -2068,7 +2142,34 @@ smi2rings(const char* fname, FileType input_type, IWString_and_File_Descriptor& 
     input.set_verbose(1);
   }
 
-  return smi2rings(input, output);
+  return smi2rings(input, dbhash, output);
+}
+
+static int
+DoStore(const IWString& usmi,
+        const Smi2Rings::Ring& proto,
+        Db& database) {
+  Dbt dbkey((void*)usmi.data(), usmi.length());
+
+  static google::protobuf::TextFormat::Printer printer;  
+  printer.SetSingleLineMode(true);
+
+  std::string buffer;
+  printer.PrintToString(proto, &buffer);
+
+  Dbt dbdata((void*)buffer.data(), buffer.length());
+
+  return do_store(database, dbkey, dbdata);
+}
+
+static int
+WriteHash(absl::flat_hash_map<IWString, Smi2Rings::Ring>& dbhash,
+          Db* database) {
+  for (const auto& [usmi, proto] : dbhash) {
+    DoStore(usmi, proto, *database);
+  }
+
+  return 1;
 }
 
 static void
@@ -2101,6 +2202,7 @@ DisplayDashYOptions(std::ostream& output) {
  -Y smiproto     write smiles, id followed by textproto output
  -Y proto        write as Smi2Rings::Results textproto
  -Y writemissing=<fname> during lookup write any missing rings to <fname>.smi
+ -Y hash         when storing, hash all results and write database at end (recommended)
 )";
   // clang-format on
 
@@ -2522,6 +2624,11 @@ smi2rings(int argc, char** argv) {
         if (verbose) {
           cerr << "Missing rings written to '" << fname << "'\n";
         }
+      } else if (y == "hash") {
+        hash_store = 1;
+        if (verbose) {
+          cerr << "Will cache rings and flush at the end\n";
+        }
       } else if (y == "help") {
         DisplayDashYOptions(cerr);
       } else {
@@ -2551,12 +2658,24 @@ smi2rings(int argc, char** argv) {
 
   IWString_and_File_Descriptor output(1);
 
+  std::unique_ptr<absl::flat_hash_map<IWString, Smi2Rings::Ring>> dbhash;
+  if (hash_store) {
+    dbhash = std::make_unique<absl::flat_hash_map<IWString, Smi2Rings::Ring>>();
+  }
+
   int rc = 0;
   for (int i = 0; i < cl.number_elements(); i++) {
-    if (!smi2rings(cl[i], input_type, output)) {
+    if (!smi2rings(cl[i], input_type, dbhash, output)) {
       rc = i + 1;
       break;
     }
+  }
+
+  if (hash_store) {
+    if (verbose) {
+      cerr << "Writing " << dbhash->size() << " ring systems to the database\n";
+    }
+    WriteHash(*dbhash, databases[0]);
   }
 
   output.flush();

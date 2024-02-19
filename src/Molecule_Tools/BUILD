@@ -67,6 +67,7 @@ local_install(
         ":msort_parallel",
         ":numbered_smiles",
         ":overlapping_fragment_model",
+        ":parsimonious_set",
         ":pharmacophore_2d",
         ":preferred_smiles",
         ":psafp",

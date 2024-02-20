@@ -196,6 +196,11 @@ if [[ -v BUILD_JULIA ]] ; then
   #cmake --install . --prefix /home/ian/LillyMol/third_party/
 fi
 
+must_build=0
+if [[ ! -s "qqq" ]] ; then
+  git clone https://github.com/pybind/pybind11_protobuf
+fi
+
 # cilk??
 
 # Not yet in the public release.

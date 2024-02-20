@@ -16,6 +16,7 @@ cc_library(
         "//Molecule_Lib:moleculeio",
         "//Molecule_Tools:alogp_lib",
         "//Molecule_Tools:xlogp_lib",
+#       "@com_google_pybind11_protobuf",
         "@pybind11",
         "@python",
     ],

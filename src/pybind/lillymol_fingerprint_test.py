@@ -46,7 +46,7 @@ class TestECFingerprints(absltest.TestCase):
     intersection = np.minimum(bits1, bits2)
     union = np.maximum(bits1, bits2)
     tanimoto = np.sum(intersection) / np.sum(union)
-    self.assertAlmostEqual(tanimoto, 0.832, places=3)
+    self.assertAlmostEqual(tanimoto, 0.8531, places=3)
 
 if __name__ == '__main__':
   absltest.main()

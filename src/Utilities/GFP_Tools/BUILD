@@ -525,6 +525,8 @@ cc_binary(
     ],
     deps = [
         ":gfp",
+        ":nearneighbours_cc_proto",
+        "//Foundational/data_source:iwtfdata_record",
         "//Foundational/histogram:iwhistogram",
     ],
 )

@@ -416,26 +416,6 @@ cc_library(
     ],
 )
 
-cc_shared_library(
-  name = "iwmolecule_shared",
-  deps = [
-      ":iwmolecule",
-  ],
-  dynamic_deps = [
-      ":geometric_constraints_shared",
-  ],
-  shared_lib_name = "iwmolecule.so",
-)
-
-cc_library(
-    name = "iwsubstructure",
-    srcs = [
-    ],
-    hdrs = [
-    ],
-    deps = [
-    ],
-)
 
 cc_library (
     name = "charge_assigner",
@@ -555,13 +535,6 @@ cc_library(
     deps = [
         ":geometric_constraints_cc_proto",
         ":iwmolecule",
-    ],
-)
-
-cc_shared_library(
-    name = "geometric_constraints_shared",
-    deps = [
-        "geometric_constraints",
     ],
 )
 

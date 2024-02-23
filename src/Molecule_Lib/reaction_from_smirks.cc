@@ -1014,7 +1014,7 @@ Substructure_Atom::first_specified_isotope() const
   {
     const Substructure_Atom_Specifier * c = _components[i];
 
-    const Min_Max_Specifier<int> & iso = c->isotope();
+    const iwmatcher::Matcher<uint32_t> & iso = c->isotope();
 
     if (iso.number_elements())
       return iso[0];

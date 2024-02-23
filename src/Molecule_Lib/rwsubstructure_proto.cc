@@ -213,7 +213,8 @@ AddOperator(const SubstructureSearch::Operator op,
 static int
 fetch_elements(const SubstructureSearch::SubstructureAtomSpecifier & proto,
                resizable_array<const Element*>& ele,
-               resizable_array<int>& element_unique_id)
+               resizable_array<int>& element_unique_id,
+               extending_resizable_array<int>& element_uid)
 {
   if (proto.atomic_symbol_size() > 0) {
     for (const auto& s : proto.atomic_symbol()) 
@@ -230,6 +231,7 @@ fetch_elements(const SubstructureSearch::SubstructureAtomSpecifier & proto,
       
       ele.add_if_not_already_present(e);
       element_unique_id.add_if_not_already_present(e->unique_id());
+      element_uid[e->unique_id()] = 1;
     }
   }
 
@@ -243,6 +245,7 @@ fetch_elements(const SubstructureSearch::SubstructureAtomSpecifier & proto,
       
       ele.add_if_not_already_present(e);
       element_unique_id.add_if_not_already_present(e->unique_id());
+      element_uid[e->unique_id()] = 1;
     }
   }
 
@@ -364,8 +367,9 @@ Substructure_Atom_Specifier::construct_from_proto(const SubstructureSearch::Subs
   assert (ok());
 
 //cerr << "SubstructureAtomSpecifier::construct_from_proto:from " << proto.ShortDebugString() << '\n';
-  if (! fetch_elements(proto, _element, _element_unique_id))
+  if (! fetch_elements(proto, _element, _element_unique_id, _element_uid)) {
     return 0;
+  }
 
   if (proto.has_preference_value())
     _preference_value = proto.preference_value();
@@ -374,62 +378,69 @@ Substructure_Atom_Specifier::construct_from_proto(const SubstructureSearch::Subs
   if (!GETVALUESINT(proto, formal_charge, -12, 12))
     return 0;
 
-  if (! GETVALUES(proto, ncon, 0, no_limit))
-    return 0;
+  MATCHER_FROM_PROTO(proto, ncon, int, _ncon);
+//if (! GETVALUES(proto, ncon, 0, no_limit))
+//  return 0;
 
-  if (!GETVALUES(proto, nbonds, 0, no_limit))
-    return 0;
+  MATCHER_FROM_PROTO(proto, nbonds, int, _nbonds);
+//if (!GETVALUES(proto, nbonds, 0, no_limit))
+//  return 0;
 
-  if (!GETVALUES(proto, valence, 0, no_limit))
-    return 0;
+  MATCHER_FROM_PROTO(proto, valence, int, _valence);
+//if (!GETVALUES(proto, valence, 0, no_limit))
+//  return 0;
 
-  if (!GETVALUES(proto, nrings, 0, no_limit))
-    return 0;
+  MATCHER_FROM_PROTO(proto, nrings, int, _nrings);
+//if (!GETVALUES(proto, nrings, 0, no_limit))
+//  return 0;
 
-  if (!GETVALUES(proto, ring_bond_count, 0, no_limit))
-    return 0;
+  MATCHER_FROM_PROTO(proto, ring_bond_count, int, _ring_bond_count);
+//if (!GETVALUES(proto, ring_bond_count, 0, no_limit))
+//  return 0;
 
   if (!GETVALUES(proto, ncon2, 0, no_limit))
     return 0;
+  MATCHER_FROM_PROTO(proto, hcount, int, _hcount);
+//if (!GETVALUES(proto, hcount, 0, no_limit))
+//  return 0;
 
-  if (!GETVALUES(proto, hcount, 0, no_limit))
-    return 0;
+  MATCHER_FROM_PROTO(proto, ring_size, int, _ring_size);
+//if (!GETVALUES(proto, ring_size, 0, no_limit))
+//  return 0;
 
-  if (!GETVALUES(proto, ring_size, 0, no_limit))
-    return 0;
+  MATCHER_FROM_PROTO(proto, attached_heteroatom_count, int, _attached_heteroatom_count);
 
-  if (!GETVALUES(proto, attached_heteroatom_count, 0, no_limit))
-    return 0;
+  MATCHER_FROM_PROTO(proto, lone_pair_count, int, _lone_pair_count);
+//if (!GETVALUES(proto, lone_pair_count, 0, no_limit))
+//  return 0;
 
-  if (!GETVALUES(proto, lone_pair_count, 0, no_limit))
-    return 0;
+  MATCHER_FROM_PROTO(proto, unsaturation, int, _unsaturation);
+//if (!GETVALUES(proto, unsaturation, 0, no_limit))
+//  return 0;
 
-  if (!GETVALUES(proto, unsaturation, 0, no_limit))
-    return 0;
+  MATCHER_FROM_PROTO(proto, daylight_x, int, _daylight_x);
+//if (!GETVALUES(proto, daylight_x, 0, no_limit))
+//  return 0;
 
-  if (!GETVALUES(proto, daylight_x, 0, no_limit))
-    return 0;
+  MATCHER_FROM_PROTO(proto, isotope, uint32_t, _isotope);
+//if (!GETVALUES(proto, isotope, 0, no_limit))
+//  return 0;
 
-  if (!GETVALUES(proto, isotope, 0, no_limit))
-    return 0;
+  MATCHER_FROM_PROTO(proto, aryl, int, _aryl);
 
-  if (!GETVALUES(proto, aryl, 0, no_limit))
-    return 0;
+  MATCHER_FROM_PROTO(proto, vinyl, int, _vinyl);
 
-  if (!GETVALUES(proto, vinyl, 0, no_limit))
-    return 0;
+  MATCHER_FROM_PROTO(proto, fused_system_size, int, _fused_system_size);
+//if (!GETVALUES(proto, fused_system_size, 0, no_limit))
+//  return 0;
 
-  if (!GETVALUES(proto, fused_system_size, 0, no_limit))
-    return 0;
+  MATCHER_FROM_PROTO(proto, symmetry_degree, int, _symmetry_degree);
+//if (!GETVALUES(proto, symmetry_degree, 0, no_limit))
+//  return 0;
 
-  if (!GETVALUES(proto, symmetry_degree, 0, no_limit))
-    return 0;
-
-  if (!GETVALUES(proto, fused_system_size, 0, no_limit))
-    return 0;
-
-  if (!GETVALUES(proto, scaffold_bonds_attached_to_ring, 0, no_limit))
-    return 0;
+  MATCHER_FROM_PROTO(proto, scaffold_bonds_attached_to_ring, int, _scaffold_bonds_attached_to_ring);
+//if (!GETVALUES(proto, scaffold_bonds_attached_to_ring, 0, no_limit))
+//  return 0;
 
   if (proto.has_symmetry_group())
   {
@@ -453,15 +464,18 @@ Substructure_Atom_Specifier::construct_from_proto(const SubstructureSearch::Subs
   if (proto.has_chirality())
     _chirality = proto.chirality();
 
-  if (!GETVALUES(proto, heteroatoms_in_ring, 0, no_limit))
-    return 0;
+  MATCHER_FROM_PROTO(proto, heteroatoms_in_ring, int, _heteroatoms_in_ring);
+//if (!GETVALUES(proto, heteroatoms_in_ring, 0, no_limit))
+//  return 0;
 
   // Min should be related to min aromatic ring size.
-  if (!GETVALUES(proto, aromatic_ring_size, 4, no_limit))
-    return 0;
+  MATCHER_FROM_PROTO(proto, aromatic_ring_size, int, _aromatic_ring_size);
+//if (!GETVALUES(proto, aromatic_ring_size, 4, no_limit))
+//  return 0;
 
-  if (!GETVALUES(proto, aliphatic_ring_size, 3, no_limit))
-    return 0;
+  MATCHER_FROM_PROTO(proto, aliphatic_ring_size, int, _aliphatic_ring_size);
+//if (!GETVALUES(proto, aliphatic_ring_size, 3, no_limit))
+//  return 0;
 
   if (proto.has_all_rings_kekule()) 
     _all_rings_kekule = proto.all_rings_kekule();
@@ -1627,15 +1641,15 @@ Substructure_Atom_Specifier::BuildProto(SubstructureSearch::SubstructureAtomSpec
     }
   }
 
-  SetProtoValues(_ncon, "ncon", proto);  // 3
+  PROTO_FROM_MATCHER(_ncon, ncon, int, proto); // 3
   SetProtoValues(_ncon2, "ncon2", proto);  // 6
-  SetProtoValues(_nbonds, "nbonds", proto);  // 9
-  SetProtoValues(_valence, "valence", proto);  // 79
+  PROTO_FROM_MATCHER(_nbonds, nbonds, int, proto); // 9
+  PROTO_FROM_MATCHER(_valence, valence, int, proto); // 79
   SetProtoValuesInt(_formal_charge, "formal_charge", proto);  // 12
-  SetProtoValues(_nrings, "nrings", proto);  // 15
-  SetProtoValues(_ring_bond_count, "ring_bond_count", proto);  // 18
-  SetProtoValues(_ring_size, "ring_size", proto);  // 21
-  SetProtoValues(_hcount, "hcount", proto);  // 24
+  PROTO_FROM_MATCHER(_nrings, nrings, int, proto); // 15
+  PROTO_FROM_MATCHER(_ring_bond_count, ring_bond_count, int, proto);  // 15
+  PROTO_FROM_MATCHER(_ring_size, ring_size, int, proto);  // 21
+  PROTO_FROM_MATCHER(_hcount, hcount, int, proto); // 24
   if (_aromaticity == SUBSTRUCTURE_NOT_SPECIFIED) {
   }  else if (_aromaticity == AROMATIC) {  // 27
     proto.set_aromatic(true);
@@ -1644,24 +1658,24 @@ Substructure_Atom_Specifier::BuildProto(SubstructureSearch::SubstructureAtomSpec
   }
   if (_chirality != SUBSTRUCTURE_NOT_SPECIFIED)
     proto.set_chirality(true);  // 28
-  SetProtoValues(_aromatic_ring_size, "aromatic_ring_size", proto);  // 30
-  SetProtoValues(_aliphatic_ring_size, "aliphatic_ring_size", proto);  // 33
-  SetProtoValues(_attached_heteroatom_count, "attached_heteroatom_count", proto);  // 36
-  SetProtoValues(_lone_pair_count, "lone_pair_count", proto);  // 39
-  SetProtoValues(_unsaturation, "unsaturation", proto);  // 42
-  SetProtoValues(_daylight_x, "daylight_x", proto);  // 45
-  SetProtoValues(_isotope, "isotope", proto);  // 48
-  SetProtoValues(_aryl, "aryl", proto);  // 51
-  SetProtoValues(_vinyl, "vinyl", proto);  // 54
-  SetProtoValues(_fused_system_size, "fused_system_size", proto);  // 57
+  PROTO_FROM_MATCHER(_aromatic_ring_size, aromatic_ring_size, int, proto);  // 30
+  PROTO_FROM_MATCHER(_aliphatic_ring_size, aliphatic_ring_size, int, proto);  // 33
+  PROTO_FROM_MATCHER(_attached_heteroatom_count, attached_heteroatom_count, int, proto);  // 36
+  PROTO_FROM_MATCHER(_lone_pair_count, lone_pair_count, int, proto);  // 39
+  PROTO_FROM_MATCHER(_unsaturation, unsaturation, int, proto);  // 42
+  PROTO_FROM_MATCHER(_daylight_x, daylight_x, int, proto);  // 45
+  PROTO_FROM_MATCHER(_isotope, isotope, uint32_t, proto);  // 48
+  PROTO_FROM_MATCHER(_aryl, aryl, int, proto);  // 51
+  PROTO_FROM_MATCHER(_vinyl, vinyl, int, proto);  // 54
+  PROTO_FROM_MATCHER(_fused_system_size, fused_system_size, int, proto);  // 58
   if (_all_rings_kekule != SUBSTRUCTURE_NOT_SPECIFIED) {
     proto.set_all_rings_kekule(true);  // 60
   }
-  SetProtoValues(_heteroatoms_in_ring, "heteroatoms_in_ring", proto);  // 61
+  PROTO_FROM_MATCHER(_heteroatoms_in_ring, heteroatoms_in_ring, int, proto);  // 61
   SET_PROTO_IF_SET(proto, match_spinach_only, -1);  // 64
-  SetProtoValues(_scaffold_bonds_attached_to_ring, "scaffold_bonds_attached_to_ring", proto);  // 65
+  PROTO_FROM_MATCHER(_scaffold_bonds_attached_to_ring, scaffold_bonds_attached_to_ring, int, proto);  // 65
   SET_PROTO_IF_SET(proto, preference_value, 0);  // 68
-  SetProtoValues(_symmetry_degree, "symmetry_degree", proto);  // 69
+  PROTO_FROM_MATCHER(_symmetry_degree, symmetry_degree, int, proto);  // 69
   SET_PROTO_IF_SET(proto, symmetry_group, 0);  // 72
   if (_spiro < 0) {
   } else if (_spiro == 0) {

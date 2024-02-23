@@ -254,7 +254,9 @@ fetch_aromaticity(const msi_object &msi, aromaticity_type_t &aromaticity) {
 
 static int
 fetch_elements(const msi_object &msi, resizable_array<const Element *> &ele,
-               resizable_array<int> &element_unique_id, int &attributes_specified) {
+               resizable_array<int> &element_unique_id,
+               extending_resizable_array<int>& element_uid,
+               int &attributes_specified) {
   int ii = 0;
 
   const msi_attribute *attribute;
@@ -280,6 +282,7 @@ fetch_elements(const msi_object &msi, resizable_array<const Element *> &ele,
 
       ele.add(e);
       element_unique_id.add(e->unique_id());
+      element_uid[e->unique_id()] = 1;
     }
   }
 
@@ -307,6 +310,7 @@ fetch_elements(const msi_object &msi, resizable_array<const Element *> &ele,
 
       ele.add(e);
       element_unique_id.add(e->unique_id());
+      element_uid[e->unique_id()] = 1;
       //    cerr << "Hash value " << e->atomic_symbol_hash_value() << endl;
     }
   }
@@ -585,7 +589,7 @@ Substructure_Atom_Specifier::construct_from_msi_object(const msi_object &msi) {
     }
   }
 
-  if (!fetch_elements(msi, _element, _element_unique_id, _attributes_specified)) {
+  if (!fetch_elements(msi, _element, _element_unique_id, _element_uid, _attributes_specified)) {
     return 0;
   }
 

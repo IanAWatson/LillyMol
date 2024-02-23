@@ -47,6 +47,8 @@ Substructure_Atom::_default_values()
 
   _atom_type_group = 0;
 
+  _on_queue_for_matching = 0;
+
   return;
 }
 
@@ -837,7 +839,9 @@ Substructure_Atom::_adjust_ring_sizes (const List_of_Ring_Sizes & ring_sizes_per
     return 1;
   }
 
-  _ring_size.add_non_duplicated_elements(ring_sizes_perceived);
+  for (const auto r : ring_sizes_perceived) {
+    _ring_size.add_if_not_already_present(r);
+  }
 
   return 1;
 }
@@ -1298,7 +1302,7 @@ Substructure_Atom::move_to_next_match_from_current_anchor (int * already_matched
     Target_Atom * a = bata.other();
 
 #ifdef DEBUG_MOVE_TO_NEXT_FROM_ANCHOR
-    cerr << "Query atom " << _unique_id << ", _con " << _con << ", may go to atom " << a->atom_number();
+    cerr << "Query atom " << _unique_id << ", _con " << _con << ", may go to atom " << a->atom_number() << " atn " << a->atomic_number() << '\n';
     if (already_matched[a->atom_number()])
       cerr << ". Nope, that one's matched\n";
     else
@@ -1327,8 +1331,11 @@ Substructure_Atom::move_to_next_match_from_current_anchor (int * already_matched
     if (! matches(*a, already_matched))
       continue;
 
-    if (! _ring_closure_bonds_match(a))
+    // If only the bond to the parent, no need to check ring closure bonds.
+    if (_bonds.number_elements() == 1) {
+    } else if (! _ring_closure_bonds_match(a)) {
       continue;
+    }
 
 //  Looking good. Check any _ring_id values
 
@@ -1375,29 +1382,31 @@ Substructure_Atom::determine_ring_or_non_ring (int & result) const
   if (! _nrings.is_set())
     return 0;
 
-  if (1 == _nrings.number_elements())
-  {
+  const int nelements = _nrings.number_elements();
+
+  if (nelements == 1) {
     result = _nrings[0];
     return 1;
   }
 
   int tmp;
-  if (_nrings.min(tmp) && tmp > 0)
-  {
+  if (_nrings.min(tmp) && tmp > 0) {
     result = tmp;
     return 1;
   }
 
-  if (_nrings.empty())    // must just be a max value specified
+  // must be just a max value specified.
+  if (nelements == 0) {
     return 0;
+  }
 
 // There are multiple values for nrings. If they are all > 0, then ok.
 // Fingerprint just needs to know ring or non ring.
 
-  for (const int r : _nrings)
-  {
-    if (0 == r)
+  for (int i = 0; i < nelements; ++i) {
+    if (_nrings[i] == 0) {
       return 0;
+    }
   }
 
 // All _nrings values were > 0
@@ -1506,9 +1515,15 @@ Substructure_Atom::check_internal_consistency(int connections) const
 int
 Substructure_Atom::ring_sizes_specified(resizable_array<int> & ring_sizes) const
 {
-  ring_sizes.add_non_duplicated_elements(_aromatic_ring_size);
+  int n = _aromatic_ring_size.number_elements();
+  for (int i = 0; i < n; ++i) {
+    ring_sizes.add_if_not_already_present(_aromatic_ring_size[i]);
+  }
 
-  ring_sizes.add_non_duplicated_elements(_aliphatic_ring_size);
+  n = _aliphatic_ring_size.number_elements();
+  for (int i = 0; i < n; ++i) {
+    ring_sizes.add_if_not_already_present(_aliphatic_ring_size[i]);
+  }
 
   return ring_sizes.number_elements();
 }
@@ -1828,12 +1843,16 @@ int
 Substructure_Atom::remove_your_children(Query_Atoms_Matched & atoms,
                                         int * already_matched)
 {
-//assert (ok ());
+  if (_current_hold_atom) {
+    release_hold(already_matched);
+  }
 
   const int nc = _children.number_elements();
-  if (0 == nc)
-    ;
-  else if (1 == nc)
+  if (0 == nc) {
+    return 1;
+  }
+
+  if (1 == nc)
     atoms.remove_first(_children[0]);
   else if (2 == nc)
     atoms.remove_two_items(_children[0], _children[1]);
@@ -1845,8 +1864,6 @@ Substructure_Atom::remove_your_children(Query_Atoms_Matched & atoms,
     }
   }
 
-  if (_current_hold_atom)
-    release_hold(already_matched);
 
   return 1;
 }

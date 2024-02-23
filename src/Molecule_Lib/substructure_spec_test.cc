@@ -1497,7 +1497,7 @@ TEST_P(TestRanges, TestD) {
 //cerr << "TestingD '" << params.smiles << "' smarts '" << params.smarts << " xpt " << params.nhits << '\n';
   ASSERT_TRUE(_m.build_from_smiles(params.smiles));
   ASSERT_TRUE(_query.create_from_smarts(params.smarts));
-  EXPECT_EQ(_query.substructure_search(&_m), params.nhits);
+  EXPECT_EQ(_query.substructure_search(&_m), params.nhits) << params.smiles << ' ' << params.smarts;
 }
 INSTANTIATE_TEST_SUITE_P(TestRangesD, TestRanges, testing::Values(
   SmilesSmartsNhits{"C", "[CD0]", 1},
@@ -1814,7 +1814,7 @@ TEST_P(TestAnySmarts, Test1) {
   // std::cerr << "TestAnySmarts '" << params.smiles << "' smarts '" << params.smarts << " xpt " << params.nhits << '\n';
   ASSERT_TRUE(_m.build_from_smiles(params.smiles));
   ASSERT_TRUE(_query.create_from_smarts(params.smarts));
-  EXPECT_EQ(_query.substructure_search(&_m), params.nhits);
+  EXPECT_EQ(_query.substructure_search(&_m), params.nhits) << params.smiles << ' ' << params.smarts;
 }
 INSTANTIATE_TEST_SUITE_P(TestAnySmarts, TestAnySmarts, testing::Values(
   SmilesSmartsNhits{"C", "[C,$(C)]", 1},

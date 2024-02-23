@@ -1421,8 +1421,9 @@ Single_Substructure_Query::_add_embedding (Query_Atoms_Matched & matched_atoms,
   results.add_embedding(new_embedding, matched_atoms);
 
   if (_max_matches_to_find > 0 &&
-      static_cast<int>(results.hits_found()) >= _max_matches_to_find)
+      static_cast<int>(results.hits_found()) >= _max_matches_to_find) {
     results.set_complete();
+  }
 
   return 1;
 }

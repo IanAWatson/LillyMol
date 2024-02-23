@@ -311,7 +311,9 @@ Substructure_Atom_Specifier::_adjust_ring_sizes(
     return 1;
   }
 
-  _ring_size.add_non_duplicated_elements(ring_sizes_perceived);
+  for (const auto r : ring_sizes_perceived) {
+    _ring_size.add_if_not_already_present(r);
+  }
 
   return 1;
 }
@@ -396,6 +398,7 @@ Substructure_Atom_Specifier::set_element(const Element* e) {
   }
 
   _element_unique_id.add(e->unique_id());
+  _element_uid[e->unique_id()] = 1;
 
   return 1;
 }
@@ -768,12 +771,15 @@ Substructure_Atom_Specifier::_matches(Target_Atom& target) {
   }
 #endif
 
-  if (_element_unique_id.number_elements()) {
-    if (!_element_unique_id.contains(target.element_unique_id())) {
+  if (! _element_unique_id.empty()) {
+    if (_element_unique_id.size() == 1) {
+      if (_element_unique_id[0] != target.element_unique_id()) {
+        return 0;
+      }
+    } else if (! _element_uid[target.element_unique_id()]) {
       return 0;
     }
-
-    attributes_checked++;
+    ++attributes_checked;
     if (attributes_checked == _attributes_specified) {
       return 1;
     }
@@ -1473,9 +1479,15 @@ Substructure_Atom_Specifier::check_internal_consistency(int connections) const {
 int
 Substructure_Atom_Specifier::ring_sizes_specified(
     resizable_array<int>& ring_sizes) const {
-  ring_sizes.add_non_duplicated_elements(_aromatic_ring_size);
+  int n = _aromatic_ring_size.number_elements();
+  for (int i = 0; i < n; ++i) {
+    ring_sizes.add_if_not_already_present(_aromatic_ring_size[i]);
+  }
 
-  ring_sizes.add_non_duplicated_elements(_aliphatic_ring_size);
+  n = _aliphatic_ring_size.number_elements();
+  for (int i = 0; i < n; ++i) {
+    ring_sizes.add_if_not_already_present(_aliphatic_ring_size[i]);
+  }
 
   return ring_sizes.number_elements();
 }
@@ -2370,6 +2382,49 @@ SmartsNumericQualifier(const char* input, int max_chars, Min_Max_Specifier<int>&
   return rc;
 }
 
+int
+SmartsNumericQualifier(const char* input, int max_chars, iwmatcher::Matcher<int>& result) {
+  if (*input == '<' || *input == '>') {
+    int value;
+    int ltgt;
+    int chars_consumed = substructure_spec::SmartsFetchNumeric(input, max_chars, value, ltgt);
+    if (ltgt < 0) {
+      result.set_max(value - 1);
+    } else if (ltgt > 0) {
+      result.set_min(value + 1);
+    } else {
+      result.add(value);
+    }
+    return chars_consumed;
+  }
+
+  if (*input == kOpenBrace) {
+    return substructure_spec::SmartsParseRange(input, max_chars, result);
+  }
+
+  // Input might be a number.
+
+  int value = 0;
+  int rc = 0;
+  for (int i = 0; i < max_chars; ++i) {
+    if (!isdigit(input[i])) {
+      break;
+    }
+    value = value * 10 + input[i] - '0';
+    ++rc;
+  }
+
+  // No number detected.
+  if (rc == 0) {
+    return 0;
+  }
+
+  result.add(value);
+
+  return rc;
+}
+
+
 }  // namespace substructure_spec
 
 // #define DEBUG_GET_ATOMIC_NUMBER_OR_SYMBOL
@@ -2463,6 +2518,7 @@ int
 Substructure_Atom_Specifier::_add_element(const Element* e) {
   _element.add(e);
   _element_unique_id.add(e->unique_id());
+  _element_uid[e->unique_id()] = 1;
 
   // cerr << "Substructure_Atom_Specifier::_add_element:added " << e->symbol() << "
   // unique_id " << e->unique_id() << '\n';
@@ -2610,6 +2666,7 @@ Substructure_Atom_Specifier::construct_from_smarts_token(
       nchars--;
       _element.add(e);
       _element_unique_id.add(e->unique_id());
+      _element_uid[e->unique_id()] = 1;
       first_elemental_primitive_encountered = 1;
     }
 
@@ -3098,7 +3155,7 @@ Substructure_Atom_Specifier::construct_from_smarts_token(
         nchars = 3 + 7 - 1;
         _attributes_specified++;
       } else if (c.starts_with("nonorganic")) {
-        //      AddNonOrganicElements();
+        AddNonOrganicElements();
         nchars = 3 + 10 - 1;
         ++_match_non_organic;
         _attributes_specified++;

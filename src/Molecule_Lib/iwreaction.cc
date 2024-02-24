@@ -3945,7 +3945,7 @@ IWReaction::in_place_transformations(Molecule & m,
 
   int rc = 0;
 
-  for (int i = 0; i < sresults.number_embeddings(); i++)
+  for (uint32_t i = 0; i < sresults.number_embeddings(); i++)
   {
     const Set_of_Atoms & e = *(sresults.embedding(i));
 

@@ -542,7 +542,7 @@ do_discard_hits_in_non_organic_fragments (Molecule_to_Match & target,
       non_organic_fragments.add(ai.fragment_membership());
   }
 
-  for (int i = 0; i < sresults.number_embeddings(); i++)
+  for (uint32_t i = 0; i < sresults.number_embeddings(); i++)
   {
     const Set_of_Atoms * e = sresults.embedding(i);
 
@@ -1019,10 +1019,11 @@ label_matches_and_write_to_stream_for_individually_labelled_matches(Molecule & m
 {
   std::unique_ptr<isotope_t[]> atom_isotopic_label = std::make_unique<isotope_t[]>(m.natoms());
 
-  for (int i = 0; i < sresults.number_embeddings(); i++)
+  for (uint32_t i = 0; i < sresults.number_embeddings(); i++)
   {
-    if (i > 0)
+    if (i > 0) {
       m.transform_to_non_isotopic_form();
+    }
 
     if (! label_match_and_write_to_stream_for_individually_labelled_matches(m, query_number,
                         sresults, i, atom_isotopic_label.get(), number_queries)) {

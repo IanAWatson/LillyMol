@@ -1790,7 +1790,7 @@ molecular_transformations(Molecule & m,
   }
   else if (mdo >= 0)
   {
-    if (mdo >= sresults.number_embeddings()) {
+    if (static_cast<uint32_t>(mdo) >= sresults.number_embeddings()) {
       cerr << "Reaction '" << ri.comment() << "' only " << nhits << " hits, so embedding " << mdo << " invalid\n";
       return 0;
     }

@@ -2300,7 +2300,7 @@ class SetOfEmbeddings : public resizable_array_p<Set_of_Atoms> {
 class Substructure_Results
 {
   private:
-    unsigned int _hits_found;
+    uint64_t _hits_found;
 
     int _atoms_in_target_molecule;
 
@@ -2423,7 +2423,7 @@ class Substructure_Results
     const Set_of_Atoms * embedding(int i) const { return _embedding[i];}
     const Query_Atoms_Matched * query_atoms_matching(int i) const { return _query_atoms_matched[i];}
 
-    int number_embeddings() const { return _embedding.number_elements();};
+    uint32_t number_embeddings() const { return _embedding.size();};
     int print_embeddings(std::ostream &, int = 0) const;
     int print_embeddings(std::ostream &, const Molecule *) const;
 
@@ -3403,8 +3403,8 @@ class Single_Substructure_Query
 
 //  Search all atoms in the molecule for a match to the query.
 
-    int substructure_search(Molecule *, Substructure_Results &);
-    int substructure_search(Molecule_to_Match &, Substructure_Results &);
+    uint32_t substructure_search(Molecule *, Substructure_Results &);
+    uint32_t substructure_search(Molecule_to_Match &, Substructure_Results &);
 
 //  Once we allow decisions into a query, there can be a different number
 //  of query atoms which are matched for each match.
@@ -3614,17 +3614,17 @@ class Substructure_Query : public resizable_array_p<Single_Substructure_Query>
     // On a positive match, it may (or may not) contain some matched atoms,
     // because the last component matched might have been a non-match in
     // an XOR.
-    int substructure_search(Molecule *);
-    int substructure_search(Molecule *, Substructure_Results &);
-    int substructure_search(Molecule &);
-    int substructure_search(Molecule &, Substructure_Results &);
-    int substructure_search(Molecule_to_Match &);
-    int substructure_search(Molecule_to_Match &, Substructure_Results &);
+    uint32_t substructure_search(Molecule *);
+    uint32_t substructure_search(Molecule *, Substructure_Results &);
+    uint32_t substructure_search(Molecule &);
+    uint32_t substructure_search(Molecule &, Substructure_Results &);
+    uint32_t substructure_search(Molecule_to_Match &);
+    uint32_t substructure_search(Molecule_to_Match &, Substructure_Results &);
 
 //  Sometimes we want to search each component of a query regardless of what operators
 //  might be present.
 
-    int substructure_search_do_each_component(Molecule_to_Match & target, Substructure_Results & sresults);
+    uint32_t substructure_search_do_each_component(Molecule_to_Match & target, Substructure_Results & sresults);
 
     int set_find_one_embedding_per_atom(int);
     int set_find_unique_embeddings_only(int);

@@ -2508,7 +2508,7 @@ Single_Substructure_Query::_one_time_initialisations()
        3                   8             2
 */
 
-int
+uint32_t
 Single_Substructure_Query::substructure_search(Molecule_to_Match & target_molecule,
                                                Substructure_Results & results)
 {
@@ -2775,7 +2775,7 @@ Single_Substructure_Query::_examine_bond_specifications()
   return 1;
 }
 
-int
+uint32_t
 Single_Substructure_Query::substructure_search(Molecule * m,
                                                Substructure_Results & results)
 {

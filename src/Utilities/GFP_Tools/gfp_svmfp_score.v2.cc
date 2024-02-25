@@ -44,7 +44,7 @@ char output_separator = ' ';
 // By default, we write just the numeric score, but we can
 // write other things.
 bool write_label = true;
-bool write_score = false;
+bool write_score = true;
 
 Fraction_as_String fraction_as_string;
 
@@ -304,6 +304,7 @@ SvmModel::~SvmModel() {
 int
 SvmModel::Initialise(const GfpModel::SvmfpModel& model_proto,
                      const IWString& dir) {
+#define PROTO3_HAS_HAS
 #ifdef PROTO3_HAS_HAS
   if (! model_proto.has_bit_subset()) {
     cerr << "SvmModel::Initialise:missing bit_subset\n";
@@ -737,7 +738,7 @@ GfpSvmfpEvaluate(int argc, char** argv) {
       output << output_separator << models[i].response_name();
       continue;
     }
-    output << output_separator << models[i].response_name() << "_label";
+    output << output_separator << models[i].response_name() << "_pred";
     if (write_label && write_score) {
       output << output_separator << models[i].response_name() << "_score";
     }

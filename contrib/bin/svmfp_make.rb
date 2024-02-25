@@ -97,6 +97,7 @@ end
 cmdline = IWCmdline.new('-v-mdir=s-A=sfile-C-gfp=close-svml=close-p=ipos-flatten-gfp_make=xfile' \
                         '-svm_learn=xfile-gfp_to_svm_lite=xfile-lightgbm=close-lightgbm_config=sfile' \
                         '-catboost=close' \
+                        '-j=f' \
                         '-xgboost=close-xgboost_config=sfile-xgb_test=sfile')
 if cmdline.unrecognised_options_encountered
   $stderr << "unrecognised_options_encountered\n"
@@ -210,6 +211,9 @@ if cmdline.option_present('C')  # Classification.
   else
     perform_class_label_translation(activity_file, mdir, train_activity, verbose)
     svm_learn_options = "#{svm_learn_options} -z c"
+    if cmdline.option_present('j')
+      svm_learn_options << " -j " << cmdline.value('j').to_s
+    end
   end
 else  # Regression
   perform_response_scaling(activity_file, mdir, train_smi, train_activity, verbose)

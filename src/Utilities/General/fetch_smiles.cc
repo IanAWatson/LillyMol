@@ -41,8 +41,19 @@ int missing_identifier = 0;
 
 void
 Usage(int rc) {
+// clang-format off
+#if defined(GIT_HASH) && defined(TODAY)
+  cerr << __FILE__ << " compiled " << TODAY << " git hash " << GIT_HASH << '\n';
+#else
+  cerr << __FILE__ << " compiled " << __DATE__ << " " << __TIME__ << '\n';
+#endif
+  // clang-format on
+  // clang-format off
   cerr << " -c <col>       identifier column in identifier file\n";
   cerr << " -C <col>       identifier column in smiles file\n";
+  cerr << " -z             ignore missing identifiers\n";
+  // clang-format on
+
   exit(rc);
 }
 
@@ -167,7 +178,7 @@ ReadData(const char * fname,
 
 int
 FetchSmiles(int argc, char** argv) {
-  Command_Line cl(argc, argv, "vc:C:");
+  Command_Line cl(argc, argv, "vc:C:z");
   if (cl.unrecognised_options_encountered()) {
     cerr << "unrecognised_options_encountered\n";
     Usage(1);
@@ -200,6 +211,13 @@ FetchSmiles(int argc, char** argv) {
     params.data_file_column--;
   }
 
+  if (cl.option_present('z')) {
+    params.ignore_missing_identifiers = 1;
+    if (verbose) {
+      cerr << "Will ignore missing identifiers\n";
+    }
+  }
+
   if (cl.number_elements() < 2) {
     cerr << "Must specify at least 2 files\n";
     Usage(1);
@@ -219,6 +237,13 @@ FetchSmiles(int argc, char** argv) {
   IWString_and_File_Descriptor output(1);
   if (! FetchSmiles(cl[0], params, data, output)) {
     return 1;
+  }
+
+  output.flush();
+  if (verbose) {
+    if (params.ignore_missing_identifiers) {
+      cerr << missing_identifier << " missing identifiers ignored\n";
+    }
   }
 
   return 0;

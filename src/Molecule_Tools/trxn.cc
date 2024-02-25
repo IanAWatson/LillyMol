@@ -789,7 +789,7 @@ process_no_reagents(Molecule& m, IWReaction& reaction,
   ;
 
   if (smc.process_hit_number() >= 0) {
-    int mdo = smc.process_hit_number();
+    uint32_t mdo = smc.process_hit_number();
 
     if (mdo >= sresults.number_embeddings()) {
       cerr << "Request to process embedding " << mdo << " but query produced "

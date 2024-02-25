@@ -371,6 +371,12 @@ feature_to_description {
   }
 }
 feature_to_description {
+  key: "w_alogp"
+  value {
+    description: "alogP"
+  }
+}
+feature_to_description {
   key: "w_bbr1"
   value {
     description: "One bond between two rings"

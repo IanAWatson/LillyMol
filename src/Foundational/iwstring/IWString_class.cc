@@ -3624,7 +3624,7 @@ IWString::strncpy(const char * s, int nchars)
 #ifdef _WIN32
   IW_STRNCPY(_things, s, nchars);
 #else
-  ::memcpy(_things, s, nchars);
+  ::memcpy(_things, s, static_cast<uint32_t>(nchars));
 #endif
 
   _number_elements = nchars;

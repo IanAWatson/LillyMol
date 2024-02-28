@@ -1,6 +1,12 @@
 // Generate a set of ReplacementRing protos from a set of molecules.
 // Protos are written as text_format since there are never that many of them.
 
+// TODO:ianwatson
+// Molecules like
+// O[1C]1([2CH]2[3CH2][4CH2]2)[5CH2][6CH2][7N](=[8O])([9CH3])[10CH2][11CH2]1 CHEMBL1977635
+// do not work properly. The smarts at the N atom is written as [D2].
+// There are a small number of such cases, ignored.
+
 #include <algorithm>
 #include <cstdint>
 #include <cstring>
@@ -179,7 +185,11 @@ class ExtractRings {
 
     // As a check, once the smarts for a ring is generated, we can do a search
     // in the starting molecule.
+    // This really does not work. The main problem is that if we have a ring
+    // with exocyclic double bonds, we (deliberately) form a smarts with [D2],
+    // and that means we do not match our parent.
     int _substructure_search_starting_molecule;
+    int _invalid_smarts;
     int _substructure_search_failures;
 
     // Optionally we can generate raw rings, with no substituent information.
@@ -273,6 +283,7 @@ ExtractRings::ExtractRings() {
   _respect_aromaticity = 1;
   _substructure_search_starting_molecule = 0;
   _substructure_search_failures = 0;
+  _invalid_smarts = 0;
   _generate_substitution_not_specified = 0;
 }
 
@@ -445,6 +456,7 @@ ExtractRings::Report(std::ostream& output) const {
   }
 
   if (_substructure_search_starting_molecule) {
+    output << _invalid_smarts << " invalid smarts\n";
     output << _substructure_search_failures << " substructure search failures\n";
   }
 
@@ -1042,6 +1054,7 @@ ExtractRings::MaybeCheckSubstructureMatch(Molecule& m, const IWString& smt) {
   Substructure_Query query;
   if (! query.create_from_smarts(smt)) {
     cerr << "ExtractRings::MaybeCheckSubstructureMatch:invalid smarts '" << smt << "'\n";
+    ++_invalid_smarts;
     return 0;
   }
 
@@ -1052,7 +1065,7 @@ ExtractRings::MaybeCheckSubstructureMatch(Molecule& m, const IWString& smt) {
   }
 
   cerr << "No substructure match " << m.smiles() << " smt '" << smt << "' matched " <<
-      sresults.max_query_atoms_matched_in_search() << " query atoms\n";
+      sresults.max_query_atoms_matched_in_search() << " query atoms " << m.name() << '\n';
   cerr << "Contains " << m.aromatic_atom_count() << " aromatic atoms\n";
   write_isotopically_labelled_smiles(m, false, cerr);
   cerr << '\n';
@@ -1203,6 +1216,11 @@ ExtractRings::GenerateSmarts(Molecule& parent,
 
   // This step may not be necessary, but let's make sure.
   // set_write_smiles_aromatic_bonds_as_colons, below, seems to cover it.
+
+  // C12=C(N=C(N)S1)CC1=CC=CC=C12 CHEMBL38523
+  // the reason we need to check in_same_aromatic_ring is because of the
+  // middle ring, which has a bond where the atom at each end is aromatic,
+  // but the bond is not.
   if (aromatic_atoms_encountered) {
     for (const Bond* b : m.bond_list()) {
       if (b->nrings() == 0) {
@@ -1212,11 +1230,15 @@ ExtractRings::GenerateSmarts(Molecule& parent,
       const atom_number_t a1 = b->a1();
       const atom_number_t a2 = b->a2();
       if (data.aromatic_in_child[a1] && data.aromatic_in_child[a2]) {
-        m.set_bond_permanent_aromatic(b->a1(), b->a2());
+        if (m.in_same_aromatic_ring(a1, a2)) {
+          m.set_bond_permanent_aromatic(b->a1(), b->a2());
+        }
       }
     }
   }
 
+  // N1(C(=NNC1=O)C1=CC=CC=C1)CC CHEMBL409021
+  // Generates a smarts with a double bond. TODO:ianwatson
   if (_respect_aromaticity) {
     set_write_smiles_aromatic_bonds_as_colons(1);
   }
@@ -1228,6 +1250,7 @@ ExtractRings::GenerateSmarts(Molecule& parent,
   result = smiles_information.smiles();
 
   ChangeRingDoubleBonds(m, result);
+
 
   return 1;
 }
@@ -1252,7 +1275,9 @@ ExtractRings::GenerateRing(Molecule& parent,
   IWString smt;
   GenerateSmarts(parent, m, data, include_d, smt);
 
-  MaybeCheckSubstructureMatch(parent, smt);
+  if (exocyclic_smiles.empty()) {
+    MaybeCheckSubstructureMatch(parent, smt);
+  }
 
   auto iter_label = _ring.find(label);
   if (iter_label == _ring.end()) {
@@ -1429,7 +1454,7 @@ ReplaceRings(ExtractRings& extract_rings,
 
 int
 Main(int argc, char** argv) {
-  Command_Line cl(argc, argv, "vE:A:i:g:lcS:aR:P:kr:X:");
+  Command_Line cl(argc, argv, "vE:A:i:g:lcS:aR:P:kr:X:Z:");
   if (cl.unrecognised_options_encountered()) {
     cerr << "unrecognised_options_encountered\n";
     Usage(1);

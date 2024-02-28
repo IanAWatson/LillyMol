@@ -52,6 +52,7 @@ local_install(
         ":make_these_molecules",
         ":marvin_pka",
         ":medchemwizard",
+        ":minor_changes",
         ":mkfrag",
         ":mol2qry",
         ":mol2SAFE",

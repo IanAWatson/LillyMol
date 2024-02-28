@@ -33,9 +33,9 @@ probability_move_fragment 0.0
 
 swap_adjacent_atoms 0.0
 
-# Aromatic rings are generally desirable, so make their destruction a low probability event
+# Aromatic rings are generally desirable, so make their destruction impossible.
 
-destroy_aromatic_ring 0.1
+destroy_aromatic_ring 0.0
 
 change_carbon_to_nitrogen 1.0
 

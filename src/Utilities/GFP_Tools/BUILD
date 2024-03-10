@@ -27,6 +27,7 @@ local_install(
         ":gfp_nearneighbours_single_file_tbb",
         ":gfp_pairwise_distances",
         ":gfp_profile_activity_by_bits",
+        ":gfp_server",
         ":gfp_single_linkage",
         ":gfp_sparse_to_fixed",
         ":gfp_spread",
@@ -105,6 +106,9 @@ proto_library(
     srcs = [
         "nearneighbours.proto",
     ],
+    visibility = [
+        "//visibility:public",
+    ],
 )
 
 cc_proto_library(
@@ -121,6 +125,33 @@ py_proto_library(
     name = "nearneighbours_py_proto",
     srcs = [
         "nearneighbours.proto",
+    ],
+)
+
+proto_library(
+    name = "nn_request_proto",
+    srcs = [
+        "nn_request.proto",
+    ],
+    deps = [
+        "//Utilities/GFP_Tools:nearneighbours",
+    ],
+)
+
+cc_proto_library(
+    name = "nn_request_cc_proto",
+    deps = [
+        ":nn_request_proto",
+    ]
+)
+
+py_proto_library(
+    name = "nn_request_py_proto",
+    srcs = [
+        "nn_request.proto",
+    ],
+    deps = [
+        "nearneighbours_py_proto",
     ],
 )
 
@@ -398,6 +429,29 @@ cc_binary(
         "//Foundational/accumulator",
         "//Foundational/iwmisc",
     ],
+)
+
+cc_binary(
+  name = "gfp_server",
+  srcs = [
+      "gfp_server.cc",
+  ],
+  deps = [
+       "nn_request_cc_proto",
+       "//Foundational/cmdline:iwcmdline",
+       "//Foundational/data_source:iwstring_data_source",
+       "//Molecule_Lib:iwmfingerprint",
+       "//Molecule_Lib:iwmolecule",
+       "//Molecule_Lib:moleculeio",
+       "//Molecule_Tools:mpr",
+       "//Molecule_Tools:maccskeys_fn5_lib",
+       "//Utilities/GFP_Tools:gfp_standard",
+       "//Utilities/GFP_Tools:nearneighbours_cc_proto",
+        "@com_google_protobuf//:protobuf",
+  ],
+  linkopts = [
+    "-lzmq",
+  ],
 )
 
 cc_binary(

@@ -17,6 +17,28 @@ extern float *precomputed_ratio;
 
 using std::cerr;
 
+int
+GFP_Standard::DebugPrint(std::ostream& output) const {
+  output << "GFP_Standard::DebugPrint\n";
+  const uint64_t * x = (const uint64_t*) _iw;
+  output << "IW\n";
+  for (int i = 0; i < 32; ++i) {
+    output << i << ' ' << x[i] << '\n';
+  }
+  x = (const uint64_t*) _mk;
+  output << "MK\n";
+  for (int i = 0; i < 4; ++i) {
+    output << i << ' ' << x[i] << '\n';
+  }
+  x = (const uint64_t*) _mk2;
+  output << "MK2\n";
+  for (int i = 0; i < 4; ++i) {
+    output << i << ' ' << x[i] << '\n';
+  }
+
+  return output.good();
+}
+
 void
 GFP_Standard::build_molecular_properties(const Molecular_Properties_Integer &mpr) {
   copy_vector(_molecular_properties, mpr.rawdata(), 8);
@@ -140,7 +162,7 @@ void
 GFP_Standard::build_mk(const int *b, uint32_t nbits) {
   CheckOkMkNBits(nbits);
 
-  _nset_mk2 = 0;
+  _nset_mk = 0;
 
   std::fill_n(_mk, sizeof(_mk), 0);
 
@@ -155,7 +177,7 @@ GFP_Standard::build_mk2(const int *b, uint32_t nbits) {
 
   _nset_mk2 = 0;
 
-  std::fill_n(_mk, sizeof(_mk), 0);
+  std::fill_n(_mk2, sizeof(_mk2), 0);
 
   bits_from_array(b, nbits, _mk2, _nset_mk2);
 
@@ -216,23 +238,28 @@ popcount(const unsigned char *b, const int nwords) {
   return count;
 }
 
+//#define DEBUG_GFP_STANDARD_TANIMOTO
+
 float
 GFP_Standard::tanimoto(const GFP_Standard &rhs) const {
   float rc = static_cast<float>(0.0);
 
+  int ndiv = 1;
   for (int i = 0; i < 8; ++i) {
     const int j = _molecular_properties[i] * 256 + rhs._molecular_properties[i];
     rc += precomputed_ratio[j];
+    
   }
 
 #ifdef DEBUG_GFP_STANDARD_TANIMOTO
   cerr << "Properties " << rc << " _nset_iw " << _nset_iw << ' ' << rhs._nset_iw <<
-          "mk " << _nset_mk << ' ' << rhs._nset_mk << " mk2 " << _nset_mk2 << ' ' << rhs._nset_mk2 << '\n';
+          " mk " << _nset_mk << ' ' << rhs._nset_mk << " mk2 " << _nset_mk2 << ' ' << rhs._nset_mk2 << '\n';
 #endif
 
   if (_nset_iw || rhs._nset_iw) {
     int bic = popcount_2fp((const unsigned *)_iw, (const unsigned *)rhs._iw, 64);
     rc += (static_cast<float>(bic) / static_cast<float>(_nset_iw + rhs._nset_iw - bic));
+    ++ndiv;
     assert(rc <= 2.0f);
   }
 
@@ -244,23 +271,28 @@ GFP_Standard::tanimoto(const GFP_Standard &rhs) const {
     int bic = popcount_2fp((const unsigned *)_mk, (const unsigned *)rhs._mk, 8);
 
     rc += (static_cast<float>(bic) / static_cast<float>(_nset_mk + rhs._nset_mk - bic));
+    ++ndiv;
     assert(rc <= 3.0f);
   }
+#ifdef DEBUG_GFP_STANDARD_TANIMOTO
+  cerr << "After MK " << rc << '\n';
+#endif
 
   if (_nset_mk2 || rhs._nset_mk2) {
     int bic = popcount_2fp((const unsigned *)_mk2, (const unsigned *)rhs._mk2, 8);
 
     rc += (static_cast<float>(bic) / static_cast<float>(_nset_mk2 + rhs._nset_mk2 - bic));
     assert(rc <= 4.0f);
+    ++ndiv;
   }
 
-  assert(rc <= 4.0f);
+  assert(rc <= ndiv);
 
 #ifdef DEBUG_GFP_STANDARD_TANIMOTO
-  cerr << "tanimoto returning " << (rc * 0.25) << '\n';
+  cerr << "tanimoto " << rc << " ndiv " << ndiv << " returning " << static_cast<float>(rc) / static_cast<float>(ndiv) << '\n';
 #endif
 
-  return rc * 0.25f;
+  return static_cast<float>(rc) / static_cast<float>(ndiv);
 }
 
 void

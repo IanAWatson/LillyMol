@@ -12,12 +12,12 @@ We examine three common cases here
 
 ## Diversity Measure
 Most diversity studies require some measure of similarity between
-individual molecules. This might be a fingerprint measure, a measures
+individual molecules. This might be a fingerprint measure, a measure
 based on a descriptor space, or a measure based on position in an
 embedding space. All are likely quite reasonable choices. While this
 document will focus on a fingerprint computation available within
 LillyMol, the principles outlined here can be applied to any
-individual molecular similarity method.
+individual measure of molecular similarity.
 
 That said, the default gfp fingerprint has found widespread
 acceptance as a reasonable approximation to human perception of
@@ -33,10 +33,11 @@ measure, together with reasonable run-time characteristics.
 
 Spread is a greedy approximation to a hard task. The hard task
 would be to identify a sequence of molecules from a set that
-maximised the diversity of the molecules as they are selected.
-If we were to select 1000 molecules, what are the most diverse
-subset of 1000 that could be selected? Solving that problem
-is hard, but the spread approximation makes this feasible.
+maximises the diversity of the molecules as they are selected.
+Or more generally, if we were to select 1000 molecules, what is the most diverse
+1000 molecules that could be selected? Solving that problem
+is hard, but the spread approximation makes this feasible, while
+giving up little in terms of accuracy.
 
 ### Spread
 Spread works by selecting a first molecule - this can be either
@@ -97,7 +98,7 @@ What we see is that you can select a 500k subset from Chembl
 and no two molecules in there will be closer than 0.2. This
 is a very diverse set of molecules!
 
-It can be very informative to supoerimpose trajectories from
+It can be very informative to superimpose trajectories from
 different collections - possibly with a normalisation
 across the X axis to account for differing numbers of molecules.
 
@@ -113,10 +114,16 @@ very close. For example
 ![CHEMBL3909048](Images/CHEMBL3909048.png)
 ![CHEMBL4577687](Images/CHEMBL4577687.png)
 
-which differ by a methyl group.
+which differ by the substitution pattern on the aromatic
+heterocycle.
 
 A spread selection provides a very informative measure of the
-internal diversity of a set of molecules.
+internal diversity of a set of molecules, while retaining
+ease of understanding.
+
+On a large set of molecules, it may make sense to terminate
+the calculation once the distance has dropped to a given
+value, which can substantially shorted the computation.
 
 ## Other Measures
 Something that people often find informative is the notion of
@@ -135,11 +142,12 @@ to a diverse sampling of the available scaffolds.
 
 Molecular Property Profiles should always be generated for any
 collection of molecules of interest, see
-[Molecular Property Profile[(//contrib/Molecular_Property_Profile/README.md)
+[Molecular Property Profile](/contrib/Molecular_Property_Profile/README.md)
 
 It would be possible to compare the molecular property profile of the
 first N selected vs the overall collection. Generally spread picks very
-strange molecules at first - the outliers of the set. 
+strange molecules at first - the outliers of the set, so there
+might very well be differences from the overall set.
 
 ## Activity Guided Diversity
 If the task is to select a diverse subset of molecules, subject to
@@ -179,6 +187,13 @@ These two methods provide easy means of generating subsets of molecules
 that are both internally diverse, while significantly enriched in the
 most desirable.
 
+The other thing to note is that you have x Million molecules and
+need to select 1000, it is very unlikely that anything beyond
+the top 20 or 50k molecules will be relevant, so a potentially large
+calculation can often be short circuited by simply discarding the
+vast majority of the candidates, which are very unlikely to be
+selected anyway.
+
 ## Inter Collection Diversity
 If two collections are to be compared, there are many approaches.
 
@@ -196,7 +211,7 @@ But the most detailed way of comparing two sets is to do a
 pairwise fingerprint comparison. This will necessarily be 
 expensive, although for moderate sized collections, quite doable.
 
-For example, if one were to compare Chembl with Chembl, 2.17M that
+For example, if one were to compare Chembl with Chembl, 2.24M that
 will take a while. But the task can easily be parallelised.
 
 Start with the already generated fingerprint file for chembl and
@@ -205,7 +220,7 @@ split it into chunks of 50k molecules each.
 gfp_make.sh chembl.smi > chembl.gfp
 iwsplit -tdt -n 50000 chembl.gfp
 ```
-This generates a bunch of `iwsplit*.gfp` files, each 
+This generates a sequence of `iwsplit*.gfp` files, each 
 containing 50k fingerprints.
 
 Each of these can be compared against the entire set via
@@ -213,7 +228,7 @@ something like
 ```
 time gfp_lnearneighbours_standard -p iwsplit1.gfp -n 1 -v -r 50000 chembl.gfp > iwsplit1.nn
 ```
-which on a relatively modern machine, takes just over 6 minutes to do the 50k vs 2.17M 
+which on a relatively modern machine, takes just over 6 minutes to do the 50k vs 2.24M 
 comparisons - it is running parallel with omp. The rate is about 580 M similarity
 computations per second, or 72M per core per second.
 
@@ -226,7 +241,7 @@ Within dopattern that might look like
 ```
 dopattern.sh -o 50 'gfp_lnearneighbours_standard -p iwsplit%.gfp -n 1 chembl.gfp > iwsplit%.nn'
 ```
-when the execution directed to a cluster.
+with the execution directed to a cluster, for simultaneous processing.
 
 These individual .nn files can be collated with nplotnn
 
@@ -234,6 +249,8 @@ These individual .nn files can be collated with nplotnn
 nplotnn -H histogram.txt -v iwsplit*.nn > all.nn
 ```
 With the file `histogram.txt` containing a histogram of the nearest neighbours.
+`nplotnn` has a wide variety of options for identify close or distance neighbours,
+which may be of particular interest.
 
 Other approaches might include subsampling either collection. But the
 problem here is that it is often the closest distances that are the most
@@ -250,3 +267,8 @@ If you wish to restrict attention to very close neighbours it might be
 possible to sort the collections into different atom count buckets, and
 only compare across buckets of similar size. This is what the `-W` option
 to many `gfp_*` tools does.
+
+Clearly these N^2 algorithms are much slower than algorithms that work by
+projecting molecules into a common representation. If you have a space that
+can reliably minic expected similarities, that will clearly be more scalable.
+The real challenge is whether or not such a satisfactory space exists.

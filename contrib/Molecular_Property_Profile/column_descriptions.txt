@@ -430,3 +430,21 @@ feature_to_description {
     description: "Number of rings with 7 or more atoms"
   }
 }
+feature_to_description {
+  key: "w_brunshbdsum"
+  value {
+    description: "Sum of donors and acceptors"
+  }
+}
+feature_to_description {
+  key: "w_ro5_ohnh"
+  value {
+    description: "Rule of five donor count"
+  }
+}
+feature_to_description {
+  key: "w_ro5_on"
+  value {
+    description: "Rule of five acceptor count"
+  }
+}

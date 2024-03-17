@@ -273,7 +273,7 @@ class Group_of_Molecules : public IWString {
   int is_within_tolerance(float t) const;
   int min_and_max_within_ratio(float t) const;
 
-  int write_structure_group(IWString_and_File_Descriptor &output) const;
+  int write_structure_group(IWString_and_File_Descriptor &output);
 
   int write_first_member(IWString_and_File_Descriptor &output) const;
 
@@ -349,7 +349,7 @@ Group_of_Molecules::min_and_max_within_ratio(float t) const {
 }
 
 int
-Group_of_Molecules::write_structure_group(IWString_and_File_Descriptor &output) const {
+Group_of_Molecules::write_structure_group(IWString_and_File_Descriptor &output) {
   output << (*this) << ' ';
 
   if (only_display_common_group) {
@@ -373,6 +373,9 @@ Group_of_Molecules::write_structure_group(IWString_and_File_Descriptor &output) 
          << _activity.maxval() << " ave " << static_cast<float>(_activity.average())
          << " diff " << (static_cast<float>(_activity.maxval() - _activity.minval()))
          << '\n';
+
+  Smiles_ID_Activity_Comparator cmp;
+  _sida.iwqsort(cmp);
 
   for (int i = 0; i < _sida.number_elements(); i++) {
     _sida[i]->do_write(output);
@@ -1095,7 +1098,7 @@ do_merge_output(const IW_STL_Hash_Map<IWString, Group_of_Molecules *> &structure
   Accumulator<float> acc;
 
   for (auto i : structure_group) {
-    const Group_of_Molecules *g = i.second;
+    Group_of_Molecules *g = i.second;
 
     if (1 == g->n()) {
       g->write_first_member(output);
@@ -2178,7 +2181,7 @@ activity_consistency(int argc, char **argv) {
   IWString_and_File_Descriptor output(1);
 
   for (int i = 0; i < items_to_display; i++) {
-    const Group_of_Molecules *g = gm[i];
+    Group_of_Molecules *g = gm[i];
 
     g->write_structure_group(output);
 

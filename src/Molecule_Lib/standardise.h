@@ -136,6 +136,7 @@ class IWStandard_Current_Molecule
     int * _ring_is_fused;
     int * _atom_is_aromatic;
     int * _ring_is_aromatic;
+    int * _ring_bond_count;
     int * _fsid;
     const Atom ** _atom;
 
@@ -189,6 +190,7 @@ class IWStandard_Current_Molecule
     const int *  ring_is_aromatic () const { return _ring_is_aromatic;}
     const int *  atom_is_aromatic () const { return _atom_is_aromatic;}
     const int *  ring_nitrogen_count () const { return _ring_nitrogen_count;}
+    const int *  ring_bond_count() const { return _ring_bond_count;}
 
 //  Some methods are non const
 

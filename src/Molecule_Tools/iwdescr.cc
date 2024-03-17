@@ -3605,6 +3605,8 @@ do_compute_distance_matrix_descriptors(Molecule & m,
 
 //set_vector(totd, matoms, 0);
 
+  // Actually this is wrong, it is measuring heteroatoms further
+  // than 3 bonds. Turns out this is useful this way.
   int largest_heteroatoms_within_three_bonds = 0;
 
   for (auto i = 0; i < matoms; ++i)
@@ -3619,6 +3621,7 @@ do_compute_distance_matrix_descriptors(Molecule & m,
 //    int d = m.bonds_between(i, j);
       int d = dm[i * matoms + j];
 
+      // Wrong, but useful as is.
       if (d < 3)
         continue;
 

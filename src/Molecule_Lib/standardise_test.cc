@@ -338,4 +338,85 @@ TEST_F(TestStandardisation, Test124Triazole) {
         "124 triazole not converted " << _m1.unique_smiles() << '\n';
 }
 
+TEST_F(TestStandardisation, TestExternalNoSmilesNoSmarts) {
+  const_IWSubstring buffer = R"(
+)";
+  const_IWSubstring fname_not_used;
+
+  EXPECT_FALSE(_chemical_standardisation.ReadExternalProto(buffer, fname_not_used));
+}
+
+TEST_F(TestStandardisation, TestExternalNoSmarts) {
+  const_IWSubstring buffer = R"(
+  smiles: "O=[N+]-[O-]"
+)";
+  const_IWSubstring fname_not_used;
+
+  EXPECT_FALSE(_chemical_standardisation.ReadExternalProto(buffer, fname_not_used));
+}
+
+TEST_F(TestStandardisation, TestExternalNoSmiles) {
+  const_IWSubstring buffer = R"(
+  smarts: "O=N=O"
+)";
+  const_IWSubstring fname_not_used;
+
+  EXPECT_FALSE(_chemical_standardisation.ReadExternalProto(buffer, fname_not_used));
+}
+
+TEST_F(TestStandardisation, TestExternalNitroToChargeSeparated) {
+  const_IWSubstring buffer = R"(
+  smiles: "O=[N+]-[O-]"
+  smarts: "O=N=O"
+)";
+  const_IWSubstring fname_not_used;
+
+  EXPECT_TRUE(_chemical_standardisation.ReadExternalProto(buffer, fname_not_used));
+  ASSERT_TRUE(_chemical_standardisation.active());
+
+  _smiles = "CN(=O)=O";
+  ASSERT_TRUE(_m1.build_from_smiles(_smiles));
+  EXPECT_TRUE(_chemical_standardisation.process(_m1));
+
+  EXPECT_EQ(_m1.unique_smiles(), "O=[N+]([O-])C") << "GOt smiles " << _m1.smiles();
+}
+
+TEST_F(TestStandardisation, TestExternalChargeSeparatedToNitro) {
+  const_IWSubstring buffer = R"(
+  smarts: "O=[N+]-[O-]"
+  smiles: "O=N=O"
+)";
+  const_IWSubstring fname_not_used;
+
+  EXPECT_TRUE(_chemical_standardisation.ReadExternalProto(buffer, fname_not_used));
+  ASSERT_TRUE(_chemical_standardisation.active());
+
+  _smiles = "C[N+](=O)[O-]";
+  ASSERT_TRUE(_m1.build_from_smiles(_smiles));
+  EXPECT_TRUE(_chemical_standardisation.process(_m1));
+
+  EXPECT_EQ(_m1.unique_smiles(), "CN(=O)=O") << "GOt smiles " << _m1.smiles();
+}
+
+TEST_F(TestStandardisation, TestExternalNeutraliseAcid) {
+  const_IWSubstring buffer = R"(
+  smarts: "[O-][C,S]=O"
+  smiles: "O-*=O"
+  name: "acid"
+)";
+  const_IWSubstring fname_not_used;
+
+  EXPECT_TRUE(_chemical_standardisation.ReadExternalProto(buffer, fname_not_used));
+  ASSERT_TRUE(_chemical_standardisation.active());
+  _chemical_standardisation.set_append_string_depending_on_what_changed(1);
+
+  _smiles = "[O-]C=O";
+  ASSERT_TRUE(_m1.build_from_smiles(_smiles));
+  _m1.set_name("foo");
+  EXPECT_TRUE(_chemical_standardisation.process(_m1));
+
+  EXPECT_EQ(_m1.unique_smiles(), "OC=O") << "GOt smiles " << _m1.smiles();
+  EXPECT_EQ(_m1.name(), "foo STD:acid") << "Name mismatch got " << _m1.name();
+}
+
 }  // namespace

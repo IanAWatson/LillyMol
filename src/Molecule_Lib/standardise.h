@@ -5,14 +5,63 @@
 // Transformations that change one molecular representation to another.
 
 #include <iostream>
+#include <string>
 
-class Molecule;
-class Atom;
-class Command_Line;
+#include "Foundational/cmdline/cmdline.h"
 
-#include "iwmtypes.h"
-
+#include "molecule.h"
 #include "set_of_atoms.h"
+#include "substructure.h"
+#include "Molecule_Lib/standardise.pb.h"
+
+namespace standardisation {
+// Transformations can be externally specified.
+class ExternalTransformation {
+  private:
+    uint64_t _molecules_processed;
+    uint64_t _molecules_changed;
+
+    // The proto from which we are built.
+    standardisation::Standardisation _standardisation;
+
+    // The query built either from the smarts or the query file
+    // in the proto.
+    Substructure_Query _query;
+
+    // This will be constructed from the `smiles` attribute of
+    // the proto. It stores the bonds to be made. This all works
+    // because the atom numbers in `_molecule` correspond to the
+    // query atom numbers in `_query`.
+    Molecule _molecule;
+
+  // Private functions.
+
+    int Process(Molecule& m, const Set_of_Atoms& embedding);
+
+  public:
+    ExternalTransformation();
+
+    // This will copy `proto` to _standardisation.
+    // `fname` is needed if there is a query file. The default
+    // assumption is that the query file will be in the same
+    // directory as the proto.
+    int Build(const standardisation::Standardisation& proto,
+                              const IWString& fname);
+
+    // Returns the name() field in the proto.
+    const std::string& name() const;
+
+    uint64_t molecules_processed() const {
+      return _molecules_processed;
+    }
+    uint64_t molecules_changed() const {
+      return _molecules_changed;
+    }
+
+    int Process(Molecule& m);
+};
+
+}  // namespace standardisation
 
 class Chemical_Transformation
 {
@@ -297,9 +346,11 @@ class IWStandard_Current_Molecule
 #define CS_FWIH  "fwih"
 #define CS_IMIDAZOLE  "imidazole"
 #define CS_CHARGED_IMIDAZOLE  "charged_imidazole"
+#define CS_IMIDAZOLE_EXONH "imidazoleNH"
 #define CS_PYRAZOLE  "pyrazole"
 #define CS_TRIAZOLE  "triazole"
 #define CS_TETRAZOLE  "tetrazole"
+#define CS_PYRIMIDINE "pyrimidine"
 #define CS_LACTIM_LACTAM "ltlt"
 #define CS_LACTIM_LACTAM_RING "ltltr"
 #define CS_REVERSE_NITRO "rvnitro"
@@ -371,8 +422,10 @@ class Chemical_Standardisation
     Chemical_Transformation _transform_misdrawn_urea;
     Chemical_Transformation _transform_imidazole;
     Chemical_Transformation _transform_charged_imidazole;
+    Chemical_Transformation _transform_imidazole_exocyclic_nh;
     Chemical_Transformation _transform_pyrazole;
     Chemical_Transformation _transform_triazole;
+    Chemical_Transformation _transform_pyrimidine;
     Chemical_Transformation _transform_lactim_lactam;
     Chemical_Transformation _transform_lactim_lactam_ring;
     Chemical_Transformation _transform_aromatic_guanidine_ring;
@@ -406,7 +459,11 @@ class Chemical_Standardisation
     int _append_string_depending_on_what_changed;
 
     int _check_valence_before_and_after;
+
     standardise::Canonicalise _convert_to_canonical_order;
+
+    // Any number of externally specified transformations.
+    resizable_array_p<standardisation::ExternalTransformation> _external_transformation;
 
 //  Some other possibilities
 
@@ -452,9 +509,23 @@ class Chemical_Standardisation
     int  _do_charged_imidazole(Molecule &, const int ring_number, IWStandard_Current_Molecule & current_molecule_data);
     int  _do_imidazole (Molecule &, IWStandard_Current_Molecule & current_molecule_data);
     int  _do_imidazole (Molecule &, const int, IWStandard_Current_Molecule & current_molecule_data);
+    int  _do_imidazole_exocyclic_nh(Molecule& m, IWStandard_Current_Molecule& current_molecule_data);
+    int  _do_imidazole_exocyclic_nh(Molecule & m,
+                        IWStandard_Current_Molecule& current_molecule_data,
+                        atom_number_t nh, atom_number_t carbon);
     int  _swap_imidazole (Molecule & m, atom_number_t n1, atom_number_t c, atom_number_t n2) const;
+    int ResolveImidazole(Molecule& m,
+                const Set_of_Atoms& r,
+                atom_number_t c1,
+                atom_number_t nh0,
+                atom_number_t c2,
+                atom_number_t c3,
+                atom_number_t nh1);
     int  _do_pyrazole (Molecule &, int * atom_already_changed, IWStandard_Current_Molecule & current_molecule_data);
     int  _do_pyrazole (Molecule &, int * atom_already_changed, const int, IWStandard_Current_Molecule & current_molecule_data);
+    int  _do_pyrimidine(Molecule& m, IWStandard_Current_Molecule& current_molecule_data);
+    int  _do_pyrimidine(Molecule& m, IWStandard_Current_Molecule& current_molecule_data,
+                const Set_of_Atoms& ring);
     int  _swap_charged_pyrazole(Molecule& m, const int ring_number, IWStandard_Current_Molecule & current_molecule_data, const atom_number_t n1, const atom_number_t n2);
     int  _do_triazole (Molecule &, IWStandard_Current_Molecule & current_molecule_data);
     int  _do_triazole (Molecule &, const Set_of_Atoms &, const Set_of_Atoms * is_fused, IWStandard_Current_Molecule & current_molecule_data);
@@ -506,7 +577,9 @@ class Chemical_Standardisation
     int  _do_transform_pyrazolone (Molecule & m, const Set_of_Atoms & ri, const int ring_is_fused, int * atom_already_changed, IWStandard_Current_Molecule & current_molecule_data);
 
     int _do_transform_to_4_pyridone(Molecule& m, IWStandard_Current_Molecule& current_molecule_data);
-    int _do_transform_to_4_pyridone(Molecule& m, const Set_of_Atoms& ring) const;
+    int _do_transform_to_4_pyridone(Molecule& m,
+                        IWStandard_Current_Molecule& current_molecule_data,
+                        const Set_of_Atoms& ring) const;
     int _do_transform_to_4_pyridone(Molecule& m, const Set_of_Atoms& r, int n_index, int oh_index, atom_number_t oh) const;
 
     int _do_transform_sulfonyl_urea(Molecule& m, IWStandard_Current_Molecule& current_molecule_data);
@@ -530,6 +603,11 @@ class Chemical_Standardisation
 
     int _processing_needed (const IWStandard_Current_Molecule & current_molecule_data) const;
 
+    int AddExternalSpecification(const const_IWSubstring& directive);
+    int ReadFileOfExternalProtos(iwstring_data_source& input, const const_IWSubstring& fname);
+    int ReadFileOfExternalProtos(const const_IWSubstring& fname);
+    int DoExternalTransformations(Molecule& m);
+
   public:
     Chemical_Standardisation ();
     ~Chemical_Standardisation ();
@@ -544,6 +622,7 @@ class Chemical_Standardisation
     void set_convert_to_canonical_order(standardise::Canonicalise s) {
       _convert_to_canonical_order = s;
     }
+    void set_append_string_depending_on_what_changed(int s);
 
     int construct_from_command_line (Command_Line &, int = 0, char = 'g');
 
@@ -565,6 +644,11 @@ class Chemical_Standardisation
     void deactivate () { _active = 0;}
 
     int deactivate (const const_IWSubstring &);
+
+    // `buffer` must contain a TextProto representation of a substitution::Substitution
+    // proto. `fname` is needed in the case of there being a query_file specification
+    // in the proto.
+    int ReadExternalProto(const const_IWSubstring& buffer, const const_IWSubstring& fname);
 };
 
 extern int display_standard_chemical_standardisation_options (std::ostream &, char);

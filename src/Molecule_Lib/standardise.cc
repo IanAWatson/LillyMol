@@ -10301,7 +10301,7 @@ ExternalTransformation::Process(Molecule& m) {
 int
 ExternalTransformation::Process(Molecule& m,
                 const Set_of_Atoms& embedding) {
-  cerr << "Processing embedding " << embedding << '\n';
+  // cerr << "Processing embedding " << embedding << '\n';
   int rc = 0;
   for (const Bond* b : _molecule.bond_list()) {
     atom_number_t a1 = embedding[b->a1()];

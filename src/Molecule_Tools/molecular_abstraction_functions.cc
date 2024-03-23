@@ -3643,6 +3643,8 @@ Set_of_Molecular_Abstractions::build(const Molecular_Abstraction_Directives_Node
       _a[i] = new Molecular_Abstraction_Spinach();
     } else if (MAD_TYPE_RMSCAFFOLD == t) {
       _a[i] = new Molecular_Abstraction_Inverse_Scaffold();
+    } else if (MAD_TYPE_GRAPH == t) {
+      _a[i] = new Molecular_Abstraction_Graph();
     } else {
       cerr << "Set_of_Molecular_Abstractions::build:unrecognised form " << t << '\n';
       return 0;
@@ -4374,4 +4376,48 @@ Molecular_Abstraction_Spinach::process(Molecule_With_Info_About_Parent& m,
   }
 
   return _do_any_writing_needed(m, 1, output);
+}
+
+Molecular_Abstraction_Graph::Molecular_Abstraction_Graph() {
+  _mol2graph.TurnOnMostUsefulOptions();
+}
+
+int
+Molecular_Abstraction_Graph::debug_print(std::ostream& output) const {
+  output << "Graph transformation\n";
+
+  return 1;
+}
+
+// No directives are recognised, only from the base class.
+int
+Molecular_Abstraction_Graph::build(const Molecular_Abstraction_Directives_Node& madn) {
+  const IWString& s = madn.args();
+
+  int i = 0;
+  const_IWSubstring token;
+  while (s.nextword(token, i)) {
+    int fatal;
+    if (Molecular_Abstraction_Base_Class::_process(token, "GRAPH", fatal)) {  // great
+      continue;
+    } else if (fatal) {
+      cerr << "Molecular_Abstraction_Graph::build:cannot process '" << token << "'\n";
+      return 0;
+    }
+
+    cerr << "Molecular_Abstraction_Graph::build:unrecognised directive '" << token << "'\n";
+    return 0;
+
+  }
+
+  return 1;
+}
+
+int
+Molecular_Abstraction_Graph::process(Molecule_With_Info_About_Parent& m,
+                IWString_and_File_Descriptor& output) {
+
+  int rc = m.change_to_graph_form(_mol2graph);
+
+  return _do_any_writing_needed(m, rc, output);
 }

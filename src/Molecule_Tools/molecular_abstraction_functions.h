@@ -481,6 +481,22 @@ class Molecular_Abstraction_Spinach : public Molecular_Abstraction_Base_Class {
   int process(Molecule_With_Info_About_Parent&, IWString_and_File_Descriptor&);
 };
 
+class Molecular_Abstraction_Graph : public Molecular_Abstraction_Base_Class {
+ private:
+  Mol2Graph _mol2graph;
+
+  // private functions
+
+ public:
+  Molecular_Abstraction_Graph();
+
+  int debug_print(std::ostream& output) const;
+
+  int build(const Molecular_Abstraction_Directives_Node& madn);
+
+  int process(Molecule_With_Info_About_Parent& m, IWString_and_File_Descriptor& output);
+};
+
 class Set_of_Molecular_Abstractions {
  private:
   int _n;

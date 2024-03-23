@@ -170,5 +170,4 @@ REGISTER_TYPED_TEST_SUITE_P(EnsureEndsWithTest,
 INSTANTIATE_TYPED_TEST_SUITE_P(My, EnsureEndsWithTest, MyTypes);
 
 
-
 }  // namespace

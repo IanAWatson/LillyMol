@@ -161,6 +161,13 @@ DisplayDashJOptions(std::ostream& output) {
 void
 DisplayDashYOptions(std::ostream& output) {
   output << " -Y flush          flush output after each molecule\n";
+  output << " -Y label          label atoms with atom type assigned\n";
+  output << " -Y quiet          suppress warning messages about unassigned atoms\n";
+  output << " -Y alcacid        use the alcohol atom type for certain acids - rdkit compat\n";
+  output << " -Y RDKIT.N+       treat N+ atoms same as RDKit\n";
+  output << " -Y RDKIT.HP       treat phosphoric acids same as RDKit\n";
+  output << " -Y ZWIT           explicit treatment of Zwitterions\n";
+
   ::exit(0);
 }
 

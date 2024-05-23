@@ -103,6 +103,14 @@ the specification would only match a substituent that had all of those
 attributes simultaneously. We want to identify and discard molecules,
 that have any of these attributes.
 
+The maximum number of atoms in the region is 8 - this will include all
+branches from the linker region. If there is any ring in the region, the
+query fails. And if the bond distance from the matched atoms (linker) to 
+anywhere in the sidechain, is larger than 3, also fail. Other constraints
+could have been used. If we wanted to prohibit all elaboraion of this
+region, that would have been harder since amide groups are common in
+linker regions.
+
 The invocation looks like
 ```
 tsubstructure -j 1 -j same -v -q PROTO:3.qry -q PROTO:4.qry -q PROTO:5.qry -m x2 aliphatic.smi

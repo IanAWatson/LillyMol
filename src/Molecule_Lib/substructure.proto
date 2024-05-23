@@ -1128,6 +1128,8 @@ message SingleSubstructureQuery {
   // A substituent can be anywhere there is a chain bond.
   // This might generate a large number of matches.
   repeated Substituent substituent = 25;
+  // If one of these matches, the whole query match fails.
+  repeated Substituent substituent_no_match = 83;
 
   optional bool fail_if_embeddings_too_close = 26;
 
@@ -1271,7 +1273,7 @@ message SingleSubstructureQuery {
   // This is probably the most flexible.
   repeated NearbyAtoms nearby_atoms = 82;
 
-  // Next to assign 83
+  // Next to assign 84
 }
 
 // A SubstructureQuery is merely a collection of individual

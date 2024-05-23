@@ -2300,6 +2300,18 @@ Single_Substructure_Query::_construct_from_proto(const SubstructureSearch::Singl
     }
   }
 
+  if (proto.substituent_no_match_size() > 0) {
+    for (const auto& subst : proto.substituent_no_match()) {
+      std::unique_ptr<Substituent> substituent(std::make_unique<Substituent>());
+      if (! substituent->ConstructFromProto(subst)) {
+        cerr << "Single_Substructure_Query::_construct_from_proto:invalid Substituent\n";
+        cerr << subst.ShortDebugString() << '\n';
+        return 0;
+      }
+      _substituent_no_match.add(substituent.release());
+    }
+  }
+
   if (proto.region_size() > 0) {
     for (const auto& r : proto.region()) {
       std::unique_ptr<Region> region(std::make_unique<Region>());

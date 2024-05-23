@@ -2915,6 +2915,8 @@ class Single_Substructure_Query
 
     // Substituents that are not anchored to a ring.
     resizable_array_p<Substituent> _substituent;
+    // If any of these match, the whole query match fails.
+    resizable_array_p<Substituent> _substituent_no_match;
 
     // The no matched atoms between matching can be done on either the
     // first path between the ends of the No_Matched_Atoms_Between, or
@@ -3187,6 +3189,7 @@ class Single_Substructure_Query
     int  _nmab_satisfied(Molecule_to_Match& target, Query_Atoms_Matched & matched_atoms) const;
     int  _down_the_bond_satisfied(Molecule_to_Match& target_molecule, Query_Atoms_Matched& matched_query_atoms) const;
     int  _substituent_satisfied(Molecule_to_Match& target_molecule, Query_Atoms_Matched& matched_query_atoms) const;
+    int _substituent_no_match_matches(Molecule_to_Match& target_molecule, Query_Atoms_Matched& matched_query_atoms) const;
     int  _link_atoms_satisfied(Query_Atoms_Matched & matched_atoms) const;
     int  _link_atom_satisfied(const Link_Atom & l,
                                Query_Atoms_Matched & matched_atoms) const;

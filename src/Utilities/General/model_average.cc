@@ -13,7 +13,6 @@
 #include "Foundational/data_source/iwstring_data_source.h"
 
 using std::cerr;
-using std::endl;
 
 const char* prog_name = NULL;
 
@@ -158,50 +157,6 @@ Model::_parse_numeric_column_specification(const const_IWSubstring& c)
 
   return 1;
 }
-
-#ifdef NOT_USED_ANY_MORE
-int
-Model::build(const const_IWSubstring& buffer)
-{
-  const_IWSubstring mybuffer(buffer);
-
-  if (mybuffer.starts_with("A:")) {
-    mybuffer.remove_leading_chars(2);
-    _from_arbor = 1;
-  }
-
-  int comma = mybuffer.index(',');
-
-  if (comma < 0) {
-    return _parse_numeric_column_specification(mybuffer);
-  }
-
-  const_IWSubstring c, w;
-  if (!mybuffer.split(c, ',', w) || 0 == c.length() || w.length() < 3) {
-    cerr << "Model::build:invalid column,weight specification '" << mybuffer << "'\n";
-    return 0;
-  }
-
-  if (!_parse_numeric_column_specification(c)) {
-    return 0;
-  }
-
-  if (!w.starts_with("w=")) {
-    cerr << "Model::build:the weight specification must start with 'w=', '" << mybuffer
-         << "' is invalid\n";
-    return 0;
-  }
-
-  w.remove_leading_chars(2);
-
-  if (!w.numeric_value(_weight) || _weight <= 0.0 || _weight >= 1.0) {
-    cerr << "Model::build:the weight must be a valid fraction\n";
-    return 0;
-  }
-
-  return 1;
-}
-#endif
 
 static int nmodels = 0;
 
@@ -941,7 +896,7 @@ gather_columns_and_weights(const Command_Line& cl, resizable_array<int>& col,
 
   if (nc != nw)  // gack, I have messed up
   {
-    cerr << "Mismatch between columns entered " << nc << " and weights " << nw << endl;
+    cerr << "Mismatch between columns entered " << nc << " and weights " << nw << '\n';
     return 0;
   }
 
@@ -964,7 +919,7 @@ gather_columns_and_weights(const Command_Line& cl, resizable_array<int>& col,
   }
 
   if (weights_specified > 1.0) {
-    cerr << "Sorry, weights need to sum to 1.0, " << weights_specified << endl;
+    cerr << "Sorry, weights need to sum to 1.0, " << weights_specified << '\n';
     return 0;
   }
 
@@ -1214,7 +1169,7 @@ model_average(int argc, char** argv)
     classification_model = 1;
 
     if (verbose) {
-      cerr << "Class cutoff at " << class_cutoff << endl;
+      cerr << "Class cutoff at " << class_cutoff << '\n';
     }
 
     if (cl.option_present('d')) {
@@ -1324,7 +1279,7 @@ model_average(int argc, char** argv)
       col_to_model[model[i].column()] = i;
 
       if (verbose > 1) {
-        cerr << "Data in column " << (model[i].column() + 1) << " is model " << i << endl;
+        cerr << "Data in column " << (model[i].column() + 1) << " is model " << i << '\n';
       }
     }
 
@@ -1333,12 +1288,12 @@ model_average(int argc, char** argv)
         const Model& mi = model[i];
 
         cerr << "Model in column " << (mi.column() + 1) << " weight " << mi.weight()
-             << endl;
+             << '\n';
       }
     }
   }
 
-  if (0 == cl.number_elements()) {
+  if (cl.empty()) {
     cerr << "Insufficient arguments\n";
     usage(2);
   }
@@ -1354,7 +1309,7 @@ model_average(int argc, char** argv)
   for (int i = 0; i < cl.number_elements(); i++) {
     int rc;
 
-    //  cerr << "mat " << model_average_type << endl;
+    //  cerr << "mat " << model_average_type << '\n';
 
     if (MODEL_AVERAGE_MANY_CLASS_CLASSIFICATION_PAIRS == model_average_type) {
       rc = model_average_many_class_pairs(cl[i], output);
@@ -1373,7 +1328,7 @@ model_average(int argc, char** argv)
       Sum s;
       rc = model_average(cl[i], s, output);
     } else {
-      cerr << "Not sure what to do with " << model_average_type << endl;
+      cerr << "Not sure what to do with " << model_average_type << '\n';
       return 8;
     }
 
@@ -1389,7 +1344,7 @@ model_average(int argc, char** argv)
     cerr << "Made predictions for " << score_acc.n() << " items\n";
     if (score_acc.n() > 1) {
       cerr << "Values between " << score_acc.minval() << " and " << score_acc.maxval()
-           << " ave " << static_cast<float>(score_acc.average()) << endl;
+           << " ave " << static_cast<float>(score_acc.average()) << '\n';
     }
   }
 

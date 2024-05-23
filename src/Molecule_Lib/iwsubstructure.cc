@@ -1142,6 +1142,12 @@ Single_Substructure_Query::_global_query_conditions_also_matched(Query_Atoms_Mat
     }
   }
 
+  if (_substituent_no_match.size()) {
+    if (_substituent_no_match_matches(target_molecule, matched_query_atoms)) {
+      return 0;
+    }
+  }
+
   // cerr << "nmab " << _nmab.size() << " nmab items\n";
   if (_nmab.number_elements()) {
     if (! _nmab_satisfied(target_molecule, matched_query_atoms)) {
@@ -3404,6 +3410,8 @@ Single_Substructure_Query::InterRingRegionsMatch(Molecule_to_Match& target,
   return 1;
 }
 
+// For every matched atom, set the corresponding entry in `ring_atom`.
+// Note that we do not enforce anything related to ring membership.
 void
 SetRingAtoms(Query_Atoms_Matched& matched_query_atoms,
              int * ring_atom) {
@@ -3433,6 +3441,26 @@ Single_Substructure_Query::_substituent_satisfied(Molecule_to_Match& target_mole
   }
 
   return rc;
+}
+
+int
+Single_Substructure_Query::_substituent_no_match_matches(Molecule_to_Match& target_molecule,
+                Query_Atoms_Matched& matched_query_atoms) const {
+  const int matoms = target_molecule.natoms();
+
+  std::unique_ptr<int[]> matched_by_global_specs(new_int(matoms));
+  std::unique_ptr<int[]> ring_atoms(new_int(matoms));
+  SetRingAtoms(matched_query_atoms, ring_atoms.get());
+  std::unique_ptr<int[]> storage(new_int(matoms));
+
+  for (Substituent* subst : _substituent_no_match) {
+    if (subst->Matches(target_molecule, ring_atoms.get(), storage.get(),
+                matched_by_global_specs)) {
+      return 1;;
+    }
+  }
+
+  return 0;
 }
 
 MatchedAtomMatch::MatchedAtomMatch() {

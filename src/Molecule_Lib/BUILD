@@ -113,6 +113,20 @@ py_proto_library(
 )
 
 proto_library(
+    name = "standardise_proto",
+    srcs = [
+        "standardise.proto",
+    ],
+)
+
+cc_proto_library(
+    name = "standardise_cc_proto",
+    deps = [
+        ":standardise_proto",
+    ]
+)
+
+proto_library(
     name = "substructure_proto",
     srcs = [
         "substructure.proto",
@@ -373,6 +387,7 @@ cc_library(
         ":mol2graph_cc_proto",
         ":pharmacophore_cc_proto",
         ":space_vector",
+        ":standardise_cc_proto",
         ":substructure_cc_proto",
         ":toggle_kekule_form_cc_proto",
         "//Foundational/accumulator",

@@ -96,6 +96,9 @@ static int perform_search_even_if_names_the_same = 1;
 */
 static int write_results_as_proto = 0;
 
+// Nov 2022. Pass our own Molecule_to_Query to substructur reading.
+static Molecule_to_Query_Specifications mqs;
+
 static void
 usage(int rc)
 {
@@ -645,8 +648,8 @@ do_proto_output(Molecule& m,
 {
   SubstructureSearch::QueryMatchResults to_write;
 
-  to_write.set_smiles(m.smiles().AsString());
-  to_write.set_name(m.name().AsString());
+  to_write.set_smiles(m.smiles().data(), m.smiles().length());
+  to_write.set_name(m.name().data(), m.name().length());
 
   const int number_queries = queries.number_elements();
 
@@ -656,7 +659,7 @@ do_proto_output(Molecule& m,
       continue;
 
     SubstructureSearch::QueryMatchResults::Matches* matches = to_write.add_matches();
-    matches->set_name(queries[i]->comment().AsString());
+    matches->set_name(queries[i]->comment().data(), queries[i]->comment().length());
     matches->set_nhits(hits[i]);
   }
 
@@ -2139,7 +2142,7 @@ tsubstructure(int argc, char ** argv)
       }
       else if ("nrnr" == m)
       {
-        set_respect_ring_membership(1);
+        mqs.set_bonds_preserve_ring_membership(1);
         if (verbose)
           cerr << "Non ring atoms in molecule queries will not match ring atoms\n";
       }
@@ -2365,7 +2368,7 @@ tsubstructure(int argc, char ** argv)
       }
       else if ("onlysubiso" == m)
       {
-        set_substituents_only_at_isotopic_atoms(1);
+        mqs.set_substituents_only_at_isotopic_atoms(1);
         if (verbose)
           cerr << "When building queries from molecules, isotopic atoms indicate substitution points\n";
       }
@@ -2435,7 +2438,7 @@ tsubstructure(int argc, char ** argv)
       }
       else if ("CEH" == m)
       {
-        set_molecule_to_query_always_condense_explicit_hydrogens_to_anchor_atoms (1);
+        mqs.set_condense_explicit_hydrogens_to_anchor_atoms (1);
         if (verbose)
           cerr << "Queries from molecules always condense explicit Hydrogens\n";
       }
@@ -2477,7 +2480,7 @@ tsubstructure(int argc, char ** argv)
       }
       else if ("ama" == m)
       {
-        set_only_aromatic_atoms_match_aromatic_atoms(1);
+        mqs.set_only_aromatic_atoms_match_aromatic_atoms(1);
         if (verbose)
           cerr << "Molecule to query transformations such that only aromatic atoms match aromatic atoms\n";
       }

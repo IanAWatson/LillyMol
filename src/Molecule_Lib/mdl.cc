@@ -20,6 +20,7 @@
 #include "mdl_atom_record.h"
 #include "misc2.h"
 #include "molecule.h"
+#include "moleculeio.h"
 #include "readmdl.h"
 #include "rwmolecule.h"
 
@@ -804,7 +805,7 @@ Molecule::_final_processing_of_aromatic_mdl_input(int* aromatic_atoms,
 
 int
 return_code_depending_on_ignore_incorrect_chiral_input() {
-  if (ignore_incorrect_chiral_input()) {
+  if (moleculeio::ignore_incorrect_chiral_input()) {
     cerr << "Ignored\n";
     return 1;
   }
@@ -1711,7 +1712,7 @@ Molecule::write_extra_text_info(IWString& buffer) const {
   for (int i = 0; i < ne; i++) {
     const IWString* info = _text_info[i];
 
-    buffer << (*info) << newline_string();
+    buffer << (*info) << moleculeio::newline_string();
   }
 
   return buffer.length();
@@ -2821,7 +2822,7 @@ Molecule::_write_M_RGP_records(const MDL_File_Supporting_Material& mdlfos,
       continue;
     }
 
-    os << "M  RGP  1 " << std::setw(3) << (i + 1) << "   " << s[1] << newline_string();
+    os << "M  RGP  1 " << std::setw(3) << (i + 1) << "   " << s[1] << moleculeio::newline_string();
   }
 
   return os.good();

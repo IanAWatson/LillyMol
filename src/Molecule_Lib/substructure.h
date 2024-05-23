@@ -221,7 +221,7 @@ class NMAB_Token
 
 // Once the NMAB directive is parsed into NMAB_Token's, those can be transformed
 // into NMAB_Operator's.
-// If query_ is not set, then _number is interpreted as match atom count.
+// If _query is not set, then _number is interpreted as match atom count.
 // Kind of a lkudge, I did think of having a base class and virtual...
 class NMAB_Operator 
 {
@@ -837,6 +837,9 @@ class Substructure_Atom_Environment : public resizable_array_p<Substructure_Atom
 
     int number_elements () const { return _number_elements;}
     int active () const { return _number_elements;}
+
+    int BuildProto(SubstructureSearch::SubstructureAtom& proto) const;
+    int BuildFromProto(const SubstructureSearch::SubstructureAtomEnvironment& proto);
 
     int create_from_smarts (const Atomic_Smarts_Component &);
     int create_from_msi_object (msi_object &);
@@ -1560,6 +1563,41 @@ class Elements_Needed
 
     int matches(Query_Atoms_Matched & qam) const;
     int matches(Molecule_to_Match & target) const;
+};
+
+// We can sometimes speed up searches by doing an initial scan of the
+// bond list.
+// Note that we deliberately only support atomic numbers as ints, rather than
+// using the atomic_symbol_hash_value. While it is an int today, maybe it becomes
+// unsigned later. And that need is too obscure.
+class RequiredBond {
+  private:
+    // element and number of connections of first atom.
+    int _atomic_number_1;
+    int _ncon1;
+
+    bond_type_t _btype;
+
+    // element and number of connections of second atom.
+    int _atomic_number_2;
+    int _ncon2;
+
+    // How many instances needed for a match, defaults to 1.
+    // Note that we do not support zero, could be changed.
+    int _min_count;
+
+  // private functions.
+    int MatchesSingle(const Molecule& m) const;
+    int MatchesDouble(const Molecule& m) const;
+    int MatchesTriple(const Molecule& m) const;
+
+  public:
+    RequiredBond();
+
+    int ConstructFromProto(const SubstructureSearch::RequiredBond& proto);
+    int BuildProto(SubstructureSearch::RequiredBond& proto) const;
+
+    int Matches(const Molecule& m) const;
 };
 
 /*
@@ -2513,6 +2551,10 @@ class RequiredMolecularProperties {
     // Requirements on counts of certain elements.
     resizable_array_p<Elements_Needed> _elements_needed;
 
+    // A set of bond specifications that are checked before any
+    // atom matching is done.
+    resizable_array_p<RequiredBond> _required_bonds;
+
     // The most common use for net formal charge is to look for molecules
     // that have a net formal charge, either positive or negative, so make
     // that easy to specify.
@@ -2833,6 +2875,11 @@ class Single_Substructure_Query
 
     resizable_array_p<Elements_Needed> _element_hits_needed;
 
+
+    // A set of bond specifications that are checked before any
+    // atom matching is done.
+    resizable_array_p<RequiredBond> _required_bonds;
+
 //  We can also stop looking once we have a given number of matches.
 
     int _max_matches_to_find;
@@ -3088,6 +3135,8 @@ class Single_Substructure_Query
     int _one_time_initialisations();
 
     int _match_elements_needed(Molecule_to_Match & target_molecule) const;
+
+    int RequiredBondsMatch(const Molecule& m);
 
     int _aromatic_atoms_matches(Molecule_to_Match& target_molecule) const;
 
@@ -3743,7 +3792,7 @@ namespace substructure_spec {
 int SmartsNumericQualifier(const char * input,
                        int max_chars,
                        Min_Max_Specifier<int>& result);
-int SmartsFetchNumeric(const char * string, int & value, 
+int SmartsFetchNumeric(const char * string, int nchars, int & value, 
                      int & qualifier);
 
 int

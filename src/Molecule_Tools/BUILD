@@ -442,6 +442,7 @@ cc_binary(
         "atom_pair_fingerprint_main.cc",
     ],
     deps = [
+        ":fingerprint_writer",
         "//Foundational/iwmisc:sparse_fp_creator",
         "//Molecule_Lib:atom_pair_fingerprint",
         "//Molecule_Lib:iwmolecule",
@@ -474,6 +475,18 @@ cc_binary(
         "//Molecule_Lib:iwmolecule",
         "//Molecule_Lib:moleculeio",
         "@com_google_absl//absl/algorithm:container",
+    ],
+)
+
+cc_binary(
+    name = "bump_check",
+    srcs = [
+        "bump_check.cc",
+    ],
+    deps = [
+        "//Foundational/cmdline:iwcmdline",
+        "//Molecule_Lib:iwmolecule",
+        "//Molecule_Lib:moleculeio",
     ],
 )
 
@@ -1777,6 +1790,9 @@ cc_library(
         ":fingerprint_writer",
         "//Molecule_Lib:iwmolecule",
         "//Foundational/iwmisc:sparse_fp_creator",
+    ],
+    visibility = [
+        "//visibility:public",
     ],
 )
 

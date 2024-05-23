@@ -1,7 +1,9 @@
 
 package(default_visibility = ["//visibility:public"])
 
-load("@rules_python_pytest//python_pytest:defs.bzl", "py_pytest_test")
+#load("@rules_python_pytest//python_pytest:defs.bzl", "py_pytest_test")
+load("@rules_python//python:py_test.bzl", "py_test")
+
 
 cc_library(
     name = "lillymol_pybind",
@@ -41,9 +43,18 @@ cc_library(
         "//Molecule_Lib:iwmfingerprint",
         "//Molecule_Lib:iwmolecule",
         "//Molecule_Lib:moleculeio",
+        "//Molecule_Tools:ec_fingerprint_lib",
         "@pybind11",
         "@python",
     ],
+)
+
+cc_shared_library(
+    name = "lillymol_fingerprint",
+    deps = [
+        ":lillymol_pybind_fingerprints",
+    ],
+    shared_lib_name = "lillymol_fingerprint.so"
 )
 
 cc_library(
@@ -312,12 +323,11 @@ cc_shared_library(
 )
 
 # Cannot figure out how to make this work. TODO:ianwatson
-#py_pytest_test(
+#py_test(
 #    name = "test_lillymol",
-#    size = "small",
 #    srcs = ["lillymol_test.py"],
 #    deps = [
 #      ":lillymol_pybind",
 #    ],
 #)
-
+#

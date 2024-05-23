@@ -104,6 +104,29 @@ message ElementsNeeded {
   optional uint32 max_hits_needed = 6;
 }
 
+// Sometimes we can speed up a query by specifying one or more
+// bonds that must be present in the molecule. This is implemented as
+// a scan over the bond list, before any atom matching is attempted.
+message RequiredBond {
+  // The first atom.
+  oneof ElementSpecifier1 {
+    uint32 atomic_number_1 = 1;
+    string atomic_symbol_1 = 2;
+  }
+
+  // The bond between them - defaults to single.
+  optional BondType btype = 3;
+
+  // The second atom.
+  oneof ElementSpecifier2 {
+    uint32 atomic_number_2 = 4;
+    string atomic_symbol_2 = 5;
+  }
+
+  // If specified, molecule must have at least this many occurrences, def 1.
+  optional uint32 min_count = 6;
+}
+
 message NoMatchedAtomsBetween {
   optional uint32 a1 = 1;
   optional uint32 a2 = 2;
@@ -801,6 +824,8 @@ message SubstructureAtom {
   // Per atom global match id value, used for matching query atoms
   // to atoms marked by global match conditions.
   optional uint32 global_match_id = 34;
+
+  repeated SubstructureAtom children = 35;
 }
 
 // Specifications of the atoms adjacent to the matched atoms.
@@ -1003,6 +1028,8 @@ message RequiredMolecularProperties {
 
   // Only search the molecule if elements_needed is satisfied.
   repeated ElementsNeeded elements_needed = 47;
+
+  repeated RequiredBond required_bond = 48;
 }
 
 // The concept of other atoms that must be somewhere near the matched

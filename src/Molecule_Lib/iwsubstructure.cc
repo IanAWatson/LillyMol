@@ -2519,6 +2519,12 @@ Single_Substructure_Query::substructure_search(Molecule_to_Match & target_molecu
 {
   assert (target_molecule.ok());
 
+  // Before any atom matching.
+  if (_required_bonds.empty()) {
+  } else if (! RequiredBondsMatch(*target_molecule.molecule())) {
+    return 0;
+  }
+
   const int matoms = target_molecule.natoms();
 
   results.initialise(matoms);     // no returns before this.
@@ -3554,6 +3560,17 @@ MatchedAtomMatch::Matches(Query_Atoms_Matched& matched_query_atoms,
 #endif
         return 0;
       }
+    }
+  }
+
+  return 1;
+}
+
+int
+Single_Substructure_Query::RequiredBondsMatch(const Molecule& m) {
+  for (const RequiredBond* b : _required_bonds) {
+    if (! b->Matches(m)) {
+      return 0;
     }
   }
 

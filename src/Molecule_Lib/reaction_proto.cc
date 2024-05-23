@@ -1072,6 +1072,14 @@ IWReaction::ConstructFromProto(const ReactionProto::Reaction& proto,
       ! _match_conditions.ConstructFromProto(proto.scaffold_match_conditions()))
     return WriteError("IWReaction::ConstructFromProto:invalid scaffold match conditions", proto);
 
+  // Copy match conditions to query.
+  if (_match_conditions.find_unique_embeddings_only()) {
+    set_find_unique_embeddings_only(1);
+  }
+  if (_match_conditions.one_embedding_per_start_atom()) {
+    set_one_embedding_per_start_atom(1);
+  }
+
   for (const auto& sidechain : proto.sidechain()) {
     std::unique_ptr<Sidechain_Reaction_Site> sc(new Sidechain_Reaction_Site);
     if (! sc->ConstructFromProto(sidechain, file_name)) {

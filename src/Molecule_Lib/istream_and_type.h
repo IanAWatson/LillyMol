@@ -1,9 +1,12 @@
 #ifndef IW_ISTREAM_AND_TYPE
 #define IW_ISTREAM_AND_TYPE
 
+#include <string>
+
 #include "Foundational/data_source/iwstring_data_source.h"
 
 #include "iwmtypes.h"
+#include "moleculeio.h"
 
 template <typename T>
 class data_source_and_type : public iwstring_data_source
@@ -47,6 +50,7 @@ class data_source_and_type : public iwstring_data_source
 
   public:
     data_source_and_type (const IWString &);
+    data_source_and_type (FileType, std::string &);
     data_source_and_type (FileType, const char *);
     data_source_and_type (FileType, const IWString &);
     data_source_and_type ();
@@ -102,10 +106,10 @@ data_source_and_type<T>::_default_values(FileType input_type)
   _dos = 0;
 
   _connection_table_errors_encountered = 0;
-  _connection_table_errors_allowed = ::number_connection_table_errors_to_skip();
+  _connection_table_errors_allowed = moleculeio::number_connection_table_errors_to_skip();
 
-  _skip_first = skip_first_molecules();
-  _do_only = do_only_n_molecules();
+  _skip_first = moleculeio::skip_first_molecules();
+  _do_only = moleculeio::do_only_n_molecules();
 
   if (FILE_TYPE_NO_ARG_CONSTRUCTOR == input_type)
     ;
@@ -146,16 +150,15 @@ data_source_and_type<T>::_file_opened_ok (const IWString & fname)
 
   _valid = 1;
 
-  iwstring_data_source::set_record_delimiter (input_file_delimiter());
+  iwstring_data_source::set_record_delimiter (moleculeio::input_file_delimiter());
 
-  if (input_is_dos_mode())
+  if (moleculeio::input_is_dos_mode())
     iwstring_data_source::set_dos (1);
 
-  if (seek_to_from_command_line() > 0)
+  if (moleculeio::seek_to_from_command_line() > 0)
   {
-    if (! iwstring_data_source::seekg (seek_to_from_command_line()))
-    {
-      std::cerr << "data_source_and_type::_file_opened_ok: cannot seek to " << seek_to_from_command_line() << '\n';
+    if (! iwstring_data_source::seekg(moleculeio::seek_to_from_command_line())) {
+      std::cerr << "data_source_and_type::_file_opened_ok: cannot seek to " << moleculeio::seek_to_from_command_line() << '\n';
     }
   }
 
@@ -169,8 +172,7 @@ data_source_and_type<T>::data_source_and_type(FileType input_type,
 {
   if (0 == input_type) {
     input_type = discern_file_type_from_name(fname);
-    if (0 == input_type)
-    {
+    if (input_type == FILE_TYPE_INVALID) {
       std::cerr << "Data_Source_and_Type:: cannot discern input type '" << fname << "'\n";
       return;
     }
@@ -187,6 +189,21 @@ data_source_and_type<T>::data_source_and_type(FileType input_type,
   _do_skip_first();
 
   return;
+}
+
+template <typename T>
+data_source_and_type<T>::data_source_and_type(FileType input_type,
+                         std::string& fname) : iwstring_data_source(fname.c_str()) {
+  if (! _default_values(input_type)) {
+    return;
+  }
+
+  IWString tmp(fname);
+  if (! _file_opened_ok(tmp)) {
+    return;
+  }
+
+  _do_skip_first();
 }
 
 template <typename T>
@@ -210,8 +227,7 @@ data_source_and_type<T>::data_source_and_type (const IWString & fname)
                            : iwstring_data_source (fname)
 {
   FileType tmp;
-  if (FILE_TYPE_INVALID == (tmp = discern_file_type_from_name (fname)))
-  {
+  if (FILE_TYPE_INVALID == (tmp = discern_file_type_from_name (fname))) {
     std::cerr << "Data_source_and_type::constructor: cannot determine file type '" << fname << "'\n";
     return;
   }
@@ -267,8 +283,7 @@ data_source_and_type<T>::do_open(const char * fname,
   else if (FILE_TYPE_INVALID == input_type)
   {
     input_type = discern_file_type_from_name(fname);
-    if (input_type <= 0)
-    {
+    if (input_type == FILE_TYPE_INVALID) {
       std::cerr << "data_source_and_type::do_open:cannot discern input type from '" << fname << "'\n";
       return 0;
     }
@@ -324,7 +339,7 @@ data_source_and_type<T>::next_molecule()
     {
       _offset_for_most_recent_molecule = tellg();
 
-      if (_offset_for_most_recent_molecule >= max_offset_from_command_line())
+      if (_offset_for_most_recent_molecule >= moleculeio::max_offset_from_command_line())
         return nullptr;
     }
 
@@ -416,7 +431,7 @@ data_source_and_type<T>::next_molecule(T& m) {
     if (! is_pipe()) {
       _offset_for_most_recent_molecule = tellg();
 
-      if (_offset_for_most_recent_molecule >= max_offset_from_command_line()) {
+      if (_offset_for_most_recent_molecule >= moleculeio::max_offset_from_command_line()) {
         return 0;
       }
     }

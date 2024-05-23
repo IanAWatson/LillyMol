@@ -606,7 +606,7 @@ mol2qry(MDL_Molecule & m,
 
   if (radius_from_coordination_point <= 0) {
   } else if (identify_coordination_point_and_adjacent_atoms(m)) {
-    set_only_include_isotopically_labeled_atoms(1);
+    mqs.set_only_include_isotopically_labeled_atoms(1);
   } else {
     cerr << "Cannot identify coordination points in '" << m.name() << "'\n";
     return 0;
@@ -1048,21 +1048,21 @@ mol2qry(int  argc, char ** argv) {
 //  mqs.substitutions_only_at().create_from_smarts("[!0*]");
     isotopically_labelled_from_slicer = 1;
 
-    set_substituents_only_at_isotopic_atoms(1);
+    mqs.set_substituents_only_at_isotopic_atoms(1);
 
     if (cl.option_present('t')) {
-      set_must_have_substituent_at_every_isotopic_atom(0);
+      mqs.set_must_have_substituent_at_every_isotopic_atom(0);
       if (verbose)
         cerr << "Not all isotopically labelled atoms need substituents\n";
     }
 
     if (cl.option_present('c')) {
-      set_isotope_count_means_extra_connections(1);
+      mqs.set_isotope_count_means_extra_connections(1);
       if (verbose)
         cerr << "Isotopic number indicates number of extra connections\n";
     }
   } else if (cl.option_present('w')) {
-    set_substitutions_only_at_non_isotopic_atoms(1);
+    mqs.set_substituents_only_at_non_isotopic_atoms(1);
   } else if (cl.option_present('u')) {
     const_IWSubstring smarts;
     cl.value('u', smarts);
@@ -1174,11 +1174,11 @@ mol2qry(int  argc, char ** argv) {
       cerr << "Coordination points defined by matches to '" << smt << "'\n";
     }
 
-    set_only_include_isotopically_labeled_atoms(1);
+    mqs.set_only_include_isotopically_labeled_atoms(1);
   }
 
   if (cl.option_present('I')) {
-    set_only_include_isotopically_labeled_atoms(1);
+    mqs.set_only_include_isotopically_labeled_atoms(1);
 
     if (verbose) {
       cerr << "Will only include isotopically labelled atoms in the query\n";

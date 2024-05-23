@@ -1455,7 +1455,7 @@ TEST_P(TestRanges, TestH) {
   ASSERT_TRUE(_m.build_from_smiles(params.smiles));
   ASSERT_TRUE(_query.create_from_smarts(params.smarts));
   //cerr << "TestingH '" << params.smiles << "' smarts '" << params.smarts << " xpt " << params.nhits << '\n';
-  EXPECT_EQ(_query.substructure_search(&_m), params.nhits);
+  EXPECT_EQ(_query.substructure_search(&_m), params.nhits) << "smiles " << params.smiles << " smarts " << params.smarts;
 }
 INSTANTIATE_TEST_SUITE_P(TestRanges, TestRanges, testing::Values(
   SmilesSmartsNhits{"C", "[CH]", 0},
@@ -1800,6 +1800,38 @@ INSTANTIATE_TEST_SUITE_P(TestCipStereo, TestCipStereo, testing::Values(
   SmilesSmartsNhits{"F[C@H](Br)I",  "[/IWcipS]", 0},
   SmilesSmartsNhits{"I[C@@H](Br)F", "[/IWcipS]", 0},
   SmilesSmartsNhits{"I[C@H](F)Br",  "[/IWcipS]", 0}
+));
+
+class TestAnySmarts : public testing::TestWithParam<SmilesSmartsNhits> {
+  protected:
+    Substructure_Query _query;
+    Molecule _m;
+};
+
+// Some tests checking mixed smarts forms, primitives and $() forms.
+TEST_P(TestAnySmarts, Test1) {
+  const auto params = GetParam();
+  // std::cerr << "TestAnySmarts '" << params.smiles << "' smarts '" << params.smarts << " xpt " << params.nhits << '\n';
+  ASSERT_TRUE(_m.build_from_smiles(params.smiles));
+  ASSERT_TRUE(_query.create_from_smarts(params.smarts));
+  EXPECT_EQ(_query.substructure_search(&_m), params.nhits);
+}
+INSTANTIATE_TEST_SUITE_P(TestAnySmarts, TestAnySmarts, testing::Values(
+  SmilesSmartsNhits{"C", "[C,$(C)]", 1},
+  SmilesSmartsNhits{"C", "[$(C),C]", 1},
+  SmilesSmartsNhits{"C", "[$(C);C]", 1},
+  SmilesSmartsNhits{"C", "[$(C)^O]", 1},
+  SmilesSmartsNhits{"C", "[C;!$(N)]", 1},
+  SmilesSmartsNhits{"C", "[$(C);!$(N)]", 1},
+  SmilesSmartsNhits{"C", "[C,$(C),F,N,O,$([P]),[U]]", 1},
+  SmilesSmartsNhits{"C1CN1C", "[#7;R1][#6;!$(c=O)]", 3},
+  SmilesSmartsNhits{"C1CN1CF", "[#7;R1]!@[#6;!$(C-F)]", 0},
+  SmilesSmartsNhits{"C1CN1CF", "[#7;$([R1])]!@[#6;!$(C-F)]", 0},
+  SmilesSmartsNhits{"C1CN1CF", "[#7;$([R1])][#6;$(C-F)]", 1},
+  SmilesSmartsNhits{"C=CC#N", "C=[C!r]C#N", 1},
+  SmilesSmartsNhits{"C1=CC1", "[CD2R1Hx2G1!a]", 2},
+  SmilesSmartsNhits{"C1CC1", "[C;!$(F);!$(N);R1r3!+]", 3},
+  SmilesSmartsNhits{"CN1NC(=O)CC1", "[Nv3X3][Nv3X3!H0]", 1}
 ));
 
 }  // namespace

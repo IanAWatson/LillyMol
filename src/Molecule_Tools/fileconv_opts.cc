@@ -26,6 +26,8 @@
 #include "Molecule_Lib/is_actually_chiral.h"
 #include "Molecule_Lib/istream_and_type.h"
 #include "Molecule_Lib/mdl.h"
+#include "Molecule_Lib/molecule.h"
+#include "Molecule_Lib/moleculeio.h"
 #include "Molecule_Lib/numass.h"
 #include "Molecule_Lib/output.h"
 #include "Molecule_Lib/path.h"
@@ -4214,7 +4216,7 @@ FileconvConfig::GetChiralityInstructions(Command_Line& cl, char flag) {
       if (verbose)
         cerr << "Will reflect coordinates and invert chiral centres\n";
     } else if ("discard" == tmp) {
-      set_ignore_all_chiral_information_on_input(1);
+      moleculeio::set_ignore_all_chiral_information_on_input(1);
       if (verbose)
         cerr << "All chiral information in input will be discarded\n";
     } else if ("remove" == tmp) {
@@ -4222,7 +4224,7 @@ FileconvConfig::GetChiralityInstructions(Command_Line& cl, char flag) {
       if (verbose)
         cerr << "Will strip all chiral information from molecules\n";
     } else if ("good" == tmp || "ignore" == tmp) {
-      set_ignore_incorrect_chiral_input(1);
+      moleculeio::set_ignore_incorrect_chiral_input(1);
       if (verbose)
         cerr << "Incorrect chiral specifications will be ignored\n";
     } else if ("rmbad" == tmp) {

@@ -16,14 +16,14 @@
 
 struct XMLNode;
 
-/*
-  Header file for Molecule objects
-*/
+class Command_Line;
+class iwstring_data_source;
+
+//  Header file for Molecule objects
 
 #include "Foundational/iwaray/iwaray.h"
 #include "Foundational/iwstring/iwstring.h"
 #include "Foundational/iwbits/iwbits.h"
-class iwstring_data_source;
 
 #include "iwmtypes.h"
 
@@ -43,6 +43,7 @@ class iwstring_data_source;
 class Molecule;
 class Ring;
 class Beep;
+class Path;
 class Path_Scoring;
 class Smiles_First_Atom;
 class Smiles_Formation_Info;
@@ -89,8 +90,6 @@ class Components : public resizable_array_p<Molecule> {
 
 // Used during aromaticity determinations. Mostly to reduce the
 // number of arguments passed.
-
-class Molecule;
 
 struct AromData {
   // For each atom, the number of pi electrons available for aromaticity.
@@ -198,8 +197,6 @@ inline constexpr int kRingMembershipNotComputed = -41871;
 inline constexpr int kRingMembershipIsRingAtom = -76;
 
 #define REASONABLE_RING_SIZE(r) ((r) > 2)
-
-class Path;
 
 class List_of_Ring_Sizes : public resizable_array<int> {};
 
@@ -2256,7 +2253,6 @@ extern void set_type_to_write_with_operator(FileType s);
 extern std::ostream& operator<<(std::ostream& os, Molecule& m);
 extern std::ostream& operator<<(std::ostream& os, const CahnIngoldPrelog& cip);
 
-extern FileType string_to_file_type(const const_IWSubstring&);
 extern FileType discern_file_type_from_name(const IWString&);
 extern const char* suffix_for_file_type(FileType file_type);
 extern int valid_file_type(int);
@@ -2364,29 +2360,31 @@ extern void set_ignore_self_bonds(int);
 template <typename T>
 int read_next_v30_record(T& input, IWString& buffer);
 
-extern off_t seek_to_from_command_line();
-extern void set_seek_to(off_t);
+//extern off_t seek_to_from_command_line();
+//extern void set_seek_to(off_t);
 
-extern off_t max_offset_from_command_line();
-extern void set_max_offset_from_command_line(off_t);
+//extern off_t max_offset_from_command_line();
+//extern void set_max_offset_from_command_line(off_t);
 
-extern void set_mol2_assign_default_formal_charges(int);
-extern void set_mol2_write_assigned_atom_types(int s);
-extern void set_place_mol2_residue_information_in_user_specified_void_ptr(int s);
-extern void set_mol2_write_formal_charge_as_partial_charge(int s);
-extern void set_mol2_read_charge_column_contains_formal_charges(int s);
+namespace tripos {
+void set_mol2_assign_default_formal_charges(int);
+void set_mol2_write_assigned_atom_types(int s);
+void set_place_mol2_residue_information_in_user_specified_void_ptr(int s);
+void set_mol2_write_formal_charge_as_partial_charge(int s);
+void set_mol2_read_charge_column_contains_formal_charges(int s);
+}  // namespace tripos
 
-extern int ignore_all_chiral_information_on_input();
-extern void set_ignore_all_chiral_information_on_input(int);
+//extern int ignore_all_chiral_information_on_input();
+//extern void set_ignore_all_chiral_information_on_input(int);
 
 extern void set_ignore_tdts_with_no_smiles(int);
 extern void set_smiles_tag(const const_IWSubstring&);
 
-extern int flush_files_after_writing_each_molecule();
-extern void set_flush_files_after_writing_each_molecule(int);
+//extern int flush_files_after_writing_each_molecule();
+//extern void set_flush_files_after_writing_each_molecule(int);
 
-extern int ignore_incorrect_chiral_input();
-extern void set_ignore_incorrect_chiral_input(int);
+//extern int ignore_incorrect_chiral_input();
+//extern void set_ignore_incorrect_chiral_input(int);
 extern void set_automatically_add_implicit_hydrogen_to_incomplete_chiral_centre(int s);
 
 extern int set_sdf_identifier(const const_IWSubstring&);
@@ -2402,15 +2400,13 @@ extern void set_mdl_display_invalid_chiral_connectivity(int);
 extern void set_tdt_identifier_dataitem(const const_IWSubstring&);
 extern void set_tdt_append_dataitem(const const_IWSubstring&);
 
-extern void set_discern_cis_trans_bonds(int);
-extern int discern_cis_trans_bonds();
+//extern void set_discern_cis_trans_bonds(int);
+//extern int discern_cis_trans_bonds();
 
-extern void set_discern_chirality_from_3d_coordinates(int);
-extern int discern_chirality_from_3d_coordinates();
+//extern void set_discern_chirality_from_3d_coordinates(int);
+//extern int discern_chirality_from_3d_coordinates();
 
-extern void set_ignore_bad_cis_trans_input(int s);
-extern int ignore_bad_cis_trans_input();
-extern void set_discard_directional_bonds_on_input(int);
+//extern void set_discard_directional_bonds_on_input(int);
 
 #ifdef BONDS_KNOW_RING_MEMBERSHIP
 
@@ -2420,29 +2416,27 @@ extern void set_discard_directional_bonds_on_input(int);
 
 #endif
 
-extern void set_read_extra_text_info(int);
-extern int read_extra_text_info();
-extern void set_write_extra_text_info(int);
-extern int write_extra_text_info();
-extern char input_file_delimiter();
-extern int input_is_dos_mode();
+//extern void set_read_extra_text_info(int);
+//extern int read_extra_text_info();
+//extern void set_write_extra_text_info(int);
+//extern int write_extra_text_info();
+//extern char input_file_delimiter();
+//extern int input_is_dos_mode();
 
-extern void set_write_DOS_records(int s);
-extern int write_DOS_records();
-extern const IWString& newline_string();
+//extern void set_write_DOS_records(int s);
+//extern int write_DOS_records();
+//extern const IWString& newline_string();
 
-extern void set_skip_first_molecules(int);
-extern int skip_first_molecules();
-extern void set_do_only_n_molecules(int);
-extern int do_only_n_molecules();
+//extern void set_skip_first_molecules(int);
+//extern int skip_first_molecules();
+//extern void set_do_only_n_molecules(int);
+//extern int do_only_n_molecules();
 
 // extern Molecule * next_molecule(iwstring_data_source &, int);
 
 // extern int next_molecule(Molecule &, iwstring_data_source &, int);
 
 // extern int construct_ring(resizable_array<const Bond *> & bonds, Ring * r);
-
-class Command_Line;
 
 // extern int process_file_types  (const Command_Line &, int &, int &);
 extern int process_input_type(const Command_Line&, FileType&);
@@ -2519,8 +2513,8 @@ class Temporarily_Disable_Messages_About_Unable_to_Compute_Implicit_Hydrogens {
 
 int is_actually_chiral(Molecule& m, atom_number_t zatom);
 
-extern int unconnect_covalently_bonded_non_organics_on_read();
-extern void set_unconnect_covalently_bonded_non_organics_on_read(int);
+//extern int unconnect_covalently_bonded_non_organics_on_read();
+//extern void set_unconnect_covalently_bonded_non_organics_on_read(int);
 
 /*
   When asking for smarts from a molecule, we need to decide what kind of
@@ -2584,8 +2578,8 @@ extern int set_max_reasonble_atomic_partial_charge_value(charge_t);
 extern int set_min_reasonble_atomic_partial_charge_value(charge_t);
 extern int set_reasonable_atomic_partial_charge_range(charge_t, charge_t);
 
-extern int number_connection_table_errors_to_skip();
-extern void set_number_connection_table_errors_to_skip(int);
+//extern int number_connection_table_errors_to_skip();
+//extern void set_number_connection_table_errors_to_skip(int);
 
 /*
   Determine the number of atoms in a smiles just by examining text

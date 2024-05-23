@@ -385,7 +385,7 @@ GatherRange(const Command_Line_v2& cl,
 
 int
 FeatureScaling(int argc, char** argv) {
-  Command_Line_v2 cl(argc, argv, "-v-C=s-U=s-c=ipos-action=s-hdr=ipos-prec=ipos-bin-subset-11=sfile-scol=ipos");
+  Command_Line_v2 cl(argc, argv, "-v-C=s-U=s-c=ipos-action=s-hdr=ipos-prec=ipos-bin-subset=sfile-11-scol=ipos");
   if (cl.unrecognised_options_encountered()) {
     cerr << "unrecognised_options_encountered\n";
     Usage(1);

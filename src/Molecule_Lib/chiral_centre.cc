@@ -15,6 +15,7 @@
 #include "mdl.h"
 #include "misc2.h"
 #include "molecule.h"
+#include "moleculeio.h"
 
 using std::cerr;
 
@@ -1137,7 +1138,7 @@ Molecule::_check_for_incomplete_chiral_specifications()
 
     _chiral_centres.remove_item(i);
 
-    if (! ignore_incorrect_chiral_input())
+    if (! moleculeio::ignore_incorrect_chiral_input())
       rc = 0;
   }
 
@@ -2143,7 +2144,7 @@ Molecule::_complete_chiral_centres_from_mdl_files(const MDL_File_Supporting_Mate
       continue;
     }
 
-    if (ignore_incorrect_chiral_input()) {
+    if (moleculeio::ignore_incorrect_chiral_input()) {
       cerr << "Discarding invalid chiral centre on atom " << c->a() << " '" << smarts_equivalent_for_atom(c->a()) << "'\n";
 
       _chiral_centres.remove_item(i);

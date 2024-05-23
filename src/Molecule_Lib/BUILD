@@ -91,6 +91,23 @@ py_proto_library(
 )
 
 proto_library(
+    name = "molecule_to_query_proto",
+    srcs = [
+        "molecule_to_query.proto",
+    ],
+    deps = [
+        ":substructure_proto",
+    ],
+)
+
+cc_proto_library(
+    name = "molecule_to_query_cc_proto",
+    deps = [
+        ":molecule_to_query_proto",
+    ],
+)
+
+proto_library(
     name = "pharmacophore_proto",
     srcs = [
         "pharmacophore.proto",
@@ -263,6 +280,7 @@ cc_library(
         "mdl_file_data.cc",
         "mdl_molecule.cc",
         "misc2.cc",
+        "moleculeio.cc",
         "mol2graph.cc",
         "mol2graph_proto.cc",
         "molecule.cc",
@@ -345,6 +363,7 @@ cc_library(
         "mdl_file_data.h",
         "mdl_molecule.h",
         "misc2.h",
+        "moleculeio.h",
         "mol2graph.h",
         "mol2graph_proto.h",
         "molecule.h",
@@ -385,6 +404,7 @@ cc_library(
         ":atom_type_ext_cc_proto",
         ":donor_acceptor_cc_proto",
         ":mol2graph_cc_proto",
+        ":molecule_to_query_cc_proto",
         ":pharmacophore_cc_proto",
         ":space_vector",
         ":standardise_cc_proto",
@@ -789,6 +809,19 @@ cc_test(
     deps = [
         ":space_vector",
         "@googletest//:gtest_main",
+    ],
+)
+
+cc_test(
+    name = "substructure_a_test",
+    srcs = ["substructure_a_test.cc"],
+    timeout="short",
+    deps = [
+        ":iwmolecule",
+        ":moleculeio",
+        ":substructure_cc_proto",
+        "@googletest//:gtest_main",
+        "@com_google_protobuf//:protobuf",
     ],
 )
 

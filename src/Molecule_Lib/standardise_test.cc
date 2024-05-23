@@ -260,6 +260,20 @@ TEST_F(TestStandardisation, PyrazoloneNoProcess) {
   EXPECT_EQ(_chemical_standardisation.process(_m1), 0);
 }
 
+#ifdef THIS_CASE_DOES_NOT_EXIST
+Jan 2024.
+Looking at Chembl, this case seems not to exist. Turn off for now.
+The existing standardisation does not change [N+]#[C-].
+TEST_F(TestStandardisation, ReverseReversedCyano) {
+  _smiles = "CCN#C";
+  ASSERT_TRUE(_m1.build_from_smiles(_smiles));
+  constexpr int kVerbose = 0;
+  _chemical_standardisation.Activate(CS_REVERSE_NV5, kVerbose);
+  EXPECT_EQ(_chemical_standardisation.process(_m1), 1);
+  EXPECT_EQ(_m1.unique_smiles(), "CC[N+]#[C-]") << _m1.unique_smiles() << " not match";
+}
+#endif
+
 // First do a test without canonicalization, and then
 // repeat with canonicalisation.
 TEST_F(TestStandardisation, TestNoUsmi) {

@@ -8117,7 +8117,7 @@ dicer (int argc, char ** argv)
     }
     else
     {
-      set_read_extra_text_info(1);
+      moleculeio::set_read_extra_text_info(1);
       MDL_File_Supporting_Material * mdlfs = global_default_MDL_File_Supporting_Material();
       mdlfs->set_report_unrecognised_records(0);
     }

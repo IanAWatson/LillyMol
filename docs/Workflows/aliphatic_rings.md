@@ -2,8 +2,8 @@
 
 The task is to identify Chembl molecules that exemplify
 
-. aliphatic rings separated by 3-5 bonds
-. not too much extra complexity in the inter-ring region.
+* aliphatic rings separated by 3-5 bonds
+* not too much extra complexity in the inter-ring region.
 
 For example
 
@@ -51,7 +51,7 @@ the size of the fused system must be less than three, i.e. one or
 two rings only.
 The construct `...{<6}` to indicate the distance between them.
 
-We have 254k starting molecules. Query took 59 seconds.
+From 2.3M starting molecules we get 254k starting molecules. Query took 59 seconds.
 
 ### Step 2
 Unfortunately, it is not possible to combine the `...` construct with
@@ -76,16 +76,20 @@ query {
   }
 }
 ```
-And in the `4.qry` file there will be found instances of `[R0]`. The
+And in the `4.qry` file there will be four instances of `[R0]`, etc.. The
 interesting parts are the `substituent_no_match` directives.
 
-A 'substituent' is atoms bonded to the atoms matched by the smarts. In
+A 'substituent' consists of atoms bonded to the atoms matched by the smarts.
+These atoms are not part of the atom matching, but can be examined in order
+to determine whether or not a match is generted.
+In
 this case substituents will be the atoms attached to the linker atoms.
 But note that a substituent is not a single atom, but a region of the
-molecule.
+molecule, a region defined by atoms not matched by the query, but attached 
+to matched atoms.
 
 We have three `substituent_no_match` directives. That means that if
-this requirement is met, the whole query (smarts) does not match. We
+any of these requirements is met, the whole query (smarts) does not match. We
 need separate `substituent_no_match` directives since if combined
 into one,
 ```
@@ -157,7 +161,7 @@ where we see isotope 2 has been applied to all the other ring atoms.
 But note that the '=O' atom does not have an isotope. Nor will any other
 atom in this region. There does not appear to be an easy way of propagating
 the isotopic labels from the chain out to all the atoms attached to the
-chain.
+chain. That turns out to not be a problem.
 
 ### Step 4
 At this stage, the easy way to get rid of the unwanted atoms outside
@@ -175,7 +179,8 @@ scaffold {
 ```
 We look for an atom with isotope 2 that is in a ring. These are the
 isotopes we applied above. That atom must be bonded, via a non ring bond,
-to an atom with zero isotope. This removes the extra atoms.
+to an atom with zero isotope. We break the bond, and discard the fragment
+that had the zero isotope atom.
 ```
 trxn -z i -z w  -P remove_extra.rxn -S x4 x3.smi
 ```

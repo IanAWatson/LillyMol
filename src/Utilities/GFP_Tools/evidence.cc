@@ -801,9 +801,35 @@ Evidence::ReadNbrList(TFDataReader& input) {
   return 1;
 }
 
+// return an iterator to `name` in `haystack`.
+// If `name` is in `haystack`, return the iterator.
+// If not, see if we can truncate `name` and look up the first token.
+template <typename T>
+absl::flat_hash_map<std::string, T>::const_iterator
+GetIter(const absl::flat_hash_map<std::string, T>& haystack,
+        const std::string& name) {
+  auto iter = haystack.find(name);
+  if (iter != haystack.end()) {
+    return iter;
+  }
+
+  const size_t space_pos = name.find(' ');
+
+  if (space_pos == std::string::npos) {
+    return haystack.end();
+  }
+
+  std::string myname(name);
+
+  myname.resize(space_pos);
+
+  return haystack.find(myname);
+}
+
 int
 Evidence::Initialise(const nnbr::NearNeighbours& proto) {
-  const auto iter_ndx = _id_to_ndx.find(proto.name());
+
+  const auto iter_ndx = GetIter(_id_to_ndx, proto.name());
   if (iter_ndx == _id_to_ndx.end()) {
     cerr << "Evidence::Initialise:no index for '" << proto.name() << "'\n";
     return 0;
@@ -823,12 +849,12 @@ Evidence::Initialise(const nnbr::NearNeighbours& proto) {
       return 1;
     }
 
-    const auto iter_ndx = _id_to_ndx.find(nbr.id());
+    const auto iter_ndx = GetIter(_id_to_ndx, nbr.id());
     if (iter_ndx == _id_to_ndx.end()) {
       cerr << "Evidence::Initialise:cannot find '" << nbr.id() << "'\n";
       return 0;
     }
-    const auto iter_activity = _id_to_activity.find(nbr.id());
+    const auto iter_activity = GetIter(_id_to_activity, nbr.id());
     if (iter_activity == _id_to_activity.end()) {
       cerr << "Evidence::Initialise:no activity for '" << nbr.id() << "'\n";
       return 0;

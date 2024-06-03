@@ -417,6 +417,8 @@ int
 Donor_Acceptor_Assigner::_fetch_queries(T& c,
                 resizable_array_p<Substructure_Hit_Statistics>& queries) {
   assert('=' == c[1]);
+  // cerr << "Donor_Acceptor_Assigner::_fetch_queries file is '" << c << "'\n";
+
 
   // Reading old style specification
   if (c.starts_with("a=") || c.starts_with("d=")) {

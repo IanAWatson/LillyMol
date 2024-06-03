@@ -4576,13 +4576,14 @@ Substructure_Environment::construct_from_msi_object(
 
     if (NAME_OF_QUERY_BOND_OBJECT == m.name()) {
     } else if (NAME_OF_QUERY_ATOM_OBJECT == m.name()) {
-      std::unique_ptr<Substructure_Atom> a = std::make_unique<Substructure_Atom>();
+      Substructure_Atom* a = new Substructure_Atom();
       if (!a->construct_from_msi_object(m, completed)) {
+        delete a;
         return 0;
       }
 
       if (is_root_substructure_atom(m)) {
-        add(a.release());
+        add(a);
       }
     } else {
       cerr << "Unknown msi object type in query_environment\n" << m;
@@ -5418,18 +5419,15 @@ Single_Substructure_Query::_construct_from_msi_object(const msi_object &msi,
               "defined\n";
       return 0;
     } else {
-      // Feb 2024. Looks like a bug. This gets silently handled then discarded. 
-      // Issue error message
-      cerr << "Non root substructure atom in query\n";
-      return 0;
-
-      std::unique_ptr<Substructure_Atom> a = std::make_unique<Substructure_Atom>();
-      if (!a->construct_from_msi_object(mi, completed)) {
+      Substructure_Atom * a = new Substructure_Atom;
+      if (! a->construct_from_msi_object(mi, completed)) {
+        delete a;
         return 0;
       }
 
       if (0 == a->nbonds()) {  // no bonds to anything already defined
         cerr << "Non root Substructure_Atom not bonded\n";
+        delete a;
         cerr << mi;
         return 0;
       }

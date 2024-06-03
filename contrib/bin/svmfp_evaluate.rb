@@ -83,7 +83,7 @@ if ARGV.empty?
 end
 
 gfp_make = if cmdline.option_present('gfp_make')
-             cl.value('gfp_make')
+             cmdline.value('gfp_make')
            else
              'gfp_make.sh'
            end

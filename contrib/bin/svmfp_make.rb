@@ -1,8 +1,6 @@
 # Build svmfp models
 # Subsequently altered to also build lightgbm models.
 
-# frozen_string_literal: true
-
 require 'date'
 require 'fileutils'
 require 'tempfile'
@@ -13,12 +11,13 @@ require_relative 'lib/gfp_model_pb'
 
 def usage(retcod)
   $stderr << "Builds an svmfp model from smiles and activity\n"
-  $stderr << " -mdir <dir>   model directory to create\n"
-  $stderr << " -A <fname>    file containing activity data\n"
-  $stderr << " -C            classification model\n"
-  $stderr << " -gfp ... -gfp fingerprint specification (to gfp_make)\n"
-  $stderr << " -p <support>  support level for bit inclusion\n"
-  $stderr << " -flatten      flatten sparse fingerprint counts to 1\n"
+  $stderr << " -mdir <dir>     model directory to create\n"
+  $stderr << " -A <fname>      file containing activity data\n"
+  $stderr << " -C              classification model\n"
+  $stderr << " -gfp ... -gfp   fingerprint specification (to gfp_make)\n"
+  $stderr << " -p <support>    support level for bit inclusion\n"
+  $stderr << " -tube <width>   tube width (def 0.1, smaller for more accurate model)\n"
+  $stderr << " -flatten        flatten sparse fingerprint counts to 1\n"
   $stderr << " -lightgbm ... -lightgbm build a lightgbm model\n"
   $stderr << " -catboost ... -catboost build a catboost model\n"
   $stderr << " -v            verbose output\n"
@@ -97,6 +96,7 @@ end
 cmdline = IWCmdline.new('-v-mdir=s-A=sfile-C-gfp=close-svml=close-p=ipos-flatten-gfp_make=xfile' \
                         '-svm_learn=xfile-gfp_to_svm_lite=xfile-lightgbm=close-lightgbm_config=sfile' \
                         '-catboost=close' \
+                        '-tube=float' \
                         '-xgboost=close-xgboost_config=sfile-xgb_test=sfile')
 if cmdline.unrecognised_options_encountered
   $stderr << "unrecognised_options_encountered\n"
@@ -147,6 +147,10 @@ svm_learn_options = if cmdline.option_present('svml')
                     else
                       '-t 4 -m 500'
                     end
+
+if cmdline.option_present('tube')
+  svm_learn_options << ' -w ' << cmdline.value('tube').to_s
+end
 
 # the alternate model forms will be nil if not specified.
 lightgbm = cmdline.value('lightgbm')

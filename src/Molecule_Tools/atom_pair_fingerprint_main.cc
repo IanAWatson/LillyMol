@@ -422,6 +422,11 @@ DoAtomPairFingerprint(int argc, char** argv) {
 
   IWString_and_File_Descriptor output(1);
 
+  if (fp_writer.IsWritingDescriptors()) {
+    fp_writer.WriteHeaderIfNeeded(output);
+  }
+
+
   int rc;
   for (int i = 0; i < cl.number_elements(); ++i) {
     if (!DoAtomPairFingerprint(cl[i], input_type, atom_pair_fp_gen, output)) {

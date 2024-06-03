@@ -3306,7 +3306,7 @@ Chemical_Standardisation::_process(Molecule & m,
   if (_transform_azid_reverse.active())
     rc += _do_transform_reverse_azid(m, current_molecule_data);
 
-  cerr << "_transform_nv5_to_charge_separated " << _transform_nv5_to_charge_separated.active() << '\n';
+  // cerr << "_transform_nv5_to_charge_separated " << _transform_nv5_to_charge_separated.active() << '\n';
   if (_transform_nv5_to_charge_separated.active()) {
     rc += _do_nv5_to_charge_separated(m, current_molecule_data);
   }
@@ -3570,7 +3570,7 @@ Chemical_Standardisation::_process(Molecule & m)
   }
 
   if (! _processing_needed(current_molecule_data)) {
-    cerr << "Processing not needed\n";
+    // cerr << "Processing not needed\n";
     return rc;
   }
 

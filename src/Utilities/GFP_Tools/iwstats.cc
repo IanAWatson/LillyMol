@@ -1601,7 +1601,7 @@ iwstats(unsigned int number_records, const IWString* chunk_title, int which_pred
     output << "Average absolute error " << ae.average() << '\n';
     if (all_outputs_have_equals_sign) {
       write_something_identifying_the_column(predicted_column, output);
-      output << "= ";
+      output << " RMS = ";
       output << sqrt(ae.sum_of_squares() / static_cast<double>(ae.n())) << '\n';
     } else {
       output << "RMS error " << sqrt(ae.sum_of_squares() / static_cast<double>(ae.n())) << '\n';

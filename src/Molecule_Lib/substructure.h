@@ -221,7 +221,7 @@ class NMAB_Token
 
 // Once the NMAB directive is parsed into NMAB_Token's, those can be transformed
 // into NMAB_Operator's.
-// If query_ is not set, then _number is interpreted as match atom count.
+// If _query is not set, then _number is interpreted as match atom count.
 // Kind of a lkudge, I did think of having a base class and virtual...
 class NMAB_Operator 
 {
@@ -586,29 +586,30 @@ class Substructure_Atom_Specifier
     // The _element array is retained so elemental properties can be retrieved.
     resizable_array<const Element *> _element;
     resizable_array<int>   _element_unique_id;
+    extending_resizable_array<int> _element_uid;
 
-    Min_Max_Specifier<int> _ncon;
+    iwmatcher::Matcher<int> _ncon;
     Min_Max_Specifier<int> _ncon2;
-    Min_Max_Specifier<int> _nbonds;
-    Min_Max_Specifier<int> _valence;  // From the 'v' directive in smarts.
+    iwmatcher::Matcher<int> _nbonds;
+    iwmatcher::Matcher<int> _valence;  // From the 'v' directive in smarts.
     Min_Max_Specifier<int> _formal_charge;
-    Min_Max_Specifier<int> _nrings;
-    Min_Max_Specifier<int> _ring_bond_count;
-    Min_Max_Specifier<int> _ring_size;
-    Min_Max_Specifier<int> _hcount;
+    iwmatcher::Matcher<int> _nrings;
+    iwmatcher::Matcher<int> _ring_bond_count;
+    iwmatcher::Matcher<int> _ring_size;
+    iwmatcher::Matcher<int> _hcount;
     aromaticity_type_t     _aromaticity;
     int                    _chirality;
-    Min_Max_Specifier<int> _aromatic_ring_size;
-    Min_Max_Specifier<int> _aliphatic_ring_size;
-    Min_Max_Specifier<int> _attached_heteroatom_count;
-    Min_Max_Specifier<int> _lone_pair_count;
-    Min_Max_Specifier<int> _unsaturation;
-    Min_Max_Specifier<int> _daylight_x;
-    Min_Max_Specifier<int> _isotope;
+    iwmatcher::Matcher<int> _aromatic_ring_size;
+    iwmatcher::Matcher<int> _aliphatic_ring_size;
+    iwmatcher::Matcher<int> _attached_heteroatom_count;
+    iwmatcher::Matcher<int> _lone_pair_count;
+    iwmatcher::Matcher<int> _unsaturation;
+    iwmatcher::Matcher<int> _daylight_x;
+    iwmatcher::Matcher<uint32_t> _isotope;
     int                    _userAtomType = 0;
-    Min_Max_Specifier<int> _aryl;
-    Min_Max_Specifier<int> _fused_system_size;
-    Min_Max_Specifier<int> _vinyl;
+    iwmatcher::Matcher<int> _aryl;
+    iwmatcher::Matcher<int> _fused_system_size;
+    iwmatcher::Matcher<int> _vinyl;
     int                    _all_rings_kekule;
     // initialise to negative to indicate no specification.
     // 0 means NOT spiro.
@@ -617,7 +618,7 @@ class Substructure_Atom_Specifier
 
 //  int                    _carbocycle;
 
-    Min_Max_Specifier<int> _heteroatoms_in_ring;
+    iwmatcher::Matcher<int> _heteroatoms_in_ring;
 
     CahnIngoldPrelog _cip_chirality;
 
@@ -632,7 +633,7 @@ class Substructure_Atom_Specifier
 
 //  We want to be able to look for an atom in a "terminal" ring.
 
-    Min_Max_Specifier<int> _scaffold_bonds_attached_to_ring;
+    iwmatcher::Matcher<int> _scaffold_bonds_attached_to_ring;
 
     // If the query contains atom typing.
     atom_type_t _atom_type;
@@ -651,7 +652,7 @@ class Substructure_Atom_Specifier
 //   a. the number of atoms in a symmetry group (F in CF3 is 3) [DEGREE]
 //   b. relationship to other matched atoms   [GROUP]
 
-    Min_Max_Specifier<int> _symmetry_degree;
+    iwmatcher::Matcher<int> _symmetry_degree;
     int _symmetry_group;
 
 //  During matching is it desirable to keep track of how many attributes
@@ -804,7 +805,7 @@ class Substructure_Atom_Specifier
 
     const resizable_array<const Element *> & element () const { return _element;};
     const Min_Max_Specifier<int> & formal_charge () const { return _formal_charge;}
-    const Min_Max_Specifier<int> & isotope () const { return _isotope;}
+    const iwmatcher::Matcher<uint32_t> & isotope () const { return _isotope;}
     const int & userAtomType () const { return _userAtomType;} 
 
     int spiro() const {
@@ -837,6 +838,9 @@ class Substructure_Atom_Environment : public resizable_array_p<Substructure_Atom
 
     int number_elements () const { return _number_elements;}
     int active () const { return _number_elements;}
+
+    int BuildProto(SubstructureSearch::SubstructureAtom& proto) const;
+    int BuildFromProto(const SubstructureSearch::SubstructureAtomEnvironment& proto);
 
     int create_from_smarts (const Atomic_Smarts_Component &);
     int create_from_msi_object (msi_object &);
@@ -998,6 +1002,10 @@ class Substructure_Atom : public Substructure_Atom_Specifier
     Target_Atom * _anchor;      // should be _parent->current_hold_atom ();
     int           _con;
     int           _anchor_ncon;
+
+    // Feb 2023. Keep track of whether or not we are on the queue of atoms awaiting
+    // matching. This avoids a search.
+    int _on_queue_for_matching;
 
 //  End of non Root_Substructure_Atom variables
 
@@ -1340,6 +1348,13 @@ class Substructure_Atom : public Substructure_Atom_Specifier
 
     // Used when parsing environments. Note that we take ownership of `spec`.
     int add_component(Substructure_Atom_Specifier* spec);
+
+    int on_queue_for_matching() const {
+      return _on_queue_for_matching;
+    }
+    void set_on_queue_for_matching(int s) {
+      _on_queue_for_matching = s;
+    }
 };
 
 extern std::ostream & operator << (std::ostream &, const Substructure_Atom &);
@@ -1560,6 +1575,41 @@ class Elements_Needed
 
     int matches(Query_Atoms_Matched & qam) const;
     int matches(Molecule_to_Match & target) const;
+};
+
+// We can sometimes speed up searches by doing an initial scan of the
+// bond list.
+// Note that we deliberately only support atomic numbers as ints, rather than
+// using the atomic_symbol_hash_value. While it is an int today, maybe it becomes
+// unsigned later. And that need is too obscure.
+class RequiredBond {
+  private:
+    // element and number of connections of first atom.
+    int _atomic_number_1;
+    int _ncon1;
+
+    bond_type_t _btype;
+
+    // element and number of connections of second atom.
+    int _atomic_number_2;
+    int _ncon2;
+
+    // How many instances needed for a match, defaults to 1.
+    // Note that we do not support zero, could be changed.
+    int _min_count;
+
+  // private functions.
+    int MatchesSingle(const Molecule& m) const;
+    int MatchesDouble(const Molecule& m) const;
+    int MatchesTriple(const Molecule& m) const;
+
+  public:
+    RequiredBond();
+
+    int ConstructFromProto(const SubstructureSearch::RequiredBond& proto);
+    int BuildProto(SubstructureSearch::RequiredBond& proto) const;
+
+    int Matches(const Molecule& m) const;
 };
 
 /*
@@ -2235,6 +2285,10 @@ class ISIS_Link_Atom : public Link_Atom
 
 extern std::ostream & operator << (std::ostream &, const ISIS_Link_Atom &);
 
+class SetOfEmbeddings : public resizable_array_p<Set_of_Atoms> {
+  private:
+  public:
+};
 /*
   We need an object to hold the results of a substructure query, as well as
   the intermediate working data used by a substructure query. This is for
@@ -2246,7 +2300,7 @@ extern std::ostream & operator << (std::ostream &, const ISIS_Link_Atom &);
 class Substructure_Results
 {
   private:
-    unsigned int _hits_found;
+    uint64_t _hits_found;
 
     int _atoms_in_target_molecule;
 
@@ -2264,7 +2318,7 @@ class Substructure_Results
 
 //  During a search, each query keeps a list of the embeddings it has made. 
 
-    resizable_array_p<Set_of_Atoms> _embedding;
+    SetOfEmbeddings _embedding;
 
 //  Some programmes (fragmenter for example) need to know the identity
 //  of the Substructure_Atom matched to each atom in a molecule, so we
@@ -2369,7 +2423,7 @@ class Substructure_Results
     const Set_of_Atoms * embedding(int i) const { return _embedding[i];}
     const Query_Atoms_Matched * query_atoms_matching(int i) const { return _query_atoms_matched[i];}
 
-    int number_embeddings() const { return _embedding.number_elements();};
+    uint32_t number_embeddings() const { return _embedding.size();};
     int print_embeddings(std::ostream &, int = 0) const;
     int print_embeddings(std::ostream &, const Molecule *) const;
 
@@ -2388,7 +2442,7 @@ class Substructure_Results
 
     int set_embeddings(const Set_of_Atoms **, const int n);
 
-    const resizable_array_p<Set_of_Atoms>& embeddings() const { 
+    const SetOfEmbeddings& embeddings() const {
       return _embedding;
     }
 
@@ -2508,6 +2562,10 @@ class RequiredMolecularProperties {
 
     // Requirements on counts of certain elements.
     resizable_array_p<Elements_Needed> _elements_needed;
+
+    // A set of bond specifications that are checked before any
+    // atom matching is done.
+    resizable_array_p<RequiredBond> _required_bonds;
 
     // The most common use for net formal charge is to look for molecules
     // that have a net formal charge, either positive or negative, so make
@@ -2829,6 +2887,11 @@ class Single_Substructure_Query
 
     resizable_array_p<Elements_Needed> _element_hits_needed;
 
+
+    // A set of bond specifications that are checked before any
+    // atom matching is done.
+    resizable_array_p<RequiredBond> _required_bonds;
+
 //  We can also stop looking once we have a given number of matches.
 
     int _max_matches_to_find;
@@ -3082,6 +3145,8 @@ class Single_Substructure_Query
     int _one_time_initialisations();
 
     int _match_elements_needed(Molecule_to_Match & target_molecule) const;
+
+    int RequiredBondsMatch(const Molecule& m);
 
     int _aromatic_atoms_matches(Molecule_to_Match& target_molecule) const;
 
@@ -3338,8 +3403,8 @@ class Single_Substructure_Query
 
 //  Search all atoms in the molecule for a match to the query.
 
-    int substructure_search(Molecule *, Substructure_Results &);
-    int substructure_search(Molecule_to_Match &, Substructure_Results &);
+    uint32_t substructure_search(Molecule *, Substructure_Results &);
+    uint32_t substructure_search(Molecule_to_Match &, Substructure_Results &);
 
 //  Once we allow decisions into a query, there can be a different number
 //  of query atoms which are matched for each match.
@@ -3549,17 +3614,17 @@ class Substructure_Query : public resizable_array_p<Single_Substructure_Query>
     // On a positive match, it may (or may not) contain some matched atoms,
     // because the last component matched might have been a non-match in
     // an XOR.
-    int substructure_search(Molecule *);
-    int substructure_search(Molecule *, Substructure_Results &);
-    int substructure_search(Molecule &);
-    int substructure_search(Molecule &, Substructure_Results &);
-    int substructure_search(Molecule_to_Match &);
-    int substructure_search(Molecule_to_Match &, Substructure_Results &);
+    uint32_t substructure_search(Molecule *);
+    uint32_t substructure_search(Molecule *, Substructure_Results &);
+    uint32_t substructure_search(Molecule &);
+    uint32_t substructure_search(Molecule &, Substructure_Results &);
+    uint32_t substructure_search(Molecule_to_Match &);
+    uint32_t substructure_search(Molecule_to_Match &, Substructure_Results &);
 
 //  Sometimes we want to search each component of a query regardless of what operators
 //  might be present.
 
-    int substructure_search_do_each_component(Molecule_to_Match & target, Substructure_Results & sresults);
+    uint32_t substructure_search_do_each_component(Molecule_to_Match & target, Substructure_Results & sresults);
 
     int set_find_one_embedding_per_atom(int);
     int set_find_unique_embeddings_only(int);
@@ -3736,7 +3801,7 @@ namespace substructure_spec {
 int SmartsNumericQualifier(const char * input,
                        int max_chars,
                        Min_Max_Specifier<int>& result);
-int SmartsFetchNumeric(const char * string, int & value, 
+int SmartsFetchNumeric(const char * string, int nchars, int & value, 
                      int & qualifier);
 
 int

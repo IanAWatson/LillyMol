@@ -272,7 +272,9 @@ class const_IWSubstring
     int split (IWString *, char = ' ') const;
     int split (std::vector<std::string> &, std::string) const;
 
+    // Both of these will fail badly if the string is empty.
     char last_item () const { return *(_data + _nchars - 1);}
+    char back() const { return *(_data + _nchars - 1);}
 
     int balance (char, char) const;   // reports the numeric imbalance - returns 0 if balanced
 
@@ -411,6 +413,9 @@ class IWString : public resizable_array<char>
     int operator != (const char *) const;
     int operator == (const IWString &) const;
     int operator != (const IWString &) const;
+
+    bool operator== (const std::string& rhs) const;
+    bool operator!= (const std::string& rhs) const;
 
 //  The relational operators are implemented using strncmp
 
@@ -1073,7 +1078,8 @@ class IWString_and_File_Descriptor : public IWString
     int active () const { return _fd > 0 || nullptr != _gzfile;}
     int is_open() const { return _fd > 0 || nullptr != _gzfile;}
 
-    int open(const char *);
+    // If fname starts with '>>' then the file is opened for append.
+    int open(const char * fname);
     int close();
 };
 
@@ -1235,7 +1241,6 @@ const_IWSubstring::split_into_directive_and_value (const_IWSubstring & directive
   return 0;
 }
 
-#endif
-#endif
+#endif  // SPLIT_DV_IMPLEMENTATION
 
-/* arch-tag: a3c38e2b-3093-495e-a598-8ad0d05cc122 */
+#endif  // FOUNDATIONAL_IWSTRING_IWSTRING_H

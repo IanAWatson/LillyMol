@@ -11,6 +11,7 @@
 
 #include "mdl.h"
 #include "molecule.h"
+#include "moleculeio.h"
 #include "output.h"
 #include "smiles.h"
 
@@ -540,13 +541,13 @@ Molecule_Output_Object::determine_output_types(const Command_Line& cl, char opt)
   {
     if ("flush" == c)
     {
-      set_flush_files_after_writing_each_molecule(1);
+      moleculeio::set_flush_files_after_writing_each_molecule(1);
       continue;
     }
 
     if ("info" == c)
     {
-      set_write_extra_text_info(1);
+      moleculeio::set_write_extra_text_info(1);
       continue;
     }
 
@@ -662,7 +663,7 @@ Molecule_Output_Object::determine_output_types(const Command_Line& cl, char opt)
 
     if ("DOS" == c)
     {
-      set_write_DOS_records(1);
+      moleculeio::set_write_DOS_records(1);
       continue;
     }
 
@@ -699,7 +700,7 @@ Molecule_Output_Object::determine_output_types(const Command_Line& cl, char opt)
 
     if ("mol2wfc" == c)
     {
-      set_mol2_write_formal_charge_as_partial_charge(1);
+      tripos::set_mol2_write_formal_charge_as_partial_charge(1);
       continue;
     }
 
@@ -720,7 +721,7 @@ Molecule_Output_Object::determine_output_types(const Command_Line& cl, char opt)
       exit(1);
     }
 
-    FileType tmp = string_to_file_type(c);
+    FileType tmp = moleculeio::string_to_file_type(c);
     if (FILE_TYPE_INVALID == tmp)
     {
       cerr << "Molecule_Output_Object::determine_output_types:Unrecognised output type '" << c

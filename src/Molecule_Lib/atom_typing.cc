@@ -1513,9 +1513,9 @@ Atom_Typing_Specification::_assign_atom_types_pharmacophore(Molecule& m, T* atyp
   for (auto i = 0; i < _hydrophobe.number_elements(); ++i) {
     Substructure_Results sresults;
 
-    auto nhits = _hydrophobe[i]->substructure_search(target, sresults);
+    uint32_t nhits = _hydrophobe[i]->substructure_search(target, sresults);
 
-    for (auto j = 0; j < nhits; ++j) {
+    for (uint32_t j = 0; j < nhits; ++j) {
       const Set_of_Atoms* e = sresults.embedding(j);
 
       atom_number_t k = e->first();

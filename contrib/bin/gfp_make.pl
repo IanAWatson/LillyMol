@@ -104,6 +104,9 @@ my $clogd = 0;
 my $clogpd = 0;
 my $clogp_bit_replicates = 0;
 
+my $xlogp = 0;
+my $xlogp_bit_replicates = 10;
+
 my $marvin = 0;
 my $marvin_string = "";
 
@@ -1305,6 +1308,17 @@ OPTION: while ($argptr < @ARGV)
     $clogp_bit_replicates = $1;
     $fingerprints_specified++;
   }
+  elsif ($opt eq "-XLOGP")
+  {
+    $xlogp = 1;
+    $fingerprints_specified++;
+  }
+  elsif ($opt =~ /-XLOGP(\d+)$/)
+  {
+    $xlogp = 1;
+    $xlogp_bit_replicates = $1;
+    $fingerprints_specified++;
+  }
   elsif ($opt eq "-MCLP")
   {
     $marvin_string .= ' -O clogp';
@@ -1435,7 +1449,7 @@ OPTION: while ($argptr < @ARGV)
   }
   elsif ($opt eq "-D2F")
   {
-    my $descriptors_to_fingerprint = find_executable('descriptors_to_fingerprint.sh');
+    my $descriptors_to_fingerprint = find_executable('descriptors_to_fingerprint');
 
     $d2f_string .= "|${descriptors_to_fingerprint} -f ";
     my $tmp = $ARGV[$argptr++];
@@ -2600,7 +2614,7 @@ my $catsp_cmd_pipe;
 
 if ($catsp)
 {
-  my $catsp_exe = find_executable("jwcats");
+  my $catsp_exe = find_executable("jwcats.sh");
 
   my $tag = "NCCATSP";
 
@@ -2639,7 +2653,7 @@ my $cats_cmd_pipe;
 
 if ($cats)
 {
-  my $cats_exe = find_executable("jwcats");
+  my $cats_exe = find_executable("jwcats.sh");
 
   my $tag = "NCCATS";
   my $cats_cmd = "${cats_exe} -E autocreate";
@@ -2726,6 +2740,30 @@ if ($marvin)
   {
     $marvin_cmd_first = "${marvin_exe} FILE | ${m2gfp} ${marvin_string} -";
   }
+}
+
+my $xlogp_cmd_first;
+my $xlogp_cmd_pipe;
+
+if ($xlogp)
+{
+  my $xlogp_exe = find_executable('xlogp');
+  my $xlogp_cmd = "${xlogp_exe} -p ${xlogp_bit_replicates} -J NCXLP${xlogp_bit_replicates}";
+
+  if ($work_as_filter)
+  {
+    $xlogp_cmd_first = "${xlogp_cmd} -g all -l FILE";
+  }
+  elsif ($work_as_tdt_filter)
+  {
+    $xlogp_cmd_first = "${xlogp_cmd} -g all -l -f -";
+  }
+  else 
+  {
+    $xlogp_cmd_first = "${xlogp_cmd} -g all -l FILE";
+  }
+
+  $xlogp_cmd_pipe = "${xlogp_cmd} -f -";
 }
 
 my $psa_cmd_first;
@@ -2994,6 +3032,18 @@ while ($fingerprints_specified > 0)
     }
 
     $mpr = 0;
+  }
+  elsif ($xlogp)
+  {
+    if ($first)
+    {
+      $cmd = $xlogp_cmd_first;
+    }
+    else
+    {
+      $cmd .= "| $xlogp_cmd_pipe";
+    }
+    $xlogp = 0;
   }
   elsif ($mk || $mk2 || $ncmk)
   {

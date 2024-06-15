@@ -181,6 +181,26 @@ if [[ -v BUILD_BDB ]] ; then
   fi
 fi
 
+if [[ -v BUILD_JULIA ]] ; then
+  julia=$(type -P 'julia')
+  if [[ -z "${julia}" ]] ; then
+    echo "Julia build requested, but not in PATH. cannot continue" >&2
+    exit 1
+  fi
+  must_build=0
+  if [[ ! -d 'libcxxwrap-julia' ]] ; then
+    git clone https://github.com/JuliaInterop/libcxxwrap-julia
+    must_build=1
+  fi
+  #
+  #cmake --install . --prefix /home/ian/LillyMol/third_party/
+fi
+
+must_build=0
+if [[ ! -s "qqq" ]] ; then
+  git clone https://github.com/pybind/pybind11_protobuf
+fi
+
 # cilk??
 
 # Not yet in the public release.

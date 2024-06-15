@@ -38,6 +38,7 @@
 #include "Molecule_Tools/nvrtspsa.h"
 #include "Molecule_Tools/qry_wcharge.h"
 #include "Molecule_Tools/partial_symmetry.h"
+#include "Molecule_Tools/alogp.h"
 #include "Molecule_Tools/xlogp.h"
 
 #include "Molecule_Tools/iwdescr.pb.h"
@@ -73,6 +74,8 @@ static IW_STL_Hash_Map_String name_translation;
 
 static int flush_after_each_molecule = 0;
 
+static alogp::ALogP alogp_engine;
+
 /*
   Since the strongly fused ring system descriptors are sparse, they are
   optional too
@@ -100,6 +103,7 @@ struct DescriptorsToCompute {
   int ring_chain_descriptors = 1;
   int ring_fusion_descriptors = 1;
   int ring_substitution_descriptors = 1;
+  int compute_alogp = 1;
   int compute_xlogp = 1;
   int ring_substitution_ratio_descriptors = 1;
   int specific_groups = 1;
@@ -139,6 +143,7 @@ DescriptorsToCompute::SetAll(int s) {
   polar_bond_descriptors = s;
   ring_chain_descriptors = s;
   ring_substitution_descriptors = s;
+  compute_alogp = s;
   compute_xlogp = s;
   ring_substitution_ratio_descriptors = s;
   simple_hbond_descriptors = s;
@@ -323,6 +328,11 @@ DescriptorsToCompute::Initialise(Command_Line& cl) {
       if (verbose) {
         cerr << "specific substructure descriptors enabled\n";
       }
+    } else if (o == "alogp") {
+      compute_alogp = 1;
+      if (verbose) {
+        cerr << "alogp will be computed\n";
+      }
     } else if (o == "xlogp") {
       compute_xlogp = 1;
       if (verbose) {
@@ -373,7 +383,7 @@ static int output_precision = 4;
 static int compute_spiro_fusions = 1;
 
 static int verbose = 0;
-static int molecules_read = 0;
+static uint64_t molecules_read = 0;
 static int molecules_with_no_rings = 0;
 
 static unsigned int alarm_time = 0;
@@ -439,6 +449,7 @@ enum IWDescr_Enum
   iwdescr_fdiffallp,
   iwdescr_harary,
   iwdescr_rotbond,
+  iwdescr_frotbond,
   iwdescr_ringatom,
   iwdescr_rhacnt,
   iwdescr_rhaf,
@@ -685,6 +696,7 @@ enum IWDescr_Enum
   iwdescr_maxpsymdmean,
   iwdescr_psymdnumzero,
 
+  iwdescr_alogp,
   iwdescr_xlogp,
 
 // Ramey descriptors
@@ -991,6 +1003,7 @@ fill_descriptor_extremeties (Descriptor * d,
   d[iwdescr_fdiffallp].set_min_max_resolution(0.0f, 10.0f, resolution);
   d[iwdescr_harary].set_min_max_resolution(0.0f, 1.0f, resolution);
   d[iwdescr_rotbond].set_min_max_resolution(0.0f, 19.3958f, resolution);
+  d[iwdescr_frotbond].set_min_max_resolution(0.0f, 1.0f, resolution);
   d[iwdescr_ringatom].set_min_max_resolution(0.0f, 19.3958f, resolution);
   d[iwdescr_rhacnt].set_min_max_resolution(0.0f, 10.70095f, resolution);
   d[iwdescr_rhaf].set_min_max_resolution(0.0f, 1.0f, resolution);
@@ -1225,6 +1238,7 @@ fill_descriptor_extremeties (Descriptor * d,
   d[iwdescr_rmyni].set_min_max_resolution(0.0f, 8.0f, resolution);
   d[iwdescr_rmy_heavy_halogen].set_min_max_resolution(0.0f, 10.0f, resolution);
 
+  d[iwdescr_alogp].set_min_max_resolution(-4.0f, 10.0f, resolution);
   d[iwdescr_xlogp].set_min_max_resolution(-4.0f, 10.0f, resolution);
 
   return;
@@ -1568,6 +1582,7 @@ allocate_descriptors()
     descriptor[iwdescr_harary].set_name("harary");
   }
   descriptor[iwdescr_rotbond].set_name("rotbond");
+  descriptor[iwdescr_frotbond].set_name("frotbond");
   descriptor[iwdescr_ringatom].set_name("ringatom");
   descriptor[iwdescr_rhacnt].set_name("rhacnt");
   descriptor[iwdescr_rhaf].set_name("rhaf");
@@ -1880,6 +1895,9 @@ allocate_descriptors()
     descriptor[iwdescr_rmynbr].set_name("rmynbr");
     descriptor[iwdescr_rmyni].set_name("rmyni");
     descriptor[iwdescr_rmy_heavy_halogen].set_name("heavy_halogen");
+  }
+  if (descriptors_to_compute.compute_alogp) {
+    descriptor[iwdescr_alogp].set_name("alogp");
   }
   if (descriptors_to_compute.compute_xlogp) {
     descriptor[iwdescr_xlogp].set_name("xlogp");
@@ -2615,6 +2633,17 @@ compute_xlogp(Molecule& m) {
   std::optional<double> x = xlogp::XLogP(m);
   if (x) {
     descriptor[iwdescr_xlogp] = *x;
+    return 1;
+  }
+
+  return 0;
+}
+
+static int
+compute_alogp(Molecule& m) {
+  std::optional<double> x = alogp_engine.LogP(m);
+  if (x) {
+    descriptor[iwdescr_alogp] = *x;
     return 1;
   }
 
@@ -3576,6 +3605,8 @@ do_compute_distance_matrix_descriptors(Molecule & m,
 
 //set_vector(totd, matoms, 0);
 
+  // Actually this is wrong, it is measuring heteroatoms further
+  // than 3 bonds. Turns out this is useful this way.
   int largest_heteroatoms_within_three_bonds = 0;
 
   for (auto i = 0; i < matoms; ++i)
@@ -3590,6 +3621,7 @@ do_compute_distance_matrix_descriptors(Molecule & m,
 //    int d = m.bonds_between(i, j);
       int d = dm[i * matoms + j];
 
+      // Wrong, but useful as is.
       if (d < 3)
         continue;
 
@@ -7349,6 +7381,7 @@ compute_topological_descriptors(Molecule & m,
   descriptor[iwdescr_fdcca].set(static_cast<float>(two_connected_chain_atom) / static_cast<float>(matoms));
 
   descriptor[iwdescr_rotbond].set(static_cast<float>(rotatable_bonds));
+  descriptor[iwdescr_frotbond].set(iwmisc::Fraction<float>(rotatable_bonds, m.nedges()));
   descriptor[iwdescr_ringatom].set(static_cast<float>(ring_atom_count));
   if (ring_atom_count)
   {
@@ -7460,6 +7493,10 @@ compute_topological_descriptors(Molecule & m,
   if (descriptors_to_compute.compute_xlogp) {
     compute_xlogp(m);
   }
+  if (descriptors_to_compute.compute_alogp) {
+    compute_alogp(m);
+  }
+
 
   if (descriptors_to_compute.ring_substitution_descriptors) {
     compute_ring_substitution_descriptors(m, ncon);
@@ -9103,6 +9140,10 @@ iwdescr(int argc, char ** argv)
   }
 
   mwc.set_ignore_isotopes(1);
+
+  // Even if alogp is not being computed, set some useful default values.
+  alogp_engine.set_use_alcohol_for_acid(1);
+  alogp_engine.set_rdkit_phoshoric_acid_hydrogen(1);
 
   if (cl.empty()) {
     cerr << prog_name << ": no files specified\n";

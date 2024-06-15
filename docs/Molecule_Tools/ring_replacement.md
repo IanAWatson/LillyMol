@@ -8,34 +8,52 @@ of what plausible variants might exist?
 
 `ring_replacement` takes a starting molecule, a database of known rings,
 and generates molecules that have the existing rings replaced by rings
-from the database. The way the database is constructed, ring sizes and
+from the database. The way the database is constructed, ring sizes, aromaticity
+and
 substitution patterns are preserved. So if the starting molecule
 is a para substituted benzene ring, the results will also be para
 substituted 6 membered aromatic rings.
 
-For example of the starting molecule is
+For example if the starting molecule is a para substituted benzene
 ```
-Clc1ccc(F)cc1 p-benzene
+Cc1ccc(F)cc1 s
 ```
 requesting replacement of the 6 membered aromatic
 ```
-ring_replacement -R rings_6a.smi p-benzene.smi
+ring_replacement -w -R rings_6a.smi p-benzene.smi
 ```
-generates 185 new molecules. The first 10 (from Chembl) of those are
+generates 33 new molecules. The first 12 (from Chembl) of those are
 ```
-Cl[1c]1cc[1c](F)cc1 p-benzene %% CHEMBL503634.6a 1496512
-Cl[1c]1c[n][1c](F)cc1 p-benzene %% CHEMBL156037.6a 83606
-Cl[1c]1[n]c[1c](F)cc1 p-benzene %% CHEMBL156037.6a 83606
-Cl[1c]1[n]c[1c](F)c[n]1 p-benzene %% CHEMBL1171471.6a 19926
-Cl[1c]1c[n][1c](F)[n]c1 p-benzene %% CHEMBL1171471.6a 19926
-Cl[1c]1[n][n][1c](F)cc1 p-benzene %% CHEMBL600052.6a 10360
-Cl[1c]1[n]c[1c](F)[n]c1 p-benzene %% CHEMBL268339.6a 7938
-Cl[1c]1cc[1n+](F)cc1 p-benzene %% CHEMBL505408.6a 6908
-Cl[1n+]1cc[1c](F)cc1 p-benzene %% CHEMBL505408.6a 6908
+C[1C]1=CC=[1C](F)C=C1 s %% CHEMBL503634 1496512
+C[1C]1=CC=[1C](F)N=C1 s %% CHEMBL156037 83606
+C[1C]1=NC=[1C](F)C=N1 s %% CHEMBL1171471 19926
+C[1C]1=NN=[1C](F)C=C1 s %% CHEMBL600052 10360
+C[1C]1=NC=[1C](F)N=C1 s %% CHEMBL268339 7938
+C[1C]1=CC=[1N+](F)C=C1 s %% CHEMBL505408 6908
+C[1C]1=CC=[1C](F)NC1=O s %% CHEMBL48776 1432
+C[1C]1=CO[1C](=CC1=O)F s %% CHEMBL9792 918
+C[1N]1C(=O)N[1C](=CC1=O)F s %% CHEMBL4543258 542
+C[1C]1=CC(=O)[1C](=CN1)F s %% CHEMBL4466751 334
+C[1N]1C(=O)C(=O)[1N](F)C=C1 s %% CHEMBL95650 106
+C[1C]1=NN=[1C](F)N=N1 s %% CHEMBL17447 94
+C[1C]1=NN=[1C](F)N=C1 s %% CHEMBL351412 76
 ```
+![s_CHEMBL503634_1496512](Images/s_CHEMBL503634_1496512.png)
+![s_CHEMBL156037_83606](Images/s_CHEMBL156037_83606.png)
+![s_CHEMBL1171471_19926](Images/s_CHEMBL1171471_19926.png)
+![s_CHEMBL600052_10360](Images/s_CHEMBL600052_10360.png)
+![s_CHEMBL268339_7938](Images/s_CHEMBL268339_7938.png)
+![s_CHEMBL505408_6908](Images/s_CHEMBL505408_6908.png)
+![s_CHEMBL48776_1432](Images/s_CHEMBL48776_1432.png)
+![s_CHEMBL9792_918](Images/s_CHEMBL9792_918.png)
+![s_CHEMBL4543258_542](Images/s_CHEMBL4543258_542.png)
+![s_CHEMBL4466751_334](Images/s_CHEMBL4466751_334.png)
+![s_CHEMBL95650_106](Images/s_CHEMBL95650_106.png)
+![s_CHEMBL17447_94](Images/s_CHEMBL17447_94.png)
+
 The output consists of the smiles of the new molecule.  The name of
-the starting molecule.  Then follows the name of an exemplar molecule,
-that contains an example of the ring that has been
+the starting molecule, 's' in this case.  Then follows the name of an
+exemplar molecule, that contains an example of the ring that has been
 inserted.  The `6a` suffix indicates that the replacement is a six
 membered aromatic.  The last token is the number of these rings found
 in the knowledge base.  The output is sorted by occurrence.
@@ -44,7 +62,7 @@ Note that due to symmetry, many of the replacement rings are used twice.
 
 Clearly the larger the number of examples of a ring in the
 knowledge base, the higher the probability that this ring
-might be synthietically feasible. Experience tells us that rings 
+might be synthetically feasible. Experience tells us that rings 
 with low numbers of exemplars should be treated with caution.
 While some may represent real molecules that have been made,
 many seem more likely to have been drawing errors, or aspirations.
@@ -56,6 +74,18 @@ Fc1c[nH][n](Cl)so1 pbenzene %% PBCHM144506470.6a 2
 Fc1[c-][o+]c(Cl)cc1 pbenzene %% PBCHM139100082.6a 2
 ```
 are rings that have only two examples in the knowledge base.
+
+From Chembl, the most common ring system is `5a6a`, where there
+are about 4300 different 5-6 fused aromatic ring systems. There
+are several ring systems with just one instance including
+`4A4A4A`
+![4A4A4A](Images/CHEMBL4933998.png)
+and
+`4a5A7A`
+![4a5A7A](Images/CHEMBL5220269.png)
+Given that rings are only exchanged with like-rings, these are
+very unlikely to be used.
+
 
 ## Usage
 In order to make ring replacement work, two procedures are required.
@@ -103,7 +133,6 @@ cd ..
 mkdir ...
 ```
 
-
 ## Naming convention.
 We adopt an idea from smarts in that aromatic atoms are represented
 as lowercase and aliphatic as uppercase. So the file containing data
@@ -121,8 +150,11 @@ fused (or possibly spiro fused) systems consisting of a
 Such a dataitem might be
 ```
 smi: "[1CH]1=C2CCC3(CC3)OC2=N[1CH]=N1"
-     smt: "[ax2r6D3]1:[ax3r6r6D3]2:[ax2r6D2]:[ax2r6D2]:[ax4r3r6D4]3(:[ax2r3D2]:[ax2r3D2]:3):[ax2r6D2]:[ax3r6r6D3]:2:[ax2r6D2]:[ax2r6D3]:[ax2r6D2]:1"
-     id: "SCHEMBL2706866" n: 126 conn: true usmi: "O1C2(CCc3c1[n][1cH][n][1cH]3)CC2"
+     smt: "[ax2r6D3]1:[ax3r6D3]2:[ax2r6D2]:[ax2r6D2]:[ax4r3r6D4]3(:[ax2r3D2]:[ax2r3D2]:3):[ax2r6D2]:[ax3r6D3]:2:[ax2r6D2]:[ax2r6D3]:[ax2r6D2]:1"
+     id: "SCHEMBL2706866"
+     n: 126
+     conn: true
+     usmi: "O1C2(CCc3c1[n][1cH][n][1cH]3)CC2"
 ```
 which includes a spiro fused 3 membered ring.
 
@@ -136,7 +168,30 @@ are case insensitive, where the files 'rings_5a.smi' and 'rings_5A.smi' cannot
 coexist. See the '-X' option.
 
 On a fairly old computer (2014), running ring extraction on 2.2M Chembl molecules
-takes 5 minutes. Newer hardware will see that done in under 2 minutes.
+takes 5 minutes. A 2017 computer that takes 3:30 minutes.
+Newer hardware will see that done in under 3 minutes.
+
+### Aromaticity
+It can be useful to allow for the possibility of replacing an aromatic ring with
+an aliphatic ring, or vice versa. As can be seen from the smarts above,
+aromaticity is, by default, recorded in the smarts. Adding the `-X noarom`
+option to `ring_extraction`, generates smarts that do not specify the
+aromaticity of the atom, which then allows ring replacement regardless of
+aromaticity.
+
+A typical entry in the file might look like
+```
+smi: "[CH2:70]1[1NH]N=[1CH]C2=CC=CC=C12"
+     smt: "[x2r6D2]1[x2r6D>2][x2r6D2]=[x2r6D>2][x3r6D3]2:[x2r6D2]:[x2r6D2]:[x2r6D2]:[x2r6D2]:[x3r6D3]1:2"
+     id: "CHEMBL1500071.66"
+     n: 4569
+     conn: true
+     exo: "[70O]"
+     usmi: "O=c1[1nH][n][1cH]c2c1cccc2"
+```
+Note that the previous smarts had 'a' or 'A' to denote the atom's aromaticity, but this
+version leaves that unspecified, leaving the smarts able to match aromatic or aliphatic
+forms. Ring replacement does not need any changes in order to accommodate this.
 
 ## Details - TLDR, for geeks only.
 
@@ -220,6 +275,7 @@ is fast enough.
 ## Ring Replacement
 Once a set of replacement rings has been assembled, those can be used to
 perform ring replacement on molecules with existing ring/ring systems.
+```
  -R <fname>    file of labelled rings created by ring_extraction
  -s <smarts>   only replace rings matched by <smarts>
  -q <query>    only replace rings matched by <query>

@@ -59,7 +59,7 @@ When building a rings database, extract all representations, which one
 to use can be decided at lookup time.
 ```
 smi2rings_bdb -d STORE -d /dev/shm/collection.rings.bdb -g all -v -n \
-    -j ring -j iso -j env=UST:achry -j double -j spiro -z 8 -N add collection.smi
+    -j ring -j iso -j env=UST:achry -j double -j spiro -z 8 -N add -Y hash collection.smi
 ```
 
 ### -d STORE -d /dev/shm/collection.rings.bdb
@@ -103,6 +103,13 @@ This might depend on what you believe to be the reliability of chirality
 information available, and whether or not a generative model is making
 chiral molecules. I should probably implement the ability to store
 both chiral and non-chiral forms...
+
+-Y hash
+By default, smi2rings_bdb writes each ring encountered to the
+database. This can lead to significant inefficiencies. With the
+`-Y hash` option, instead the rings are accumulated in an internal
+hash map, and only at program termination is the data written to the
+database. This should always be used when building.
 
 #### Building databases
 

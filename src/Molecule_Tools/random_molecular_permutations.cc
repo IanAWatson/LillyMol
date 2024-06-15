@@ -159,6 +159,10 @@ class RandomState {
     T * RandomItem(const resizable_array_p<T>& items);
     template <typename T>
     T RandomItem(const resizable_array<T>& items);
+
+    std::default_random_engine& rng() {
+      return _rng;
+    }
 };
 
 RandomState::RandomState() : _fraction(0.0f, 1.0f) {
@@ -3665,9 +3669,10 @@ permutation_remove_terminal_ring(Molecule & m,
 }
 
 static void
-randomly_permute(Set_of_Atoms & s)
+randomly_permute(Set_of_Atoms & s,
+            RandomState& random_state)
 {
-  std::random_shuffle(s.begin(), s.end());
+  std::shuffle(s.begin(), s.end(), random_state.rng());
   return;
 }
 
@@ -3950,7 +3955,8 @@ permutation_split_apart_fused_ring(Molecule & m,
 static int
 switch_ring(Molecule & m,
             const Set_of_Atoms & ring_to_remove_arg,
-            Molecule & ring_to_add)
+            Molecule & ring_to_add,
+            RandomState& random_state)
 {
   Set_of_Atoms ring_to_remove = ring_to_remove_arg;    // we need a copy because add_molecule destroys existing rings
 
@@ -3986,7 +3992,7 @@ switch_ring(Molecule & m,
     return 0;
   }
 
-  randomly_permute(attachment_points_open);
+  randomly_permute(attachment_points_open, random_state);
 
 // Now the tricky part. We want to break all the bonds to the old ring, and re-make them to atoms
 // in the new ring. Note that any previous double bond will be converted to a single bond
@@ -4059,8 +4065,9 @@ permutation_switch_ring(Molecule & m,
   {
     const Ring * rj = random_state.RandomItem(rings_to_try);
 
-    if (switch_ring(m, *rj, ring_to_add))
+    if (switch_ring(m, *rj, ring_to_add, random_state)) {
       return 1;
+    }
   }
 
   return 0;

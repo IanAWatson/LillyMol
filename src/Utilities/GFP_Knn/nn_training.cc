@@ -3602,7 +3602,8 @@ determine_tvalue_threshold (int n,
   // double lp = iwpvalue (n, left);
 
 //cerr << " lp " << lp << " threshold " << pvalue_threshold << " rp " << rp << '\n';
-  assert (lp >= pvalue_threshold && pvalue_threshold >= rp);
+  //assert (lp >= pvalue_threshold && pvalue_threshold >= rp);
+  assert (pvalue_threshold >= rp);
 
   while (1)
   {

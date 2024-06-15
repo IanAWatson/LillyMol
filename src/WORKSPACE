@@ -48,16 +48,6 @@ http_archive(
     urls = ["https://github.com/google/leveldb/archive/main.zip"],
 )
 
-# Change master to the git tag you want.
-http_archive(
-    name = "com_grail_bazel_toolchain",
-    strip_prefix = "bazel-toolchain-master",
-    urls = ["https://github.com/grailbio/bazel-toolchain/archive/master.tar.gz"],
-)
-
-load("@com_grail_bazel_toolchain//toolchain:deps.bzl", "bazel_toolchain_dependencies")
-bazel_toolchain_dependencies()
-
 new_local_repository(
     name = "local_f2c",
     path = "../third_party/libf2c",
@@ -69,6 +59,34 @@ cc_library(
     visibility = ["//visibility:public"],
 )
 """,
+)
+
+new_local_repository(
+    name = "charge_assigner",
+    path = "../data/queries/charges",
+    build_file_content = """
+filegroup(
+    name = "charge_assigner_data",
+    srcs = glob(["**"]),
+    visibility = [
+        "//visibility:public",
+    ],
+)
+"""
+)
+
+new_local_repository(
+    name = "donor_acceptor",
+    path = "../data/queries/hbonds",
+    build_file_content = """
+filegroup(
+    name = "donor_acceptor_data",
+    srcs = glob(["**"]),
+    visibility = [
+        "//visibility:public",
+    ],
+)
+"""
 )
 
 #local_repository(
@@ -161,6 +179,46 @@ cc_library(
 """,
 )
 
+new_local_repository(
+    name = "julia",
+    path = "/home/ian/third_party/julia-1.10.0",
+    build_file_content = """
+cc_library(
+    name= "julia",
+    srcs = glob(
+        ["lib/*.so"],
+    ),
+    hdrs = glob(
+        ["include/julia/*.h"],
+    ),
+    strip_include_prefix = "include/julia",
+    visibility = ["//visibility:public"],
+)
+""",
+)
+
+new_local_repository(
+    name = "libcxxwrap",
+    path = "/home/ian/LillyMol/third_party",
+    build_file_content = """
+cc_library(
+    name = "libcxxwrap",
+    srcs = glob(
+          ["lib/*.so"],
+    ),
+    hdrs = glob(
+            ["include/jlcxx/*.hpp"],
+    ),
+    strip_include_prefix = "include",
+    visibility = ["//visibility:public"],
+)
+""",
+)
+
+#local_repository(
+#    name = "com_google_pybind11_protobuf",
+#    path = "../third_party/pybind11_protobuf/pybind11_protobuf",
+#)
 
 # THESE TARGETS REQUIRE THIRD PARTY LICENSED PRODUCTS.
 # If you have these products available, adjust the file

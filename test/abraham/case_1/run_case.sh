@@ -50,5 +50,5 @@ else
         echo "$case_id : TEST FAIL"
 fi
 
-rm $name1
-rm err.txt
+#rm $name1
+#rm err.txt

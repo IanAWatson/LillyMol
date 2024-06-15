@@ -1,5 +1,6 @@
 load("@rules_proto//proto:defs.bzl", "proto_library")
 load("//build_deps:install.bzl", "local_install")
+load("@com_google_protobuf//:protobuf.bzl", "py_proto_library")
 
 local_install(
     name = "install",
@@ -26,6 +27,7 @@ local_install(
         ":gfp_nearneighbours_single_file_tbb",
         ":gfp_pairwise_distances",
         ":gfp_profile_activity_by_bits",
+        ":gfp_server",
         ":gfp_single_linkage",
         ":gfp_sparse_to_fixed",
         ":gfp_spread",
@@ -33,6 +35,7 @@ local_install(
         ":gfp_spread_omp",
         ":gfp_spread_standard",
         ":gfp_svmfp_score",
+        ":gfp_svmfp_score.v2",
         ":gfp_svmfp_score_tbb",
         ":gfp_to_descriptors",
         ":gfp_to_descriptors_multiple",
@@ -91,10 +94,20 @@ cc_proto_library(
     ],
 )
 
+py_proto_library(
+    name = "gfp_to_svm_lite_proto_py_proto",
+    srcs = [
+        "gfp_to_svm_lite.proto",
+    ],
+)
+
 proto_library(
     name = "nearneighbours",
     srcs = [
         "nearneighbours.proto",
+    ],
+    visibility = [
+        "//visibility:public",
     ],
 )
 
@@ -105,6 +118,40 @@ cc_proto_library(
     ],
     deps = [
         ":nearneighbours",
+    ],
+)
+
+py_proto_library(
+    name = "nearneighbours_py_proto",
+    srcs = [
+        "nearneighbours.proto",
+    ],
+)
+
+proto_library(
+    name = "nn_request_proto",
+    srcs = [
+        "nn_request.proto",
+    ],
+    deps = [
+        "//Utilities/GFP_Tools:nearneighbours",
+    ],
+)
+
+cc_proto_library(
+    name = "nn_request_cc_proto",
+    deps = [
+        ":nn_request_proto",
+    ]
+)
+
+py_proto_library(
+    name = "nn_request_py_proto",
+    srcs = [
+        "nn_request.proto",
+    ],
+    deps = [
+        "nearneighbours_py_proto",
     ],
 )
 
@@ -385,6 +432,29 @@ cc_binary(
 )
 
 cc_binary(
+  name = "gfp_server",
+  srcs = [
+      "gfp_server.cc",
+  ],
+  deps = [
+       "nn_request_cc_proto",
+       "//Foundational/cmdline:iwcmdline",
+       "//Foundational/data_source:iwstring_data_source",
+       "//Molecule_Lib:iwmfingerprint",
+       "//Molecule_Lib:iwmolecule",
+       "//Molecule_Lib:moleculeio",
+       "//Molecule_Tools:mpr",
+       "//Molecule_Tools:maccskeys_fn5_lib",
+       "//Utilities/GFP_Tools:gfp_standard",
+       "//Utilities/GFP_Tools:nearneighbours_cc_proto",
+        "@com_google_protobuf//:protobuf",
+  ],
+  linkopts = [
+    "-lzmq",
+  ],
+)
+
+cc_binary(
     name = "gfp_sparse_to_fixed",
     srcs = [
         "gfp_sparse_to_fixed.cc",
@@ -509,6 +579,8 @@ cc_binary(
     ],
     deps = [
         ":gfp",
+        ":nearneighbours_cc_proto",
+        "//Foundational/data_source:iwtfdata_record",
         "//Foundational/histogram:iwhistogram",
     ],
 )
@@ -625,6 +697,28 @@ cc_binary(
         "//Foundational/iwmisc:normalisation",
         "//Foundational/iwmisc:sparse_fp_creator",
         "//Foundational/iwqsort",
+        "//Utilities/GFP_Tools:gfp",
+    ],
+)
+
+cc_binary(
+    name = "gfp_svmfp_score.v2",
+    srcs = [
+        "gfp_svmfp_score.v2.cc",
+    ],
+    deps = [
+        ":gfp_bit_subset",
+        ":gfp_model_cc_proto",
+        "//Foundational/accumulator",
+        "//Foundational/cmdline_v2",
+        "//Foundational/data_source:iwstring_data_source",
+        "//Foundational/iw_tdt",
+        "//Foundational/iwmisc",
+        "//Foundational/iwmisc:normalisation",
+        "//Foundational/iwmisc:sparse_fp_creator",
+        "//Foundational/iwqsort",
+        "//Utilities/General:class_label_translation_cc_proto",
+        "//Utilities/General:scaler",
         "//Utilities/GFP_Tools:gfp",
     ],
 )
@@ -907,6 +1001,7 @@ cc_binary(
     ],
     deps = [
         ":nearneighbours_cc_proto",
+        "//Foundational/accumulator",
         "//Foundational/cmdline:iwcmdline",
         "//Foundational/data_source:iwtfdata_record",
         "//Foundational/iwmisc",

@@ -770,6 +770,8 @@ seconds.
 So, in cases where most of the calculation is being done with python, speed
 may be significantly diminished.
 
+See also the section below with a comparison with RDKit.
+
 ## Miscellaneous functions
 
 ### count_atoms_in_smiles
@@ -797,3 +799,118 @@ again substructure searching is with `[#{Ala}D1]~[#{Gly}D2]...`.
 ### interpret_D_as_deuterium, interpret_T_as_deuterium
 Elements `D` and `T` are interpreted as Hydrogen isotopes.
 
+
+## RDkit Comparison
+THe `4-pyridone` script was also implemented in RDKit for comparison, this time on
+different hardware. Here the relevant timings are 
+
+| Language | Time | Mols/sec |
+| -------- | ---- | -------- |
+| Python   | 222  | 9420 |
+| Julia    | 60   | 36529 |
+| C++      | 51   | 42686 |
+
+Reading the same set of molecules with RDKit via the 
+```
+  suppl = Chem.SmilesMolSupplier(argv[1])
+```
+construct takes 280 seconds just to read the file. Accessing the RingInfo data in order to
+identify 6 membered rings takes the run time to 401 seconds.
+```
+  ri = mol.GetRingInfo()
+  atominfo = ri.AtomRings()
+  if len(atominfo) == 0:
+    return
+
+  for ring in atominfo:
+    if len(ring) != 6:
+      continue
+```
+In the RDKit Cookbook, `ri.BondRings()` is used to determine whether a ring is
+aromatic or not. But just switching from AtomRings to BondRings for determining
+the ring sizes, takes the run time to 526 seconds.
+
+Using the recipe in the RDKit Cookbook for identifying an aromatic ring,
+```
+# To detect aromatic rings, I would loop over the bonds in each ring and
+# flag the ring as aromatic if all bonds are aromatic:
+def isRingAromatic(mol, bondRing):
+  for id in bondRing:
+    if not mol.GetBondWithIdx(id).GetIsAromatic():
+      return False
+  return True
+```
+and looping over the `ri.BondRings()` instead and doing some other
+rearrangements results in a run time of 480 seconds.
+
+ALl this before then doing what will be the complex work of examining the
+atoms and bonds in the ring and finding the substitution pattern.
+
+I claim no significant expertise in RDKit, so there is a high probability my
+attempts are not optimal, but from this initial approach, there would appear
+to be a significant performance gap between LillyMol Python and RDKit Python
+for these kinds of operations.
+
+The final version of the tool used above is
+```
+from absl import app
+from absl import logging
+
+from rdkit import Chem
+
+def isRingAromatic(mol, bondRing):
+  for id in bondRing:
+    if not mol.GetBondWithIdx(id).GetIsAromatic():
+      return False
+  return True
+
+
+def four_pyridone(mol):
+  ri = mol.GetRingInfo()
+  atomrings = ri.AtomRings()
+  if len(atomrings) == 0:
+    return
+  bondrings = ri.BondRings()
+
+  for ring_number, ring in enumerate(bondrings):
+    if len(ring) != 6:
+      continue
+    if not isRingAromatic(mol, ring):
+      continue
+
+  # Further processing would go here...
+
+  return
+
+def main(argv):
+  suppl = Chem.SmilesMolSupplier(argv[1])
+  for mol in suppl:
+    if mol is None:
+      logging.warning("Skipping None molecule")
+      continue
+    four_pyridone(mol)
+
+if __name__ == "__main__":
+  app.run(main)
+```
+
+Part of what seems to be driving this is LillyMol seems to have available
+via C++ methods common operations like finding aromatic rings. So whereas
+RDKit required a user written function in order to identify an aromatic
+ring, identifying aromatic rings in LillyMol was available via object
+methods implemented in C++
+```
+  m.compute_aromaticity_if_needed();
+  for r in m.rings():
+    if r.size() != 6:
+      continue
+    if not r.is_aromatic():
+      continue
+
+    ring_is_four_pyridone(m, r)
+```
+But even if my RDKit implementation is completely wrong, just reading the
+molecules takes significantly longer, 280 seconds, vs doing the entire
+processing with LillyMol, 222 seconds. Just reading the Chembl molecules
+with LillyMol takes 51 seconds. If we also compute aromaticity that grows
+to 86 seconds.

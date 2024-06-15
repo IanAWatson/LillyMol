@@ -94,8 +94,6 @@ def ring_is_four_pyridone(m:Molecule, ring:Ring)->None:
   if n_index < 0 or oh_index < 0:
     return
 
-  # print(f'{ring} N {n_index} c-OH {oh_index} OH {oh}')
-  # The two indices must be 3 apart in `ring`. 
   if (n_index + 3) % 6 == oh_index:
     pass
   elif (oh_index + 3) == n_index:
@@ -123,6 +121,8 @@ def main(argv):
       if m is None:
         print(f'Skipping {line.rstrip()}', file=sys.stderr)
         continue
+      m.compute_aromaticity_if_needed()
+      continue
       four_pyridone(m)
 
 if __name__ == '__main__':

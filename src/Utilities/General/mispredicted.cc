@@ -19,6 +19,7 @@
 #include "Foundational/accumulator/accumulator.h"
 #include "Foundational/cmdline/cmdline.h"
 #include "Foundational/data_source/iwstring_data_source.h"
+#include "Foundational/iwmisc/misc.h"
 #include "Foundational/iwmisc/iwre2.h"
 #include "Foundational/iwqsort/iwqsort.h"
 #include "Foundational/iwstring/iw_stl_hash_map.h"
@@ -56,6 +57,8 @@ static IWString_and_File_Descriptor stream_for_summary;
 static int data_includes_distance_to_support_vector = 0;
 
 static int sort_best_to_worst = 1;
+
+static IW_STL_Hash_Map_String id_to_smiles;
 
 class Binning_Data
 {
@@ -198,14 +201,11 @@ class Entity_Classification : public Entity
   void
   predicted_as(const const_IWSubstring& s);
 
-  float
-  accuracy() const;
+  float accuracy() const;
 
-  int
-  report(IWString_and_File_Descriptor&) const;
+  int report(IWString_and_File_Descriptor&) const;
 
-  int
-  write_summary_data(IWString_and_File_Descriptor&) const;
+  int write_summary_data(IWString_and_File_Descriptor&) const;
 };
 
 Entity_Classification::Entity_Classification(const IWString& s) : Entity(s)
@@ -241,10 +241,21 @@ Entity_Classification::accuracy() const
 int
 Entity_Classification::report(IWString_and_File_Descriptor& output) const
 {
-  output << _id << " " << _correct_class << " predicted " << _times_predicted;
-  if (_times_predicted > 0) {
-    output << " correct " << _correct_predictions << ' ' << accuracy();
+  static constexpr char kSep = ' ';
+
+  output << _id << kSep;
+
+  if (produce_descriptor_file) {
+    output << _correct_class << kSep << _times_predicted << kSep <<
+              _correct_predictions << kSep <<
+              iwmisc::Fraction<float>(_correct_predictions, _times_predicted);
+  } else {
+    output << _correct_class << " predicted " << _times_predicted;
+    if (_times_predicted > 0) {
+      output << " correct " << _correct_predictions << kSep << accuracy();
+    }
   }
+
   output << '\n';
 
   return 1;
@@ -278,31 +289,24 @@ class Entity_Continuous : public Entity
   Entity_Continuous(const IWString&);
 
   void
-  set_experimental_value(T s)
-  {
+  set_experimental_value(T s) {
     _experimental_value = s;
   }
 
   T
-  experimental_value() const
-  {
+  experimental_value() const {
     return _experimental_value;
   }
 
-  int
-  predicted_as(const const_IWSubstring&);
+  int predicted_as(const const_IWSubstring&);
   void predicted_as(T);
-  int
-  prediction_and_distance(const const_IWSubstring&, const const_IWSubstring&);
+  int prediction_and_distance(const const_IWSubstring&, const const_IWSubstring&);
 
-  T
-  accuracy() const;
+  T accuracy() const;
 
-  int
-  report(IWString_and_File_Descriptor&) const;
+  int report(IWString_and_File_Descriptor&) const;
 
-  int
-  write_summary_data(IWString_and_File_Descriptor&) const;
+  int write_summary_data(IWString_and_File_Descriptor&) const;
 };
 
 template <typename T>
@@ -378,14 +382,24 @@ template <typename T>
 int
 Entity_Continuous<T>::report(IWString_and_File_Descriptor& output) const
 {
-  if (produce_descriptor_file) {
-    if (0 == _times_predicted) {
-      return 1;
-    }
+  static constexpr char kSep = ' ';
 
-    output << _id << ' ' << _experimental_value << ' ' << accuracy();
+  if (! id_to_smiles.empty()) {
+    const auto iter = id_to_smiles.find(_id);
+    if (iter == id_to_smiles.end()) {
+      cerr << "NO smiles for '" << _id << "'\n";
+      output << '*' << kSep;
+    } else {
+      output << iter->second << kSep;
+    }
+  }
+
+  output << _id << kSep << _experimental_value << kSep;
+
+  if (produce_descriptor_file) {
+    output << accuracy();
   } else {
-    output << _id << ' ' << _experimental_value << " predicted " << _times_predicted;
+    output << "predicted " << _times_predicted;
     if (_times_predicted > 0) {
       output << " btw " << _predictions.minval() << " and " << _predictions.maxval()
              << " diffs btw " << _diffs.minval() << " and " << _diffs.maxval() << " ave "
@@ -533,11 +547,51 @@ usage(int rc)
   cerr << " -D <fname>     produce file of distance vs abs prediction error\n";
   cerr << " -Y <fname>     produce file 'id ave_diff N'\n";
   cerr << " -R <regex>     process all files that match <regex> in current directory\n";
+  cerr << " -S <fname>     file of smiles - output will include the smiles\n";
   cerr << " -r             reverse sort order, sort output from worst (top of file) to best (bottom)\n";
   cerr << " -v             verbose output\n";
   // clang-format on
 
   exit(rc);
+}
+
+static int
+ReadSmilesLine(const_IWSubstring& buffer, IW_STL_Hash_Map_String& id_to_smiles) {
+  IWString smiles, id;
+  int i = 0;
+  if (! buffer.nextword(smiles, i) || 
+      ! buffer.nextword(id, i)) {
+    cerr << "Cannot extract smiles and/or id\n";
+    return 0;
+  }
+
+  id_to_smiles[id] = smiles;
+
+  return 1;
+}
+
+static int
+ReadSmiles(iwstring_data_source& input, IW_STL_Hash_Map_String& id_to_smiles) {
+  const_IWSubstring buffer;
+  while (input.next_record(buffer)) {
+    if (! ReadSmilesLine(buffer, id_to_smiles)) {
+      cerr << "ReadSmiles:cannot process '" << buffer << "'\n";
+      return 0;
+    }
+  }
+
+  return id_to_smiles.size();
+}
+
+static int
+ReadSmiles(const char* fname, IW_STL_Hash_Map_String& id_to_smiles) {
+  iwstring_data_source input(fname);
+  if (! input.good()) {
+    cerr << "ReadSmiles:cannot open '" << fname << "'\n";
+    return 0;
+  }
+
+  return ReadSmiles(input, id_to_smiles);
 }
 
 typedef IW_STL_Hash_Map<IWString, Entity_Classification*> ID_to_Classification_Data;
@@ -1383,7 +1437,7 @@ report_coverage(const ID_to_Classification_Data& idcd, std::ostream& os)
 static int
 mispredicted(int argc, char** argv)
 {
-  Command_Line cl(argc, argv, "vgCE:e:p:c:Fsw:W:dbY:R:HX:r");
+  Command_Line cl(argc, argv, "vgCE:e:p:c:Fsw:W:dbY:R:HX:rS:");
 
   if (cl.unrecognised_options_encountered()) {
     cerr << "Unrecognised options encountered\n";
@@ -1522,6 +1576,18 @@ mispredicted(int argc, char** argv)
     usage(3);
   }
 
+  if (cl.option_present('S')) {
+    IWString fname = cl.string_value('S');
+    if (! ReadSmiles(fname.null_terminated_chars(), id_to_smiles)) {
+      cerr << "Cannot read smiles '" << fname << "'\n";
+      return 1;
+    }
+
+    if (verbose) {
+      cerr << "Read " << id_to_smiles.size() << " id to smiles from " << fname << "n";
+    }
+  }
+
   if (cl.option_present('R')) {
     ;
   } else if (cl.empty()) {
@@ -1534,7 +1600,17 @@ mispredicted(int argc, char** argv)
   IWString_and_File_Descriptor output(1);
 
   if (produce_descriptor_file) {
-    output << "ID EXPT AVDIFF\n";
+    static constexpr char kSep = ' ';
+
+    if (id_to_smiles.size()) {
+      output << "SMILES" << kSep;
+    }
+    if (classification) {
+      output << "ID EXPT N Correct Accuracy";
+    } else {
+      output << "ID EXPT AVDIFF";
+    }
+    output << '\n';
   }
 
   if (cl.option_present('Y')) {

@@ -132,7 +132,7 @@ struct FileconvConfig {
 
   // We can keep track of how many atoms are lost
 
-  Accumulator_Int<int> atoms_lost;
+  Accumulator_Int<uint64_t> atoms_lost;
   extending_resizable_array<int> initial_fragment_count;
 
   // For efficiency we have a single variable which indicates whether or not
@@ -188,8 +188,8 @@ struct FileconvConfig {
   int molecules_below_molecular_weight_cutoff = 0;
   int molecules_above_molecular_weight_cutoff = 0;
 
-  Accumulator<molecular_weight_t> amw_accumulator;
-  Accumulator_Int<int> natoms_accumulator;
+  Accumulator<double> amw_accumulator;
+  Accumulator_Int<uint64_t> natoms_accumulator;
   extending_resizable_array<int> atom_count;
 
   int lower_atom_count_cutoff = 0;

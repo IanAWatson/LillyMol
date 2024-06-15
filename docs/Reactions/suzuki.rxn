@@ -1,0 +1,25 @@
+comment: "suzuki"
+scaffold {
+  id: 0
+  smarts: "[OD1]-B(-[OD1])-*"
+  break_bond {
+    a1: 1
+    a2: 3
+  }
+  remove_fragment: 0
+  isotope {
+    atom: 3
+    isotope: 1
+  }
+}
+sidechain {
+  id: 1
+  smarts: "Br-a"
+  remove_atom: 0
+  join {
+
+    a1: 3
+    a2: 1
+    btype: SS_SINGLE_BOND
+  }
+}

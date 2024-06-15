@@ -1,0 +1,44 @@
+
+min_natoms: 10
+max_natoms: 45
+
+min_nrings: 1
+max_nrings: 6
+
+min_heteroatom_count: 2
+
+min_heteroatom_fraction: 0.0
+max_heteroatom_fraction: 0.5
+
+min_aromatic_ring_count: 1
+max_aromatic_ring_count: 5
+
+max_aliphatic_ring_count: 3
+
+max_ring_system_size: 4
+max_aromatic_rings_in_system: 3
+largest_ring_size: 7
+
+exclude_non_organic: true
+exclude_isotopes: true
+
+min_rotatable_bonds: 1
+max_rotatable_bonds: 13
+
+min_tpsa: 20
+max_tpsa: 160
+
+min_alogp: 0.0
+max_alogp: 6.0
+
+min_hba: 1
+max_hba: 12
+
+# min_hbd: 0
+max_hbd: 6
+
+max_halogen_count: 6
+
+max_distance: 21
+min_sp3_carbon: 1
+max_aromatic_density: 0.85

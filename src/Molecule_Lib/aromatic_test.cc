@@ -103,4 +103,9 @@ O=[3SH]1=c2c(=NC(=N1)N1CCN(C(=O)c3ccccc3)CC1)cc[3cH]c2
 O=C(c1ccccc1)N1CCN(C2=N[3SH](=O)=c3c(=N2)cc[3cH]c3)CC1
 #endif
 
+TEST(TestReadAromaticSulphur, TestReadAromaticSulphur) {
+  Molecule m;
+  EXPECT_TRUE(m.build_from_smiles("[sH]1ccccc1"));
+}
+
 }  //namespace

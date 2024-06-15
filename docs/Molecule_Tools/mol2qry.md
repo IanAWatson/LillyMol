@@ -49,6 +49,7 @@ Converts a molecule to a query file
   -p             write individual textproto files
   -b             put all queries in a single file rather than separate file for each
   -D ...         create proto query files with GeometricConstraints
+  -B <fname>     generate smarts instead of query file
   -Y ...         more obscure options, enter '-Y help' for info
   -i <type>      specify input file type
   -A <qualifier> Aromaticity, enter "-A help" for options
@@ -256,6 +257,7 @@ The `-Y` options are
  -Y ncon=n      matches must have exactly  <n> connections to unmatched atoms
  -Y min_ncon=n  matches must have at least <n> connections to unmatched atoms
  -Y max_ncon=n  matches must have at most  <n> connections to unmatched atoms
+ -Y smtrange    write smarts relationals [D>2] as RdKit ranges [D{3-}]
  -Y test        for each query formed, do a match against the starting molecule
 ```
 
@@ -305,3 +307,33 @@ how connected the matched atoms are within the larger molecule
 For each query formed, do a match against the starting molecule. This can
 be a useful testing tool. Note that it is possible to generate queries that
 do not match the starting molecule.
+
+### -Y smtrange
+By default when smarts are written, connections at unspecified atoms might
+be written as `[D>2]`. But this is not compatible with other systems. With the
+`smtrange` option, ranges are written as `[D{3-}]` instead.
+
+## Smarts Output
+For some applications it may be convenient to create smarts rather than
+query files. Currently only a very limited number of options are supported.
+
+Activate by adding
+```
+-B /path/to/file.smt
+```
+which creates a file or smarts. This can then be consumed in `tsubstructure`
+via `-q S:file.smt`.
+
+### -s
+Only allow substitutions at isotopically labelled atoms.
+### -j
+All atoms must conserve their ring membership.
+
+Other options will be added as the need arises.
+
+Also of interest is the idea of passing the tool a partially
+filled in SubstructureQuery proto, and it would insert the `smarts`
+attribute, together with any other attributes it can compute. This would
+facilitate queries that might, for example, impose limits on the
+number of unmatched atoms, or... A great deal of flexibility opens
+up.

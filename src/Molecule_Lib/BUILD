@@ -3,6 +3,11 @@ load("@com_google_protobuf//:protobuf.bzl", "py_proto_library")
 
 package(default_visibility = ["//visibility:public"])
 
+#filegroup(
+#    name = "charge_assigner_data",
+#    srcs = glob([":charge_assigner/**"]),
+#)
+
 #genrule(
 #  name = 'gfortran_iw',
 #  srcs = [
@@ -91,6 +96,23 @@ py_proto_library(
 )
 
 proto_library(
+    name = "molecule_to_query_proto",
+    srcs = [
+        "molecule_to_query.proto",
+    ],
+    deps = [
+        ":substructure_proto",
+    ],
+)
+
+cc_proto_library(
+    name = "molecule_to_query_cc_proto",
+    deps = [
+        ":molecule_to_query_proto",
+    ],
+)
+
+proto_library(
     name = "pharmacophore_proto",
     srcs = [
         "pharmacophore.proto",
@@ -119,6 +141,20 @@ proto_library(
     ],
     deps = [
         "geometric_constraints_proto",
+    ],
+)
+
+proto_library(
+    name = "standardise_proto",
+    srcs = [
+        "standardise.proto",
+    ],
+)
+
+cc_proto_library(
+    name = "standardise_cc_proto",
+    deps = [
+        "standardise_proto",
     ],
 )
 
@@ -249,6 +285,7 @@ cc_library(
         "mdl_file_data.cc",
         "mdl_molecule.cc",
         "misc2.cc",
+        "moleculeio.cc",
         "mol2graph.cc",
         "mol2graph_proto.cc",
         "molecule.cc",
@@ -331,6 +368,7 @@ cc_library(
         "mdl_file_data.h",
         "mdl_molecule.h",
         "misc2.h",
+        "moleculeio.h",
         "mol2graph.h",
         "mol2graph_proto.h",
         "molecule.h",
@@ -371,8 +409,10 @@ cc_library(
         ":atom_type_ext_cc_proto",
         ":donor_acceptor_cc_proto",
         ":mol2graph_cc_proto",
+        ":molecule_to_query_cc_proto",
         ":pharmacophore_cc_proto",
         ":space_vector",
+        ":standardise_cc_proto",
         ":substructure_cc_proto",
         ":toggle_kekule_form_cc_proto",
         "//Foundational/accumulator",
@@ -391,24 +431,30 @@ cc_library(
     ],
 )
 
-cc_shared_library(
-  name = "iwmolecule_shared",
-  deps = [
-      ":iwmolecule",
-  ],
-  dynamic_deps = [
-      ":geometric_constraints_shared",
-  ],
-  shared_lib_name = "iwmolecule.so",
-)
 
-cc_library(
-    name = "iwsubstructure",
+cc_library (
+    name = "charge_assigner",
     srcs = [
+        "charge_assigner.cc",
     ],
     hdrs = [
+        "charge_assigner.h",
     ],
     deps = [
+        ":iwmolecule",
+    ],
+)
+
+cc_library (
+    name = "donor_acceptor",
+    srcs = [
+        "donor_acceptor.cc",
+    ],
+    hdrs = [
+        "donor_acceptor.h",
+    ],
+    deps = [
+        ":iwmolecule",
     ],
 )
 
@@ -507,13 +553,6 @@ cc_library(
     ],
 )
 
-cc_shared_library(
-    name = "geometric_constraints_shared",
-    deps = [
-        "geometric_constraints",
-    ],
-)
-
 cc_library(
     name = "linear_fingerprint",
     srcs = [
@@ -590,6 +629,9 @@ cc_test(
     name = "donor_acceptor_test",
     srcs = [
         "donor_acceptor_test.cc",
+    ],
+    data = [
+        "@donor_acceptor//:donor_acceptor_data",
     ],
     deps = [
         ":iwmolecule",
@@ -774,6 +816,19 @@ cc_test(
     deps = [
         ":space_vector",
         "@googletest//:gtest_main",
+    ],
+)
+
+cc_test(
+    name = "substructure_a_test",
+    srcs = ["substructure_a_test.cc"],
+    timeout="short",
+    deps = [
+        ":iwmolecule",
+        ":moleculeio",
+        ":substructure_cc_proto",
+        "@googletest//:gtest_main",
+        "@com_google_protobuf//:protobuf",
     ],
 )
 
@@ -1076,6 +1131,19 @@ cc_library(
     ],
     hdrs = [
         "iw_vdw.h",
+    ],
+    deps = [
+        ":iwmolecule",
+    ],
+)
+
+cc_library(
+    name = "ring_data",
+    srcs = [
+        "ring_data.cc",
+    ],
+    hdrs = [
+        "ring_data.h",
     ],
     deps = [
         ":iwmolecule",

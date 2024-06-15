@@ -61,6 +61,9 @@ class SP_Database
   int _in_cache(Dbt& zkey, const DBKey& dbkey, int& radius, int& count);
   int _in_cache_mutex_protected(Dbt& zkey, const DBKey& dbkey, int& radius, int& count);
 
+  int SlurpDataContainsExamples(const Dbt& dkey, const Dbt& zdata, int min_examples);
+  int SlurpCountRadius(const Dbt& dkey, const Dbt& zdata, int min_examples);
+
  public:
   SP_Database();
   ~SP_Database();

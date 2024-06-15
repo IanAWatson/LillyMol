@@ -167,12 +167,6 @@ do_fingerprint_output(Molecule& m, const int array_size, const double* scaled_co
 
   output << fingerprint_tag << tmp << ">\n";
 
-  if (function_as_gfp_filter) {
-    ;
-  } else {
-    output << "|\n";
-  }
-
   return 1;
 }
 

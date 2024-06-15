@@ -789,7 +789,7 @@ process_no_reagents(Molecule& m, IWReaction& reaction,
   ;
 
   if (smc.process_hit_number() >= 0) {
-    int mdo = smc.process_hit_number();
+    uint32_t mdo = smc.process_hit_number();
 
     if (mdo >= sresults.number_embeddings()) {
       cerr << "Request to process embedding " << mdo << " but query produced "
@@ -1944,6 +1944,7 @@ trxn(int argc, char** argv) {
 
   if (cl.option_present('u')) {
     rxn.set_find_one_embedding_per_atom(1);
+    rxn.set_find_unique_embeddings_only(1);
     sidechain_match_conditions.set_one_embedding_per_start_atom(1);
     if (verbose) {
       cerr << "One embedding per start atom\n";

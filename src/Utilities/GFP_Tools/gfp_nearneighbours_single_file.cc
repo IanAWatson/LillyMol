@@ -3,14 +3,15 @@
 */
 
 #include <stdlib.h>
-#include <memory>
+#include <cmath>
 #include <fstream>
 #include <limits>
-#include <cmath>
+#include <memory>
 
 #include "Foundational/accumulator/accumulator.h"
 #include "Foundational/cmdline/cmdline.h"
 #include "Foundational/data_source/iwstring_data_source.h"
+#include "Foundational/data_source/tfdatarecord.h"
 #include "Foundational/histogram/iwhistogram.h"
 #include "Foundational/iwmisc/iwdigits.h"
 #include "Foundational/iwmisc/misc.h"
@@ -20,6 +21,8 @@
 #include "gfp.h"
 #include "sparse_collection.h"
 #include "tversky.h"
+
+#include "Utilities/GFP_Tools/nearneighbours.pb.h"
 
 using std::cerr;
 
@@ -274,6 +277,43 @@ write_average_neighbour_distance(IW_GFP_D_ID ** neighbours,
 }
 
 
+static void
+UpdateGlobalStatistics(int i, float d) {
+  distance_stats.extra(d);
+
+  if (allow_arbitrary_distances) {
+    ;
+  } else if (0 == i && (create_histogram || verbose)) {
+    nearest_neighbour_distance_stats.extra(d);
+    if (create_histogram) {
+      histogram_nearnest_neighbour_distances.extra(d);
+    }
+  }
+}
+
+static int
+WriteTfData(const IW_GFP_D_ID & target,
+            IW_GFP_D_ID ** neighbours,
+            int number_neighbours,
+            iw_tf_data_record::TFDataWriter& output) {
+  nnbr::NearNeighbours proto;
+  proto.set_smiles(target.smiles().data(), target.smiles().length());
+  proto.set_name(target.id().data(), target.id().length());
+
+  for (int i = 0; i < number_neighbours; ++i) {
+    const IW_GFP_D_ID* n = neighbours[i];
+
+    auto* nbr = proto.add_nbr();
+    nbr->set_smi(n->smiles().data(), n->smiles().length());
+    nbr->set_id(n->id().data(), n->id().length());
+    nbr->set_dist(n->distance());
+
+    UpdateGlobalStatistics(i, n->distance());
+  }
+
+  return output.WriteSerializedProto<nnbr::NearNeighbours>(proto);
+}
+
 static int
 write_neighbour_list (const IW_GFP_D_ID & target,
                       IW_GFP_D_ID ** neighbours,
@@ -307,16 +347,7 @@ write_neighbour_list (const IW_GFP_D_ID & target,
     output.append_number(d, 3);
     output << ">\n";
 
-    distance_stats.extra(d);
-
-    if (allow_arbitrary_distances)
-      ;
-    else if (0 == i && (create_histogram || verbose))
-    {
-      nearest_neighbour_distance_stats.extra(d);
-      if (create_histogram)
-        histogram_nearnest_neighbour_distances.extra(d);
-    }
+    UpdateGlobalStatistics(i, d);
   }
 
   output << "|\n";
@@ -615,7 +646,8 @@ nearneighbours(IW_GFP_D_ID & fp,
 }
 
 static int
-nearneighbours(IWString_and_File_Descriptor & output)
+nearneighbours(std::unique_ptr<iw_tf_data_record::TFDataWriter>& tfdata,
+               IWString_and_File_Descriptor & output)
 {
   int nbrs = neighbours_to_find;
   if (std::numeric_limits<float>::max() != upper_distance_threshold)
@@ -633,8 +665,9 @@ nearneighbours(IWString_and_File_Descriptor & output)
 
     if (0 == nn && ! write_molecules_with_no_neighbours)
       molecules_with_no_neighbours++;
-    else
-    {
+    else if (tfdata) {
+      WriteTfData(pool[i], neighbours, nn, *tfdata);
+    } else {
       (void) write_neighbour_list(pool[i], neighbours, nn, output);
       output.write_if_buffer_holds_more_than(32768);
     }
@@ -684,6 +717,7 @@ usage (int rc)
   cerr << " -x               exclude smiles from the output\n";
   cerr << " -y               allow arbitrary distances\n";
   cerr << " -R <number>      report progress every <number> items processed\n";
+  cerr << " -S <fname>       write nnbr::NearNeighbours TFDataRecord serialized protos to <fname>\n";
   cerr << " -v               verbose output\n";
 // clang-format on
 
@@ -702,7 +736,7 @@ do_write_histogram(std::ostream & os)
 static int
 nearneighbours(int argc, char ** argv)
 {
-  Command_Line cl(argc, argv, "vs:n:I:t:T:P:F:W:Q:X:V:A:zr:hoK:xH:N:bypj:R:");
+  Command_Line cl(argc, argv, "vs:n:I:t:T:P:F:W:Q:X:V:A:zr:hoK:xH:N:bypj:R:S:");
 
   if (cl.unrecognised_options_encountered())
   {
@@ -1029,6 +1063,20 @@ nearneighbours(int argc, char ** argv)
 
   int rc = 0;
 
+  std::unique_ptr<iw_tf_data_record::TFDataWriter> tfdata;
+  if (cl.option_present('S')) {
+    IWString fname = cl.string_value('S');
+    tfdata = std::make_unique<iw_tf_data_record::TFDataWriter>();
+    if (! tfdata->Open(fname)) {
+      cerr << "Cannot open '" << fname << "'\n";
+      return 1;
+    }
+
+    if (verbose) {
+      cerr << "Serialized nnbr::Nearneighbours protos written in TFDataRecord format to '" << fname << "'\n";
+    }
+  }
+
   IWString_and_File_Descriptor output(1);
 
   if (cl.option_present('p'))
@@ -1039,7 +1087,7 @@ nearneighbours(int argc, char ** argv)
       rc = 4;
     }
   }
-  else if (! nearneighbours(output))
+  else if (! nearneighbours(tfdata, output))
   {
     cerr << "Fatal error during neighbour determination\n";
     rc = 3;

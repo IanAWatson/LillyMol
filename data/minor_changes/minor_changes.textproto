@@ -1,0 +1,43 @@
+
+destroy_amide: false
+
+add_fragments: true
+
+replace_terminal_fragments: true
+
+single_to_double_bond: true
+double_to_single_bond: true
+
+unspiro: true
+
+make_three_membered_rings: true
+
+change_carbon_to_nitrogen: true
+change_carbon_to_oxygen: true
+change_nitrogen_to_carbon: true
+
+insert_ch2: true
+remove_ch2: true
+
+destroy_aromatic_rings: false
+destroy_aromatic_ring_systems: false
+swap_adjacent_atoms: true
+
+max_variants: 200
+
+fragment: "[1CH4]"
+fragment: "[1CH3]C"
+fragment: "[1CH2]1CC1"
+fragment: "[1cH]1ccccc1"
+fragment: "[1OH]C"
+fragment: "[1CH](=O)N"
+fragment: "[1NH2]C=O"
+
+max_atoms_lost: 5
+insert_fragments: true
+replace_inner_fragments: true
+
+bivalent_fragment: "[1CH4]"
+bivalent_fragment: "[1CH](=O)N"
+bivalent_fragment: "[1NH2]C=O"
+fuse_biphenyls: true

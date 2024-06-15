@@ -956,6 +956,45 @@ Hydrogen atom if run that way. It also works for secondary amines
 because the `H` requirement in the smarts is interpreted
 as 'at least 1 Hydrogen attached'.
 
+## Suzuki
+A Suzuki reaction might be done via
+```
+comment: "suzuki"
+scaffold {
+  id: 0
+  smarts: "[OD1]-B(-[OD1])-*"
+  break_bond {
+    a1: 1
+    a2: 3
+  }
+  remove_fragment: 0
+  isotope {
+    atom: 3
+    isotope: 1
+  }
+}
+sidechain {
+  id: 1
+  smarts: "Br-a"
+  remove_atom: 0
+  join {
+    a1: 3
+    a2: 1
+    btype: SS_SINGLE_BOND
+  }
+}
+```
+In the scaffold an `[OH]-B-[OH]` functional group is identified.
+The bond between the Boron atom (atom 1) and the atom to which
+it is attached, `*` atom 3, is broken, and then all atoms in
+the fragment containing atom 0 are removed - the OBO atoms.
+For convenience, we leave an isotope on the `*` atom so we can
+see how the products were formed.
+
+In the sidechain we identify an aryl Bromide. The Bromine atom
+is removed, and then the `*` atom in the scaffold (matched atom 3)
+is joined to matched atom 1 in the sidechain, via a single bond.
+
 ## Breaking Molecules
 Reactions are just changes to a connection table. They can both form, change or
 break bonds, add or remove atoms.

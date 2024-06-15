@@ -1421,8 +1421,9 @@ Single_Substructure_Query::_add_embedding (Query_Atoms_Matched & matched_atoms,
   results.add_embedding(new_embedding, matched_atoms);
 
   if (_max_matches_to_find > 0 &&
-      static_cast<int>(results.hits_found()) >= _max_matches_to_find)
+      static_cast<int>(results.hits_found()) >= _max_matches_to_find) {
     results.set_complete();
+  }
 
   return 1;
 }
@@ -2507,11 +2508,17 @@ Single_Substructure_Query::_one_time_initialisations()
        3                   8             2
 */
 
-int
+uint32_t
 Single_Substructure_Query::substructure_search(Molecule_to_Match & target_molecule,
                                                Substructure_Results & results)
 {
   assert (target_molecule.ok());
+
+  // Before any atom matching.
+  if (_required_bonds.empty()) {
+  } else if (! RequiredBondsMatch(*target_molecule.molecule())) {
+    return 0;
+  }
 
   const int matoms = target_molecule.natoms();
 
@@ -2768,7 +2775,7 @@ Single_Substructure_Query::_examine_bond_specifications()
   return 1;
 }
 
-int
+uint32_t
 Single_Substructure_Query::substructure_search(Molecule * m,
                                                Substructure_Results & results)
 {
@@ -3526,6 +3533,17 @@ MatchedAtomMatch::Matches(Query_Atoms_Matched& matched_query_atoms,
 #endif
         return 0;
       }
+    }
+  }
+
+  return 1;
+}
+
+int
+Single_Substructure_Query::RequiredBondsMatch(const Molecule& m) {
+  for (const RequiredBond* b : _required_bonds) {
+    if (! b->Matches(m)) {
+      return 0;
     }
   }
 

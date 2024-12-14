@@ -1,4 +1,5 @@
-load("@com_google_protobuf//:protobuf.bzl", "py_proto_library")
+# load("@com_google_protobuf//:protobuf.bzl", "py_proto_library")
+load("@rules_python//python:proto.bzl", "py_proto_library")
 load("@rules_proto//proto:defs.bzl", "proto_library")
 load("//build_deps:install.bzl", "local_install")
 
@@ -207,8 +208,8 @@ cc_proto_library(
 
 py_proto_library(
     name = "feature_scaling_py_proto",
-    srcs = [
-        "feature_scaling.proto",
+    deps = [
+        "feature_scaling_proto",
     ],
 )
 

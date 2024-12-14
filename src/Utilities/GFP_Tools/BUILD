@@ -1,4 +1,5 @@
-load("@com_google_protobuf//:protobuf.bzl", "py_proto_library")
+# load("@com_google_protobuf//:protobuf.bzl", "py_proto_library")
+load("@rules_python//python:proto.bzl", "py_proto_library")
 # load("@rules_python//python:proto.bzl", "py_proto_library")
 # load("@rules_proto_grpc_cpp//:defs.bzl", "cpp_grpc_compile")
 
@@ -98,13 +99,13 @@ cc_proto_library(
 
 py_proto_library(
     name = "gfp_to_svm_lite_proto_py_proto",
-    srcs = [
-        "gfp_to_svm_lite.proto",
+    deps = [
+        ":gfp_to_svm_lite_proto",
     ],
 )
 
 proto_library(
-    name = "nearneighbours",
+    name = "nearneighbours_proto",
     srcs = [
         "nearneighbours.proto",
     ],
@@ -119,14 +120,14 @@ cc_proto_library(
         "//visibility:public",
     ],
     deps = [
-        ":nearneighbours",
+        ":nearneighbours_proto",
     ],
 )
 
 py_proto_library(
     name = "nearneighbours_py_proto",
-    srcs = [
-        "nearneighbours.proto",
+    deps = [
+        ":nearneighbours_proto",
     ],
 )
 
@@ -136,7 +137,7 @@ proto_library(
         "nn_request.proto",
     ],
     deps = [
-        "//Utilities/GFP_Tools:nearneighbours",
+        "//Utilities/GFP_Tools:nearneighbours_proto",
     ],
 )
 
@@ -149,11 +150,9 @@ cc_proto_library(
 
 py_proto_library(
     name = "nn_request_py_proto",
-    srcs = [
-        "nn_request.proto",
-    ],
     deps = [
-        "nearneighbours_py_proto",
+        ":nn_request_proto",
+        ":nearneighbours_proto",
     ],
 )
 

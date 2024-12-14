@@ -87,7 +87,7 @@ cc_library(
         "iwpvalue.h",
     ],
     deps = [
-        "@local_f2c//:f2c",
+        "@third_party//:f2c",
     ],
 )
 

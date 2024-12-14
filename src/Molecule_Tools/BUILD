@@ -1,4 +1,5 @@
-load("@com_google_protobuf//:protobuf.bzl", "py_proto_library")
+# load("@com_google_protobuf//:protobuf.bzl", "py_proto_library")
+load("@rules_python//python:proto.bzl", "py_proto_library")
 load("@rules_cc//cc:defs.bzl", "cc_binary")
 load("@rules_proto//proto:defs.bzl", "proto_library")
 load("//build_deps:install.bzl", "local_install")
@@ -213,8 +214,8 @@ cc_proto_library(
 
 py_proto_library(
     name = "dicer_fragments_py_proto",
-    srcs = [
-        "dicer_fragments.proto",
+    deps = [
+        ":dicer_fragments_proto",
     ],
 )
 
@@ -248,8 +249,8 @@ cc_proto_library(
 
 py_proto_library(
     name = "iwdescr_py_proto",
-    srcs = [
-        ":iwdescr.proto",
+    deps = [
+        ":iwdescr_proto",
     ],
 )
 
@@ -504,8 +505,8 @@ cc_proto_library(
 
 py_proto_library(
     name = "xlogp_py_proto",
-    srcs = [
-        "xlogp.proto",
+    deps = [
+        ":xlogp_proto",
     ],
 )
 

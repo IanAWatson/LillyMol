@@ -1,5 +1,6 @@
-load("@com_google_protobuf//:protobuf.bzl", "py_proto_library")
-load("@rules_proto//proto:defs.bzl", "proto_library")
+load("@com_google_protobuf//bazel:proto_library.bzl", "proto_library")
+load("@rules_python//python:proto.bzl", "py_proto_library")
+
 
 package(default_visibility = ["//visibility:public"])
 
@@ -42,8 +43,8 @@ cc_proto_library(
 
 py_proto_library(
     name = "atom_type_ext_py_proto",
-    srcs = [
-        "atom_type_ext.proto",
+    deps = [
+        ":atom_type_ext_proto",
     ],
 )
 
@@ -91,8 +92,8 @@ cc_proto_library(
 
 py_proto_library(
     name = "mol2graph_py_proto",
-    srcs = [
-        "mol2graph.proto",
+    deps = [
+        ":mol2graph_proto",
     ],
 )
 
@@ -112,8 +113,8 @@ cc_proto_library(
 
 py_proto_library(
     name = "geometric_constraints_py_proto",
-    srcs = [
-        "geometric_constraints.proto",
+    deps = [
+        ":geometric_constraints_proto",
     ],
     visibility = ["//visibility:public"],
 )
@@ -151,8 +152,8 @@ cc_proto_library(
 
 py_proto_library(
     name = "pharmacophore_py_proto",
-    srcs = [
-        "pharmacophore.proto",
+    deps = [
+        ":pharmacophore_proto",
     ],
     visibility = ["//visibility:public"],
 )
@@ -190,10 +191,10 @@ cc_proto_library(
 
 py_proto_library(
     name = "substructure_py_proto",
-    srcs = ["substructure.proto"],
     visibility = ["//visibility:public"],
     deps = [
-        "geometric_constraints_py_proto",
+        ":substructure_proto",
+        ":geometric_constraints_proto",
     ],
 )
 
@@ -204,7 +205,7 @@ proto_library(
     ],
     deps = [
         ":substructure_proto",
-        ":toggle_kekule_form",
+        ":toggle_kekule_form_proto",
     ],
 )
 
@@ -217,18 +218,16 @@ cc_proto_library(
 
 py_proto_library(
     name = "reaction_py_proto",
-    srcs = [
-        "reaction.proto",
-    ],
     visibility = ["//visibility:public"],
     deps = [
-        "substructure_py_proto",
-        "toggle_kekule_form_py_proto",
+        ":reaction_proto",
+        ":substructure_proto",
+        ":toggle_kekule_form_proto",
     ],
 )
 
 proto_library(
-    name = "toggle_kekule_form",
+    name = "toggle_kekule_form_proto",
     srcs = [
         "toggle_kekule_form.proto",
     ],
@@ -240,18 +239,16 @@ proto_library(
 cc_proto_library(
     name = "toggle_kekule_form_cc_proto",
     deps = [
-        ":toggle_kekule_form",
+        ":toggle_kekule_form_proto",
     ],
 )
 
 py_proto_library(
     name = "toggle_kekule_form_py_proto",
-    srcs = [
-        "toggle_kekule_form.proto",
-    ],
     visibility = ["//visibility:public"],
     deps = [
-        ":substructure_py_proto",
+        ":toggle_kekule_form_proto",
+        ":substructure_proto",
     ],
 )
 

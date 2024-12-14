@@ -1,4 +1,5 @@
 load("//build_deps:install.bzl", "local_install")
+load("@rules_python//python:proto.bzl", "py_proto_library")
 
 # Some executables are still used in certain systems.
 local_install(
@@ -438,7 +439,7 @@ cc_binary(
         "//Foundational/cmdline:iwcmdline",
         "//Foundational/data_source:iwstring_data_source",
         "//Foundational/iwmisc",
-        "@local_f2c//:f2c",
+        "@third_party//:f2c",
     ],
 )
 
@@ -495,7 +496,7 @@ cc_binary(
         "//Foundational/cmdline:iwcmdline",
         "//Molecule_Lib:iwmolecule",
         "//Molecule_Lib:moleculeio",
-        "@berkeleydb",
+        "@third_party//:berkeley_static",
     ],
 )
 

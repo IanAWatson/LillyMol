@@ -350,7 +350,7 @@ fi
 # libraries from LillyMol/lib to your default PYTHONPATH.
 
 if [[ -v BUILD_PYTHON ]] ; then
-    ${bazel} ${bazel_options} build ${build_options} pybind:all
+    ${bazel} ${bazel_options} --enable_workspace build ${build_options} pybind:all
     ./copy_shared_libraries.sh $REPO_HOME/lib 
 
     ./run_python_unit_tests.sh

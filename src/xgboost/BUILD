@@ -1,6 +1,6 @@
 load("@com_google_protobuf//:protobuf.bzl", "py_proto_library")
 load("@rules_proto//proto:defs.bzl", "proto_library")
-load("@rules_proto_grpc_go//:defs.bzl", "go_proto_compile", "go_proto_library")
+# load("@rules_proto_grpc_go//:defs.bzl", "go_proto_compile", "go_proto_library")
 load("//build_deps:install.bzl", "local_install")
 
 local_install(
@@ -50,14 +50,14 @@ py_proto_library(
 #    ],
 #)
 
-go_proto_library(
-    name = "xgboost_model_go_proto",
-    importpath = "xgboost_lib",
-    protos = [
-        ":xgboost_model_proto",
-    ],
-    visibility = ["//visibility:public"],
-)
+#go_proto_library(
+#    name = "xgboost_model_go_proto",
+#    importpath = "xgboost_lib",
+#    protos = [
+#        ":xgboost_model_proto",
+#    ],
+#    visibility = ["//visibility:public"],
+#)
 
 proto_library(
     name = "random_forest_model_proto",

@@ -805,75 +805,156 @@ Chemical_Standardisation::Activate(const IWString& directive,
   }
   else if (CS_TETRAZOLE == tmp)
   {
-    _transform_tetrazole.activate();
+    if (negation) {
+      _transform_tetrazole.deactivate();
+    } else {
+      _transform_tetrazole.activate();
+    }
   }
   else if (CS_PYRAZOLE == tmp)
   {
-    _transform_pyrazole.activate();
+    if (negation)  {
+      _transform_pyrazole.deactivate();
+    } else {
+      _transform_pyrazole.activate();
+    }
   }
   else if (CS_TRIAZOLE == tmp)
   {
-    _transform_triazole.activate();
+    if (negation) {
+      _transform_triazole.deactivate();
+    } else {
+      _transform_triazole.activate();
+    }
   }
   else if (tmp == CS_PYRIMIDINE) {
-    _transform_pyrimidine.activate();
+    if (negation) {
+      _transform_pyrimidine.deactivate();
+    } else {
+      _transform_pyrimidine.activate();
+    }
   }
   else if (CS_ISOXAZOLE == tmp)
   {
-    _transform_isoxazole.activate();
+    if (negation) {
+      _transform_isoxazole.deactivate();
+    } else {
+      _transform_isoxazole.activate();
+    }
   }
   else if (CS_ARGUAN == tmp)
   {
-    _transform_aromatic_guanidine_ring.activate();
+    if (negation) {
+      _transform_aromatic_guanidine_ring.deactivate();
+    } else {
+      _transform_aromatic_guanidine_ring.activate();
+    }
   }
   else if (CS_PYRAZOLONE == tmp)
   {
-    _transform_pyrazolone.activate();
+    if (negation) {
+      _transform_pyrazolone.deactivate();
+    } else {
+      _transform_pyrazolone.activate();
+    }
   }
   else if (CS_AMINO_THIAZOLE == tmp)
   {
-    _transform_amino_thiazole.activate();
+    if (negation) {
+      _transform_amino_thiazole.deactivate();
+    } else {
+      _transform_amino_thiazole.activate();
+    }
   }
   else if (CS_LACTIM_LACTAM == tmp)
   {
-    _transform_lactim_lactam.activate();
+    if (negation) {
+      _transform_lactim_lactam.deactivate();
+    } else {
+      _transform_lactim_lactam.activate();
+    }
   }
   else if (CS_LACTIM_LACTAM_RING == tmp)
   {
-    _transform_lactim_lactam_ring.activate();
+    if (negation) {
+      _transform_lactim_lactam_ring.deactivate();
+    } else {
+      _transform_lactim_lactam_ring.activate();
+    }
   }
   else if (CS_REVERSE_NITRO == tmp)
   {
-    _transform_nitro_reverse.activate();
+    if (negation) {
+      _transform_nitro_reverse.deactivate();
+    } else {
+      _transform_nitro_reverse.activate();
+    }
   }
   else if (CS_REVERSE_NV5 == tmp)
   {
-    _transform_back_to_nplus_nminus.activate();
-    _transform_to_charge_separated_azid.activate();
+    if (negation) {
+      _transform_to_charge_separated_azid.deactivate();
+      _transform_to_charge_separated_azid.deactivate();
+    } else {
+      _transform_back_to_nplus_nminus.activate();
+      _transform_to_charge_separated_azid.activate();
+    }
   }
   else if (CS_KETO_ENOL == tmp)
   {
-    _transform_enol_to_keto.activate();
+    if (negation) {
+      _transform_enol_to_keto.deactivate();
+    } else {
+      _transform_enol_to_keto.activate();
+    }
   }
   else if (tmp == CS_4_PYRIDONE) {
-    _transform_to_4_pyridone.activate();
+    if (negation) {
+      _transform_to_4_pyridone.deactivate();
+    } else {
+      _transform_to_4_pyridone.activate();
+    }
   }
   else if (tmp == CS_SULFONYL_UREA) {
-    _transform_sulfonyl_urea.activate();
+    if (negation) {
+      _transform_sulfonyl_urea.deactivate();
+    } else {
+      _transform_sulfonyl_urea.activate();
+    }
   }
   else if (tmp == CS_124TRIAZINE) {
-    _transform_124_triazine.activate();
+    if (negation) {
+      _transform_124_triazine.deactivate();
+    } else {
+      _transform_124_triazine.activate();
+    }
   }
   else if (tmp == CS_ENOL_FUSED) {
-    _transform_enol_fused.activate();
+    if (negation) {
+      _transform_enol_fused.deactivate();
+    } else {
+      _transform_enol_fused.activate();
+    }
   }
   else if (tmp == CS_ISOTOPE) {
-    _transform_isotopes.activate();
+    if (negation) {
+      _transform_isotopes.deactivate();
+    } else {
+      _transform_isotopes.activate();
+    }
   }
   else if (tmp == CS_2AMINO_PYRIDINE) {
-    _transform_to_2_amino_pyridine.activate();
+    if (negation) {
+      _transform_to_2_amino_pyridine.deactivate();
+    } else {
+      _transform_to_2_amino_pyridine.activate();
+    }
   } else if (tmp == CS_OXO_PYRIMIDINE) {
-    _transform_oxo_pyrimidine.activate();
+    if (negation) {
+      _transform_oxo_pyrimidine.deactivate();
+    } else {
+      _transform_oxo_pyrimidine.activate();
+    }
   } else {
     cerr << "Chemical_Standardisation::Activate:unrecognized directive '" << directive << "'\n";
     return 0;
@@ -10697,7 +10778,7 @@ Chemical_Standardisation::_do_transform_to_2_amino_pyridine(Molecule& m,
   }
 
   if (_append_string_depending_on_what_changed) {
-    _append_to_changed_molecules << " STD:2AminePyridine";
+    _append_to_changed_molecules << " STD:2AminoPyridine";
   }
 
   return rc;

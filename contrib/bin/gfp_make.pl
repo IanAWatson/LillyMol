@@ -2794,7 +2794,7 @@ my $alogp_cmd_pipe;
 if ($alogp)
 {
   my $alogp_exe = find_executable("alogp");
-  my $alogp_cmd = "${alogp_exe}";
+  my $alogp_cmd = "${alogp_exe} -Y alcacid -Y ZWIT -Y OTHER=3.0";
 
   if ($alogp_bit_replicates > 0)
   {

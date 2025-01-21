@@ -2514,8 +2514,8 @@ iwstats(int argc, char** argv) {
     }
 
     if (0 == experimental_column && !cl.option_present('E')) {
-      cerr << "Descriptor file, but you gave the experimental column as 1, sorry...\n";
-      usage(7);
+      cerr << "Descriptor file, but you gave the experimental column as 1, strange...\n";
+//    usage(7);
     }
 
     if (predicted_column.contains(0)) {

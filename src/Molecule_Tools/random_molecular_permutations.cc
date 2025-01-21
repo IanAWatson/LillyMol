@@ -1371,7 +1371,7 @@ initialise_never_change_atoms(Molecule& m, Can_Change& can_change) {
 #endif
 
 
-#define FREQUENTLY_CHECK_VALENCES 1
+//#define FREQUENTLY_CHECK_VALENCES 1
 
 /*
   The convention is that each member of the double attachment library

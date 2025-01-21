@@ -1423,7 +1423,7 @@ class __attribute__((visibility("default"))) Molecule : private resizable_array_
   //  Note that all angles are in radians. Note that angles are always positive.
 
   distance_t bond_length(atom_number_t, atom_number_t, BondedStatus = kOkNotBonded) const;
-  angle_t bond_angle(atom_number_t, atom_number_t, atom_number_t, BondedStatus = kOkNotBonded) const;
+  angle_t bond_angle(atom_number_t centre_atom, atom_number_t a1, atom_number_t a2, BondedStatus = kOkNotBonded) const;
   angle_t dihedral_angle(atom_number_t, atom_number_t, atom_number_t, atom_number_t,
                          BondedStatus = kOkNotBonded) const;
 

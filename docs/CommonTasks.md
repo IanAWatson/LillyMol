@@ -143,3 +143,6 @@ will likely do what is needed. See [msort](/docs/Molecule_Tools/msort.md].
 
 ## Reactions
 See [trxn](/docs/Molecule_Tools/trxn.md).
+
+## DeNovo Molecule Generation
+See [denovo](/docs/Molecule_Tools/denovo.md)

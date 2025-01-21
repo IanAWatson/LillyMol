@@ -16,7 +16,6 @@
 #include "Molecule_Lib/target.h"
 
 using std::cerr;
-using std::endl;
 
 const char * prog_name = nullptr;
 
@@ -216,7 +215,7 @@ check_uniqueness(Molecule & m,
   if (discard_bad_balences && ! m.valence_ok())
   {
     if (verbose > 2)
-      cerr << "bad valence " << m.smiles() << ' ' << m.name() << ", last rxn " << query_just_run << ' ' << rxn[query_just_run]->comment() << endl;
+      cerr << "bad valence " << m.smiles() << ' ' << m.name() << ", last rxn " << query_just_run << ' ' << rxn[query_just_run]->comment() << '\n';
     bad_valences_discarded++;
 
     if (stream_for_bad_valence.is_open())
@@ -471,7 +470,7 @@ medchem_wizard(int argc, char ** argv)
   {
     if (! cl.value('M', max_atoms) || max_atoms < min_atoms)
     {
-      cerr << "The maximum number of atoms option (-M) must be a whole +ve number greater than " << min_atoms << endl;
+      cerr << "The maximum number of atoms option (-M) must be a whole +ve number greater than " << min_atoms << '\n';
       usage(1);
     }
 
@@ -512,7 +511,7 @@ medchem_wizard(int argc, char ** argv)
     }
 
     if (verbose)
-      cerr << "max depth " << max_depth << endl;
+      cerr << "max depth " << max_depth << '\n';
   }
 
   if (cl.option_present('x'))
@@ -600,7 +599,7 @@ medchem_wizard(int argc, char ** argv)
   else if (! all_files_recognised_by_suffix(cl))
     return 4;
 
-  if (0 == cl.number_elements())
+  if (cl.empty())
   {
     cerr << "Insufficient arguments\n";
     usage(2);
@@ -626,9 +625,9 @@ medchem_wizard(int argc, char ** argv)
 
   if (verbose)
   {
-    cerr << "Read " << molecules_read << " molecules, produced " << molecules_produced << endl;
+    cerr << "Read " << molecules_read << " molecules, produced " << molecules_produced << '\n';
     if (truncated_to_max_hits > 0)
-      cerr << truncated_to_max_hits << " substructure searches truncated to " << max_hits << endl;
+      cerr << truncated_to_max_hits << " substructure searches truncated to " << max_hits << '\n';
     if (duplicate_molecules_suppressed)
       cerr << duplicate_molecules_suppressed << " duplicate molecules suppressed\n";
 
@@ -636,7 +635,7 @@ medchem_wizard(int argc, char ** argv)
     {
       float f = static_cast<float>(molecules_hitting_reaction[i]) / static_cast<float>(molecules_read);
 
-      cerr << molecules_hitting_reaction[i] << " molecules hit " << rxn[i]->comment() << ' ' << f << endl;
+      cerr << molecules_hitting_reaction[i] << " molecules hit " << rxn[i]->comment() << ' ' << f << '\n';
     }
     cerr << bad_valences_discarded << " produces with bad valences discarded\n";
     if (discarded_for_too_many_atoms)

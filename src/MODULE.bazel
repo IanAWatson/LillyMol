@@ -20,7 +20,7 @@ bazel_dep(name = "abseil-cpp", version = "20240116.2", repo_name="com_google_abs
 bazel_dep(name = "bazel_skylib", version = "1.7.1")
 bazel_dep(name = "caseyduquettesc_rules_python_pytest", version = "1.1.0", repo_name = "rules_python_pytest")
 bazel_dep(name = "eigen", version = "3.4.0", repo_name="com_gitlab_libeigen_eigen")
-# bazel_dep(name = "gazelle", version = "0.38.0")
+bazel_dep(name = "gazelle", version = "0.38.0")
 bazel_dep(name = "highwayhash", version = "0.0.0-20240305-5ad3bf8")
 
 # Does not work inside Lilly, link error half way through the build.

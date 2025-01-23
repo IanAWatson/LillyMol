@@ -2173,7 +2173,7 @@ trxn(int argc, char** argv) {
          << sidechains_that_are_just_single_reagents << " have just a single reagent\n";
     cerr << "But " << files_on_command_line << " files specified on the command line\n";
     cerr << "Impossible\n";
-    return 9;
+//  return 9;
   }
 
   int j = 1;  // index into Command_Line object
@@ -2181,6 +2181,7 @@ trxn(int argc, char** argv) {
     Sidechain_Reaction_Site* s = rxn.sidechain(i);
 
     if (s->single_reagent_only()) {
+      --j;
       continue;
     }
 

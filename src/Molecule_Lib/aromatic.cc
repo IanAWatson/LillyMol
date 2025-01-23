@@ -7484,7 +7484,9 @@ Molecule::find_kekule_form(int * aromatic_atoms, const int * aromatic_bonds)
 
   int aromatic_atoms_found = 0;
   if (! _kekule_could_be_aromatic(aromatic_atoms, aromatic_atoms_found)) {
-    cerr << "Could not be aromatic\n";
+    // Commented out Dec 2024, smiles_mutation generates too many of these warnings.
+    // TODO:ianwatson maybe make this warning optional.
+    //  cerr << "Could not be aromatic\n";
     return 0;
   }
 

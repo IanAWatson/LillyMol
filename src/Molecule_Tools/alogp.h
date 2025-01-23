@@ -130,6 +130,10 @@ class ALogP {
     // Whether or not to display error messages.
     int _display_error_messages = 1;
 
+    // If we want to process all molecules, we can assign a default value for all
+    // otherwise unrecognised atoms. This is obviously wrong, but might be useful.
+    std::optional<float> _value_for_otherwise_unclassified;
+
   // Private functions
     int Carbon(PerMoleculeData& pmd, atom_number_t zatom, float& result);
     int AromaticCarbon(PerMoleculeData& pmd, atom_number_t zatom, float& result);
@@ -190,6 +194,10 @@ class ALogP {
 
     void set_apply_zwitterion_correction(int s) {
       _add_zwitterion_correction = s;
+    }
+
+    void set_unclassified_value(float s) {
+      _value_for_otherwise_unclassified = s;
     }
 
     // Note that molecules must have formal charges assigned.

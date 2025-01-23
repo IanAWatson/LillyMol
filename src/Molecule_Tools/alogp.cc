@@ -1635,6 +1635,8 @@ ALogP::LogP(Molecule& m) {
       if (! Iodine(pmd, i, result)) {
         return std::nullopt;
       }
+    } else if (_value_for_otherwise_unclassified) {
+      return *_value_for_otherwise_unclassified;
     } else {
       if (_display_error_messages) {
         cerr << "ALogP:unclassified atom " << Diagnostic(pmd, i) << '\n';

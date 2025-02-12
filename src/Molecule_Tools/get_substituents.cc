@@ -373,6 +373,12 @@ Options::Initialise(Command_Line& cl) {
     }
   }
 
+  if (cl.option_present('n') && cl.option_present('p')) {
+    cerr << "The write parent (-p) and suppress output (-n) options are not compatible\n";
+    return 0;
+  }
+
+
   if (cl.option_present('n')) {
     _write_fragments = 0;
     if (_verbose) {
@@ -704,6 +710,10 @@ Options::GetUnmatchedAtoms(const Molecule& m,
       continue;
     }
 
+    if (b->nrings()) {
+      continue;
+    }
+
     atom_number_t j = b->other(zatom);
     //cerr << "From matched atom " << zatom << " to atom " << j << " matched " << matched[j] << " ring " << b->nrings() << '\n';
     if (matched[j]) {
@@ -775,7 +785,7 @@ Options::QueryMatchToFragment(Molecule& m,
   std::fill_n(_storage.get(), matoms, 0);
   embedding.set_vector(_storage.get(), 1);
 
-  if (! embedding.ok_index(start_atom)) {
+  if (! embedding.ok_index(start_atom)) [[ unlikely ]] {
     cerr << "Options::QueryMatchToFragment:invalid matched atom\n";
     cerr << "Embedding " << embedding << " ndx " << start_atom << " invald\n";
     return 0;
@@ -793,7 +803,7 @@ Options::QueryMatchToFragment(Molecule& m,
   m.ring_membership();
 
   const atom_number_t zatom = embedding[start_atom];
-  if (zatom < 0) {
+  if (zatom < 0) [[ unlikely ]] {
     cerr << "QueryMatchToFragment:excluded atom is start atom " << embedding << '\n';
     return 0;
   }

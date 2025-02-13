@@ -37,6 +37,15 @@ the goals of chemical standardization is to neutralize charged
 atoms wherever possible. Therefore five valent Nitrogen atoms
 in Nitro groups.
 
+Note that both nitro representations are "wrong". The charge
+separated form, `O=[N+]-[O-]` implies that the oxygen atoms
+are different. Also any detection of formal charges will be
+rendered more complex because of the need to identify, and ignore,
+these actually neutral forms. A five valent Nitrogen is not
+good either. The smiles language does not have a good way of
+representing groups like this, although perhaps `N(:O):O` could
+be used.
+
 ## HOWTO
 Entering `-g help` to most LillyMol tools yields the usage message
 ```

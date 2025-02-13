@@ -6583,10 +6583,10 @@ GetNitrogenIndices(const Set_of_Atoms& r,
 /*
   Make sure that the Nitrogen with the Hydrogen is adjacent to the carbon
 
-There are problems with this molecule. It has two fused pyrazoles and
-changing one, changes the other. May need special processing.
+  There are problems with this molecule. It has two fused pyrazoles and
+  changing one, changes the other. May need special processing.
 
-N1C2=CNN=C2C(=N1)C CHEMBL1599242
+  N1C2=CNN=C2C(=N1)C CHEMBL1599242
 */
 
 int
@@ -6596,6 +6596,7 @@ Chemical_Standardisation::_do_pyrazole(
   const int* ring_is_aromatic = current_molecule_data.ring_is_aromatic();
   const int* ring_nitrogen_count = current_molecule_data.ring_nitrogen_count();
   const int* ring_size = current_molecule_data.ring_size();
+  const int* ring_is_fused = current_molecule_data.ring_is_fused();
 
   const int nr = m.nrings();
 
@@ -6619,6 +6620,15 @@ Chemical_Standardisation::_do_pyrazole(
     }
 
     if (5 != ring_size[i]) {
+      continue;
+    }
+
+    // Feb 2024. Too many problems with fused prazoles
+    // C12=CNN=C1C1=NN(N=C1C=C2)C1=CC=CC=C1 CHEMBL1449655
+    // Changing the pyrazole switches the Kekule form, which
+    // can then impact the triazole ring. Too hard for now.
+
+    if (ring_is_fused[i]) {
       continue;
     }
 

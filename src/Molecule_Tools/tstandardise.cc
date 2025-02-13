@@ -291,12 +291,13 @@ tstandardise(Molecule& m, IWString_and_File_Descriptor& output)
       cerr << "Repeated standardisation failure\n";
       cerr << tmp.unique_smiles() << ' ' << m.name()
            << " initial smiles after standardisation\n";
-      cerr << tmp2.unique_smiles() << ' ' << m.name()
+      cerr << tmp2.unique_smiles() << ' ' << tmp2.name()
            << " built from standardised form and standardised\n";
       tmp.invalidate_smiles();
       tmp2.invalidate_smiles();
-      cerr << tmp.smiles() << " and " << tmp2.smiles() << " " << tmp.smiles() << '.'
-           << tmp2.smiles() << " build from " << smiles << '\n';
+      cerr << smiles << ' ' << m.name() << " starting smiles\n";
+      cerr << tmp.smiles() << " first smiles " << tmp.name() << '\n';
+      cerr << tmp2.smiles() << " second smiles " << tmp2.name() << '\n';
       //    tmp2.debug_print(cerr);
       failures_this_molecule++;
       if (break_on_error) {

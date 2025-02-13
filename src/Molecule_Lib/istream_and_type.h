@@ -564,15 +564,18 @@ data_source_and_type<T>::_rx_for_input_type() const {
 
     case FILE_TYPE_TDT:
       return RE2("^|");
-      break;
 
     case FILE_TYPE_MRK:
       return RE2("^[ 0-9]{5} [ 0-9]{5} *$");
-      break;
 
     case FILE_TYPE_PDB:
       return RE2("^END$");
-      break;
+
+    case FILE_TYPE_CSV:
+      return RE2(".");
+
+    case FILE_TYPE_TXTPROTO:
+      return RE2(".");
 
     default:
       std::cerr << "data_source_and_type::molecules_remaining: no rx for type "

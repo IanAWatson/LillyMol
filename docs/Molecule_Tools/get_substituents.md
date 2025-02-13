@@ -90,6 +90,22 @@ after a C(CH3)(CH3) group `-s '[CD4](-[CH3])(-[CH3])-*'`, but note
 that this query will match both left and right. This can be tricky,
 just like any substructrure based matching.
 
+A common operation is to generate a list of aromatic substituents from
+something like Chembl. Suggest an invocation like
+```
+get_substituents -s '[aD3]' -M 10 -I 1 -c -n -S chembl.textproto -v -z i chembl.smi
+```
+which will accumulate all aromatic substituents in Chembl with 10 atoms or
+fewer. The smarts `[aD3]` says to look for substituents on all 3 connected
+aromatic atoms. The combination `-M 10` specifies the maximum size of substituents.
+Isotope 1 is placed on the join atom because of `-I 1`. In this case I have
+chosen to remove chirality with the `-c` option. Adjust to taste. Normal,
+per-molecule, output is suppressed with the `-n` option, and a textproto
+summary is written to `chembl.textproto`. Molecules that do not contain
+a three connected aromatic atom are ignored because of `-z i`. The `-v`
+option may yield useful information. This should take less than one
+minute on a modern computer.
+
 ### Annotation
 You almost certainly want to specify an isotope for the attachment atom.
 This will be the atom in the fragment that would join to the matched atom 
@@ -164,7 +180,8 @@ Chembl that exemplified the query, and `n` which is the number of
 instances across all molecules examined.
 
 The last column is the number of instances of this fragment in the input.
-We can sort by that, and see the most common aromatic substituents.
+We can sort by that, and see the most common aromatic substituents, with
+at least 4 atoms `-m 4`, are
 ```
 COc1cc[1cH]cc1 iso: ATT smi: "COc1cc[1cH]cc1" par: "CHEMBL39210" nat: 8 n: 410 
 O1CC[1NH]CC1 iso: ATT smi: "O1CC[1NH]CC1" par: "CHEMBL1506642" nat: 6 n: 507 
@@ -223,7 +240,7 @@ increasing the probability of success. Of course more complex patterns for
 the substitution point will also increase that probability, one could
 easily imagine queries for substituted rings with various electron donating
 or withdrawing groups. Or what substituents have been found on the other
-side of an amide `-s 'C(=O)N' or the amide the other way round
+side of an amide `-s 'C(=O)N'` or the amide the other way round
 `-s 'N-[CD3]=O`.
 
 And of course, the no restriction substituent will also work

@@ -289,6 +289,29 @@ that aromatic atoms are considered unsaturated. `[G1]` will match
 most atoms one double bond, and `[G2]` will match 
 atoms with a triple bond attached.
 
+## Ring Bond Count
+The '@' symbol is used to specify that a bond is in a ring. In LillyMol
+smarts multiple '@' symbols can be used to specify the number of rings
+that include that bond. By default, a single '@' symbol matches
+any number of rings including the bond. But '@@' will only match
+bonds that are covered by exactly two rings. For example `C@@C` matches
+Adamantane and `c@@c` matches the ring fusion bond in Napthalene.
+
+It is important to note that there is currently a discrepancy in how
+ring information
+is accounted for at atoms and at bonds. The `nrings` attribute for
+an atom is the number of SSSR rings including that atom. The `nrings`
+attribute for a bond may include counts for certain non SSSR rings as
+well. This may change. For atoms, using the ring bond count is
+generally preferred.
+
+For simple fused systems, which do not have non-SSSR rings, this discrepancy
+will not matter.
+
+There is no means of specifying that a bond is in  exactly one ring - use the ring
+bond count attribute on the atoms. `[cx3]:[cx3]` will mostly be 
+the same as `c@@c` - there are interesting differences.
+
 ## Not enough letters!
 As work continued on LillyMol, we found increasingly complex
 requests coming from chemists, and it was clear that we would run

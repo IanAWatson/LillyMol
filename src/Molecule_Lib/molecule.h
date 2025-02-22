@@ -1020,8 +1020,13 @@ class __attribute__((visibility("default"))) Molecule : private resizable_array_
   int set_element(atom_number_t a, const Element* e);
   int set_atomic_number(atom_number_t a, atomic_number_t);
 
+  // The number of atoms with an isotope.
   int number_isotopic_atoms() const;
+  // The number of atoms with isotope `iso`.
   int number_isotopic_atoms(isotope_t iso) const;
+  // Returns true if any atom has an isotope.
+  // For efficiency, stops counting once an isotopic atom is encountered.
+  bool ContainsIsotopicAtoms() const;
 
   // If `unset_implicit_h` is set, then all atoms that are changed will also
   // have their implicit Hydrogens known flag updated.
@@ -1689,8 +1694,8 @@ class __attribute__((visibility("default"))) Molecule : private resizable_array_
   int compute_fragment_information(Fragment_Information&, const int*) const;
 
   int identify_spinach(int*);  // molecules outside and not between rings
-  int identify_spinach_preset(int* spinach)
-      const;  // same, but anything already set in SPINACH will also be included
+  // same, but anything already set in SPINACH will also be included
+  int identify_spinach_preset(int* spinach) const;
 
   int atoms_in_fragment(Set_of_Atoms&, int);  // Set_of_Atoms must start empty
   int add_atoms_in_fragment(Set_of_Atoms&,

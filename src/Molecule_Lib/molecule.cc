@@ -3167,6 +3167,17 @@ Molecule::number_isotopic_atoms(isotope_t iso) const
   return rc;
 }
 
+bool
+Molecule::ContainsIsotopicAtoms() const {
+  for (const Atom* a : *this) {
+    if (a->isotope() > 0) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
 /*
   Special function for removing an isotopic specification
 */

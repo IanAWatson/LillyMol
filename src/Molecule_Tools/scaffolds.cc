@@ -830,9 +830,9 @@ ScaffoldFinder::Process(Molecule& m,
 #endif
 
   // Set up arrays needed for combinations.
-  std::vector<int> count(nsys);
+  std::vector<uint32_t> count(nsys);
   std::fill(count.begin(), count.end(), 2);
-  std::vector<int> state(nsys);
+  std::vector<uint32_t> state(nsys);
 
   combinations::Combinations comb(count);
 

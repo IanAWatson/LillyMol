@@ -152,7 +152,7 @@ Options::Options() {
   _remove_chirality = 0;
   _molecules_read = 0;
   _rotbond.set_calculation_type(quick_rotbond::QuickRotatableBonds::RotBond::kExpensive);
-  set_display_psa_unclassified_atom_mesages(0);
+  nvrtspsa::set_display_psa_unclassified_atom_mesages(0);
   xlogp::SetIssueUnclassifiedAtomMessages(0);
 
   _alogp.set_use_alcohol_for_acid(1);

@@ -116,7 +116,7 @@ class PerMoleculeData {
                             isotope_t substituent) const;
 
     // Return true if the combination of ring systems in `state` is disconnected.
-    int StateIsDisconnected(const std::vector<int>& state) const;
+    int StateIsDisconnected(const std::vector<uint32_t>& state) const;
 
     // For every atom that is between ring systems `r1` and `r2`, set the
     // value in `atoms_in_subset` to `flag`.
@@ -155,7 +155,7 @@ class ScaffoldFinder {
     int Process(Molecule& m,
                  scaffolds::ScaffoldData& results);
     int Process(const Molecule& m,
-                 const std::vector<int>& state,
+                 const std::vector<uint32_t>& state,
                  PerMoleculeData& pmd,
                  scaffolds::ScaffoldData& results);
 

@@ -231,7 +231,7 @@ psafp(int argc, char** argv) {
   verbose = cl.option_count('v');
 
   if (!verbose) {
-    set_display_psa_unclassified_atom_mesages(0);
+    nvrtspsa::set_display_psa_unclassified_atom_mesages(0);
   }
 
   if (cl.option_present('A')) {
@@ -272,7 +272,7 @@ psafp(int argc, char** argv) {
   }
 
   if (cl.option_present('z')) {
-    set_return_zero_for_unclassified_atoms(1);
+    nvrtspsa::set_return_zero_for_unclassified_atoms(1);
 
     if (verbose) {
       cerr << "Unclassified atoms assigned zero value in psa computation\n";

@@ -1529,12 +1529,12 @@ Options::ReplaceLinker2(Molecule& m, const Substructure_Results* sresults,
                         IWString_and_File_Descriptor& output) {
   uint32_t rc = 0;
 
-  std::vector<int> count(2);
+  std::vector<uint32_t> count(2);
   count[0] = sresults[0].number_embeddings();
   count[1] = sresults[1].number_embeddings();
 
   Combinations comb(count);
-  std::vector<int> state(2);
+  std::vector<uint32_t> state(2);
   while (comb.Next(state)) {
     atom_number_t remove1 = sresults[0].embedding(state[0])->item(0);
     atom_number_t attach1 = sresults[0].embedding(state[0])->item(1);
@@ -1631,12 +1631,12 @@ Options::ReplaceLinker3(Molecule& m, const Substructure_Results* sresults,
                         IWString_and_File_Descriptor& output) {
   uint32_t rc = 0;
 
-  std::vector<int> count(3);
+  std::vector<uint32_t> count(3);
   for (int i = 0; i < 3; ++i) {
     count[i] = sresults[i].number_embeddings();
   }
 
-  std::vector<int> state(3);
+  std::vector<uint32_t> state(3);
   Combinations comb(count);
   while (comb.Next(state)) {
     atom_number_t remove1 = sresults[0].embedding(state[0])->item(0);

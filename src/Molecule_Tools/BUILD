@@ -79,6 +79,7 @@ local_install(
         ":preferred_smiles",
         ":psafp",
         ":pubchem_fingerprints",
+        ":qed",
         ":r1r2etc",
         ":random_geometric_changes",
         ":random_molecular_permutations",
@@ -93,6 +94,7 @@ local_install(
         ":ring_fingerprint",
         ":ring_replacement",
         ":ring_replacement_collate",
+        ":ring_replacement_inexact",
         ":ring_size_fingerprint",
         ":ring_substitution",
         ":ring_trimming",
@@ -1781,6 +1783,19 @@ cc_binary(
 )
 
 cc_binary(
+    name = "qed",
+    srcs = [
+        "qed_main.cc",
+    ],
+    deps = [
+        ":qed_lib",
+        "//Foundational/cmdline:iwcmdline",
+        "//Molecule_Lib:iwmolecule",
+        "//Molecule_Lib:moleculeio",
+    ],
+)
+
+cc_binary(
     name = "ring_closure",
     srcs = [
         "ring_closure_main.cc",
@@ -1874,6 +1889,30 @@ cc_binary(
         "//Molecule_Lib:iwmolecule",
         "//Molecule_Lib:moleculeio",
         "//Molecule_Lib:substructure_cc_proto",
+        "@com_google_protobuf//:protobuf",
+    ],
+)
+
+cc_binary(
+    name = "ring_replacement_inexact",
+    srcs = [
+        "ring_replacement_inexact.cc",
+    ],
+    deps = [
+        ":reaction_duplicate",
+        ":replacement_ring_cc_proto",
+        "//Foundational/accumulator",
+        "//Foundational/cmdline:iwcmdline",
+        "//Foundational/iw_tdt",
+        "//Foundational/iwaray",
+        "//Foundational/iwmisc",
+        "//Foundational/iwstring:absl_hash",
+        "//Molecule_Lib:iwmolecule",
+        "//Molecule_Lib:iwreaction",
+        "//Molecule_Lib:reaction_cc_proto",
+        "//Molecule_Lib:moleculeio",
+        "//Molecule_Lib:substructure_cc_proto",
+        "@com_google_absl//absl/container:flat_hash_set",
         "@com_google_protobuf//:protobuf",
     ],
 )
@@ -3164,6 +3203,21 @@ cc_library(
         "partial_symmetry.h",
     ],
     deps = [
+        "//Molecule_Lib:iwmolecule",
+    ],
+)
+
+cc_library(
+    name = "qed_lib",
+    srcs = [
+        "qed.cc",
+    ],
+    hdrs = [
+        "qed.h",
+    ],
+    deps = [
+        ":alogp_lib",
+        ":nvrtspsa",
         "//Molecule_Lib:iwmolecule",
     ],
 )

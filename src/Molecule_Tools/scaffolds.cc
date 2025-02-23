@@ -434,7 +434,7 @@ ScaffoldFinder::ScaffoldFinder() {
 // Use Euler's formula to figure out if the combination of ring systems
 // implied by `state` is connected or not.
 int
-PerMoleculeData::StateIsDisconnected(const std::vector<int>& state) const {
+PerMoleculeData::StateIsDisconnected(const std::vector<uint32_t>& state) const {
   assert(state.size() == static_cast<int>(_nsys));
 
   const uint32_t state_size = state.size();
@@ -872,7 +872,7 @@ ScaffoldFinder::Process(Molecule& m,
 // the ring systems that can be reached from atoms in that region.
 int
 ScaffoldFinder::Process(const Molecule& m,
-                 const std::vector<int>& state,
+                 const std::vector<uint32_t>& state,
                  PerMoleculeData& pmd,
                  scaffolds::ScaffoldData& result) {
   assert(state.size() > 1);

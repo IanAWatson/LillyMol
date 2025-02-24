@@ -65,6 +65,7 @@ static Accumulator<similarity_type_t> nearest_selected_neighbour_distance;
 static IWString smiles_tag("$SMI<");
 static IWString identifier_tag("PCN<");
 static IWString distance_tag("DIST<");
+static IWString scale_tag("SCALE<");
 
 static IWString previously_computed_nn_distance_tag;
 
@@ -98,8 +99,8 @@ get_previously_computed_nearest_neighbour(
 {
   IW_STL_Hash_Map_float::const_iterator f = previously_computed_distances.find(p.id());
 
-  if (f ==
-      previously_computed_distances.end()) {  // OK if no previously computed distance
+  // OK if no previously computed distance
+  if (f == previously_computed_distances.end()) {  
     return 1;
   }
 
@@ -778,7 +779,7 @@ fpobj_spread(IWString_and_File_Descriptor& output)
     output << smiles_tag << sid.smiles() << ">\n";
     output << identifier_tag << sid.id() << ">\n";
     if (static_cast<float>(1.0) != fpsel.scale()) {
-      output << "SCALE<" << fpsel.scale() << ">\n";
+      output << scale_tag << fpsel.scale() << ">\n";
     }
     output << distance_tag << fpsel.distance()
            << ">\n";  // the sid object does not know about any scaling of the distance

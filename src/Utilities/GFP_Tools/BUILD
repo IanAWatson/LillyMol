@@ -683,6 +683,7 @@ cc_binary(
         ":gfp_standard",
         ":nearneighbours_cc_proto",
         ":neighbour_list",
+        "//Foundational/data_source:iwtfdata_record",
     ],
 )
 
@@ -974,6 +975,7 @@ cc_binary(
     ],
     deps = [
         ":gfp",
+        "//Foundational/data_source:iwtfdata_record",
     ],
 )
 

@@ -734,27 +734,33 @@ usage (int rc)
 #endif
 // clang-format on
 // clang-format off
-  cerr << "Finds near neighbours\n";
-  cerr << "Usage " << prog_name << " ... -p <needles> <haystack>\n";
-  cerr << " -p <file>        specify file against which input is to be compared (needles)\n";
-  cerr << " -s <number>      specify max pool size\n";
-  cerr << " -n <number>      specify how many neighbours to find\n";
-  cerr << " -T <distance>    specify upper distance threshold\n";
-  cerr << " -m <number>      the minimum number of neighbours to find\n";
-  cerr << " -T TAG=tag       upper distance threshold for each molecule in TAG<>\n";
-  cerr << " -t <distance>    specify lower distance threshold\n";
-  cerr << " -i <dataitem>    specify identifier dataitem in pool\n";
-  cerr << " -I <dataitem>    specify identifier dataitem in input file\n";
-  cerr << " -e <dataitem>    specify pool object dataitems to be echo'd (default $SMI and PCN)\n";
-  cerr << " -r <number>      report progress every <number> fingerprints\n";
-  cerr << " -D <tag>         tag for distances (default '" << distance_tag << "')\n";
-  cerr << " -h               discard neighbours with zero distance and the same ID as the target\n";
-  cerr << " -B <qualifier>   various other options, enter '-B help' for details\n";
-  cerr << " -F ...           gfp options, enter '-F help' for details\n";
-  cerr << " -V ...           Tversky specification, enter '-V help' for details\n";
-  cerr << " -g <dist>        Abandon distance computation if any component > dist \n";
-  cerr << " -k               generate nnbr::NearNeighbours textproto output\n";
-  cerr << " -v               verbose output\n";
+  cerr << R"(Finds near neighbours.
+Uses the concept of needles and haystack. For each needle fingerprint, find the
+closest fingerprints in the haystack. The needles are in the -p file, and the
+haystack is in one or more input files.
+gfp_lnearneighbours -p needles.gfp haystack.gfp > needles.nn
+Output can be processed with nplotnn.
+
+ -p <file>        specify file against which input is to be compared (needles)
+ -s <number>      specify max pool size
+ -n <number>      specify how many neighbours to find
+ -T <distance>    specify upper distance threshold
+ -m <number>      the minimum number of neighbours to find
+ -T TAG=tag       upper distance threshold for each molecule in TAG<>
+ -t <distance>    specify lower distance threshold
+ -i <dataitem>    specify identifier dataitem in pool
+ -I <dataitem>    specify identifier dataitem in input file
+ -e <dataitem>    specify pool object dataitems to be echo'd (default $SMI and PCN)
+ -r <number>      report progress every <number> fingerprints
+ -D <tag>         tag for distances (default '" << distance_tag << "')
+ -h               discard neighbours with zero distance and the same ID as the target
+ -B <qualifier>   various other options, enter '-B help' for details
+ -F ...           gfp options, enter '-F help' for details
+ -V ...           Tversky specification, enter '-V help' for details
+ -g <dist>        Abandon distance computation if any component > dist 
+ -k               generate nnbr::NearNeighbours textproto output
+ -v               verbose output
+)";
 // clang-format on
 
   exit (rc);

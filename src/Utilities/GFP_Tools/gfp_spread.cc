@@ -755,8 +755,9 @@ fpobj_spread(IWString_and_File_Descriptor &output) {
     if (static_cast<float>(1.0) != fpsel.scale()) {
       output << "SCALE<" << fpsel.scale() << ">\n";
     }
-    output << distance_tag << fpsel.distance()
-           << ">\n";  // the sid object does not know about any scaling of the distance
+
+    // the sid object does not know about any scaling of the distance
+    output << distance_tag << fpsel.distance() << ">\n";
     output << "|\n";
 
     if (verbose > 1) {

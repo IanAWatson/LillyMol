@@ -28,9 +28,12 @@ Usage(int rc) {
   cerr << __FILE__ << " compiled " << __DATE__ << " " << __TIME__ << '\n';
 #endif
 // clang-format on
-  cerr << "Performs some task on a set of molecules.\n";
-  cerr << " -a          what the -a option does\n";
-  cerr << " -v          verbose output\n";
+// clang-format off
+  cerr << R"(Performs some task on a set of molecules.
+ -a          what the -a option does
+ -v          verbose output
+)";
+// clang-format on
 
   ::exit(rc);
 }

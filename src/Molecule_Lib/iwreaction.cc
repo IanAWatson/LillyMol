@@ -742,6 +742,9 @@ Reaction_Site::check_internal_consistency()
   if (! check_bonds(_bonds_to_be_made, atoms_in_query))
     return 0;
 
+  if (! check_bonds(_bonds_to_be_changed, atoms_in_query))
+    return 0;
+
   if (! check_atoms(_atoms_to_be_removed, atoms_in_query))
     return 0;
 
@@ -750,8 +753,12 @@ Reaction_Site::check_internal_consistency()
   int n = _atoms_to_be_removed.number_elements();
   for (int i = 0; i < n; i++)
   {
-    if (atom_in_list_of_bonds(_bonds_to_be_made, _atoms_to_be_removed[i]))
-    {
+    if (atom_in_list_of_bonds(_bonds_to_be_made, _atoms_to_be_removed[i])) {
+      cerr << "Reaction_Site::check_internal_consistency: atom to be removed " << _atoms_to_be_removed[i] <<
+              " is involved in a bond to be made\n";
+      return 0;
+    }
+    if (atom_in_list_of_bonds(_bonds_to_be_changed, _atoms_to_be_removed[i])) {
       cerr << "Reaction_Site::check_internal_consistency: atom to be removed " << _atoms_to_be_removed[i] <<
               " is involved in a bond to be made\n";
       return 0;
@@ -767,6 +774,11 @@ Reaction_Site::check_internal_consistency()
 
   for (int i = 0; i < n; i++) {
     if (atom_in_list_of_bonds(_bonds_to_be_made, _fragments_to_be_removed[i])) {
+      cerr << "Reaction_Site::check_internal_consistency: fragment to be removed " << _fragments_to_be_removed[i] <<
+              " is involved in a bond to be made\n";
+      return 0;
+    }
+    if (atom_in_list_of_bonds(_bonds_to_be_changed, _fragments_to_be_removed[i])) {
       cerr << "Reaction_Site::check_internal_consistency: fragment to be removed " << _fragments_to_be_removed[i] <<
               " is involved in a bond to be made\n";
       return 0;
@@ -927,6 +939,21 @@ Reaction_Site::ok() const
     }
   }
 
+  if (_bonds_to_be_changed.number_elements())
+  {
+    int nb = _bonds_to_be_changed.number_elements();
+
+    for (int i = 0; i < nb; i++)
+    {
+      const Bond * b = _bonds_to_be_changed[i];
+      if (! b->ok())
+      {
+        cerr << "Reaction_Site::ok: bad bond to be changed\n";
+        return 0;
+      }
+    }
+  }
+
   if (_bonds_to_be_broken.number_elements())
   {
     int nb = _bonds_to_be_broken.number_elements();
@@ -1010,6 +1037,12 @@ int
 Reaction_Site::add_bond_to_be_made(const int a1, const int a2, const bond_type_t bt)
 {
   return common_bond_creation_thingy(a1, a2, bt, _bonds_to_be_made);
+}
+
+int
+Reaction_Site::add_bond_to_be_changed(const int a1, const int a2, const bond_type_t bt)
+{
+  return common_bond_creation_thingy(a1, a2, bt, _bonds_to_be_changed);
 }
 
 int
@@ -1218,15 +1251,31 @@ Reaction_Site::debug_print(std::ostream & os,
     }
   }
 
-  if (_bonds_to_be_made.number_elements())
-  {
+  if (_bonds_to_be_made.number_elements()) {
     int nb = _bonds_to_be_made.number_elements();
 
     os << ind << "  will make " << nb << " bonds\n";
 
-    for (int i = 0; i < nb; i++)
-    {
+    for (int i = 0; i < nb; i++) {
       const Bond * b = _bonds_to_be_made[i];
+      if (b->is_single_bond())
+        os << ind << "    single";
+      else if (b->is_double_bond())
+        os << ind << "    double";
+      else if (b->is_triple_bond())
+        os << ind << "    triple";
+
+      os << " bond between " << b->a1() << " and " << b->a2() << '\n';
+    }
+  }
+
+  if (_bonds_to_be_changed.number_elements()) {
+    int nb = _bonds_to_be_changed.number_elements();
+
+    os << ind << "  will changed " << nb << " bonds\n";
+
+    for (int i = 0; i < nb; i++) {
+      const Bond * b = _bonds_to_be_changed[i];
       if (b->is_single_bond())
         os << ind << "    single";
       else if (b->is_double_bond())
@@ -4461,6 +4510,44 @@ Reaction_Site::do_makes_breaks(Molecule & result,
       }
       else
         result.set_bond_type_between_atoms(a1, a2, b->btype());
+    }
+
+    result.recompute_implicit_hydrogens(a1);   // very important to recompute as soon as formed
+    result.recompute_implicit_hydrogens(a2);
+  }
+
+  for (const Bond* b : _bonds_to_be_changed) {
+    atom_number_t a1;
+    if (! valid_member_of_embedding(embedding, b->a1(), "Reaction_Site::do_makes_breaks: a1", a1)) {
+      return 0;
+    }
+
+    atom_number_t a2;
+    if (! valid_member_of_embedding(embedding, b->a2(), "Reaction_Site::do_makes_breaks: a2", a2)) {
+      return 0;
+    }
+
+    a1 += offset;
+    a2 += offset;
+
+//  Ran into problems while making a double bond to an atom which had a chiral
+//  centre. set_bond_type_between_atoms removes the chiral centre, but we must
+//  now tell that atom that it's implicit hydrogens are no longer known
+
+    result.set_implicit_hydrogens_known(a1, 0);
+    result.set_implicit_hydrogens_known(a2, 0);
+
+    // For bonds being made, atoms must already be bonded.
+    if (! result.are_bonded(a1, a2)) {
+      cerr << "IWReaction::do_makes_breaks:change bond, atoms not bonded " << result.name() << '\n';
+      return 0;
+    } else {
+      if (AROMATIC_BOND == b->btype()) {
+        Bond * b = const_cast<Bond *>(result.bond_between_atoms(a1, a2));
+        b->set_permanent_aromatic(1);
+      } else {
+        result.set_bond_type_between_atoms(a1, a2, b->btype());
+      }
     }
 
     result.recompute_implicit_hydrogens(a1);   // very important to recompute as soon as formed

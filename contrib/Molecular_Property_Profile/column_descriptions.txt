@@ -442,3 +442,9 @@ feature_to_description {
     description: "Lipinski Acceptors"
   }
 }
+feature_to_description {
+  key: "w_nchiral"
+  value {
+    description: "Number of Chiral Centres"
+  }
+}

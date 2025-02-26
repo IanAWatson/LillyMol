@@ -839,6 +839,13 @@ Reaction_Site::ConstructFromProto(const P& proto, const IWString& fname)
     _bonds_to_be_made.add(b.release());
   }
 
+  for (const auto& bond_to_be_changed : proto.change_bond()) {
+    std::unique_ptr<Bond> b(new Bond());
+    if (! BondFromProto(*b, bond_to_be_changed))
+      return WriteError("Reaction_Site::ConstructFromProto:invalid bond to be changed ", bond_to_be_changed);
+    _bonds_to_be_changed.add(b.release());
+  }
+
   for (const auto& bond_to_be_broken : proto.break_bond()) {
     std::unique_ptr<Bond> b(new Bond());
     b->set_bond_type(SINGLE_BOND);   // Seems invalid if not set.
@@ -1387,6 +1394,19 @@ Reaction_Site::BuildProto(P& proto) const {
 
   for (const Bond* bond : _bonds_to_be_made) {
     auto* b = proto.add_make_bond();
+    b->set_a1(bond->a1());
+    b->set_a2(bond->a2());
+    if (bond->is_single_bond()) {
+      b->set_btype(SubstructureSearch::SS_SINGLE_BOND);
+    } else if (bond->is_double_bond()) {
+      b->set_btype(SubstructureSearch::SS_DOUBLE_BOND);
+    } else if (bond->is_triple_bond()) {
+      b->set_btype(SubstructureSearch::SS_TRIPLE_BOND);
+    }
+  }
+
+  for (const Bond* bond : _bonds_to_be_changed) {
+    auto* b = proto.add_change_bond();
     b->set_a1(bond->a1());
     b->set_a2(bond->a2());
     if (bond->is_single_bond()) {

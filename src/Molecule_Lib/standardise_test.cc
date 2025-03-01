@@ -596,10 +596,11 @@ INSTANTIATE_TEST_SUITE_P(TestStandardisationP, TestStandardisationP, testing::Va
 
   ForStd{{"oxopyrimidine"}, "C1(=C(NC(=NC1=O)C)NCC1=CN=CC=C1)C#N CHEMBL17125", "O=c1[nH]c(C)[n]c(NCc2c[n]ccc2)c1C#N"},
   ForStd{{"oxopyrimidine"}, "C1CCCC2=C1NC(=NC2=O)N=C(NC1=CC=C(C=C1)OC)N CHEMBL4932203",
-                            "O=c1[nH]c([n]c2c1CCCC2)N=C(Nc1ccc(OC)cc1)N"},
+                            "O=c1[nH]c([n]c2c1CCCC2)N=C(Nc1ccc(OC)cc1)N"}
 
-  ForStd{{"pyrazole"}, "C1=C2C(=NC(=NC2=NN1)C)O CHEMBL154781",
-                "Oc1c2c[n][nH]c2[n]c(C)[n]1"}
+//We are no longer standardising fused pyrazoles.
+//ForStd{{"pyrazole"}, "C1=C2C(=NC(=NC2=NN1)C)O CHEMBL154781",
+//              "Oc1c2c[n][nH]c2[n]c(C)[n]1"}
 ));
 
 struct ForStdKetoEnol {

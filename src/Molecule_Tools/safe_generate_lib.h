@@ -49,6 +49,9 @@ class SafeFragment {
     // Number of rings in the fragment.
     int _nrings;
 
+    // A list of ring sizes.
+    resizable_array<int> _ring_sizes;
+
     // Number of connections (ring openings) in the fragment.
     int _ncon;
 

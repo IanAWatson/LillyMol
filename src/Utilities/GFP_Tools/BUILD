@@ -980,6 +980,18 @@ cc_binary(
 )
 
 cc_binary(
+    name = "nn_spread",
+    srcs = [
+        "nn_spread.cc",
+    ],
+    deps = [
+        ":nearneighbours_cc_proto",
+        "//Foundational/cmdline:iwcmdline",
+        "//Foundational/data_source:iwtfdata_record",
+    ],
+)
+
+cc_binary(
     name = "parallel_nn_search_to_gfp_spread",
     srcs = [
         "parallel_nn_search_to_gfp_spread.cc",

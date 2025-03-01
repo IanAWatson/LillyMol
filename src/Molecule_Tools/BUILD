@@ -2622,6 +2622,22 @@ cc_binary(
 )
 
 cc_binary(
+    name = "unique_molecules_sorted",
+    srcs = [
+        "unique_molecules_sorted.cc",
+    ],
+    deps = [
+        ":dicer_fragments_cc_proto",
+        "//Foundational/iwaray",
+        "//Foundational/iwmisc",
+        "//Foundational/iwstring:absl_hash",
+        "//Molecule_Lib:iwmolecule",
+        "//Molecule_Lib:moleculeio",
+        "@com_google_absl//absl/container:flat_hash_map",
+    ],
+)
+
+cc_binary(
     name = "verloop",
     srcs = [
         "sterimol.cc",

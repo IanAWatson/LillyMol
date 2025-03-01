@@ -77,7 +77,6 @@ def usage (rc)
   exit(rc)
 end
 
-$stderr << "suffix " << cl.option_present('suffix') << "\n"
 if cl.option_present('o')
   istop = cl.value('o')
 elsif cl.option_present('stop')

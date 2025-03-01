@@ -381,6 +381,8 @@ struct FileconvConfig {
 
   int append_isis_molecular_formula_to_name = 0;
 
+  int append_aromatic_distinguishing_molecular_formula_to_name = 0;
+
   int append_nrings_to_name = 0;
 
   int append_aromatic_ring_count_to_name = 0;
@@ -392,6 +394,12 @@ struct FileconvConfig {
   int append_net_formal_charge_to_name = 0;
 
   int append_clnd_count_to_name = 0;
+
+  // When we append a computed property to the name, by default we add
+  // a prefix that says what that feature is.
+  // That can be suppressed by turning this off, so just the computed
+  // value will be appended - with no explanation.
+  int prepend_feature_name = 1;
 
   molecular_weight_t lower_amw_cutoff = -1.0;
   int molecules_below_amw_cutoff = 0;
@@ -457,6 +465,7 @@ struct FileconvConfig {
 
   // Functions that compute values, print things, change or filter the molecule.
   void DoAppends(Molecule& m, IWString& extra_stuff);
+  void MaybeAppendFeatureName(const char* feature_name, IWString& extra_stuff) const;
   int PrintTorsion(const Molecule& m, const Bond& b, std::ostream& output);
   int PrintBondAngle(const Molecule& m,
                      const atom_number_t a1,

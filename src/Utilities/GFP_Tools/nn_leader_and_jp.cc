@@ -482,7 +482,10 @@ get_nbr_id(const const_IWSubstring& buffer, const IW_STL_Hash_Map_int& id_to_ndx
 static int
 GetNbrId(const std::string& id, const IW_STL_Hash_Map_int& id_to_ndx,
          int& nbr) {
-  const IWString s(id);
+  IWString s(id);
+
+  s.truncate_at_first(' ');
+
   const auto f = id_to_ndx.find(s);
 
   if (f == id_to_ndx.end()) {
@@ -493,7 +496,6 @@ GetNbrId(const std::string& id, const IW_STL_Hash_Map_int& id_to_ndx,
   nbr = f->second;
 
   return 1;
-
 }
 
 template <typename T>
@@ -751,10 +753,14 @@ Leader_Item::form_cluster_threshold(int* selected, const float threshold,
                                     const resizable_array_p<IWString>& smiles,
                                     const resizable_array_p<IWString>& id,
                                     std::ostream& output) {
+  // First need to find the cluster size so we can write the CSIZE tag.
   int csize = 1;
 
+  // This will be the range of the second scan through the neighbour list.
+  int istop = _nbrs;
   for (int i = 0; i < _nbrs; ++i) {
     if (_dist[i] > threshold) {
+      istop = i + 1;
       break;
     }
 
@@ -782,11 +788,7 @@ Leader_Item::form_cluster_threshold(int* selected, const float threshold,
     selected[_ndx] = 1;
   }
 
-  for (int i = 0; i < _nbrs; ++i) {
-    if (_dist[i] > threshold) {
-      break;
-    }
-
+  for (int i = 0; i < istop; ++i) {
     const int j = _nbr[i];
 
     if (selected[j]) {
@@ -1298,11 +1300,15 @@ choose_next_centre(const int* selected, const Leader_Item* pool, const int pool_
   }
 
   icentre = -1;
-  if (!scores_present)  // just grab the first unselected item
-  {
-    for (int i = 0; i < pool_size; i++) {
+
+  // If scores not present, return the first unselected.
+  // Save the position of the previously selected item for efficiency
+  if (!scores_present) {
+    static int istart = 0;
+    for (int i = istart; i < pool_size; i++) {
       if (!selected[i]) {
         icentre = i;
+        istart = i + 1;
         return 1;
       }
     }
@@ -1359,19 +1365,17 @@ leader(Leader_Item* pool, const int pool_size, int* selected,
     similarity_type_t my_threshold;
     if (threshold_number < 0) {
       my_threshold = global_threshold;
-    } else if (ldr.threshold(
-                   my_threshold,
-                   threshold_number))  // perhaps a per item threshold can be used
+    } else if (ldr.threshold(my_threshold, threshold_number)) {  // perhaps a per item threshold can be used
       ;
-    else {
+    } else {
       my_threshold = global_threshold;
     }
 
     int max_cluster_size_this_molecule;
 
-    if (ldr.max_cluster_size(max_cluster_size_this_molecule))
+    if (ldr.max_cluster_size(max_cluster_size_this_molecule)) {
       ;
-    else {
+    } else {
       max_cluster_size_this_molecule = max_cluster_size;
     }
 

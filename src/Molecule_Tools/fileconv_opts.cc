@@ -263,6 +263,8 @@ FileconvConfig::DefaultValues() {
 
   append_isis_molecular_formula_to_name = 0;
 
+  append_aromatic_distinguishing_molecular_formula_to_name = 0;
+
   append_nrings_to_name = 0;
 
   append_aromatic_ring_count_to_name = 0;
@@ -274,6 +276,8 @@ FileconvConfig::DefaultValues() {
   append_net_formal_charge_to_name = 0;
 
   append_clnd_count_to_name = 0;
+
+  prepend_feature_name = 1;
 
   lower_amw_cutoff = -1.0;
   molecules_below_amw_cutoff = 0;
@@ -436,20 +440,23 @@ DisplayFOptions(int rc) {
 void
 DisplayPDirectives(int rc) {
   // clang-format off
-  cerr << " Appends various molecular properties to the molecule name\n";
-  cerr << "  -p AMW         append molecular weight to the name (isotopic atoms fail molecule)\n";
-  cerr << "  -p AMWI        append molecular weight to the name (isotopic atoms handled)\n";
-  cerr << "  -p MF          append molecular formula to the name\n";
-  cerr << "  -p ISISMF      append ISIS-like molecular formula to the name\n";
-  cerr << "  -p NATOMS      append number of atoms to the name\n";
-  cerr << "  -p NRINGS      append number of rings to the name\n";
-  cerr << "  -p AROMR       append number of aromatic rings to the name\n";
-  cerr << "  -p HTROAC      append number of heteroatoms to the name\n";
-  cerr << "  -p EXACT       append exact mass to the name\n";
-  cerr << "  -p NFC         append net formal charge to the name\n";
-  cerr << "  -p CLND        append Chemiluminescent Nitrogen Detection\n";
-  cerr << "  -p PREPEND     do a prepend rather than append\n";
-  cerr << "  -p LARGE       computed properties derived from the largest fragment\n";
+  cerr << R"( Appends various molecular properties to the molecule name
+  -p AMW         append molecular weight to the name (isotopic atoms fail molecule)
+  -p AMWI        append molecular weight to the name (isotopic atoms handled)
+  -p MF          append molecular formula to the name
+  -p ISISMF      append ISIS-like molecular formula to the name
+  -p ADMF        append aromatic distinguishing molecular formula to the name
+  -p NATOMS      append number of atoms to the name
+  -p NRINGS      append number of rings to the name
+  -p AROMR       append number of aromatic rings to the name
+  -p HTROAC      append number of heteroatoms to the name
+  -p EXACT       append exact mass to the name
+  -p NFC         append net formal charge to the name
+  -p CLND        append Chemiluminescent Nitrogen Detection
+  -p PREPEND     do a prepend rather than append
+  -p LARGE       computed properties derived from the largest fragment
+  -p noname      do NOT prepend the name of the property to the result
+)";
   // clang-format on
 
   exit(rc);
@@ -646,28 +653,56 @@ FileconvConfig::ComputeClnd(const Molecule& m) {
   return rc;
 }
 
+// If we are prepending feature names, add `feature_name`
+// to `extra_stuff`.
+// If we are NOT prepending the feature name to the output,
+// add a space so that when the value is appended, there is a space.
+void
+FileconvConfig::MaybeAppendFeatureName(const char* feature_name,
+                IWString& extra_stuff) const {
+  if (! prepend_feature_name) {
+    extra_stuff << ' ';
+    return;
+  }
+
+  extra_stuff << ' ' << feature_name << " = ";
+}
+
 void
 FileconvConfig::DoAppends(Molecule& m, IWString& extra_stuff) {
   if (append_molecular_formula_to_name) {
-    extra_stuff += " MF = ";
+    MaybeAppendFeatureName("MF", extra_stuff);
     extra_stuff += m.molecular_formula();
   }
 
   if (append_isis_molecular_formula_to_name) {
-    extra_stuff += " ISISMF = ";
+    MaybeAppendFeatureName("ISISMF", extra_stuff);
     IWString tmp;
     m.isis_like_molecular_formula_dot_between_fragments(tmp);
     extra_stuff += tmp;
   }
 
-  if (append_natoms_to_name)
-    extra_stuff << " NATOMS = " << m.natoms();
+  if (append_aromatic_distinguishing_molecular_formula_to_name) {
+    MaybeAppendFeatureName("ADMF", extra_stuff);
+    IWString tmp;
+    m.formula_distinguishing_aromatic(tmp);
+    extra_stuff += tmp;
+  }
 
-  if (append_nbonds_to_name)
-    extra_stuff << " NBONDS = " << m.nedges();
+  if (append_natoms_to_name) {
+    MaybeAppendFeatureName("NATOMS", extra_stuff);
+    extra_stuff << m.natoms();
+  }
 
-  if (append_nrings_to_name)
-    extra_stuff << " NRINGS = " << m.nrings();
+  if (append_nbonds_to_name) {
+    MaybeAppendFeatureName("NBONDS", extra_stuff);
+    extra_stuff << m.nedges();
+  }
+
+  if (append_nrings_to_name) {
+    MaybeAppendFeatureName("NRINGS", extra_stuff);
+    extra_stuff << m.nrings();
+  }
 
   if (append_aromatic_ring_count_to_name) {
     m.compute_aromaticity_if_needed();
@@ -680,17 +715,20 @@ FileconvConfig::DoAppends(Molecule& m, IWString& extra_stuff) {
         nar++;
     }
 
-    extra_stuff << " AROMRING = " << nar;
+    MaybeAppendFeatureName("AROMRING", extra_stuff);
+    extra_stuff << nar;
   }
 
-  if (append_molecular_weight_to_name)
-    extra_stuff << " AMW = " << m.molecular_weight();
-  else if (append_molecular_weight_ok_isotope_to_name) {
+  if (append_molecular_weight_to_name) {
+    MaybeAppendFeatureName("AMW", extra_stuff);
+    extra_stuff << m.molecular_weight();
+  } else if (append_molecular_weight_ok_isotope_to_name) {
     Molecular_Weight_Control mwc;
     Molecular_Weight_Calculation_Result mwcr;
     mwc.set_ignore_isotopes(0);
     (void)m.molecular_weight(mwc, mwcr);
-    extra_stuff << " AMW = " << mwcr.amw();
+    MaybeAppendFeatureName("AMW", extra_stuff);
+    extra_stuff << mwcr.amw();
   }
 
   if (append_exact_mass_to_name) {
@@ -698,18 +736,24 @@ FileconvConfig::DoAppends(Molecule& m, IWString& extra_stuff) {
     if (!m.exact_mass(x))
       cerr << "Warning, molecule '" << m.name() << "' partial result for exact mass\n";
 
-    extra_stuff << " EXACT_MASS = " << x;
+    MaybeAppendFeatureName("EXACT_MASS", extra_stuff);
+    extra_stuff << x;
   }
 
   if (append_heteratom_count_to_name) {
-    extra_stuff << " HTROAC = " << (m.natoms() - m.natoms(6) - m.natoms(1));
+    MaybeAppendFeatureName("HTROAC", extra_stuff);
+    extra_stuff << (m.natoms() - m.natoms(6) - m.natoms(1));
   }
 
-  if (append_net_formal_charge_to_name)
-    extra_stuff << " FORMAL_CHARGE = " << m.formal_charge();
+  if (append_net_formal_charge_to_name) {
+    MaybeAppendFeatureName("FORMAL_CHARGE", extra_stuff);
+    extra_stuff << m.formal_charge();
+  }
 
-  if (append_clnd_count_to_name)
-    extra_stuff << " CLND = " << ComputeClnd(m);
+  if (append_clnd_count_to_name) {
+    MaybeAppendFeatureName("CLND", extra_stuff);
+    extra_stuff << ComputeClnd(m);
+  }
 
   return;
 }
@@ -4794,6 +4838,12 @@ FileconvConfig::GatherAppendSpecifications(Command_Line& cl, char flag) {
         cerr << "The ISIS-like molecular formula will be appended to the name\n";
 
       appends_to_be_done = 1;
+    } else if ("ADMF" == p) {
+      append_aromatic_distinguishing_molecular_formula_to_name = 1;
+      if (verbose) {
+        cerr << "The aromatic distinguishing molecular formula will be appended to the name\n";
+      }
+      appends_to_be_done = 1;
     } else if ("NATOMS" == p) {
       append_natoms_to_name = 1;
       if (verbose)
@@ -4850,6 +4900,11 @@ FileconvConfig::GatherAppendSpecifications(Command_Line& cl, char flag) {
         cerr << "Will append the heteroatom count to the name\n";
 
       appends_to_be_done = 1;
+    } else if (p == "noname") {
+      prepend_feature_name = 0;
+      if (verbose) {
+        cerr << "Will NOT prepend the feature name before the property value\n";
+      }
     } else if ("help" == p) {
       DisplayPDirectives(0);
     } else {

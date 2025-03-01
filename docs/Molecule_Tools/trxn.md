@@ -1,7 +1,7 @@
 # trxn
 
 `trxn` makes molecules based on a reaction specification
-and one or more sets of input molecules. It operate on a
+and one or more sets of input molecules. It can operate on a
 single molecule - performing some kind of intra-molecular
 change, or to perform a reaction involving any number of
 different sidechains.
@@ -15,13 +15,157 @@ reaction file will
 need to specify that the bond between matched atoms 0 (`[OH]`) and
 1 (`C`) is to be broken, and that matched atom 0, the `[OH]` is 
 to be removed. While this may seem tedious at first, the
-fine degree of control available becomes an advantage.
+precise degree of control available becomes an advantage.
 
 Whenever using `trxn` this correspondence between matched atom
 number, starting at zero, is crucial. All directives for changes
 are specified based on one or more matched atom numbers.
 
-It was originally developed to process combinatorial libraries
+For example, an simple acid-amine reaction might look like
+
+```
+name: "Acid + amine"
+scaffold {
+  id: 0
+  smarts: "[OH]-[CD3]=O"
+  remove_atom: 0
+}
+sidechain {
+  id: 1
+  smarts: "[NH2]-[CX4]"
+  join {
+    a1: 1
+    a2: 0
+    btype: SS_SINGLE_BOND
+  }
+}
+```
+The `name` field is optional.
+
+The order of the atoms in the smarts defines the atom numbering
+for the directives that change the molecule. Again, atom numbers
+start with 0.
+
+In this case we chose to call the acid the
+scaffold, and the amine the sidechain. That is entirely arbitrary, but it
+does mean that in order to perform this reaction, the command line must
+look something like
+```
+trxn -P acid_amine.rxn acid.smi amine.smi
+```
+where the order of the input files on the command line corresponds to
+the ordering within the reaction file.
+
+The same effect can be achieved by reversing the role of scaffold and
+sidechain,
+```
+name: "Amine + Acid"
+scaffold {
+  id: 0
+  smarts: "[NH2]-[CX4]"
+}
+sidechain {
+  id: 1
+  smarts: "[OH]-[CD3]=O"
+  remove_atom: 0
+  join {
+    a1: 0
+    a2: 1
+    btype: SS_SINGLE_BOND
+  }
+}
+```
+and then running
+```
+trxn -P amine_acid.rxn amine.smi acid.smi
+```
+where again, the order of reagents in the reaction file must correspond
+with what is given on the command line.
+
+If there is a single sidechain, the same reagent is being reacted with
+each scaffold, that can be specified in the reaction file via a
+`reagent` directive in the sidechain. For example
+a Buchwald reaction that just uses di-ethyl amine 'CCNCC' might be
+
+```
+name: "Buchwald"
+scaffold {
+  id: 0
+  smarts: "Br-c"
+  remove_atom: 0
+}
+sidechain {
+  id: 1
+  reagent: "CCNCC diethylamine"
+  smarts: "[ND2](-[CX4])-[CX4]"
+  join {
+    a1: 1
+    a2: 0
+    btype: SS_SINGLE_BOND
+  }
+}
+```
+and in this case `trxn` would be invoked with just the file of aryl Bromides
+```
+trxn -P buchwald_fixed.rxn aryl_bromine.smi
+```
+
+Note that with both of these reactions there is a single atom lost, which
+is discarded via the `remove_atom` directive. If that was not specified,
+those atoms would remain with their original bonding - likely leading
+to a valence error. If you instread wish to preserve the lost atoms as
+a separate fragment, you can break the bond between the lost atom and
+the rest of the molecule.
+
+The fixed reagent Buchwald reaction would be
+```
+name: "Buchwald"
+scaffold {
+  id: 0
+  smarts: "Br-c"
+  break_bond {
+    a1: 0
+    a2: 1
+  }
+}
+sidechain {
+  id: 1
+  reagent: "CCNCC diethylamine"
+  smarts: "[ND2](-[CX4])-[CX4]"
+  join {
+    a1: 1
+    a2: 0
+    btype: SS_SINGLE_BOND
+  }
+}
+```
+which generates products that include disconnected Bromine atoms.
+
+Once a bond has been broken, if that defines a fragment, rather
+than atom, to be lost, the remove_fragment directive will remove all atoms
+in the fragment defined by the matched atom.
+
+Note that multiple atoms (or fragments) can be removed, since in 
+the proto definition file, [reaction.proto](/src/Molecule_Lib/reaction.proto)
+the `remove_atom` and `remove_fragment` directives are repeated fields. Removing
+multiple atoms can be either
+```
+scaffold {
+  remove_atom: 0
+  remove_atom: 1
+}
+```
+or
+```
+scaffold {
+  remove_atom: [0, 1]
+}
+```
+where the atoms to be removed are entered either as separate directives or
+as a vector of matched atoms.
+
+## Combinatorial Generation
+`trxn` was originally developed to process combinatorial libraries
 and as such, can be fast if doing that. For historical reasons,
 it divides reagents into one called `scaffold` and all others
 are referred to as `sidechains`. This is an artificial

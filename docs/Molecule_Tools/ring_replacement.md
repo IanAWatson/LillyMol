@@ -192,7 +192,7 @@ smi: "[CH2:70]1NC=CC=[1CH]1" smt: "[ax2r6D2]1:[ax2r6D2]:[ax2r6D2]:[ax2r6D2]:[ax2
         id: "CHEMBL4558322.6a" n: 1 conn: true exo: "[70O]" usmi: "O=c1[nH]ccc[1cH]1"
 ```
 The exocyclic atoms are specified as a separate molecule with an isotopic label near
-70. Somewhere within the replacement ring 'smi:', there will be an atom map number
+70. Somewhere within the replacement ring 'smi:', there will be an atom with atom map number
 corresponding to this isotopic label. That is where the doubly bonded exocyclic
 atom will be joined. The corresponding atom within the smarts does still have 'D2'
 so we can not yet do fully flexibile ring replacement. Getting there...

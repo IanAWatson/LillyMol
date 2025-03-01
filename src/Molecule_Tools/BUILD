@@ -3163,22 +3163,6 @@ cc_library(
 )
 
 cc_library(
-    name = "molfromcoords",
-    srcs = [
-        "molfromcoords.cc",
-    ],
-    hdrs = [
-        "molfromcoords.h",
-    ],
-    deps = [
-        ":bond_length_distribution_cc_proto",
-        "//Foundational/iwmisc",
-        "//Molecule_Lib:iwmolecule",
-        "//Molecule_Lib:iwreaction",
-    ],
-)
-
-cc_library(
     name = "mpr",
     srcs = [
         "mpr.cc",

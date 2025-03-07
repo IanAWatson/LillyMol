@@ -2,6 +2,8 @@
 #define MOLECULE_TOOLS_SAFE_GENERATE_LIB_H_
 
 #include "Molecule_Lib/molecule.h"
+#include "Molecule_Lib/path.h"
+
 #ifdef BUILD_BAZEL
 #include "Molecule_Tools/dicer_fragments.pb.h"
 #else

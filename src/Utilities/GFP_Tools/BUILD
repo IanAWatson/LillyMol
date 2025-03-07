@@ -986,8 +986,21 @@ cc_binary(
     ],
     deps = [
         ":nearneighbours_cc_proto",
+        ":spread_weights",
+        "//Foundational/accumulator",
         "//Foundational/cmdline:iwcmdline",
         "//Foundational/data_source:iwtfdata_record",
+    ],
+    copts = [
+        #       "-fopenmp=libiomp5",  llvm
+        "-fopenmp",
+    ],
+    linkopts = [
+        #       "-L/usr/lib/llvm-11/lib/",  # clang
+        "-lgomp",
+    ],
+    tags = [
+        "omp",
     ],
 )
 
@@ -1347,6 +1360,21 @@ cc_library(
     ],
     deps = [
         "//Foundational/accumulator",
+    ],
+)
+
+cc_library( 
+    name = "spread_weights",
+    srcs = [
+        "spread_weights.cc",
+    ],
+    hdrs = [
+        "spread_weights.h",
+    ],
+    deps = [
+        "//Foundational/cmdline:iwcmdline",
+        "//Foundational/data_source:iwstring_data_source",
+        "//Foundational/iwstring:iwstring",
     ],
 )
 

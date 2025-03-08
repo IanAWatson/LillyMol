@@ -38,7 +38,6 @@
 #include "nndata.h"
 
 using std::cerr;
-using std::endl;
 
 // Must be defined before neighbour_list.h
 static IWString identifier_tag("PCN<");
@@ -213,7 +212,7 @@ Needle::_consider_min_nbrs(const similarity_type_t d, const IWString& smiles,
   // of neighbours grow without bounds
 
   // cerr << "nbrs " << number_neighbours() << " max d " <<
-  // distance_of_furthest_neighbour() << " max " << _upper_distance_threshold << endl;
+  // distance_of_furthest_neighbour() << " max " << _upper_distance_threshold << '\n';
 
   if (nn + 1 > min_number_neighbours &&
       distance_of_furthest_neighbour() > upper_distance_threshold) {
@@ -628,7 +627,7 @@ nearneighbours(int argc, char** argv) {
     lower_distance_threshold = t;
 
     if (verbose) {
-      cerr << "Lower distance threshold set to " << lower_distance_threshold << endl;
+      cerr << "Lower distance threshold set to " << lower_distance_threshold << '\n';
     }
   }
 
@@ -643,7 +642,7 @@ nearneighbours(int argc, char** argv) {
       }
 
       if (verbose) {
-        cerr << "Upper distance threshold set to " << upper_distance_threshold << endl;
+        cerr << "Upper distance threshold set to " << upper_distance_threshold << '\n';
       }
     }
   }
@@ -779,7 +778,7 @@ nearneighbours(int argc, char** argv) {
 
     if (neighbours_to_find > 0 && min_number_neighbours > neighbours_to_find) {
       cerr << "Inconsistent specification of neighbours_to_find " << neighbours_to_find
-           << " and min_number_neighbours " << min_number_neighbours << endl;
+           << " and min_number_neighbours " << min_number_neighbours << '\n';
       usage(4);
     }
   }

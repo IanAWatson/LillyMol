@@ -1,6 +1,7 @@
 // Spread implementation using precomputed distances.
 // Nearnest neighbour data is read from serialized NearNeighbours protos
 
+#include <chrono>
 #include <iostream>
 #include <limits>
 #include <optional>
@@ -13,6 +14,7 @@
 #define RESIZABLE_ARRAY_IWQSORT_IMPLEMENTATION
 #include "Foundational/accumulator/accumulator.h"
 #include "Foundational/cmdline/cmdline.h"
+#include "Foundational/data_source/iwstring_data_source.h"
 #include "Foundational/data_source/tfdatarecord.h"
 #include "Foundational/iwmisc/misc.h"
 #include "Foundational/iwstring/iw_stl_hash_map.h"
@@ -59,6 +61,7 @@ then use the resulting .tfdata file here.
  -q <n>         squeeze out selected items every <n> items selected.
  -3             three column output 'smiles id distance'.
  -W ...         initialise weighting options, enter '-W help' for info.
+ -e             input consists of nnbr::NearNeighboursIndices protos - possibly written by nn_id_to_ndx.
  -h <nthreads>  number of OMP threads to use.
  -S <fname>     smiles file that generated the nearneighbours - saves a scan through the input file.
  -v             verbose output.
@@ -139,9 +142,6 @@ class SpreadItem {
     // with that distance.
     uint32_t _index_of_shortest_distance;
 
-    // The index of this item in the global arrays of ids and smiles.
-    uint32_t _ndx;
-
     // The number of neighbours we have.
     uint32_t _nbrs;
 
@@ -159,6 +159,9 @@ class SpreadItem {
     int Build(const nnbr::NearNeighbours& proto,
               uint32_t ndx,
               const Data& data);
+    int Build(const nnbr::NearNeighboursIndices& proto,
+              uint32_t ndx,
+              const Data& data);
 
     int number_neighbours() const {
       return _nbrs;
@@ -172,6 +175,9 @@ class SpreadItem {
 
     uint32_t index_of_shortest_distance() const {
       return _index_of_shortest_distance;
+    }
+    float shortest_distance_to_selected() const {
+      return _shortest_distance_to_selected;
     }
 
     float unweighted_distance(uint32_t nbr) const;
@@ -199,7 +205,6 @@ constexpr float kNoNeighboursSelected = 0.99f;
 SpreadItem::SpreadItem() {
   _index_of_shortest_distance = 0;  // not really
   _shortest_distance_to_selected = kNoNeighboursSelected;
-  _ndx = 0;
   _nbrs = 0;
   _nbr = nullptr;
   _dist = nullptr;
@@ -279,6 +284,56 @@ SpreadItem::Build(const nnbr::NearNeighbours& proto,
   return 1;
 }
 
+// Build from `proto` in a situation where our index will be `my_ndx`.
+// If we detect self neighbours in the input, drop them.
+int
+SpreadItem::Build(const nnbr::NearNeighboursIndices& proto,
+                  uint32_t my_ndx,
+                  const Data& data) {
+  _nbrs = proto.nbr_size();
+  _nbr = new uint32_t[_nbrs];
+  _dist = new float[_nbrs];
+
+  int ndx = 0;  // Index into the arrays.
+
+  for (const nnbr::NbrNdx& nbr : proto.nbr()) {
+    float d = nbr.dist();
+
+    assert(d >= 0.0f && d <= 1.0f);
+
+    if (d > data.max_distance) {
+      continue;
+    }
+
+    uint32_t n = nbr.id();
+    if (n == my_ndx) [[ unlikely ]] {
+      continue;
+    }
+
+    if (n >= data.smiles.size()) {
+      cerr << "SpreadItem::Buiid:nbr number out of range\n";
+      cerr << data.smiles.size() << " smiles, nbr " << n << '\n';
+      return 0;
+    }
+
+    _nbr[ndx] = n;
+    _dist[ndx] = d;
+
+    ++ndx;
+  }
+
+  _nbrs = ndx;
+
+#ifdef DEBUG_BUILD
+  cerr << "Item " << _ndx << " has " << _nbrs << " neighbours\n";
+  for (int i = 0; i < _nbrs; ++i) {
+    cerr << ' ' << _nbr[i] << '\n';
+  }
+#endif
+
+  return 1;
+}
+
 void
 SpreadItem::set_weight(float s) {
   _weight = s;
@@ -324,7 +379,7 @@ bool
 SpreadItem::ClosestToAlreadySelected(float& closest_distance) const {
 
   // cerr << "ClosestToAlreadySelected, _shortest_distance_to_selected " << _shortest_distance_to_selected << " cmp " << closest_distance << '\n';
-  if (closest_distance > _shortest_distance_to_selected) {
+  if (_shortest_distance_to_selected < closest_distance) {
     return false;
   }
 
@@ -394,17 +449,23 @@ class Spread {
 
     spread_weights::ScalingFactor _weights;
 
+    // Will be set if we are reading nnbr::NearNeighboursIndices protos.
+    int _nbr_data_is_indices;
+
     // Number of OMP threads to use.
     int _nthreads;
 
     int _verbose;
 
+    // We can make generating a plot of distances easier.
+    IWString_and_File_Descriptor _selected_distances_stream;
+
   // Private functions.
-    int AddToPool(const nnbr::NearNeighbours& proto,
+    template <typename T> int AddToPool(const T& proto,
           const Data& data,
           IWString_and_File_Descriptor& output);
-    bool EstablishCrossReferences(const nnbr::NearNeighbours& proto, Data& data);
-    uint32_t EstablishCrossReferences(TFDataReader& input, Data& data);
+    template <typename T>bool EstablishCrossReferences(const T& proto, Data& data);
+    template <typename T> uint32_t EstablishCrossReferences(TFDataReader& input, Data& data);
     bool EstablishCrossReferences(const IWString& smiles,
                                  IWString& id,
                                  Data& data);
@@ -413,7 +474,10 @@ class Spread {
     uint32_t ReadNbrData(TFDataReader& input,
             const Data& data,
             IWString_and_File_Descriptor& output);
-    int HandleSingleton(const nnbr::NearNeighbours& proto,
+    uint32_t ReadNbrDataIndics(TFDataReader& input,
+                          const Data& data,
+                          IWString_and_File_Descriptor& output);
+    template <typename T> int HandleSingleton(const T& proto,
                         IWString_and_File_Descriptor& output);
     bool MostDistant(Data& data, uint32_t& ndx_of_furthest,
                     uint32_t& nbr_of_furthest,
@@ -459,7 +523,20 @@ class Spread {
       return _singleton_count;
     }
 
+    // If we are squeezing or _nbr_data_is_indices
+    bool xref_needed() const {
+      return _squeeze > 0 || _nbr_data_is_indices;
+    }
+
+    // If we are reading NearNeighboursIndices protos, we have loaded _pool
+    // with nullptr entries. Remove them and adjust everyone's numbering.
+    int SqueezeSingletons(Data& data);
+
     uint32_t ReadNbrData(const char* fname,
+            const Data& data,
+            IWString_and_File_Descriptor& output);
+
+    template <typename T> uint32_t ReadNbrDataTemplate(TFDataReader& input,
             const Data& data,
             IWString_and_File_Descriptor& output);
 
@@ -475,6 +552,7 @@ Spread::Spread() {
   _singleton_count = 0;
   _three_column_output = false;
   _output_separator = ' ';
+  _nbr_data_is_indices = 0;
   _verbose = 0;
 }
 
@@ -482,6 +560,13 @@ int
 Spread::Initialise(Command_Line& cl) {
 
   _verbose = cl.option_present('v');
+
+  if (cl.option_present('e')) {
+    _nbr_data_is_indices = 1;
+    if (_verbose) {
+      cerr << "Input files assumed to be TFDataRecord serialized nnbr::NearNeighboursIndices\n";
+    }
+  }
 
   if (cl.option_present('n')) {
     if (! cl.value('n', _items_to_select)) {
@@ -544,8 +629,29 @@ Spread::Initialise(Command_Line& cl) {
   return 1;
 }
 
+// Just fill the data.selected array and call Squeeze.
 int
-Spread::HandleSingleton(const nnbr::NearNeighbours& proto,
+Spread::SqueezeSingletons(Data& data) {
+  if (! _nbr_data_is_indices) {
+    return 1;
+  }
+
+  const uint32_t n = _pool.size();
+
+  for (uint32_t i = 0; i < n; ++i) {
+    if (_pool[i] == nullptr) {
+      data.selected[i] = 1;
+    } else {
+      data.selected[i] = 0;
+    }
+  }
+
+  return Squeeze(data);
+}
+
+template <typename T>
+int
+Spread::HandleSingleton(const T& proto,
                         IWString_and_File_Descriptor& output) {
   ++_singleton_count;
 
@@ -558,13 +664,14 @@ Spread::HandleSingleton(const nnbr::NearNeighbours& proto,
     output << "|\n";
   }
 
-  output.write_if_buffer_holds_more_than(4192);
+  output.write_if_buffer_holds_more_than(4096);
 
   return 1;
 }
 
+template <typename T>
 int
-Spread::AddToPool(const nnbr::NearNeighbours& proto,
+Spread::AddToPool(const T& proto,
           const Data& data,
           IWString_and_File_Descriptor& output) {
   std::unique_ptr<SpreadItem> s = std::make_unique<SpreadItem>();
@@ -578,6 +685,10 @@ Spread::AddToPool(const nnbr::NearNeighbours& proto,
   }
 
   if (s->number_neighbours() == 0) {
+    if (_nbr_data_is_indices) {
+      _pool << static_cast<SpreadItem*>(nullptr);
+    }
+
     return HandleSingleton(proto, output);
   }
 
@@ -586,13 +697,13 @@ Spread::AddToPool(const nnbr::NearNeighbours& proto,
   return 1;
 }
 
+template <typename T>
 uint32_t
-Spread::ReadNbrData(TFDataReader& input,
+Spread::ReadNbrDataTemplate(TFDataReader& input,
             const Data& data,
             IWString_and_File_Descriptor& output) {
   while (1) {
-    std::optional<nnbr::NearNeighbours> maybe_proto =
-      input.ReadProto<nnbr::NearNeighbours>();
+    std::optional<T> maybe_proto = input.ReadProto<T>();
     if (! maybe_proto) {
       return _pool.size();
     }
@@ -601,6 +712,21 @@ Spread::ReadNbrData(TFDataReader& input,
   }
 
   return _pool.size();
+}
+                
+
+uint32_t
+Spread::ReadNbrData(TFDataReader& input,
+            const Data& data,
+            IWString_and_File_Descriptor& output) {
+  return ReadNbrDataTemplate<nnbr::NearNeighbours>(input, data, output);
+}
+
+uint32_t
+Spread::ReadNbrDataIndics(TFDataReader& input,
+                          const Data& data,
+                          IWString_and_File_Descriptor& output) {
+  return ReadNbrDataTemplate<nnbr::NearNeighboursIndices>(input, data, output);
 }
 
 uint32_t
@@ -614,15 +740,20 @@ Spread::ReadNbrData(const char* fname,
     return 0;
   }
 
+  if (_nbr_data_is_indices) {
+    return ReadNbrDataIndics(input, data, output);
+  }
+
   return ReadNbrData(input, data, output);
 }
 
+template <typename T>
 bool
-Spread::EstablishCrossReferences(const nnbr::NearNeighbours& proto, Data& data) {
-  IWString id = proto.name();
+Spread::EstablishCrossReferences(const T& proto, Data& data) {
   IWString smiles = proto.smiles();
+  IWString id = proto.name();
 
-  return EstablishCrossReferences(id, smiles, data);
+  return EstablishCrossReferences(smiles, id, data);
 }
 
 bool
@@ -648,18 +779,20 @@ Spread::EstablishCrossReferences(const IWString& smiles,
   return true;
 }
 
+template <typename T>
 uint32_t
 Spread::EstablishCrossReferences(TFDataReader& input, Data& data) {
   uint32_t items_read = 0;
 
   while (1) {
-    std::optional<nnbr::NearNeighbours> maybe_proto =
-      input.ReadProto<nnbr::NearNeighbours>();
+    std::optional<T> maybe_proto = input.ReadProto<T>();
     if (! maybe_proto) {
       return items_read;
     }
 
-    if (maybe_proto->nbr_size() == 0) {
+    // If indexing is being done by names, we can skip singletons here.
+    if (_nbr_data_is_indices) {
+    } else if (maybe_proto->nbr_size() == 0) {
       continue;
     }
 
@@ -681,7 +814,11 @@ Spread::EstablishCrossReferences(const char* fname, Data& data) {
     return 0;
   }
 
-  return EstablishCrossReferences(input, data);
+  if (_nbr_data_is_indices) {
+    return EstablishCrossReferences<nnbr::NearNeighboursIndices>(input, data);
+  } else {
+    return EstablishCrossReferences<nnbr::NearNeighbours>(input, data);
+  }
 }
 
 uint32_t
@@ -766,7 +903,7 @@ Spread::MostDistantOmp(Data& data, uint32_t& ndx_of_furthest,
   {
     float longest_distance_private = -1.0f;
     uint32_t ndx_of_furthest_private = 0;
-#pragma omp for schedule(dynamic, 4192) nowait
+#pragma omp for schedule(dynamic, 8192) nowait
     for (uint32_t i = 0; i < n; ++i) {
       if (data.selected[i]) [[ unlikely ]] {
         continue;
@@ -802,7 +939,7 @@ Spread::SpreadSelection(Data& data, IWString_and_File_Descriptor& output) {
   uint32_t items_selected = 1;
 
   while (items_selected < _items_to_select) {
-    // cerr << items_selected << " items selected\n";
+    // cerr << items_selected << " items selected, need " << _items_to_select << " pool contains " << _pool.size() << '\n';
     uint32_t most_distant;
     uint32_t prev_sel;
     float longest_distance;
@@ -898,7 +1035,11 @@ Spread::ItemHasBeenSelected(Data& data, uint32_t sel,
       continue;
     }
 
+    if (nbr >= _pool.size()) {
+      cerr << "Nbr out of range " << nbr << " pool " << _pool.size() << '\n';
+    } else {
     _pool[nbr]->ItemHasBeenSelected(sel);
+    }
   }
 
   return 1;
@@ -915,13 +1056,16 @@ Spread::Squeeze(Data& data) {
       continue;
     }
 
-    data.xref[ndx] = i;
+    data.xref[i] = ndx;
+    ++ndx;
   }
 
   // Remove selected items from _pool.
-  for (uint32_t i = n - 1; i >= 0; --i) {
-    if (data.selected[i]) {
-      _pool.remove_item(i);
+  // Note that we cannot use a uint32_t in the for loop if descending...
+  for (uint32_t i = 0; i < n; ++i) {
+    uint32_t j = n - i - 1;
+    if (data.selected[j]) {
+      _pool.remove_item(j);
     }
   }
 
@@ -930,6 +1074,7 @@ Spread::Squeeze(Data& data) {
   }
 
   // All items are unselected now.
+  // cerr << "Spread::Squeeze ndx " << ndx << '\n';
   std::fill_n(data.selected, ndx, 0);
 
   return 1;
@@ -940,6 +1085,10 @@ Spread::Nbrs() const {
   Accumulator_Int<uint64_t> result;
 
   for (const SpreadItem* s : _pool) {
+    if (s == nullptr) {
+      continue;
+    }
+
     result.extra(s->number_neighbours());
   }
 
@@ -969,7 +1118,7 @@ Spread::InitialiseWeights(Data& data) {
 
 int
 Main(int argc, char** argv) {
-  Command_Line cl(argc, argv, "vs:n:3q:T:W:h:S:");
+  Command_Line cl(argc, argv, "vs:n:3q:T:W:h:S:e");
 
   if (cl.unrecognised_options_encountered()) {
     cerr << "Unrecognised options encountered\n";
@@ -995,6 +1144,8 @@ Main(int argc, char** argv) {
     cerr << "Cannot initialise Data struct\n";
     return 1;
   }
+
+  const auto tzero = std::chrono::system_clock::now();
 
   uint32_t items_in_input = 0;
 
@@ -1030,15 +1181,17 @@ Main(int argc, char** argv) {
   spread.ReservePool(items_in_input);
   data.selected = new_int(items_in_input);
 
-  if (spread.squeeze() > 0) {
-    data.xref = new uint32_t[spread.squeeze()];
+  if (spread.xref_needed()) {
+    data.xref = new uint32_t[items_in_input];
   }
 
-  // Declare here because singletons are discarded as the data is read.
+  // Declare now because singletons are discarded as the data is read.
   IWString_and_File_Descriptor output(1);
 
   for (const char* fname: cl) {
-    cerr << "Reading NNDATA from '" << fname << "'\n";
+    if (verbose) {
+      cerr << "Reading NNDATA from '" << fname << "'\n";
+    }
     if (! spread.ReadNbrData(fname, data, output)) {
       cerr << "Cannot read nearest neighbour data from '" << fname << "'\n";
       return 1;
@@ -1051,12 +1204,21 @@ Main(int argc, char** argv) {
     const Accumulator_Int<uint64_t> acc_nbrs = spread.Nbrs();
     cerr << "Nbrs btw " << acc_nbrs.minval() << " and " << acc_nbrs.maxval() << 
             " ave " << static_cast<float>(acc_nbrs.average()) << '\n';
+    auto now = std::chrono::system_clock::now();
+    auto elapsed_seconds = std::chrono::duration_cast<std::chrono::seconds>(now - tzero);
+    cerr << "Reading data took " << elapsed_seconds << " seconds\n";
   }
 
   if (cl.option_present('W')) {
     if (! spread.InitialiseWeights(data)) {
       cerr << "Cannot initialise weights\n";
     }
+  }
+
+  spread.SqueezeSingletons(data);
+
+  if (verbose) {
+    cerr << "After squeezing singletons " << spread.size() << '\n';
   }
 
   spread.SpreadSelection(data, output);

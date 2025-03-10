@@ -64,6 +64,7 @@ then use the resulting .tfdata file here.
  -e             input consists of nnbr::NearNeighboursIndices protos - possibly written by nn_id_to_ndx.
  -h <nthreads>  number of OMP threads to use.
  -S <fname>     smiles file that generated the nearneighbours - saves a scan through the input file.
+ -D <fname>     write file of distance vs number selected to <fname>.
  -v             verbose output.
   )";
   // clang-format on
@@ -438,6 +439,7 @@ class Spread {
     resizable_array_p<SpreadItem> _pool;
 
     uint32_t _squeeze;
+    uint32_t _next_squeeze;
 
     // As the data is read, anything with 0 neighbours is a singleton
     // and will be selected immediately, and not added to the pool.
@@ -549,6 +551,7 @@ Spread::Spread() {
   _items_to_select = std::numeric_limits<uint32_t>::max();
   _nthreads = 0;
   _squeeze = 0;
+  _next_squeeze = std::numeric_limits<uint32_t>::max();
   _singleton_count = 0;
   _three_column_output = false;
   _output_separator = ' ';
@@ -607,6 +610,7 @@ Spread::Initialise(Command_Line& cl) {
     if (_verbose) {
       cerr << "Will squeeze out selected items every " << _squeeze << " items selected\n";
     }
+    _next_squeeze = _squeeze;
   }
 
   if (cl.option_present('W')) {
@@ -624,6 +628,18 @@ Spread::Initialise(Command_Line& cl) {
     if (_verbose) {
       cerr << "Will use " << _nthreads << " threads\n";
     }
+  }
+
+  if (cl.option_present('D')) {
+    IWString fname = cl.string_value('D');
+    if (! _selected_distances_stream.open(fname)) {
+      cerr << "Spread::Initialise:cannot open stream for selected distances " << fname << "\n";
+      return 0;
+    }
+    if (_verbose) {
+      cerr << "Selection distance written to '" << fname << "'\n";
+    }
+    _selected_distances_stream << "Sel Dist\n";
   }
 
   return 1;
@@ -858,6 +874,8 @@ Spread::ReadSmilesRecord(const const_IWSubstring& buffer, Data& data) {
   return EstablishCrossReferences(smiles, id, data);
 }
 
+// When profiling is run, this is the most prominent function
+// consuming 30% of CPU
 bool
 Spread::MostDistant(Data& data, uint32_t& ndx_of_furthest,
                     uint32_t& nbr_of_furthest,
@@ -949,6 +967,10 @@ Spread::SpreadSelection(Data& data, IWString_and_File_Descriptor& output) {
 
     ItemHasBeenSelected(data, most_distant, prev_sel, longest_distance, output);
     ++items_selected;
+
+    if (items_selected > _next_squeeze) {
+      Squeeze(data);
+    }
   }
 
   output.flush();
@@ -1021,6 +1043,19 @@ Spread::ItemHasBeenSelected(Data& data, uint32_t sel,
     output << "|\n";
   }
 
+  if (_selected_distances_stream.is_open()) {
+    static int seq;
+    static float previous_distance = 2.0f;
+    if ((previous_distance - dist) >= 0.001) {
+      _selected_distances_stream << seq << ' ' << dist << '\n';
+    }
+
+    ++seq;
+    previous_distance = dist;
+
+    _selected_distances_stream.write_if_buffer_holds_more_than(4096);
+  }
+
   output.write_if_buffer_holds_more_than(4192);
 
   data.selected[sel] = 1;
@@ -1077,6 +1112,9 @@ Spread::Squeeze(Data& data) {
   // cerr << "Spread::Squeeze ndx " << ndx << '\n';
   std::fill_n(data.selected, ndx, 0);
 
+  //cerr << "After squeeze pool contains " << _pool.size() << " items\n";
+  _next_squeeze += _squeeze;
+
   return 1;
 }
 
@@ -1118,7 +1156,7 @@ Spread::InitialiseWeights(Data& data) {
 
 int
 Main(int argc, char** argv) {
-  Command_Line cl(argc, argv, "vs:n:3q:T:W:h:S:e");
+  Command_Line cl(argc, argv, "vs:n:3q:T:W:h:S:eD:");
 
   if (cl.unrecognised_options_encountered()) {
     cerr << "Unrecognised options encountered\n";

@@ -17,6 +17,7 @@
 #include "Foundational/data_source/iwstring_data_source.h"
 #include "Foundational/data_source/tfdatarecord.h"
 #include "Foundational/iwmisc/misc.h"
+#include "Foundational/iwmisc/report_progress.h"
 #include "Foundational/iwstring/iw_stl_hash_map.h"
 
 #include "spread_weights.h"
@@ -139,8 +140,11 @@ class SpreadItem {
   private:
     // Each item keeps track of how close it is to a selected item.
     float _shortest_distance_to_selected;
+
     // We also need to keep track of the index value for the neighbour
     // with that distance.
+    // It is important to note that this is an index into the starting
+    // smiles and id arrays. During squeezing this will not be changed.
     uint32_t _index_of_shortest_distance;
 
     // The number of neighbours we have.
@@ -152,6 +156,10 @@ class SpreadItem {
     float* _dist;
 
     float _weight;
+
+    // A unique id for this item. Actually it is the position of this
+    // item in the global smiles and id arrays.
+    uint32_t _uid;
 
   public:
     SpreadItem();
@@ -174,6 +182,13 @@ class SpreadItem {
     // All the stored distances are updated as well.
     void set_weight(float s);
 
+    void set_uid(uint32_t s) {
+      _uid = s;
+    }
+    uint32_t uid() const {
+      return _uid;
+    }
+
     uint32_t index_of_shortest_distance() const {
       return _index_of_shortest_distance;
     }
@@ -181,13 +196,17 @@ class SpreadItem {
       return _shortest_distance_to_selected;
     }
 
+    int DebugPrint(std::ostream& output) const;
+
     float unweighted_distance(uint32_t nbr) const;
 
     void Squeeze(const Data& data);
 
     // If item `ndx` has been selected, we may need to update our
-    // _shortest_distance_to_selected value.
-    void ItemHasBeenSelected(uint32_t ndx);
+    // _shortest_distance_to_selected value and
+    // _index_of_shortest_distance. That will be set to `nbr`
+    // if it is updated.
+    void ItemHasBeenSelected(uint32_t ndx, uint32_t nbr);
 
     // Among our already selected neighbours, what is the shortest distance.
     // If successful, `ndx_of_closest` will be the index of the closest,
@@ -204,13 +223,14 @@ class SpreadItem {
 constexpr float kNoNeighboursSelected = 0.99f;
 
 SpreadItem::SpreadItem() {
-  _index_of_shortest_distance = 0;  // not really
-  _shortest_distance_to_selected = kNoNeighboursSelected;
+  _index_of_shortest_distance = kNoNeighboursSelected;
+  _shortest_distance_to_selected = 2.0f;
   _nbrs = 0;
   _nbr = nullptr;
   _dist = nullptr;
 
   _weight = 1.0f;
+  _uid = 0;
 }
 
 SpreadItem::~SpreadItem() {
@@ -218,6 +238,23 @@ SpreadItem::~SpreadItem() {
   delete [] _dist;
 }
 
+int
+SpreadItem::DebugPrint(std::ostream& output) const {
+  output << "SpreadItem with " << _nbrs << " neighbours\n";
+  for (uint32_t i = 0; i < _nbrs; ++i) {
+    if (i > 0) {
+      output << ' ';
+    }
+    output << _nbr[i] << ' ' << _dist[i];
+  }
+
+  output << '\n';
+  if (_nbrs > 0) {
+    output << "_index_of_shortest_distance " << _index_of_shortest_distance << " _shortest_distance_to_selected " << _shortest_distance_to_selected << '\n';
+  }
+
+  return output.good();
+}
 
 // Return the value for the key `id` in `id_to_ndx`.
 std::optional<uint32_t>
@@ -361,6 +398,7 @@ SpreadItem::unweighted_distance(uint32_t nbr) const {
 // away from an already selected item.
 // So far, the furthest item is `closest_distance`. If we are larger
 // then that, then update `closest_distance` and `ndx_of_closest`.
+#ifdef NO_LONGER_USED_JJ
 bool
 SpreadItem::ClosestToAlreadySelected(uint32_t& ndx_of_closest,
                         float& closest_distance) const {
@@ -376,6 +414,8 @@ SpreadItem::ClosestToAlreadySelected(uint32_t& ndx_of_closest,
 
   return true;
 }
+#endif
+
 bool
 SpreadItem::ClosestToAlreadySelected(float& closest_distance) const {
 
@@ -393,8 +433,10 @@ SpreadItem::ClosestToAlreadySelected(float& closest_distance) const {
 // Item `sel` has just been selected. 
 // Scan our list of neighbours and find `sel`. Update
 // _shortest_distance_to_selected if needed.
+// `nbr` is the initial index of `sel`, so we can find its
+// smiles and id.
 void
-SpreadItem::ItemHasBeenSelected(uint32_t sel) {
+SpreadItem::ItemHasBeenSelected(uint32_t sel, uint32_t nbr) {
   for (uint32_t i = 0; i < _nbrs; ++i) {
     if (_nbr[i] != sel) {
       continue;
@@ -402,7 +444,7 @@ SpreadItem::ItemHasBeenSelected(uint32_t sel) {
 
     if (_dist[i] < _shortest_distance_to_selected) {
       _shortest_distance_to_selected = _dist[i];
-      _index_of_shortest_distance = _nbr[i];
+      _index_of_shortest_distance = nbr;
     }
     return;
   }
@@ -413,15 +455,15 @@ void
 SpreadItem::Squeeze(const Data& data) {
   uint32_t ndx = 0;
   for (uint32_t i = 0; i < _nbrs; ++i) {
-    if (data.selected[i]) {
-    } else if (ndx < i) {
-      _nbr[ndx] = data.xref[_nbr[i]];
-      _dist[ndx] = _dist[i];
-      ++ndx;
+    uint32_t j = _nbr[i];
+    if (data.selected[j]) {
+      continue;
     }
-  }
 
-  _index_of_shortest_distance = data.xref[_index_of_shortest_distance];
+    _nbr[ndx] = data.xref[j];
+    _dist[ndx] = _dist[i];
+    ++ndx;
+  }
 
   _nbrs = ndx;
 }
@@ -458,6 +500,8 @@ class Spread {
     int _nthreads;
 
     int _verbose;
+
+    Report_Progress _report_progress;
 
     // We can make generating a plot of distances easier.
     IWString_and_File_Descriptor _selected_distances_stream;
@@ -642,6 +686,13 @@ Spread::Initialise(Command_Line& cl) {
     _selected_distances_stream << "Sel Dist\n";
   }
 
+  if (cl.option_present('r')) {
+    if (! _report_progress.initialise(cl, 'r', _verbose)) {
+      cerr << "Spread::Initialise:cannot initialise progress reporting (-r)\n";
+      return 0;
+    }
+  }
+
   return 1;
 }
 
@@ -708,6 +759,7 @@ Spread::AddToPool(const T& proto,
     return HandleSingleton(proto, output);
   }
 
+  s->set_uid(_pool.size());
   _pool << s.release();
 
   return 1;
@@ -955,6 +1007,7 @@ Spread::SpreadSelection(Data& data, IWString_and_File_Descriptor& output) {
   FirstItemHasBeenSelected(data, 0, output);
 
   uint32_t items_selected = 1;
+  // cerr << "Begin spread\n";
 
   while (items_selected < _items_to_select) {
     // cerr << items_selected << " items selected, need " << _items_to_select << " pool contains " << _pool.size() << '\n';
@@ -964,12 +1017,18 @@ Spread::SpreadSelection(Data& data, IWString_and_File_Descriptor& output) {
     if (! MostDistant(data, most_distant, prev_sel, longest_distance)) {
       break;
     }
+    // cerr << "most_distant " << most_distant << " nbr " << prev_sel << " dist " << longest_distance << '\n';
 
     ItemHasBeenSelected(data, most_distant, prev_sel, longest_distance, output);
     ++items_selected;
 
+    // cerr << items_selected << " items selected, _next_squeeze " << _next_squeeze << '\n';
     if (items_selected > _next_squeeze) {
       Squeeze(data);
+    }
+    if (_report_progress()) {
+      cerr << "Selected " << items_selected << " distance " << longest_distance <<
+              " pool contains " << _pool.size() << " items\n";
     }
   }
 
@@ -1007,19 +1066,20 @@ Spread::FirstItemHasBeenSelected(Data& data, uint32_t sel,
                 IWString_and_File_Descriptor& output) {
   assert(data.selected[sel] == 0);
 
+  uint32_t initial_index = _pool[sel]->uid();
+
   if (_three_column_output) {
-    ThreeColumOutput(data, sel, kUnsetNeighbour, -1.0f, output);
+    ThreeColumOutput(data, initial_index, kUnsetNeighbour, -1.0f, output);
   } else {
-    WriteSmilesId(data, sel, output);
+    WriteSmilesId(data, initial_index, output);
     output << "|\n";
   }
 
   data.selected[sel] = 1;
 
   // Notify all pool members that this first item has been selected.
-  const uint32_t n = _pool.size();
-  for (uint32_t i = 0; i < n; ++i) {
-    _pool[i]->ItemHasBeenSelected(sel);
+  for (SpreadItem* s : _pool) {
+    s->ItemHasBeenSelected(sel, 0);  // should not be 0, fix...
   }
 
   return 1;
@@ -1032,10 +1092,12 @@ Spread::ItemHasBeenSelected(Data& data, uint32_t sel,
                 IWString_and_File_Descriptor& output) {
   assert(data.selected[sel] == 0);
 
+  const uint32_t initial_index = _pool[sel]->uid();
+
   if (_three_column_output) {
-    ThreeColumOutput(data, sel, nbr, dist, output);
+    ThreeColumOutput(data, initial_index, nbr, dist, output);
   } else {
-    WriteSmilesId(data, sel, output);
+    WriteSmilesId(data, initial_index, output);
     if (dist != kNoNeighboursSelected) {
       WriteSmilesId(data, nbr, output);
       output << distance_tag << dist << ">\n";
@@ -1043,17 +1105,18 @@ Spread::ItemHasBeenSelected(Data& data, uint32_t sel,
     output << "|\n";
   }
 
+  // Only write a point when it is significantly different from what was
+  // previously written.
   if (_selected_distances_stream.is_open()) {
-    static int seq;
+    static uint32_t number_selected;
     static float previous_distance = 2.0f;
     if ((previous_distance - dist) >= 0.001) {
-      _selected_distances_stream << seq << ' ' << dist << '\n';
+      _selected_distances_stream << number_selected << ' ' << dist << '\n';
+      previous_distance = dist;
+      _selected_distances_stream.write_if_buffer_holds_more_than(4096);
     }
 
-    ++seq;
-    previous_distance = dist;
-
-    _selected_distances_stream.write_if_buffer_holds_more_than(4096);
+    ++number_selected;
   }
 
   output.write_if_buffer_holds_more_than(4192);
@@ -1062,6 +1125,7 @@ Spread::ItemHasBeenSelected(Data& data, uint32_t sel,
 
   // Tell the unselected neighbours of `sel` that `sel` has been selected.
 
+  const uint32_t sel_index = _pool[sel]->uid();
   const uint32_t* nbrs = _pool[sel]->nbrs();
 #pragma omp parallel for schedule(dynamic, 16)
   for (int i = 0; i < _pool[sel]->number_neighbours(); ++i) {
@@ -1070,11 +1134,7 @@ Spread::ItemHasBeenSelected(Data& data, uint32_t sel,
       continue;
     }
 
-    if (nbr >= _pool.size()) {
-      cerr << "Nbr out of range " << nbr << " pool " << _pool.size() << '\n';
-    } else {
-    _pool[nbr]->ItemHasBeenSelected(sel);
-    }
+    _pool[nbr]->ItemHasBeenSelected(sel, sel_index);
   }
 
   return 1;
@@ -1086,14 +1146,17 @@ Spread::Squeeze(Data& data) {
 
   const uint32_t n = _pool.size();
   uint32_t ndx = 0;
+  // cerr << "Spread::Squeeze: pool contains " << n << " items\n";
   for (uint32_t i = 0; i < n; ++i) {
     if (data.selected[i]) {
       continue;
     }
 
     data.xref[i] = ndx;
+    // cerr << " item " << i << " xref " << data.xref[i] << '\n';
     ++ndx;
   }
+  // cerr << "Xref updated\n";
 
   // Remove selected items from _pool.
   // Note that we cannot use a uint32_t in the for loop if descending...
@@ -1156,7 +1219,7 @@ Spread::InitialiseWeights(Data& data) {
 
 int
 Main(int argc, char** argv) {
-  Command_Line cl(argc, argv, "vs:n:3q:T:W:h:S:eD:");
+  Command_Line cl(argc, argv, "vs:n:3q:T:W:h:S:eD:r:");
 
   if (cl.unrecognised_options_encountered()) {
     cerr << "Unrecognised options encountered\n";

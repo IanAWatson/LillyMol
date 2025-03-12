@@ -48,12 +48,13 @@ class iwstring_data_source
     int      _record_buffered;
     int      _record_delimiter;
     int      _longest_record;
-    int      _lines_read;
-    int      _lines_which_are_returned;
     int      _strip_leading_blanks;
     int      _strip_trailing_blanks;
     int      _compress_spaces;
     int      _skip_blank_lines;
+
+    uint64_t _lines_read;
+    uint64_t _lines_which_are_returned;
 
     std::unique_ptr<RE2> _ignore_pattern;
     std::unique_ptr<RE2> _filter_pattern;

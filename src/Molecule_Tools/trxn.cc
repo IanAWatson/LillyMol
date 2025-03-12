@@ -13,6 +13,7 @@
 #include "Foundational/iw_tdt/iw_tdt.h"
 #include "Foundational/iwmisc/iwre2.h"
 #include "Foundational/iwmisc/proto_support.h"
+#include "Foundational/iwmisc/report_progress.h"
 #include "Foundational/iwqsort/iwqsort.h"
 #include "Foundational/iwstring/iw_stl_hash_set.h"
 
@@ -34,9 +35,9 @@ const char* prog_name = nullptr;
 
 static int verbose = 0;
 
-static int molecules_processed = 0;
+static uint64_t molecules_processed = 0;
 
-static int products_written = 0;
+static uint64_t products_written = 0;
 
 static Number_Assigner number_assigner;
 
@@ -60,7 +61,7 @@ static int avoid_overlapping_scaffold_changes = 0;
 
 static int max_atoms_in_product = 0;
 
-static int products_discarded_for_too_many_atoms = 0;
+static uint64_t products_discarded_for_too_many_atoms = 0;
 
 // Oct 2023. It is common to generate molecules that might
 // have fragments that are too large or too small. These can
@@ -71,7 +72,7 @@ static int products_discarded_for_too_many_atoms = 0;
 static int need_to_check_product_fragment_sizes = 0;
 static int min_allowed_fragment_size_in_product = 0;
 static int max_allowed_fragment_size_in_product = std::numeric_limits<int>::max();
-static int products_discarded_for_violating_fragment_specifications = 0;
+static uint64_t products_discarded_for_violating_fragment_specifications = 0;
 
 // Nov 2023.
 // A common operation is to fragment a molecule, and the next step will
@@ -176,7 +177,7 @@ static Elements_to_Remove elements_to_remove;
 
 static int suppress_duplicate_molecules = 0;
 
-static int duplicate_molecules_suppressed = 0;
+static uint64_t duplicate_molecules_suppressed = 0;
 
 static IW_STL_Hash_Set smiles_generated_current_molecule;
 static IW_STL_Hash_Set unique_smiles_generated_current_molecule;
@@ -184,6 +185,8 @@ static IW_STL_Hash_Set unique_smiles_generated_current_molecule;
 static int all_scaffold_possibilities_enumeration = 0;
 
 static int unset_unnecessary_implicit_hydrogens_known_values = 0;
+
+static Report_Progress report_progress;
 
 static void
 usage(int rc) {
@@ -597,6 +600,10 @@ do_write(Molecule_and_Embedding* sidechain, Molecule& product, int nhits,
   if (write_multi_fragment_products_as_separate_molecules &&
       product.number_fragments() > 1) {
     return WriteMultiFragmentMolecule(product, output);
+  }
+
+  if (report_progress()) {
+    cerr << "trxn generated " << products_written << " molecules\n";
   }
 
   return output.write(product);
@@ -1456,6 +1463,7 @@ display_dash_j_qualifiers(std::ostream& os) {
  -J mfpseparate write multi fragment products as separate molecules
  -J nomshmsg    do NOT write 'hits in scaffold' messages for multiple scaffold query hits
  -J noschmsg    do NOT write warning messages about no sidechain substructure matches
+ -J rpt=<n>     report progress every <n> products written.
 )";
   // clang-format on
 
@@ -1803,13 +1811,24 @@ trxn(int argc, char** argv) {
       } else if (j == "nomshmsg") {
         display_multiple_scaffold_hits_message = 0;
         if (verbose) {
-          cerr << "Will NOT write messagea about multiple scaffold query hits\n";
+          cerr << "Will NOT write messages about multiple scaffold query hits\n";
         }
       } else if (j == "noschmsg") {
         if (verbose) {
           cerr << "Will NOT warn about no sidechain query matches\n";
         }
         scaffold_match_conditions.set_issue_sidechain_no_match_warnings(0);
+      } else if (j.starts_with("rpt=")) {
+        j.remove_leading_chars(4);
+        uint32_t rpt;
+        if (! j.numeric_value(rpt)) {
+          cerr << "Invalid report progress specification '" << j << "'\n";
+          return 1;
+        }
+        report_progress.set_report_every(rpt);
+        if (verbose) {
+          cerr << "Will report progress every " << rpt << " products generated\n";
+        }
       } else {
         cerr << "Unrecognised -J qualifier '" << j << "'\n";
         display_dash_j_qualifiers(cerr);

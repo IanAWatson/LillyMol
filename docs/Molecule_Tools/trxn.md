@@ -936,6 +936,16 @@ Do NOT write 'hits in scaffold' messages for multiple scaffold query hits.
 In large enumerations where this is expected, the messages are uninformative
 and slow down processing.
 
+## -J noschmsg
+Do NOT write warning messages about no sidechain substructure matches.
+Note however that this information can be very important, so only suppress
+this is you are confident about the reaction being done.
+
+## -J rpt=<n>
+Report progress every <n> products written. By default trxn works silently
+and can quickly generate large numbers of molecules. This can help keep
+track of progress - helpful too if you know how many products to expect.
+
 ## 3D
 While the primary purpose of `trxn` is manipulating connection
 tables, it is fully 3d aware if the input data contains

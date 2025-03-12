@@ -20,17 +20,18 @@ molecule_filter on that file to impose restrictions, and then use the -substitue
 This tool can either replace an existing substituent, or add substituents to a site that currently has a Hydrogen substituent.
 Use -smarts1 'smarts'   to specify the smarts of an atom to which substituents are added. '[$([aD2H](:[aD2]):[aD2])]' for example.
 Use -smarts2 'smarts'   to specify two atoms. The bond between them is broken, the second atom removed,
-                        and the sidechain attached to the first atom. '[$([aD3](:[aD2]):[aD2])]-!@[D2]' for example.
+                        and the sidechain attached to the first atom. '[$([aD3](:[aD2]):[aD2])]-!@{a<10}[D2]' for example.
 In either case '-smarts1 def' or '-smarts2 def' will apply the default smarts listed above.
 Options
  -sidechains <fname>    file of sidechains, by default LILLYMOL_HOME/data/chembl_sidechains.textproto.
- -smarts1 <smarts>      smarts for unsubstitued atom to which Chembl sidechains are attached.
- -smarts2 <smarts>      smarts for a bond that will be broken, and the sidechain attached to the first atom.
+ -smarts1 <smarts>      smarts for an unsubstitued atom to which the Chembl sidechains are attached.
+ -smarts2 <smarts>      smarts for a bond that will be broken. The new sidechain will be attached to the first atom
+                        and the fragment defined by the second atom will be removed.
  -smarts{1,2} def       use default smarts listed above.
- -support <n>           only use substituents that occur <n> or more times in the substituents file
+ -support <n>           only use sidechains that occur <n> or more times in the sidechains file.
  -S <fname>             output file to produce, stdout by default.
+ -trxn ... -trxn        options passed directly to trxn.
  -v                     verbose output
-
 HELP
   $stderr << help << "\n"
 
@@ -63,7 +64,7 @@ def get_sidechains(cl)
 end
 
 def main
-  cl = IWCmdline.new("-v-substituents=sfile-support=ipos-smarts1=s-smarts2=s")
+  cl = IWCmdline.new("-v-sidechains=sfile-support=ipos-smarts1=s-smarts2=s-trxn=close")
   if cl.unrecognised_options_encountered
     $stderr << "unrecognised_options_encountered\n"
     usage
@@ -84,7 +85,7 @@ def main
   if cl.option_present('smarts1')
     s = cl.value('smarts1')
     if s == 'def'
-      smarts1 = '[$([aD2H](:[aD2]):[aD2])]'
+      smarts1 = '[$([cD2H](:[aD2]):[aD2])]'
     else
       smarts1 = cl.value('smarts1')
     end
@@ -93,14 +94,14 @@ def main
   if cl.option_present('smarts2')
     s = cl.value('smarts2')
     if s == 'def'
-      smarts2 = '[$([aD3](:[aD2]):[aD2])]-!@[D2]'
+      smarts2 = '[$([cD3](:[aD2]):[aD2])]-!@{a<10}[D2]'
     else
       smarts2 = cl.value('smarts2')
     end
   end
 
   if ! cl.option_present('smarts1') && ! cl.option_present('smarts2')
-    smarts1 = '[$([aD2H](:[aD2]):[aD2])]'
+    smarts1 = '[$([cD2H](:[aD2]):[aD2])]'
   end
 
   reaction1 = <<-END_REACTION1
@@ -178,7 +179,10 @@ END_REACTION2
     end
   end
 
-  cmd = "trxn -z i -m each -P #{rxnfile}"
+  cmd = "trxn -z i -m each -P #{rxnfile} -J rpt=100000 -J nomshmsg"
+
+  cmd << ' ' << cl.value('trxn') if cl.option_present('trxn')
+
   if cl.option_present('S')
     s = cl.value('S')
     cmd << " -S #{s}"

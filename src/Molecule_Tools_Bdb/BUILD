@@ -1,20 +1,6 @@
 load("@rules_proto//proto:defs.bzl", "proto_library")
-load("//build_deps:install.bzl", "local_install")
 
 package(default_visibility = ["//visibility:public"])
-
-local_install(
-    name = "install",
-    srcs = [
-        ":buildsmidb_bdb",
-        ":in_database_bdb",
-        ":in_lilly_database_bdb",
-        ":iwecfp_database_load",
-        ":iwecfp_database_lookup",
-        ":smi2rings_bdb",
-        ":substituent_identification",
-    ],
-)
 
 proto_library(
     name = "smi2rings_proto",

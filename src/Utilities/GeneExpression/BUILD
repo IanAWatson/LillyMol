@@ -1,14 +1,5 @@
 load("@rules_python//python:proto.bzl", "py_proto_library")
 load("@rules_proto//proto:defs.bzl", "proto_library")
-load("//build_deps:install.bzl", "local_install")
-
-local_install(
-    name = "install",
-    srcs = [
-        ":gene_expression_nearneighbours",
-        ":gene_expression_to_proto",
-    ],
-)
 
 proto_library(
     name = "gene_expression_proto",

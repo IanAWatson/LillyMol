@@ -1,12 +1,3 @@
-load("//build_deps:install.bzl", "local_install")
-
-local_install(
-    name = "install",
-    srcs = [
-        ":topological_torsion",
-    ],
-)
-
 cc_binary(
     name = "topological_torsion",
     srcs = [

@@ -4,56 +4,6 @@ load("@rules_python//python:proto.bzl", "py_proto_library")
 # load("@rules_proto_grpc_cpp//:defs.bzl", "cpp_grpc_compile")
 
 load("@rules_proto//proto:defs.bzl", "proto_library")
-load("//build_deps:install.bzl", "local_install")
-
-local_install(
-    name = "install",
-    srcs = [
-        ":descriptor_file_to_01_fingerprints",
-        ":gfp_add_descriptors",
-        ":gfp_distance_filter",
-        ":gfp_distance_matrix",
-        ":gfp_distance_matrix_iwdm",
-        ":gfp_flatten_counted",
-        ":gfp_histogram",
-        ":gfp_incremental_diversity",
-        ":gfp_iterative_expansion",
-        ":gfp_leader",
-        ":gfp_leader_standard",
-        ":gfp_leader_tbb",
-        ":gfp_lnearneighbours",
-        ":gfp_lnearneighbours_standard",
-        ":gfp_mcs",
-        ":gfp_naive_bayesian",
-        ":gfp_nearneighbours",
-        ":gfp_nearneighbours_single_file",
-        ":gfp_nearneighbours_single_file_tbb",
-        ":gfp_pairwise_distances",
-        ":gfp_profile_activity_by_bits",
-        ":gfp_single_linkage",
-        ":gfp_sparse_to_fixed",
-        ":gfp_spread",
-        ":gfp_spread_buckets",
-        ":gfp_spread_omp",
-        ":gfp_spread_standard",
-        ":gfp_standalone",
-        ":gfp_svmfp_score",
-        ":gfp_svmfp_score_tbb",
-        ":gfp_to_descriptors",
-        ":gfp_to_descriptors_multiple",
-        ":gfp_to_svm_lite.v2",
-        ":iwstats",
-        ":marvin2gfp",
-        ":nn2csv",
-        ":nn_leader_and_jp",
-        ":nn_merge",
-        ":nn_merge_from_smiles",
-        ":nplotnn",
-        ":parallel_nn_search_to_gfp_spread",
-        ":random_fingerprint",
-        ":train_test_split_optimise",
-    ],
-)
 
 proto_library(
     name = "evidence_proto",

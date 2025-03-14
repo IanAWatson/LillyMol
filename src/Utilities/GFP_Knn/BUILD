@@ -1,13 +1,3 @@
-load("//build_deps:install.bzl", "local_install")
-
-local_install(
-    name = "install",
-    srcs = [
-        ":nn_predictions",
-        ":nn_training",
-        ":test_t_test",
-    ],
-)
 
 cc_binary(
     name = "nn_predictions",

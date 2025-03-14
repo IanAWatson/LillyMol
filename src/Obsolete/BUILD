@@ -1,17 +1,4 @@
-load("//build_deps:install.bzl", "local_install")
 load("@rules_python//python:proto.bzl", "py_proto_library")
-
-# Some executables are still used in certain systems.
-local_install(
-    name = "install",
-    srcs = [
-        ":complex_chirality",
-        ":descriptor_file_same_row_order",
-        ":diff_line_by_line",
-        ":prediction_bias",
-        ":rearrange_columns",
-    ],
-)
 
 cc_binary(
     name = "concat_files_large_memory",

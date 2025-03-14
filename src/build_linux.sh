@@ -205,6 +205,12 @@ else
     inside_lilly=0
 fi
 
+# Copy vendor stuff if we are inside Lilly
+# TODO:ianwatson do within MODULE.bazel
+if [[ ${inside_lilly} -eq 1 ]] ; then
+  mkdir 'BioByte'
+fi
+
 # Options that are used by all bazelisk invocations.
 
 # bazel will not work on an NFS mounted file system. So if you are on an NFS
@@ -317,20 +323,23 @@ if [[ -v BUILD_XGBOOST ]] ; then
 fi
 
 # Now install the targets
+# Now being done with install.sh
 
-if [[ ! -v BUILD_LIBRARY_ONLY ]] ; then
-    echo "Installing tools"
-    ${bazel} ${bazel_options} run ${build_options} Foundational/iw_tdt:install
-    ${bazel} ${bazel_options} run ${build_options} Molecule_Tools:install
-    ${bazel} ${bazel_options} run ${build_options} Obsolete:install
-    ${bazel} ${bazel_options} run ${build_options} Obsolete/Descriptor_Similarity:install
-    ${bazel} ${bazel_options} run ${build_options} Utilities/General:install
-    ${bazel} ${bazel_options} run ${build_options} Utilities/GeneExpression:install
-    ${bazel} ${bazel_options} run ${build_options} Utilities/GFP_Knn:install
-    ${bazel} ${bazel_options} run ${build_options} Utilities/GFP_Tools:install
-    ${bazel} ${bazel_options} run ${build_options} Utilities/Distance_Matrix:install
-    ${bazel} ${bazel_options} run ${build_options} go:install
-fi
+# if [[ ! -v BUILD_LIBRARY_ONLY ]] ; then
+#     echo "Installing tools"
+#     ${bazel} ${bazel_options} run ${build_options} Foundational/iw_tdt:install
+#     ${bazel} ${bazel_options} run ${build_options} Molecule_Tools:install
+#     ${bazel} ${bazel_options} run ${build_options} Obsolete:install
+#     ${bazel} ${bazel_options} run ${build_options} Obsolete/Descriptor_Similarity:install
+#     ${bazel} ${bazel_options} run ${build_options} Utilities/General:install
+#     ${bazel} ${bazel_options} run ${build_options} Utilities/GeneExpression:install
+#     ${bazel} ${bazel_options} run ${build_options} Utilities/GFP_Knn:install
+#     ${bazel} ${bazel_options} run ${build_options} Utilities/GFP_Tools:install
+#     ${bazel} ${bazel_options} run ${build_options} Utilities/Distance_Matrix:install
+#     ${bazel} ${bazel_options} run ${build_options} go:install
+# fi
+
+./install.sh
 
 if [[ ${inside_lilly} -eq 1 || -v BUILD_VENDOR ]] ; then
     ${bazel} ${bazel_options} run ${build_options} Vendor:install

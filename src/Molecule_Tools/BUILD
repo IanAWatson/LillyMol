@@ -2173,6 +2173,19 @@ cc_binary(
 )
 
 cc_binary(
+    name = "sidechain_switcheroo",
+    srcs = [
+        "sidechain_switcheroo.cc",
+    ],
+    deps = [
+        "//Foundational/iwstring:absl_hash",
+        "//Molecule_Lib:iwmolecule",
+        "//Molecule_Lib:moleculeio",
+        "@com_google_absl//absl/container:flat_hash_set",
+    ],
+)
+
+cc_binary(
     name = "skeleton",
     srcs = [
         "skeleton.cc",

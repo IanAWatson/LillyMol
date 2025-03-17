@@ -1137,9 +1137,9 @@ IWReaction::ConstructFromProto(const ReactionProto::Reaction& proto,
     return WriteError("IWReaction::ConstructFromProto:invalid scaffold", proto);
   }
 
-  if (proto.has_comment()) {
+  if (proto.has_name()) {
     _comment = proto.comment();
-  } else if (proto.has_name()) {
+  } else if (proto.has_comment()) {
     _comment = proto.name();
   }
 

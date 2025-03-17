@@ -144,6 +144,7 @@ Options::Preprocess(Molecule& m) {
 
   if (_remove_chirality) {
     m.remove_all_chiral_centres();
+    m.revert_all_directional_bonds_to_non_directional();
   }
 
   if (_chemical_standardisation.active()) {

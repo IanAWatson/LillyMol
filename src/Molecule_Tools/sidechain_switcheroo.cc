@@ -46,7 +46,7 @@ Note that this can generate large numbers of molecules!
  -z i           ignore molecules that do not match any of the -s queries.
  -x <n>         create molecules with as many as <n> sites permuted - beware combinatorics!
  -X <n>         keep only the <n> smallest sidechains found - helps to reduce the number of molecules formed.
- -t             remove isotopes from product molecules - isotopes are used internally to label atoms. 
+ -I             remove isotopes from product molecules - isotopes are used internally to label atoms. 
  -V             report and discard product molecules with invalid valences - hopefully will not happen.
  -c             remove chirality as molecules are read.
  -r <n>         report progress every <n> products generated.
@@ -366,7 +366,7 @@ Options::Initialise(Command_Line& cl) {
     }
   }
 
-  if (cl.option_present('t')) {
+  if (cl.option_present('I')) {
     _remove_isotopes_from_products = 1;
     if (_verbose) {
       cerr << "Isotopes will be removed from product molecules\n";
@@ -906,6 +906,8 @@ Options::MaybeWrite(Molecule& product,
 
   output << product.smiles() << ' ' << product.name() << '.' << _molecules_written << '\n';
 
+  output.write_if_buffer_holds_more_than(4196);
+
   return 1;
 }
 
@@ -1004,7 +1006,7 @@ Options::Preprocess(Molecule& m) {
 
 int
 Main(int argc, char** argv) {
-  Command_Line cl(argc, argv, "vE:A:lcg:i:q:s:x:X:z:tVhr:");
+  Command_Line cl(argc, argv, "vE:A:lcg:i:q:s:x:X:z:IVhr:");
 
   if (cl.unrecognised_options_encountered()) {
     cerr << "Unrecognised options encountered\n";

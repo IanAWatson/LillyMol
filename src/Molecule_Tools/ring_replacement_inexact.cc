@@ -103,6 +103,7 @@ ring_replacement_inexact -z i -p -c -v -R rings_6a6a.smi -s '[/IWfss2r5r5]' file
                 tsubstructure -q syntax, so smarts is '-Y SMARTS:n'
                 query file is '-Y PROTO:/path/to/file/qry`
  -N <query>     queries for features that must NOT be in product molecules.
+ -X ...         miscellaneous options, enter '-X help' for info.
  -c             remove chirality from input molecules.
  -v             verbose output
 )";
@@ -413,7 +414,12 @@ class Replacement {
     Set_of_Atoms _attachment_points;
 
   public:
-    int Build(const ReplacementRing& proto, int use_existing_attachment_points);
+    // If `use_existing_attachment_points` is set and the molecule in the proto
+    // has no isotopic atoms, that is a failure. But a harmless failure.
+    // In that case, `failed_for_no_attachment_points` will be set, so the caller
+    // knows not to complain.
+    int Build(const ReplacementRing& proto, int use_existing_attachment_points,
+              int& failed_for_no_attachment_points);
 
     const Molecule& molecule() const {
       return _m;
@@ -451,7 +457,10 @@ class Replacement {
 // points are restricted to the labelled atoms in the proto.
 int
 Replacement::Build(const ReplacementRing& proto,
-                  int use_existing_attachment_points) {
+                  int use_existing_attachment_points,
+                  int& failed_for_no_attachment_points) {
+  failed_for_no_attachment_points = 0;
+
   if (proto.smi().empty()) {
     cerr << "Replacement::Build:empty smiles " << proto.ShortDebugString() << '\n';
     return 0;
@@ -489,6 +498,9 @@ Replacement::Build(const ReplacementRing& proto,
   }
 
   if (_attachment_points.empty()) {
+    if (use_existing_attachment_points) {
+      failed_for_no_attachment_points = 1;
+    }
     return 0;
   }
 
@@ -638,6 +650,12 @@ class Options {
     int ReadReplacementRings(const const_IWSubstring& buffer, absl::flat_hash_set<IWString>& already_found);
     int BuildReplacement(const const_IWSubstring& buffer,
                           absl::flat_hash_set<IWString>& already_found);
+    int ReadFileOfReplacementRings(IWString& fname,
+                iwstring_data_source& input,
+                absl::flat_hash_set<IWString>& already_found);
+    int ReadFileOfReplacementRings(IWString& fname,
+                                    absl::flat_hash_set<IWString>& already_found);
+
     uint32_t ProcessInner(Molecule& m, IWString_and_File_Descriptor& output);
 
     int IdentifyMatchedAtoms(Molecule& m, int* matched_atoms);
@@ -751,6 +769,13 @@ Options::Options() {
   _isotope = 1;  // We need this to be non zero
 }
 
+void
+DisplayDashXOptions(std::ostream& output) {
+  output << "-X any             any available ring atom can receive substituents - not just isotopically labelled\n";
+
+  ::exit(0);
+}
+
 int
 Options::Initialise(Command_Line& cl) {
 
@@ -778,6 +803,20 @@ Options::Initialise(Command_Line& cl) {
     _remove_chirality = 1;
     if (_verbose) {
       cerr << "Will remove all chirality\n";
+    }
+  }
+
+  if (cl.option_present('X')) {
+    IWString x;
+    for (int i = 0; cl.value('X', x, i); ++i) {
+      if (x == "any") {
+        _use_existing_attachment_points = 0;
+      } else if (x == "help") {
+        DisplayDashXOptions(cerr);
+      } else {
+        cerr << "Unrecognised -X qualifier '" << x << "'\n";
+        DisplayDashXOptions(cerr);
+      }
     }
   }
 
@@ -933,6 +972,11 @@ Options::Initialise(Command_Line& cl) {
 int
 Options::ReadReplacementRings(IWString& fname,
                               absl::flat_hash_set<IWString>& already_found) {
+  if (fname.starts_with("F:")) {
+    fname.remove_leading_chars(2);
+    return ReadFileOfReplacementRings(fname, already_found);
+  }
+
   iwstring_data_source input(fname);
   if (! input.good()) {
     cerr << "Options::ReadReplacementRings:cannot open '" << fname << "'\n";
@@ -940,6 +984,40 @@ Options::ReadReplacementRings(IWString& fname,
   }
 
   return ReadReplacementRings(input, already_found);
+}
+
+int
+Options::ReadFileOfReplacementRings(IWString& fname,
+                                    absl::flat_hash_set<IWString>& already_found) {
+  iwstring_data_source input(fname);
+  if (! input.good()) {
+    cerr << "Options::ReadFileOfReplacementRings:cannot open '" << fname << "'\n";
+    return 0;
+  }
+
+  // The directory...
+  if (fname.contains('/')) {
+    fname.truncate_at_last('/');
+  }
+
+  return ReadFileOfReplacementRings(fname, input, already_found);
+}
+
+int
+Options::ReadFileOfReplacementRings(IWString& dirname,
+                iwstring_data_source& input,
+                absl::flat_hash_set<IWString>& already_found) {
+  IWString buffer;
+  while (input.next_record(buffer)) {
+    IWString fname;
+    fname << dirname << '/' << buffer;
+    if (! ReadReplacementRings(fname, already_found)) {
+      cerr << "Options::ReadFileOfReplacementRings:cannot read '" << fname << "'\n";
+      return 0;
+    }
+  }
+
+  return _replacements.size();
 }
 
 int
@@ -979,7 +1057,13 @@ Options::BuildReplacement(const const_IWSubstring& buffer,
 
   std::unique_ptr<Replacement> r = std::make_unique<Replacement>();
 
-  if (! r->Build(proto, _use_existing_attachment_points)) {
+  int failed_for_no_attachment_points = 0;
+  if (r->Build(proto, _use_existing_attachment_points, failed_for_no_attachment_points)) {
+    // great
+  } else if (failed_for_no_attachment_points) {
+    // safe to ignore.
+    return 1;
+  } else {
     cerr << "Options::ReadReplacementRings:invalid proto " << proto.ShortDebugString() << '\n';
     cerr << "ignored\n";
     return 1;
@@ -1005,7 +1089,9 @@ Options::Report(std::ostream& output) const {
   output << "Read " << _molecules_read << " molecules\n";
   output << _molecules_not_matching_queries << " molecules did not match any queries\n";
   output << _no_substituents << " molecuels had no substients at matched atoms\n";
-  output << _ortho_substitutions_suppressed << " ortho substited products suppressed\n";
+  if (! _allow_ortho_replacements) {
+    output << _ortho_substitutions_suppressed << " ortho substited products suppressed\n";
+  }
   if (_discard_invalid_valence) {
     output << _invalid_valence_discarded << " products with invalid valences discarded\n";
   }
@@ -1038,6 +1124,7 @@ Options::Preprocess(Molecule& m) {
 
   if (_remove_chirality) {
     m.remove_all_chiral_centres();
+    m.revert_all_directional_bonds_to_non_directional();
   }
 
   if (_chemical_standardisation.active()) {
@@ -1999,7 +2086,7 @@ RingReplacementInexact(Options& options,
 
 int
 RingReplacementInexact(int argc, char** argv) {
-  Command_Line cl(argc, argv, "vE:A:lcg:i:s:q:IR:z:pn:ex:oVY:N:");
+  Command_Line cl(argc, argv, "vE:A:lcg:i:s:q:IR:z:pn:ex:oVY:N:X:");
 
   if (cl.unrecognised_options_encountered()) {
     cerr << "Unrecognised options encountered\n";
@@ -2011,6 +2098,7 @@ RingReplacementInexact(int argc, char** argv) {
   if (!process_standard_aromaticity_options(cl, verbose)) {
     Usage(5);
   }
+
   if (! process_elements(cl, verbose, 'E')) {
     cerr << "Cannot process elements\n";
     Usage(1);

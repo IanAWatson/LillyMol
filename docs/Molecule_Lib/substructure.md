@@ -700,7 +700,7 @@ So a complex down the bond smarts might look like
 ```
 [Nx0]-C(=O)-{a{2-5};h0;r>1;u>0}C
 ```
-which is an amide group, then down the bond with between 2 and 5 atoms, no
+which is a non-ring amide group, then down the bond with between 2 and 5 atoms, no
 heteroatoms, at least one ring atom (actually there would be at least
 three ring atoms) and at least one unsaturated atom. This matches molecules
 like
@@ -845,3 +845,44 @@ but clearly more could be added as the need arises.
 
 The C++ unit tests in the [src/Molecule_Lib](src/Molecule_Lib) directory contain
 more examples of proto specifications of complex queries that test these concepts.
+
+## MatchedAtomMatch
+This is a syntactic extension designed to help avoid overly complex recursive smarts.
+It is common for an atom to be specified by a lengthy list of properties that it
+either must have or must not have. This can generate things that are very difficult
+to pick apart - smarts has been described as a write-only language. This message
+provides an alternative representation.
+
+For example if we wanted a phenolic oxygen atom that was NOT ortho to a Nitrogen
+atom or to another phenolic oxygen, that could be represented as
+```
+query {
+  smarts: "[$([cD3]);!$(c:c-[OH])]-[OH]"
+}
+```
+which is a simple example of the many more complex case I have seen.
+
+This can be equivalently written as
+```
+query {
+  smarts: "[cD3]-[OH]"
+  matched_atom_must_be {
+    atom: 0
+    smarts: "!c:c-[OH]"
+  }
+}
+```
+Any number of smarts can be specified, it is a repeated field. And
+other matched_atom_must_be messages can be used to describe other
+matched atoms, atom numbering starts at 0.
+
+which is functionally equivalent, but considerably easier to understand.
+Note however that the current implementation does not allow arbitrary
+logical operators between the 'smarts' directives. They are combined
+as 'and' operators, but anything beginning with '!' is interpreted as
+a negative match. In practice, this is usually good enough to handle
+most cases of interest.
+
+The c++ unit test file [substructure_mam_test.cc](src/Molecule_Lib/substructure_mam_test.cc)
+contains examples of some quite complex cases, all of which would have
+varying degress of interpreting if represented as recursive smarts.

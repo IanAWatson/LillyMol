@@ -101,7 +101,7 @@ ring_replacement_inexact -z i -p -c -v -R rings_6a6a.smi -s '[/IWfss2r5r5]' file
  -e             preserve the same-ring attachment patterns of the starting molecule.
  -Y <query>     queries that product molecules must contain.
                 tsubstructure -q syntax, so smarts is '-Y SMARTS:n'
-                query file is '-Y PROTO:/path/to/file/qry`
+                textproto query file is '-Y PROTO:/path/to/file/qry`
  -N <query>     queries for features that must NOT be in product molecules.
  -X ...         miscellaneous options, enter '-X help' for info.
  -c             remove chirality from input molecules.

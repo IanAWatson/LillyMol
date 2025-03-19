@@ -104,6 +104,15 @@ It could also be made more 'adventurous' by removing the constraint
 on what is attached. For example `[/IWrid1D3R1]-!@*` would consider
 every exocyclic bond as defining a "substituent".
 
+Note too that if implicit Hydrogens are converted to explicit, then
+substituents will move to sites that previously did not have
+a substituent
+```
+trxn -d -J exph -m each -P /path/to/reaction.rxn file.smi
+```
+Using the example above, rather than 500 products generated, we now get
+2500.
+
 Theoretically one could combine all molecules into a single, multi
 fragment molecule,
 ```

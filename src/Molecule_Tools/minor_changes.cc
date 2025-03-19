@@ -3000,8 +3000,8 @@ Options::ReplaceTerminalFragments(Molecule& m,
       mcopy->add_molecule(&frag->mol());
       mcopy->remove_bond_between_atoms(a1, a2);
       mcopy->add_bond(a2, matoms + frag->attachment_point(), SINGLE_BOND);
-      mcopy->remove_fragment_containing_atom(a1);
       mcopy->unset_all_implicit_hydrogen_information(matoms + frag->attachment_point());
+      mcopy->remove_fragment_containing_atom(a1);
       // cerr << "Added " << frag->mol().smiles() << " to form "  << mcopy->smiles() << '\n';
       rc += AddToResultsIfNew(mcopy, results);
     }

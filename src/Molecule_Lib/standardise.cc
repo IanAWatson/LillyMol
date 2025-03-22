@@ -384,6 +384,7 @@ Chemical_Standardisation::activate_all() {
   _transform_charged_non_organic.activate();
   _transform_to_2_amino_pyridine.activate();
   _transform_oxo_pyrimidine.activate();
+  _transform_indole_hydrogen.activate();
 
   _active = 1;
 
@@ -896,6 +897,12 @@ Chemical_Standardisation::Activate(const IWString& directive, const int verbose)
       _transform_oxo_pyrimidine.deactivate();
     } else {
       _transform_oxo_pyrimidine.activate();
+    }
+  } else if (tmp == CS_INDOLEH) {
+    if (negation) {
+      _transform_indole_hydrogen.deactivate();
+    } else {
+      _transform_indole_hydrogen.activate();
     }
   } else {
     cerr << "Chemical_Standardisation::Activate:unrecognized directive '" << directive
@@ -3858,6 +3865,10 @@ Chemical_Standardisation::_process(Molecule& m,
 
   if (_transform_oxo_pyrimidine.active()) {
     rc += _do_transform_oxo_pyrimidine(m, current_molecule_data);
+  }
+
+  if (_transform_indole_hydrogen.active()) {
+    rc += _do_transform_indole_hydrogen(m, current_molecule_data);
   }
 
   if (_external_transformation.size() > 0) {
@@ -9378,7 +9389,9 @@ IWStandard_Current_Molecule::initialise(Molecule& m) {
       _rings.add(s);
 
       _ring_size[i] = ri->number_elements();
-      _ring_is_fused[i] = ri->is_fused();
+      // Mar 2025. Change from boolean to a count. Should not
+      // impact any existing code.
+      _ring_is_fused[i] = ri->fused_ring_neighbours();
 
       if (ri->is_aromatic()) {
         _ring_is_aromatic[i] = 1;
@@ -9762,7 +9775,8 @@ Chemical_Standardisation::_processing_needed(
       (_transform_to_2_amino_pyridine.active() &&
        current_molecule_data.nitrogens() > 1) ||
       (_transform_oxo_pyrimidine.active() && current_molecule_data.nitrogens() > 1) ||
-      (_transform_isotopes.active() && current_molecule_data.isotope() > 0)) {
+      (_transform_isotopes.active() && current_molecule_data.isotope() > 0) ||
+      (_transform_indole_hydrogen.active() && current_molecule_data.nitrogens() > 1)) {
     return 1;
   }
 
@@ -11951,6 +11965,373 @@ Chemical_Standardisation::_do_transform_oxo_pyrimidine(
 
   if (_append_string_depending_on_what_changed) {
     _append_to_changed_molecules << " STD:oxypyrimdine";
+  }
+
+  return rc;
+}
+
+
+// We need to handle the case of an indole with no Hydrogen on the Nitrogen
+// atom in the 5 membered ring, and the H in an adjacent fused 6 membered ring.
+// BrC1=CNC2=NC=NC2=C1 CHEMBL1562708.
+// These are the atoms we need to keep track of
+//            n2
+//          /                b3
+//        c2
+//        :                  b2
+//        c1
+//      /                    b1
+//   n1
+
+struct Indole {
+  atom_number_t n1;
+  atom_number_t c1;
+  atom_number_t c2;
+  atom_number_t n2;
+
+  Indole(atom_number_t s);
+};
+
+Indole::Indole(atom_number_t s) : n1(s) {
+  c1 = kInvalidAtomNumber;
+  c2 = kInvalidAtomNumber;
+  n2 = kInvalidAtomNumber;
+}
+
+// Return true if indole.n1 is adjacent to an exocyclic =[!#6] bond.
+// Such as C1=CC(=S)C2=C(N1)N=CN2 CHEMBL5268854
+static bool
+N2OppositeExocyclic(Molecule& m,
+                    const Indole& indole,
+                    const Set_of_Atoms& ring,
+                    IWStandard_Current_Molecule& current_molecule_data) {
+  const atomic_number_t* z = current_molecule_data.atomic_number();
+  const int* ncon = current_molecule_data.ncon();
+  assert(z[indole.n1] == 7);
+
+  const atom_number_t c1 = indole.c1;
+
+  for (const Bond* b : m[c1]) {
+    atom_number_t o = b->other(c1);
+    if (o == indole.n1 || o == indole.c2) {
+      continue;
+    }
+
+    if (ncon[o] != 3) {
+      return 0;
+    }
+
+    for (const Bond* b2 : m[o]) {
+      if (! b2->is_double_bond()) {
+        continue;
+      }
+      atom_number_t exocyclic = b2->other(o);
+      if (ncon[exocyclic] > 1) {
+        continue;
+      }
+      if (z[exocyclic] != 6) {
+        return true;
+      }
+    }
+  }
+
+  return false;
+}
+
+// `n1` must be in a 5 membered ring without a hydrogen.
+// `n2` is in a fused 6 membered ring and must have a Hydrogen.
+static int
+DoIndoleSwitch(Molecule& m, 
+               const Indole& indole,
+               IWStandard_Current_Molecule& current_molecule_data) {
+  
+  const atom_number_t n1 = indole.n1;
+  const atom_number_t c1 = indole.c1;
+  const atom_number_t c2 = indole.c2;
+  const atom_number_t n2 = indole.n2;
+
+  // Save current bonding just in case.
+  const int nedges = m.nedges();
+  std::unique_ptr<bond_type_t[]> bsave = std::make_unique<bond_type_t[]>(nedges);
+  for (int i = 0; i < nedges; ++i) {
+    const Bond* b = m.bondi(i);
+    if (b->is_single_bond()) {
+      bsave[i] = SINGLE_BOND;
+    } else if (b->is_double_bond()) {
+      bsave[i] = DOUBLE_BOND;
+    } else if (b->is_triple_bond()) {
+      bsave[i] = TRIPLE_BOND;
+    }
+  }
+
+  m.unset_all_implicit_hydrogen_information(n1);
+  m.unset_all_implicit_hydrogen_information(n2);
+
+  atom_number_t c0 = kInvalidAtomNumber;
+  for (const Bond* b : m[n1]) {
+    atom_number_t o = b->other(n1);
+    if (o == c1) {
+      continue;
+    }
+    c0 = o;
+    break;
+  }
+
+  Set_of_Atoms embedding;
+  embedding.reserve(4);
+  embedding << c0 << n1 << c1 << c2 << n2;
+
+  Toggle_Kekule_Form tkf;
+  tkf.add_bond(0, 1, SINGLE_BOND);
+  tkf.add_bond(1, 2, SINGLE_BOND);
+  tkf.add_bond(2, 3, DOUBLE_BOND);
+  tkf.add_bond(3, 4, SINGLE_BOND);
+
+  int changed_not_used = 0;
+  if (tkf.process(m, embedding, changed_not_used)) {
+    return 1;
+  }
+
+  // Restore bonding.
+
+  for (int i = 0; i < nedges; ++i) {
+    const Bond* b = m.bondi(i);
+    m.set_bond_type_between_atoms(b->a1(), b->a2(), bsave[i]);
+  }
+
+  return 0;
+}
+ 
+// Is `zatom` an indole like Nitrogen?
+// We just check for an adjacent atom that is in two rings.
+// If that is the case, we fill indole.c1 and return true.
+bool
+IsIndoleNitrogen(Molecule& m,
+                   atom_number_t zatom,
+                   const IWStandard_Current_Molecule& current_molecule_data,
+                   Indole& indole) {
+  const int* ring_membership = current_molecule_data.ring_membership();
+
+  for (const Bond* b : m[zatom]) {
+    atom_number_t o = b->other(zatom);
+    if (ring_membership[o] == 2) {
+      indole.c1 = o;
+      return true;
+    }
+  }
+
+  return false;
+}
+
+// return true if any of the six membered items in `rings` contains `n2`.
+static bool
+InSixMemberedRing(atom_number_t n2, const resizable_array_p<Set_of_Atoms>& rings) {
+  for (const Set_of_Atoms* ring : rings) {
+    if (ring->size() != 6) {
+      continue;
+    }
+    if (ring->contains(n2)) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
+// Fill out the rest of `indole` given that indole.n1 and indole.c1 are known.
+
+// Note that we look for multiple matches - even though currently the caller
+// is restricted to two ring systems, so currently it will be impossible
+// to have multiple matches. When that restriction gets lifted, this is ready.
+bool
+FindAdjacentNitrogen(Molecule& m, 
+                     const Set_of_Atoms& ring,
+                     IWStandard_Current_Molecule& current_molecule_data,
+                     Indole& indole) {
+  assert(ring.size() == 5);
+
+  const atomic_number_t * z = current_molecule_data.atomic_number();
+  const int* ncon = current_molecule_data.ncon();
+  const int* ring_membership = current_molecule_data.ring_membership();
+  const int* atom_is_aromatic = current_molecule_data.atom_is_aromatic();
+  const resizable_array_p<Set_of_Atoms>& rings = current_molecule_data.rings();
+
+  const atom_number_t nh0 = indole.n1;
+  assert(ring_membership[nh0] == 1);
+  indole.n2 = kInvalidAtomNumber;
+
+  // cerr << "Adjacent nitrogen for " << nh0 << " in " << m.name() << '\n';
+  for (const Bond* b1 : m[nh0]) {
+    atom_number_t c1 = b1->other(nh0);
+    // cerr << "Check atom " << c1 << '\n';
+    if (ring_membership[c1] != 2) {
+      continue;
+    }
+    if (ncon[c1] != 3) {
+      continue;
+    }
+
+    // cerr << "What is attached\n";
+    for (const Bond* b2 : m[c1]) {
+      atom_number_t c2 = b2->other(c1);
+      if (ring_membership[c2] != 2) {
+        continue;
+      }
+      if (ncon[c2] != 3) {
+        continue;
+      }
+      // cerr << " ring contains " << c2 << " " << ring.contains(c2) << '\n';
+      if (! ring.contains(c2)) {
+        continue;
+      }
+
+      // cerr << "Further examination from " << c2 << '\n';
+      for (const Bond* b3 : m[c2]) {
+        atom_number_t n2 = b3->other(c2);
+        if (n2 == c1) {
+          continue;
+        }
+        // cerr << "Is this a nitrogen " << z[n2] << '\n';
+        if (z[n2] != 7) {
+          continue;
+        }
+        // For now we are ignoring things like C12=C(NC3=C1C=CC=C3)C=CC=[N+]2C CHEMBL367658
+        if (ncon[n2] != 2) {
+          continue;
+        }
+        if (! atom_is_aromatic[n2]) {
+          continue;
+        }
+        // cerr << "Checking hcount " << m.hcount(n2) << '\n';
+        if (m.hcount(n2) != 1) {
+          continue;
+        }
+        // cerr << "Does the starting ring contain this atom " << ring.contains(n2) << '\n';
+        if (ring.contains(n2)) {
+          continue;
+        }
+        // cerr << "Testing InSixMemberedRing\n";
+        if (! InSixMemberedRing(n2, rings)) {
+          continue;
+        }
+        // If we have already found one of these, we fail.
+        if (indole.n2 != kInvalidAtomNumber) {
+          return false;
+        }
+        indole.c1 = c1;
+        indole.c2 = c2;
+        indole.n2 = n2;
+        break;
+      }
+    }
+  }
+
+  if (indole.n2 == kInvalidAtomNumber) {
+    return false;
+  }
+
+  return true;
+}
+
+// `ring` is a five membered aromatic with at least one N atom, and it is fused.
+// See if there is an Indole Hydrogen shift transformation to be made.
+int
+IndoleHydrogenTransfer(Molecule& m, const Set_of_Atoms& ring,
+                       IWStandard_Current_Molecule& current_molecule_data) {
+  const atomic_number_t* z = current_molecule_data.atomic_number();
+  const int* ncon = current_molecule_data.ncon();
+
+  assert(ring.size() == 5);
+
+  for (atom_number_t a : ring) {
+    if (z[a] != 7) {
+      continue;
+    }
+    if (ncon[a] != 2) {
+      continue;
+    }
+    if (m.hcount(a) > 0) {
+      continue;
+    }
+
+    Indole indole(a);
+    if (! IsIndoleNitrogen(m, a, current_molecule_data, indole)) {
+      // cerr << "Is not indole nitrogen\n";
+      continue;
+    }
+
+    if (! FindAdjacentNitrogen(m, ring, current_molecule_data, indole)) {
+      // cerr << "NO adjacent nitrogen\n";
+      continue;
+    }
+
+    if (N2OppositeExocyclic(m, indole, ring, current_molecule_data)) {
+      // cerr << "Is opposite exocyclic\n";
+      continue;
+    }
+
+    if (! DoIndoleSwitch(m, indole, current_molecule_data)) {
+      // cerr << "Cannot do switch\n";
+      continue;
+    }
+
+    // It would be impossible to do this two times in a ring
+    return 1;
+  }
+
+  return 0;
+}
+
+int
+Chemical_Standardisation::_do_transform_indole_hydrogen(Molecule& m,
+                IWStandard_Current_Molecule& current_molecule_data) {
+  const int nrings = current_molecule_data.nrings();
+
+  if (nrings < 2) {
+    return 0;
+  }
+
+  const int* ring_is_aromatic = current_molecule_data.ring_is_aromatic();
+  const int* ring_is_fused = current_molecule_data.ring_is_fused();
+  const int* ring_size = current_molecule_data.ring_size();
+  const int* ring_nitrogen_count = current_molecule_data.ring_nitrogen_count();
+
+  const resizable_array_p<Set_of_Atoms>& rings = current_molecule_data.rings();
+
+  // cerr << m.smiles() << " begin _do_transform_indole_hydrogen " << m.name() << '\n';
+  int rc = 0;
+  for (int i = 0; i < nrings; ++i) {
+    if (! ring_is_aromatic[i]) {
+      continue;
+    }
+
+    if (ring_nitrogen_count[i] == 0) {
+      continue;
+    }
+
+    // Deliberate choice to start simple. There are lots of these in
+    // 3 ring systems.
+    // N1=C2C(=C3C1=C(C)C=CN3)C=CC=C2 CHEMBL176545
+
+    if (ring_is_fused[i] != 1) {
+      continue;
+    }
+
+    if (ring_size[i] != 5) {
+      continue;
+    }
+
+    rc += IndoleHydrogenTransfer(m, *rings[i], current_molecule_data);
+  }
+
+  // cerr << "INDOLEH rc " << rc << '\n';
+
+  if (rc == 0) {
+    return 0;
+  }
+
+  if (_append_string_depending_on_what_changed) {
+    _append_to_changed_molecules << " STD:" << CS_INDOLEH;
   }
 
   return rc;

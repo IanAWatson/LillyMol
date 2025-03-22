@@ -285,7 +285,7 @@ class const_IWSubstring
     int operator != (const const_IWSubstring &) const;
     int operator == (const IWString &) const;
     int operator != (const IWString & rhs) const;
-    int operator == (char) const;
+    bool operator == (char) const;
 
 //  The relational operators are implemented using strncmp
 
@@ -405,7 +405,7 @@ class IWString : public resizable_array<char>
     IWString & operator = (IWString &&);
 
     int operator == (char) const;
-    int operator != (char) const;
+    bool operator != (char) const;
     int operator == (const const_IWSubstring & rhs) const;
     int operator != (const const_IWSubstring & rhs) const;
     int operator == (const char *) const;
@@ -947,22 +947,24 @@ operator == (char lhs, const const_IWSubstring & rhs)
   return lhs == rhs._data[0];
 }
 
-inline int
+inline bool
 const_IWSubstring::operator == (char rhs) const
 {
 //cerr << "invoked at line " << __LINE__ << endl;
-  if (1 != _nchars)
-    return 0;
+  if (1 != _nchars) {
+    return false;
+  }
 
   return rhs == _data[0];
 }
 
-inline int
+inline bool
 IWString::operator != (char rhs) const
 {
 //cerr << "invoked at line " << __LINE__ << endl;
-  if (1 != _number_elements)
-    return 1;
+  if (1 != _number_elements) {
+    return true;
+  }
 
   return rhs != _things[0];
 }

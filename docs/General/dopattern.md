@@ -104,3 +104,27 @@ are just about to be executed.
 dopattern can use gnu parallel to execute the tasks in parallel on
 an SMP machine. In addition, if you have a Grid Engine cluster,
 dopattern can be used to launch tasks to a Grid Engine cluster.
+
+# parallel_process_file
+This is a Go tool that can in some cases perform the same
+functionality as dopattern, but without the need to split an input
+file. For example, to search chembl for phenols across 8 CPU's
+try
+```
+parallel_process_file -v -h 8 -cmd 'tsubstructure -s '[OH]-c' -m phenol%d -' chemb.smi
+```
+which runs in about 6 seconds. 
+
+The 'magic' is the %d in the output file. This will be interpolated with
+a unique sequence number, so 'phenol1.smi', 'phenol2.smi'... will be generated.
+The other 'magic' is that the command just be reading from standard input. If you
+run this with the -v option, you will see why that is the case.
+
+To generate all the cheap descriptors on Chembl.
+```
+parallel_process_file -v -h 8 -cmd 'iwdescr.sh -O none - > chembl%d.w' chembl.smi
+```
+which takes about 9 seconds. This time output is to standard output, with each
+job writing a uniquely named file, 'chembl1.w', 'chembl2.w' .... Concatenate
+these with descriptor_file_cat - which is a cat utility that knows about
+header records.

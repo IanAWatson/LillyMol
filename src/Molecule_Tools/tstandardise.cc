@@ -237,8 +237,8 @@ tstandardise(Molecule& m, IWString_and_File_Descriptor& output)
       cerr << "Potential problems for '" << m.name() << "', parent "
            << starting_structure_changed_by_chemical_standardisation << "\nvariant "
            << changes << ", i = " << i << '\n';
-      cerr << "Parent after processing " << initial_smiles << '\n';
-      cerr << "Random variant smiles " << smiles << ' ' << tmp.name() << '\n';
+      cerr << initial_smiles << " parent after processing\n";
+      cerr << smiles << ' ' << tmp.name() << " random variant smiles\n";
     }
 
     if (tmp.unique_smiles() != initial_smiles) {

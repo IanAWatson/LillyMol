@@ -2971,6 +2971,65 @@ collect_attached_nitrogen_atoms(
   return 1;
 }
 
+// The atoms are all Nitrogen atoms that are part of a Guanidine. Resolve them.
+// Make sure that ncon1 is the lowest connectivity.
+// If not possible, resolve by shell expansion.
+static int
+ResolveGuanidineByConnectivity(Molecule& m,
+                               atom_number_t carbon,
+                               atom_number_t& n1,
+                               atom_number_t& n2,
+                               atom_number_t& n3,
+                               IWStandard_Current_Molecule& current_molecule_data) {
+  const int* ncon = current_molecule_data.ncon();
+  const int* nrings = current_molecule_data.ring_membership();
+
+  const int ncon1 = ncon[n1];
+  const int ncon2 = ncon[n2];
+  const int ncon3 = ncon[n3];
+
+  if (nrings[n1] == 0) {
+    if (ncon1 < ncon2 && ncon1 < ncon3) {
+      return 1;
+    }
+    if (ncon1 > ncon2 && ncon1 > ncon3) {
+      return 1;
+    }
+  }
+
+  if (nrings[n2] == 0) {
+    if (ncon2 < ncon1 && ncon2 < ncon3) {
+      std::swap(n1, n2);
+      return 1;
+    }
+    if (ncon2 > ncon1 && ncon2 > ncon3) {
+      std::swap(n1, n2);
+      return 1;
+    }
+  }
+
+  if (nrings[n3] == 0) {
+    if (ncon3 < ncon1 && ncon3 < ncon2) {
+      std::swap(n1, n3);
+      return 1;
+    }
+    if (ncon3 > ncon1 && ncon3 > ncon2) {
+      std::swap(n1, n3);
+      return 1;
+    }
+  }
+
+  // Therefore they must all have the same connectivity or there
+  // are ring atoms involved.
+
+  resolve_by_shell_expansion(m, n1, n2, n3, carbon, current_molecule_data);
+  if (nrings[n1]) {
+    std::swap(n1, n2);
+  }
+
+  return 1;
+}
+
 /*
   We convert -N=C(-NH2)-NH2  to -N-C(=NH)-NH2
 
@@ -3007,6 +3066,7 @@ Chemical_Standardisation::_do_transform_guanidine(
 
   int ng = g.number_elements();
 
+// #define DEBUG_DO_TRANSFORM_GUANIDINE
 #ifdef DEBUG_DO_TRANSFORM_GUANIDINE
   cerr << "Transforming guanidine, ng " << ng << '\n';
   cerr << m.smiles() << ' ' << m.name() << '\n';
@@ -3066,29 +3126,16 @@ Chemical_Standardisation::_do_transform_guanidine(
     // cerr << "From atom " << c << " first_nh " << first_nh << " second_nh " << second_nh
     // << " doubly_bonded_n " << doubly_bonded_n << '\n';
 
-    if (1 == ncon[second_nh])
-      ;
-    else if (1 == ncon[first_nh]) {
-      std::swap(first_nh, second_nh);
-    } else {
-      int h1 = m.hcount(first_nh);
-      int h2 = m.hcount(second_nh);
-      if (h1 == 0 && h2 == 0) [[ unlikely ]] {  // should never happen
-        continue;
-      }
-      if (h1 == 0 && h2 == 1) {
-      } else if (h1 == 1 && h2 == 0) {
-        std::swap(first_nh, second_nh);
-      } else {
-        resolve_by_shell_expansion(m, second_nh, first_nh, doubly_bonded_n, c,
-                                 current_molecule_data);
-        // cerr << first_nh << ' ' << second_nh << ' ' << doubly_bonded_n << '\n';
-      }
-    }
+    if (ncon[doubly_bonded_n] == 1) [[unlikely]] {  // should not happen, removed above.
+      continue; // correct as is.
+    } 
+    
+    ResolveGuanidineByConnectivity(m, c, first_nh, second_nh, doubly_bonded_n, current_molecule_data);
 
     m.set_bond_type_between_atoms(c, doubly_bonded_n, SINGLE_BOND);
-    m.set_bond_type_between_atoms(c, second_nh, DOUBLE_BOND);
-    m.set_bond_type_between_atoms(c, first_nh, SINGLE_BOND);
+    m.set_bond_type_between_atoms(c, second_nh, SINGLE_BOND);
+    m.set_bond_type_between_atoms(c, first_nh, DOUBLE_BOND);
+    m.set_implicit_hydrogens_known(first_nh, 0);
     m.set_implicit_hydrogens_known(second_nh, 0);
     m.set_implicit_hydrogens_known(doubly_bonded_n, 0);
 

@@ -6,18 +6,17 @@ actives vs inactives, understanding differences between sets can be informative.
 
 The tool works in three phases.
 
-1. Compute molecular descriptors for the collection(s).
+1. Compute molecular descriptors for the collection(s) using contrib/bin/iwdescr.sh
 2. Computed molecular descriptors are examined and put into a common data format.
 3. Those common data formats are used to generate plots.
 
-The tool is set up to work with molecular descriptors computed by `iwdescr`.
-Within Lilly, we can compute those via
 ```
-iwdescr -i ICTE -g all -l -O all file.smi > file.w
+bin/contrib/iwdescr.sh -i ICTE -O all file.smi > file.w
 ```
 The `-i ICTE` option is important. It tells `iwdescr` to skip over any otherwise
 fatal input errors. LillyMol has a wide variety of tools for attempting
-to recover from such errors [fileconv](/docs/Molecule_Tools/fileconv.md).
+to recover from such errors [fileconv](/docs/Molecule_Tools/fileconv.md), but
+something like this, losing a small number of molecules is likely harmless.
 
 You can also add your own features to the tool. You will need to create an entry
 in `column_descriptions.txt`, and concatenate your features onto what is

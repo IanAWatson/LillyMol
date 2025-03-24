@@ -603,7 +603,9 @@ INSTANTIATE_TEST_SUITE_P(TestStandardisationP, TestStandardisationP, testing::Va
 //              "Oc1c2c[n][nH]c2[n]c(C)[n]1"}
 
   ForStd{{"indoleh"}, "BrC1=CNC2=NC=NC2=C1 CHEMBL1562708",
-                            "Brc1c[n]c2[n]c[nH]c2c1"}
+                            "Brc1c[n]c2[n]c[nH]c2c1"},
+  ForStd{{"guan"}, "C(=NC1=CC=CN=C1)(NC#N)N1CCCCC1 CHEMBL86956",
+                            "N#CN=C(N1CCCCC1)Nc1c[n]ccc1"}
 ));
 
 struct ForStdKetoEnol {
@@ -701,12 +703,14 @@ TEST_P(TestStandardisationNoChange, Tests) {
     ASSERT_TRUE(_chemical_standardisation.Activate(directive, kVerbose));
   }
   ASSERT_TRUE(_m.build_from_smiles(params.smiles));
-  ASSERT_FALSE(_chemical_standardisation.process(_m));
+  ASSERT_FALSE(_chemical_standardisation.process(_m)) << params.directives[0] << " changed " <<
+                params.smiles;
 }
 INSTANTIATE_TEST_SUITE_P(TestStandardisationNoChange, TestStandardisationNoChange, testing::Values(
   NoChange{{"to2ap"}, "C12=NC(=N)C=CN1[C@H]1O[C@H]([C@H](O)[C@H]1O2)CO CHEMBL4303543"},
   NoChange{{"to2ap"}, "CC=CC1=C(C(=CC(=C1)CC1=CNC(=N)NC1=N)CCC)OC CHEMBL528943"},
-  NoChange{{"indoleh"}, "CC1=CC(=O)N2N=CC=C2N1 CHEMBL4525057"}
+  NoChange{{"indoleh"}, "CC1=CC(=O)N2N=CC=C2N1 CHEMBL4525057"},
+  NoChange{{"guan"}, "C(=N)(NC1=C2C(=CC=C1)C=CC=C2)N1CCCCC1 CHEMBL91145"}
 ));
 
 }  // namespace

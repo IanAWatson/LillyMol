@@ -1,0 +1,27 @@
+name: "Pictet-Spengler"
+comment: "[c;r6:1](-[NH1;$(N-[#6]):2]):[c;r6:3](-[NH2:4]).[#6:6]-[C;R0:5](=[OD1])-[#8;H1,$(O-[CH3])]>>[c:3]2:[c:1]:[n:2]:[c:5](-[#6:6]):[n:4]@2"
+scaffold {
+  id: 0
+  smarts: "[c;r6:1](-[ND2H1T0:2]):[c;r6:3](-[NH2:4])"
+}
+sidechain {
+  id: 1
+  reagent: "CC(=O)OC benzimidazole"
+  smarts: "CC(=O)OC"
+  remove_atom: 2
+  break_bond {
+    a1: 1
+    a2: 3
+  }
+  remove_fragment: 3
+  join {
+    a1: 1
+    a2: 1
+    btype: SS_DOUBLE_BOND
+  }
+  join {
+    a1: 3
+    a2: 1
+    btype: SS_SINGLE_BOND
+  }
+}

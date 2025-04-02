@@ -1,0 +1,29 @@
+name: "Pictet-Spengler"
+scaffold {
+  id: 0
+  smarts: "[#6;!$([#6](-C=O)-C=O):4]-[CH0:1](=[OD1])-[C;H1&!$(C-[*;!#6])&!$(C-C(=O)O),H2:2]-[CH0;R0:3](=[OD1])-[#6;!$([#6](-C=O)-C=O):5]"
+  remove_atom: [2, 5]
+  make_bond {
+    a1: 1
+    a2: 3
+    btype: SS_DOUBLE_BOND
+  }
+  match_conditions {
+    embeddings_can_overlap: false
+  }
+}
+sidechain {
+  id: 1
+  reagent: "NC(O)=C-C#N"
+  smarts: "NC(O)=C-C#N"
+  join {
+    a1: 1
+    a2: 3
+    btype: SS_SINGLE_BOND
+  }
+  join {
+    a1: 4
+    a2: 0
+    btype: SS_DOUBLE_BOND
+  }
+}

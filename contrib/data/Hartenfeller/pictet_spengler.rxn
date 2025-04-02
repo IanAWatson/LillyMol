@@ -1,0 +1,21 @@
+name: "Pictet-Spengler"
+scaffold {
+  id: 0
+  smarts: "[NH2]-[CH2]-[CH2]c1ccccc1"
+}
+sidechain {
+  id: 1
+  reagent: "O=C-C"
+  smarts: "[OD1]=[CH1R0]-C"
+  remove_atom: 0
+  join {
+    a1: 1
+    a2: 1
+    btype: SS_SINGLE_BOND
+  }
+  join {
+    a1: 8
+    a2: 2
+    btype: SS_SINGLE_BOND
+  }
+}

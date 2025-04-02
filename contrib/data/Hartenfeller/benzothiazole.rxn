@@ -1,0 +1,16 @@
+name: "benzothiazole"
+comment: "[c;r6:1](-[SH1:2]):[c;r6:3](-[NH2:4]).[#6:6]-[CH1;R0:5](=[OD1])>>[c:3]2:[c:1]:[s:2]:[c:5](-[#6:6]):[n:4]@2"
+scaffold {
+  id: 0
+  smarts: "[cr6:1](-[SH1:2]):[c;r6:3]-[NH2:4]"
+}
+sidechain {
+  id: 1
+  reagent: "[CH3:6][C:5](=O)
+  smarts: "q"
+  join {
+    a1:
+    a2:
+    btype: SS_SINGLE_BOND
+  }
+}

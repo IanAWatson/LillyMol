@@ -1,0 +1,26 @@
+name: "tetrazole-terminal"
+comment: "[CH0;$(C-[#6]):1]#[NH0:2]>>[C:1]1=[N:2]-N-N=N-1"
+scaffold {
+  id: 0
+  smarts: "[CD2T1]#[NH0]"
+  change_bond {
+    a1: 0
+    a2: 1
+    btype: SS_DOUBLE_BOND
+  }
+}
+sidechain {
+  id: 1
+  reagent: "NN=N"
+  smarts: "NN=N"
+  join {
+    a1: 1
+    a2: 0
+    btype: SS_SINGLE_BOND
+  }
+  join {
+    a1: 0
+    a2: 2
+    btype: SS_SINGLE_BOND
+  }
+}

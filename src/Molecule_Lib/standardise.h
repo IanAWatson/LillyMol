@@ -417,6 +417,7 @@ class IWStandard_Current_Molecule
 #define CS_ISOTOPE "isotope"
 #define CS_2AMINO_PYRIDINE "to2ap"
 #define CS_OXO_PYRIMIDINE "oxopyrimidine"
+#define CS_INDOLEH "indoleh"
 
 
 namespace standardisation {
@@ -503,6 +504,7 @@ class Chemical_Standardisation
     Chemical_Transformation _transform_to_2_amino_pyridine;
     Chemical_Transformation _transform_oxo_pyrimidine;
     Chemical_Transformation _transform_isotopes;
+    Chemical_Transformation _transform_indole_hydrogen;
 
 //  Various reverse direction transformations
 
@@ -694,6 +696,8 @@ class Chemical_Standardisation
                         standardisation::KetoEnol keto_enol,
                         IWStandard_Current_Molecule& current_molecule_data);
     int _do_transform_oxo_pyrimidine(Molecule& m,
+                IWStandard_Current_Molecule& current_molecule_data);
+    int _do_transform_indole_hydrogen(Molecule& m,
                 IWStandard_Current_Molecule& current_molecule_data);
 
     int _activate_nohmove_transformations();

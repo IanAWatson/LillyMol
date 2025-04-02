@@ -432,6 +432,7 @@ DownTheBond::Build(const const_IWSubstring& buffer) {
 #endif
 
   // We cannot multiply specify a condition.
+  // I thought about enabling it, but the underlying matcher does not play well.
   resizable_array<int> seen;
   seen.reserve(tokens.size());
 
@@ -445,6 +446,7 @@ DownTheBond::Build(const const_IWSubstring& buffer) {
     }
     if (! seen.add_if_not_already_present(static_cast<int>(dtb->type()))) {
       cerr << "DownTheBond::Build:duplicate specification\n";
+      cerr << "You can specify a range 'x{3-6}'\n";
       return 0;
     }
   }

@@ -6,7 +6,7 @@ scaffold {
 }
 sidechain {
   id: 1
-  reagent: "[CH3:6][C:5](=O)
+  reagent: "[CH3:6][C:5](=O)"
   smarts: "q"
   join {
     a1:

@@ -1,4 +1,4 @@
-name: "Pictet-Spengler"
+name: "pictet-spengler"
 scaffold {
   id: 0
   smarts: "[NH2]-[CH2]-[CH2]c1ccccc1"

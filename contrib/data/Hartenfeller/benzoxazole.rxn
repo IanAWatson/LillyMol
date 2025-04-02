@@ -1,4 +1,4 @@
-name: "Pictet-Spengler"
+name: "benzoxazole"
 comment: "[c:1](-[OH1;$(Oc1ccccc1):2]):[c;r6:3](-[NH2:4]).[c:6]-[CH1;R0:5](=[OD1])>>[c:3]2:[c:1]:[o:2]:[c:5](-[c:6]):[n:4]@2"
 scaffold {
   id: 0

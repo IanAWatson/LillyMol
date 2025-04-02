@@ -1,4 +1,4 @@
-name: "Pictet-Spengler"
+name: "thiazole"
 comment: "[#6:6]-[C;R0:1](=[OD1])-[CH1;R0:5](-[#6:7])-[*;#17,#35,#53].[NH2:2]-[C:3]=[SD1:4]>>[c:1]2(-[#6:6]):[n:2]:[c:3]:[s:4][c:5]([#6:7]):2"
 scaffold {
   id: 0

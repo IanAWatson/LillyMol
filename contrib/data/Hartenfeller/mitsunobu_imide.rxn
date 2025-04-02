@@ -1,0 +1,13 @@
+name: "mitsunobu_imide"
+comment: "[C;H1&$(C([#6])[#6]),H2&$(C[#6]):1][OH1].[NH1;$(N(C=O)C=O):2]>>[C:1][N:2]"
+scaffold {
+  id: 0
+  smarts: "[C;H1&$(C([#6])[#6]),H2&$(C[#6]):1][OH1]"
+  match_conditions {
+    embeddings_can_overlap: false
+  }
+  change_element {
+    atom: 1
+    element: "N"
+  }
+}

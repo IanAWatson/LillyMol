@@ -196,9 +196,9 @@ read_reactions(iwstring_data_source& input, const IWString& dir,
 }
 
 static int
-read_reactions(const char* fname, const Sidechain_Match_Conditions& smc,
+read_reactions(IWString& fname, const Sidechain_Match_Conditions& smc,
                resizable_array_p<IWReaction>& rxn) {
-  iwstring_data_source input(fname);
+  iwstring_data_source input(fname.null_terminated_chars());
 
   if (!input.good()) {
     cerr << "read_reactions:cannot open '" << fname << "'\n";
@@ -506,15 +506,16 @@ medchem_wizard(int argc, char** argv) {
   resizable_array_p<IWReaction> rxn;
 
   if (cl.option_present('R')) {
-    const char* r = cl.option_value('R');
-
-    if (!read_reactions(r, smc, rxn)) {
-      cerr << "Cannot read reactions from '" << r << "'\n";
-      return 1;
+    IWString fname;
+    for (int i = 0; cl.value('R', fname, i); ++i) {
+      if (!read_reactions(fname, smc, rxn)) {
+        cerr << "Cannot read reactions from '" << fname << "'\n";
+        return 1;
+      }
     }
 
     if (verbose) {
-      cerr << "Read " << rxn.size() << " reactions from '" << r << "'\n";
+      cerr << "Read " << rxn.size() << " reactions\n";
     }
   }
 
@@ -643,7 +644,7 @@ medchem_wizard(int argc, char** argv) {
            << ' ' << f << '\n';
     }
     if (discard_bad_balences) {
-      cerr << bad_valences_discarded << " produces with bad valences discarded\n";
+      cerr << bad_valences_discarded << " products with bad valences discarded\n";
     }
     if (discarded_for_too_many_atoms) {
       cerr << discarded_for_too_many_atoms << " discarded_for_too_many_atoms\n";

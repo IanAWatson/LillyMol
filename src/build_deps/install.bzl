@@ -34,6 +34,6 @@ local_install = rule(
     implementation = _local_install_impl,
     attrs = {
         "srcs": attr.label_list(allow_files = True),
-        "target": attr.string(default = "/lrlhps/users/rx87690/LillyMolPrivate/bin/Linux", doc = "Installation target directory"),
+        "target": attr.string(default = "/Users/hstern/LillyMol/bin/Darwin", doc = "Installation target directory"),
     },
 )

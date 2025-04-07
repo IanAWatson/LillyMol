@@ -4,7 +4,8 @@
 */
 
 #include <stdlib.h>
-#include <values.h>
+#include <float.h>
+#include <limits.h>
 #include <iostream>
 #include <memory>
 

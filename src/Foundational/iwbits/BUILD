@@ -15,6 +15,7 @@ cc_library(
         "fixed_bit_vector.h",
         "iwbits.h",
         "iwbits_support.h",
+        "popcount.h"
     ],
     visibility = ["//visibility:public"],
     deps = [

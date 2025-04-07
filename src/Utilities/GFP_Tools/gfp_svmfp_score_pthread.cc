@@ -713,6 +713,10 @@ static Do_Part_of_Pool * dpp = nullptr;
 static int nthreads = 0;
 static pthread_t * child_thread = nullptr;
 
+#ifdef __APPLE__
+#include pthread_barrier.h
+#endif
+
 static pthread_barrier_t start_barrier;
 static pthread_barrier_t end_barrier;
 

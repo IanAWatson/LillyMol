@@ -193,8 +193,22 @@ else
     bazel_options=""
 fi
 
-build_options="--cxxopt=-DGIT_HASH=\"$(git rev-parse --short --verify HEAD)\" --cxxopt=-DTODAY=\"$(date +%Y-%b-%d)\" --jobs=${jobs} -c opt"
-build_options="${build_options} --copt=-march=native --cxxopt=-march=native --cxxopt=-mtune=native"
+build_options=(
+  "--verbose_failures"
+  "--cxxopt=-DGIT_HASH=\"$(git rev-parse --short --verify HEAD)\""
+  "--cxxopt=-DTODAY=\"$(date +%Y-%b-%d)\""
+  "--jobs=${jobs}"
+  "-c"
+  "opt"
+  "--copt=-march=native"
+  "--cxxopt=-march=native"
+  "--cxxopt=-mtune=native"
+  "--copt=-Xclang"
+  "--copt=-fopenmp"
+  "--cxxopt=-Xclang"
+  "--cxxopt=-fopenmp"
+  "--linkopt=-lomp"
+)
 
 # Seems like splitting out the BerkeleyDB components of the python
 # bindings is needlessly complex at this stage. If python is being
@@ -205,20 +219,21 @@ fi
 
 # All BerkeleyDB things are now isolated, so this probably makes no difference.
 if [[ ! -v BUILD_BDB ]] ; then
-    build_options="${build_options} --build_tag_filters=-berkeleydb"
+    build_options+=(--build_tag_filters=-berkeleydb)
 fi
 
 # First task is unit tests
 
-${bazel} ${bazel_options} test ${build_options} Foundational/...:all
-${bazel} ${bazel_options} test ${build_options} Molecule_Lib:all
-${bazel} ${bazel_options} test ${build_options} Molecule_Tools:all
-${bazel} ${bazel_options} test ${build_options} Utilities/...:all
+${bazel} ${bazel_options} test "${build_options[@]}" Foundational/...:all
+${bazel} ${bazel_options} test "${build_options[@]}" Molecule_Lib:all
+${bazel} ${bazel_options} test "${build_options[@]}" Molecule_Tools:all
+${bazel} ${bazel_options} test "${build_options[@]}" Utilities/...:all
+
 
 # Currently no tests in these.
 if [[ -v BUILD_BDB ]] ; then
-    # ${bazel} ${bazel_options} test ${build_options} BerkeleyDB:all
-    # ${bazel} ${bazel_options} test ${build_options} Molecule_Tools_Bdb:all
+    # ${bazel} ${bazel_options} test "${build_options[@]}" BerkeleyDB:all
+    # ${bazel} ${bazel_options} test "${build_options[@]}" Molecule_Tools_Bdb:all
     echo ""
 fi
 
@@ -227,43 +242,43 @@ fi
 
 if [[ ! -v BUILD_LIBRARY_ONLY ]] ; then
     echo "Building tools"
-    ${bazel} ${bazel_options} build ${build_options} Molecule_Tools:all
-    ${bazel} ${bazel_options} build ${build_options} Obsolete:all
-    ${bazel} ${bazel_options} build ${build_options} Obsolete/Descriptor_Similarity:all
-    ${bazel} ${bazel_options} build ${build_options} Foundational/iw_tdt:all
-    ${bazel} ${bazel_options} build ${build_options} Utilities/...:all
+    ${bazel} ${bazel_options} build "${build_options[@]}" Molecule_Tools:all
+    ${bazel} ${bazel_options} build "${build_options[@]}" Obsolete:all
+    ${bazel} ${bazel_options} build "${build_options[@]}" Obsolete/Descriptor_Similarity:all
+    ${bazel} ${bazel_options} build "${build_options[@]}" Foundational/iw_tdt:all
+    ${bazel} ${bazel_options} build "${build_options[@]}" Utilities/...:all
 fi  
 
 if [[ ${inside_lilly} -eq 1 || -v BUILD_VENDOR ]] ; then
-    ${bazel} ${bazel_options} build ${build_options} Vendor/...:all
+    ${bazel} ${bazel_options} build "${build_options[@]}" Vendor/...:all
 fi
 
 if [[ -v BUILD_BDB ]] ; then
-    ${bazel} ${bazel_options} build ${build_options} BerkeleyDB:all
-    ${bazel} ${bazel_options} build ${build_options} Molecule_Tools_Bdb:all
+    ${bazel} ${bazel_options} build "${build_options[@]}" BerkeleyDB:all
+    ${bazel} ${bazel_options} build "${build_options[@]}" Molecule_Tools_Bdb:all
 fi
 
 # Now install the targets
 
 if [[ ! -v BUILD_LIBRARY_ONLY ]] ; then
     echo "Installing tools"
-    ${bazel} ${bazel_options} run ${build_options} Foundational/iw_tdt:install
-    ${bazel} ${bazel_options} run ${build_options} Molecule_Tools:install
-    ${bazel} ${bazel_options} run ${build_options} Obsolete:install
-    ${bazel} ${bazel_options} run ${build_options} Obsolete/Descriptor_Similarity:install
-    ${bazel} ${bazel_options} run ${build_options} Utilities/General:install
-    ${bazel} ${bazel_options} run ${build_options} Utilities/GFP_Tools:install
-    ${bazel} ${bazel_options} run ${build_options} Utilities/GFP_Knn:install
-    ${bazel} ${bazel_options} run ${build_options} Utilities/Distance_Matrix:install
+    ${bazel} ${bazel_options} run "${build_options[@]}" Foundational/iw_tdt:install
+    ${bazel} ${bazel_options} run "${build_options[@]}" Molecule_Tools:install
+    ${bazel} ${bazel_options} run "${build_options[@]}" Obsolete:install
+    ${bazel} ${bazel_options} run "${build_options[@]}" Obsolete/Descriptor_Similarity:install
+    ${bazel} ${bazel_options} run "${build_options[@]}" Utilities/General:install
+    ${bazel} ${bazel_options} run "${build_options[@]}" Utilities/GFP_Tools:install
+    ${bazel} ${bazel_options} run "${build_options[@]}" Utilities/GFP_Knn:install
+    ${bazel} ${bazel_options} run "${build_options[@]}" Utilities/Distance_Matrix:install
 fi
 
 if [[ ${inside_lilly} -eq 1 || -v BUILD_VENDOR ]] ; then
-    ${bazel} ${bazel_options} run ${build_options} Vendor:install
+    ${bazel} ${bazel_options} run "${build_options[@]}" Vendor:install
 fi
 
 if [[ -v BUILD_BDB ]] ; then
-    ${bazel} ${bazel_options} run ${build_options} BerkeleyDB:install
-    ${bazel} ${bazel_options} run ${build_options} Molecule_Tools_Bdb:install
+    ${bazel} ${bazel_options} run "${build_options[@]}" BerkeleyDB:install
+    ${bazel} ${bazel_options} run "${build_options[@]}" Molecule_Tools_Bdb:install
 fi
 
 # Python if requested, build, install and test.
@@ -271,6 +286,6 @@ fi
 # libraries from LillyMol/lib to your default PYTHONPATH.
 
 if [[ -v BUILD_PYTHON ]] ; then
-    ${bazel} ${bazel_options} build ${build_options} pybind:all
+    ${bazel} ${bazel_options} build "${build_options[@]}" pybind:all
     ./copy_shared_libraries.sh $REPO_HOME/lib
 fi

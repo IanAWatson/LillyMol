@@ -522,6 +522,7 @@ class IWString : public resizable_array<char>
     int numeric_value (double &) const;
     int numeric_value (long long &) const;
     int numeric_value (unsigned long &) const;
+    int numeric_value (unsigned long long &) const;
 
     int numeric_value_fast(int &) const;
 

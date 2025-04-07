@@ -1311,8 +1311,6 @@ Main(int argc, char** argv) {
       cerr << "Cannot determine input type\n";
       return 1;
     }
-  } else if (cl.size() == 1 && ::strcmp(cl[0], "-") == 0) {
-    input_type = FILE_TYPE_SMI;
   } else if (!all_files_recognised_by_suffix(cl)) {
     return 1;
   }

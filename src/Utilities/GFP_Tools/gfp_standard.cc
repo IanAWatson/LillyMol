@@ -4,7 +4,7 @@
 #include <stdafx.h>
 #endif
 
-#include <nmmintrin.h>
+#include "Foundational/iwbits/popcount.h"
 #include <algorithm>
 
 #include <iostream>
@@ -202,22 +202,22 @@ popcount_2fp(const unsigned *bufA, const unsigned *bufB, const int nwords) {
   int count = 0;
   assert(nwords % 8 == 0);
 
-#if defined(__x86_64__)
+#ifndef __i386__
   int nquads = nwords / 2;
   const uint64_t *a64 = (uint64_t *)bufA;
   const uint64_t *b64 = (uint64_t *)bufB;
   for (int i = 0; i < nquads; i += 4) {
-    count += _mm_popcnt_u64(a64[i] & b64[i]) + _mm_popcnt_u64(a64[i + 1] & b64[i + 1]) +
-             _mm_popcnt_u64(a64[i + 2] & b64[i + 2]) +
-             _mm_popcnt_u64(a64[i + 3] & b64[i + 3]);
+    count += POPCOUNT(a64[i] & b64[i]) + POPCOUNT(a64[i + 1] & b64[i + 1]) +
+             POPCOUNT(a64[i + 2] & b64[i + 2]) +
+             POPCOUNT(a64[i + 3] & b64[i + 3]);
   }
 #else
   const uint32_t *a32 = (const uint32_t *)bufA;
   const uint32_t *b32 = (const uint32_t *)bufB;
   for (int i = 0; i < nwords; i += 4) {
-    count += _mm_popcnt_u32(a32[i] & b32[i]) + _mm_popcnt_u32(a32[i + 1] & b32[i + 1]) +
-             _mm_popcnt_u32(a32[i + 2] & b32[i + 2]) +
-             _mm_popcnt_u32(a32[i + 3] & b32[i + 3]);
+    count += POPCOUNT(a32[i] & b32[i]) + POPCOUNT(a32[i + 1] & b32[i + 1]) +
+             POPCOUNT(a32[i + 2] & b32[i + 2]) +
+             POPCOUNT(a32[i + 3] & b32[i + 3]);
   }
 #endif
   return count;
@@ -231,8 +231,8 @@ popcount(const unsigned char *b, const int nwords) {
   const uint64_t *b64 = reinterpret_cast<const uint64_t *>(b);
 
   for (int i = 0; i < nquads; i += 4) {
-    count += _mm_popcnt_u64(b64[i]) + _mm_popcnt_u64(b64[i + 1]) +
-             _mm_popcnt_u64(b64[i + 2]) + _mm_popcnt_u64(b64[i + 3]);
+    count += POPCOUNT(b64[i]) + POPCOUNT(b64[i + 1]) +
+             POPCOUNT(b64[i + 2]) + POPCOUNT(b64[i + 3]);
   }
 
   return count;

@@ -3,7 +3,8 @@
 */
 
 #include <stdlib.h>
-#include <values.h>
+#include <limits.h>
+#include <float.h>
 
 #include <fstream>
 #include <iostream>

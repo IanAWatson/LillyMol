@@ -3097,8 +3097,8 @@ Molecule::remove_atoms(const T * to_remove)
 
   return rc;
 }
-template int Molecule::remove_atoms(const int32_t*);
-template int Molecule::remove_atoms(const int64_t*);
+// template int Molecule::remove_atoms(const int32_t*);
+// template int Molecule::remove_atoms(const int64_t*);
 
 int
 Molecule::remove_many_atoms(const int * to_remove)

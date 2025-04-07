@@ -5,6 +5,11 @@ load("@rules_python//python:proto.bzl", "py_proto_library")
 
 load("@rules_proto//proto:defs.bzl", "proto_library")
 
+config_setting(
+    name = "darwin",
+    values = {"cpu": "darwin"}
+)
+
 proto_library(
     name = "evidence_proto",
     srcs = [
@@ -296,14 +301,14 @@ cc_binary(
     srcs = [
         "gfp_leader_standard.cc",
     ],
-    copts = [
-        #       "-fopenmp=libiomp5",  llvm
-        "-fopenmp",
-    ],
-    linkopts = [
-        #       "-L/usr/lib/llvm-11/lib/",  # clang
-        "-lgomp",
-    ],
+    copts = select({
+        ":darwin": ["-Xclang", "-fopenmp"],
+        "//conditions:default": ["-fopenmp"]
+    }),
+    linkopts = select ({
+        ":darwin": ["-Xclang", "-fopenmp", "-lomp"],
+        "//conditions:default": ["-lgomp"]
+    }),
     tags = [
         "omp",
     ],
@@ -486,10 +491,14 @@ cc_binary(
     srcs = [
         "gfp_spread_omp.cc",
     ],
-    copts = ["-fopenmp"],
-    linkopts = [
-        "-lgomp",
-    ],
+    copts = select({
+        ":darwin": ["-Xclang", "-fopenmp"],
+        "//conditions:default": ["-fopenmp"]
+    }),
+    linkopts = select ({
+        ":darwin": ["-Xclang", "-fopenmp", "-lomp"],
+        "//conditions:default": ["-lgomp"]
+    }),
     tags = [
         "omp",
     ],
@@ -508,14 +517,14 @@ cc_binary(
     srcs = [
         "gfp_spread_standard.cc",
     ],
-    copts = [
-        #       "-fopenmp=libiomp5", llvm
-        "-fopenmp",
-    ],
-    linkopts = [
-        #       "-L/usr/lib/llvm-11/lib/",  # clang
-        "-lgomp",
-    ],
+    copts = select({
+        ":darwin": ["-Xclang", "-fopenmp"],
+        "//conditions:default": ["-fopenmp"]
+    }),
+    linkopts = select ({
+        ":darwin": ["-Xclang", "-fopenmp", "-lomp"],
+        "//conditions:default": ["-lgomp"]
+    }),
     tags = [
         "omp",
     ],
@@ -575,11 +584,15 @@ cc_binary(
     srcs = [
         "gfp_nearneighbours_single_file_tbb.cc",
     ],
-    copts = ["-fopenmp"],
-    linkopts = [
-        "-ldl",
-        "-lgomp",
-    ],
+
+    copts = select({
+        ":darwin": ["-Xclang", "-fopenmp"],
+        "//conditions:default": ["-fopenmp"]
+    }),
+    linkopts = select ({
+        ":darwin": ["-Xclang", "-fopenmp", "-ldl", "-lomp"],
+        "//conditions:default": ["-ldl", "-lgomp"]
+    }),
     tags = [
         "omp",
         "tbb",
@@ -617,14 +630,14 @@ cc_binary(
         "fp_and_smiles.cc",
         "gfp_lnearneighbours_standard.cc",
     ],
-    copts = [
-        #       "-fopenmp=libiomp5",  llvm
-        "-fopenmp",
-    ],
-    linkopts = [
-        #       "-L/usr/lib/llvm-11/lib/",  # clang
-        "-lgomp",
-    ],
+    copts = select({
+        ":darwin": ["-Xclang", "-fopenmp"],
+        "//conditions:default": ["-fopenmp"]
+    }),
+    linkopts = select ({
+        ":darwin": ["-Xclang", "-fopenmp", "-lomp"],
+        "//conditions:default": ["-lgomp"]
+    }),
     tags = [
         "omp",
     ],
@@ -941,14 +954,14 @@ cc_binary(
         "//Foundational/cmdline:iwcmdline",
         "//Foundational/data_source:iwtfdata_record",
     ],
-    copts = [
-        #       "-fopenmp=libiomp5",  llvm
-        "-fopenmp",
-    ],
-    linkopts = [
-        #       "-L/usr/lib/llvm-11/lib/",  # clang
-        "-lgomp",
-    ],
+    copts = select({
+        ":darwin": ["-Xclang", "-fopenmp"],
+        "//conditions:default": ["-fopenmp"]
+    }),
+    linkopts = select ({
+        ":darwin": ["-Xclang", "-fopenmp", "-lomp"],
+        "//conditions:default": ["-lgomp"]
+    }),
     tags = [
         "omp",
     ],

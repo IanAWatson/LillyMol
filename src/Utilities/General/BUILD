@@ -2,6 +2,11 @@
 load("@rules_python//python:proto.bzl", "py_proto_library")
 load("@rules_proto//proto:defs.bzl", "proto_library")
 
+config_setting(
+    name = "darwin",
+    values = {"cpu": "darwin"}
+)
+
 proto_library(
     name = "class_label_translation_proto",
     srcs = [
@@ -456,12 +461,14 @@ cc_binary(
     srcs = [
         "isolation_forest.cc",
     ],
-    copts = [
-        "-fopenmp",
-    ],
-    linkopts = [
-        "-lgomp",
-    ],
+    copts = select({
+        ":darwin": ["-Xclang", "-fopenmp"],
+        "//conditions:default": ["-fopenmp"]
+    }),
+    linkopts = select ({
+        ":darwin": ["-Xclang", "-fopenmp", "-lomp"],
+        "//conditions:default": ["-lgomp"]
+    }),
     deps = [
         "//Foundational/accumulator",
         "//Foundational/cmdline:iwcmdline",

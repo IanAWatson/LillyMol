@@ -1138,9 +1138,9 @@ IWReaction::ConstructFromProto(const ReactionProto::Reaction& proto,
   }
 
   if (proto.has_name()) {
-    _comment = proto.name();
-  } else if (proto.has_comment()) {
     _comment = proto.comment();
+  } else if (proto.has_comment()) {
+    _comment = proto.name();
   }
 
   if (proto.has_scaffold_match_conditions() &&

@@ -3,7 +3,7 @@
 #include <iostream>
 #include <iomanip>
 #include <memory>
-#include <nmmintrin.h>
+#include "popcount.h"
 
 #include "Foundational/iwbits/dy_fingerprint.h"
 #include "Foundational/iwbits/iwbits.h"
@@ -254,7 +254,7 @@ int
 FixedBitVector::nset() const {
   int rc = 0;
   for (int i = 0; i < _nwords; ++i) {
-    rc +=  _mm_popcnt_u64(_bits[i]);
+    rc +=  POPCOUNT(_bits[i]);
   }
   return rc;
 }
@@ -272,7 +272,7 @@ int
 FixedBitVector::BitsInCommon(const FixedBitVector& rhs) const {
   int rc = 0;
   for (int i = 0; i < _nwords; ++i) {
-    rc +=  _mm_popcnt_u64(_bits[i] & rhs._bits[i]);
+    rc +=  POPCOUNT(_bits[i] & rhs._bits[i]);
   }
   return rc;
 }

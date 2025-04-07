@@ -4,7 +4,7 @@ load("@rules_proto//proto:defs.bzl", "proto_library")
 
 config_setting(
     name = "darwin",
-    values = {"cpu": "darwin"}
+    constraint_values = ["@platforms//os:osx"]
 )
 
 proto_library(

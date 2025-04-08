@@ -7,6 +7,8 @@
 #elif defined(__i386__)
 #include <nmmintrin.h>
 #define POPCOUNT _mm_popcnt_u32
+#elif __APPLE__
+#define POPCOUNT __builtin_popcount
 #else
 #include <bit>
 #define POPCOUNT std::popcount

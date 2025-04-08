@@ -205,11 +205,6 @@ build_options=(
   "--copt=-march=native"
   "--cxxopt=-march=native"
   "--cxxopt=-mtune=native"
-  "--copt=-Xclang"
-  "--copt=-fopenmp"
-  "--cxxopt=-Xclang"
-  "--cxxopt=-fopenmp"
-  "--linkopt=-lomp"
 )
 
 # Seems like splitting out the BerkeleyDB components of the python
@@ -275,7 +270,7 @@ fi
 #    ${bazel} ${bazel_options} run "${build_options[@]}" Utilities/Distance_Matrix:install
 #fi
 
-./install.sh
+./install.sh ../bin/Darwin
 
 if [[ ${inside_lilly} -eq 1 || -v BUILD_VENDOR ]] ; then
     ${bazel} ${bazel_options} run "${build_options[@]}" Vendor:install

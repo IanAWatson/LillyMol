@@ -261,18 +261,21 @@ if [[ -v BUILD_BDB ]] ; then
 fi
 
 # Now install the targets
+# Now being done with install.sh
 
-if [[ ! -v BUILD_LIBRARY_ONLY ]] ; then
-    echo "Installing tools"
-    ${bazel} ${bazel_options} run "${build_options[@]}" Foundational/iw_tdt:install
-    ${bazel} ${bazel_options} run "${build_options[@]}" Molecule_Tools:install
-    ${bazel} ${bazel_options} run "${build_options[@]}" Obsolete:install
-    ${bazel} ${bazel_options} run "${build_options[@]}" Obsolete/Descriptor_Similarity:install
-    ${bazel} ${bazel_options} run "${build_options[@]}" Utilities/General:install
-    ${bazel} ${bazel_options} run "${build_options[@]}" Utilities/GFP_Tools:install
-    ${bazel} ${bazel_options} run "${build_options[@]}" Utilities/GFP_Knn:install
-    ${bazel} ${bazel_options} run "${build_options[@]}" Utilities/Distance_Matrix:install
-fi
+#if [[ ! -v BUILD_LIBRARY_ONLY ]] ; then
+#    echo "Installing tools"
+#    ${bazel} ${bazel_options} run "${build_options[@]}" Foundational/iw_tdt:install
+#    ${bazel} ${bazel_options} run "${build_options[@]}" Molecule_Tools:install
+#    ${bazel} ${bazel_options} run "${build_options[@]}" Obsolete:install
+#    ${bazel} ${bazel_options} run "${build_options[@]}" Obsolete/Descriptor_Similarity:install
+#    ${bazel} ${bazel_options} run "${build_options[@]}" Utilities/General:install
+#    ${bazel} ${bazel_options} run "${build_options[@]}" Utilities/GFP_Tools:install
+#    ${bazel} ${bazel_options} run "${build_options[@]}" Utilities/GFP_Knn:install
+#    ${bazel} ${bazel_options} run "${build_options[@]}" Utilities/Distance_Matrix:install
+#fi
+
+./install.sh
 
 if [[ ${inside_lilly} -eq 1 || -v BUILD_VENDOR ]] ; then
     ${bazel} ${bazel_options} run "${build_options[@]}" Vendor:install

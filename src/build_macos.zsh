@@ -194,6 +194,8 @@ else
 fi
 
 build_options=(
+  "-k"
+  "--jobs=${THREADS}"
   "--verbose_failures"
   "--cxxopt=-DGIT_HASH=\"$(git rev-parse --short --verify HEAD)\""
   "--cxxopt=-DTODAY=\"$(date +%Y-%b-%d)\""

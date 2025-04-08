@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
 me=$0
-me=$(readlink -e $0)
+me=$(realpath $0)
 
 if [[ ! -v LILLYMOL_HOME ]] ; then
   LILLYMOL_HOME=$(dirname $(dirname $(dirname $(dirname ${me}))))

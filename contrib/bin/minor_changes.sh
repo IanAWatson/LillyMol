@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
 if [[ ! -v LILLYMOL_HOME ]] ; then
-  export LILLYMOL_HOME=$(dirname $(dirname $(dirname $(readlink -e $0))))
+  export LILLYMOL_HOME=$(dirname $(dirname $(dirname $(realpath $0))))
 fi
 
 config=${LILLYMOL_HOME}/data/minor_changes/minor_changes.textproto

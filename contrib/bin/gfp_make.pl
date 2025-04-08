@@ -27,7 +27,7 @@ chomp $uname;
 
 my @bindir;
 
-unshift (@bindir, "$ianhome/bin/Linux");
+unshift (@bindir, "$ianhome/bin/$uname");
 unshift (@bindir, "$ianhome/contrib/bin");
 
 # Flags for each kind of fingerprint possible

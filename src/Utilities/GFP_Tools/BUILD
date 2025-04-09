@@ -702,11 +702,22 @@ cc_binary(
     ],
 )
 
+cc_library(
+    name = "pthread_barrier",
+    srcs = ["pthread_barrier.c"],
+    hdrs = ["pthread_barrier.h"],
+    visibility = ["//visibility:public"],
+)
+
 cc_binary(
     name = "gfp_svmfp_score_pthread",
     srcs = [
         "gfp_svmfp_score_pthread.cc",
     ],
+    copts = select({
+        ":darwin": ["-Xclang", "-fopenmp", "-Drestrict=__restrict__"],
+        "//conditions:default": ["-fopenmp"],
+    }),
     deps = [
         ":gfp_bit_subset",
         "//Foundational/accumulator",
@@ -716,7 +727,10 @@ cc_binary(
         "//Foundational/iwmisc",
         "//Foundational/iwmisc:normalisation",
         "//Utilities/GFP_Tools:gfp",
-    ],
+    ] + select({
+        ":darwin": [":pthread_barrier"],
+        "//conditions:default": [],
+    }),
 )
 
 cc_binary(

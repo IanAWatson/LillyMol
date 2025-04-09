@@ -109,7 +109,7 @@ declare -i must_build
 
 must_build=0
 if [[ ! -s 'f2c.tar.gz' ]] ; then
-    wget -O f2c.tar.gz https://www.netlib.org/f2c/src.tgz 
+    curl -L -o f2c.tar.gz https://www.netlib.org/f2c/src.tgz
     tar -zxvf f2c.tar.gz
     mv src f2c  # change the non descriptive name
     must_build=1
@@ -121,7 +121,7 @@ fi
 
 must_build=0
 if [[ ! -s 'libf2c.zip' ]] ; then
-    wget https://www.netlib.org/f2c/libf2c.zip
+    curl -L -O https://www.netlib.org/f2c/libf2c.zip
     mkdir libf2c
     cd libf2c && unzip ../libf2c.zip
     must_build=1
@@ -137,7 +137,7 @@ if [[ -v BUILD_BDB ]] ; then
     must_build=0
     bdb_version='18.1.40'
     if [[ ! -s "db-${bdb_version}.tar.gz" ]] ; then
-        wget http://download.oracle.com/berkeley-db/db-${bdb_version}.tar.gz
+        curl -L -O http://download.oracle.com/berkeley-db/db-${bdb_version}.tar.gz
         tar zxf db-${bdb_version}.tar.gz
         must_build=1
     fi

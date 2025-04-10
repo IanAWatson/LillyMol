@@ -163,7 +163,7 @@ if [[ -v BUILD_BDB ]] ; then
     fi
 fi
 
-# Step 3: biuld LillyMol executables
+# Step 3: build LillyMol executables
 echo "Builds and installs LillyMol executables"
 echo "The assumption is that WORKSPACE and build_deps/install.bzl"
 echo "have both been configured."

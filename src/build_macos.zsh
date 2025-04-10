@@ -1,5 +1,13 @@
 #!/usr/bin/env zsh
 
+if [ -z "$LILLYMOL_HOME" ]
+then 
+    echo "System variable LILLYMOL_HOME is required for building"
+    echo "Please export LILLYMOL_HOME(local path to LillyMol code)"
+    echo "Example: export LILLYMOL_HOME=/home/user/LillyMol"
+    exit 1
+fi
+
 # check if REPO_HOME is set from Makefile
 # if directly calling this script, set it
 if [[ ! -v REPO_HOME ]] ; then

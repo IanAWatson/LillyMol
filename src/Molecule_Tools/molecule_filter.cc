@@ -433,6 +433,7 @@ Options::Process(const const_IWSubstring& line,
     const int nfrag = smiles.ccount('.') + 1;
     if (nfrag > _requirements.max_number_fragments()) {
       ++_too_many_fragments;
+      MaybeWriteToRejectStream(line);
       return 0;
     }
   }
@@ -491,6 +492,7 @@ Options::Process(const const_IWSubstring& line,
   if (_requirements.has_max_chiral() &&
       m.chiral_centres() > _requirements.max_chiral()) {
     ++_too_many_chiral;
+    MaybeWriteToRejectStream(line);
     return 0;
   }
 

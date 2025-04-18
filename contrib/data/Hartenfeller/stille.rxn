@@ -1,0 +1,10 @@
+name: "stille"
+comment: "[#6;$(C=C-[#6]),$(c:c):1][Br,I].[Cl,Br,I][c:2]>>[c:2][#6:1]"
+scaffold {
+  id: 0
+  smarts: "[Br,Cl,I]-C-[#6G>0]"
+  change_element {
+    atom: 0
+    element: "C"
+  }
+}

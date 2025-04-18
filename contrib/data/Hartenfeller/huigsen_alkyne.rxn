@@ -1,0 +1,26 @@
+name: "huigsen_alkyne"
+comment: "[CH0;$(C-[#6]):1]#[NH0:2].[NH2:3]-[NH1:4]-[CH0;$(C-[#6]);R0:5]=[OD1]>>[N:2]1-[C:1]=[N:3]-[N:4]-[C:5]=1"
+scaffold {
+  id: 0
+  smarts: "[CD2T1]#[NH0]"
+  change_bond {
+    a1: 0
+    a2: 1
+    btype: SS_SINGLE_BOND
+  }
+}
+sidechain {
+  id: 1
+  reagent: "C=NN=C"
+  smarts: "C=NN=C"
+  join {
+    a1: 1
+    a2: 0
+    btype: SS_SINGLE_BOND
+  }
+  join {
+    a1: 1
+    a2: 3
+    btype: SS_SINGLE_BOND
+  }
+}

@@ -1,0 +1,17 @@
+name: "gringard_carbonyl"
+comment: "[#6:1][C:2]#[#7;D1].[Cl,Br,I][#6;$([#6]~[#6]);!$([#6]([Cl,Br,I])[Cl,Br,I]);!$([#6]=O):3]>>[#6:1][C:2](=O)[#6:3]"
+scaffold {
+  id: 0
+  smarts: "C#N"
+  remove_atom: 1
+}
+sidechain {
+  id: 1
+  reagent: "CC=O"
+  smarts: "CC=O"
+  join {
+    a1: 0
+    a2: 1
+    btype: SS_SINGLE_BOND
+  }
+}

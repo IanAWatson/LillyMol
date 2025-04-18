@@ -1,0 +1,22 @@
+name: "phthalazinone"
+comment: "[c;r6:1](-[C;$(C=O):6]-[OH1]):[c;r6:2]-[C;H1,$(C-C):3]=[OD1].[NH2:4]-[NH1;$(N-[#6]);!$(NC=[O,S,N]):5]>>[c:1]1:[c:2]-[C:3]=[N:4]-[N:5]-[C:6]-1"
+scaffold {
+  id: 0
+  smarts: "[c;r6:1](-[$(C=O):6]-[OH1]):[c;r6:2]-[CT1:3]=[OD1]"
+  remove_atom: [5, 2]
+}
+sidechain {
+  id: 1
+  reagent: "NN"
+  smarts: "NN"
+  join {
+    a1: 4
+    a2: 0
+    btype: SS_DOUBLE_BOND
+  }
+  join {
+    a1: 1
+    a2: 1
+    btype: SS_SINGLE_BOND
+  }
+}

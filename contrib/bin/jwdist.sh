@@ -11,7 +11,7 @@ fi
 charges="${LILLYMOL_HOME}/data/queries/charges/"
 hbonds="${LILLYMOL_HOME}/data/queries/hbonds"
 
-exec ${LILLYMOL_HOME}/bin/Linux/jwdist \
+exec ${LILLYMOL_HOME}/bin/$(uname)/jwdist \
      -N athpos -N F:${charges}/queries \
      -q QUERY:F:${charges}/positive \
      -q QUERY:F:${charges}/negative \

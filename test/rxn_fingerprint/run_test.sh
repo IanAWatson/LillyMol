@@ -1,4 +1,4 @@
-#! /bin/bash
+#!/usr/bin/env bash
 for dir in ./*; do
     if [ -d "$dir" ]; then
         current_path= pwd &> /dev/null

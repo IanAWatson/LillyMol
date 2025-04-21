@@ -1,4 +1,4 @@
-#! /bin/bash
+#!/usr/bin/env bash
 echo "$(basename $(dirname $(readlink -f $0))) test disabled"
 exit
 for dir in ./*; do

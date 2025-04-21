@@ -163,6 +163,18 @@ if [[ -v BUILD_BDB ]] ; then
     fi
 fi
 
+if [[ -v BUILD_ZEROMQ ]] ; then
+  git clone https://github.com/zeromq/libzmq
+  (cd libzmq && mkdir build)
+  (cd libzmq/build && cmake -DCMAKE_INSTALL_PREFIX=${third_party} -DZMQ_BUILD_TESTS=OFF ..)
+  (cd libzmq/build && make -j${THREADS})
+  (cd libzmq/build && make install)
+
+  git clone https://github.com/zeromq/cppzmq
+  # could not get it to build, but seems like a header only library. This worked.
+  cp cppzmq/zmq.hpp ${third_party}/include
+fi
+
 # Step 3: build LillyMol executables
 echo "Builds and installs LillyMol executables"
 echo "The assumption is that WORKSPACE and build_deps/install.bzl"

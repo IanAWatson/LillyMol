@@ -1466,6 +1466,20 @@ cc_binary(
 )
 
 cc_binary(
+    name = "positional_analogue_scanning",
+    srcs = [
+        "positional_analogue_scanning.cc",
+    ],
+    deps = [
+        "//Foundational/cmdline:iwcmdline",
+        "//Foundational/iwstring:absl_hash",
+        "//Molecule_Lib:iwmolecule",
+        "//Molecule_Lib:moleculeio",
+        "@com_google_absl//absl/container:flat_hash_set",
+    ],
+)
+
+cc_binary(
     name = "preferred_smiles",
     srcs = [
         "preferred_smiles.cc",

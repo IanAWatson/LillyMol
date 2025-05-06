@@ -25,4 +25,13 @@ overlaps with the collection presented here.  The dataset is available
 encoded as computer-readable Reaction SMARTS expressions from the
 Supporting Information presented for this paper.
 
+# LillyMol
+The reactions are translated to LillyMol textproto format.
 
+Unfortunately what we find is that there is almost full overlap between
+this set of molecular transformations and what is available in
+[Medchem Wizard](/data/MedchemWizard). Invoke with
+[medchem_wizard.sh](/contrib/bin/medchem_wizard.sh)
+
+There may be little reason to use these, but they are included for
+completeness.

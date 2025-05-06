@@ -1,7 +1,5 @@
 #! /usr/bin/env ruby
 
-ianhome = ENV['C3TK_BIN'] #"/home/rx87851"
-
 require_relative "lib/iwcmdline.rb"
 
 $expert = false

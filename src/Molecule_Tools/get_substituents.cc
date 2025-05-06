@@ -69,7 +69,7 @@ Usage(int rc) {
 Specifying the query and the matched atom can be tricky. A common use case is to look
 for substituents on a ring. A typical invocation might look like
 -s '[cx2D3]-!@*' -O 1 -X anchor
-This says that the substituent starts at matched atom 1 (-O 1), which is the
+This says that the substituent starts at matched atom 1 (O-1), which is the
 exocyclic atom * and that when the substituent is formed, the matched atom
 itself is part of the substituent.
 )";
@@ -416,7 +416,7 @@ Options::Initialise(Command_Line& cl) {
   }
 
   if (cl.option_present('I')) {
-    if (! cl.value('I', _isotope) || _isotope < 0) {
+    if (! cl.value('I', _isotope) || _isotope <= 0) {
       cerr << "Options::Initialise:the isotope flag (-I) must be a whole +ve number\n";
       return 0;
     }

@@ -625,6 +625,7 @@ cc_library(
         ":moleculeio",
         "//Foundational/iwmisc",
         "//Foundational/iwstring",
+        "//Foundational/iwmisc:sparse_fp_creator",
     ],
 )
 

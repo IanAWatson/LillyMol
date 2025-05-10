@@ -690,7 +690,8 @@ store_atom_type(Db& database, const Fingerprint_Characteristics& fc)
 {
   IWString string_atype;
   if (!fc.string_atom_type(string_atype)) {  // cannot happen
-    return 0;
+    cerr << "Atom type not stored\n";
+    return 1;
   }
 
   return store_check_whatever(database, ATYPE_KEY, string_atype);

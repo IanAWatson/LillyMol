@@ -215,6 +215,8 @@ class DicerFragmentLookupImpl {
 
     int _write_header_record;
 
+    uint32_t _molecules_with_no_fragments_in_db;
+
     // The output separator in our output files.
     char _sep = ' ';
 
@@ -292,6 +294,7 @@ DicerFragmentLookupImpl::DicerFragmentLookupImpl() {
   _write_header_record = 0;
   _molecules_processed = 0;
   _molecules_with_no_fragments = 0;
+  _molecules_with_no_fragments_in_db = 0;
   _min_count_needed = 0;
   _above_min_count = 0;
   _min_fragment_size = 0;
@@ -672,6 +675,12 @@ DicerFragmentLookupImpl::ProcessMolecule(const IWString& smiles,
     }
   }
 
+  if (index_with_lowest_count < 0) {
+    ++_molecules_with_no_fragments_in_db;
+    output << smiles << _sep << name << " X\n";
+    return 1;
+  }
+
   if (atom_coverage) {
     WriteAtomCoverage(*atom_coverage, _stream_for_atom_coverage);
   }
@@ -785,6 +794,7 @@ int
 DicerFragmentLookupImpl::Report(std::ostream& output) const {
   output << "Read " << _molecules_processed << " molecules\n";
   output << _molecules_with_no_fragments << " molecules generated no fragments\n";
+  output << _molecules_with_no_fragments_in_db << " molecules with zero fragments in db\n";
   output << _above_min_count << " above " << _min_count_needed << '\n';
   return 1;
 }

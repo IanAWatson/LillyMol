@@ -184,3 +184,11 @@ Tolological Torsion descriptors and fingerprints. Used by gfp_make and make_desc
 ## xgbd_make xgbd_evaluate
 Build and score XGBoost models. These scripts know about the descriptors produced by
 make_descriptors, so a smiles file can be scored directly.
+
+## xgboost_model_evaluate
+A very lightweight and fast XGBoost model scoring tool. It uses C++ rather than python to
+do model evaluation. You must provide the needed descriptors.
+
+## zof.sh
+Zartler Ocular Filter. From work with Edward Zartler. This script combines a series of
+queries and tools to identify/discard molecules that can go into a fragment screening library.

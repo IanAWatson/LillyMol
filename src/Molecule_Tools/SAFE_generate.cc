@@ -69,7 +69,7 @@ Usage(int rc) {
   cerr << R"(Denovo generation of molecules from SAFE smiles.
 Consumes the output from mol2SAFE, and the -L file is also from mol2SAFE.
 
-mol2SAFE ... -S library.textproto file.smi > file.safe.smi
+mol2SAFE ... -I 1 -c -M 15 -z -S library.textproto file.smi > file.safe.smi
 safe_generate ... -L library.textproto -C generate.config file.safe.smi > new_molecules.smi
 
  -C <fname>             safe_generate textproto configuration file.
@@ -2043,6 +2043,8 @@ SafeGenerate(int argc, char** argv) {
 
     options.MakeAllLibrary(ngenerate, output);
   }
+
+  output.flush();
 
 
   if (verbose) {

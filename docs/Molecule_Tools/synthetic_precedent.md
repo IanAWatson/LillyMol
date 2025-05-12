@@ -5,24 +5,24 @@ independently developed at about the same time that Peter Ertl implemented a
 similar tool in RDKit.
 
 The LillyMol tool does not do any special processing of rings or ring systems,
-the [ring rarity](smi2rings.md) is used for handling rings.
+the [ring rarity](smi2rings.md) tool is used for handling rings.
 
 The first step is to build a database of EC fingerprints from molecules
-which you believe has actually been made. From these molecules we 
+which you believe have actually been made. From these molecules we 
 generate EC fingerprints, and store the info in a BerkeleyDB database.
 Importantly, we also store a count of the number of instances of that
 bit found in the collections. In many larger collections, we find
 molecules that are likely to have been drawing errors, or otherwise
-mysterious. A simple presence or absence of a feature is generally
-not a safe determination of rarity.
+mysterious looking motifs. A simple presence or absence of a feature is generally
+not a robust determinant of rarity.
 
 ## Building A Database
 The tool iwecfp_database_load builds a database from one or more
 collections. These should be molecules where there is reasonable
 expectations that the molecules have actually been made.
 The keys in the database are bit numbers and
-the values contain information about prevalence. Newer versions
-will contain protos.
+the values contain information about prevalence, and maybe examplar structures.
+Newer versions will contain protos.
 
 A typical database load might look like
 ```
@@ -35,7 +35,7 @@ Once the database has been built, new molecules assessed.
 
 A typical lookup command might look like
 ```
-iwecfp_database_lookup -d precedent.bdb -w PSD -I unknown.smi
+iwecfp_database_lookup -d precedent.bdb -w PSD unknown.smi
 ```
 If we build the database with Chembl, and then lookup Chembl in that
 database, the output might look like

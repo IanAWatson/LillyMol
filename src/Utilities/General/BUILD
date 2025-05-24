@@ -1,5 +1,6 @@
 # load("@com_google_protobuf//:protobuf.bzl", "py_proto_library")
-load("@rules_python//python:proto.bzl", "py_proto_library")
+# load("@rules_python//python:proto.bzl", "py_proto_library")
+load("@com_google_protobuf//bazel:py_proto_library.bzl", "py_proto_library")
 load("@rules_proto//proto:defs.bzl", "proto_library")
 
 config_setting(
@@ -400,6 +401,18 @@ cc_binary(
         "//Foundational/iwstring",
     ],
 )
+
+#cc_binary(
+#    name = "fingerprint_name_tokens",
+#    srcs = [
+#        "fingerprint_name_tokens.cc",
+#    ],
+#    deps = [
+#        "//Foundational/data_source:iwstring_data_source",
+#        "//Foundational/iwmisc",
+#        "//Foundational/iwstring",
+#    ],
+#)
 
 cc_binary(
     name = "grep_by_column",

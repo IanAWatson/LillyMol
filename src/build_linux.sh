@@ -345,14 +345,14 @@ if [[ ${inside_lilly} -eq 1 || -v BUILD_VENDOR ]] ; then
     ${bazel} ${bazel_options} run ${build_options} Vendor:install
 fi
 
-if [[ -v BUILD_BDB ]] ; then
-    ${bazel} ${bazel_options} run ${build_options} BerkeleyDB:install
-    ${bazel} ${bazel_options} run ${build_options} Molecule_Tools_Bdb:install
-fi
+#if [[ -v BUILD_BDB ]] ; then
+#    ${bazel} ${bazel_options} run ${build_options} BerkeleyDB:install
+#    ${bazel} ${bazel_options} run ${build_options} Molecule_Tools_Bdb:install
+#fi
 
-if [[ -v BUILD_XGBOOST ]] ; then
-    ${bazel} ${bazel_options} run ${build_options} xgboost:install
-fi
+#if [[ -v BUILD_XGBOOST ]] ; then
+#    ${bazel} ${bazel_options} run ${build_options} xgboost:install
+#fi
 
 # Python if requested, build, install and test.
 # Note that PYTHONPATH will need to be adjusted, or copy the shared

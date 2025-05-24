@@ -1,4 +1,5 @@
 
+
 cc_binary(
     name = "enough_inventory_bdb",
     srcs = [

@@ -1,4 +1,4 @@
-load("@rules_python//python:proto.bzl", "py_proto_library")
+load("@com_google_protobuf//bazel:py_proto_library.bzl", "py_proto_library")
 load("@rules_proto//proto:defs.bzl", "proto_library")
 
 proto_library(

@@ -10,7 +10,17 @@ https://arxiv.org/pdf/2310.10773.pdf
 and LillyMol has a tool, `mol2SAFE` that can convert a normal
 smiles file to a SAFE type smiles file.
 
-A typical SAFE smiles might look something like
+As a reminder the fundamental principle behind the SAFE method is the observation
+that
+```
+C1.C1
+```
+is a valid smiles for ethane. A Carbon atom with ring opening 1. Not a bond.
+A Carbon with ring closing number 1. Ethane. And of course any ring
+number can be used. In this case, we use ring openings and closings larger
+than 10 to avoid interfering with existing ring openings and closings.
+
+Typical SAFE smiles for more complex molecules might look something like
 ```
 [1C]%10.[1C]%11.[1O]%10%12.[1N]%13(=O)=O.[1C]%131=[1C]%11C2=C(O1)C=[1C]%12C=C2 CHEMBL7372
 [1O]%10.[1O]%11.[1O]%12.[1O]%13.[1C]%10%14.O1[1C]%14[1C]%11CO[1P]%12(=O)O[1P]%131=O CHEMBL1162462
@@ -102,7 +112,7 @@ Once a SAFE fragment library file has been built, and/or the input set of molecu
 converted to SAFE form, safe_generate can be run. Configuration via a textproto config
 file is preferred.
 ```
-safe_generate -p -e 2000 -b 3000 -n 1000 -C generate.textproto -v -L chembl.lib.textproto input.smi
+safe_generate -p -e 2000 -b 3000 -n 1000 -C generate.textproto -v -L chembl.lib.textproto input.safe.smi
 ```
 The -n option specifies up to 1000 variants by replacing SAFE fragments with randomly
 selected fragments from the library - mode #1.

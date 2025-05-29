@@ -626,7 +626,6 @@ cc_library(
         "//Foundational/iwmisc",
         "//Foundational/iwmisc:sparse_fp_creator",
         "//Foundational/iwstring",
-        "//Foundational/iwmisc:sparse_fp_creator",
     ],
 )
 

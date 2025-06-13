@@ -5492,3 +5492,36 @@ const_IWSubstring::AsString() const {
 
   return std::string(_data, _nchars);
 }
+
+template <typename T>
+int
+NumericValueKMGCommon(const char* s, int nchars, const T& result) {
+  if (result.empty()) {
+    return 0;
+  }
+
+  int multiplier = 1;
+  const char last_char = result.back();
+
+  if (last_char == 'k' || last_char == 'K') {
+    multiplier = 1000;
+    --nchars;
+  } else if (last_char == 'm' || last_char == 'M') {
+    multiplier = 1000000;
+    --nchars;
+  } else if (last_char == 'g' || last_char == 'G') {
+    multiplier = 1000000000;
+    --nchars;
+  }
+
+  if (nchars == 0) {
+    return 0;
+  }
+
+}
+
+template <typename T>
+int
+IWString::NumericValueKMG(T& result) const {
+  return NumericValueKMGCommon(_things, _number_elements, result);
+}

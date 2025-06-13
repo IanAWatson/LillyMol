@@ -154,6 +154,9 @@ class const_IWSubstring
     int numeric_value (unsigned long &) const;
     int numeric_value (unsigned long long &) const;
 
+    // Suffixes k(thousand), m(million) and g(giga) are recognised;
+    template <typename T> int NumericValueKMG(T& result) const;
+
     int starts_with (char) const;
     int starts_with (const char *) const;
     int starts_with (const const_IWSubstring &) const;
@@ -524,6 +527,9 @@ class IWString : public resizable_array<char>
     int numeric_value (unsigned long &) const;
 
     int numeric_value_fast(int &) const;
+
+    // Suffixes k(thousand), m(million) and g(giga) are recognised;
+    template <typename T> int NumericValueKMG(T& result) const;
 
     const char * chars ();
     const char * null_terminated_chars ();

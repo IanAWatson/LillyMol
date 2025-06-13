@@ -1,0 +1,15 @@
+name: "Pictet-Spengler"
+comment: ""
+scaffold {
+  id: 0
+  smarts: "q"
+}
+sidechain {
+  id: 1
+  smarts: "q"
+  join {
+    a1:
+    a2:
+    btype: SS_SINGLE_BOND
+  }
+}

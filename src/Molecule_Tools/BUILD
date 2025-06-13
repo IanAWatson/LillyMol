@@ -1,137 +1,8 @@
-# load("@com_google_protobuf//:protobuf.bzl", "py_proto_library")
-load("@rules_python//python:proto.bzl", "py_proto_library")
+load("@com_google_protobuf//bazel:py_proto_library.bzl", "py_proto_library")
+
+# load("@rules_python//python:proto.bzl", "py_proto_library")
 load("@rules_cc//cc:defs.bzl", "cc_binary")
 load("@rules_proto//proto:defs.bzl", "proto_library")
-load("//build_deps:install.bzl", "local_install")
-
-local_install(
-    name = "install",
-    srcs = [
-        ":_fragment_filter",
-        ":abraham",
-        ":activity_consistency",
-        ":align_molecule",
-        ":alogp",
-        ":atom_triples",
-        ":chirality_fingerprint",
-        ":common_names",
-        ":dbf",
-        ":dicer",
-        ":dicer_to_topological_types",
-        ":ec_fingerprint",
-        ":echoqry",
-        ":echorxn",
-        ":enumeration",
-        ":extended_atom_pairs",
-        ":ez_descriptor",
-        ":ez_fingerprint",
-        ":ez_fingerprint_v2",
-        ":fileconv",
-        ":fingerprint_substructure",
-        ":firstatom",
-        ":get_coordinates",
-        ":get_substituents",
-        ":gfp_erg",
-        ":ghose_crippen",
-        ":grease",
-        ":grep_molecule",
-        ":grid_fingerprint",
-        ":hydrophobic_sections",
-        ":id_chirality",
-        ":iwdemerit",
-        ":iwdescr",
-        ":iwecfp",
-        ":iwecfp_intermolecular",
-        ":iwfp",
-        ":iwpathd",
-        ":jwcats",
-        ":jwdip",
-        ":jwdist",
-        ":jwestate",
-        ":jwmedv",
-        ":jwmolconn",
-        ":jwmorse",
-        ":jwsadb",
-        ":linear_fingerprint",
-        ":long_molecules",
-        ":maccskeys",
-        ":make_these_molecules",
-        ":medchemwizard",
-        ":minor_changes",
-        ":mkfrag",
-        ":mol2SAFE",
-        ":mol2qry",
-        ":molecular_abstraction",
-        ":molecular_grid",
-        ":molecular_merge",
-        ":molecular_scaffold",
-        ":molecular_transformations",
-        ":molecular_variants",
-        ":molecule_filter",
-        ":molecule_subset",
-        ":molecules_from_reagents",
-        ":msort",
-        ":msort_parallel",
-        ":numbered_smiles",
-        ":overlapping_fragment_model",
-        ":parsimonious_set",
-        ":pharmacophore_2d",
-        ":preferred_smiles",
-        ":psafp",
-        ":pubchem_fingerprints",
-        ":r1r2etc",
-        ":random_geometric_changes",
-        ":random_molecular_permutations",
-        ":random_smiles",
-        ":reduced_graph",
-        ":remove_and_label",
-        ":remove_matched_atoms",
-        ":representations",
-        ":retrosynthesis",
-        ":rgroup",
-        ":ring_extraction",
-        ":ring_fingerprint",
-        ":ring_replacement",
-        ":ring_replacement_collate",
-        ":ring_size_fingerprint",
-        ":ring_substitution",
-        ":ring_trimming",
-        ":rotatable_bond_fingerprint",
-        ":rotatable_bonds",
-        ":rule_of_five",
-        ":rxn_fingerprint",
-        ":rxn_reverse",
-        ":rxn_signature",
-        ":rxn_standardize",
-        ":rxn_substructure_search",
-        ":same_structures",
-        ":smiles_mutation",
-        ":sp3_filter",
-        ":substituent_model",
-        ":substitutions",
-        ":substructure_match_fraction",
-        ":substructure_mcs",
-        ":superimpose_by_matched_atoms",
-        ":tautomer_generation",
-        ":temperature",
-        ":tnass",
-        ":topotorsion",
-        ":topotorsion_fingerprints",
-        ":tp1_summarise",
-        ":tp_first_pass",
-        ":trxn",
-        ":tshadow",
-        ":tsmiles",
-        ":tstandardise",
-        ":tsubstructure",
-        ":tsubstructure_summarise_hits",
-        ":tsymmetry",
-        ":unique_molecules",
-        ":verloop",
-        ":xlogp",
-        ":xray_structure_compare",
-    ],
-)
 
 proto_library(
     name = "bond_length_distribution_proto",
@@ -967,6 +838,20 @@ cc_binary(
 )
 
 cc_binary(
+   name = "formula_groupings",
+   srcs = [
+       "formula_groupings.cc",
+   ],
+   deps = [
+        "//Foundational/cmdline:iwcmdline",
+        "//Foundational/iwstring:absl_hash",
+        "//Molecule_Lib:iwmolecule",
+        "//Molecule_Lib:moleculeio",
+        "@com_google_absl//absl/algorithm:container",
+   ],
+)
+
+cc_binary(
     name = "geometric_descriptors",
     srcs = [
         "geometric_descriptors.cc",
@@ -1582,6 +1467,20 @@ cc_binary(
 )
 
 cc_binary(
+    name = "positional_analogue_scanning",
+    srcs = [
+        "positional_analogue_scanning.cc",
+    ],
+    deps = [
+        "//Foundational/cmdline:iwcmdline",
+        "//Foundational/iwstring:absl_hash",
+        "//Molecule_Lib:iwmolecule",
+        "//Molecule_Lib:moleculeio",
+        "@com_google_absl//absl/container:flat_hash_set",
+    ],
+)
+
+cc_binary(
     name = "preferred_smiles",
     srcs = [
         "preferred_smiles.cc",
@@ -1781,6 +1680,19 @@ cc_binary(
 )
 
 cc_binary(
+    name = "qed",
+    srcs = [
+        "qed_main.cc",
+    ],
+    deps = [
+        ":qed_lib",
+        "//Foundational/cmdline:iwcmdline",
+        "//Molecule_Lib:iwmolecule",
+        "//Molecule_Lib:moleculeio",
+    ],
+)
+
+cc_binary(
     name = "ring_closure",
     srcs = [
         "ring_closure_main.cc",
@@ -1874,6 +1786,30 @@ cc_binary(
         "//Molecule_Lib:iwmolecule",
         "//Molecule_Lib:moleculeio",
         "//Molecule_Lib:substructure_cc_proto",
+        "@com_google_protobuf//:protobuf",
+    ],
+)
+
+cc_binary(
+    name = "ring_replacement_inexact",
+    srcs = [
+        "ring_replacement_inexact.cc",
+    ],
+    deps = [
+        ":reaction_duplicate",
+        ":replacement_ring_cc_proto",
+        "//Foundational/accumulator",
+        "//Foundational/cmdline:iwcmdline",
+        "//Foundational/iw_tdt",
+        "//Foundational/iwaray",
+        "//Foundational/iwmisc",
+        "//Foundational/iwstring:absl_hash",
+        "//Molecule_Lib:iwmolecule",
+        "//Molecule_Lib:iwreaction",
+        "//Molecule_Lib:reaction_cc_proto",
+        "//Molecule_Lib:moleculeio",
+        "//Molecule_Lib:substructure_cc_proto",
+        "@com_google_absl//absl/container:flat_hash_set",
         "@com_google_protobuf//:protobuf",
     ],
 )
@@ -2252,6 +2188,19 @@ cc_binary(
 )
 
 cc_binary(
+    name = "sidechain_switcheroo",
+    srcs = [
+        "sidechain_switcheroo.cc",
+    ],
+    deps = [
+        "//Foundational/iwstring:absl_hash",
+        "//Molecule_Lib:iwmolecule",
+        "//Molecule_Lib:moleculeio",
+        "@com_google_absl//absl/container:flat_hash_set",
+    ],
+)
+
+cc_binary(
     name = "skeleton",
     srcs = [
         "skeleton.cc",
@@ -2577,6 +2526,22 @@ cc_binary(
         "//Foundational/iwstring:absl_hash",
         "//Molecule_Lib:iwmolecule",
         "//Molecule_Lib:iwreaction",
+        "//Molecule_Lib:moleculeio",
+        "@com_google_absl//absl/container:flat_hash_map",
+    ],
+)
+
+cc_binary(
+    name = "unique_molecules_sorted",
+    srcs = [
+        "unique_molecules_sorted.cc",
+    ],
+    deps = [
+        ":dicer_fragments_cc_proto",
+        "//Foundational/iwaray",
+        "//Foundational/iwmisc",
+        "//Foundational/iwstring:absl_hash",
+        "//Molecule_Lib:iwmolecule",
         "//Molecule_Lib:moleculeio",
         "@com_google_absl//absl/container:flat_hash_map",
     ],
@@ -3148,6 +3113,21 @@ cc_library(
         "partial_symmetry.h",
     ],
     deps = [
+        "//Molecule_Lib:iwmolecule",
+    ],
+)
+
+cc_library(
+    name = "qed_lib",
+    srcs = [
+        "qed.cc",
+    ],
+    hdrs = [
+        "qed.h",
+    ],
+    deps = [
+        ":alogp_lib",
+        ":nvrtspsa",
         "//Molecule_Lib:iwmolecule",
     ],
 )

@@ -29,6 +29,10 @@ class Accumulator_Base
 
     unsigned int n () const { return _n;}
 
+    bool empty() const {
+      return _n > 0;
+    }
+
     T minval () const { return _minval;}
     T maxval () const { return _maxval;}
     T range  () const { return _maxval - _minval;}

@@ -299,4 +299,137 @@ TEST(TextNextWord, TestSpaces) {
   EXPECT_EQ(token, "foo");
 }
 
+TEST(TestStrcmp, TestAll) {
+  IWString foo("hello");
+  IWString bar("hello");
+  
+  EXPECT_EQ(foo.strcmp(bar), 0) << "hello.strcmp(hello)";
+
+  EXPECT_EQ(bar.strncmp(foo, 4), 0) << "hello.strncmp(hello, 4";
+
+  bar = "HELLO";
+
+  EXPECT_EQ(foo.strcasecmp(bar), 0) << "HELLO.strcasecmp(hello)";
+
+  EXPECT_EQ(bar.strcasecmp(foo), 0) << "HELLO.strcasecmp(hello)";
+}
+
+TEST(TestStrncat, TestAll) {
+  IWString foo("hello");
+
+  foo.strncat(" world", 6);
+
+  EXPECT_EQ(foo, "hello world") << "hello.strncat( world, 6)";
+}
+
+TEST(TestTestSplitIntoDirectiveAndValue, TestAll) {
+  IWString foo("mm=93");
+
+  const_IWSubstring directive;
+  int value;
+  ASSERT_TRUE(foo.split_into_directive_and_value(directive, '=', value));
+
+  EXPECT_EQ(directive, "mm");
+  EXPECT_EQ(value, 93);
+}
+
+TEST(TestAppendNumber, TestAll) {
+  IWString foo;
+  foo.append_number(0);
+  EXPECT_EQ(foo, "0") << "append number 0";
+
+  foo.append_number(-8);
+
+  EXPECT_EQ(foo, "0-8") << "append number -8";
+
+  foo.append_number(123456789);
+
+  EXPECT_EQ(foo, "0-8123456789") << "append number 123456789";
+
+  foo = "";
+
+  foo.append_number(-9);
+  EXPECT_EQ(foo, "-9") << "append -9";
+
+  foo.append_number(1000);
+
+  EXPECT_EQ(foo, "-91000") << "append 1000";
+}
+
+
+TEST(TestIndex, TestAll) {
+  IWString foo("hello");
+
+  auto i = foo.rindex(' ');
+  EXPECT_EQ(i, -1) << foo << " rindex space";
+
+  foo = " hello";
+
+  i = foo.rindex(' ');
+  EXPECT_EQ(i, 0) << foo << " rindex";
+
+  const_IWSubstring xx(foo);
+  i = xx.rindex(' ');
+
+  EXPECT_EQ(i, 0) << xx << " rindex";
+
+  foo = "hello";
+  i = foo.rindex('l');
+  EXPECT_EQ(i, 3) << foo << " rindex l";
+
+  i = foo.index('l');
+
+  EXPECT_EQ(i, 2) << foo << " index l";
+
+  i = foo.index('h');
+  EXPECT_EQ(i, 0) << foo << " index h";
+}
+
+
+TEST(TestStartsWith, TestAll) {
+  IWString foo;
+  foo = "abcdef";
+
+  EXPECT_TRUE(foo.starts_with ("abc")) << foo << " starts with abc";
+
+  IWString bar("abcd");
+  EXPECT_TRUE(foo.starts_with(bar)) << bar << " starts with abcd";
+
+  const_IWSubstring bb = substr(bar, 0, 2);
+  EXPECT_TRUE(foo.starts_with(bb));
+}
+
+TEST(TestCharacterEquality, TestAll) {
+  IWString foo;
+
+  foo = "f";
+
+  EXPECT_EQ(foo, 'f');
+  EXPECT_EQ('f', foo);
+
+  EXPECT_TRUE(foo == 'f');
+  EXPECT_TRUE('f' == foo);
+  EXPECT_TRUE(foo == foo);
+
+  EXPECT_FALSE(foo != 'f');
+  EXPECT_FALSE('f' != foo);
+  
+  const_IWSubstring bar = "b";
+  EXPECT_TRUE(bar == 'b') << bar << " == b";
+  EXPECT_TRUE('b' == bar) << " b == " << bar;
+
+  EXPECT_FALSE(bar != 'b');
+  EXPECT_FALSE('b' != bar);
+}
+
+TEST(TestChop, TestAll) {
+  IWString foo ("a;sldkfjas;dlfkj");
+
+  foo.chop();
+  EXPECT_EQ(foo, "a;sldkfjas;dlfk");
+
+  foo.chop(2);
+  EXPECT_EQ(foo, "a;sldkfjas;dl");
+}
+
 }  // namespace

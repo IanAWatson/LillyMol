@@ -49,4 +49,11 @@ message Config {
   repeated string discard_if_match = 16;
 
   optional MoleculeFilterData.Requirements molecule_filter = 17;
+
+  // If a replacement involves swapping a ring/ring system,
+  // we can impose constraints on differences in ring sizes
+  // between the excised fragment and the ring sizes in the
+  // replacement.
+  optional uint32 max_increase_ring_size = 18;
+  optional uint32 max_decrease_ring_size = 19;
 }

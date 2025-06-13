@@ -898,6 +898,7 @@ class Reaction_Site : public Substructure_Query
     IWString _comment;
 
     resizable_array_p<Bond> _bonds_to_be_made;
+    resizable_array_p<Bond> _bonds_to_be_changed;
     resizable_array_p<Bond> _bonds_to_be_broken;
     resizable_array<int>    _atoms_to_be_removed;
     resizable_array<int>    _fragments_to_be_removed;
@@ -1087,6 +1088,7 @@ class Reaction_Site : public Substructure_Query
     void add_atom_to_be_removed (int a) { _atoms_to_be_removed.add (a);}    // should check for A being a valid number
     int add_bond_to_be_broken (int, int);
     int add_bond_to_be_made (int, int, bond_type_t);
+    int add_bond_to_be_changed(const int a1, const int a2, const bond_type_t bt);
     int add_fragment_to_be_removed (int);
     int add_chiral_centre_to_be_inverted (int a) { _stereo_centres_to_invert.add (a); return 1;}
     int add_replace_atom (Replace_Atom * r) { _replace_atom.add (r); return 1;}

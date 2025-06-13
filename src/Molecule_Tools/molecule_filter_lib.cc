@@ -43,7 +43,7 @@ MoleculeFilter::Build(const MoleculeFilterData::Requirements& proto) {
 void
 MoleculeFilter::InitialiseOptionalFeatures() {
   _rotbond.set_calculation_type(quick_rotbond::QuickRotatableBonds::RotBond::kExpensive);
-  set_display_psa_unclassified_atom_mesages(0);
+  nvrtspsa::set_display_psa_unclassified_atom_mesages(0);
   xlogp::SetIssueUnclassifiedAtomMessages(0);
 
   _alogp.set_use_alcohol_for_acid(1);
@@ -242,9 +242,9 @@ HalogenCount(const Molecule& m) {
     0,  // 32
     0,  // 33
     0,  // 34
-    0,  // 35
+    1,  // 35
     0,  // 36
-    1,  // 37
+    0,  // 37
     0,  // 38
     0,  // 39
     0,  // 40
@@ -279,9 +279,11 @@ int
 Sp3Carbon(Molecule & m) {
   int rc = 0;
 
-  const int matoms = m.natoms();
-  for (int i = 0; i < matoms; ++i) {
-    if (m.saturated(i)) {
+  for (const Atom* a : m) {
+    if (a->atomic_number() != 6) {
+      continue;
+    }
+    if (a->fully_saturated()) {
       ++rc;
     }
   }

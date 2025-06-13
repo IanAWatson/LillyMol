@@ -1,0 +1,30 @@
+name: "pyrazole"
+comment: "[#6;!$([#6](-C=O)-C=O):4]-[CH0:1](=[OD1])-[C;H1&!$(C-[*;!#6])&!$(C-C(=O)O),H2:2]-[CH0;R0:3](=[OD1])-[#6;!$([#6](-C=O)-C=O):5].[NH2:6]-[N;!H0;$(N-[#6]),H2:7]>>[C:1]1(-[#6:4])-[C:2]=[C:3](-[#6:5])-[N:7]-[N:6]=1"
+scaffold {
+  id: 0
+  smarts: "[#6;!$([#6](-C=O)-C=O):4]-[CH0:1](=[OD1])-[C;H1&!$(C-[*;!#6])&!$(C-C(=O)O),H2:2]-[CH0;R0:3](=[OD1])-[#6;!$([#6](-C=O)-C=O):5]"
+  remove_atom: [2, 5]
+  change_bond {
+    a1: 3
+    a2: 4
+    btype: SS_DOUBLE_BOND
+  }
+  match_conditions {
+    embeddings_can_overlap: false
+  }
+}
+sidechain {
+  id: 1
+  reagent: "NN"
+  smarts: "NN"
+  join {
+    a1: 1
+    a2: 0
+    btype: SS_DOUBLE_BOND
+  }
+  join {
+    a1: 4
+    a2: 1
+    btype: SS_SINGLE_BOND
+  }
+}

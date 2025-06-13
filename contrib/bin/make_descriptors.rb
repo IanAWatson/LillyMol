@@ -10,7 +10,7 @@ require 'fileutils'
 require 'set'
 
 c3tk_home = ENV['LILLYMOL_HOME']
-raise 'C3TK_HOME not defined' unless c3tk_home
+raise 'LILLYMOL_HOME not defined' unless c3tk_home
 
 # require "#{c3tk_home}/contrib/bin/lib/iwcmdline"
 require_relative 'lib/iwcmdline'

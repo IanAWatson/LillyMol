@@ -400,6 +400,52 @@ TEST_F(TestReaction, TestMakeTripleBond)
   EXPECT_EQ(_m.unique_smiles(), "OC(=O)C#N");
 }
 
+TEST_F(TestReaction, TestChangeBondNotFound) {
+  _string_proto = R"(
+scaffold {
+  id: 0
+  smarts: "CCO"
+  change_bond {
+    a1: 0
+    a2: 2
+    btype: SS_SINGLE_BOND
+  }
+}
+)";
+
+  ASSERT_TRUE(google::protobuf::TextFormat::ParseFromString(_string_proto, &_proto));
+
+  ASSERT_TRUE(_rxn.ConstructFromProto(_proto, _unused_fname));
+
+  ASSERT_TRUE(_MoleculeFromSmiles("CCO"));
+
+  EXPECT_EQ(_rxn.in_place_transformations(_m), 0);
+}
+
+TEST_F(TestReaction, TestChangeBondOk) {
+  _string_proto = R"(
+scaffold {
+  id: 0
+  smarts: "CCO"
+  change_bond {
+    a1: 1
+    a2: 2
+    btype: SS_DOUBLE_BOND
+  }
+}
+)";
+
+  ASSERT_TRUE(google::protobuf::TextFormat::ParseFromString(_string_proto, &_proto));
+
+  ASSERT_TRUE(_rxn.ConstructFromProto(_proto, _unused_fname));
+
+  ASSERT_TRUE(_MoleculeFromSmiles("CCO"));
+
+  EXPECT_EQ(_rxn.in_place_transformations(_m), 1);
+
+  EXPECT_EQ(_m.unique_smiles(), "O=CC");
+}
+
 TEST_F(TestReaction, TestBondLength)
 {
   _string_proto = R"(

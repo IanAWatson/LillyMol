@@ -382,38 +382,39 @@ message ReactionSite {
   optional SubstructureSearch.SubstructureQuery query = 1;
   optional string comment = 2;
   repeated BondToBeMade make_bond = 3;
-  repeated PairOfAtoms break_bond = 4;
-  repeated int32 remove_atom = 5;
-  repeated int32 remove_fragment = 6;
-  repeated int32 keep_fragment = 7;
-  repeated ChangeElement change_element = 8;
-  repeated FormalCharge formal_charge = 9;
-  repeated ChangeFormalCharge change_formal_charge = 10;
-  repeated PlaceIsotope isotope = 11;
-  repeated IncrementIsotope change_isotope = 12;
-  repeated PlaceIsotope invert_isotope = 13;
+  repeated BondToBeMade change_bond = 4;
+  repeated PairOfAtoms break_bond = 5;
+  repeated int32 remove_atom = 6;
+  repeated int32 remove_fragment = 7;
+  repeated int32 keep_fragment = 8;
+  repeated ChangeElement change_element = 9;
+  repeated FormalCharge formal_charge = 10;
+  repeated ChangeFormalCharge change_formal_charge = 11;
+  repeated PlaceIsotope isotope = 12;
+  repeated IncrementIsotope change_isotope = 13;
+  repeated PlaceIsotope invert_isotope = 14;
 
-  repeated BondLength bond_length = 14;
-  repeated BondAngle bond_angle = 15;
-  repeated DihedralAngle dihedral_angle = 16;
-  repeated CoordinateTransfer coordinate_transfer = 17;
+  repeated BondLength bond_length = 15;
+  repeated BondAngle bond_angle = 16;
+  repeated DihedralAngle dihedral_angle = 17;
+  repeated CoordinateTransfer coordinate_transfer = 18;
 
-  repeated WedgeBond wedge_bonds = 18;
+  repeated WedgeBond wedge_bonds = 19;
 
-  repeated ReplaceAtom replace_atom = 19;
+  repeated ReplaceAtom replace_atom = 20;
 
-  repeated int32 unfix_implicit_hydrogens = 20;
+  repeated int32 unfix_implicit_hydrogens = 21;
 
-  repeated SubstructureSearch.SubstructureQuery inactive = 21;
+  repeated SubstructureSearch.SubstructureQuery inactive = 22;
 
-  repeated int32 invert_chirality = 22;
-  repeated int32 remove_chirality = 23;
-  optional ToggleKekuleForm.ToggleKekuleForm toggle_kekule_form = 24;
+  repeated int32 invert_chirality = 23;
+  repeated int32 remove_chirality = 24;
+  optional ToggleKekuleForm.ToggleKekuleForm toggle_kekule_form = 25;
 
-  optional bool ignore_multiple_matches_involving_atoms_not_changing = 25;
-  optional bool ignore_multiple_matches_involving_changing_atoms = 27;
+  optional bool ignore_multiple_matches_involving_atoms_not_changing = 26;
+  optional bool ignore_multiple_matches_involving_changing_atoms = 28;
 
-  optional bool noop_reaction = 28;
+  optional bool noop_reaction = 29;
 }
 
 message ScaffoldReactionSite {
@@ -422,48 +423,49 @@ message ScaffoldReactionSite {
   optional int32 id = 1;
   repeated SubstructureSearch.SubstructureQuery query = 2;
   repeated BondToBeMade make_bond = 3;
-  repeated PairOfAtoms break_bond = 4;
-  repeated int32 remove_atom = 5;
-  repeated int32 remove_fragment = 6;
-  repeated int32 keep_fragment = 7;
-  repeated ChangeElement change_element = 8;
-  repeated FormalCharge formal_charge = 9;
-  repeated ChangeFormalCharge change_formal_charge = 10;
-  repeated PlaceIsotope isotope = 11;
-  repeated IncrementIsotope change_isotope = 12;
-  repeated PlaceIsotope invert_isotope = 13;
+  repeated BondToBeMade change_bond = 4;
+  repeated PairOfAtoms break_bond = 5;
+  repeated int32 remove_atom = 6;
+  repeated int32 remove_fragment = 7;
+  repeated int32 keep_fragment = 8;
+  repeated ChangeElement change_element = 9;
+  repeated FormalCharge formal_charge = 10;
+  repeated ChangeFormalCharge change_formal_charge = 11;
+  repeated PlaceIsotope isotope = 12;
+  repeated IncrementIsotope change_isotope = 13;
+  repeated PlaceIsotope invert_isotope = 14;
 
-  repeated BondLength bond_length = 14;
-  repeated BondAngle bond_angle = 15;
-  repeated DihedralAngle dihedral_angle = 16;
-  repeated CoordinateTransfer coordinate_transfer = 17;
+  repeated BondLength bond_length = 15;
+  repeated BondAngle bond_angle = 16;
+  repeated DihedralAngle dihedral_angle = 17;
+  repeated CoordinateTransfer coordinate_transfer = 18;
 
-  repeated WedgeBond wedge_bonds = 18;
+  repeated WedgeBond wedge_bonds = 19;
 
-  repeated ReplaceAtom replace_atom = 19;
+  repeated ReplaceAtom replace_atom = 20;
 
-  repeated int32 unfix_implicit_hydrogens = 20;
+  repeated int32 unfix_implicit_hydrogens = 21;
 
-  repeated SubstructureSearch.SubstructureQuery inactive = 21;
+  repeated SubstructureSearch.SubstructureQuery inactive = 22;
 
-  repeated int32 invert_chirality = 22;
-  repeated int32 remove_chirality = 23;
-  optional ToggleKekuleForm.ToggleKekuleForm toggle_kekule_form = 24;
+  repeated int32 invert_chirality = 23;
+  repeated int32 remove_chirality = 24;
+  optional ToggleKekuleForm.ToggleKekuleForm toggle_kekule_form = 25;
 
-  optional bool ignore_multiple_matches_involving_atoms_not_changing = 25;
-  optional bool ignore_multiple_matches_involving_changing_atoms = 27;
+  optional bool ignore_multiple_matches_involving_atoms_not_changing = 26;
+  optional bool ignore_multiple_matches_involving_changing_atoms = 28;
 
-  optional bool noop_reaction = 28;
-  optional string comment = 29;
+  optional bool noop_reaction = 29;
+  optional string comment = 30;
 
-  repeated string smarts = 30;
+  repeated string smarts = 31;
 
-  repeated int32 remove_atoms = 31;
+  repeated int32 remove_atoms = 32;
 
   // Read the query from a file
-  repeated string query_file = 32;
+  repeated string query_file = 33;
 
-  repeated CipStereoAtom cip_stereo = 33;
+  repeated CipStereoAtom cip_stereo = 34;
 // DO NOT EDIT
 
   // jan 2024 this was at Reaction scope, but should be here.
@@ -477,35 +479,36 @@ message SidechainReactionSite {
   optional int32 id = 1;
   repeated SubstructureSearch.SubstructureQuery query = 2;
   repeated BondToBeMade make_bond = 3;
-  repeated PairOfAtoms break_bond = 4;
-  repeated int32 remove_atom = 5;
-  repeated int32 remove_fragment = 6;
-  repeated int32 keep_fragment = 7;
-  repeated ChangeElement change_element = 8;
-  repeated FormalCharge formal_charge = 9;
-  repeated ChangeFormalCharge change_formal_charge = 10;
-  repeated PlaceIsotope isotope = 11;
-  repeated IncrementIsotope change_isotope = 12;
-  repeated PlaceIsotope invert_isotope = 13;
+  repeated BondToBeMade change_bond = 4;
+  repeated PairOfAtoms break_bond = 5;
+  repeated int32 remove_atom = 6;
+  repeated int32 remove_fragment = 7;
+  repeated int32 keep_fragment = 8;
+  repeated ChangeElement change_element = 9;
+  repeated FormalCharge formal_charge = 10;
+  repeated ChangeFormalCharge change_formal_charge = 11;
+  repeated PlaceIsotope isotope = 12;
+  repeated IncrementIsotope change_isotope = 13;
+  repeated PlaceIsotope invert_isotope = 14;
 
-  repeated BondLength bond_length = 14;
-  repeated BondAngle bond_angle = 15;
-  repeated DihedralAngle dihedral_angle = 16;
-  repeated CoordinateTransfer coordinate_transfer = 17;
+  repeated BondLength bond_length = 15;
+  repeated BondAngle bond_angle = 16;
+  repeated DihedralAngle dihedral_angle = 17;
+  repeated CoordinateTransfer coordinate_transfer = 18;
 
-  repeated WedgeBond wedge_bonds = 18;
+  repeated WedgeBond wedge_bonds = 19;
 
-  repeated ReplaceAtom replace_atom = 19;
+  repeated ReplaceAtom replace_atom = 20;
 
-  repeated int32 unfix_implicit_hydrogens = 20;
+  repeated int32 unfix_implicit_hydrogens = 21;
 
-  repeated SubstructureSearch.SubstructureQuery inactive = 21;
+  repeated SubstructureSearch.SubstructureQuery inactive = 22;
 
-  repeated int32 invert_chirality = 22;
-  repeated int32 remove_chirality = 23;
-  optional ToggleKekuleForm.ToggleKekuleForm toggle_kekule_form = 24;
+  repeated int32 invert_chirality = 23;
+  repeated int32 remove_chirality = 24;
+  optional ToggleKekuleForm.ToggleKekuleForm toggle_kekule_form = 25;
 
-  optional bool ignore_multiple_matches_involving_atoms_not_changing = 25;
+  optional bool ignore_multiple_matches_involving_atoms_not_changing = 26;
   optional bool ignore_multiple_matches_involving_changing_atoms = 27;
 
   optional bool noop_reaction = 28;

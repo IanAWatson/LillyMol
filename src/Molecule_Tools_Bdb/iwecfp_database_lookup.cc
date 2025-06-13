@@ -749,7 +749,7 @@ do_isotopically_label_most_difficult_atoms(Molecule& m,
                                            const resizable_array<Bit_Produced_CE<I>*>& bp,
                                            int n, IWString_and_File_Descriptor& output)
 {
-  cerr << "do_isotopically_label_most_difficult_atoms, n = " << n << '\n';
+  // cerr << "do_isotopically_label_most_difficult_atoms, n = " << n << '\n';
   const auto* bpi = bp[0];  // first database only
 
   const I* ce = bpi->fromdb();
@@ -1262,6 +1262,9 @@ do_lookup_with_examples(Molecule& m, Set_of_Databases& sodb,
   }
 
   output << '\n';
+  if (! isotopically_label_most_difficult_atoms) {
+    return 1;
+  }
 
 // Label all the not-found atoms with the lowest isotpe
 

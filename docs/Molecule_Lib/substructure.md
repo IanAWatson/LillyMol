@@ -289,6 +289,29 @@ that aromatic atoms are considered unsaturated. `[G1]` will match
 most atoms one double bond, and `[G2]` will match 
 atoms with a triple bond attached.
 
+## Ring Bond Count
+The '@' symbol is used to specify that a bond is in a ring. In LillyMol
+smarts multiple '@' symbols can be used to specify the number of rings
+that include that bond. By default, a single '@' symbol matches
+any number of rings including the bond. But '@@' will only match
+bonds that are covered by exactly two rings. For example `C@@C` matches
+Adamantane and `c@@c` matches the ring fusion bond in Napthalene.
+
+It is important to note that there is currently a discrepancy in how
+ring information
+is accounted for at atoms and at bonds. The `nrings` attribute for
+an atom is the number of SSSR rings including that atom. The `nrings`
+attribute for a bond may include counts for certain non SSSR rings as
+well. This may change. For atoms, using the ring bond count is
+generally preferred.
+
+For simple fused systems, which do not have non-SSSR rings, this discrepancy
+will not matter.
+
+There is no means of specifying that a bond is in  exactly one ring - use the ring
+bond count attribute on the atoms. `[cx3]:[cx3]` will mostly be 
+the same as `c@@c` - there are interesting differences.
+
 ## Not enough letters!
 As work continued on LillyMol, we found increasingly complex
 requests coming from chemists, and it was clear that we would run
@@ -677,7 +700,7 @@ So a complex down the bond smarts might look like
 ```
 [Nx0]-C(=O)-{a{2-5};h0;r>1;u>0}C
 ```
-which is an amide group, then down the bond with between 2 and 5 atoms, no
+which is a non-ring amide group, then down the bond with between 2 and 5 atoms, no
 heteroatoms, at least one ring atom (actually there would be at least
 three ring atoms) and at least one unsaturated atom. This matches molecules
 like
@@ -822,3 +845,44 @@ but clearly more could be added as the need arises.
 
 The C++ unit tests in the [src/Molecule_Lib](src/Molecule_Lib) directory contain
 more examples of proto specifications of complex queries that test these concepts.
+
+## MatchedAtomMatch
+This is a syntactic extension designed to help avoid overly complex recursive smarts.
+It is common for an atom to be specified by a lengthy list of properties that it
+either must have or must not have. This can generate things that are very difficult
+to pick apart - smarts has been described as a write-only language. This message
+provides an alternative representation.
+
+For example if we wanted a phenolic oxygen atom that was NOT ortho to a Nitrogen
+atom or to another phenolic oxygen, that could be represented as
+```
+query {
+  smarts: "[$([cD3]);!$(c:c-[OH])]-[OH]"
+}
+```
+which is a simple example of the many more complex case I have seen.
+
+This can be equivalently written as
+```
+query {
+  smarts: "[cD3]-[OH]"
+  matched_atom_must_be {
+    atom: 0
+    smarts: "!c:c-[OH]"
+  }
+}
+```
+Any number of smarts can be specified, it is a repeated field. And
+other matched_atom_must_be messages can be used to describe other
+matched atoms, atom numbering starts at 0.
+
+which is functionally equivalent, but considerably easier to understand.
+Note however that the current implementation does not allow arbitrary
+logical operators between the 'smarts' directives. They are combined
+as 'and' operators, but anything beginning with '!' is interpreted as
+a negative match. In practice, this is usually good enough to handle
+most cases of interest.
+
+The c++ unit test file [substructure_mam_test.cc](src/Molecule_Lib/substructure_mam_test.cc)
+contains examples of some quite complex cases, all of which would have
+varying degress of interpreting if represented as recursive smarts.

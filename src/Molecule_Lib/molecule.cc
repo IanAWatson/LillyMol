@@ -2556,18 +2556,20 @@ Molecule::formula_distinguishing_aromatic(IWString & f)
 
   int * aromatic_carbon = new_int(_number_elements); std::unique_ptr<int[]> free_aromatic_carbon(aromatic_carbon);
 
-  IWString arom_string;     // concatenation of aromatic ring sizes
+  IWString aromatic_ring_string;     // concatenation of aromatic ring sizes
+  IWString aliphatic_ring_string;  // concatenation of aliphatic ring sizes.
 
   int nr = nrings();
 
-  for (int i = 0; i < nr; i++)
-  {
+  for (int i = 0; i < nr; i++) {
     const Ring * ri = ringi(i);
 
-    if (! ri->is_aromatic())
+    if (! ri->is_aromatic()) {
+      aliphatic_ring_string << ri->number_elements();
       continue;
+    }
 
-    arom_string << ri->number_elements();
+    aromatic_ring_string << ri->number_elements();
 
     if (! all_carbon_atoms(*this, *ri))
       continue;
@@ -2577,8 +2579,7 @@ Molecule::formula_distinguishing_aromatic(IWString & f)
 
   int molecular_hcount = 0;
 
-  for (int i = 0; i <= highest_atomic_number; i++)
-  {
+  for (int i = 0; i <= highest_atomic_number; i++) {
     if (0 == element_count[i])
       continue;
 
@@ -2671,8 +2672,12 @@ Molecule::formula_distinguishing_aromatic(IWString & f)
   if (molecular_hcount)
     append_atomic_symbol(f, 'H', molecular_hcount);
 
-  if (arom_string.length())
-    f << 'a' << arom_string;
+  if (aromatic_ring_string.length()) {
+    f << 'a' << aromatic_ring_string;
+  }
+  if (aliphatic_ring_string.length()) {
+    f << 'A' << aliphatic_ring_string;
+  }
 
   if (non_periodic_table_atoms_present) {
     _append_non_periodic_table_elements_to_mf(f);
@@ -3165,6 +3170,17 @@ Molecule::number_isotopic_atoms(isotope_t iso) const
   }
 
   return rc;
+}
+
+bool
+Molecule::ContainsIsotopicAtoms() const {
+  for (const Atom* a : *this) {
+    if (a->isotope() > 0) {
+      return true;
+    }
+  }
+
+  return false;
 }
 
 /*

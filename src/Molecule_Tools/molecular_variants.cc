@@ -25,18 +25,21 @@ Usage(int rc) {
 #endif
   // clang-format on
   // clang-format off
-  cerr << "Filter a set of sorted molecules based on externally specified reactions\n";
-  cerr << "If the product has been seen before, the starting molecule is discarded\n";
-  cerr << " -a              read all the input into a vector of Molecules (recommended)\n";
-  cerr << " -r <fname>      reaction file (proto only)\n";
-  cerr << " -R <fname>      file containing reaction files\n";
-  cerr << " -X <fname>      write discarded molecules to <fname>\n";
-  cerr << " -p              in the -X file, write the predecessor on a separate line\n";
-  cerr << " -g ...          standard chemical standardisation options\n";
-  cerr << " -l              reduce to largest fragment\n";
-  cerr << " -c              discard chirality\n";
-  cerr << " -o <sep>        output separator\n";
-  cerr << " -v              verbose output\n";
+  cerr << R"(Filter a set of sorted molecules based on externally specified reactions.
+The reactions are applied to molecules as they are read. If the product has already
+been seen, the new molecule is discarded. 
+ -a              read all the input into a vector of Molecules (recommended)
+ -r <fname>      reaction file (proto only)
+ -R <fname>      file containing reaction files
+ -X <fname>      write discarded molecules to <fname>
+ -p              in the -X file, write the predecessor on a separate line
+ -g ...          standard chemical standardisation options
+ -l              reduce to largest fragment
+ -c              discard chirality
+ -o <sep>        output separator
+ -v              verbose output
+)";
+
   exit(rc);
   // clang-format on
 }

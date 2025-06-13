@@ -283,6 +283,10 @@ SafeFragment::Build(const const_IWSubstring& smi) {
   _nrings = _m.nrings();
   _ncon = _first_digit.number_elements();
 
+  for (const Ring* r : _m.sssr_rings()) {
+    _ring_sizes.add_if_not_already_present(r->size());
+  }
+
   const int niso = _m.number_isotopic_atoms();
   if (niso == 0) {
     cerr << "SafeFragment::Build:no isotopes '" << _smiles << "' from '" << smi << "'\n";

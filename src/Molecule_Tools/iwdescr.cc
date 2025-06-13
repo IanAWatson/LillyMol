@@ -9009,16 +9009,16 @@ iwdescr(int argc, char ** argv)
   }
 
   if (verbose)
-    set_display_psa_unclassified_atom_mesages(1);
+    nvrtspsa::set_display_psa_unclassified_atom_mesages(1);
   else
-    set_display_psa_unclassified_atom_mesages(0);
+    nvrtspsa::set_display_psa_unclassified_atom_mesages(0);
 
   if (verbose == 0) {
     alogp_engine.set_display_error_messages(0);
   }
 
   if (cl.option_present('S')) {
-    set_non_zero_constribution_for_SD2(0);
+    nvrtspsa::set_non_zero_constribution_for_SD2(0);
     if (verbose) {
       cerr << "SD2 atoms given zero weight in PSA calculations\n";
     }
@@ -9051,7 +9051,7 @@ iwdescr(int argc, char ** argv)
         if (verbose)
           cerr << "Descriptors generated with prefix '" << descriptor_prefix << "'\n";
       } else if (b == "quiet") {
-        set_display_psa_unclassified_atom_mesages(0);
+        nvrtspsa::set_display_psa_unclassified_atom_mesages(0);
 
         if (verbose) {
           cerr << "Will not report unclassified atoms\n";

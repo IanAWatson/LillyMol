@@ -1,20 +1,4 @@
-load("//build_deps:install.bzl", "local_install")
 
-local_install(
-    name = "install",
-    srcs = [
-        ":enough_inventory_bdb",
-        ":iwbdb_cat",
-        ":iwbdb_compare",
-        ":iwbdb_delete",
-        ":iwbdb_exists",
-        ":iwbdb_fetch",
-        ":iwbdb_from_tdt",
-        ":iwbdb_list",
-        ":iwbdb_load",
-        ":iwbdb_merge_into_tdt",
-    ],
-)
 
 cc_binary(
     name = "enough_inventory_bdb",

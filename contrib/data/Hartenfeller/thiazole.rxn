@@ -1,0 +1,31 @@
+name: "thiazole"
+comment: "[#6:6]-[C;R0:1](=[OD1])-[CH1;R0:5](-[#6:7])-[*;#17,#35,#53].[NH2:2]-[C:3]=[SD1:4]>>[c:1]2(-[#6:6]):[n:2]:[c:3]:[s:4][c:5]([#6:7]):2"
+scaffold {
+  id: 0
+  smarts: "[#6:6]-[C;R0:1](=[OD1])-[CH1;R0:5](-[#6:7])-[*;#17,#35,#53]"
+  remove_atom: 2
+  remove_atom: 5
+  change_bond {
+    a1: 1
+    a2: 3
+    btype: SS_DOUBLE_BOND
+  }
+  match_conditions {
+    embeddings_can_overlap: false
+  }
+}
+sidechain {
+  id: 1
+  reagent: "N=CS"
+  smarts: "N=C-S"
+  join {
+    a1: 1
+    a2: 0
+    btype: SS_SINGLE_BOND
+  }
+  join {
+    a1: 3
+    a2: 2
+    btype: SS_SINGLE_BOND
+  }
+}

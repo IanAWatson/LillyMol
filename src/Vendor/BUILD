@@ -1,16 +1,3 @@
-load("//build_deps:install.bzl", "local_install")
-
-local_install(
-    name = "install",
-    srcs = [
-        ":clogp2descriptors_biobyte",
-        ":marvin_pka",
-        ":rcorina",
-    ],
-    tags = [
-        "vendor",
-    ],
-)
 
 cc_binary(
     name = "clogp2descriptors_biobyte",

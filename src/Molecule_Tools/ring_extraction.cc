@@ -11,6 +11,7 @@
 #include <cstdint>
 #include <cstring>
 #include <ctime>
+#include <filesystem>
 #include <iostream>
 #include <memory>
 #include <optional>
@@ -48,6 +49,7 @@
 namespace ring_extraction {
 
 using std::cerr;
+namespace fs = std::filesystem;
 
 constexpr char kOpenSquareBracket = '[';
 constexpr char kCloseSquareBracket = ']';
@@ -192,6 +194,9 @@ class ExtractRings {
     // Outputs will be written to a set of files with prefix `_stem`.
     IWString _stem;
 
+    // We can optionally write a file containing the names of all files generated.
+    IWString _file_for_list_of_files;
+
     // As a check, once the smarts for a ring is generated, we can do a search
     // in the starting molecule.
     // This really does not work. The main problem is that if we have a ring
@@ -305,6 +310,7 @@ DisplayDashXOption(std::ostream& output) {
   output << " -X a:A     letters assigned to aromatic and aliphatic rings\n";
   output << " -X noarom  generate smarts that do not specify aromaticity,\n";
   output << "            this enables replacing aromatic with aliphatic rings and vice verse\n";
+  output << " -X list=<fname>  write a list of all files generated to <fname\n";
 
   ::exit(0);
 }
@@ -414,6 +420,12 @@ ExtractRings::Initialise(Command_Line& cl) {
         _respect_aromaticity = 0;
         if (_verbose) {
           cerr << "Will create aromatic agnostic replacement rings\n";
+        }
+      } else if (x.starts_with("list=")) {
+        x.remove_leading_chars(5);
+        _file_for_list_of_files = x;
+        if (_verbose) {
+          cerr << "A list of all files generated written to '" << _file_for_list_of_files << "'\n";
         }
       } else if (x == "help") {
         DisplayDashXOption(cerr);
@@ -1381,12 +1393,38 @@ ExtractRings::GenerateRing(Molecule& parent,
 // with prefix `_stem`.
 int
 ExtractRings::WriteRings() const {
+  std::vector<IWString> files_generated;
+  if (!_file_for_list_of_files.empty()) {
+    files_generated.reserve(_ring.size());
+  }
+
   for (const auto& [label, rings] : _ring) {
     IWString fname;
     fname << _stem << '_' << label << ".smi";
     if (! WriteRings(fname, rings)) {
       cerr << "ExtractRings::WriteRings:cannot write '" << fname << "'\n";
       return 0;
+    }
+
+    if (!_file_for_list_of_files.empty()) {
+      files_generated.emplace_back(std::move(fname));
+    }
+  }
+
+  if ( !_file_for_list_of_files.empty()) {
+    IWString_and_File_Descriptor output;
+    // This function is const, so create a temporary...
+    IWString tmp(_file_for_list_of_files);
+    if (! output.open(tmp)) {
+      cerr << "ExtractRings::WriteRings:cannot open " << _file_for_list_of_files << '\n';
+      return 0;
+    }
+
+    // By convention we write just the file name, not directory.
+    for (IWString& fname : files_generated) {
+      fs::path path(fname.null_terminated_chars());
+
+      output << path.filename() << '\n';
     }
   }
 

@@ -1364,8 +1364,9 @@ Molecule::_make_ring(const Beep * bp,
     }
   }
 
-  if (r->elements_allocated() < bonds_in_ring)
+  if (r->elements_allocated() < bonds_in_ring) {
     r->resize(bonds_in_ring);
+  }
 
 // We need to build up the ring with the atoms in order
 

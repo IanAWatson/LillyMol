@@ -259,7 +259,7 @@ class Toggle_Kekule_Form {
 
   int ok_embedding(const Set_of_Atoms& embedding) const;
 
-  int process(Molecule&, const Set_of_Atoms&, int&);
+  int process(Molecule& m, const Set_of_Atoms& embedding, int& changed);
 
   int process(Molecule&, atom_number_t a1, atom_number_t a2, bond_type_t bt,
               int& changed);

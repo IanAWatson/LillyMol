@@ -167,6 +167,7 @@ DisplayDashYOptions(std::ostream& output) {
   output << " -Y RDKIT.N+       treat N+ atoms same as RDKit\n";
   output << " -Y RDKIT.HP       treat phosphoric acids same as RDKit\n";
   output << " -Y ZWIT           explicit treatment of Zwitterions\n";
+  output << " -Y OTHER=<s>      value for otherwise unclassified atoms\n";
 
   ::exit(0);
 }
@@ -260,6 +261,17 @@ Options::Initialise(Command_Line& cl) {
         }
       } else if (y == "ZWIT") {
         _alogp.set_apply_zwitterion_correction(1);
+      } else if (y.starts_with("OTHER=")) {
+        y.remove_leading_chars(6);
+        float x;
+        if (! y.numeric_value(x)) {
+          cerr << "Invalid OTHER= directive '" << y << "'\n";
+          return 1;
+        }
+        _alogp.set_unclassified_value(x); 
+        if (_verbose) {
+          cerr << "Unclassified atoms assigned " << x << "'\n";
+        }
       } else {
         cerr << "Unrecognised -Y qualifier '" << y << "'\n";
         DisplayDashYOptions(cerr);

@@ -2,6 +2,8 @@
 #define MOLECULE_TOOLS_SAFE_GENERATE_LIB_H_
 
 #include "Molecule_Lib/molecule.h"
+#include "Molecule_Lib/path.h"
+
 #ifdef BUILD_BAZEL
 #include "Molecule_Tools/dicer_fragments.pb.h"
 #else
@@ -48,6 +50,9 @@ class SafeFragment {
 
     // Number of rings in the fragment.
     int _nrings;
+
+    // A list of ring sizes.
+    resizable_array<int> _ring_sizes;
 
     // Number of connections (ring openings) in the fragment.
     int _ncon;

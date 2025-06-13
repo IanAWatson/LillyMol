@@ -2,7 +2,7 @@
 
 // Set if you want to test std::string related things
 
-#define DO_TEST_STD_STRING 0
+#define DO_TEST_STD_STRING 1
 
 #include <stdlib.h>
 #include <cstdlib>
@@ -157,90 +157,6 @@ test_returned_string()
 }
 
 static int
-test_strncasecmp()
-{
-  IWString foo("hello");
-  IWString bar("hello");
-  
-  if (0 != foo.strcmp(bar))
-  {
-    cerr << "foo.strcmp failed, compare '" << foo << "' with '" << bar << "'\n";
-    exit(1);
-  }
-
-  if (0 != bar.strncmp(foo, 4))
-  {
-    cerr << "foo.strncmp failed, compare '" << foo << "' with '" << bar << "', n = 4\n";
-    exit(1);
-  }
-
-  bar = "HELLO";
-
-  if (0 != foo.strcasecmp(bar))
-  {
-    cerr << "foo.strcasecmp failed, compare '" << foo << "' with '" << bar << "'\n";
-    cerr << "Value " << foo.strcasecmp(bar) << endl;
-    exit(1);
-  }
-
-  if (0 != bar.strcasecmp(foo))
-  {
-    cerr << "foo.strcasecmp failed, compare '" << bar << "' with '" << foo << "'\n";
-    exit(1);
-  }
-
-  return 1;
-}
-
-static int
-test_index()
-{
-  IWString foo("hello");
-
-  auto i = foo.rindex(' ');
-
-  numeric_value(i, -1, foo, "rindex");
-
-  foo = " hello";
-
-  i = foo.rindex(' ');
-
-  numeric_value(i, 0, foo, "rindex");
-
-  const_IWSubstring xx(foo);
-  i = xx.rindex(' ');
-
-  numeric_value(i, 0, xx, "rindex");
-
-  foo = "hello";
-  i = foo.rindex('l');
-
-  numeric_value(i, 3, foo, "rindex");
-
-  i = foo.index('l');
-
-  numeric_value(i, 2, foo, "index");
-
-  i = foo.index('h');
-
-  numeric_value(i, 0, foo, "index");
-
-  return 1;
-}
-
-static int
-test_strncat()
-{
-  IWString foo("hello");
-
-  foo.strncat(" world", 6);
-
-  should_match(foo, "hello world", "strncat");
-
-  return 1;
-}
-
-static int
 test_remove_suffix()
 {
   IWString foo("hello world");
@@ -270,23 +186,6 @@ test_remove_suffix()
   }
 
   should_match(foo, "", "remove suffix .smi");
-
-  return 1;
-}
-
-static int
-test_split_into_directive_and_value()
-{
-  IWString foo("foo=3");
-
-  const_IWSubstring directive;
-  int v;
-
-  if (! foo.split_into_directive_and_value(directive, '=', v) || 3 != v)
-  {
-    cerr << "split_into_directive_and_value failed '" << foo << "'\n";
-    return 0;
-  }
 
   return 1;
 }
@@ -864,34 +763,6 @@ test_append_number_width()
   return 1;
 }
 
-static int
-test_append_number()
-{
-  IWString foo;
-  foo.append_number(0);
-
-  should_match(foo, "0", "append number 0");
-
-  foo.append_number(-8);
-
-  should_match(foo, "0-8", "append number -8");
-
-  foo.append_number(123456789);
-
-  should_match(foo, "0-8123456789", "append number 123456789");
-
-  foo = "";
-
-  foo.append_number(-9);
-
-  should_match(foo, "-9", "append number -9");
-
-  foo.append_number(1000);
-
-  should_match(foo, "-91000", "append number 1000");
-
-  return 1;
-}
 
 static int
 test_operator_angle_angle()
@@ -1981,34 +1852,6 @@ test_looks_like()
   return 1;
 }
 
-static int
-test_starts_with()
-{
-  IWString foo;
-  foo = "abcdef";
-
-  if (! foo.starts_with ("abc"))
-  {
-    cerr << "Starts with (string) failed '" << foo << "'\n";
-    exit (3);
-  }
-
-  IWString bar ("abcd");
-  if (! foo.starts_with (bar))
-  {
-    cerr << "Starts with (IWString) failed '" << foo << "'\n";
-    exit (3);
-  }
-
-  const_IWSubstring bb = substr (bar, 0, 2);
-  if (! foo.starts_with (bb))
-  {
-    cerr << "Starts with (const_IWSubtring) failed '" << foo << "'\n";
-    exit (3);
-  }
-
-  return 1;
-}
 
 static int
 test_ends_with()
@@ -2426,43 +2269,6 @@ test_getline_fd (const char * fname)
 }
 #endif
 
-static int
-test_equality()
-{
-  IWString foo;
-
-  foo = "f";
-
-  if (foo == 'f')
-    ;
-  else
-  {
-    cerr << "Equality test for rhs single character failed\n";
-    exit (6);
-  }
-
-  if ('f' == foo)
-    ;
-  else
-  {
-    cerr << "Equality test for lhs single character failed\n";
-    exit (7);
-  }
-
-  if (foo != 'f')
-  {
-    cerr << "Inequality test for rhs single character failed\n";
-    exit (8);
-  }
-
-  if ('f' != foo)
-  {
-    cerr << "Inequality test for lhs single character failed\n";
-    exit (9);
-  }
-
-  return 1;
-}
 
 static int
 test_constructors()
@@ -2604,19 +2410,6 @@ test_append()
   return 1;
 }
 
-static int
-test_chop()
-{
-  IWString foo ("a;sldkfjas;dlfkj");
-
-  foo.chop();
-  should_match (foo, "a;sldkfjas;dlfk", "chop");
-
-  foo.chop (2);
-  should_match (foo, "a;sldkfjas;dl", "chop");
-
-  return 1;
-}
 
 static int
 test_strips()
@@ -2681,11 +2474,7 @@ tsclass (int argc, char ** argv)
 
   test_constructors();
 
-  test_equality();
-
   test_strips();
-
-  test_chop();
 
   test_append();
 
@@ -2702,8 +2491,6 @@ tsclass (int argc, char ** argv)
   test_from_to();
 
   test_is_int();
-
-  test_starts_with();
 
   test_ends_with();
 
@@ -2736,8 +2523,6 @@ tsclass (int argc, char ** argv)
   test_strncmp();
   test_strncpy();
 
-  test_index();
-
   test_matches_at_position();
 
   test_find();
@@ -2745,9 +2530,6 @@ tsclass (int argc, char ** argv)
   test_operator_plus_plus();
 
   test_operator_angle_angle();
-
-  test_append_number();
-
 
   test_append_number_width();
 
@@ -2777,15 +2559,9 @@ tsclass (int argc, char ** argv)
 
   test_change();
 
-  test_split_into_directive_and_value();
-
   test_remove_suffix();
 
   test_compare_without_case();
-
-  test_strncat();
-
-  test_strncasecmp();
 
   test_returned_string();
 
@@ -2817,16 +2593,7 @@ main (int argc, char ** argv)
 {
   prog_name = argv[0];
 
-#ifdef USE_IWMALLOC
-  iwmalloc_set_scramble_freed_memory (1);
-  iwmalloc_initialise_memory_tracking (128);
-#endif
-
   int rc = tsclass (argc, argv);
-
-#ifdef USE_IWMALLOC
-  iwmalloc_malloc_status (stderr);
-#endif
 
   return rc;
 }

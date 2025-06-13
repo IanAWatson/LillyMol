@@ -32,7 +32,8 @@ dramatically - see below for how to generate fragment libraries.
 
 The reactions specified with the script include a number of common
 isostere type transformations. More could be added - definitely open
-to ideas...
+to ideas... Reactions in the [medchem wizard](/data/MedchemWizard) tool
+could also be used here.
 
 ## Details
 

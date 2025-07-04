@@ -1,5 +1,6 @@
-#!/bin/bash
-here=$(dirname $(readlink -e $0))
+#!/usr/bin/env bash
+
+here=$(dirname $(realpath $0))
 
 if [[ ! -v LILLYMOL_HOME ]] ; then
   export LILLYMOL_HOME=$(dirname $(dirname ${here}))

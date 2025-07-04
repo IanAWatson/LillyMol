@@ -1,11 +1,11 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 # Setup queries for jwcats
 
 if [[ -v LILLYMOL_HOME ]] ; then
   true
 else
-  export LILLYMOL_HOME=$(dirname $(dirname $(dirname $(readlink -e $0))))
+  export LILLYMOL_HOME=$(dirname $(dirname $(dirname $(realpath $0))))
 fi
 
 charges="${LILLYMOL_HOME}/data/queries/charges/"
@@ -18,4 +18,4 @@ exec ${LILLYMOL_HOME}/bin/Linux/jwdist \
      -q SMARTS:'[!#6&!#1]' -q SMARTS:'[c,n,o]' \
      -q SMARTS:'[Cl,Br,I,F]' -q SMARTS:'[C,N,O,S]=[C,N,O,S]' \
      -q SMARTS:'[#1][N,O,P,S]' -q SMARTS:'[!#1]' \
-     -r 10 -S - -A I -A C -i ignore_bad_chiral -i sdf "$@"
+     -r 10 -S - -A I -A C -i ignore_bad_chiral "$@"

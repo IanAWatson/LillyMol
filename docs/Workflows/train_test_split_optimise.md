@@ -2,7 +2,7 @@
 
 Based on the very nice post by Pat Walters
 [Practical Cheminformatics](https://practicalcheminformatics.blogspot.com/2024/11/some-thoughts-on-splitting-chemical.html)
-I decided toapply trawn_test_split_optimise to the Biogen ADME datasets
+I decided toapply train_test_split_optimise to the Biogen ADME datasets
 he uses.
 
 Pat covers various splitting strategies that I will not recreate here. Instead

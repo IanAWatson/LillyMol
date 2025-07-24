@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+
 # Interface to random_molecular_transformations that enables
 # graph edit changes only. See also minor_changes for a systematic
 # approach to this problem.

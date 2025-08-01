@@ -22,4 +22,4 @@ exec $executable \
         -H d=${QUERIES}/hbonds/donor.qry \
         -H label -s '[*+]' -s '[*-]' -s '[1*,2*]' -s '[2*,3*]' \
         -u 0 -p 2d -p 3d -r -A D -A I -A C \
-        -i ignore_bad_chiral -i sdf "$@"
+        -i ignore_bad_chiral "$@"

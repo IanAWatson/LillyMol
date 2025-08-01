@@ -1526,7 +1526,7 @@ gfp_spread_standard(int argc, char** argv) {
   }
 
   if (cl.option_present('n')) {
-    if (!cl.value('n', nsel) || nsel < 2) {
+    if (!cl.value('n', nsel) || nsel < 1) {
       cerr << "The number if fingerprints to select must be a whole +ve number\n";
       usage(2);
     } else if (nsel > pool_size) {

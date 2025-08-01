@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 if [[ ! -v LILLYMOL_HOME ]] ; then
   LILLYMOL_HOME=$(dirname $0)/../..

@@ -42,6 +42,7 @@ END
   $stderr << "                  But note that if output is to stdout, `make` will run silently\n"
   $stderr << "                  That is because `make` echo's commands to stdout\n"
   $stderr << " -j <n>           degree of parellelism 'make -j <n>\n"
+  $stderr << " -3dsmi           input is a LillyMol 3D smiles - do NOT run through rcorina\n"
   $stderr << " -speed           do nothing, but report the relative speed of each descriptor computation\n"
   $stderr << " -keep            do NOT delete the temporary directory when done, keep it\n"
   $stderr << " -tmpdir <dir>    specify your own temporary directory - will not be deleted\n"
@@ -137,6 +138,8 @@ def create_makefile(to_compute, tmpdir, cl)
 
   $stderr << "Have #{d2.size} 2D and #{d3.size} 3D descriptors\n" if cl.option_present('v')
 
+  lillymol_3dsmi = cl.option_present('3dsmi')
+
   makefile = File.open(File.join(tmpdir, 'Makefile'), "w")
   makefile << "all:"
   to_compute.each do |d|
@@ -159,7 +162,15 @@ def create_makefile(to_compute, tmpdir, cl)
     makefile << "	fileconv.sh #{verbose} #{fileconv_options} -S std $<\n"
   end
 
-  if ! d3.empty?
+  if d3.empty?
+    # No 3d things to worry about
+  elsif lillymol_3dsmi
+    # Smiles already has coordinates.
+    d3.each do |d|
+      makefile << "std.#{d.name}: std.smi\n"
+      makefile << "	#{d.programme} #{d.extra} $< > $@\n"
+    end
+  else
     makefile << "std.sdf: std.smi\n"
     makefile << "	rcorina.sh #{verbose} #{corina_options} $< > $@\n"
     d3.each do |d|
@@ -282,7 +293,7 @@ def main
   descriptors.each do |key, v|
     opts << "-#{key}-#{key.upcase}=close"
   end
-  opts <<"-o=s-c=s-all-v-nostd-keep-tmpdir=s-j=ipos-speed-dfile=sfile-dlist=sfile"
+  opts <<"-o=s-c=s-all-v-nostd-keep-tmpdir=s-j=ipos-speed-dfile=sfile-dlist=sfile-3dsmi"
 
   # $stderr << opts << "\n"
 
@@ -298,6 +309,8 @@ def main
   end
 
   verbose = cl.option_present('v')
+
+  lillymol_3dsmi = cl.option_present('3dsmi')
 
   already_present = Set.new()
 

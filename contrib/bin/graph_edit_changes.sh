@@ -1,4 +1,5 @@
-#!/bin/bash
+#!/usr/bin/env bash
+
 # Interface to random_molecular_transformations that enables
 # graph edit changes only. See also minor_changes for a systematic
 # approach to this problem.
@@ -9,7 +10,7 @@ set -x
 if [[ -v LILLYMOL_HOME ]] ; then
   true
 else
-  export LILLYMOL_HOME=$(dirname $(dirname $(dirname $(readlink -e $0))))
+  export LILLYMOL_HOME=$(dirname $(dirname $(dirname $(realpath $0))))
 fi
 
 lib="${LILLYMOL_HOME}/data/random_molecular_permutations.d"

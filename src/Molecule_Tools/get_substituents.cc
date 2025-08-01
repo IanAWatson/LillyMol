@@ -63,8 +63,9 @@ Usage(int rc) {
  -d                allow substituents bonded via double (or triple) bonds
  -S <fname>        write summary data Dicer.DicerFragment proto, to <fname>
  -z i              ignore molecules not matching any query
- -X ...            obscure options, enter '-X help' for info
- -v                verbose output
+ -X ...            obscure options, enter '-X help' for info.
+ -c                remove chirality from input molecules.
+ -v                verbose output.
 
 Specifying the query and the matched atom can be tricky. A common use case is to look
 for substituents on a ring. A typical invocation might look like

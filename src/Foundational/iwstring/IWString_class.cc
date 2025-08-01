@@ -4263,7 +4263,7 @@ const_IWSubstring::remove_up_to_first(char target)
   Once we move to 2.8.xxx change this
 */
 
-int 
+bool 
 const_IWSubstring::operator <(int rhs) const
 {
   int intme;
@@ -4277,7 +4277,7 @@ const_IWSubstring::operator <(int rhs) const
   return intme < rhs;
 }
 
-int
+bool
 const_IWSubstring::operator ==(int rhs) const
 {
   int intme;
@@ -4291,7 +4291,7 @@ const_IWSubstring::operator ==(int rhs) const
   return intme == rhs;
 }
 
-int
+bool
 const_IWSubstring::operator <=(int rhs) const
 {
   int intme;
@@ -4305,7 +4305,7 @@ const_IWSubstring::operator <=(int rhs) const
   return intme <= rhs;
 }
 
-int
+bool
 const_IWSubstring::operator >=(int rhs) const
 {
   int intme;
@@ -4319,7 +4319,7 @@ const_IWSubstring::operator >=(int rhs) const
   return intme >= rhs;
 }
 
-int
+bool
 const_IWSubstring::operator !=(int rhs) const
 {
   int intme;
@@ -4333,7 +4333,7 @@ const_IWSubstring::operator !=(int rhs) const
   return intme != rhs;
 }
 
-int 
+bool 
 const_IWSubstring::operator <(float rhs) const
 {
   float floatme;
@@ -4347,7 +4347,7 @@ const_IWSubstring::operator <(float rhs) const
   return floatme < rhs;
 }
 
-int
+bool
 const_IWSubstring::operator ==(float rhs) const
 {
   float floatme;
@@ -4361,7 +4361,7 @@ const_IWSubstring::operator ==(float rhs) const
   return floatme == rhs;
 }
 
-int
+bool
 const_IWSubstring::operator <=(float rhs) const
 {
   float floatme;
@@ -4375,7 +4375,7 @@ const_IWSubstring::operator <=(float rhs) const
   return floatme <= rhs;
 }
 
-int
+bool
 const_IWSubstring::operator >=(float rhs) const
 {
   float floatme;
@@ -4389,7 +4389,7 @@ const_IWSubstring::operator >=(float rhs) const
   return floatme >= rhs;
 }
 
-int
+bool
 const_IWSubstring::operator !=(float rhs) const
 {
   float floatme;
@@ -4403,7 +4403,7 @@ const_IWSubstring::operator !=(float rhs) const
   return floatme != rhs;
 }
 
-int 
+bool 
 const_IWSubstring::operator <(double rhs) const
 {
   double doubleme;
@@ -4417,7 +4417,7 @@ const_IWSubstring::operator <(double rhs) const
   return doubleme < rhs;
 }
 
-int
+bool
 const_IWSubstring::operator ==(double rhs) const
 {
   double doubleme;
@@ -4431,7 +4431,7 @@ const_IWSubstring::operator ==(double rhs) const
   return doubleme == rhs;
 }
 
-int
+bool
 const_IWSubstring::operator <=(double rhs) const
 {
   double doubleme;
@@ -4445,7 +4445,7 @@ const_IWSubstring::operator <=(double rhs) const
   return doubleme <= rhs;
 }
 
-int
+bool
 const_IWSubstring::operator >=(double rhs) const
 {
   double doubleme;
@@ -4459,7 +4459,7 @@ const_IWSubstring::operator >=(double rhs) const
   return doubleme >= rhs;
 }
 
-int
+bool
 const_IWSubstring::operator !=(double rhs) const
 {
   double doubleme;

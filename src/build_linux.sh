@@ -23,23 +23,23 @@ fi
 # Must be invoked from the src directory /path/to/LillyMol/src
 pushd $REPO_HOME/src
 
-if [[ ! -s 'WORKSPACE' ]] ; then
-    echo "Must be invoked in the directory with WORKSPACE" && exit 1
+if [[ ! -s 'MODULE.bazel' ]] ; then
+    echo "Must be invoked in the directory with MODULE.bazel" && exit 1
 fi
 
 # Only build python if requested
 if [[ -v BUILD_PYTHON ]] ; then
     # Use python to update WORKSPACE for python locations.
     if [[ -s 'update_python_in_workspace.py' ]] ; then
-        cp WORKSPACE "/tmp/WORKSPACE_${USER}"
-        python3 ./update_python_in_workspace.py "/tmp/WORKSPACE_${USER}" > WORKSPACE
-            if [[ ! -s WORKSPACE ]] ; then
-                echo "Updating WORKSPACE failed, restoring orignal, python bindings will not work"
-                cp -f "/tmp/WORKSPACE_${USER}" WORKSPACE
+        cp MODULE.bazel "/tmp/WORKSPACE_${USER}"
+        python3 ./update_python_in_workspace.py "/tmp/WORKSPACE_${USER}" > MODULE.bazel
+            if [[ ! -s MODULE.bazel ]] ; then
+                echo "Updating MODULE.bazel failed, restoring orignal, python bindings will not work"
+                cp -f "/tmp/WORKSPACE_${USER}" MODULE.bazel
             fi
-        echo "WORKSPACE updated"
+        echo "MODULE.bazel updated"
     else
-        echo "Missing update_python_in_workspace.py, WORKSPACE not updated for python"
+        echo "Missing update_python_in_workspace.py, MODULE.bazel not updated for python"
     fi
 fi
 

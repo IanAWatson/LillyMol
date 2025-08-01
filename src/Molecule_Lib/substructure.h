@@ -1363,7 +1363,7 @@ class Substructure_Atom : public Substructure_Atom_Specifier
     int write_msi (std::ostream &, int &, const const_IWSubstring &, int = 0);
     int write_proto (std::ostream &, int &, const const_IWSubstring &, int = 0);
 
-    int matches (Target_Atom &, const int *);
+    int matches(Target_Atom& target, const int* already_matched);
 
 //  Once the atom is embedded, we can check whether or not any chirality is OK
 
@@ -1386,7 +1386,7 @@ class Substructure_Atom : public Substructure_Atom_Specifier
     Target_Atom * anchor () const { return _anchor;}
     int  set_anchor (Target_Atom *);
 
-    int  prepare_for_matching (Target_Atom *);
+    int  prepare_for_matching (Target_Atom* new_anchor);
 
     int move_to_next_match_from_current_anchor (int *, const Query_Atoms_Matched &);
 

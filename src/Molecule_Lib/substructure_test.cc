@@ -3173,4 +3173,12 @@ INSTANTIATE_TEST_SUITE_P(TestComponentGrouping, TestComponentGrouping, testing::
   SmilesSmartsMatches{"CCCC.CCCC", "(C).(C).C", 192}
 ));
 
+TEST(TestXor, TestXor1) {
+  Substructure_Query qry;
+  ASSERT_TRUE(qry.create_from_smarts("[OH]-c:[$(c-Br)^$(cc:c-Br)]"));
+  Molecule m;
+  ASSERT_TRUE(m.build_from_smiles("OC1=C(Br)C=C(Br)C=C1Br CHEMBL220087"));
+  EXPECT_EQ(qry.substructure_search(&m), 0);
+}
+
 }  // namespace

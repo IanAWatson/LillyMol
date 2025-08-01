@@ -1933,18 +1933,17 @@ int
 Substructure_Environment::construct_from_proto(const SubstructureSearch::SubstructureEnvironment& proto,
                                extending_resizable_array<Substructure_Atom *> & completed,
                                atom_number_t possible_parent,
-                               bond_type_t possible_parent_bond_type)
-{
+                               bond_type_t possible_parent_bond_type) {
 // Process any bonds which have been specified as attributes
 
-  if (! _process_how_connected(proto, completed))
-  {
+  if (! _process_how_connected(proto, completed)) {
     cerr << "Substructure_Environment::construct_from_proto:cannot connect " << proto.ShortDebugString() << "\n";
     return 0;
   }
 
-  if (INVALID_ATOM_NUMBER != possible_parent)
+  if (INVALID_ATOM_NUMBER != possible_parent) {
     _add_possible_parent(possible_parent, possible_parent_bond_type, completed);
+  }
 
   if (_possible_parents.empty()) {
     cerr << "Substructure_Environment::construct_from_proto: environment not connected\n";
@@ -1968,8 +1967,9 @@ Substructure_Environment::construct_from_proto(const SubstructureSearch::Substru
     _hits_needed.debug_print(cerr);
   }
 
-  if (proto.has_no_other_substituents_allowed())
+  if (proto.has_no_other_substituents_allowed()) {
     _no_other_substituents_allowed = proto.no_other_substituents_allowed();
+  }
 
   if (proto.has_hydrogen_ok())
     _hydrogen_ok_as_environment_match = proto.hydrogen_ok();
@@ -2031,9 +2031,9 @@ Substructure_Environment::construct_from_proto(const SubstructureSearch::Substru
       return 0;
     }
 
-//  cerr << "Build query from smarts " << (*att) << '\n';
     add(a.release());
   }
+  // cerr << "After processing smarts have " << this->size() << " Substructure_Atom\n";
 
   for (const auto& smiles : proto.smiles()) {
     std::unique_ptr<Substructure_Atom> a = std::make_unique<Substructure_Atom>();

@@ -1227,9 +1227,10 @@ Probabilities(const Config& config) {
   reflection->ListFields(config.probability(), &fields);
 
   for (const FieldDescriptor* f : fields) {
-    cerr << f->name() << '\n';
+    //cerr << f->name() << '\n';
     float tmp = reflection->GetFloat(config.probability(), f);
-    result[f->name()] = tmp;
+    std::string key(f->name());
+    result[key] = tmp;
   }
 
   return result;

@@ -3,6 +3,8 @@ module(
     version = "1.2.0",
 )
 
+new_local_repository = use_repo_rule("@bazel_tools//tools/build_defs/repo:local.bzl", "new_local_repository")
+
 # Periodically check the bazel central registry for new versions.
 # https://github.com/bazelbuild/bazel-central-registry/tree/main/modules
 
@@ -34,7 +36,7 @@ bazel_dep(name = "nanobind_bazel", version = "2.1.0")
 bazel_dep(name = "onetbb", version = "2022.1.0", repo_name="onetbb")
 bazel_dep(name = "platforms", version = "0.0.11")
 # Version 27.0 works for c++, but does not work with python 3.11
-bazel_dep(name = "protobuf", version = "30.1", repo_name="com_google_protobuf")
+bazel_dep(name = "protobuf", version = "31.1", repo_name="com_google_protobuf")
 bazel_dep(name = "pybind11_bazel", version = "2.13.6")
 # bazel_dep(name = "pybind11_protobuf", version = "2.11.1.bzl.3")
 bazel_dep(name = "re2", version = "2024-07-02.bcr.1")
@@ -71,4 +73,24 @@ bazel_dep(name = "third_party", version = "1.0.0")
 local_path_override(
     module_name = "third_party",
     path = "../third_party"
+)
+
+# in order to build LillyMol pybind11 bindings you will need a python
+# installation with pybind installed with that. Adjust this to meet
+# local needs.
+new_local_repository(
+    name = "python",
+    path = "/usr/include/python3.12",
+    build_file_content = """
+cc_library(
+    name = "python",
+    hdrs = glob(
+            ["**/*.h"]
+    ),
+    includes = [
+        ".",
+    ],
+    visibility = ["//visibility:public"],
+)
+"""
 )

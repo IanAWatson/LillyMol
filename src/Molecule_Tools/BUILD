@@ -105,6 +105,28 @@ cc_proto_library(
 )
 
 proto_library(
+    name = "get_coordinates_proto",
+    srcs = [
+        "get_coordinates.proto",
+    ],
+)
+
+cc_proto_library(
+    name = "get_coordinates_cc_proto",
+    deps = [
+        ":get_coordinates_proto",
+    ],
+)
+
+py_proto_library(
+    name = "get_coordinates_py_proto",
+    deps = [
+        ":get_coordinates_proto",
+    ],
+)
+
+
+proto_library(
     name = "iwdescr_proto",
     srcs = [
         "iwdescr.proto",
@@ -883,6 +905,7 @@ cc_binary(
         "get_coordinates.cc",
     ],
     deps = [
+        "get_coordinates_cc_proto",
         "//Foundational/cmdline:iwcmdline",
         "//Molecule_Lib:iwmolecule",
         "//Molecule_Lib:moleculeio",

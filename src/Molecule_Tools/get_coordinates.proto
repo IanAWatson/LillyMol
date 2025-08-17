@@ -1,0 +1,28 @@
+syntax = "proto3";
+
+package get_coordinates;
+
+message MatchedAtom {
+  optional string element = 1;
+  optional uint32 atom_number = 2;
+  optional float x = 3;
+  optional float y = 4;
+  optional float z = 5;
+}
+
+message MatchedAtoms {
+  repeated MatchedAtom atom = 1;
+}
+
+message PerQueryResult {
+  optional uint32 query_number = 1;
+  optional string query_name = 2;
+  repeated MatchedAtoms atoms = 3;
+}
+
+message MoleculeData {
+  // The name of the molecule generating the data.
+  optional string name = 1;
+
+  repeated PerQueryResult per_query_result = 2;
+}

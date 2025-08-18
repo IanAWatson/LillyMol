@@ -214,12 +214,12 @@ else
 fi
 
 build_options=(
+  "--enable_workspace"
   "-k"
   "--jobs=${THREADS}"
   "--verbose_failures"
   "--cxxopt=-DGIT_HASH=\"$(git rev-parse --short --verify HEAD)\""
   "--cxxopt=-DTODAY=\"$(date +%Y-%b-%d)\""
-  "--jobs=${jobs}"
   "-c"
   "opt"
   "--copt=-march=native"

@@ -4,6 +4,11 @@ load("@com_google_protobuf//bazel:py_proto_library.bzl", "py_proto_library")
 load("@rules_cc//cc:defs.bzl", "cc_binary")
 load("@rules_proto//proto:defs.bzl", "proto_library")
 
+config_setting(
+    name = "darwin",
+    constraint_values = ["@platforms//os:osx"]
+)
+
 proto_library(
     name = "bond_length_distribution_proto",
     srcs = [
@@ -1367,6 +1372,14 @@ cc_binary(
     srcs = [
         "molecules_from_reagents.cc",
     ],
+    copts = select({
+        ":darwin": ["-Xclang", "-fopenmp"],
+        "//conditions:default": ["-fopenmp"]
+    }),
+    linkopts = select ({
+        ":darwin": ["-Xclang", "-fopenmp", "-lomp"],
+        "//conditions:default": ["-lgomp"]
+    }),
     deps = [
         "//Foundational/iwaray",
         "//Foundational/iwmisc",
@@ -1374,6 +1387,7 @@ cc_binary(
         "//Molecule_Lib:iwmolecule",
         "//Molecule_Lib:iwreaction",
         "//Molecule_Lib:moleculeio",
+        "@homebrew_openmp",
     ],
 )
 

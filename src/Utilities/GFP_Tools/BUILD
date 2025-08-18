@@ -307,7 +307,7 @@ cc_binary(
         "//conditions:default": ["-fopenmp"]
     }),
     linkopts = select ({
-        ":darwin": ["-Xclang", "-fopenmp", "-lomp"],
+        ":darwin": ["-Xclang", "-fopenmp"],
         "//conditions:default": ["-lgomp"]
     }),
     tags = [
@@ -318,6 +318,7 @@ cc_binary(
         ":gfp_standard",
         "//Foundational/iw_tdt",
         "//Foundational/iwmisc",
+        "@homebrew_openmp",
     ],
 )
 
@@ -497,7 +498,7 @@ cc_binary(
         "//conditions:default": ["-fopenmp"]
     }),
     linkopts = select ({
-        ":darwin": ["-Xclang", "-fopenmp", "-lomp"],
+        ":darwin": ["-Xclang", "-fopenmp"],
         "//conditions:default": ["-lgomp"]
     }),
     tags = [
@@ -510,6 +511,7 @@ cc_binary(
         "//Foundational/iw_tdt",
         "//Foundational/iwmisc",
         "//Utilities/GFP_Tools:spread",
+        "@homebrew_openmp",
     ],
 )
 
@@ -523,7 +525,7 @@ cc_binary(
         "//conditions:default": ["-fopenmp"]
     }),
     linkopts = select ({
-        ":darwin": ["-Xclang", "-fopenmp", "-lomp"],
+        ":darwin": ["-Xclang", "-fopenmp"],
         "//conditions:default": ["-lgomp"]
     }),
     tags = [
@@ -534,6 +536,7 @@ cc_binary(
         ":gfp_standard",
         "//Foundational/iw_tdt",
         "//Foundational/iwmisc",
+        "@homebrew_openmp",
     ],
 )
 
@@ -610,6 +613,7 @@ cc_binary(
         "//Foundational/iwqsort",
         "//Utilities/GFP_Tools:gfp",
         "@onetbb//:tbb",
+        "@homebrew_openmp",
     ],
 )
 
@@ -636,7 +640,7 @@ cc_binary(
         "//conditions:default": ["-fopenmp"]
     }),
     linkopts = select ({
-        ":darwin": ["-Xclang", "-fopenmp", "-lomp"],
+        ":darwin": ["-Xclang", "-fopenmp"],
         "//conditions:default": ["-lgomp"]
     }),
     tags = [
@@ -648,6 +652,7 @@ cc_binary(
         ":nearneighbours_cc_proto",
         ":neighbour_list",
         "//Foundational/data_source:iwtfdata_record",
+        "@homebrew_openmp",
     ],
 )
 
@@ -968,13 +973,14 @@ cc_binary(
         "//Foundational/accumulator",
         "//Foundational/cmdline:iwcmdline",
         "//Foundational/data_source:iwtfdata_record",
+        "@homebrew_openmp",
     ],
     copts = select({
         ":darwin": ["-Xclang", "-fopenmp"],
         "//conditions:default": ["-fopenmp"]
     }),
     linkopts = select ({
-        ":darwin": ["-Xclang", "-fopenmp", "-lomp"],
+        ":darwin": ["-Xclang", "-fopenmp"],
         "//conditions:default": ["-lgomp"]
     }),
     tags = [

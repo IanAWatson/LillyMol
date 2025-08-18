@@ -483,6 +483,7 @@ cc_binary(
         "//conditions:default": ["-lgomp"]
     }),
     deps = [
+        "@homebrew_openmp",
         "//Foundational/accumulator",
         "//Foundational/cmdline:iwcmdline",
         "//Foundational/data_source:iwstring_data_source",

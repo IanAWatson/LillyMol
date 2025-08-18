@@ -2,6 +2,7 @@
   superimpose molecules by best fit to matched atoms
 */
 
+#include <algorithm>
 #include <iostream>
 #include <limits>
 #include <memory>
@@ -27,7 +28,7 @@ const char* prog_name = nullptr;
 
 static int verbose = 0;
 
-static int molecules_read = 0;
+static uint64_t molecules_read = 0;
 
 static Chemical_Standardisation chemical_standardisation;
 
@@ -38,11 +39,6 @@ static int report_rms_b4_and_after = 0;
 static resizable_array_p<Substructure_Query> queries;
 
 static Molecule_Output_Object stream_for_combined_molecules;
-
-// Unimplemented feature
-#ifdef MATCH_ATOMS_BY_ISOTOPES
-static int match_atoms_by_isotopes = 0;
-#endif
 
 static resizable_array<int> matched_query_atoms;
 
@@ -169,31 +165,36 @@ usage(int rc) {
 #endif
   // clang-format on
   // clang-format off
-  cerr << "  -T <fname>    file containing one template molecule\n";
-  cerr << "  -s <smarts>   specify smarts for matched atoms\n";
-  cerr << "  -M <smiles>   read the query as smiles - will be converted internally\n";
-  cerr << "  -m n,n,n,n    specify which matched atoms to use\n";
-  cerr << "  -u            only find unique substructure search embeddings\n";
-#ifdef MATCH_ATOMS_BY_ISOTOPES
-  cerr << "  -I            input molecules already have isotopic labels\n";
-#endif
-  cerr << "  -z i          ignore molecules not matching the query\n";
-  cerr << "  -z f          take the first of multiple query matches\n";
-  cerr << "  -z nom        ignore all matches if multiple matches\n";
-  cerr << "  -z all        process all hits\n";
-  cerr << "  -j <weight>   weight applied to matched atoms 1and2 0-1.2-3\n";
-  cerr << "  -S <fname>    output file name\n";
-  cerr << "  -o <type>     specify output type\n";
-  cerr << "  -C <fname>    file for combined molecules\n";
-  cerr << "  -Z ...        miscellaneous options\n";
-  cerr << "  -r            produce RMS both before and after fitting\n";
-  cerr << "  -D <fname>    write the matched atoms to <fname>\n";
-  cerr << "  -l            reduce to largest fragment\n";
-  cerr << "  -i <type>     input specification\n";
-  cerr << "  -g ...        chemical standardisation options\n";
-  cerr << "  -E ...        standard element specifications\n";
-  cerr << "  -A ...        standard aromaticity specifications\n";
-  cerr << "  -v            verbose output\n";
+  cerr << R"(3D align molecules so matched atoms overlay the matched atoms in a pre-aligned template molecule.
+
+superimpose_by_matched_atoms -T template.sdf -s '[OH]c1ccccc1' -o ISIS -S output file.sdf
+
+template.sdf must contain a phenol. Each input molecule is searched for a phenol and the matched atoms are aligned.
+
+ -T <fname>    file containing one template molecule
+ -s <smarts>   specify smarts for matched atoms
+ -M <smiles>   read the query as smiles - will be converted internally
+ -m n,n,n,n    specify which matched atoms to use - default is to use all.
+ -u            only find unique substructure search embeddings. Beware equivalent in 2D is not equivalent in 3D.
+ -z i          ignore molecules not matching the query
+ -z f          take the first of multiple query matches
+ -z nom        ignore all matches if multiple matches
+ -z all        process all hits
+ -z help       other options
+ -j <weight>   weight applied to matched atoms 1-and-2 0-1.2-3
+ -C <fname>    file for combined molecules
+ -R <fname>    write RMS data to <fname> in addition to stderr.
+ -r            produce RMS both before and after fitting - both to stdout and -R if specified.
+ -D <fname>    write the matched atoms to <fname>
+ -S <fname>    output file name. These are the aligned molecules.
+ -o <type>     specify output type - -o sdf or -o smi3d
+ -l            reduce to largest fragment
+ -i <type>     input specification
+ -g ...        chemical standardisation options
+ -E ...        standard element specifications
+ -A ...        standard aromaticity specifications
+ -v            verbose output.
+)";
   // clang-format on
 
   exit(rc);
@@ -234,7 +235,7 @@ Template_Molecule::identify_query_matches(
 
       Set_of_Atoms* a = new Set_of_Atoms;
 
-      if (0 == default_matched_query_atoms.size()) {  // just take all the matched atoms
+      if (default_matched_query_atoms.empty()) {  // just take all the matched atoms
         *a = *e;
       } else {
         // we only want some of the matched atoms
@@ -258,7 +259,7 @@ Template_Molecule::identify_query_matches(
     _a2 = new double[array_size * 3];
     _weight = new double[array_size];
 
-    set_vector(_weight, array_size, 1.0);
+    std::fill_n(_weight, array_size, 1.0);
     if (0.0 != special_processing_for_jibo) {
       _weight[1] = special_processing_for_jibo;
       _weight[2] = special_processing_for_jibo;
@@ -557,12 +558,12 @@ Template_Molecule::superimpose_by_matched_atoms(Molecule& m,
 {
   const auto dmqa = default_matched_query_atoms.size();
 
-  if (0 == dmqa) {
+  if (default_matched_query_atoms.empty()) {
     return _superimpose_by_matched_atoms(m, m_embedding, output);
   }
 
   Set_of_Atoms s;
-  s.resize(dmqa);
+  s.reserve(default_matched_query_atoms.size());
 
   for (unsigned int i = 0; i < dmqa; ++i) {
     const auto j = default_matched_query_atoms[i];
@@ -746,12 +747,12 @@ read_template_molecule(const const_IWSubstring& fname,
 static void
 display_misc_options(char flag, std::ostream& output) {
   // clang-format off
-  output << R"( -Z first        Take the first query match.
- -Z vH          the smarts v directive includes implicit Hydrogens.
- -Z ignore      ignore molecules not matching the template query.
- -Z nom         ignore molecules with multiple matches to the template query.
- -Z all         process all template molecule matches.
- -Z ignorezero  ignore molecules with no coordinate information.
+  output << R"( -z first        Take the first query match.
+ -z i,ignore      ignore molecules not matching the template query.
+ -z nom           ignore molecules with multiple matches to the template query.
+ -z all           process all template molecule matches.
+ -z ignorezero    ignore molecules with no coordinate information.
+ -z vH            the smarts v directive includes implicit Hydrogens.
 )";
   // clang-format on
 
@@ -760,7 +761,7 @@ display_misc_options(char flag, std::ostream& output) {
 
 static int
 superimpose_molecules(int argc, char** argv) {
-  Command_Line cl(argc, argv, "vA:E:i:o:g:lT:z:S:Iq:s:m:C:j:ryM:D:uUZ:R:");
+  Command_Line cl(argc, argv, "vA:E:i:o:g:lT:z:S:q:s:m:C:j:ryM:D:uUR:");
 
   if (cl.unrecognised_options_encountered()) {
     cerr << "Unrecognised options encountered\n";
@@ -810,7 +811,7 @@ superimpose_molecules(int argc, char** argv) {
 
   if (cl.option_present('z')) {
     const_IWSubstring z;
-    for (int i = 0; cl.value('Z', z, i); ++i) {
+    for (int i = 0; cl.value('z', z, i); ++i) {
       if ("first" == z || 'f' == z) {
         take_first_of_multiple_template_hits = 1;
         if (verbose) {
@@ -968,21 +969,6 @@ superimpose_molecules(int argc, char** argv) {
       default_matched_query_atoms.add(j);
     }
   }
-
-#ifdef MATCH_ATOMS_BY_ISOTOPES
-  if (cl.option_present('I') && queries.number_elements()) {
-    cerr << "Cannot do alignment by isotopes (-I) and alignment by queries (-s)\n";
-    usage(3);
-  }
-
-  if (cl.option_present('I')) {
-    match_atoms_by_isotopes = 1;
-
-    if (verbose) {
-      cerr << "Will match atoms by isotopic labels\n";
-    }
-  }
-#endif
 
   if (cl.option_present('T')) {
     const_IWSubstring t = cl.string_value('T');

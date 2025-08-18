@@ -109,4 +109,17 @@ molecule_subset is a complex utility, and is more fully described at
 [molecule_subset](/docs/Molecule_Tools/molecule_subset.md).
 
 ## superimpose_by_matched_atoms
-This tool performs alignment to an exising 3D template molecule.
+This tool performs alignment to an exising 3D template molecule. Usually this is
+used when a known pose is to be applied to a series of unaligned molecules. Note
+that the superimposition is rigid. There are other tools that can do flexible
+alignments.
+
+The aligned template molecule is specified via the -T option, and the matched
+atoms to be considered must be specified as either smarts or query file. The
+tool can compute the RMS before superimposition takes place as well as after.
+
+The following invocation demonstrates some of the functionality
+```
+superimpose_by_matched_atoms -r -R RMS.txt -Z all -s '[OH]c1ccccc1' -Z i -Z ignorezero -S superimposed \
+        -o ISIS -z i -z all -v -T template.sdf file.sdf
+```

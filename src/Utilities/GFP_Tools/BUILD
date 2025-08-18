@@ -419,6 +419,7 @@ cc_binary(
         "@com_google_protobuf//:protobuf",
         "@third_party//:cppzmq",
         "@third_party//:libzmq",
+        "@homebrew_gnutls",
     ],
 )
 

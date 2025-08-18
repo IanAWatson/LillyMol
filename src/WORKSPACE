@@ -137,3 +137,17 @@ cc_library(
 """,
 )
 
+new_local_repository(
+    name = "homebrew_gnutls",
+    path = "/opt/homebrew/Cellar/gnutls/3.8.9/",
+    build_file_content = """
+cc_library(
+    name = "homebrew_gnutls",
+    hdrs = glob(["include/**/*.h"]),
+    strip_include_prefix = "include",
+    linkopts = ["-L/opt/homebrew/Cellar/gnutls/3.8.9/lib", "-lgnutls"],
+    visibility = ["//visibility:public"],
+)
+""",
+)
+

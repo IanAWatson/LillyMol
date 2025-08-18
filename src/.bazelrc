@@ -3,7 +3,11 @@ build --cxxopt=-std=c++23 --cxxopt=-DBUILD_BAZEL
 
 build --enable_bzlmod --experimental_cc_shared_library
 # https://groups.google.com/g/bazel-discuss/c/5cbRuLuTwNg
-build --per_file_copt=external/.*@-Wno-error=maybe-uninitialized
+# Only apply this flag on non-Darwin platforms to avoid warnings on macOS
+build:linux --per_file_copt=external/.*@-Wno-error=maybe-uninitialized
+
+# Auto-detect platform and apply appropriate config
+build --enable_platform_specific_config
 
 build:asan --strip=never
 build:asan --copt -fsanitize=address

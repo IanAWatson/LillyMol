@@ -1377,7 +1377,7 @@ cc_binary(
         "//conditions:default": ["-fopenmp"]
     }),
     linkopts = select ({
-        ":darwin": ["-Xclang", "-fopenmp", "-lomp"],
+        ":darwin": ["-Xclang", "-fopenmp"],
         "//conditions:default": ["-lgomp"]
     }),
     deps = [

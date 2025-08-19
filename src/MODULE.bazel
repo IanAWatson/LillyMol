@@ -72,3 +72,38 @@ local_path_override(
     module_name = "third_party",
     path = "../third_party"
 )
+
+new_local_repository = use_repo_rule("@bazel_tools//tools/build_defs/repo:local.bzl", "new_local_repository")
+
+new_local_repository(
+    name = "homebrew_openmp",
+    path = "/opt/homebrew/Cellar/libomp/20.1.5/",
+    build_file_content = """
+cc_library(
+    name = "homebrew_openmp",
+    srcs = [
+       "lib/libomp.a"
+    ],
+    hdrs = glob(["include/*"]),
+    strip_include_prefix = "include",
+    visibility = ["//visibility:public"],
+)
+""",
+)
+
+new_local_repository(
+    name = "homebrew_gnutls",
+    path = "/opt/homebrew/Cellar/gnutls/3.8.9/",
+    build_file_content = """
+cc_library(
+    name = "homebrew_gnutls",
+    hdrs = glob(["include/**/*.h"]),
+    strip_include_prefix = "include",
+    srcs = [
+      "lib/libgnutls.dylib"
+    ],
+    visibility = ["//visibility:public"],
+)
+""",
+)
+

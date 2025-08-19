@@ -214,7 +214,6 @@ else
 fi
 
 build_options=(
-  "--enable_workspace"
   "-k"
   "--jobs=${THREADS}"
   "--verbose_failures"

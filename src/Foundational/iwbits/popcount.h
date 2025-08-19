@@ -8,7 +8,7 @@
 #include <nmmintrin.h>
 #define POPCOUNT _mm_popcnt_u32
 #elif __APPLE__
-#define POPCOUNT __builtin_popcount
+#define POPCOUNT __builtin_popcountll
 #else
 #include <bit>
 #define POPCOUNT std::popcount

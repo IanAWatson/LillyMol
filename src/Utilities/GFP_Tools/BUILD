@@ -595,7 +595,7 @@ cc_binary(
         "//conditions:default": ["-fopenmp"]
     }),
     linkopts = select ({
-        ":darwin": ["-Xclang", "-fopenmp", "-ldl", "-lomp"],
+        ":darwin": ["-Xclang", "-fopenmp", "-ldl"],
         "//conditions:default": ["-ldl", "-lgomp"]
     }),
     tags = [

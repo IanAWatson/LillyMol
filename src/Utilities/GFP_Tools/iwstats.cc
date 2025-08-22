@@ -962,7 +962,7 @@ compute_b_squared(int number_records, int experimental_column,
       n++;
     }
   } else {
-    set_vector(tmp1, number_records, static_cast<float>(0.0));
+    std::fill_n(tmp1, number_records, static_cast<float>(0.0));
     n = number_records;
   }
 

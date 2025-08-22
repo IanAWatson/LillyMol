@@ -75,6 +75,8 @@ class Options {
     // Not sure how these will be used.
     int _write_3_connected_fragments;
 
+    int _data_contains_leading_smiles;
+
     // As fragments are encountered, we create some number of files and
     // write the textprotos to its corresponding file.
     // I was not able to figure out how to do this without the unique_ptr
@@ -114,7 +116,7 @@ class Options {
       return _verbose;
     }
 
-    int Process(const const_IWSubstring& buffer);
+    int Process(const_IWSubstring buffer);  // note local copy
 
     // After processing, report a summary of what has been done.
     int Report(std::ostream& output) const;
@@ -123,6 +125,7 @@ class Options {
 Options::Options() {
   _verbose = 0;
   _molecules_read = 0;
+  _data_contains_leading_smiles = 0;
   _write_3_connected_fragments = 0;
   _write_tfdata_records = 0;
   _ignore_smiles_interpretation_errors = 0;
@@ -167,6 +170,13 @@ Options::Initialise(Command_Line& cl) {
     _suffix = ".tfdata";
   }
 
+  if (cl.option_present('s')) {
+    _data_contains_leading_smiles = 1;
+    if (_verbose) {
+      cerr << "Data contains leading smiles\n";
+    }
+  }
+
   return 1;
 }
 
@@ -186,8 +196,12 @@ Options::Report(std::ostream& output) const {
 }
 
 int
-Options::Process(const const_IWSubstring& buffer) {
+Options::Process(const_IWSubstring buffer) {
   ++_molecules_read;
+
+  if (_data_contains_leading_smiles) {
+    buffer.remove_leading_words(1);
+  }
 
   dicer_data::DicerFragment proto;
   const absl::string_view tmp(buffer.data(), buffer.length());
@@ -420,7 +434,7 @@ DicerToTopologicalTypes(Options& options,
 
 int
 Main(int argc, char** argv) {
-  Command_Line cl(argc, argv, "vE:A:S:zT");
+  Command_Line cl(argc, argv, "vE:A:S:zTs");
 
   if (cl.unrecognised_options_encountered()) {
     cerr << "Unrecognised options encountered\n";

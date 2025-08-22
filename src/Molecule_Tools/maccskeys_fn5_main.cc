@@ -1,4 +1,6 @@
 #include <stdlib.h>
+
+#include <algorithm>
 #include <iostream>
 #include <memory>
 
@@ -552,7 +554,7 @@ maccskeys (Molecule & m,
 
   int keys[256];     // make long enough for fingerprints however long they are
 
-  set_vector(keys, 256, 0);
+  std::fill_n(keys, 256, 0);
 
   int rc = maccskeys(m, keys);
 
@@ -620,7 +622,7 @@ maccskeys_filter (iwstring_data_source & input,
     {
       output << "|\n";
 
-      set_vector(keys, nbits, 0);
+      std::fill_n(keys, nbits, 0);
     }
     else
     {

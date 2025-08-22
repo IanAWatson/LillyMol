@@ -2007,7 +2007,7 @@ MT_OR_Data::set_atoms_hit(const int s) {
     return;
   }
 
-  set_vector(_atoms_hit, _matoms, s);
+  std::fill_n(_atoms_hit, _matoms, s);
 
   return;
 }

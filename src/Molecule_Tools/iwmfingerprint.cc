@@ -573,7 +573,7 @@ MFingerprint::MFingerprint (Molecule & m,
   _arom = new aromaticity_type_t[_matoms];
 
   if (ats.active() || nullptr != atype)
-    set_vector(_arom, _matoms, 0);
+    std::fill_n(_arom, _matoms, 0);
   else
     m.aromaticity(_arom);
 
@@ -601,16 +601,16 @@ MFingerprint::MFingerprint (Molecule & m,
   if (nullptr != atype)
   {
     copy_vector(_atom_hash_value, atype, _matoms);
-    set_vector(_unsaturation, _matoms, 0);
+    std::fill_n(_unsaturation, _matoms, 0);
     if (nullptr != _hcount)
-      set_vector(_hcount, _matoms, 0);
+      std::fill_n(_hcount, _matoms, 0);
   }
   else if (ats.active())
   {
     ats.assign_atom_types(m, _atom_hash_value);
-    set_vector(_unsaturation, _matoms, 0);
+    std::fill_n(_unsaturation, _matoms, 0);
     if (nullptr != _hcount)
-      set_vector(_hcount, _matoms, 0);
+      std::fill_n(_hcount, _matoms, 0);
   }
   else
   {
@@ -2015,7 +2015,7 @@ MFingerprint::build (atom_number_t astart, int * bvector, int * auxiliary_bvecto
 
   _path_length = 0;
 
-  set_vector(_in_path, _matoms, 0);
+  std::fill_n(_in_path, _matoms, 0);
 
   if (nullptr != include_these_atoms)
   {

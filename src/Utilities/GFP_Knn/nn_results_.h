@@ -4,6 +4,8 @@
 #include <stdlib.h>
 #include <memory>
 
+#include <algorithm>
+
 #include "Foundational/iwmisc/misc.h"
 #include "Foundational/data_source/iwstring_data_source.h"
 #include "Foundational/iwstring/iw_stl_hash_set.h"
@@ -348,7 +350,7 @@ NN_Results_Base<N>::build_from_distance_matrix (iwstring_data_source & input,
   }
   else
   {
-    set_vector (ndx, _number_items, -1);
+    std::fill_n (ndx, _number_items, -1);
 
     int n = 0;
     for (int i = 0; i < _number_items; i++)
@@ -454,7 +456,7 @@ NN_Results_Base<N>::_build_from_distance_matrix (IWDistanceMatrixFloat & dm,
     if (ndx[i] < 0)
       continue;
 
-    set_vector (closest_distances, dmc.max_neighbours (), static_cast<similarity_type_t> (1.0));
+    std::fill_n (closest_distances, dmc.max_neighbours (), static_cast<similarity_type_t> (1.0));
      
     N & ni = _results[i];
 

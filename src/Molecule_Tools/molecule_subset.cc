@@ -286,7 +286,7 @@ static int
 write_bond_subsets(Molecule& m, int nhits, const Substructure_Results& sresults,
                    int* include_bond, const int* hits_in_fragment,
                    Molecule_Output_Object& output) {
-  set_vector(include_bond, m.nedges(), 0);
+  std::fill_n(include_bond, m.nedges(), 0);
 
   for (int i = 0; i < nhits; i++) {
     const Set_of_Atoms* e = sresults.embedding(i);

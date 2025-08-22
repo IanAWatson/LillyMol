@@ -503,7 +503,7 @@ rgroup_do_ring(Molecule& m, RGroup_Construction_Current_State& rgrcs,
 
   int matoms = m.natoms();
 
-  set_vector(atom_already_done, m.natoms(), 0);
+  std::fill_n(atom_already_done, m.natoms(), 0);
 
   embedding.set_vector(atom_already_done, 2);  // 2 means in original embedding
 

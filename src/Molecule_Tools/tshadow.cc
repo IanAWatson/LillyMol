@@ -1109,20 +1109,20 @@ static void
 do_rotate_to_longest_distance_end_queries(Molecule& m, const Atom** atom,
                                           Shadow_Tmp& stmp) {
   int* process_these_atoms = stmp.process_these_atoms();
-  set_vector(process_these_atoms, m.natoms(), 0);
+  std::fill_n(process_these_atoms, m.natoms(), 0);
 
   Molecule_to_Match target(&m);
 
   if (!find_first_match(target, end1queries, process_these_atoms)) {
     cerr << m.name() << " no match to end1 queries, default processing\n";
-    set_vector(process_these_atoms, m.natoms(), 1);
+    std::fill_n(process_these_atoms, m.natoms(), 1);
     stmp.do_rotate_to_longest_distance(m, atom);
     return;
   }
 
   if (!find_first_match(target, end2queries, process_these_atoms)) {
     cerr << m.name() << " no match to end2 queries, default processing\n";
-    set_vector(process_these_atoms, m.natoms(), 1);
+    std::fill_n(process_these_atoms, m.natoms(), 1);
   }
 
   stmp.do_rotate_to_longest_distance(m, atom);
@@ -1145,7 +1145,7 @@ do_rotate_to_longest_distance(Molecule& m, const Atom** atom, Shadow_Tmp& stmp) 
   int matoms = m.natoms();
 
   int* process_these_atoms = stmp.process_these_atoms();
-  set_vector(process_these_atoms, matoms, 0);
+  std::fill_n(process_these_atoms, matoms, 0);
 
   Molecule_to_Match target(&m);
 
@@ -1168,7 +1168,7 @@ do_rotate_to_longest_distance(Molecule& m, const Atom** atom, Shadow_Tmp& stmp) 
   if (0 == queries_matching) {
     cerr << "Warning, none of " << queries.number_elements()
          << " queries, match, default processing\n";
-    set_vector(process_these_atoms, matoms, 1);
+    std::fill_n(process_these_atoms, matoms, 1);
   }
 
   stmp.do_rotate_to_longest_distance(m, atom);
@@ -2068,7 +2068,7 @@ tshadow(int argc, char** argv) {
     //  If nothing specified for what to write, write everything
 
     if (0 == count_non_zero_occurrences_in_array(write_oriented_molecule, 4)) {
-      set_vector(write_oriented_molecule, 4, 1);
+      std::fill_n(write_oriented_molecule, 4, 1);
     }
 
     set_write_isis_standard(1);

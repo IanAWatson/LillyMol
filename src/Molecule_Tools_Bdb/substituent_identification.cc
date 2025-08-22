@@ -39,6 +39,7 @@
 #include "Molecule_Lib/atom_typing.h"
 #include "Molecule_Lib/istream_and_type.h"
 #include "Molecule_Lib/molecule.h"
+#include "Molecule_Lib/molecular_formula.h"
 #include "Molecule_Lib/standardise.h"
 #include "Molecule_Lib/substructure.h"
 #include "Molecule_Lib/target.h"
@@ -52,6 +53,7 @@
 #include "db_cxx.h"
 
 using std::cerr;
+using molecular_formula::MolecularFormula;
 
 const char* prog_name = nullptr;
 
@@ -545,6 +547,11 @@ class SubstituentIdentification {
 
   int _min_substituent_size;
 
+  // Difference in formula between what is removed and what is added.
+  int _max_formula_difference;
+
+  uint32_t _suppressed_for_max_formula_differece;
+
   uint32_t _only_add_bond;
 
   resizable_array_p<Substructure_Query> _substituents_must_contain;
@@ -625,11 +632,13 @@ class SubstituentIdentification {
                     IWString_and_File_Descriptor& output);
   int _look_for_new_substituents(Molecule& m, atom_number_t zatom,
                                  const IWString& smiles_of_fragment_lost,
+                                 const MolecularFormula<uint32_t>& formula_of_fragment_lost,
                                  IW_STL_Hash_Set& smiles_already_found,
                                  Molecule_Specific_Temporary_Arrays& msta,
                                  IWString_and_File_Descriptor& output);
   int _look_for_new_substituents(Molecule& m, atom_number_t zatom,
                                  const IWString& smiles_of_fragment_lost,
+                                 const MolecularFormula<uint32_t>& formula_of_fragment_lost,
                                  IW_STL_Hash_Set& smiles_already_found,
                                  struct DBKey& dbkey, uint32_t& new_molecules_produced,
                                  IWString_and_File_Descriptor& output);
@@ -637,14 +646,17 @@ class SubstituentIdentification {
     Molecule& m, atom_number_t zatom, 
     UsedDuringLookups& lookup_data,
     struct DBKey& dbkey,
+    const MolecularFormula<uint32_t>& formula_of_fragment_lost,
     IWString_and_File_Descriptor& output);
   int _look_for_new_substituents(
     Molecule& m, atom_number_t zatom, 
     UsedDuringLookups& lookup_data,
     Molecule_Specific_Temporary_Arrays& msta,
+    const MolecularFormula<uint32_t>& formula_of_fragment_lost,
     IWString_and_File_Descriptor& output);
   int _look_for_new_substituents_db(Molecule& m, atom_number_t zatom,
                                     const IWString& smiles_of_fragment_lost,
+                                    const MolecularFormula<uint32_t>& formula_of_fragment_lost,
                                     IW_STL_Hash_Set& smiles_already_found,
                                     const struct DBKey& dbkey, Db& db, Dbt& zkey,
                                     IW_STL_Hash_Set& already_processed,
@@ -652,6 +664,7 @@ class SubstituentIdentification {
   int _look_for_new_substituents_db(
     Molecule& m, atom_number_t zatom,
     UsedDuringLookups& lookup_data, 
+    const MolecularFormula<uint32_t>& formula_of_fragment_lost,
     const struct DBKey& rad_and_bit, Db& db,
     Dbt& dbkey, IWString_and_File_Descriptor& output);
   int _form_new_molecules(Molecule& m, atom_number_t zatom,
@@ -671,6 +684,7 @@ class SubstituentIdentification {
                   bond_type_t bt) const;
   int FormNewMolecules(Molecule& m, atom_number_t zatom,
                                                const IWString& smiles_of_fragment_lost,
+                                               const MolecularFormula<uint32_t>& formula_of_fragment_lost,
                                                IW_STL_Hash_Set& smiles_already_found,
                                                const struct DBKey& rad_and_bit,
                                                const substituent_identification::Replacements& proto,
@@ -679,10 +693,12 @@ class SubstituentIdentification {
   int FormNewMolecules(Molecule& m, atom_number_t zatom,
                        const struct DBKey& rad_and_bit,
                        UsedDuringLookups& lookup_data,
+                       const MolecularFormula<uint32_t>& formula_of_fragment_lost,
                        const substituent_identification::Replacements& proto,
                        IWString_and_File_Descriptor& output);
   int FormNewMolecule(Molecule& m, atom_number_t zatom,
                                                const IWString& smiles_of_fragment_lost,
+                                               const MolecularFormula<uint32_t>& formula_of_fragment_lost,
                                                IW_STL_Hash_Set& smiles_already_found,
                                                const struct DBKey& rad_and_bit,
                                                const substituent_identification::Replacement& proto,
@@ -691,8 +707,13 @@ class SubstituentIdentification {
   int FormNewMolecule(Molecule& m, atom_number_t zatom,
                       const struct DBKey& rad_and_bit,
                       UsedDuringLookups& lookup_data,
+                      const MolecularFormula<uint32_t>& formula_of_fragment_lost,
                       const substituent_identification::Replacement& proto,
                       IWString_and_File_Descriptor& output);
+ int OkFormulaDifference(const MolecularFormula<uint32_t>& formula_of_fragment_lost,
+                 Molecule& frag);
+ int OkAdjacentAtoms(const Molecule& m1, atom_number_t a1, 
+                                           const Molecule& m2, atom_number_t a2) const;
 
   int _matched_pairs_qsar(Molecule& m, const atom_number_t zatom,
                           const IWString& smiles_of_fragment_lost,
@@ -718,10 +739,12 @@ class SubstituentIdentification {
 
   atom_number_t _do_break_across_first_two_matched_atoms(
       Molecule& m, atom_number_t a1, atom_number_t a2,
-      Molecule_Specific_Temporary_Arrays& msta, IWString& smiles_of_fragment_lost);
+      Molecule_Specific_Temporary_Arrays& msta, IWString& smiles_of_fragment_lost,
+      MolecularFormula<uint32_t>& formula_of_fragment_lost);
   int _identify_fragment_being_removed(Molecule& m, const atom_number_t a0,
                                        const int* to_remove,
-                                       IWString& smiles_of_fragment_lost) const;
+                                       IWString& smiles_of_fragment_lost,
+                                       MolecularFormula<uint32_t>& formula_of_fragment_lost) const;
   int _identify_non_ring_single_bonds(Molecule& m, int* process_these_pairs) const;
   int _try_bond_breaking_across(const Molecule& m, const atom_number_t a0,
                                 const atom_number_t a1, const int* to_remove,
@@ -855,6 +878,11 @@ SubstituentIdentification::_default_values() {
 
   _min_examples_needed_for_addition = 1;
 
+  // Negative number means not specified.
+  _max_formula_difference = -1;
+
+  _suppressed_for_max_formula_differece = 0;
+
   _write_fragments_added = 0;
 
   _break_molecule_at_first_two_matched_atoms = 0;
@@ -910,8 +938,8 @@ Once that database is built, new molecules can be generated by looking up atomic
 substituents that have been found in the same context.
  -d <dbname>   Berkeley database for substituent data
  -R <bonds>    radius for circular fingerprint from attachment point
- -m <natoms>   min number of atoms in a substituent
- -M <natoms>   max number of atoms in a substituent
+ -m <natoms>   min number of atoms in a substituent (during building and addition)
+ -M <natoms>   max number of atoms in a substituent (during building and addition)
  -B            flag to enable building
  -w <natoms>   during building, min number of atoms left after removing substituent
  -e <max>      during building, concatenate as many as <max> names of exemplar molecules (generate large db)
@@ -1219,7 +1247,8 @@ SubstituentIdentification::_initialise_msta(Molecule& m, int* number,
 int
 SubstituentIdentification::_identify_fragment_being_removed(
     Molecule& m, const atom_number_t attachment_point, const int* to_remove,
-    IWString& smiles_of_fragment_lost) const {
+    IWString& smiles_of_fragment_lost,
+    MolecularFormula<uint32_t>& formula_of_fragment_lost) const {
   if (_apply_atom_map_labels) {
     m.set_atom_map_number(attachment_point, 1);
   } else {
@@ -1228,6 +1257,10 @@ SubstituentIdentification::_identify_fragment_being_removed(
 
   Molecule being_discarded;
   m.create_subset(being_discarded, to_remove, 1);
+
+  if (_max_formula_difference >= 0) {
+    formula_of_fragment_lost.Build(being_discarded);
+  }
 
   smiles_of_fragment_lost = being_discarded.unique_smiles();
 
@@ -1245,8 +1278,9 @@ SubstituentIdentification::_identify_fragment_being_removed(
 atom_number_t
 SubstituentIdentification::_do_break_across_first_two_matched_atoms(
     Molecule& m, atom_number_t a0, atom_number_t a1,
-    Molecule_Specific_Temporary_Arrays& msta, IWString& smiles_of_fragment_lost) {
-  if (!m.are_bonded(a0, a1)) {
+    Molecule_Specific_Temporary_Arrays& msta, IWString& smiles_of_fragment_lost,
+    MolecularFormula<uint32_t>& formula_of_fragment_lost) {
+  if (!m.are_bonded(a0, a1)) [[unlikely]] {
     cerr << "SubstituentIdentification::_do_break_across_first_two_matched_"
             "atoms:atoms not bonded\n";
     return kInvalidAtomNumber;
@@ -1271,13 +1305,16 @@ SubstituentIdentification::_do_break_across_first_two_matched_atoms(
     if (_write_fragments_added) {  
       smiles_of_fragment_lost = m.atomic_symbol(a1);
     }
+    if (_max_formula_difference >= 0) {
+      formula_of_fragment_lost.Add(m.atomic_number(a1));
+    }
     m.remove_atom(a1);
     return a0;
   }
 
   // cerr << "Found " << atoms_being_removed << " atoms to be removed\n";
 
-  if (0 == atoms_being_removed) {  // should not happen
+  if (0 == atoms_being_removed) [[unlikely]] {  // should not happen
     return kInvalidAtomNumber;
   }
 
@@ -1294,7 +1331,7 @@ SubstituentIdentification::_do_break_across_first_two_matched_atoms(
 
   // Do we need to capture the unique smiles of what is discarded?
   if (_write_fragments_added) {  
-    _identify_fragment_being_removed(m, a1, to_remove, smiles_of_fragment_lost);
+    _identify_fragment_being_removed(m, a1, to_remove, smiles_of_fragment_lost, formula_of_fragment_lost);
   }
 
   m.remove_atoms(to_remove);
@@ -1377,14 +1414,15 @@ SubstituentIdentification::_try_bond_breaking_across(
   const int delta =
       std::count_if(to_remove, to_remove + a1, [](const int x) { return 1 == x; });
 
-  if (_write_fragments_added) {  // we need to capture the unique smiles of what is
-                                 // discarded
-    _identify_fragment_being_removed(mcopy, a0, to_remove, smiles_of_fragment_lost);
+  MolecularFormula<uint32_t> formula_of_fragment_lost;
+  if (_write_fragments_added) {
+    _identify_fragment_being_removed(mcopy, a0, to_remove, smiles_of_fragment_lost, formula_of_fragment_lost);
   }
 
   mcopy.remove_atoms(to_remove);
 
   return _look_for_new_substituents(mcopy, a1 - delta, smiles_of_fragment_lost,
+                                    formula_of_fragment_lost,
                                     smiles_already_found, msta, output);
 }
 
@@ -1559,7 +1597,7 @@ SubstituentIdentification::_look_for_new_substituents(Molecule& m,
     return 1;
   }
 
-  // cerr << "Looking for new substituents to " << m.smiles() << '\n';
+  cerr << "Looking for new substituents to " << m.smiles() << '\n';
 
   std::unique_ptr<int[]> numbers = std::make_unique<int[]>(matoms);
 
@@ -1580,13 +1618,14 @@ SubstituentIdentification::_look_for_new_substituents(Molecule& m,
   // non ring single bonds and atoms with Hydrogen atoms
   if (_default_new_molecule_starting_points) {
     IWString smiles_of_fragment_lost("H");
+    MolecularFormula<uint32_t> formula_of_fragment_lost;
 
     for (int i = 0; i < matoms; ++i) {
       if (0 == m.hcount(i)) {
         continue;
       }
 
-      _look_for_new_substituents(m, i, lookup_data, msta, output);
+      _look_for_new_substituents(m, i, lookup_data, msta, formula_of_fragment_lost, output);
       queries_hitting_this_molecule++;
     }
 
@@ -1636,13 +1675,14 @@ SubstituentIdentification::_look_for_new_substituents(Molecule& m,
         for (const Set_of_Atoms* e : sresults.embeddings()) {
           cerr << "Matched atoms " << *e << '\n';
 
-          if (e->number_elements() < 2) {  // should never happen
+          if (e->number_elements() < 2) [[unlikely]] {  // should never happen
             continue;
           }
 
           Molecule mcopy(m);
+          MolecularFormula<uint32_t> formula_of_fragment_lost;
           const atom_number_t attachment_point = _do_break_across_first_two_matched_atoms(
-              mcopy, e->item(0), e->item(1), msta, lookup_data.smiles_of_fragment_lost());
+              mcopy, e->item(0), e->item(1), msta, lookup_data.smiles_of_fragment_lost(), formula_of_fragment_lost);
           cerr << m.name() << ' ' << " atoms " << e->item(0) << " and " << e->item(1) << " attachment_point " << attachment_point << '\n';
           if (kInvalidAtomNumber == attachment_point) {
             continue;
@@ -1652,7 +1692,7 @@ SubstituentIdentification::_look_for_new_substituents(Molecule& m,
           //        << " atom " << attachment_point << " type " <<
           //        mcopy.smarts_equivalent_for_atom(attachment_point) << '\n';
 
-          _look_for_new_substituents(mcopy, attachment_point, lookup_data, msta, output);
+          _look_for_new_substituents(mcopy, attachment_point, lookup_data, msta, formula_of_fragment_lost, output);
           if (lookup_data.molecules_formed_from_current_molecule() >
               _max_molecules_per_input_molecule) {
             break;
@@ -1660,6 +1700,7 @@ SubstituentIdentification::_look_for_new_substituents(Molecule& m,
         }
       } else {
         lookup_data.smiles_of_fragment_lost() = "H";
+        MolecularFormula<uint32_t> formula_of_fragment_lost;
         for (const Set_of_Atoms* e : sresults.embeddings()) {
           const int nprocess = _get_matched_atoms_to_process(e);
 
@@ -1675,7 +1716,7 @@ SubstituentIdentification::_look_for_new_substituents(Molecule& m,
               continue;
             }
 
-            _look_for_new_substituents(m, k, lookup_data, msta, output);
+            _look_for_new_substituents(m, k, lookup_data, msta, formula_of_fragment_lost, output);
           }
         }
 
@@ -1707,13 +1748,14 @@ SubstituentIdentification::_look_for_new_substituents(Molecule& m,
 int
 SubstituentIdentification::_look_for_new_substituents(
     Molecule& m, atom_number_t zatom, const IWString& smiles_of_fragment_lost,
+    const MolecularFormula<uint32_t>& formula_of_fragment_lost,
     IW_STL_Hash_Set& smiles_already_found, Molecule_Specific_Temporary_Arrays& msta,
     IWString_and_File_Descriptor& output) {
   std::unique_ptr<uint32_t[]> b = std::make_unique<uint32_t[]>(_shell_radius + 1);
 
   auto max_shell_radius_formed = _compute_environment01(m, zatom, _shell_radius, b.get(), msta);
 
-#define ECHO_BITS_FORMED
+//#define ECHO_BITS_FORMED
 #ifdef ECHO_BITS_FORMED
   cerr << "Looking for additions to " << m.smiles() << " atom " << zatom << ' '
        << m.smarts_equivalent_for_atom(zatom) << " bits";
@@ -1731,6 +1773,7 @@ SubstituentIdentification::_look_for_new_substituents(
     DBKey dbkey{r, b[r]};
 
     const int tmp = _look_for_new_substituents(m, zatom, smiles_of_fragment_lost,
+                                               formula_of_fragment_lost,
                                                smiles_already_found, dbkey,
                                                new_molecules_produced, output);
 
@@ -1761,6 +1804,7 @@ SubstituentIdentification::_look_for_new_substituents(
     Molecule& m, atom_number_t zatom, 
     UsedDuringLookups& lookup_data,
     Molecule_Specific_Temporary_Arrays& msta,
+    const MolecularFormula<uint32_t>& formula_of_fragment_lost,
     IWString_and_File_Descriptor& output) {
   std::unique_ptr<uint32_t[]> b = std::make_unique<uint32_t[]>(_shell_radius + 1);
 
@@ -1781,7 +1825,7 @@ SubstituentIdentification::_look_for_new_substituents(
     cerr << "Looking at radius " << r << '\n';
     DBKey dbkey{r, b[r]};
 
-    if (! _look_for_new_substituents(m, zatom, lookup_data, dbkey, output)) {
+    if (! _look_for_new_substituents(m, zatom, lookup_data, dbkey, formula_of_fragment_lost, output)) {
       continue;
     }
 
@@ -1804,6 +1848,7 @@ SubstituentIdentification::_look_for_new_substituents(
 int
 SubstituentIdentification::_look_for_new_substituents(
     Molecule& m, atom_number_t zatom, const IWString& smiles_of_fragment_lost,
+    const MolecularFormula<uint32_t>& formula_of_fragment_lost,
     IW_STL_Hash_Set& smiles_already_found, struct DBKey& dbkey,
     uint32_t& new_molecules_produced, IWString_and_File_Descriptor& output) {
   Dbt zkey{(void*)(&dbkey), sizeof(dbkey)};
@@ -1815,6 +1860,7 @@ SubstituentIdentification::_look_for_new_substituents(
 
   if (0 == _ndb) {
     return _look_for_new_substituents_db(m, zatom, smiles_of_fragment_lost,
+                                         formula_of_fragment_lost,
                                          smiles_already_found, dbkey, _db, zkey,
                                          already_processed, output);
   }
@@ -1822,6 +1868,7 @@ SubstituentIdentification::_look_for_new_substituents(
   int rc = 0;
   for (int i = 0; i < _ndb; ++i) {
     int tmp = _look_for_new_substituents_db(m, zatom, smiles_of_fragment_lost,
+                                            formula_of_fragment_lost,
                                             smiles_already_found, dbkey, *(_dbs[i]), zkey,
                                             already_processed, output);
 
@@ -1845,6 +1892,7 @@ SubstituentIdentification::_look_for_new_substituents(
     Molecule& m, atom_number_t zatom, 
     UsedDuringLookups& lookup_data,
     struct DBKey& dbkey,
+    const MolecularFormula<uint32_t>& formula_of_fragment_lost,
     IWString_and_File_Descriptor& output) {
   Dbt zkey{(void*)(&dbkey), sizeof(dbkey)};
 
@@ -1856,13 +1904,13 @@ SubstituentIdentification::_look_for_new_substituents(
 
   cerr << "LINE " << __LINE__ << '\n';
   if (0 == _ndb) {
-    return _look_for_new_substituents_db(m, zatom, lookup_data,
+    return _look_for_new_substituents_db(m, zatom, lookup_data, formula_of_fragment_lost,
                                          dbkey, _db, zkey, output);
   }
 
   int rc = 0;
   for (int i = 0; i < _ndb; ++i) {
-    int tmp = _look_for_new_substituents_db(m, zatom, lookup_data, dbkey,
+    int tmp = _look_for_new_substituents_db(m, zatom, lookup_data, formula_of_fragment_lost, dbkey, 
                                             *(_dbs[i]), zkey, output);
     if (tmp == 0) {
       continue;
@@ -1881,6 +1929,7 @@ SubstituentIdentification::_look_for_new_substituents(
 int
 SubstituentIdentification::_look_for_new_substituents_db(
     Molecule& m, atom_number_t zatom, const IWString& smiles_of_fragment_lost,
+    const MolecularFormula<uint32_t>& formula_of_fragment_lost,
     IW_STL_Hash_Set& smiles_already_found, const struct DBKey& rad_and_bit, Db& db,
     Dbt& dbkey, IW_STL_Hash_Set& already_processed, IWString_and_File_Descriptor& output) {
   Dbt zdata;
@@ -1890,7 +1939,7 @@ SubstituentIdentification::_look_for_new_substituents_db(
     return 0;
   }
 
-  // cerr << "Found bit in database\n";
+  cerr << "Found bit in database\n";
 
   const_IWSubstring fromdb(reinterpret_cast<const char*>(zdata.get_data()), zdata.get_size());
 
@@ -1899,7 +1948,7 @@ SubstituentIdentification::_look_for_new_substituents_db(
     substituent_identification::Replacements proto;
     proto.ParseFromString(sv);
 
-    return FormNewMolecules(m, zatom, smiles_of_fragment_lost, smiles_already_found,
+    return FormNewMolecules(m, zatom, smiles_of_fragment_lost, formula_of_fragment_lost, smiles_already_found,
                         rad_and_bit, proto, already_processed, output);
   }
 
@@ -1912,6 +1961,7 @@ int
 SubstituentIdentification::_look_for_new_substituents_db(
     Molecule& m, atom_number_t zatom,
     UsedDuringLookups& lookup_data, 
+    const MolecularFormula<uint32_t>& formula_of_fragment_lost,
     const struct DBKey& rad_and_bit, Db& db,
     Dbt& dbkey, IWString_and_File_Descriptor& output) {
   assert(_store_protos);
@@ -1929,8 +1979,9 @@ SubstituentIdentification::_look_for_new_substituents_db(
     cerr << "SubstituentIdentification::_look_for_new_substituents_db:invalid proto data\n";
     return 0;
   }
+  cerr << "Built proto from database contents\n";
 
-  return FormNewMolecules(m, zatom, rad_and_bit, lookup_data, proto, output);
+  return FormNewMolecules(m, zatom, rad_and_bit, lookup_data, formula_of_fragment_lost, proto, output);
 }
 
 /*
@@ -1965,6 +2016,7 @@ SubstituentIdentification::_form_new_molecules(Molecule& m, atom_number_t zatom,
 int
 SubstituentIdentification::FormNewMolecules(Molecule& m, atom_number_t zatom,
                                                const IWString& smiles_of_fragment_lost,
+                                               const MolecularFormula<uint32_t>& formula_of_fragment_lost,
                                                IW_STL_Hash_Set& smiles_already_found,
                                                const struct DBKey& rad_and_bit,
                                                const substituent_identification::Replacements& proto,
@@ -1981,7 +2033,7 @@ SubstituentIdentification::FormNewMolecules(Molecule& m, atom_number_t zatom,
     }
     // Check for size of product here? Complicated by possible loss of atoms...
     // TODO:ianwatson figure this out
-    rc += FormNewMolecule(m, zatom, smiles_of_fragment_lost, smiles_already_found,
+    rc += FormNewMolecule(m, zatom, smiles_of_fragment_lost, formula_of_fragment_lost, smiles_already_found,
                 rad_and_bit, replacement, already_processed, output);
     if (rc > _max_molecules_per_input_molecule) {
       return rc;
@@ -1995,9 +2047,11 @@ int
 SubstituentIdentification::FormNewMolecules(Molecule& m, atom_number_t zatom,
                                             const struct DBKey& rad_and_bit,
                                             UsedDuringLookups& lookup_data,
+                                            const MolecularFormula<uint32_t>& formula_of_fragment_lost,
                                             const substituent_identification::Replacements& proto,
                                             IWString_and_File_Descriptor& output) {
   int rc = 0;
+  cerr << "Replacement has " << proto.replacement_size() << " replacements\n";
   for (const substituent_identification::Replacement& replacement: proto.replacement()) {
     if (replacement.n() < _min_examples_needed_for_addition) {
       continue;
@@ -2008,7 +2062,7 @@ SubstituentIdentification::FormNewMolecules(Molecule& m, atom_number_t zatom,
     }
     // Check for size of product here? Complicated by possible loss of atoms...
     // TODO:ianwatson figure this out, I think it is OK to check here...
-    rc += FormNewMolecule(m, zatom, rad_and_bit, lookup_data, replacement, output);
+    rc += FormNewMolecule(m, zatom, rad_and_bit, lookup_data, formula_of_fragment_lost, replacement, output);
     if (lookup_data.molecules_formed_from_current_molecule() > _max_molecules_per_input_molecule) {
       return rc;
     }
@@ -2063,11 +2117,13 @@ IssueInvalidValenceWarning(Molecule& m, Molecule& frag, std::ostream& output) {
 int
 SubstituentIdentification::FormNewMolecule(Molecule& m, atom_number_t zatom,
                                                const IWString& smiles_of_fragment_lost,
+                                               const MolecularFormula<uint32_t>& formula_of_fragment_lost,
                                                IW_STL_Hash_Set& smiles_already_found,
                                                const struct DBKey& rad_and_bit,
                                                const substituent_identification::Replacement& proto,
                                                IW_STL_Hash_Set& already_processed,
                                                IWString_and_File_Descriptor& output) {
+  cerr << "Fragment is " << proto.smiles() << '\n';
   const_IWSubstring smiles(proto.smiles());
   bond_type_t bt;
   if (! MaybeRemoveTrailingBondOkH(m, zatom, smiles, bt)) {
@@ -2103,10 +2159,18 @@ SubstituentIdentification::FormNewMolecule(Molecule& m, atom_number_t zatom,
 
   const int initial_matoms = m.natoms();
 
-  // cerr << "Fragment contains " << frag.natoms() << " atoms\n";
+  cerr << "Fragment contains " << frag.natoms() << " atoms, _max_formula_difference " << _max_formula_difference << '\n';
   if (initial_matoms + frag.natoms() > _max_atoms_in_product) {
     return 0;
   }
+
+#ifdef CHECK_FORMULA
+  if (_max_formula_difference >= 0) {
+    if (! OkFormulaDifference(formula_of_fragment_lost, frag)) {
+      return 0;
+    }
+  }
+#endif
 
   const atom_number_t fragment_attachment_point = frag.atom_with_isotope(1);
   if (INVALID_ATOM_NUMBER == fragment_attachment_point) {
@@ -2162,6 +2226,22 @@ SubstituentIdentification::FormNewMolecule(Molecule& m, atom_number_t zatom,
 }
 
 int
+SubstituentIdentification::OkFormulaDifference(const MolecularFormula<uint32_t>& formula_of_fragment_lost,
+                 Molecule& frag) {
+  MolecularFormula<uint32_t> rhs;
+  rhs.Build(frag);
+  
+  cerr << "Diff " << rhs.Diff(formula_of_fragment_lost) << '\n';
+  if (rhs.Diff(formula_of_fragment_lost) <= _max_formula_difference) {
+    return 1;
+  }
+
+  ++_suppressed_for_max_formula_differece;
+
+  return 0;
+}
+
+int
 SubstituentIdentification::WriteTextProto(Molecule& m,
                 const substituent_identification::Replacement& proto,
                 Molecule& frag,
@@ -2204,6 +2284,7 @@ int
 SubstituentIdentification::FormNewMolecule(Molecule& m, atom_number_t zatom,
                                                const struct DBKey& rad_and_bit,
                                                UsedDuringLookups& lookup_data,
+                                               const MolecularFormula<uint32_t>& formula_of_fragment_lost,
                                                const substituent_identification::Replacement& proto,
                                                IWString_and_File_Descriptor& output) {
   const_IWSubstring smiles(proto.smiles());
@@ -2244,10 +2325,20 @@ SubstituentIdentification::FormNewMolecule(Molecule& m, atom_number_t zatom,
     return 0;
   }
 
+  if (_max_formula_difference >= 0) {
+    if (! OkFormulaDifference(formula_of_fragment_lost, frag)) {
+      return 0;
+    }
+  }
+
   const atom_number_t fragment_attachment_point = frag.atom_with_isotope(1);
   if (INVALID_ATOM_NUMBER == fragment_attachment_point) {
     cerr << "SubstituentIdentification::FormNewMolecule:no isotopic atom in "
             "stored fragment '" << smiles << '\n';
+    return 0;
+  }
+
+  if (! OkAdjacentAtoms(m, zatom, frag, fragment_attachment_point)) {
     return 0;
   }
 
@@ -2587,6 +2678,10 @@ SubstituentIdentification::_form_new_molecule(Molecule& m, atom_number_t zatom,
     return 0;
   }
 
+  if (! OkAdjacentAtoms(m, zatom, f, fragment_attachment_point)) {
+    return 0;
+  }
+
   if (_min_examples_needed_for_addition > 1 && !_enough_examples(buffer)) {
     return 0;
   }
@@ -2666,6 +2761,19 @@ SubstituentIdentification::_form_new_molecule(Molecule& m, atom_number_t zatom,
   m.set_isotope(zatom, 0);
 
   return 1;
+}
+
+int
+SubstituentIdentification::OkAdjacentAtoms(const Molecule& m1, atom_number_t a1, 
+                                           const Molecule& m2, atom_number_t a2) const {
+  atomic_number_t z1 = m1.atomic_number(a1);
+  atomic_number_t z2 = m2.atomic_number(a2);
+
+  if (z1 == 6 || z2 == 6) {
+    return 1;
+  }
+
+  return 0;
 }
 
 /*
@@ -3617,6 +3725,15 @@ SubstituentIdentification::operator()(int argc, char** argv) {
         if (_verbose) {
           cerr << "Will write product smiles and textproto\n";
         }
+      } else if (y.starts_with("mfdiff=")) {
+        y.remove_leading_chars(7);
+        if (! y.numeric_value(_max_formula_difference) || _max_formula_difference < 0) {
+          cerr << "The maximum formula difference directive 'mfdiff=' must be a whole non negative number\n";
+          return 0;
+        }
+        if (_verbose) {
+          cerr << "Maximum formula difference for replacement fragments " << _max_formula_difference << '\n';
+        }
       } else if (y == "help") {
         DisplayDashYOptions(cerr);
       } else {
@@ -3828,6 +3945,10 @@ SubstituentIdentification::operator()(int argc, char** argv) {
       }
       _do_build_database_report(cerr);
       cerr << "Stored " << _keys_stored << " bits, " << _pairs_stored << " pairs\n";
+    }
+
+    if (_max_formula_difference >= 0) {
+      cerr << _suppressed_for_max_formula_differece << " products suppressed for formula difference\n";
     }
   }
 

@@ -856,7 +856,7 @@ Fragments_At_Recursion_Depth::initialise (int k, int b)
 
   _fragments = new uint64_t[k1 * b1];
 
-  set_vector(_fragments, k1 * b1, static_cast<uint64_t>(0));
+  std::fill_n(_fragments, k1 * b1, static_cast<uint64_t>(0));
 
   _fragments[0] = 1;         // for the recurrence relation, need to initialise something
 
@@ -6627,7 +6627,7 @@ atoms_on_side_of_bond_satisfy_min_frag_size(const Molecule & m,
 
   int matoms = m.natoms();
 
-  set_vector(tmp, matoms, 0);
+  std::fill_n(tmp, matoms, 0);
 
   tmp[b1] = 2;
   tmp[b2] = 3;          // special flag for this atom

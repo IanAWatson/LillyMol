@@ -129,7 +129,7 @@ determine_atom_class (Molecule &m, int atom_class[],
 {
   int n_atoms = m.natoms();
 
-  set_vector (atom_class, n_atoms, UNUSED_ATOM_CLASS);
+  std::fill_n (atom_class, n_atoms, UNUSED_ATOM_CLASS);
 
   for (int i=0; i<n_atoms; i++)
     {
@@ -248,7 +248,7 @@ determine_atom_intrinsic_state_index (Molecule &m, int a_index[],
 {
   int n_atoms = m.natoms();
 
-  set_vector (a_index, n_atoms, UNDEFINED_ATOM_ATTRIBUTE_INDEX);
+  std::fill_n (a_index, n_atoms, UNDEFINED_ATOM_ATTRIBUTE_INDEX);
 
   for (int i=0; i<n_atoms; i++)
   {

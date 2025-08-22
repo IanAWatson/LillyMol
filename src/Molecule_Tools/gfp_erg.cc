@@ -7,6 +7,7 @@
 #include <assert.h>
 #include <stdlib.h>
 
+#include <algorithm>
 #include <iostream>
 #include <memory>
 
@@ -633,7 +634,7 @@ aromatic_rings_to_ar_aliphatic_rings_to_al(Molecule& m, const int* ring_membersh
   bond_type_t* bond_between_ring = new bond_type_t[nr * nr];
   std::unique_ptr<bond_type_t[]> free_bond_between_ring(bond_between_ring);
 
-  set_vector(bond_between_ring, nr * nr,
+  std::fill_n(bond_between_ring, nr * nr,
              static_cast<bond_type_t>(
                  NOT_A_BOND));  // we'll use INVALID_BOND_TYPE for spiro fusions
 
@@ -649,7 +650,7 @@ aromatic_rings_to_ar_aliphatic_rings_to_al(Molecule& m, const int* ring_membersh
 
     assert(i == ri->ring_number());
 
-    set_vector(tmp, matoms, 0);
+    std::fill_n(tmp, matoms, 0);
 
     ri->set_vector(tmp, 1);
 

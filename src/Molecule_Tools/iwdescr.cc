@@ -3492,7 +3492,7 @@ do_compute_distances_from_longest_path_descriptors(Molecule & m,
 
   int matoms = m.natoms();
   
-  set_vector(in_path, matoms, 0);
+  std::fill_n(in_path, matoms, 0);
   in_path[a2] = 1;
 
   int * shortest_distance_from_longest_path = new_int(matoms, matoms); std::unique_ptr<int[]> free_sdlp(shortest_distance_from_longest_path);
@@ -4497,7 +4497,7 @@ compute_ring_descriptors(Molecule & m,
   int matoms = m.natoms();
 
   int nrings[MAX_RING_SIZE];
-  set_vector(nrings, MAX_RING_SIZE, 0);
+  std::fill_n(nrings, MAX_RING_SIZE, 0);
 
   int rings_in_largest_system = 1;
   int atoms_in_largest_system = 0;
@@ -4592,7 +4592,7 @@ compute_ring_descriptors(Molecule & m,
 
     if (ri->is_fused())
     {
-      set_vector(atom_already_done, matoms, 0);
+      std::fill_n(atom_already_done, matoms, 0);
 
       ri->set_vector(atom_already_done, 1);
 
@@ -6715,7 +6715,7 @@ strongly_fused(const Ring & r1,
                int * tmp)
 {
 
-  set_vector(tmp, matoms, 0);
+  std::fill_n(tmp, matoms, 0);
   r1.set_vector(tmp, 1);
   r2.increment_vector(tmp);
 
@@ -6830,7 +6830,7 @@ compute_planar_fused_rings(Molecule & m,
 
     int planar_system_size = grow_fused_system(m, i, ring_already_done, flag, atmp, 0);
 
-    set_vector(atmp, matoms, 0);
+    std::fill_n(atmp, matoms, 0);
     ri->set_vector(atmp, 1);
 
     number_planar_fused_systems_found++;
@@ -6951,7 +6951,7 @@ compute_non_planar_fused_rings(Molecule & m,
     if (strongly_fused_size > largest_strongly_fused_system_size)
       largest_strongly_fused_system_size = strongly_fused_size;
 
-    set_vector(atmp, matoms, 0);
+    std::fill_n(atmp, matoms, 0);
 
     for (int j = 0; j < nr; j++)
     {
@@ -7002,7 +7002,7 @@ compute_fused_rings(Molecule & m,
 
   (void) compute_non_planar_fused_rings(m, z, rtmp, atmp);
 
-  set_vector(rtmp, nr, 0);
+  std::fill_n(rtmp, nr, 0);
 
   return compute_planar_fused_rings(m, z, rtmp, atmp);
 }
@@ -7344,7 +7344,7 @@ compute_topological_descriptors(Molecule & m,
 // We count the number of atoms with a given connectivity
 
   int connected[6];
-  set_vector(connected, 6, 0);
+  std::fill_n(connected, 6, 0);
 
   int total_connectivity = 0;
   int total_aliphatic_connectivity = 0;
@@ -7668,7 +7668,7 @@ compute_topological_descriptors(Molecule & m,
   // Harder to individualise, TODO...
   compute_radha_entropy_descriptors(m, ncon, ring_membership, atom);
 
-  set_vector(already_done, matoms, 0);
+  std::fill_n(already_done, matoms, 0);
 
   if (descriptors_to_compute.specific_groups) {
     compute_amine_count(m, atom, z, ncon, ring_membership, already_done);

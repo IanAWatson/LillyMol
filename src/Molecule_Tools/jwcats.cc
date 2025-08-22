@@ -8,6 +8,7 @@
 #include <stdlib.h>
 #include <time.h>
 
+#include <algorithm>
 #include <iostream>
 #include <memory>
 
@@ -280,16 +281,16 @@ jw_cat_search(Molecule& m, IWString_and_File_Descriptor& output, int donor_accep
               int** properties, double scaled_counts[])
 {
   int property_count[5];
-  set_vector(property_count, 5, 0);
+  std::fill_n(property_count, 5, 0);
 
   const int n_atoms = m.natoms();
 
   // initialize vectors
   for (int i = 0; i < 5; i++) {
-    set_vector(properties[i], n_atoms, 0);
+    std::fill_n(properties[i], n_atoms, 0);
   }
 
-  set_vector(scaled_counts, array_size, 0.0);
+  std::fill_n(scaled_counts, array_size, 0.0);
 
   if (donor_acceptor_assigner.active()) {
     donor_acceptor_assigner.process(m, donor_acceptor);

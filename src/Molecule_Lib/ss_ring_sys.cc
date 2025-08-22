@@ -1058,7 +1058,7 @@ Substructure_Ring_System_Specification::_match_distance_to_another_ring(
           continue;
         }
 
-        set_vector(already_done, matoms, 0);
+        std::fill_n(already_done, matoms, 0);
 
         already_done[i] = 1;
 

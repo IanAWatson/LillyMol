@@ -83,7 +83,7 @@ class Molecule_Specific_Temporary_Arrays {
 
   void
   set_processing_status(int s) {
-    set_vector(_processing_status, _matoms, s);
+    std::fill_n(_processing_status, _matoms, s);
   }
 
   int* to_remove();

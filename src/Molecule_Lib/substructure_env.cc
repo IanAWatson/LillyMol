@@ -3,6 +3,8 @@
 */
 
 #include <stdlib.h>
+
+#include <algorithm>
 #include <iostream>
 #include <limits>
 #include <memory>
@@ -713,7 +715,7 @@ Single_Substructure_Query::_query_environment_also_matched(Query_Atoms_Matched &
 
   if (nr) {   // either no environment matches, or we matched the environment
     if (ne) {                                 // if already used, reset to 0
-      set_vector(env_already_done, nr, 0);
+      std::fill_n(env_already_done, nr, 0);
     }
 
     if (_environment_rejections_matched(atoms_in_target_molecule, previously_matched,

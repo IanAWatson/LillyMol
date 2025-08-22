@@ -3802,8 +3802,8 @@ RXN_File::create_reaction(IWReaction &rxn,
   _initial_bond_type = new bond_type_t[t];
   _final_bond_type = new bond_type_t[t];
 
-  set_vector(_initial_bond_type, t, static_cast<bond_type_t>(INVALID_BOND_TYPE));
-  set_vector(_final_bond_type, t, static_cast<bond_type_t>(INVALID_BOND_TYPE));
+  std::fill_n(_initial_bond_type, t, static_cast<bond_type_t>(INVALID_BOND_TYPE));
+  std::fill_n(_final_bond_type, t, static_cast<bond_type_t>(INVALID_BOND_TYPE));
 
   // cerr << "RXN_File::create_reaction:input has " << _nr << " reagents and " << _np << "
   // products\n";

@@ -457,7 +457,7 @@ Molecule::_determine_either_side_of_bond (atom_number_t a1,
   cerr << "_determine_either_side_of_bond with atoms " << a1 << " and " << a2 << '\n';
 #endif
 
-  set_vector(either_side, _number_elements, -9);
+  std::fill_n(either_side, _number_elements, -9);
 
   identify_side_of_bond(either_side, a1, -1, a2);
 

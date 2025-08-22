@@ -3,6 +3,8 @@
 */
 
 #include <stdlib.h>
+
+#include <algorithm>
 #include <iostream>
 #include <limits>
 #include <memory>
@@ -82,7 +84,7 @@ fill_array_with_bit_values(const const_IWSubstring & buffer,
                            int & i,
                            int * numeric_value)
 {
-  set_vector(numeric_value, nbits, 0);
+  std::fill_n(numeric_value, nbits, 0);
 
   const_IWSubstring token;
 

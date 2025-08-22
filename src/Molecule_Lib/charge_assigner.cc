@@ -2,6 +2,7 @@
 
 #include <stdlib.h>
 
+#include <algorithm>
 #include <filesystem>
 #include <iostream>
 #include <memory>
@@ -721,7 +722,7 @@ advance_shell(const Molecule& m, int* tmp, int flag) {
 
 static atom_number_t
 identify_survivor(Molecule& m, atom_number_t a1, atom_number_t a2, int* tmp) {
-  set_vector(tmp, m.natoms(), 0);
+  std::fill_n(tmp, m.natoms(), 0);
 
   tmp[a1] = 1;  // some non overlapping bits
   tmp[a2] = 8;
@@ -804,7 +805,7 @@ Charge_Assigner::_identify_charged_atoms_too_close(Molecule& m, const Set_of_Ato
     return 0;
   }
 
-  set_vector(times_too_close, m.natoms(), 0);
+  std::fill_n(times_too_close, m.natoms(), 0);
 
   too_close.increment_vector(times_too_close);
 
@@ -1239,7 +1240,7 @@ Charge_Assigner::_process(Molecule& m, resizable_array_p<Molecule>& charged_form
 
   formal_charge_t* charges_assigned = new formal_charge_t[matoms];
   std::unique_ptr<formal_charge_t[]> free_charges_assigned(charges_assigned);
-  set_vector(charges_assigned, matoms, static_cast<formal_charge_t>(0));
+  std::fill_n(charges_assigned, matoms, static_cast<formal_charge_t>(0));
 
   Set_of_Atoms negative_charges_assigned, positive_charges_assigned;
 
@@ -1278,7 +1279,7 @@ Charge_Assigner::_process(Molecule& m, resizable_array_p<Molecule>& charged_form
   int n = set_of_positive_charges.number_elements();
 
   for (int i = 0; i < n; i++) {
-    set_vector(charges_assigned, matoms, static_cast<formal_charge_t>(0));
+    std::fill_n(charges_assigned, matoms, static_cast<formal_charge_t>(0));
 
     const Set_of_Atoms* p = set_of_positive_charges[i];
 

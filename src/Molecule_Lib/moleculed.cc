@@ -1,3 +1,4 @@
+#include <algorithm>
 #include <iostream>
 #include <iomanip>
 #include <memory>
@@ -331,7 +332,7 @@ Molecule::_compute_distance_matrix()
 {
   int nb = _bond_list.number_elements();
 
-  set_vector(_distance_matrix, _number_elements * _number_elements, _number_elements + _number_elements);
+  std::fill_n(_distance_matrix, _number_elements * _number_elements, _number_elements + _number_elements);
 
   const Bond * const * allbonds = _bond_list.rawdata();
 
@@ -439,7 +440,7 @@ Molecule::_compute_distance_matrix()
 {
   const int distance_not_set = _number_elements + _number_elements;
 
-  set_vector(_distance_matrix, _number_elements * _number_elements, distance_not_set);
+  std::fill_n(_distance_matrix, _number_elements * _number_elements, distance_not_set);
 
   int maxcon = 0;
 
@@ -544,7 +545,7 @@ Molecule::_compute_distance_matrix()
 {
   const int distance_not_set = _number_elements + _number_elements;
 
-  set_vector(_distance_matrix, _number_elements * _number_elements, distance_not_set);
+  std::fill_n(_distance_matrix, _number_elements * _number_elements, distance_not_set);
 
   int maxcon = 0;
 
@@ -1004,17 +1005,17 @@ Molecule::_recompute_distance_matrix (int (Molecule::*identify_first_atom) (cons
   if (nullptr == _smiles_order)
     _smiles_order = new_int (_number_elements, -1);
   else
-    set_vector (_smiles_order, _number_elements, -1);
+    std::fill_n (_smiles_order, _number_elements, -1);
 
   if (nullptr == _ring_membership)
     _ring_membership = new_int (_number_elements);
   else
-    set_vector (_ring_membership, _number_elements, 0);
+    std::fill_n (_ring_membership, _number_elements, 0);
 
   if (nullptr == _distance_matrix)
     _distance_matrix = new_int (_number_elements * _number_elements, _number_elements + 9);
   else
-    set_vector (_distance_matrix, _number_elements * _number_elements, _number_elements + 9);
+    std::fill_n (_distance_matrix, _number_elements * _number_elements, _number_elements + 9);
 
   CRDM_args crdm_args (_number_elements);
 
@@ -1092,7 +1093,7 @@ Molecule::recompute_distance_matrix()
   if (nullptr == _distance_matrix)
     _distance_matrix = new_int(_number_elements * _number_elements, _number_elements + 9);
   else
-    set_vector(_distance_matrix, _number_elements * _number_elements, _number_elements + 9);
+    std::fill_n(_distance_matrix, _number_elements * _number_elements, _number_elements + 9);
 
   if (1 == _number_elements)
     return 1;

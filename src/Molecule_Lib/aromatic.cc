@@ -3295,7 +3295,7 @@ Molecule::_compute_aromaticity()
   }
   else
   {
-    set_vector(_aromaticity, _number_elements, NOT_AROMATIC);
+    std::fill_n(_aromaticity, _number_elements, NOT_AROMATIC);
 
     return 1;
   }
@@ -4022,7 +4022,7 @@ Kekule_Temporary_Arrays::establish_smallest_ring_size(Molecule & m)
   assert(_nr == m.nrings());
 
   // the non ring atoms will never be changed, OK
-  set_vector(_smallest_ring_size, m.natoms(), m.natoms());
+  std::fill_n(_smallest_ring_size, m.natoms(), m.natoms());
 
   for (auto i = 0; i < _nr; ++i)
   {
@@ -5255,12 +5255,12 @@ Molecule::_kekule_arom_test_rings(Kekule_Temporary_Arrays & kta,
   aromaticity_type_t * ra = new aromaticity_type_t[nr];
   std::unique_ptr<aromaticity_type_t[]> free_ra(ra);
 
-  set_vector(ra, nr, AROMATICITY_NOT_DETERMINED);
+  std::fill_n(ra, nr, AROMATICITY_NOT_DETERMINED);
 
   aromaticity_type_t * aa = new aromaticity_type_t[_number_elements];
   std::unique_ptr<aromaticity_type_t[]> free_aa(aa);
 
-  set_vector(aa, _number_elements, AROMATICITY_NOT_DETERMINED);
+  std::fill_n(aa, _number_elements, AROMATICITY_NOT_DETERMINED);
 
   int * pi_e = kta.pi_electrons();
 
@@ -6242,7 +6242,7 @@ Molecule::_find_kekule_form_ring_system(Kekule_Temporary_Arrays & kta,
       cerr << "Doing " << (*ri) << " separately\n";
 #endif
 
-      set_vector(process_these_atoms, _number_elements, 0);
+      std::fill_n(process_these_atoms, _number_elements, 0);
 
       ri->set_vector(process_these_atoms, 1);
 
@@ -6264,7 +6264,7 @@ Molecule::_find_kekule_form_ring_system(Kekule_Temporary_Arrays & kta,
   for (int i = 0; i < nr; ++i)
   {
     const Ring * ri = rings[i];
-    set_vector(process_these_atoms, _number_elements, 0);
+    std::fill_n(process_these_atoms, _number_elements, 0);
 
     ri->set_vector(process_these_atoms, 1);
 
@@ -6315,7 +6315,7 @@ Molecule::_find_next_ring_or_ring_system(Kekule_Temporary_Arrays & kta, int flag
 {
   int * process_these_atoms = kta.process_these_atoms();
 
-  set_vector(process_these_atoms, _number_elements, 0);
+  std::fill_n(process_these_atoms, _number_elements, 0);
 
   const int * process_these_rings = kta.process_these_rings();
 
@@ -6512,7 +6512,7 @@ Molecule::_kekule_could_be_aromatic(int * process_these_atoms, int & aromatic_at
     else if (aromatic_chain_bonds_are_ok())
     {
       _convert_any_chain_aromatic_atoms_to_permanent_aromatic(process_these_atoms);
-      set_vector(process_these_atoms, _number_elements, 0);
+      std::fill_n(process_these_atoms, _number_elements, 0);
       return 1;    // that's good!
     }
     else

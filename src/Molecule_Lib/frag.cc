@@ -1396,7 +1396,7 @@ Fragment_Information::initialise(int matoms) {
       return 0;
     }
   } else {
-    set_vector(_fragment_membership, matoms, kFragmentMembershipNotSet);
+    std::fill_n(_fragment_membership, matoms, kFragmentMembershipNotSet);
   }
 
   _number_fragments = -1;

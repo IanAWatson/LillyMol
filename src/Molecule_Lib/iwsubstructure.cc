@@ -2010,7 +2010,7 @@ Single_Substructure_Query::_substructure_search(Molecule_to_Match & target_molec
 //    return results.return_code();
 
     if (0 == _embeddings_do_not_overlap)   // that is, embeddings can overlap..
-      set_vector(already_matched, target_molecule.natoms(), 0);
+      std::fill_n(already_matched, target_molecule.natoms(), 0);
   }
 
   assert (0 == _iroot);

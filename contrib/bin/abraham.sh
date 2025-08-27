@@ -17,5 +17,5 @@ fi
 
 F=${ABR_LIB}/Abraham
 P=${ABR_LIB}/Alpha2H
-exec ${LILLYMOL_HOME}/bin/Linux/abraham -E autocreate -l -F ${F} -P ${P} -g all  "$@"
+exec ${LILLYMOL_HOME}/bin/$(uname)/abraham -E autocreate -l -F ${F} -P ${P} -g all  "$@"
 

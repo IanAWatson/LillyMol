@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # Case insensitive file systems cannot differentiate 5a5A.smi from 5a5a.smi.
 # Convert all ring replacement files in the current directory to case differentiated forms.
 

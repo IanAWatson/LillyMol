@@ -3,6 +3,11 @@
 load("@com_google_protobuf//bazel:py_proto_library.bzl", "py_proto_library")
 load("@rules_proto//proto:defs.bzl", "proto_library")
 
+config_setting(
+    name = "darwin",
+    constraint_values = ["@platforms//os:osx"]
+)
+
 proto_library(
     name = "class_label_translation_proto",
     srcs = [
@@ -469,13 +474,16 @@ cc_binary(
     srcs = [
         "isolation_forest.cc",
     ],
-    copts = [
-        "-fopenmp",
-    ],
-    linkopts = [
-        "-lgomp",
-    ],
+    copts = select({
+        ":darwin": ["-Xclang", "-fopenmp"],
+        "//conditions:default": ["-fopenmp"]
+    }),
+    linkopts = select ({
+        ":darwin": ["-Xclang", "-fopenmp"],
+        "//conditions:default": ["-lgomp"]
+    }),
     deps = [
+        "@homebrew_openmp",
         "//Foundational/accumulator",
         "//Foundational/cmdline:iwcmdline",
         "//Foundational/data_source:iwstring_data_source",

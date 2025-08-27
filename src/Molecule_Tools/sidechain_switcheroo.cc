@@ -10,6 +10,7 @@
 
 #define RESIZABLE_ARRAY_IMPLEMENTATION
 
+// #include "jxy.h"
 #include "Foundational/cmdline/cmdline.h"
 #include "Foundational/iwmisc/report_progress.h"
 #include "Foundational/iwstring/absl_hash.h"
@@ -1062,6 +1063,8 @@ Main(int argc, char** argv) {
   if (verbose) {
     options.Report(cerr);
   }
+
+  // jxy();
 
   return 0;
 }

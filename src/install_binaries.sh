@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 # Copy executables from bazel-bin to another location
 # This does all executables in the repo that need to be installed.

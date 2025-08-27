@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 if [ -z "$LILLYMOL_HOME" ] || [ -z "$BUILD_DIR" ]; then 
     echo "System variables LILLYMOL_HOME and BUILD_DIR are required for running the test"

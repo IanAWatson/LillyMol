@@ -6,6 +6,11 @@ load("@com_google_protobuf//bazel:py_proto_library.bzl", "py_proto_library")
 
 load("@rules_proto//proto:defs.bzl", "proto_library")
 
+config_setting(
+    name = "darwin",
+    constraint_values = ["@platforms//os:osx"]
+)
+
 proto_library(
     name = "evidence_proto",
     srcs = [
@@ -297,14 +302,14 @@ cc_binary(
     srcs = [
         "gfp_leader_standard.cc",
     ],
-    copts = [
-        #       "-fopenmp=libiomp5",  llvm
-        "-fopenmp",
-    ],
-    linkopts = [
-        #       "-L/usr/lib/llvm-11/lib/",  # clang
-        "-lgomp",
-    ],
+    copts = select({
+        ":darwin": ["-Xclang", "-fopenmp"],
+        "//conditions:default": ["-fopenmp"]
+    }),
+    linkopts = select ({
+        ":darwin": ["-Xclang", "-fopenmp"],
+        "//conditions:default": ["-lgomp"]
+    }),
     tags = [
         "omp",
     ],
@@ -313,6 +318,7 @@ cc_binary(
         ":gfp_standard",
         "//Foundational/iw_tdt",
         "//Foundational/iwmisc",
+        "@homebrew_openmp",
     ],
 )
 
@@ -413,6 +419,7 @@ cc_binary(
         "@com_google_protobuf//:protobuf",
         "@third_party//:cppzmq",
         "@third_party//:libzmq",
+        "@homebrew_gnutls",
     ],
 )
 
@@ -487,10 +494,14 @@ cc_binary(
     srcs = [
         "gfp_spread_omp.cc",
     ],
-    copts = ["-fopenmp"],
-    linkopts = [
-        "-lgomp",
-    ],
+    copts = select({
+        ":darwin": ["-Xclang", "-fopenmp"],
+        "//conditions:default": ["-fopenmp"]
+    }),
+    linkopts = select ({
+        ":darwin": ["-Xclang", "-fopenmp"],
+        "//conditions:default": ["-lgomp"]
+    }),
     tags = [
         "omp",
     ],
@@ -501,6 +512,7 @@ cc_binary(
         "//Foundational/iw_tdt",
         "//Foundational/iwmisc",
         "//Utilities/GFP_Tools:spread",
+        "@homebrew_openmp",
     ],
 )
 
@@ -509,14 +521,14 @@ cc_binary(
     srcs = [
         "gfp_spread_standard.cc",
     ],
-    copts = [
-        #       "-fopenmp=libiomp5", llvm
-        "-fopenmp",
-    ],
-    linkopts = [
-        #       "-L/usr/lib/llvm-11/lib/",  # clang
-        "-lgomp",
-    ],
+    copts = select({
+        ":darwin": ["-Xclang", "-fopenmp"],
+        "//conditions:default": ["-fopenmp"]
+    }),
+    linkopts = select ({
+        ":darwin": ["-Xclang", "-fopenmp"],
+        "//conditions:default": ["-lgomp"]
+    }),
     tags = [
         "omp",
     ],
@@ -525,6 +537,7 @@ cc_binary(
         ":gfp_standard",
         "//Foundational/iw_tdt",
         "//Foundational/iwmisc",
+        "@homebrew_openmp",
     ],
 )
 
@@ -576,11 +589,15 @@ cc_binary(
     srcs = [
         "gfp_nearneighbours_single_file_tbb.cc",
     ],
-    copts = ["-fopenmp"],
-    linkopts = [
-        "-ldl",
-        "-lgomp",
-    ],
+
+    copts = select({
+        ":darwin": ["-Xclang", "-fopenmp"],
+        "//conditions:default": ["-fopenmp"]
+    }),
+    linkopts = select ({
+        ":darwin": ["-Xclang", "-fopenmp", "-ldl"],
+        "//conditions:default": ["-ldl", "-lgomp"]
+    }),
     tags = [
         "omp",
         "tbb",
@@ -597,6 +614,7 @@ cc_binary(
         "//Foundational/iwqsort",
         "//Utilities/GFP_Tools:gfp",
         "@onetbb//:tbb",
+        "@homebrew_openmp",
     ],
 )
 
@@ -618,14 +636,14 @@ cc_binary(
         "fp_and_smiles.cc",
         "gfp_lnearneighbours_standard.cc",
     ],
-    copts = [
-        #       "-fopenmp=libiomp5",  llvm
-        "-fopenmp",
-    ],
-    linkopts = [
-        #       "-L/usr/lib/llvm-11/lib/",  # clang
-        "-lgomp",
-    ],
+    copts = select({
+        ":darwin": ["-Xclang", "-fopenmp"],
+        "//conditions:default": ["-fopenmp"]
+    }),
+    linkopts = select ({
+        ":darwin": ["-Xclang", "-fopenmp"],
+        "//conditions:default": ["-lgomp"]
+    }),
     tags = [
         "omp",
     ],
@@ -635,6 +653,7 @@ cc_binary(
         ":nearneighbours_cc_proto",
         ":neighbour_list",
         "//Foundational/data_source:iwtfdata_record",
+        "@homebrew_openmp",
     ],
 )
 
@@ -690,11 +709,22 @@ cc_binary(
     ],
 )
 
+cc_library(
+    name = "pthread_barrier",
+    srcs = ["pthread_barrier.c"],
+    hdrs = ["pthread_barrier.h"],
+    visibility = ["//visibility:public"],
+)
+
 cc_binary(
     name = "gfp_svmfp_score_pthread",
     srcs = [
         "gfp_svmfp_score_pthread.cc",
     ],
+    copts = select({
+        ":darwin": ["-Xclang", "-fopenmp", "-Drestrict=__restrict__"],
+        "//conditions:default": ["-fopenmp"],
+    }),
     deps = [
         ":gfp_bit_subset",
         "//Foundational/accumulator",
@@ -704,7 +734,10 @@ cc_binary(
         "//Foundational/iwmisc",
         "//Foundational/iwmisc:normalisation",
         "//Utilities/GFP_Tools:gfp",
-    ],
+    ] + select({
+        ":darwin": [":pthread_barrier"],
+        "//conditions:default": [],
+    }),
 )
 
 cc_binary(
@@ -941,15 +974,16 @@ cc_binary(
         "//Foundational/accumulator",
         "//Foundational/cmdline:iwcmdline",
         "//Foundational/data_source:iwtfdata_record",
+        "@homebrew_openmp",
     ],
-    copts = [
-        #       "-fopenmp=libiomp5",  llvm
-        "-fopenmp",
-    ],
-    linkopts = [
-        #       "-L/usr/lib/llvm-11/lib/",  # clang
-        "-lgomp",
-    ],
+    copts = select({
+        ":darwin": ["-Xclang", "-fopenmp"],
+        "//conditions:default": ["-fopenmp"]
+    }),
+    linkopts = select ({
+        ":darwin": ["-Xclang", "-fopenmp"],
+        "//conditions:default": ["-lgomp"]
+    }),
     tags = [
         "omp",
     ],

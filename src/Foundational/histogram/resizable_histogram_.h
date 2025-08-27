@@ -5,7 +5,8 @@
 #include <assert.h>
 #include <math.h>
 #include <iostream.h>
-#include <values.h>
+#include <limits.h>
+#include <float.h>
 
 #include "iwhistogram.h"
 

@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 # Use bazel query to identify all cc_binary targets, and for
 # those that are newer than what is in the target directory, copy

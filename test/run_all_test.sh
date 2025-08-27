@@ -1,4 +1,4 @@
-#! /bin/bash
+#!/usr/bin/env bash
 
 # LILLYMOL_HOME and BUILD_DIR should be exported, use my location if not set.
 

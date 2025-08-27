@@ -9,6 +9,7 @@
 #include <fcntl.h>
 #include <pthread.h>
 #include <stdlib.h>
+#include <signal.h>
 
 #include <algorithm>
 #include <fstream>

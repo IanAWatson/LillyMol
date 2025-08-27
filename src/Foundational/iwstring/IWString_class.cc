@@ -1512,6 +1512,12 @@ IWString::numeric_value(long long & result) const
 }
 
 int
+IWString::numeric_value(unsigned long long & result) const
+{
+  return string_class_is_int_8(_things, _number_elements, result);
+}
+
+int
 IWString::numeric_value(unsigned int & result) const
 {
   if (4 == sizeof(result))

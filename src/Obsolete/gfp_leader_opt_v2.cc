@@ -4,6 +4,9 @@
 */
 
 #include <stdlib.h>
+
+#include <float.h>
+#include <limits.h>
 #include <values.h>
 
 #include <algorithm>

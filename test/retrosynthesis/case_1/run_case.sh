@@ -1,4 +1,4 @@
-#! /bin/bash
+#!/usr/bin/env bash
 if [ -z "$LILLYMOL_HOME" ] || [ -z "$BUILD_DIR" ]
 then 
     # undefined BIN_DIR

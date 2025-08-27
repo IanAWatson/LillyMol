@@ -949,8 +949,6 @@ message SubstructureEnvironment {
   // If 2 environment matches are needed, you can ensure that
   // the come from 2 different matched atoms.
   optional uint32 max_env_matches_per_anchor = 18;
-
-  repeated string comment = 25;
 }
 
 // Environments work if there is just one attachment point, but I

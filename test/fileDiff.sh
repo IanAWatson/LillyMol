@@ -1,4 +1,4 @@
-#! /bin/bash
+#!/usr/bin/env bash
 
 in_name=$1
 out_name=$2

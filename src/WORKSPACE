@@ -46,22 +46,22 @@ cc_library (
 # in order to build LillyMol pybind11 bindings you will need a python
 # installation with pybind installed with that. Adjust this to meet
 # local needs.
-new_local_repository(
-    name = "python",
-    path = "/home/ian/third_party/PYTHON3.11/include/python3.11",
-    build_file_content = """
-cc_library(
-    name = "python",
-    hdrs = glob(
-            ["**/*.h"]
-    ),
-    includes = [
-        ".",
-    ],
-    visibility = ["//visibility:public"],
-)
-"""
-)
+#new_local_repository(
+#    name = "python",
+#    path = "/usr/include/python3.12",
+#    build_file_content = """
+#cc_library(
+#    name = "python",
+#    hdrs = glob(
+#            ["**/*.h"]
+#    ),
+#    includes = [
+#        ".",
+#    ],
+#    visibility = ["//visibility:public"],
+#)
+#"""
+#)
 
 new_local_repository(
     name = "x86-simd-sort",

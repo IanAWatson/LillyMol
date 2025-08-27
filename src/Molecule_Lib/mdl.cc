@@ -1,3 +1,4 @@
+#include <algorithm>
 #include <fstream>
 #include <iomanip>
 #include <iostream>
@@ -522,7 +523,7 @@ int
 Molecule::_identify_atoms_at_ends_of_aromatic_bonds(const int* aromatic_bond,
                                                     int* aromatic_connections,
                                                     int* ab) const {
-  set_vector(aromatic_connections, _number_elements, 0);
+  std::fill_n(aromatic_connections, _number_elements, 0);
 
   const int nb = nedges();
 
@@ -599,7 +600,7 @@ Molecule::process_delocalised_carbonyl_bonds(int* aromatic_atoms, int* aromatic_
   int* ab = new int[_number_elements * _number_elements];
   std::unique_ptr<int[]> free_ab(ab);
 
-  set_vector(ab, _number_elements * _number_elements, 0);
+  std::fill_n(ab, _number_elements * _number_elements, 0);
 
   _identify_atoms_at_ends_of_aromatic_bonds(aromatic_bonds, number_aromatic_connections,
                                             ab);

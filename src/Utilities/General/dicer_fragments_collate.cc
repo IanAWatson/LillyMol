@@ -45,7 +45,14 @@ struct DicerData {
   std::string par;
   uint32_t n;
   uint32_t natoms;
+
+  DicerData();
 };
+
+DicerData::DicerData() {
+  n = 0;
+  natoms = 0;
+}
 
 class DicerFragmentsCollate {
   private:
@@ -363,6 +370,7 @@ DicerFragmentsCollate::InsertIntoDataHash(dicer_data::DicerFragment& proto,
   }
   data.par = proto.par();
   data.n = proto.n();
+  data.natoms = proto.nat();
 
   _hash_data.insert(std::make_pair(proto.smi(), std::move(data)));
 

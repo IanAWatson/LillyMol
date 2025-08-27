@@ -1,3 +1,4 @@
+#include <algorithm>
 #include <fstream>
 #include <iostream>
 #include <limits>
@@ -4840,7 +4841,7 @@ fetch_heteroatom_definitions(const msi_attribute *att,
 
 static int
 fetch_heteroatom_definitions(const msi_attribute &att, int *heteroatm) {
-  set_vector(heteroatm, HIGHEST_ATOMIC_NUMBER + 1, 0);
+  std::fill_n(heteroatm, HIGHEST_ATOMIC_NUMBER + 1, 0);
 
   int z;
   int ndx = 0;

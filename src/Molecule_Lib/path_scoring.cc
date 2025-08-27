@@ -2,6 +2,7 @@
 #include <math.h>
 #include <stdlib.h>
 
+#include <algorithm>
 #include <iostream>
 #include <memory>
 
@@ -99,7 +100,7 @@ operator<<(std::ostream& os, const Path_Scoring& ps) {
 
 void
 Atomic_Numbers_Encounterd::initialise() {
-  set_vector(_found, SIZE_OF_ATOMIC_NUMBERS_ENCOUNTERED_ARRAY, 0);
+  std::fill_n(_found, SIZE_OF_ATOMIC_NUMBERS_ENCOUNTERED_ARRAY, 0);
 
   return;
 }

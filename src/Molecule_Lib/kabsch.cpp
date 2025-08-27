@@ -40,7 +40,7 @@ bool kabsch(const vector<Vector3d>& _src, const vector<Vector3d>& _tgt, Affine3d
     src.col(i) = _src[i];
   }
 
-  Vector3d centroid_src(0, 0, 0), centroid_tgt(0, 0, 0);
+  Vector3d centroid_src(0.0, 0.0, 0.0), centroid_tgt(0.0, 0.0, 0.0);
   for (size_t c = 0; c < n; c++) {
     centroid_src += src.col(c);
     centroid_tgt += tgt.col(c);
@@ -134,7 +134,10 @@ bool kabsch(const vector<Vector3d>& _src, const vector<Vector3d>& _tgt, Affine3d
     src.col(i) = _src[i];
   }
 
-  Vector3d centroid_src(0, 0, 0), centroid_tgt(0, 0, 0);
+//Vector3d centroid_src(0.0, 0.0, 0.0), centroid_tgt(0.0, 0.0, 0.0);
+  Vector3d centroid_src, centroid_tgt;
+  centroid_src << 0.0, 0.0, 0.0;
+  centroid_tgt << 0.0, 0.0, 0.0;
   for (size_t c = 0; c < n; c++) {
     centroid_src += src.col(c);
     centroid_tgt += tgt.col(c);
@@ -210,7 +213,7 @@ bool kabsch(MatrixXd& src, MatrixXd& tgt, Affine3d& _tx) {
 
   const size_t n = tgt.cols();
 
-  Vector3d centroid_src(0, 0, 0), centroid_tgt(0, 0, 0);
+  Vector3d centroid_src(0.0, 0.0, 0.0), centroid_tgt(0.0, 0.0, 0.0);
   for (size_t c = 0; c < n; c++) {
     centroid_src += src.col(c);
     centroid_tgt += tgt.col(c);

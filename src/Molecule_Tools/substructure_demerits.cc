@@ -1,3 +1,4 @@
+#include <algorithm>
 #include <iostream>
 #include <memory>
 
@@ -130,7 +131,7 @@ too_many_charges(const Molecule & m_in, Demerit & demerit)
 
   formal_charge_t * f = new formal_charge_t[matoms]; std::unique_ptr<formal_charge_t[]> free_f(f);
 
-  set_vector(f, matoms, static_cast<formal_charge_t>(0));
+  std::fill_n(f, matoms, static_cast<formal_charge_t>(0));
 
   _charge_assigner.set_apply_charges_to_molecule(0);
 

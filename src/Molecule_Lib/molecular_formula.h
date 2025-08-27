@@ -81,6 +81,8 @@ class MolecularFormula {
       return _count;
     }
 
+    void Add(atomic_number_t z);
+
     // Given _count, create a molecular formula in `s`. Existing
     // contents are overwritten.
     int MakeFormula(IWString& s) const;
@@ -89,6 +91,9 @@ class MolecularFormula {
 
     int ToSparseFingerprint(IWString& destination) const;
     int ToFixedCountedFingerprint(IWString& destination) const;
+
+    // Unsigned difference
+    int Diff(const MolecularFormula<T>& rhs) const;
 };
 
 };

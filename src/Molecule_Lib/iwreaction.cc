@@ -6044,7 +6044,7 @@ Reaction_Site::_do_find_kekule_forms_for_bad_valence (Molecule & result,
     if (! result.in_ring_of_given_size (i, 6))     // only 6 membered aromatic rings have Kekule forms
       continue;
 
-    set_vector (aromatic_atoms, matoms, 0);
+    std::fill_n (aromatic_atoms, matoms, 0);
     identify_atoms_in_ring_system (result, i, aromatic_atoms, initially_aromatic_atoms);
     for (int j = 0; j < matoms; j++)
     {

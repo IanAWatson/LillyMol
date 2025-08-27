@@ -134,6 +134,8 @@ ReadTextProtoJson(const IWString& fname) {
   // This makes me very nervous, we should not be using an internal namespace.
   if (auto status = google::protobuf::util::JsonStringToMessage(tmp, &result, options);
       status != absl::OkStatus()) {
+    cerr << "Cannot convert to JSON\n";
+    cerr << tmp << '\n';
     return std::nullopt;
   }
 

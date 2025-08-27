@@ -1,0 +1,8 @@
+name: "Nobel Prize!"
+scaffold {
+  smarts: "[Pb]"
+  change_element {
+    atom: 0
+    element: "Au"
+  }
+}

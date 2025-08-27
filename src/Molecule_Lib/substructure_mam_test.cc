@@ -93,7 +93,6 @@ std::string primary_amine = R"pb(
       smarts: "!N-C=O"
       smarts: "!N-S=O"
       smarts: "!N-C=S"
-      smarts: "!N-C=S"
       smarts: "![ND2]"
       smarts: "!N-a"
       smarts: "!N-[!#6]"

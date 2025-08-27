@@ -1,3 +1,4 @@
+#include <algorithm>
 #include <iostream>
 #include <iomanip>
 #include <memory>
@@ -2050,7 +2051,7 @@ Molecule::_compute_element_count(int * element_count,
                                  int & isotopes_present,
                                  int & non_periodic_table_atoms_present) const
 {
-  set_vector(element_count, HIGHEST_ATOMIC_NUMBER + 1, 0);
+  std::fill_n(element_count, HIGHEST_ATOMIC_NUMBER + 1, 0);
 
   non_periodic_table_atoms_present = 0;
   isotopes_present = 0;
@@ -2090,7 +2091,7 @@ Molecule::_compute_element_count(int * element_count,
                                  int & isotopes_present,
                                  int & non_periodic_table_atoms_present) const
 {
-  set_vector(element_count, HIGHEST_ATOMIC_NUMBER + 1, 0);
+  std::fill_n(element_count, HIGHEST_ATOMIC_NUMBER + 1, 0);
 
   non_periodic_table_atoms_present = 0;
   isotopes_present = 0;
@@ -2138,7 +2139,7 @@ Molecule::_compute_element_count(int * element_count,
                                  int & isotopes_present,
                                  int & non_periodic_table_atoms_present) const
 {
-  set_vector(element_count, HIGHEST_ATOMIC_NUMBER + 1, 0);
+  std::fill_n(element_count, HIGHEST_ATOMIC_NUMBER + 1, 0);
 
   non_periodic_table_atoms_present = 0;
   isotopes_present = 0;

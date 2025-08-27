@@ -220,6 +220,7 @@ cc_binary(
         "//Foundational/cmdline:iwcmdline",
         "//Foundational/iwmisc",
         "//Molecule_Lib:iwmolecule",
+        "//Molecule_Lib:molecular_formula_lib",
         "//Molecule_Lib:moleculeio",
         "@third_party//:berkeley_static",
         "@com_google_absl//absl/container:flat_hash_set",

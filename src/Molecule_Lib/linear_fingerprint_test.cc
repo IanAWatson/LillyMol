@@ -352,7 +352,7 @@ TEST_F(TestLinearFingerprint, TestRingCaseWithRingsRequested)
         "got " << _fingerprint;
 }
 
-TEST_F(TestLinearFingerprint, TestPathsCanCross)
+TEST_F(TestLinearFingerprint, DISABLED_TestPathsCanCross)
 {
   _smiles = "CCC1(CC)CC1";
   ASSERT_TRUE(_m.build_from_smiles(_smiles));

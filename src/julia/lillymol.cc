@@ -886,31 +886,31 @@ JLCXX_MODULE define_julia_module(jlcxx::Module& mod)
   );
   mod.unset_override_module();
 
-  mod.add_type<Bond_list>("BondList")
+  mod.add_type<BondList>("BondList")
     .constructor<>()
   ;
   mod.method("bonds_in_set",
-    [](const Bond_list& b)->int64_t {
+    [](const BondList& b)->int64_t {
       return b.size();
     }
   );
 
   mod.set_override_module(jl_base_module);
   mod.method("getindex",
-    [](const jlcxx::BoxedValue<Bond_list>& boxed_bond_list, int ndx)->const Bond*{
-      const Bond_list& b = jlcxx::unbox<const Bond_list&>(boxed_bond_list);
+    [](const jlcxx::BoxedValue<BondList>& boxed_bond_list, int ndx)->const Bond*{
+      const BondList& b = jlcxx::unbox<const BondList&>(boxed_bond_list);
       return b[ndx];
     }
   );
   mod.method("getindex",
-    [](const Bond_list& blist, int i)->const Bond*{
-      //std::cerr << "Bond_list::getindex length " << blist.size() << " ndx " << i << '\n';
+    [](const BondList& blist, int i)->const Bond*{
+      //std::cerr << "BondList::getindex length " << blist.size() << " ndx " << i << '\n';
       return blist[i - 1];
     }
   );
 #ifdef DOES_NOT_SEEM_NECESSARY
   mod.method("getindex",
-    [](Bond_list& blist, int i)->const Bond*{
+    [](BondList& blist, int i)->const Bond*{
       //std::cerr << "Bond_list::getindex length " << blist.size() << " ndx " << i << '\n';
       return blist[i];
     }
@@ -922,7 +922,7 @@ JLCXX_MODULE define_julia_module(jlcxx::Module& mod)
   // generated an ambiguous getitem invocation, so this is a supporting function to
   // support that functionality. Do not use.
   mod.method("internal_get_item",
-    [](const Bond_list& blist, int ndx)->const Bond* {
+    [](const BondList& blist, int ndx)->const Bond* {
       return blist[ndx - 1];
     }
   );
@@ -1558,17 +1558,17 @@ JLCXX_MODULE define_julia_module(jlcxx::Module& mod)
       }
     )
     .method("bond_list",
-      [](const Molecule& m)->const Bond_list& {
+      [](const Molecule& m)->const BondList& {
         return m.bond_list();
       }
     )
     .method("jl_bonds",
-      [](const Molecule& m)->const Bond_list& {
+      [](const Molecule& m)->const BondList& {
         return m.bond_list();
       }
     )
 //  .method("bonds",
-//    [](const Molecule* m)->const Bond_list& {
+//    [](const Molecule* m)->const BondList& {
 //      return m->bond_list();
 //    }
 //  )

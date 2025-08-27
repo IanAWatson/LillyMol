@@ -1,7 +1,9 @@
 #include <string.h>
 
+#include <algorithm>
 #include <iostream>
 #include <memory>
+
 using std::cerr;
 using std::endl;
 
@@ -592,7 +594,7 @@ Molecule::ring_membership() {
   }
 
   if (0 == nrings()) {
-    set_vector(_ring_membership, _number_elements, 0);
+    std::fill_n(_ring_membership, _number_elements, 0);
   } else {
     _force_complete_sssr_determination();
   }
@@ -603,7 +605,7 @@ Molecule::ring_membership() {
 int
 Molecule::ring_or_non_ring(int* result) {
   if (0 == nrings()) {
-    set_vector(result, _number_elements, 0);
+    std::fill_n(result, _number_elements, 0);
     return 1;
   }
 
@@ -617,7 +619,7 @@ Molecule::ring_or_non_ring(int* result) {
 int
 Molecule::ring_membership(int* rm) {
   if (0 == nrings()) {
-    set_vector(rm, _number_elements, 0);
+    std::fill_n(rm, _number_elements, 0);
     return 1;
   }
 
@@ -1036,7 +1038,7 @@ Molecule::_find_sssr_for_these_fused_raw_rings(int fused_sys_id, int* tmp) {
   cerr << "Finding SSSR for fsid " << fused_sys_id << endl;
 #endif
 
-  set_vector(tmp, _number_elements, 0);
+  std::fill_n(tmp, _number_elements, 0);
 
   int nraw = _raw_rings.number_elements();
 
@@ -1293,7 +1295,7 @@ Molecule::get_fused_system(int fsid, Set_of_Atoms& result) {
 
 int
 Molecule::label_atoms_by_ring_system_no_compute(int* r) const {
-  set_vector(r, _number_elements, 0);
+  std::fill_n(r, _number_elements, 0);
 
   int nr = _sssr_rings.number_elements();
 
@@ -1372,7 +1374,7 @@ int
 Molecule::label_atoms_by_ring_system_including_spiro_fused(int* r) {
   (void)ring_membership();
 
-  set_vector(r, _number_elements, 0);
+  std::fill_n(r, _number_elements, 0);
 
   const int nr = _sssr_rings.number_elements();
 
@@ -1886,7 +1888,7 @@ Molecule::identify_spinach_preset(int* spinach) const {
 int
 Molecule::identify_spinach(int* spinach) {
   if (0 == nrings()) {
-    set_vector(spinach, _number_elements, 1);
+    std::fill_n(spinach, _number_elements, 1);
     return _number_elements;
   }
 
@@ -1894,7 +1896,7 @@ Molecule::identify_spinach(int* spinach) {
     return 0;
   }
 
-  set_vector(spinach, _number_elements, 0);
+  std::fill_n(spinach, _number_elements, 0);
 
   Set_of_Atoms stack;
   stack.resize(_number_elements);

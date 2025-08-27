@@ -140,8 +140,7 @@ Element_Matcher::construct_from_string (const const_IWSubstring & directive)
 
   isotope_t maybe_isotope = 0;
 
-  while (s.length() > 0 && isdigit(s[0]))
-  {
+  while (s.length() > 0 && isdigit(s[0])) {
     maybe_isotope = 10 * maybe_isotope + s[0] - '0';
 
     s++;

@@ -1,10 +1,11 @@
 #include <stdlib.h>
 #include <math.h>
 
-#include "re2/re2.h"
-
+#include <algorithm>
 #include <iostream>
 #include <memory>
+
+#include "re2/re2.h"
 
 #include "Foundational/cmdline/cmdline.h"
 #include "Foundational/iwmisc/misc.h"
@@ -453,7 +454,7 @@ NN_Weight_Function::initialise_flat_weight_function()
 {
   _allocate_weight_array_if_needed();
 
-  set_vector (_weight, number_points_in_weight_array, static_cast<weight_t> (0.5));
+  std::fill_n (_weight, number_points_in_weight_array, static_cast<weight_t> (0.5));
 
   _type = "flat";
 

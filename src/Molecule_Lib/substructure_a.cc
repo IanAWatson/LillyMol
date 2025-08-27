@@ -1157,10 +1157,8 @@ Substructure_Atom::_ring_closure_bonds_match(Target_Atom * a) const
 }
 
 int
-Substructure_Atom::set_anchor (Target_Atom * a)
+Substructure_Atom::set_anchor(Target_Atom * a)
 {
-//assert (a->ok());
-
   _con = 0;
 
   _anchor = a;
@@ -1176,7 +1174,7 @@ Substructure_Atom::set_anchor (Target_Atom * a)
 */
 
 int
-Substructure_Atom::prepare_for_matching (Target_Atom * new_anchor)
+Substructure_Atom::prepare_for_matching(Target_Atom * new_anchor)
 {
   _release_hold();
 

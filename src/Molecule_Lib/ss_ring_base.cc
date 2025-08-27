@@ -1,6 +1,7 @@
 #include <ctype.h>
 #include <stdlib.h>
 
+#include <algorithm>
 #include <iostream>
 #include <memory>
 
@@ -171,7 +172,7 @@ Substructure_Ring_Base::_environment_matches(Molecule_to_Match & target,
 
     if (_environment_can_match_in_ring_atoms)
     {
-      set_vector(already_matched, matoms, 0);
+      std::fill_n(already_matched, matoms, 0);
       already_matched[i] = 1;
     }
 

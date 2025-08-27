@@ -3,6 +3,7 @@
   Input is raw structure file
 */
 
+#include <algorithm>
 #include <iostream>
 #include <memory>
 using std::cerr;
@@ -473,7 +474,7 @@ selimsteg_build (int argc, char ** argv)
 
 // initialise the array of allowable elements
 
-  set_vector(ok_elements, HIGHEST_ATOMIC_NUMBER + 1, 0);
+  std::fill_n(ok_elements, HIGHEST_ATOMIC_NUMBER + 1, 0);
 
   ok_elements[6] = 1;
   ok_elements[7] = 1;

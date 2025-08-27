@@ -3,6 +3,8 @@
 */
 
 #include <stdlib.h>
+
+#include <algorithm>
 #include <iostream>
 #include <memory>
 
@@ -265,7 +267,7 @@ ring_substitution(Molecule & m,
     if (ring_already_done[i])
       continue;
 
-    set_vector(in_ring_system, matoms, 0);
+    std::fill_n(in_ring_system, matoms, 0);
 
     const Ring * ri = m.ringi(i);
 

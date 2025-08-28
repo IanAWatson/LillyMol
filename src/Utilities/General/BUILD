@@ -483,13 +483,16 @@ cc_binary(
         "//conditions:default": ["-lgomp"]
     }),
     deps = [
-        "@homebrew_openmp",
         "//Foundational/accumulator",
         "//Foundational/cmdline:iwcmdline",
         "//Foundational/data_source:iwstring_data_source",
         "//Foundational/iwbits",
         "//Foundational/iwmisc",
-    ],
+    ] +
+      select( {
+      "darwin": [ "@homebrew_openmp"],
+      "//conditions:default": []
+    })
 )
 
 cc_binary(

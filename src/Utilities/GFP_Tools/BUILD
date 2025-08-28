@@ -176,6 +176,37 @@ cc_binary(
 # )
 
 cc_binary(
+    name = "gfp_compare_collections",
+    srcs = [
+        "gfp_compare_collections.cc",
+    ],
+    copts = select({
+        ":darwin": ["-Xclang", "-fopenmp"],
+        "//conditions:default": ["-fopenmp"]
+    }),
+    linkopts = select ({
+        ":darwin": ["-Xclang", "-fopenmp"],
+        "//conditions:default": ["-lgomp"]
+    }),
+    deps = [
+        ":gfp",
+        ":gfp_standard",
+        "//Foundational/accumulator",
+        "//Foundational/cmdline:iwcmdline",
+        "//Foundational/data_source:iwstring_data_source",
+        "//Foundational/iw_tdt",
+        "//Foundational/iwmisc",
+    ] +
+      select( {
+      "darwin": [ "@homebrew_openmp"],
+      "//conditions:default": []
+    }),
+    tags = [
+        "omp",
+    ],
+)
+
+cc_binary(
     name = "gfp_distance_matrix_iwdm",
     srcs = [
         "gfp_distance_matrix_iwdm.cc",
@@ -313,12 +344,15 @@ cc_binary(
     tags = [
         "omp",
     ],
-    deps = [
+    deps = select( {
+      "darwin": [ "@homebrew_openmp"],
+      "//conditions:default": []
+    })
+      + [
         ":gfp",
         ":gfp_standard",
         "//Foundational/iw_tdt",
         "//Foundational/iwmisc",
-        "@homebrew_openmp",
     ],
 )
 
@@ -419,8 +453,11 @@ cc_binary(
         "@com_google_protobuf//:protobuf",
         "@third_party//:cppzmq",
         "@third_party//:libzmq",
-        "@homebrew_gnutls",
-    ],
+    ] +
+      select( {
+      "darwin": [ "@homebrew_openmp"],
+      "//conditions:default": []
+    })
 )
 
 # cc_binary(
@@ -512,8 +549,11 @@ cc_binary(
         "//Foundational/iw_tdt",
         "//Foundational/iwmisc",
         "//Utilities/GFP_Tools:spread",
-        "@homebrew_openmp",
-    ],
+    ] +
+      select( {
+      "darwin": [ "@homebrew_openmp"],
+      "//conditions:default": []
+    })
 )
 
 cc_binary(
@@ -537,8 +577,11 @@ cc_binary(
         ":gfp_standard",
         "//Foundational/iw_tdt",
         "//Foundational/iwmisc",
-        "@homebrew_openmp",
-    ],
+    ] +
+      select( {
+      "darwin": [ "@homebrew_openmp"],
+      "//conditions:default": []
+    })
 )
 
 cc_binary(
@@ -614,8 +657,11 @@ cc_binary(
         "//Foundational/iwqsort",
         "//Utilities/GFP_Tools:gfp",
         "@onetbb//:tbb",
-        "@homebrew_openmp",
-    ],
+    ] +
+      select( {
+      "darwin": [ "@homebrew_openmp"],
+      "//conditions:default": []
+    })
 )
 
 cc_binary(
@@ -653,8 +699,11 @@ cc_binary(
         ":nearneighbours_cc_proto",
         ":neighbour_list",
         "//Foundational/data_source:iwtfdata_record",
-        "@homebrew_openmp",
-    ],
+    ] +
+      select( {
+      "darwin": [ "@homebrew_openmp"],
+      "//conditions:default": []
+    })
 )
 
 cc_binary(
@@ -974,8 +1023,11 @@ cc_binary(
         "//Foundational/accumulator",
         "//Foundational/cmdline:iwcmdline",
         "//Foundational/data_source:iwtfdata_record",
-        "@homebrew_openmp",
-    ],
+    ] +
+      select( {
+      "darwin": [ "@homebrew_openmp"],
+      "//conditions:default": []
+    }),
     copts = select({
         ":darwin": ["-Xclang", "-fopenmp"],
         "//conditions:default": ["-fopenmp"]

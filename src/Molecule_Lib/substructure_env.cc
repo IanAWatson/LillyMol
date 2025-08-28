@@ -319,7 +319,7 @@ Substructure_Environment::matches(int * previously_matched_atoms,
       ++parent_unmatched_connections;
     }
 
-    cerr << "parent_unmatched_connections " << parent_unmatched_connections << '\n';
+    // cerr << "parent_unmatched_connections " << parent_unmatched_connections << '\n';
     if (0 == parent_unmatched_connections) {
 #ifdef DEBUG_SS_ENV_MATCHES
       if (_hydrogen_ok_as_environment_match && a->hcount())
@@ -637,7 +637,7 @@ Single_Substructure_Query::_query_environment_also_matched(const int atoms_in_ta
       }
     }
 
-    cerr << "OR group contains " << z_group.size() << " items\n";
+    //cerr << "OR group contains " << z_group.size() << " items\n";
 
     if (! _query_environment_or_group_matched(previously_matched_atoms, matched_by_global_specs,
                         z_group, anchor_atom_available)) {
@@ -646,7 +646,7 @@ Single_Substructure_Query::_query_environment_also_matched(const int atoms_in_ta
     ++matches_found;
   }
 
-  cerr << "Find " << matches_found << " matches found\n";
+  // cerr << "Find " << matches_found << " matches found\n";
   return matches_found;
 }
 
@@ -675,7 +675,6 @@ Single_Substructure_Query::_query_environment_also_matched(Query_Atoms_Matched &
 
 //cerr << "Single_Substructure_Query::_query_environment_also_matched: _environment_must_match_unmatched_atoms " << _environment_must_match_unmatched_atoms << '\n';
 
-  cerr << _environment_must_match_unmatched_atoms << " _environment_must_match_unmatched_atoms\n";
   if (_environment_must_match_unmatched_atoms) {
     int na = matched_query_atoms.number_elements();
     for (int i = 0; i < na; i++) {

@@ -18,8 +18,8 @@ else
     echo "No bazel/bazelisk, see README.md" && exit 1
 fi
 
-# Step 1: udpate WORKSPACE and install.bzl
-# Update WORKSPACE and install.bzl for the current location.
+# Step 1: udpate MODULE-bazel and install.bzl
+# Update MODULE-bazel and install.bzl for the current location.
 # Must be invoked from the src directory /path/to/LillyMol/src
 pushd $REPO_HOME/src
 
@@ -29,13 +29,13 @@ fi
 
 # Only build python if requested
 if [[ -v BUILD_PYTHON ]] ; then
-    # Use python to update WORKSPACE for python locations.
+    # Use python to update MODULE-bazel for python locations.
     if [[ -s 'update_python_in_workspace.py' ]] ; then
-        cp MODULE.bazel "/tmp/WORKSPACE_${USER}"
-        python3 ./update_python_in_workspace.py "/tmp/WORKSPACE_${USER}" > MODULE.bazel
+        cp MODULE.bazel "/tmp/MODULE-bazel_${USER}"
+        python3 ./update_python_in_workspace.py "/tmp/MODULE.bazel_${USER}" > MODULE.bazel
             if [[ ! -s MODULE.bazel ]] ; then
                 echo "Updating MODULE.bazel failed, restoring orignal, python bindings will not work"
-                cp -f "/tmp/WORKSPACE_${USER}" MODULE.bazel
+                cp -f "/tmp/MODULE.bazel_${USER}" MODULE.bazel
             fi
         echo "MODULE.bazel updated"
     else
@@ -91,7 +91,7 @@ if [[ ! -d "${lib}" ]] ; then
 fi
 
 
-# If you are building with bazel, also need to update this path in WORKSPACE
+# If you are building with bazel, also need to update this path in MODULE.bazel
 # If you are building with cmake, also need to update this path in CMakeLists.txt
 
 # The general stragegy here is that if the source directory does not exist, fetch it.
@@ -190,7 +190,7 @@ fi
 
 # Step 3: build LillyMol executables
 echo "Builds and installs LillyMol executables"
-echo "The assumption is that WORKSPACE and build_deps/install.bzl"
+echo "The assumption is that MODULE.bazel and build_deps/install.bzl"
 echo "have both been configured."
 echo ""
 echo "First task is to build and run C++ unit tests."

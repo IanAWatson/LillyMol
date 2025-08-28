@@ -75,9 +75,6 @@ local_path_override(
     path = "../third_party"
 )
 
-
-new_local_repository = use_repo_rule("@bazel_tools//tools/build_defs/repo:local.bzl", "new_local_repository")
-
 new_local_repository(
     name = "homebrew_openmp",
     path = "/opt/homebrew/Cellar/libomp/20.1.5/",
@@ -110,7 +107,6 @@ cc_library(
 """,
 )
 
-=======
 # in order to build LillyMol pybind11 bindings you will need a python
 # installation with pybind installed with that. Adjust this to meet
 # local needs.

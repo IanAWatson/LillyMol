@@ -1894,9 +1894,8 @@ int
 Atom_Typing_Specification::assign_atom_types(Molecule& m, T* atype, const int* ncon) {
   std::fill_n(atype, m.natoms(), 0);
 
-  if (IWATTYPE_PPHORE ==
-      _type)  // because this owns the charge assigner etc queries. Must be done first
-  {
+      // because this owns the charge assigner etc queries. Must be done first
+  if (IWATTYPE_PPHORE == _type) {
     if (!_assign_atom_types_pharmacophore(m, atype)) {  // we allow
       return 0;
     }

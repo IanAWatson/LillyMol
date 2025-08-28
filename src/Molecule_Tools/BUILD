@@ -4,11 +4,6 @@ load("@com_google_protobuf//bazel:py_proto_library.bzl", "py_proto_library")
 load("@rules_cc//cc:defs.bzl", "cc_binary")
 load("@rules_proto//proto:defs.bzl", "proto_library")
 
-config_setting(
-    name = "darwin",
-    constraint_values = ["@platforms//os:osx"]
-)
-
 proto_library(
     name = "bond_length_distribution_proto",
     srcs = [
@@ -1395,14 +1390,6 @@ cc_binary(
     srcs = [
         "molecules_from_reagents.cc",
     ],
-    copts = select({
-        ":darwin": ["-Xclang", "-fopenmp"],
-        "//conditions:default": ["-fopenmp"]
-    }),
-    linkopts = select ({
-        ":darwin": ["-Xclang", "-fopenmp"],
-        "//conditions:default": ["-lgomp"]
-    }),
     deps = [
         "//Foundational/iwaray",
         "//Foundational/iwmisc",
@@ -1410,7 +1397,6 @@ cc_binary(
         "//Molecule_Lib:iwmolecule",
         "//Molecule_Lib:iwreaction",
         "//Molecule_Lib:moleculeio",
-        "@homebrew_openmp",
     ],
 )
 
@@ -1758,9 +1744,10 @@ cc_binary(
 cc_binary(
     name = "ring_substitution",
     srcs = [
-        "ring_substitution.cc",
+        "ring_substitution_main.cc",
     ],
     deps = [
+        "ring_substitution_lib",
         "//Foundational/cmdline:iwcmdline",
         "//Foundational/iw_tdt",
         "//Foundational/iwmisc:sparse_fp_creator",
@@ -3228,6 +3215,25 @@ cc_library(
     ],
     deps = [
         "//Molecule_Lib:iwmolecule",
+    ],
+)
+
+cc_library(
+    name = "ring_substitution_lib",
+    srcs = [
+        "ring_substitution.cc",
+    ],
+    hdrs = [
+        "ring_substitution.h",
+    ],
+    deps = [
+        "//Foundational/iwmisc:sparse_fp_creator",
+        "//Molecule_Lib:iwmolecule",
+        "//Molecule_Lib:iwmfingerprint",
+        "//Molecule_Tools:maccskeys_fn5_lib",
+    ],
+    visibility = [
+        "//visibility:public",
     ],
 )
 

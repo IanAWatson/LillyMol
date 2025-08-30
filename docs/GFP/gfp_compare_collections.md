@@ -60,7 +60,7 @@ Dist,Fraction
 0.203,5.177699e-08
 0.204,5.72534e-08
 ```
-Plot both the first sample, takes after 200 fingerprints have been process and another
+Plot both the first sample, taken after 400 fingerprints have been processed and another
 sample after 1600 fingerprints are processed.
 ![compare_collections](Images/compare_collections.png)
 
@@ -73,7 +73,7 @@ with what it was on the previous check. If the differences are within the conver
 criterion specified, processing stops.
 
 It is hard to know whether an absolute or relative tolerance would be most meaningful.
-The `-a` option specifies an absolute tolernace. All bucketised distance counts differences
+The `-a` option specifies an absolute tolernace. All bucketised distance count differences
 must be less than this value in order for the distribution to be considered converged.
 
 On the other hand, the relative convergence criterion compares the difference with

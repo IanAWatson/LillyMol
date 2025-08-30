@@ -11,7 +11,7 @@ template <typename T, typename SUMMER>
 class Accumulator_Base
 {
   protected:
-    unsigned int _n;
+    uint64_t _n;
     T _minval;
     T _maxval;
     SUMMER _xsum;
@@ -27,7 +27,7 @@ class Accumulator_Base
 
     int ok () const;
 
-    unsigned int n () const { return _n;}
+    uint64_t n () const { return _n;}
 
     bool empty() const {
       return _n > 0;

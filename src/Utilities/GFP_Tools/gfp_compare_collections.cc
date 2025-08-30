@@ -13,6 +13,7 @@
 #define REPORT_PROGRESS_IMPLEMENTATION
 #include "re2/re2.h"
 
+#include "Foundational/accumulator/accumulator.h"
 #include "Foundational/cmdline/cmdline.h"
 #include "Foundational/data_source/iwstring_data_source.h"
 #include "Foundational/iw_tdt/iw_tdt.h"
@@ -439,6 +440,8 @@ Options::WriteDistribution(uint64_t tot) {
 
   static constexpr char kSep = ',';
 
+  Accumulator<double> stats;
+
   output << "Dist" << kSep << "Fraction\n";
   float next_distance = 0.05;
   uint64_t sum = 0;
@@ -447,6 +450,10 @@ Options::WriteDistribution(uint64_t tot) {
     output << dist << kSep << static_cast<float>(_distribution[i]) << '\n';
 
     sum += _acc[i];
+
+    if (_acc[i] > 0) {
+      stats.extra(dist, _acc[i]);
+    }
 
     if (dist > _max_distance) {
       break;
@@ -462,6 +469,11 @@ Options::WriteDistribution(uint64_t tot) {
       cerr << dist << ' ' << sum << ' ' << static_cast<float>(sum) / static_cast<float>(tot) << '\n';
       next_distance += 0.05;
     }
+  }
+
+  if (_verbose) {
+    cerr << "Average " << static_cast<float>(stats.average()) << " std " << std::sqrt(stats.variance()) << '\n';
+    cerr << stats.minval() << " to " << stats.maxval() << ' ' << stats.sum() << " sum\n";
   }
 
   return 1;

@@ -61,7 +61,7 @@ Smiles files to not have header records.
 All tokens after the smiles are part of the molecule name.
 ```
 C methane consists of           a Carbon atom
-CC methane has two.
+CC ethane has two.
 ```
 is a Methane molecule whose name consists of 6 words, and an Ethane whose
 name consists of 3 words.
@@ -108,7 +108,7 @@ The `-f lod` directive says reduce these molecules to the likely largest fragmen
 
 We alomost certainly do not want molecules with valence errors, `-V` discards those.
 
-We apply [chemical_standardisation](../docs/Molecule_Lib/chemical_standardisation.md) via the
+We apply [chemical_standardisation](/docs/Molecule_Lib/chemical_standardisation.md) via the
 `-g all` option.
 
 Discard molecules with fewer than 6 or more than 50 atoms. Note that `-g all` will remove
@@ -195,7 +195,7 @@ unique_molecules -S unique -c -z -l -v -t I=Cl -t Br=Cl external.smi
 ```
 We are not interested in chiral variants, chirality and cis-trans bonding is discarded, -c -z.
 Counterions are discarded (if not already happened) with the -l option. We don't
-really consider the Iodo and Bromo variants of a Chloro group to be "differen
+really consider the Iodo and Bromo variants of a Chloro group to be "different
 enough" so we translate all the heavy halogens to Chlorine. Again
 there is unique_molecules_parallel.sh for larger sets of molecules.
 
@@ -298,7 +298,7 @@ When closely examining larger collections it is usually convenient to use
 a sorted list of molecules
 ```
 msort_parallsl external.smi > external.sorted.smi
-``
+```
 2.3M Chembl molecules can be processed in 3.8 seconds.
 
 There may have been a claim that this set of molecules contains aromatic ring systems
@@ -315,6 +315,7 @@ query {
   }
 }
 ```
+
 Note that the query specifies that on the ring system there should be exactly
 one aniline group and exactly one of the Halogens, and zero occurrences of a Phenol.
 We also restricted attention
@@ -326,8 +327,10 @@ tsubstructure -q PROTO:/path/to/aniline_halogen.qry -m aniline_halogen external.
 ```
 
 or use `tsubstructure_parallel.sh` if the file is large. This might match molecules like
-![CHEMBL27011](Images/CHEMBL27011.png)
-![CHEMBL81588](Images/CHEMBL81588.png)
+
+![CHEMBL27011](docs/Images/CHEMBL27011.png)
+
+![CHEMBL81588](docs/Images/CHEMBL81588.png)
 
 And of course if a query can be specified as smarts, that can be used with the `-s` option.
 
@@ -337,14 +340,13 @@ than five bonds away '...{>5}' from an acid 'C(=O)-[OH]'
 ```
 tsubstructure -j 1 -s '[NH2]-[CX4T1]...{>5}C(=O)-[OH]' -m matches external.smi
 ```
-which might match molecules line
-![CHEMBL2286788](CHEMBL2286788.png)
+which might match molecules like
+![CHEMBL2286788](docs/Images/CHEMBL2286788.png)
 
 Because we use the -j option to tsubstructure, the matched atoms are given isotopic
 labels. Somewhat confusingly matched atom 0, the Nitrogen atom, is assigned isotope
 1 - because isotope 0 is not an isotopic atom. Generally LillyMol uses zero based
 indexing for matched atoms.
-
 
 Or we want to mark a reactive Nitrogen atom in order or likely reactivity
 ```
@@ -354,10 +356,10 @@ tsubstructure -s '[ND1H2]-[CX4]||[ND2H]([CX4])[CX4]||[ND1H2]-a||[ND2H]([CX4])-a|
 The OR type queries in LillyMol, || are evaluated left to right. When one matches
 matching stops, and the matched atoms will be returned and labelled with an
 isotope. This might match molecules like
-![CHEMBL4101550](Images/CHEMBL4101550.png
+![CHEMBL4101550](docs/Images/CHEMBL4101550.png
 This match is interesting because it shows how the precedence matching has worked.
 The primary amine is a match, and that was detected first
-![CHEMBL70445](Images/CHEMBL70445.png).
+![CHEMBL70445](docs/Images/CHEMBL70445.png).
 
 ## Reactions
 When performing reactions, what is usually the hardest part is selecting the
@@ -422,7 +424,7 @@ trxn -P acid_amine.rxn acid.smi R1.smi
 ```
 
 Of course it can be done in one step if needed by using the `query_file` directive
-rather than `smarts` in the reaction file. See [trxn](/docs/Molecule_Tools/trxn.md).
+rather than `smarts` in the reaction file. See [trxn](docs/Molecule_Tools/trxn.md).
 Using that construct, the exact same query that is used to filter the reagents
 can be used for the reaction.
 
@@ -446,7 +448,7 @@ sure both are rectangular
 tcount train.activity train.smi
 ```
 
-Use [activity_consistency](/docs/Molecule_Tools/activity_consistency.md)
+Use [activity_consistency](docs/Molecule_Tools/activity_consistency.md)
 to explore the nature of duplicates, and possibly generate a more internally consistent
 training set file.
 
@@ -546,7 +548,7 @@ long_molecules -F long -d 3 -D 4 -m 20 all.smi
 We are looking for molecules where the longest path is at least 20
 bonds, the average distance from that longest path is 3 and the longest
 distance from that path is 4 atoms. This matches molecules like
-![CHEMBL13003](Images/CHEMBL13003.png)
+![CHEMBL13003](docs/Images/CHEMBL13003.png)
 We may wish to filter molecules like this - they might not fail other
 filters, although a rotatable bond filter may get some of them.
 
@@ -558,6 +560,9 @@ So given the smiles
 ```
 ClC(CCl)CO CHEMBL1538584
 ```
+
 it will generate
-![CHEMBL1538585](Images/CHEMBL1538585.png)
+
+![CHEMBL1538585](docs/Images/CHEMBL1538585.png)
+
 A number of other properties can be applied as isotopic labels.

@@ -37,6 +37,8 @@ constexpr char kOparen = '(';
 constexpr char kCparen = ')';
 constexpr char kOpenBrace = '{';
 constexpr char kCloseBrace = '}';
+constexpr char kOpenBracket = '[';
+constexpr char kCloseBracket = ']';
 
 /*
   Aug 2002. 
@@ -987,11 +989,146 @@ maybe_deuterium_or_tritium(const char * smiles,
   return 1;
 }
 
+// Element symbols can have arbitrary lengths.
+// Examine `smiles, first determining if it is a valid known element.
+int
+GetMaybeLongElement(const char* smiles,
+                    int characters_to_process,
+                    int& aromatic,
+                    formal_charge_t& fc,
+                    int& hcount,
+                    int& atomic_mass,
+                    const Element* & result) {
+
+  assert(*smiles = kOpenBracket);
+
+  // cerr << "GetMaybeLongElement char " << *smiles << " characters_to_process " << characters_to_process << '\n';
+
+  // Find the closing square bracket.
+  int close_square_bracket = -1;
+  for (int i = 0; i < characters_to_process; ++i) {
+    if (smiles[i] == kCloseBracket) {
+      close_square_bracket = i;
+      break;
+    }
+  }
+
+  if (close_square_bracket < 0) {
+    cerr << "GetMaybeLongElement:no closing bracket\n";
+    return 0;
+  }
+
+  characters_to_process = close_square_bracket;
+  if (characters_to_process == 0) {
+    cerr << "GetMaybeLongElement:empty atom\n";
+    return 0;
+  }
+
+  int rc = 0;
+
+  if (characters_to_process <= 0) {
+    cerr << "GetMaybeLongElement:pure numeric element not allowed\n";
+    return 0;
+  }
+
+  if (smiles[characters_to_process - 1] == '+') {
+    fc = 1;
+    --characters_to_process;
+    ++rc;
+  } else if (smiles[characters_to_process - 1] == '-') {
+    fc = -1;
+    --characters_to_process;
+    ++rc;
+  }
+
+  if (smiles[characters_to_process - 1] == 'H') {
+    hcount = 1;
+    --characters_to_process;
+    ++rc;
+  }
+
+  if (characters_to_process <= 0) {
+    cerr << "GetMaybeLongElement:no element\n";
+    return 0;
+  }
+
+  if (characters_to_process > 2) {
+    if (isdigit(smiles[characters_to_process - 1]) && smiles[characters_to_process - 2] == 'H') {
+      hcount = smiles[characters_to_process - 1] - '0';
+      characters_to_process -= 2;
+      rc += 2;
+    }
+  }
+
+  // cerr << "Hcount now " << hcount << " charge " << fc << '\n';
+
+  // Even long element names must start alphanumeric.
+  if (! ::isalpha(*smiles)) {
+    cerr << "GetMaybeLongElement:elements must start with an alphanumeric '" << *smiles << "' invalid\n";
+    return 0;
+  }
+
+  // cerr << "characters_to_process " << characters_to_process << " check for single letter element\n";
+  if (characters_to_process == 1) {
+    const char c = smiles[0];
+
+    if (c == 'D' && element::interpret_d_as_deuterium()) {
+      result = get_element_from_atomic_number(1);
+      atomic_mass = 2;
+      return rc + 1;
+    }
+
+    if (c == 'T' && element::interpret_t_as_tritium()) {
+      result = get_element_from_atomic_number(1);
+      atomic_mass = 3;
+      return rc + 1;
+    }
+
+    if (c == 'c') {
+      result = get_element_from_atomic_number(6);
+      aromatic = 1;
+      return rc + 1;
+    }
+    if (c == 'n') {
+      result = get_element_from_atomic_number(7);
+      aromatic = 1;
+      return rc + 1;
+    }
+    if (c == 'o') {
+      result = get_element_from_atomic_number(8);
+      aromatic = 1;
+      return rc + 1;
+    }
+    if (c == 's') {
+      result = get_element_from_atomic_number(16);
+      aromatic = 1;
+      return rc + 1;
+    }
+
+    result = get_element_from_symbol_no_case_conversion(smiles, 1);
+    if (result != nullptr) {
+      return rc + 1;
+    }
+
+    // element_from_long_smiles_string needs the closing square bracket.
+    // It might be here, but might not...
+    IWString tmp;
+    tmp << *smiles << kCloseBracket;
+    return rc + element_from_long_smiles_string(tmp.data(), 3, result);
+  }
+
+  // element_from_long_smiles_string needs the closing square bracket.
+  IWString tmp;
+  tmp.strncat(smiles, characters_to_process);
+  tmp << kCloseBracket;
+  return rc + element_from_long_smiles_string(tmp.data(), characters_to_process + 1, result);
+}
+
 /*
   Parsing an atom enclosed in a square bracket
 */
 
-//#define DEBUG_PARSE_SMILES_TOKEN
+// #define DEBUG_PARSE_SMILES_TOKEN
 
 int
 parse_smiles_token (const char * smiles,
@@ -1041,14 +1178,15 @@ parse_smiles_token (const char * smiles,
   // cerr << "Begin check on smiles at " << *smiles << '\n';
   if (isalpha(*smiles))
   {
-    if (atomic_symbols_can_have_arbitrary_length())     // note that if we have D and/or T in this case, we will not pick up the mass diff.... Fix if ever anyone cares...
-      tmp = element_from_long_smiles_string(smiles, characters_to_process, e);
-    else  
+    if (atomic_symbols_can_have_arbitrary_length()) {
+      tmp = GetMaybeLongElement(smiles, characters_to_process, aromatic, fc, hcount, atomic_mass, e);
+    } else {
       tmp = element_from_smiles_string(smiles, characters_to_process, e);
+    }
 
     // cerr << "atomic_symbols_can_have_arbitrary_length " << atomic_symbols_can_have_arbitrary_length << " tmp " << tmp << '\n';
 
-    if (0 == tmp && characters_to_process > 1 && ']' == smiles[1])     
+    if (0 == tmp && characters_to_process > 1 && kCloseBracket == smiles[1])     
       tmp = maybe_deuterium_or_tritium(smiles, e, atomic_mass);
 
     if (0 == tmp)
@@ -1105,7 +1243,7 @@ parse_smiles_token (const char * smiles,
   int hcount_encountered = 0;
   int chiral_encountered = 0;
 
-  while (']' != *smiles && rc < characters_to_process)
+  while (kCloseBracket != *smiles && rc < characters_to_process)
   {
     // cerr << "processing smiles char " << *smiles << " in " << smiles << '\n';
     if ('H' == *smiles)
@@ -2016,7 +2154,7 @@ Molecule::_build_from_smiles(const char * smiles,
       previous_atom_chiral_count = chirality_stack.pop();
       characters_processed++;
 #ifdef DEBUG_BUILD_FROM_SMILES
-      cerr << "Closing paren found, previous atom now " << previous_atom->unique_id() << '\n';
+      cerr << "Closing paren found, previous atom now " << previous_atom << '\n';
 #endif
     }
     else if (characters_processed && '.' == *s)
@@ -2107,7 +2245,7 @@ Molecule::_build_from_smiles(const char * smiles,
       int amap = 0;
 
       int tmp;
-      if ('[' == *s)
+      if (kOpenBracket == *s)
         tmp = parse_smiles_token(s, characters_to_process - characters_processed,
                                   e, aromatic, fc, hcount, chiral_count, atomic_mass, amap);
 
@@ -2122,7 +2260,7 @@ Molecule::_build_from_smiles(const char * smiles,
       }
 
 #ifdef DEBUG_BUILD_FROM_SMILES
-      cerr << "Parse smiles token '" << s << "'\n";
+      //cerr << "Parse smiles token '" << s << "'\n";
       cerr << "Element " << e->atomic_number() << " arom = " << aromatic <<
               " fc = " << fc << " hcount = " << hcount;
       if (chiral_count)
@@ -2171,7 +2309,7 @@ Molecule::_build_from_smiles(const char * smiles,
 
 //    cerr << "Atom map " << a->atom_map() << endl;
 
-      if ('[' == *s)
+      if (kOpenBracket == *s)
         a->set_implicit_hydrogens_known(1);
 
       if (INVALID_ATOM_NUMBER != previous_atom)
@@ -2865,7 +3003,7 @@ Substructure_Atom::_parse_smarts_specifier(const const_IWSubstring & qsmarts,
         a = new Substructure_Atom;
 
       int tmp;
-      if ('[' == *s)
+      if (kOpenBracket == *s)
         tmp = a->construct_from_smarts_token(s, characters_to_process - characters_processed);
       else if ('*' == *s)
         tmp = 1;

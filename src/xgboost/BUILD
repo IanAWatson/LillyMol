@@ -62,7 +62,7 @@ proto_library(
 cc_proto_library(
     name = "random_forest_model_cc_proto",
     deps = [
-        "random_forest_model_proto",
+        ":random_forest_model_proto",
     ],
 )
 

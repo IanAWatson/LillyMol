@@ -1496,7 +1496,7 @@ gfp_spread_standard(int argc, char** argv) {
   if (cl.option_present('A')) {
     const char* fname = cl.option_value('A');
 
-    set_vector(distances, pool_size, 1.0f);
+    std::fill_n(distances, pool_size, 1.0f);
 
     if (!do_previously_selected(fname)) {
       cerr << "Cannot process previously selected file '" << fname << "'\n";

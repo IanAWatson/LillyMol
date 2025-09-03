@@ -1,6 +1,8 @@
 #ifndef FXDSZSPFP_H
 #define FXDSZSPFP_H
 
+#include <algorithm>
+
 class Tversky;
 class const_IWSubstring;
 
@@ -176,7 +178,7 @@ Fixed_Size_Counted_Fingerprint_Base<T>::resize (int s)
 
   _n = s;
 
-  set_vector (_count, _n, static_cast<T> (0));
+  std::fill_n (_count, _n, static_cast<T> (0));
 
   return _n;
 }

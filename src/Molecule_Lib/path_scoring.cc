@@ -2,6 +2,7 @@
 #include <math.h>
 #include <stdlib.h>
 
+#include <algorithm>
 #include <iostream>
 #include <memory>
 
@@ -99,7 +100,7 @@ operator<<(std::ostream& os, const Path_Scoring& ps) {
 
 void
 Atomic_Numbers_Encounterd::initialise() {
-  set_vector(_found, SIZE_OF_ATOMIC_NUMBERS_ENCOUNTERED_ARRAY, 0);
+  std::fill_n(_found, SIZE_OF_ATOMIC_NUMBERS_ENCOUNTERED_ARRAY, 0);
 
   return;
 }
@@ -644,8 +645,6 @@ identify_attached_atoms (const Atom * a,
   return (INVALID_ATOM_NUMBER != a1);
 }*/
 
-// #define DEBUG_SCORE_EZ
-
 /*
   Someone is interested in an E/Z classification.
   We must first identify the atoms involved
@@ -740,6 +739,8 @@ Molecule::identify_ez_atoms(atom_number_t a3, atom_number_t a4, atom_number_t& a
   if (INVALID_ATOM_NUMBER != a6) {
     already_done[a6] = 1;
   }
+
+  // #define DEBUG_SCORE_EZ
 
   int rc = 1;
 
@@ -1481,7 +1482,7 @@ int
 Molecule::remove_invalid_directional_bonds() {
   int rc = 0;  // number of invalid cis-trans bonds we remove
 
-  std::unique_ptr<int[]> already_done;
+  int* already_done = nullptr;
 
   int nb = _bond_list.number_elements();
 
@@ -1496,12 +1497,6 @@ Molecule::remove_invalid_directional_bonds() {
       continue;
     }
 
-    // If these are set then that end of the double bond has been identified as symmetric.
-    atom_number_t a1 = kInvalidAtomNumber;
-    atom_number_t a2 = kInvalidAtomNumber;
-    atom_number_t a5 = kInvalidAtomNumber;
-    atom_number_t a6 = kInvalidAtomNumber;
-
     atom_number_t a3 = b->a1();
     atom_number_t a4 = b->a2();
 
@@ -1509,15 +1504,15 @@ Molecule::remove_invalid_directional_bonds() {
 
     if (1 == _things[a3]->ncon()) {  // definitely bad
       remove_it = 1;
-    } else if (2 == _things[a3]->ncon()) {
+    }
+    if (2 == _things[a3]->ncon()) {
       ;
     } else {
       if (nullptr == already_done) {
-        already_done.reset(new_int(_number_elements));
-      } else {
-        std::fill_n(already_done.get(), _number_elements, 0);
+        already_done = new_int(_number_elements);
       }
 
+      atom_number_t a1, a2;
       identify_attached_atoms(_things[a3], a3, a1, a2);
 
       Path_Scoring ps[2];
@@ -1525,11 +1520,8 @@ Molecule::remove_invalid_directional_bonds() {
       ps[1].initialise(a2, _things[a2]);
       already_done[a1] = already_done[a2] = 1;
 
-      if (0 == _score_ez_bond(already_done.get(), ps[0], ps[1])) {
+      if (0 == _score_ez_bond(already_done, ps[0], ps[1])) {
         remove_it = 1;
-      } else {
-        a1 = kInvalidAtomNumber;
-        a2 = kInvalidAtomNumber;
       }
     }
 
@@ -1540,6 +1532,7 @@ Molecule::remove_invalid_directional_bonds() {
     } else if (2 == _things[a4]->ncon()) {
       ;
     } else {
+      atom_number_t a5, a6;
       identify_attached_atoms(_things[a4], a4, a5, a6);
 
       Path_Scoring ps[2];
@@ -1547,22 +1540,18 @@ Molecule::remove_invalid_directional_bonds() {
       ps[1].initialise(a6, _things[a6]);
 
       if (nullptr == already_done) {
-        already_done.reset(new_int(_number_elements));
-      } else {
-        std::fill_n(already_done.get(), _number_elements, 0);
+        already_done = new_int(_number_elements);
       }
 
       already_done[a5] = already_done[a6] = 1;
 
-      if (0 == _score_ez_bond(already_done.get(), ps[0], ps[1])) {
+      if (0 == _score_ez_bond(already_done, ps[0], ps[1])) {
         remove_it = 1;
-      } else {
-        a5 = kInvalidAtomNumber;
-        a6 = kInvalidAtomNumber;
       }
     }
 
-    // cerr << "Bond between " << a3 << " and " << a4 << " remove_it " << remove_it << '\n';
+    //  cerr << "Bond between " << a3 << " and " << a4 << " remove_it " << remove_it <<
+    //  '\n';
 
     if (!remove_it) {
       continue;
@@ -1573,13 +1562,13 @@ Molecule::remove_invalid_directional_bonds() {
     //  Any single bonds attached that are not part of another cis-trans bond must be
     //  notified
 
-    if (a1 != kInvalidAtomNumber) {
-      _cis_trans_bond_has_been_invalidated(a3);
-    }
-    if (a5 != kInvalidAtomNumber) {
-      _cis_trans_bond_has_been_invalidated(a4);
-    }
+    _cis_trans_bond_has_been_invalidated(a3);
+    _cis_trans_bond_has_been_invalidated(a4);
     rc++;
+  }
+
+  if (nullptr == already_done) {
+    delete[] already_done;
   }
 
   return rc;
@@ -1588,49 +1577,47 @@ Molecule::remove_invalid_directional_bonds() {
 /*
   A cis-trans bond involving atom zatom has been invalidated
   Notify any atoms singly bonded to ZATOM
-
-  `zatom` is assumed to be at the end of a double bond.
-  atoms `a1` and `a2` are atoms connected to `zatom`
-  presumably by directional bonds. Those directional bonds
-  must be invalidated.
 */
 
 int
 Molecule::_cis_trans_bond_has_been_invalidated(atom_number_t zatom) {
+  int rc = 0;
 
-  // Pointers to the two bonds that will need to be reset.
-  // We will discard the const attribute.
-  const Bond* reset1 = nullptr;
-  const Bond* reset2 = nullptr;
+  const Atom* a = _things[zatom];
 
-  // For each of the singly attched atoms, see if they are involved
-  // in some other cis-trans grouping.
-  for (const Bond* b : *_things[zatom]) {
+  for (int i = 0; i < a->ncon(); i++) {
+    const Bond* b = a->item(i);
+
     if (!b->is_single_bond()) {
       continue;
     }
 
-    atom_number_t o = b->other(zatom);
+    atom_number_t j = b->other(zatom);
 
-    // The single bonds are placed into reset1 and reset2.
-    for (const Bond* b2 : *_things[o]) {
-      if (b2->is_double_bond() && b2->part_of_cis_trans_grouping()) {
-        // `b` cannot be reset.
-      } else if (reset1 == nullptr) {
-          reset1 = b;
-      } else if (reset2 == nullptr) {
-        reset2 = b;
+    const Atom* aj = _things[j];
+
+    int jcon = aj->ncon();
+
+    int found_another_cis_trans_bond = 0;
+
+    for (int k = 0; k < jcon; k++) {
+      const Bond* b = aj->item(k);
+
+      if (!b->is_double_bond()) {
+        continue;
       }
+
+      if (b->part_of_cis_trans_grouping()) {
+        found_another_cis_trans_bond = 1;
+        break;
+      }
+    }
+
+    if (!found_another_cis_trans_bond) {
+      const_cast<Bond*>(b)->set_not_directional();
+      rc = 1;
     }
   }
 
-  // cerr << "reset1 " << reset1 << " reset2 " << reset2 << '\n';
-  if (reset1 != nullptr) {
-    const_cast<Bond*>(reset1)->set_not_directional();
-  }
-  if (reset2 != nullptr) {
-    const_cast<Bond*>(reset2)->set_not_directional();
-  }
-
-  return 1;
+  return rc;
 }

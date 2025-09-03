@@ -1,5 +1,6 @@
 #include "donor_acceptor.h"
 
+#include <algorithm>
 #include <filesystem>
 #include <iostream>
 #include <memory>
@@ -351,7 +352,7 @@ Donor_Acceptor_Assigner::process(Molecule& m, int* isotope) {
     i_own_the_vector = 0;
   }
 
-  set_vector(isotope, matoms, 0);
+  std::fill_n(isotope, matoms, 0);
 
   int rc = _process(m, isotope);
 

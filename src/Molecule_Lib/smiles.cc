@@ -1,4 +1,6 @@
 #include <stdlib.h>
+
+#include <algorithm>
 #include <iostream>
 #include <memory>
 #include <random>
@@ -836,7 +838,7 @@ Smiles_Information::prepare_to_build_ordering(int matoms)
   if (_smiles_order == nullptr)
     _smiles_order = new_int(matoms, -1);
   else
-    set_vector(_smiles_order, matoms, -1);
+    std::fill_n(_smiles_order, matoms, -1);
 
   _natoms = matoms;
 
@@ -902,7 +904,7 @@ Smiles_Information::set_create_smarts_embedding(int s)
   if (nullptr == _create_smarts_embedding)
     _create_smarts_embedding = new_int(_natoms, s);
   else
-    set_vector(_create_smarts_embedding, _natoms, s);
+    std::fill_n(_create_smarts_embedding, _natoms, s);
 
   return 1;
 }
@@ -3122,7 +3124,7 @@ Molecule::_handle_spiro_between_isolated_and_fused(const resizable_array<Ring *>
                                                     int fsid,
                                                     int * atmp)
 {
-  set_vector(atmp, _number_elements, 0);
+  std::fill_n(atmp, _number_elements, 0);
 
   int nr = rings.number_elements();
 

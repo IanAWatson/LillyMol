@@ -1,4 +1,6 @@
 #include <assert.h>
+
+#include <algorithm>
 #include <iostream>
 #include <memory>
 
@@ -192,16 +194,8 @@ Target_Atom::invalidate()
   _heteroatoms_in_ring = TARGET_ATOM_NOTHING_CAN_MATCH;
 
   // Ideally we would have an invalid element.
-  // But we need something that can respond to a unique_id.
-
-  static const Element* default_element = nullptr;
-
-  if (default_element == nullptr) {
-    isotope_t notused = 0;
-    default_element = get_element_from_symbol("*", notused);
-  }
-
-  _element = default_element;
+  isotope_t notused = 0;
+  _element = get_element_from_symbol("*", notused);
 
   _chirality_fetched = 0;
 
@@ -1266,10 +1260,10 @@ Molecule_to_Match::_initialise_molecule(Molecule * m)
 //_first = new_int(HIGHEST_ATOMIC_NUMBER + 1, INVALID_ATOM_NUMBER);
 //_last  = new_int(HIGHEST_ATOMIC_NUMBER + 1, INVALID_ATOM_NUMBER);
 
-  set_vector(_first, HIGHEST_ATOMIC_NUMBER + 1, INVALID_ATOM_NUMBER);   // no need to initialis last
+  std::fill_n(_first, HIGHEST_ATOMIC_NUMBER + 1, INVALID_ATOM_NUMBER);   // no need to initialis last
 
   if (initialise_element_counts)
-    set_vector(_count, HIGHEST_ATOMIC_NUMBER + 1, 0);
+    std::fill_n(_count, HIGHEST_ATOMIC_NUMBER + 1, 0);
 
 // We have two separate loops rather than putting the test for
 // initialise_element_counts inside the loop. Warning, potential

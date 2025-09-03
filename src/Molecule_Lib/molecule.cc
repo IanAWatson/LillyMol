@@ -1,3 +1,4 @@
+#include <algorithm>
 #include <iostream>
 #include <iomanip>
 #include <memory>
@@ -915,7 +916,8 @@ Molecule::partial_charge_type() const
 */
 
 void
-Molecule::set_formal_charge(atom_number_t zatom, formal_charge_t qq) {
+Molecule::set_formal_charge(atom_number_t zatom, formal_charge_t qq)
+{
   assert(ok_atom_number(zatom));
   assert(reasonable_formal_charge_value(qq));
 
@@ -2049,7 +2051,7 @@ Molecule::_compute_element_count(int * element_count,
                                  int & isotopes_present,
                                  int & non_periodic_table_atoms_present) const
 {
-  set_vector(element_count, HIGHEST_ATOMIC_NUMBER + 1, 0);
+  std::fill_n(element_count, HIGHEST_ATOMIC_NUMBER + 1, 0);
 
   non_periodic_table_atoms_present = 0;
   isotopes_present = 0;
@@ -2089,7 +2091,7 @@ Molecule::_compute_element_count(int * element_count,
                                  int & isotopes_present,
                                  int & non_periodic_table_atoms_present) const
 {
-  set_vector(element_count, HIGHEST_ATOMIC_NUMBER + 1, 0);
+  std::fill_n(element_count, HIGHEST_ATOMIC_NUMBER + 1, 0);
 
   non_periodic_table_atoms_present = 0;
   isotopes_present = 0;
@@ -2137,7 +2139,7 @@ Molecule::_compute_element_count(int * element_count,
                                  int & isotopes_present,
                                  int & non_periodic_table_atoms_present) const
 {
-  set_vector(element_count, HIGHEST_ATOMIC_NUMBER + 1, 0);
+  std::fill_n(element_count, HIGHEST_ATOMIC_NUMBER + 1, 0);
 
   non_periodic_table_atoms_present = 0;
   isotopes_present = 0;
@@ -3055,15 +3057,15 @@ Molecule::remove_atoms(const int * to_remove, int flag)
   int rc = 0;
   for (int i = _number_elements - 1; i >= 0; i--)
   {
-    if (to_remove[i] == flag) {
+    if (to_remove[i] == flag)
+    {
       _remove_atom(i);
       rc++;
     }
   }
 
-  if (rc) {
+  if (rc)
     _set_modified();
-  }
 
   return rc;
 }
@@ -3096,8 +3098,8 @@ Molecule::remove_atoms(const T * to_remove)
 
   return rc;
 }
-template int Molecule::remove_atoms(const int32_t*);
-template int Molecule::remove_atoms(const int64_t*);
+// template int Molecule::remove_atoms(const int32_t*);
+// template int Molecule::remove_atoms(const int64_t*);
 
 int
 Molecule::remove_many_atoms(const int * to_remove)
@@ -3829,10 +3831,6 @@ Molecule::translate_atoms(coord_t x, coord_t y, coord_t z)
     t->add(x, y, z);
   }
 
-  if (lillymol::include_coordinates_with_smiles()) {
-    invalidate_smiles();
-  }
-
   return;
 }
 
@@ -3851,10 +3849,6 @@ Molecule::translate_atoms(coord_t x, coord_t y, coord_t z,
     Coordinates * t = _things[atom_to_move];
 
     t->add(x, y, z);
-  }
-
-  if (lillymol::include_coordinates_with_smiles()) {
-    invalidate_smiles();
   }
 
   return;
@@ -3877,10 +3871,6 @@ Molecule::translate_atoms(const Coordinates & whereto,
     *t += whereto;
   }
 
-  if (lillymol::include_coordinates_with_smiles()) {
-    invalidate_smiles();
-  }
-
   return;
 }
 
@@ -3890,10 +3880,6 @@ Molecule::translate_atoms(const Coordinates & whereto)
   for (int i = 0; i < _number_elements; i++)
   {
     _things[i]->translate(whereto);
-  }
-
-  if (lillymol::include_coordinates_with_smiles()) {
-    invalidate_smiles();
   }
 
   return;
@@ -3906,13 +3892,8 @@ Molecule::translate_atoms(const Coordinates & whereto,
 {
   for (int i = 0; i < _number_elements; i++)
   {
-    if (flag == to_move[i]) {
+    if (flag == to_move[i])
       _things[i]->translate(whereto);
-    }
-  }
-
-  if (lillymol::include_coordinates_with_smiles()) {
-    invalidate_smiles();
   }
 
   return;
@@ -3928,11 +3909,6 @@ Molecule::ScaleCoordinates(float multiply) {
     float z = a->z() * multiply;
     a->setxyz(x, y, z);
   }
-
-  if (lillymol::include_coordinates_with_smiles()) {
-    invalidate_smiles();
-  }
-
 
   return 1;
 }
@@ -3983,10 +3959,6 @@ Molecule::rotate_atoms(const Coordinates & axis, angle_t theta)
     double zz = rotmat31 * x0 + rotmat32 * y0 + rotmat33 * z0;
 
     a->setxyz(xx, yy, zz);
-  }
-
-  if (lillymol::include_coordinates_with_smiles()) {
-    invalidate_smiles();
   }
 
   return 1;
@@ -4059,10 +4031,6 @@ Molecule::rotate_atoms(const Space_Vector<T> & axis, T theta,
 //  cerr << "New coordinates for atom " << j << " " << *a << endl;
   }
 
-  if (lillymol::include_coordinates_with_smiles()) {
-    invalidate_smiles();
-  }
-
   return 1;
 }
 
@@ -4127,10 +4095,6 @@ Molecule::rotate_atoms(const Space_Vector<T> & axis, T theta,
 
     a->setxyz(static_cast<coord_t>(xx), static_cast<coord_t>(yy), static_cast<coord_t>(zz) );
 //  cerr << "New coordinates for atom " << j << " " << *a << endl;
-  }
-
-  if (lillymol::include_coordinates_with_smiles()) {
-    invalidate_smiles();
   }
 
   return 1;
@@ -4221,10 +4185,6 @@ Molecule::rotate_to_longest_distance_along_x(atom_number_t & left, atom_number_t
   report_average_position(m, "At end of rotate_2", cerr);
   cerr << "left is " << left << " (" << _things[left]->x() << ',' << _things[left]->y() << "), right " << right << " (" << _things[right]->x() << ',' << _things[right]->y() << ")\n";
 #endif
-
-  if (lillymol::include_coordinates_with_smiles()) {
-    invalidate_smiles();
-  }
 
   return;
 }
@@ -4517,10 +4477,6 @@ Molecule::_set_bond_length(atom_number_t a1, atom_number_t a2,
   cerr << "After moving, distance " << distance_between_atoms(a1, a2) << endl;
   cerr << *(_things[a1]) << " and " << *(_things[a2]) << endl;
 #endif
-
-  if (lillymol::include_coordinates_with_smiles()) {
-    invalidate_smiles();
-  }
 
   return 1;
 }

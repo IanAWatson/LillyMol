@@ -15,24 +15,6 @@ cc_proto_library(
     ],
 )
 
-proto_library(
-    name = "normalisation_proto",
-    srcs = [
-        "normalisation.proto",
-    ],
-    deps = [
-        "//Foundational/accumulator:accumulator_proto",
-    ],
-)
-
-cc_proto_library(
-    name = "normalisation_cc_proto",
-    deps = [
-        "normalisation_proto",
-    ],
-    visibility = ["//visibility:public"],
-)
-
 cc_library(
     name = "activity_from_file",
     srcs = [
@@ -256,8 +238,6 @@ cc_library(
     ],
     visibility = ["//visibility:public"],
     deps = [
-        ":normalisation_cc_proto",
-        ":iwmisc",
         "//Foundational/accumulator",
         "//Foundational/cmdline:iwcmdline",
     ],
@@ -343,20 +323,6 @@ cc_test(
         "@benchmark//:benchmark_main",
     ],
 )
-
-cc_test(
-    name = "normalisation_test",
-    srcs = [
-        "normalisation_test.cc",
-    ],
-    deps = [
-        ":normalisation",
-        ":normalisation_cc_proto",
-        "//Foundational/accumulator",
-        "@googletest//:gtest_main",
-    ],
-)
-
 
 cc_test(
     name = "sorted_list_test",

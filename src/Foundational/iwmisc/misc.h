@@ -127,6 +127,7 @@ index_of_largest(int n, const T * items)
 }
 
 template <typename T>
+[[deprecated("Use std::fill_n")]]
 void
 set_vector(T * values, int n, T new_value)
 {

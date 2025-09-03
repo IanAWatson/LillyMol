@@ -2232,7 +2232,6 @@ smi2rings(data_source_and_type<Molecule>& input,
 
     output.write_if_buffer_holds_more_than(16384);
   }
-  cerr << "Reading complete\n";
 
   return output.good();
 }

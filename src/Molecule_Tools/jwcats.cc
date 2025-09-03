@@ -8,6 +8,7 @@
 #include <stdlib.h>
 #include <time.h>
 
+#include <algorithm>
 #include <iostream>
 #include <memory>
 
@@ -124,14 +125,13 @@ usage(int rc)
 }
 
 static int
-preprocess_molecule(Molecule& m)
-{
+preprocess_molecule(Molecule& m) {
   if (reduce_to_largest_fragment) {
     m.reduce_to_largest_fragment();
   }
 
-  if (chemical_standardisation
-          .active()) {  // just assume this is getting rid of explicit hydrogens
+  // just assume this is getting rid of explicit hydrogens
+  if (chemical_standardisation.active()) {
     chemical_standardisation.process(m);
   } else {
     m.remove_all(1);  // don't want explicit hydrogens here
@@ -142,8 +142,7 @@ preprocess_molecule(Molecule& m)
 
 static int
 do_fingerprint_output(Molecule& m, const int array_size, const double* scaled_counts,
-                      IWString_and_File_Descriptor& output)
-{
+                      IWString_and_File_Descriptor& output) {
   Sparse_Fingerprint_Creator sfc;
 
   for (int i = 0; i < array_size; i++) {
@@ -200,8 +199,7 @@ static const char * pair_name[] = {
 // clang-format on
 
 static int
-find_property_pair_number(int npi, int npj)
-{
+find_property_pair_number(int npi, int npj) {
   assert((npi > -1) && (npi < 5) && (npj > -1) && (npj < 5));
 
   int small_no = npi;
@@ -215,8 +213,7 @@ find_property_pair_number(int npi, int npj)
 }
 
 static int
-output_result_header(IWString_and_File_Descriptor& output)
-{
+output_result_header(IWString_and_File_Descriptor& output) {
   int size = 15;
   // nomally, you print out the whole thing, but, when no hydrophobic-pair flag is on, do
   // not print out them
@@ -238,8 +235,7 @@ output_result_header(IWString_and_File_Descriptor& output)
 
 static int
 handle_missing_charge_data_fingerprint(Molecule& m, int array_size,
-                                       IWString_and_File_Descriptor& output)
-{
+                                       IWString_and_File_Descriptor& output) {
   output << fingerprint_tag << ">\n";
 
   molecules_containing_non_alowed_elements++;
@@ -249,8 +245,7 @@ handle_missing_charge_data_fingerprint(Molecule& m, int array_size,
 
 static int
 handle_missing_charge_data(Molecule& m, int array_size,
-                           IWString_and_File_Descriptor& output)
-{
+                           IWString_and_File_Descriptor& output) {
   if (fingerprint_tag.length() > 0) {
     return handle_missing_charge_data_fingerprint(m, array_size, output);
   }
@@ -277,19 +272,18 @@ handle_missing_charge_data(Molecule& m, int array_size,
 
 static int
 jw_cat_search(Molecule& m, IWString_and_File_Descriptor& output, int donor_acceptor[],
-              int** properties, double scaled_counts[])
-{
+              int** properties, double scaled_counts[]) {
   int property_count[5];
-  set_vector(property_count, 5, 0);
+  std::fill_n(property_count, 5, 0);
 
   const int n_atoms = m.natoms();
 
   // initialize vectors
   for (int i = 0; i < 5; i++) {
-    set_vector(properties[i], n_atoms, 0);
+    std::fill_n(properties[i], n_atoms, 0);
   }
 
-  set_vector(scaled_counts, array_size, 0.0);
+  std::fill_n(scaled_counts, array_size, 0.0);
 
   if (donor_acceptor_assigner.active()) {
     donor_acceptor_assigner.process(m, donor_acceptor);

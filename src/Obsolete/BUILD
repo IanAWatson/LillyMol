@@ -250,6 +250,22 @@ cc_binary(
 )
 
 cc_binary(
+    name = "gfp_distance_matrix_iwdm",
+    srcs = [
+        "gfp_distance_matrix_iwdm.cc",
+    ],
+    deps = [
+        "//Foundational/accumulator",
+        "//Foundational/cmdline:iwcmdline",
+        "//Foundational/data_source:iwstring_data_source",
+        "//Foundational/iw_tdt",
+        "//Foundational/iwmisc",
+        "//Utilities/GFP_Tools:gfp",
+        "//Utilities/Distance_Matrix:distance_matrix_base",
+    ],
+)
+
+cc_binary(
     name = "gfp_linear_model_optimise",
     srcs = [
         "gfp_linear_model_optimise.cc",

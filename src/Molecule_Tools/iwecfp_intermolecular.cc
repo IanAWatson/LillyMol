@@ -576,7 +576,7 @@ produce_fingerprint (Molecule & m,
       if (0 == min_shell_radius)
         set_bit(sfc, e, atom_weight[i]);
 
-      set_vector(processing_status, matoms, 0);
+      std::fill_n(processing_status, matoms, 0);
 
       processing_status[i] = PROCESSING_FINISHED;
 

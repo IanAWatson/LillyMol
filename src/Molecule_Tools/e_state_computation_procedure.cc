@@ -8,6 +8,8 @@
  */
 
 #include <stdlib.h>
+
+#include <algorithm>
 #include <iostream>
 #include <memory>
 #include <assert.h>
@@ -154,7 +156,7 @@ determine_atom_e_state_index (Molecule &m,
 
   (void) determine_Kier_and_Hall_atom_intrinsic_state (m, i_state, atoms, z, hcount);
 
-  set_vector (e_state_index, n_atoms, 0.0);
+  std::fill_n (e_state_index, n_atoms, 0.0);
 
   for (int i=0; i<n_atoms; i++)
   {

@@ -1,5 +1,7 @@
 #include <stdlib.h>
 
+#include <algorithm>
+
 #include "Foundational/iwmisc/misc.h"
 #include "circular_fingerprint.h"
 
@@ -112,7 +114,7 @@ Circular_Fingerprint_Generator::generate_fingerprint(const Molecule & m,
 
     sfc.hit_bit(e);
 
-    set_vector(_processing_status, _matoms, 0);
+    std::fill_n(_processing_status, _matoms, 0);
 
     _processing_status[i] = PROCESSING_FINISHED;
 

@@ -9,6 +9,8 @@
 
 #include <stdlib.h>
 #include <assert.h>
+
+#include <algorithm>
 #include <memory>
 
 #include "Foundational/iwmisc/misc.h"
@@ -161,7 +163,7 @@ determine_atom_e_state_index (Molecule &m, double e_state_index [],
 {
   const int n_atoms = m.natoms();
 
-  set_vector (e_state_index, n_atoms, 0.0);
+  std::fill_n (e_state_index, n_atoms, 0.0);
 
   for (int i=0; i<n_atoms; i++)
   {

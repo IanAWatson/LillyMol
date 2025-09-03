@@ -1794,6 +1794,7 @@ cc_binary(
         "ring_substitution.cc",
     ],
     deps = [
+        "ring_substitution_lib",
         "//Foundational/cmdline:iwcmdline",
         "//Foundational/iw_tdt",
         "//Foundational/iwmisc:sparse_fp_creator",
@@ -3282,6 +3283,25 @@ cc_library(
     ],
     deps = [
         "//Molecule_Lib:iwmolecule",
+    ],
+)
+
+cc_library(
+    name = "ring_substitution_lib",
+    srcs = [
+        "ring_substitution.cc",
+    ],
+    hdrs = [
+        "ring_substitution.h",
+    ],
+    deps = [
+        "//Foundational/iwmisc:sparse_fp_creator",
+        "//Molecule_Lib:iwmolecule",
+        "//Molecule_Lib:iwmfingerprint",
+        "//Molecule_Tools:maccskeys_fn5_lib",
+    ],
+    visibility = [
+        "//visibility:public",
     ],
 )
 

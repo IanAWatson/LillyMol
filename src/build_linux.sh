@@ -45,18 +45,15 @@ if [[ -v BUILD_PYTHON ]] ; then
     fi
 fi
 
+# intall.bzl no longer used.
 # install.bzl does need to be updated.
-echo 'Updating build_deps/install.bzl'
-if [[ ! -s 'build_deps/install.bzl' ]] ; then
-    echo "build_deps/install.bzl not found" && exit 1
-fi
-
-bindir=$(echo $REPO_HOME/bin/$(uname) | sed -e 's/\//\\\//g')
-
+# echo 'Updating build_deps/install.bzl'
+# if [[ ! -s 'build_deps/install.bzl' ]] ; then
+#     echo "build_deps/install.bzl not found" && exit 1
+# fi
 # Make a copy
-cp build_deps/install.bzl /tmp/install.bzl.${USER}
-
-sed -i -e "s/default *= *\".*\",/default = \"${bindir}\",/" build_deps/install.bzl
+# cp build_deps/install.bzl /tmp/install.bzl.${USER}
+# sed -i -e "s/default *= *\".*\",/default = \"${bindir}\",/" build_deps/install.bzl
 
 # Create bindir if not already present
 bindir=$REPO_HOME/bin/$(uname)
@@ -143,6 +140,11 @@ if [[ -v BUILD_BDB ]] ; then
         tar zxf db-${bdb_version}.tar.gz
         must_build=1
     fi
+    if [[ $(uname) -eq "Linux" ]] ; then
+      suffix='so'
+    elif [[ $(uname) -eq "Darwin" ]] ; then
+      suffix='dylib'
+    fi
     if [[ ${must_build} -eq 1 || ! -s "${third_party}/BDB/include/db.h" ]] ; then
         (cd "db-${bdb_version}/build_unix" && make realclean)
         (cd "db-${bdb_version}/build_unix" && ../dist/configure --prefix=${third_party}/BDB --enable-cxx --enable-shared=yes --with-repmgr-ssl=no)
@@ -153,7 +155,7 @@ if [[ -v BUILD_BDB ]] ; then
         echo ""
         echo "Ignore error messages from BerkeleyDB install, it is for components we do not use"
         # Copy shared libraries to our lib folder so python bindings work.
-        (cp BDB/lib/lib*.so ${lib}) || echo "Did not copy BerkeleyDB shared libraries"
+        (cp BDB/lib/lib*.${suffix} ${lib}) || echo "Did not copy BerkeleyDB shared libraries"
     fi
 fi
 

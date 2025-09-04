@@ -21,7 +21,7 @@
 UNAME := $(shell uname)
 
 ifeq ($(UNAME),Darwin)
-	BUILD_SCRIPT := build_macos.zsh
+	BUILD_SCRIPT := build_linux.sh
 else
 	BUILD_SCRIPT := build_linux.sh
 endif

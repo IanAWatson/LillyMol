@@ -362,7 +362,7 @@ fi
 #fi
 
 # Deal with compressed files and hidden file names
-./uncompress_and_install.sh
+LILLYMOL_HOME=${REPO_HOME} ./uncompress_and_install.sh
 
 # Python if requested, build, install and test.
 # Note that PYTHONPATH will need to be adjusted, or copy the shared

@@ -16,6 +16,8 @@ if [[ -s "${hidden_ring}" ]] ; then
   if [[ $(uname) == "Linux" ]] ; then
     echo "Unhiding replacement rings"
     cd ${LILLYMOL_HOME}/data/ring_replacement && ./to_linux.sh
+  elif [[ $(uname) == "Darwin" ]] ; then
+    cd ${LILLYMOL_HOME}/data/ring_replacement && ./to_mac.sh
   fi
   # not doing mac yet
 fi

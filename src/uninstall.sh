@@ -66,6 +66,7 @@ to_remove+=('tsmiles')
 to_remove+=('tspassbyref')
 to_remove+=('tstandardise')
 to_remove+=('unique_molecules_sorted')
+to_remove+=('gfp_svmfp_score_pthread')
 
 for file in "${to_remove[@]}" ; do
   fname="${install_dir}/${file}"

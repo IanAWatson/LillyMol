@@ -5,6 +5,8 @@
 
 #include <stdlib.h>
 #include <values.h>
+
+#include <algorithm>
 #include <iostream>
 #include <memory>
 
@@ -511,7 +513,7 @@ compute_intra_cluster_distances (const Cluster & cluster,
 {
   int cluster_size = cluster.number_elements();
 
-  set_vector (tmp, cluster_size, static_cast<similarity_type_t> (0.0));
+  std::fill_n (tmp, cluster_size, static_cast<similarity_type_t> (0.0));
 
   for (int i = 0; i < cluster_size; i++)
   {

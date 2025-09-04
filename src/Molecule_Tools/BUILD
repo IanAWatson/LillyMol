@@ -1791,7 +1791,7 @@ cc_binary(
 cc_binary(
     name = "ring_substitution",
     srcs = [
-        "ring_substitution.cc",
+        "ring_substitution_main.cc",
     ],
     deps = [
         "ring_substitution_lib",

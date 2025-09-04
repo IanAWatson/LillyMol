@@ -111,7 +111,7 @@ cc_library (
 # local needs.
 new_local_repository(
     name = "python",
-    path = "/lrlhps/data/c3tk/dev/virtenv/gc3tk-env/include/python3.11",
+    path = "/usr/include/python3.12",
     build_file_content = """
 cc_library(
     name = "python",

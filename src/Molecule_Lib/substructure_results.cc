@@ -1,4 +1,5 @@
 #include <stdlib.h>
+
 #include <algorithm>
 #include <iostream>
 #include <memory>
@@ -803,7 +804,7 @@ Substructure_Results::_remove_hits_not_in_largest_fragment_multiple_largest(Mole
 
     if (a > atoms_in_largest_fragment)
     {
-      set_vector(is_largest, nf, 0);
+      std::fill_n(is_largest, nf, 0);
       is_largest[i] = 1;
       atoms_in_largest_fragment = a;
     }

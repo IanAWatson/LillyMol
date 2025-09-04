@@ -1,7 +1,4 @@
-# load("@com_google_protobuf//:protobuf.bzl", "py_proto_library")
-# load("@rules_python//python:proto.bzl", "py_proto_library")
 load("@com_google_protobuf//bazel:py_proto_library.bzl", "py_proto_library")
-# load("@rules_python//python:proto.bzl", "py_proto_library")
 # load("@rules_proto_grpc_cpp//:defs.bzl", "cpp_grpc_compile")
 
 load("@rules_proto//proto:defs.bzl", "proto_library")
@@ -118,17 +115,6 @@ py_proto_library(
 #      "nn_request.proto",
 #  ],
 #)
-
-cc_binary(
-    name = "descriptor_file_to_01_fingerprints",
-    srcs = [
-        "descriptor_file_to_01_fingerprints.cc",
-    ],
-    deps = [
-        ":gfp",
-        "//Foundational/iwmisc",
-    ],
-)
 
 cc_binary(
     name = "evidence",
@@ -728,6 +714,7 @@ cc_binary(
         "gfp_svmfp_score.cc",
     ],
     deps = [
+        ":gfp",
         ":gfp_bit_subset",
         "//Foundational/accumulator",
         "//Foundational/cmdline:iwcmdline",
@@ -737,7 +724,7 @@ cc_binary(
         "//Foundational/iwmisc:normalisation",
         "//Foundational/iwmisc:sparse_fp_creator",
         "//Foundational/iwqsort",
-        "//Utilities/GFP_Tools:gfp",
+        "//Utilities/General:linear_scaling",
     ],
 )
 
@@ -871,6 +858,25 @@ cc_binary(
 )
 
 cc_binary(
+    name = "model_uncertainty",
+    srcs = [
+        "model_uncertainty.cc",
+    ],
+    deps = [
+        ":gfp",
+        "//Foundational/accumulator",
+        "//Foundational/cmdline:iwcmdline",
+        "//Foundational/data_source:iwstring_data_source",
+        "//Foundational/iwstring:absl_hash",
+        "//Foundational/iw_tdt",
+        "//Foundational/iwmisc",
+        "//Utilities/General:mispredicted_cc_proto",
+        "@com_google_absl//absl/container:flat_hash_map",
+        "@com_google_absl//absl/strings:string_view",
+    ]
+)
+
+cc_binary(
     name = "nn_fixed_size_cluster",
     srcs = [
         "nn_fixed_size_cluster.cc",
@@ -971,20 +977,6 @@ cc_binary(
 )
 
 cc_binary(
-    name = "marvin2gfp",
-    srcs = [
-        "marvin2gfp.cc",
-    ],
-    deps = [
-        "//Foundational/accumulator",
-        "//Foundational/cmdline:iwcmdline",
-        "//Foundational/data_source:iwstring_data_source",
-        "//Foundational/iwmisc",
-        "//Foundational/iwmisc:sparse_fp_creator",
-    ],
-)
-
-cc_binary(
     name = "nn_leader_and_jp",
     srcs = [
         "nn_leader_and_jp.cc",
@@ -1053,20 +1045,6 @@ cc_binary(
 )
 
 cc_binary(
-    name = "plate_layout",
-    srcs = [
-        "plate_layout.cc",
-    ],
-    deps = [
-        "//Foundational/accumulator",
-        "//Foundational/cmdline:iwcmdline",
-        "//Foundational/data_source:iwstring_data_source",
-        "//Foundational/iwmisc",
-        "//Utilities/GFP_Tools:gfp",
-    ],
-)
-
-cc_binary(
     name = "random_fingerprint",
     srcs = [
         "random_fingerprint.cc",
@@ -1122,6 +1100,8 @@ cc_binary(
         "//Foundational/data_source:iwstring_data_source",
         "//Foundational/iwmisc",
         "//Foundational/iwqsort",
+        "//Utilities/General:linear_scaling",
+        "@com_google_protobuf//:protobuf",
     ],
 )
 
@@ -1282,6 +1262,9 @@ cc_library(
     ],
     deps = [
         ":gfp",
+    ],
+    visibility = [
+        "//visibility:public",
     ],
 )
 

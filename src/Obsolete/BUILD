@@ -261,7 +261,7 @@ cc_binary(
         "//Foundational/iw_tdt",
         "//Foundational/iwmisc",
         "//Utilities/GFP_Tools:gfp",
-        "//Utilities/Distance_Matrix:distance_matrix_base",
+        "//Obsolete/Distance_Matrix:distance_matrix_base",
     ],
 )
 
@@ -284,23 +284,6 @@ cc_binary(
     ],
     tags = [
         "nlopt",
-    ],
-)
-
-cc_binary(
-    name = "gfp_svmfp_score_pthread",
-    srcs = [
-        "gfp_svmfp_score_pthread.cc",
-    ],
-    deps = [
-        "//Foundational/accumulator",
-        "//Foundational/cmdline:iwcmdline",
-        "//Foundational/data_source:iwstring_data_source",
-        "//Foundational/iw_tdt",
-        "//Foundational/iwmisc",
-        "//Foundational/iwmisc:normalisation",
-        "//Utilities/GFP_Tools:gfp_bit_subset",
-        "//Utilities/GFP_Tools:gfp",
     ],
 )
 

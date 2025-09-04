@@ -1,5 +1,6 @@
 #include <time.h>
 
+#include <algorithm>
 #include <cassert>
 #include <iostream>
 #include <limits>
@@ -446,7 +447,7 @@ write_mdl_v30_bond_list(Molecule& m, const const_IWSubstring& query_name,
                         const Set_of_Atoms& e, int* btmp, std::ostream& output) {
   int nb = m.nedges();
 
-  set_vector(btmp, nb, 0);
+  std::fill_n(btmp, nb, 0);
 
   int n = e.number_elements();
 

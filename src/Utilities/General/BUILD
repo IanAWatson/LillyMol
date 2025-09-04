@@ -670,6 +670,7 @@ cc_binary(
         "//Foundational/accumulator",
         "//Foundational/data_source:iwstring_data_source",
         "//Foundational/iwmisc",
+        "//Foundational/iwmisc:normalisation_cc_proto",
         "//Foundational/iwmisc:normalisation",
         "//Foundational/iwstring",
     ],

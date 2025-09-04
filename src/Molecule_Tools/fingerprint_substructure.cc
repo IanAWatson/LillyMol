@@ -3,6 +3,7 @@
   grouping molecules
 */
 
+#include <algorithm>
 #include <iostream>
 #include <memory>
 
@@ -692,7 +693,7 @@ do_fingerprint_each_substructure_match (Molecule & m,
 
 //  mark all atoms within extend_shell of the matched atoms with the number 2. Matched atoms get 1
 
-    set_vector(tmp, matoms, 0);
+    std::fill_n(tmp, matoms, 0);
 
     for (int j = 0; j < nhits; ++j) {
       const Set_of_Atoms* e = sresults.embedding(i);

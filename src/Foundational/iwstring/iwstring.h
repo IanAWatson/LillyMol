@@ -157,6 +157,9 @@ class const_IWSubstring
     int numeric_value (unsigned long &) const;
     int numeric_value (unsigned long long &) const;
 
+    // Suffixes k(thousand), m(million) and g(giga) are recognised;
+    template <typename T> int NumericValueKMG(T& result) const;
+
     int starts_with (char) const;
     int starts_with (const char *) const;
     int starts_with (const const_IWSubstring &) const;
@@ -298,6 +301,7 @@ class const_IWSubstring
     bool operator > (const IWString &) const;
 
 #ifdef THESE_WERE_NEVER_IMPLEMENTED_AND_A_BAD_IDEA
+
     int operator <= (int) const;
     int operator > (int) const;
     int operator >= (int) const;
@@ -526,6 +530,7 @@ class IWString : public resizable_array<char>
     int numeric_value (double &) const;
     int numeric_value (long long &) const;
     int numeric_value (unsigned long &) const;
+    int numeric_value (unsigned long long &) const;
 
     int numeric_value_fast(int &) const;
 
@@ -755,7 +760,7 @@ IWString::operator == (const char * rhs) const
 //cerr << "invoked at line " << __LINE__ << endl;
 
   if (_number_elements != (int) std::strlen (rhs))    // cannot be the same if different lengths
-    return 0;
+    return false;
 
   return 0 == ::strncmp (_things, rhs, _number_elements);    // loss of const OK for strcmp
 }
@@ -764,7 +769,7 @@ inline bool
 operator != (char lhs, const const_IWSubstring & rhs)
 {
   if (1 != rhs.length ())
-    return 1;
+    return true;
 
   return lhs != rhs[0];
 }
@@ -775,12 +780,12 @@ const_IWSubstring::operator != (const const_IWSubstring & rhs) const
 //cerr << "invoked at line " << __LINE__ << endl;
   int l2 = rhs._nchars;
   if (_nchars != l2)
-    return 1;
+    return true;
 
   if (0 == ::strncmp (_data, rhs._data, _nchars))
-    return 0;
+    return false;
   else
-    return 1;
+    return true;
 }
 
 inline bool
@@ -789,12 +794,12 @@ const_IWSubstring::operator != (const IWString & rhs) const
 //cerr << "invoked at line " << __LINE__ << endl;
 
   if (_nchars != rhs.nchars ())
-    return 1;
+    return true;
 
   if (0 == ::strncmp (_data, rhs.rawchars (), _nchars))
-    return 0;
+    return false;
   else
-    return 1;
+    return true;
 }
 
 inline bool
@@ -802,7 +807,7 @@ IWString::operator == (const IWString & rhs) const
 {
 //cerr << "invoked at line " << __LINE__ << endl;
   if (_number_elements != rhs._number_elements)
-    return 0;
+    return false;
 
 //return (0 == ::strncmp (_things, rhs._things, _number_elements));
   return (0 == ::memcmp (_things, rhs._things, _number_elements));
@@ -814,7 +819,7 @@ IWString::operator != (const IWString & rhs) const
 //cerr << "invoked at line " << __LINE__ << endl;
 
   if (_number_elements != rhs._number_elements)
-    return 1;
+    return true;
 
   return (0 != ::strncmp (_things, rhs._things, _number_elements));
 }
@@ -824,7 +829,7 @@ inline bool
 const_IWSubstring::operator == (const const_IWSubstring & rhs) const
 {
   if (_nchars != rhs._nchars)
-    return 0;
+    return false;
 
   return (0 == ::strncmp (_data, rhs._data, _nchars));
 }
@@ -834,7 +839,7 @@ const_IWSubstring::operator == (const IWString & rhs) const
 {
 //cerr << "invoked at line " << __LINE__ << endl;
   if (_nchars != rhs._number_elements)
-    return 0;
+    return false;
 
   return (0 == ::strncmp (_data, rhs._things, _nchars));
 }
@@ -845,7 +850,7 @@ IWString::operator == (char rhs) const
 //cerr << "invoked at line " << __LINE__ << endl;
 
   if (1 != _number_elements)
-    return 0;
+    return false;
 
   return rhs == _things[0];
 }
@@ -856,7 +861,7 @@ operator == (const char * lhs, const IWString & rhs)
 //cerr << "invoked at line " << __LINE__ << endl;
   int lchars = static_cast<int>(std::strlen (lhs));
   if (lchars != rhs._number_elements)
-    return 0;
+    return false;
 
   return 0 == ::strncmp (lhs, rhs._things, lchars);
 }
@@ -867,7 +872,7 @@ operator != (const char * lhs, const IWString & rhs)
 //cerr << "invoked at line " << __LINE__ << endl;
   int lchars = static_cast<int>(std::strlen (lhs));
   if (lchars != rhs._number_elements)
-    return 1;
+    return true;
 
   return 0 != ::strncmp (lhs, rhs._things, lchars);
 }
@@ -878,7 +883,7 @@ operator == (const char * lhs, const const_IWSubstring & rhs)
 //cerr << "invoked at line " << __LINE__ << endl;
   int lchars = static_cast<int>(std::strlen (lhs));
   if (lchars != rhs._nchars)
-    return 0;
+    return false;
 
   return (0 == ::strncmp (lhs, rhs._data, lchars));
 }
@@ -889,7 +894,7 @@ operator != (const char * lhs, const const_IWSubstring & rhs)
 //cerr << "invoked at line " << __LINE__ << endl;
   int lchars = static_cast<int>(std::strlen (lhs));
   if (lchars != rhs._nchars)
-    return 1;
+    return true;
 
   return (0 != ::strncmp (lhs, rhs._data, lchars));
 }
@@ -899,7 +904,7 @@ operator != (char lhs, const IWString & rhs)
 {
 //cerr << "invoked at line " << __LINE__ << endl;
   if (1 != rhs._number_elements)
-    return 1;
+    return true;
 
   return lhs != rhs._things[0];
 }
@@ -910,7 +915,7 @@ const_IWSubstring::operator == (const char * rhs) const
   int l2 = static_cast<int>(std::strlen (rhs));
 
   if (_nchars != l2)
-    return 0;
+    return false;
 
   return 0 == ::strncmp (_data, rhs, _nchars);
 }
@@ -922,7 +927,7 @@ IWString::operator == (const const_IWSubstring & rhs) const
 
   int l2 = rhs.nchars ();
   if (_number_elements != l2)
-    return 0;
+    return false;
 
   return 0 == ::strncmp (_things, rhs.rawchars (), _number_elements);
 }
@@ -933,7 +938,7 @@ IWString::operator != (const const_IWSubstring & rhs) const
 //cerr << "invoked at line " << __LINE__ << endl;
 
   if (_number_elements != rhs.nchars ())
-    return 1;
+    return true;
 
   return 0 != ::strncmp (_things, rhs.rawchars (), _number_elements);
 }
@@ -943,7 +948,7 @@ operator == (char lhs, const IWString & rhs)
 {
 //cerr << "invoked at line " << __LINE__ << endl;
   if (1 != rhs._number_elements)
-    return 0;
+    return false;
 
   return lhs == rhs._things[0];
 }
@@ -953,7 +958,7 @@ operator == (char lhs, const const_IWSubstring & rhs)
 {
 //cerr << "invoked at line " << __LINE__ << endl;
   if (1 != rhs._nchars)
-    return 0;
+    return false;
 
   return lhs == rhs._data[0];
 }
@@ -986,7 +991,7 @@ IWString::operator != (const char * rhs) const
 //cerr << "invoked at line " << __LINE__ << endl;
 
   if (_number_elements != (int) std::strlen (rhs))    // indeed they are different if different lengths
-    return 1;
+    return true;
 
   return 0 != ::strncmp (_things, rhs, _number_elements);
 }
@@ -998,7 +1003,7 @@ const_IWSubstring::operator != (const char * rhs) const
 
   int l2 = static_cast<int>(std::strlen (rhs));
   if (l2 != _nchars)    // the two strings are definitely not equal
-    return 1;
+    return true;
 
   return 0 != ::strncmp (_data, rhs, l2);
 }

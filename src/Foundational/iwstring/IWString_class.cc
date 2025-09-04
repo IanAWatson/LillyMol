@@ -1512,6 +1512,12 @@ IWString::numeric_value(long long & result) const
 }
 
 int
+IWString::numeric_value(unsigned long long & result) const
+{
+  return string_class_is_int_8(_things, _number_elements, result);
+}
+
+int
 IWString::numeric_value(unsigned int & result) const
 {
   if (4 == sizeof(result))
@@ -4264,7 +4270,7 @@ const_IWSubstring::remove_up_to_first(char target)
   Once we move to 2.8.xxx change this
 */
 
-int 
+bool 
 const_IWSubstring::operator <(int rhs) const
 {
   int intme;
@@ -4278,7 +4284,7 @@ const_IWSubstring::operator <(int rhs) const
   return intme < rhs;
 }
 
-int
+bool
 const_IWSubstring::operator ==(int rhs) const
 {
   int intme;
@@ -4292,7 +4298,7 @@ const_IWSubstring::operator ==(int rhs) const
   return intme == rhs;
 }
 
-int
+bool
 const_IWSubstring::operator <=(int rhs) const
 {
   int intme;
@@ -4306,7 +4312,7 @@ const_IWSubstring::operator <=(int rhs) const
   return intme <= rhs;
 }
 
-int
+bool
 const_IWSubstring::operator >=(int rhs) const
 {
   int intme;
@@ -4320,7 +4326,7 @@ const_IWSubstring::operator >=(int rhs) const
   return intme >= rhs;
 }
 
-int
+bool
 const_IWSubstring::operator !=(int rhs) const
 {
   int intme;
@@ -4334,7 +4340,7 @@ const_IWSubstring::operator !=(int rhs) const
   return intme != rhs;
 }
 
-int 
+bool 
 const_IWSubstring::operator <(float rhs) const
 {
   float floatme;
@@ -4348,7 +4354,7 @@ const_IWSubstring::operator <(float rhs) const
   return floatme < rhs;
 }
 
-int
+bool
 const_IWSubstring::operator ==(float rhs) const
 {
   float floatme;
@@ -4362,7 +4368,7 @@ const_IWSubstring::operator ==(float rhs) const
   return floatme == rhs;
 }
 
-int
+bool
 const_IWSubstring::operator <=(float rhs) const
 {
   float floatme;
@@ -4376,7 +4382,7 @@ const_IWSubstring::operator <=(float rhs) const
   return floatme <= rhs;
 }
 
-int
+bool
 const_IWSubstring::operator >=(float rhs) const
 {
   float floatme;
@@ -4390,7 +4396,7 @@ const_IWSubstring::operator >=(float rhs) const
   return floatme >= rhs;
 }
 
-int
+bool
 const_IWSubstring::operator !=(float rhs) const
 {
   float floatme;
@@ -4404,7 +4410,7 @@ const_IWSubstring::operator !=(float rhs) const
   return floatme != rhs;
 }
 
-int 
+bool 
 const_IWSubstring::operator <(double rhs) const
 {
   double doubleme;
@@ -4418,7 +4424,7 @@ const_IWSubstring::operator <(double rhs) const
   return doubleme < rhs;
 }
 
-int
+bool
 const_IWSubstring::operator ==(double rhs) const
 {
   double doubleme;
@@ -4432,7 +4438,7 @@ const_IWSubstring::operator ==(double rhs) const
   return doubleme == rhs;
 }
 
-int
+bool
 const_IWSubstring::operator <=(double rhs) const
 {
   double doubleme;
@@ -4446,7 +4452,7 @@ const_IWSubstring::operator <=(double rhs) const
   return doubleme <= rhs;
 }
 
-int
+bool
 const_IWSubstring::operator >=(double rhs) const
 {
   double doubleme;
@@ -4460,7 +4466,7 @@ const_IWSubstring::operator >=(double rhs) const
   return doubleme >= rhs;
 }
 
-int
+bool
 const_IWSubstring::operator !=(double rhs) const
 {
   double doubleme;

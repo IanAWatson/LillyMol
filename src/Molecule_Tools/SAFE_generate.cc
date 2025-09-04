@@ -1985,7 +1985,7 @@ Options::Breed(SafedMolecule& m1, SafedMolecule& m2,
 
   Molecule m;
   if (!m.build_from_smiles(new_smiles)) {
-    cerr << "Options::Breed:invalid smiles '" << tmp << "'\n";
+    cerr << "Options::Breed:invalid smiles '" << new_smiles << "'\n";
     cerr << "f1_ndx " << f1_ndx << ' ';
     m1.DebugPrint(cerr);
     cerr << "f2_ndx " << f2_ndx << ' ';

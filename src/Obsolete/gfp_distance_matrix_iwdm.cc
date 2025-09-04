@@ -13,10 +13,10 @@
 #include "Foundational/data_source/iwstring_data_source.h"
 #include "Foundational/iwmisc/misc.h"
 #include "Foundational/iw_tdt/iw_tdt.h"
-#include "Utilities/Distance_Matrix/IWDistanceMatrixBase.h"
+#include "Obsolete/Distance_Matrix/IWDistanceMatrixBase.h"
 
-#include "gfp.h"
-#include "tversky.h"
+#include "Utilities/GFP_Tools/gfp.h"
+#include "Utilities/GFP_Tools/tversky.h"
 
 using std::cerr;
 using std::endl;

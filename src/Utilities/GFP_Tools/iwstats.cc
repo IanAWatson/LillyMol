@@ -1133,7 +1133,7 @@ compute_b_squared(int number_records, int experimental_column,
       n++;
     }
   } else {
-    set_vector(tmp1, number_records, static_cast<float>(0.0));
+    std::fill_n(tmp1, number_records, static_cast<float>(0.0));
     n = number_records;
   }
 
@@ -1603,11 +1603,13 @@ ReportMSRDefaults(uint32_t number_records, const float* expt, const float* pred,
 
   cerr << "MSR " << msr << " all predictions average " << ave << " within " << m << '\n';
 
+  static std::random_device rd;
+  static std::mt19937 rng(rd());
+
   std::copy_n(pred, number_records, tmp.get());
   for (int i = 0; i < 3; ++i) {
-    std::random_shuffle(tmp.get(), tmp.get() + number_records);
+    std::shuffle(tmp.get(), tmp.get() + number_records, rng);
     float m = WithinRange(number_records, expt, tmp.get(), msr);
-    cerr << " shuffled " << m << '\n';
   }
 }
 

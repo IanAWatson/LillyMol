@@ -6,6 +6,7 @@
 #include <stdlib.h>
 #include <math.h>
 
+#include <algorithm>
 #include <fstream>
 #include <iomanip>
 #include <iostream>
@@ -1803,7 +1804,7 @@ NN_Item_Category::compute_predicted_values (const BSquared & bs,
                                    int which_prediction,
                                    const NN_Weight_Function & wfn)
 {
-  set_vector (category_sumw, highest_category_number + 1, static_cast<weight_t> (0.0));
+  std::fill_n (category_sumw, highest_category_number + 1, static_cast<weight_t> (0.0));
 
   int neighbours = bs.number_neighbours ();
   double radius = bs.radius ();
@@ -3137,7 +3138,7 @@ NN_Results_Category::establish_categories ()
 
   weight_t w = 1.0 / static_cast<weight_t> (number_categories);
 
-  set_vector (category_weight, highest_category_number + 1, w);
+  std::fill_n (category_weight, highest_category_number + 1, w);
 
   if (good_better_best_model)
   {
@@ -3211,7 +3212,7 @@ NN_Results_Category::assign_training_test_set_membership (const Cross_Validation
   if (cvc.number_elements ())
     return _assign_training_test_set_membership_external (cvc, i);
 
-  set_vector (_number_selected_from_category, highest_category_number + 1, 0);
+  std::fill_n (_number_selected_from_category, highest_category_number + 1, 0);
 
   int categories_completed = 0;
 
@@ -3379,8 +3380,8 @@ NN_Results_Category::compute_model_quality (int number_estimates,
 {
   for (int i = 0; i < number_estimates; i++)
   {
-    set_vector (_category_count,  highest_category_number + 1, 0);
-    set_vector (_category_errors, highest_category_number + 1, 0);
+    std::fill_n (_category_count,  highest_category_number + 1, 0);
+    std::fill_n (_category_errors, highest_category_number + 1, 0);
 
     int number_predicted_values = 0;
     for (int j = 0; j < _number_items; j++)

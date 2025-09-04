@@ -18,7 +18,7 @@
 #include "Foundational/iwmisc/normalisation.h"
 
 #include "Utilities/GFP_Tools/gfp.h"
-#include "gfp_bit_subset.h"
+#include "Utilities/GFP_Tools/gfp_bit_subset.h"
 
 using std::cerr;
 using std::endl;
@@ -89,7 +89,7 @@ static similarity_type_t minimum_similarity_for_singleton_consideration = static
 
 static Accumulator<double> acc_scores;
 
-static NColumn normalisation;
+static NColumn my_normalisation;
 
 static int normalisation_active = 0;
 
@@ -174,7 +174,7 @@ Fingerprint_and_Weight::extract_numeric_value_from_id (int w)
   }
 
   if (normalisation_active)
-    normalisation.scale(_weight, _weight);
+    my_normalisation.scale(_weight, _weight);
 
   return 1;
 }
@@ -940,7 +940,7 @@ svmfp_score (IW_General_Fingerprint & fp,
   if (normalisation_active)
   {
     double unscaled;
-    normalisation.unscale(rc, unscaled);
+    my_normalisation.unscale(rc, unscaled);
 //  cerr << "Unscale '" << fp.id() << "' " << rc << " to " << unscaled << endl;
     output << static_cast<float>(unscaled);
 
@@ -1047,7 +1047,7 @@ svmfp_score (const char * fname,
 
 static int
 read_normalisation_data(iwstring_data_source & input,
-                        NColumn & normalisation)
+                        NColumn & my_normalisation)
 {
   IWString buffer;
 
@@ -1071,7 +1071,7 @@ read_normalisation_data(iwstring_data_source & input,
 
     buffer.remove_leading_words(1);
 
-    return normalisation.establish_range_from_pre_existing_data(buffer);
+    return my_normalisation.establish_range_from_pre_existing_data(buffer);
   }
 
   cerr << "No normalisation data in file\n";
@@ -1080,7 +1080,7 @@ read_normalisation_data(iwstring_data_source & input,
 
 static int
 read_normalisation_data(const IWString & n,
-                        NColumn & normalisation)
+                        NColumn & my_normalisation)
 {
   iwstring_data_source input(n);
 
@@ -1090,7 +1090,7 @@ read_normalisation_data(const IWString & n,
     return 0;
   }
 
-  return read_normalisation_data (input, normalisation);
+  return read_normalisation_data (input, my_normalisation);
 }
 
 /*
@@ -1315,7 +1315,7 @@ svmfp_score (int argc, char ** argv)
       cerr << "Missing or empty normalisation file '" << n << "'\n";
       return 3;
     }
-    if (! read_normalisation_data(n, normalisation))
+    if (! read_normalisation_data(n, my_normalisation))
     {
       cerr << "Invalid normalisation data '" << n << "'\n";
       return 4;

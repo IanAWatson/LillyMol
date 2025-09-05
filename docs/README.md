@@ -9,6 +9,7 @@ will see things that seem duplicative. Work is ongoing to clean deprecate
 obsolete tools and replace with their more modern counterparts.
 
 ## abraham
+Implements an Abraham atomic contribution method.
 
 ## activity_consistency
 [activity_consistency](/docs/Molecule_Tools/activity_consistency.md)
@@ -150,6 +151,7 @@ not used, because the reliability/presence of such information can be low.
 
 ## ez_fingerprint
 Fingerprint based on E/Z bond specifications. See previous comment.
+
 ## ez_fingerprint_v2
 Newer generation of E/Z fingerprinting. Still unsatisfactory. E/Z
 data is not robustly handled in LillyMol.
@@ -364,7 +366,7 @@ Descriptor generator. Generates 250+ mostly interpretable molecular descriptors.
 [iwdescr](Molecule_Tools/iwdescr.md)
 
 ## iwecfp
-Generates EC fingerprints, the -EC to gfp_make.
+Generates EC fingerprints, the -EC option to gfp_make.
 
 ## iwecfp_database_load
 ## iwecfp_database_lookup
@@ -558,7 +560,7 @@ Pubchem Fingerprints
 Command line version for computing QED [QED](Molecule_Tools/QED.md).
 
 ## QupKake.sh
-Consumes output from atom contribution methods like QupKake and Epok
+Consumes output from atom contribution methods like QupKake and Epik
 for pKa computations. [QupKake](Molecule_Tools/QupKake.md).
 
 ## r1r2etc

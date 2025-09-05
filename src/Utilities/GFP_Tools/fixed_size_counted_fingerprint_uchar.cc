@@ -34,7 +34,8 @@ Fixed_Size_Counted_Fingerprint_uchar::construct_from_tdt_record (const const_IWS
 
   const_IWSubstring fp, other_info;
 
-  if (! mybuffer.split (fp, ';', other_info))   // just the fingerprint present, no info about nset or nbits
+  // just the fingerprint present, no info about nset or nbits
+  if (! mybuffer.split (fp, ';', other_info)) 
   {
     if (! _construct_from_tdt_record (mybuffer))
       return 0;

@@ -1610,6 +1610,7 @@ ReportMSRDefaults(uint32_t number_records, const float* expt, const float* pred,
   for (int i = 0; i < 3; ++i) {
     std::shuffle(tmp.get(), tmp.get() + number_records, rng);
     float m = WithinRange(number_records, expt, tmp.get(), msr);
+    cerr << " shuffled " << m << '\n';
   }
 }
 

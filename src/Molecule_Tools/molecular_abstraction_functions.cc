@@ -9,6 +9,7 @@
 
 #include <stdlib.h>
 
+#include <algorithm>
 #include <iostream>
 #include <limits>
 #include <memory>
@@ -2177,7 +2178,7 @@ Molecular_Abstraction_Abstract_Ring_Form::_place_abstract_rings(
   for (int i = 0; i < nr; i++) {
     const Ring* ri = m.ringi(i);
 
-    set_vector(tmp, matoms, 0);
+    std::fill_n(tmp, matoms, 0);
 
     ri->set_vector(tmp, 1);
 
@@ -2359,7 +2360,7 @@ Molecular_Abstraction_Abstract_Ring_Form::_spread_apart_any_spiro_rings(
   for (int i = 0; i < nr; i++) {
     const Ring* ri = m.ringi(i);
 
-    set_vector(tmp, matoms, 0);
+    std::fill_n(tmp, matoms, 0);
     ri->set_vector(tmp, 1);
 
     for (int j = i + 1; j < nr; j++) {
@@ -4210,7 +4211,7 @@ Molecular_Abstraction_Remove_Ring_CH2::process(Molecule_With_Info_About_Parent& 
          << " and " << rhs << '\n';
 #endif
 
-    set_vector(to_remove, matoms, 0);
+    std::fill_n(to_remove, matoms, 0);
 
     //  If we have an isolated ring, we may need to shrink it
 

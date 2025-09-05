@@ -10,7 +10,6 @@
 #include "google/protobuf/io/zero_copy_stream_impl_lite.h"
 #include "google/protobuf/text_format.h"
 
-
 #include "db_cxx.h"
 
 #include "Foundational/cmdline/cmdline.h"
@@ -22,7 +21,7 @@
 #include "Foundational/iwqsort/iwqsort.h"
 
 #include "Molecule_Lib/atom_typing.h"
-#include "Molecule_Lib/molecular_formula.h"
+#include "Molecule_Tools/mformula.h"
 #include "Molecule_Lib/molecule.h"
 #include "Molecule_Lib/set_of_atoms.h"
 #include "Molecule_Lib/target.h"
@@ -67,7 +66,7 @@ class Replacement {
 
     Molecule _m;
 
-    molecular_formula::MolecularFormula<uint32_t> _mformula;
+    mformula::MFormula _mformula;
 
     int _aromatic_atom_count;
     int _nrings;

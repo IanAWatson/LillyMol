@@ -104,7 +104,7 @@ cc_binary(
         "//Foundational/data_source:iwstring_data_source",
         "//Foundational/iwstring:absl_hash",
         "//Molecule_Lib:iwmolecule",
-        "//Molecule_Lib:molecular_formula_lib",
+        "//Molecule_Lib:moleculeio",
         "//Molecule_Tools:dicer_fragments_cc_proto",
         "//Molecule_Tools:mformula",
         "@third_party//:berkeley_static",

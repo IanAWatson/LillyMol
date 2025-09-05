@@ -102,13 +102,22 @@ if [[ ! -d ${third_party}/bin ]] ; then
   mkdir -p ${third_party}/bin
 fi
 
+# Platform specific ways of fetching a file
+
+if [[ $(uname) == 'Linux' ]] ; then
+  FETCH='wget'
+elif [[ $(uname) == 'Darwin' ]] ; then
+  FETCH='curl -L'
+fi
+ 
+
 # If we clone the repo we must build it, even if the
 # file being checked is still present.
 declare -i must_build
 
 must_build=0
 if [[ ! -s 'f2c.tar.gz' ]] ; then
-    wget -O f2c.tar.gz https://www.netlib.org/f2c/src.tgz 
+    ${FETCH} -O f2c.tar.gz https://www.netlib.org/f2c/src.tgz 
     tar -zxvf f2c.tar.gz
     mv src f2c  # change the non descriptive name
     must_build=1
@@ -120,7 +129,7 @@ fi
 
 must_build=0
 if [[ ! -s 'libf2c.zip' ]] ; then
-    wget https://www.netlib.org/f2c/libf2c.zip
+    ${FETCH} https://www.netlib.org/f2c/libf2c.zip
     mkdir libf2c
     cd libf2c && unzip ../libf2c.zip
     must_build=1
@@ -136,7 +145,7 @@ if [[ -v BUILD_BDB ]] ; then
     must_build=0
     bdb_version='18.1.40'
     if [[ ! -s "db-${bdb_version}.tar.gz" ]] ; then
-        wget http://download.oracle.com/berkeley-db/db-${bdb_version}.tar.gz
+        ${FETCH} http://download.oracle.com/berkeley-db/db-${bdb_version}.tar.gz
         tar zxf db-${bdb_version}.tar.gz
         must_build=1
     fi

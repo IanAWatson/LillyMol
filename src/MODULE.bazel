@@ -34,7 +34,7 @@ bazel_dep(name = "nanobind_bazel", version = "2.7.0")
 bazel_dep(name = "onetbb", version = "2022.1.0", repo_name="onetbb")
 bazel_dep(name = "platforms", version = "1.0.0")
 # Version 27.0 works for c++, but does not work with python 3.11
-bazel_dep(name = "protobuf", version = "31.1", repo_name="com_google_protobuf")
+bazel_dep(name = "protobuf", version = "32.0", repo_name="com_google_protobuf")
 bazel_dep(name = "pybind11_bazel", version = "2.13.6")
 # bazel_dep(name = "pybind11_protobuf", version = "2.11.1.bzl.3")
 bazel_dep(name = "re2", version = "2024-07-02")
@@ -48,7 +48,7 @@ bazel_dep(name = "rules_proto", version = "7.1.0")
 # bazel_dep(name = "rules_proto_grpc_go", version = "5.0.1")
 # Beware, adding this version will cause a bump in the
 # protoc version to an incompatible version.
-bazel_dep(name = "rules_python", version = "1.4.1")
+bazel_dep(name = "rules_python", version = "1.6.0")
 
 # bazel_dep(name = "rules_proto_grpc", version = "5.0.0")
 # bazel_dep(name = "rules_proto_grpc_cpp", version = "5.0.0")

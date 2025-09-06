@@ -45,6 +45,16 @@ if [[ -v BUILD_PYTHON ]] ; then
     fi
 fi
 
+# Homebrew openmp
+if [[ $(uname) == 'Darwin' ]] ; then
+  grep -q 'homebrew.*openmp' MODULE.bazel
+  if [[ $? -eq 0 ]] ; then
+    python3 ./add_homebrew_to_module_bazel.py >> MODULE.bazel
+  else
+    echo "Homebrew openmp already added to MODULE.bazel"
+  fi
+fi
+
 # intall.bzl no longer used.
 # install.bzl does need to be updated.
 # echo 'Updating build_deps/install.bzl'
@@ -102,22 +112,17 @@ if [[ ! -d ${third_party}/bin ]] ; then
   mkdir -p ${third_party}/bin
 fi
 
-# Platform specific ways of fetching a file
-
-if [[ $(uname) == 'Linux' ]] ; then
-  FETCH='wget'
-elif [[ $(uname) == 'Darwin' ]] ; then
-  FETCH='curl -L'
-fi
- 
-
 # If we clone the repo we must build it, even if the
 # file being checked is still present.
 declare -i must_build
 
 must_build=0
 if [[ ! -s 'f2c.tar.gz' ]] ; then
-    ${FETCH} -O f2c.tar.gz https://www.netlib.org/f2c/src.tgz 
+   if [[ $(uname) == 'Linux' ]] ; then
+    wget -o f2c.tar.gz https://www.netlib.org/f2c/src.tgz 
+   else
+    curl -L -o f2c.tar.gz https://www.netlib.org/f2c/src.tgz 
+   fi
     tar -zxvf f2c.tar.gz
     mv src f2c  # change the non descriptive name
     must_build=1
@@ -129,7 +134,11 @@ fi
 
 must_build=0
 if [[ ! -s 'libf2c.zip' ]] ; then
-    ${FETCH} https://www.netlib.org/f2c/libf2c.zip
+    if [[ $(uname) == 'Linux' ]] ; then
+      wget https://www.netlib.org/f2c/libf2c.zip
+    else
+      curl -L -O https://www.netlib.org/f2c/libf2c.zip
+    fi
     mkdir libf2c
     cd libf2c && unzip ../libf2c.zip
     must_build=1
@@ -144,14 +153,19 @@ fi
 if [[ -v BUILD_BDB ]] ; then
     must_build=0
     bdb_version='18.1.40'
-    if [[ ! -s "db-${bdb_version}.tar.gz" ]] ; then
-        ${FETCH} http://download.oracle.com/berkeley-db/db-${bdb_version}.tar.gz
-        tar zxf db-${bdb_version}.tar.gz
+    tarfile="db-${bdb_version}.tar.gz"
+    if [[ ! -s "${tarfile}" ]] ; then
+        if [[ $(uname) == 'Linux' ]] ; then
+          wget http://download.oracle.com/berkeley-db/${tarfile}
+        else
+          curl -L -O http://download.oracle.com/berkeley-db/${tarfile}
+        fi
+        tar zxf ${tarfile}
         must_build=1
     fi
-    if [[ $(uname) -eq "Linux" ]] ; then
+    if [[ $(uname) == "Linux" ]] ; then
       suffix='so'
-    elif [[ $(uname) -eq "Darwin" ]] ; then
+    elif [[ $(uname) == "Darwin" ]] ; then
       suffix='dylib'
     fi
     if [[ ${must_build} -eq 1 || ! -s "${third_party}/BDB/include/db.h" ]] ; then

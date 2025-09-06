@@ -8,7 +8,7 @@
 
 using std::cout;
 
-#include <omp.h>
+#include "omp.h"
 
 #include "Foundational/cmdline/cmdline.h"
 #include "Foundational/data_source/iwstring_data_source.h"

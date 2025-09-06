@@ -10,7 +10,7 @@
 
 #define USE_OMP
 #ifdef USE_OMP
-#include <omp.h>
+#include "omp.h"
 #endif
 
 #define REPORT_PROGRESS_IMPLEMENTATION

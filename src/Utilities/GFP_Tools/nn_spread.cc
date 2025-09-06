@@ -8,7 +8,7 @@
 
 #define USE_OMP
 #ifdef USE_OMP
-#include <omp.h>
+#include "omp.h"
 #endif
 
 #define RESIZABLE_ARRAY_IWQSORT_IMPLEMENTATION

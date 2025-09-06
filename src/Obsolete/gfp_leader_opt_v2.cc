@@ -4,7 +4,6 @@
 */
 
 #include <stdlib.h>
-#include <values.h>
 
 #include <algorithm>
 #include <iostream>

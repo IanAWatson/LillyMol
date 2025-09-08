@@ -12,6 +12,7 @@ namespace ring_substitution {
 RingSubstitutionGenerator::RingSubstitutionGenerator() {
   _positional_information_only = 1;
   _simple_atom_types = 0;
+  _full_atom_types = 0;
   _max_path_length = 24;
   _place_single_feature_bits = 0;
 }

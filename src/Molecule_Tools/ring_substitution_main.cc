@@ -331,12 +331,12 @@ Main(int argc, char** argv) {
         if (verbose) {
           cerr << "Simple atom types for substitutent atoms\n";
         }
-//    } else if ("full" == m) {
-//      gen.set_full_atom_types(1);
-//      nset++;
-//      if (verbose) {
-//        cerr << "Full atom typing\n";
-//      }
+      } else if ("full" == m) {
+        gen.set_full_atom_types(1);
+        nset++;
+        if (verbose) {
+          cerr << "Full atom typing\n";
+        }
       } else if ("sfb" == m) {
         gen.set_place_single_feature_bits(1);
         if (verbose) {

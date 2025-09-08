@@ -10,6 +10,7 @@ class RingSubstitutionGenerator {
   private:
     int _positional_information_only;
     int _simple_atom_types;
+    int _full_atom_types;
     int _max_path_length;
 
     // We can lower the distances between molecules by including presence
@@ -36,6 +37,9 @@ class RingSubstitutionGenerator {
     }
     void set_simple_atom_types(int s) {
       _simple_atom_types = s;
+    }
+    void set_full_atom_types(int s) {
+      _full_atom_types = s;
     }
     void set_max_path_length(int s) {
       _max_path_length = s;

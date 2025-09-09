@@ -12,7 +12,7 @@ files_copied=0
 already_copied=0
 
 if [[ -z "$1" ]] ; then
-  destination='../bin/Linux'
+  destination="../bin/$(uname)"
   echo "No argument, using default destinaton ${destination}" >&2
 elif [[ -d "$1" ]] ; then
   destination="$1"

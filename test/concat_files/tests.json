@@ -41,7 +41,5 @@
           "args": [ "-a #{indir}/t8.1 #{indir}/t8.2" ],
           "comment": [ "Concatenates two files. -a = write all identifiers (includes those not in first file)." ]
         }
-      ]
-    }
-  }
+    ]
 }

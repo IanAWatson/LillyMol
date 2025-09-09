@@ -57,7 +57,13 @@ def rf_evaluate_smiles(fname, mdir, proto, cl)
     cmd << " -j #{j}"
   end
 
-  tmpfile = File.join(ENV['TMPDIR'], "rf_evaluate_smiles_#{Process.uid}.#{Process.pid}.dat")
+  tmpdir = if ENV.key?('TMPDIR')
+             ENV['TMPDIR']
+           else
+             '/tmp/'
+           end
+
+  tmpfile = File.join(tmpdir, "rf_evaluate_smiles_#{Process.uid}.#{Process.pid}.dat")
 
   descriptors.each do |d|
     cmd << " -#{d}"

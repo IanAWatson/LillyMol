@@ -5,9 +5,9 @@
 #include <iostream>
 #include <memory>
 
-#define IW_MULTI_THREAD_OMP
+// #define IW_MULTI_THREAD_OMP
 #ifdef IW_MULTI_THREAD_OMP
-#include <omp.h>
+#include "omp.h"
 #endif
 
 #define RESIZABLE_ARRAY_IMPLEMENTATION

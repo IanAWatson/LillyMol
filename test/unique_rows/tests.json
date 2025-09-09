@@ -54,7 +54,5 @@
           "args": [ "-s -c 1 -c 2 #{indir}/t10.dat" ],
           "comment": [ "like case_1, but with -s" ]
         }
-      ]
-    }
-  }
+    ]
 }

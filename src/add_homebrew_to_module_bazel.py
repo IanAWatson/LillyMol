@@ -26,7 +26,7 @@ def get_openmp(cellar, version)->str:
   """Return the new_local_repository directive for openmp version `version`
   """
   return f"""new_local_repository(
-    name = "homebrew_gnutls",
+    name = "homebrew_openmp",
     path = "{cellar}/libomp/{version}",
     build_file_content = \"\"\"
 cc_library(
@@ -70,7 +70,7 @@ def add_homebrew_to_module_bazel(unused_args):
   if not os.path.isdir(cellar):
     logging.fatal("Where is %s", cellar)
 
-  openmp_dir = os.path.join(cellar, 'openmp')
+  openmp_dir = os.path.join(cellar, 'libomp')
   gnutls_dir = os.path.join(cellar, 'gnutls')
 
   if not os.path.isdir(openmp_dir):

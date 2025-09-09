@@ -498,6 +498,32 @@ cc_binary(
 )
 
 cc_binary(
+    name = "isolation_forest",
+    srcs = [
+        "isolation_forest.cc",
+    ],
+    copts = select({
+        ":darwin": ["-Xclang", "-fopenmp"],
+        "//conditions:default": ["-fopenmp"]
+    }),
+    linkopts = select ({
+        ":darwin": ["-Xclang", "-fopenmp"],
+        "//conditions:default": ["-lgomp"]
+    }),
+    deps = [
+        "//Foundational/accumulator",
+        "//Foundational/cmdline:iwcmdline",
+        "//Foundational/data_source:iwstring_data_source",
+        "//Foundational/iwbits",
+        "//Foundational/iwmisc",
+    ] +
+      select( {
+      "darwin": [ "@homebrew_openmp"],
+      "//conditions:default": []
+    }),
+)
+
+cc_binary(
     name = "molecular_merge",
     srcs = [
         "molecular_merge.cc",

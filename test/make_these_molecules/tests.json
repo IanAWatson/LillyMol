@@ -38,7 +38,5 @@
                    " -M #{indir}/products.lbl #{indir}/amines.smi #{indir}/enamine_bb.smi #{indir}/acids.smi " ],
           "comment": [ "Simple test" ]
         }
-      ]
-    }
-  }
+    ]
 }

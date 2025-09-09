@@ -48,7 +48,7 @@ fi
 # Homebrew openmp
 if [[ $(uname) == 'Darwin' ]] ; then
   grep -q 'homebrew.*openmp' MODULE.bazel
-  if [[ $? -eq 0 ]] ; then
+  if [[ $? -ne 0 ]] ; then
     python3 ./add_homebrew_to_module_bazel.py >> MODULE.bazel
   else
     echo "Homebrew openmp already added to MODULE.bazel"

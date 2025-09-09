@@ -7,7 +7,7 @@ import sys
 from typing import List
 
 import pandas as pd
-import xgboost_model_pb2
+import xgbd.xgboost_model_pb2
 from absl import app, flags, logging
 from google.protobuf import text_format
 from matplotlib import pyplot

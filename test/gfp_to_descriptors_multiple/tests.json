@@ -11,7 +11,5 @@
           "name": "case_2",
           "args": [ "-v -x 0.5 -F FPIW ${LILLYMOL_HOME}/data/chembl10.gfp" ]
         }
-      ]
-    }
-  }
+    ]
 }

@@ -38,7 +38,5 @@
           "args": [ "-k 2 -X 5000 -B nbamide -m 5 -M 20 #{datadir}/rand.smi" ],
           "comment": [ "nbamide" ]
         }
-      ]
-    }
-  }
+    ]
 }

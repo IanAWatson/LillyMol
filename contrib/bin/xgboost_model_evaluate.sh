@@ -5,4 +5,4 @@ if [[ ! -v LILLYMOL_HOME ]] ; then
 fi
 
 export LD_LIBRARY_PATH=${LILLYMOL_HOME}/third_party/lib:${LD_LIBRARY_PATH}
-exec ${LILLYMOL_HOME}/bin/Linux/xgboost_model_evaluate "$@"
+exec ${LILLYMOL_HOME}/bin/$(uname)/xgboost_model_evaluate "$@"

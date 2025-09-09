@@ -8,5 +8,6 @@ else
   export LILLYMOL_HOME=$(dirname $(dirname ${here}))
 fi
 
-exec perl ${here}/gfp_make.pl "$@"
+PATH=${here}:${LILLYMOL_HOME}/bin/${uname}:$PATH
 
+exec perl ${here}/gfp_make.pl "$@"

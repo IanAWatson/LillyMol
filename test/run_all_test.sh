@@ -1,7 +1,7 @@
 #!/bin/bash
 
 export UNAME=$(uname)
-export OSTYPE=${UNAME}
+export OSTYPE=$(uname)
 echo "using UNAME ${UNAME}"
 
 if [[ ! -v LILLYMOL_HOME ]] ; then

@@ -2,7 +2,7 @@
 
 # Rename hidden files to case differentiated forms
 
-for file in $(ls .*arom*.smi) ; do
-  newname=$(echo $file | sed -e 's/^\.//' -e 's/notarom/A/g' -e 's/isarom/a/g')
+for file in $(ls rings*.smi) ; do
+  newname=$(echo $file | sed -e 's/Ar/a/g' -e 's/Al/A/g')
   mv $file $newname
 done

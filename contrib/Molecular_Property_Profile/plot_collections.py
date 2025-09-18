@@ -15,7 +15,7 @@ a png file will be created instead.
 
 from dataclasses import dataclass
 from dataclasses import field
-import sys
+import os, sys
 from typing import List, Tuple
 
 from absl import app
@@ -44,6 +44,7 @@ flags.DEFINE_float('width', 0.0, 'Width of bars in bar plots')
 flags.DEFINE_float('quantile', 0.0, 'Truncate plots to the <quantile> quantile')
 flags.DEFINE_integer('int2c', 0, 'Plot int features with <int2c> or more values as float')
 flags.DEFINE_string('legend', None, 'File for legends\n')
+flags.DEFINE_boolean('fault_tolerant', False, 'Fault tolerant mode - ignore missing features')
 flags.DEFINE_boolean('verbose', False, "verbose output")
 
 @dataclass
@@ -81,6 +82,8 @@ class Options:
   # for the number of different features, above which the
   # continuous value plot function is used.
   int2c: int = 0
+
+  fault_tolerant: bool = False
 
 def usage(ret):
   """Print usage and exit
@@ -397,6 +400,14 @@ def process_group_of_files(options: Options,
   protos = []
   for collection in collections:
     fname = f"{collection}_{feature_name}.dat"
+    if os.path.getsize(fname) == 0:
+      if options.fault_tolerant:
+        logging.warning("Skipping missing feature %s", fname)
+        continue
+      else:
+        logging.error("Missing feature %s - use the --fault_tolerant option", fname)
+        return
+
     with open(fname, "r") as reader:
       file_contents = reader.readlines()
 
@@ -446,6 +457,7 @@ def plot_profiles(args):
   """
   options = Options()
   options.verbose = FLAGS.verbose
+  options.fault_tolerant = FLAGS.fault_tolerant
   options.stem = FLAGS.stem
   options.x = FLAGS.X
   options.y = FLAGS.Y

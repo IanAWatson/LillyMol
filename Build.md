@@ -5,8 +5,8 @@
 **Note**: This is significantly different from prior versions.
 
 LillyMol is primarily developed on RedHat and Ubuntu systems. It has
-been built on a variety of Cloud environments. It does not yet build on
-a Mac - that is a work in progress.
+been built on a variety of Cloud environments. In September 2025 we
+have the first successful Mac builds. See below.
 
 The primary build system used for LillyMol is [bazel](https://bazel.build/).
 You might also choose to use [bazelisk](https://github.com/bazelbuild/bazelisk)
@@ -40,6 +40,20 @@ Other system components that are needed
 * unzip
 * libz-dev
 
+## MacOs
+The Mac installation is new and not completely tested. If you encounter
+problems, please raise an issue.
+
+- install [homebrew](https://brew.sh)
+- `brew install bazelisk libomp wget gnutls`
+- clone repo
+- `cd /path/to/LillyMol`
+- `export LILLYMOL_HOME=/path/to/LillyMol`
+- `make -j 10 2>&1 | tee make.log`
+
+I wish to express my thanks to Harry Stern for providing invaluable help with the
+LillyMol MacOS port.
+
 ### Python
 If you wish to build the python bindings, you will need a recent version of
 python. Development was done with python3.11 and has not been
@@ -53,16 +67,19 @@ apt install python-dev
 If you wish to use the xgboost QSAR model building tools in LillyMol,
 also pip install xgboost, scikit-learn, matplotlib and pandas.
 
+If you wish to use the molecular property profile tool in LillyMol, also
+pip install scipy, numpy
+
 Make sure that python-dev and libblas-dev are installed at system level.
 
 ```
 sudo apt install python-dev libblas-dev
 ```
 
-Things seem to work seamlessly in virtualenv.
+Things seem to work seamlessly in virtualenv and `uv`.
 
 Note that with the default build (below) Python bindings are not built,
-but 'make all' will.
+but 'make all' will build python related targets.
 
 # TLDR
 If you have bazelisk and gcc installed, there is a reasonable possibility that
@@ -126,14 +143,14 @@ via that mechanism. Today that includes
 The complete listing is in the file [MODULE.bazel](src/MODULE.bazel).
 
 Other third party dependencies are downloaded and built by the
-[build_linus.sh](src/build_linus.sh) script, which will create a `third_party`
+[build_linux.sh](src/build_linux.sh) script, which will populate the `third_party`
 directory (next to src) and then download, build and install the following dependencies
 
 - **BerkeleyDb**: used for key/value databases
 - **f2c/libf2c**: there is some fortran in LillyMol.
 - **xgboost**: used for XGBoost models.
 - **inchii**: if InChi bindings are needed.
-- **nlopt**: an optimisation library.
+- **nlopt**: an optimisation library if needed
 
 Note that BerkeleyDB and Python bindings are only built if requested. 
 In [Makefile](/Makefile) you will see use of the shell variables
@@ -147,7 +164,7 @@ considerable amounts of disk space. For example at the time of writing my
 'third_party' directory contains 1.2GB and my bazel temporary area contains 4.2GB.
 
 ### Python Bindings
-During building of external dependencies (with build_third_party.sh
+During building of external dependencies (with build_linux.sh
 and if BUILD_PYTHON is set)
 the script `update_python_in_module_bazel.py` will examine your python
 installation and get information about the include path. With that
@@ -162,8 +179,8 @@ python installation. See the 'new_local_repository' sections for 'python'
 and 'pybind11'
 
 # Build
-Once the third party dependencies have been built, and MODULE.bazel and
-install.bzl configured, LillyMol building can begin. 
+Once the third party dependencies have been built, and MODULE.bazel is configured,
+LillyMol building can begin. 
 
 Bazel needs to be able to store its cache on a local disk, *not* NFS. When building
 inside Lilly, I have used `--output_user_root=/node/scratch/${USER}` to
@@ -183,7 +200,7 @@ If needed, limit the number of cores with the `--jobs` option inside
 'build_linux.sh' (sorry no command line options here).
 
 Optionally set shell variables BUILD_BDB and BUILD_PYTHON to enable
-building of optional features.
+building of optional features, or just use `make all`.
 
 Once the bazel preconditions are set, do the build, test and installs
 ```

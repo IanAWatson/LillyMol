@@ -118,11 +118,7 @@ declare -i must_build
 
 must_build=0
 if [[ ! -s 'f2c.tar.gz' ]] ; then
-   if [[ $(uname) == 'Linux' ]] ; then
     wget -o f2c.tar.gz https://www.netlib.org/f2c/src.tgz 
-   else
-    curl -L -o f2c.tar.gz https://www.netlib.org/f2c/src.tgz 
-   fi
     tar -zxvf f2c.tar.gz
     mv src f2c  # change the non descriptive name
     must_build=1
@@ -134,11 +130,7 @@ fi
 
 must_build=0
 if [[ ! -s 'libf2c.zip' ]] ; then
-    if [[ $(uname) == 'Linux' ]] ; then
-      wget https://www.netlib.org/f2c/libf2c.zip
-    else
-      curl -L -O https://www.netlib.org/f2c/libf2c.zip
-    fi
+    wget https://www.netlib.org/f2c/libf2c.zip
     mkdir libf2c
     cd libf2c && unzip ../libf2c.zip
     must_build=1
@@ -155,11 +147,7 @@ if [[ -v BUILD_BDB ]] ; then
     bdb_version='18.1.40'
     tarfile="db-${bdb_version}.tar.gz"
     if [[ ! -s "${tarfile}" ]] ; then
-        if [[ $(uname) == 'Linux' ]] ; then
-          wget http://download.oracle.com/berkeley-db/${tarfile}
-        else
-          curl -L -O http://download.oracle.com/berkeley-db/${tarfile}
-        fi
+        wget http://download.oracle.com/berkeley-db/${tarfile}
         tar zxf ${tarfile}
         must_build=1
     fi
@@ -386,6 +374,17 @@ fi
 
 # Deal with compressed files and hidden file names
 LILLYMOL_HOME=${REPO_HOME} ./uncompress_and_install.sh
+
+# If Macos compile some protos.
+# There are a great many other protos that could be compiled for the platform.
+# bazel query 'kind("proto_library", ...:all)'
+
+if [[ $(uname) == 'Darwin' ]] ; then
+  (cd ${REPO_HOME}/test && protoc --ruby_out=. lillymol_tests.proto)
+  (cd ${REPO_HOME}/src && protoc --python_out=. xgboost/xgboost_model.proto && cp src/xgboost/xgboost_model_pb2.py ${REPO_HOME}/contrib/bin/xgbd )
+  (cd ${REPO_HOME}/src && protoc --python_out=. xgboost/random_forest_model.proto && cp src/xgboost/random_forest_model_pb2.py ${REPO_HOME}/contrib/bin/xgbd )
+  (cd ${REPO_HOME}/src && protoc --python_out=. Utilities/General/linear_scaling.proto && cp src/Utilities/General/linear_scaling_pb2.py ${REPO_HOME}/contrib/bin/xgbd )
+fi
 
 # Python if requested, build, install and test.
 # Note that PYTHONPATH will need to be adjusted, or copy the shared

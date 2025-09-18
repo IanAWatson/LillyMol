@@ -518,26 +518,6 @@ cc_binary(
 )
 
 cc_binary(
-    name = "isolation_forest",
-    srcs = [
-        "isolation_forest.cc",
-    ],
-    copts = [
-        "-fopenmp",
-    ],
-    linkopts = [
-        "-lgomp",
-    ],
-    deps = [
-        "//Foundational/accumulator",
-        "//Foundational/cmdline:iwcmdline",
-        "//Foundational/data_source:iwstring_data_source",
-        "//Foundational/iwbits",
-        "//Foundational/iwmisc",
-    ],
-)
-
-cc_binary(
     name = "iwsplit",
     srcs = [
         "iwsplit.cc",

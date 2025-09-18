@@ -39,6 +39,11 @@ for lib in "${libs[@]}" ; do
 done
 
 # Copy python generated protos
+# Note that there can be discrepancies between the protoc version that bazel
+# uses and what is on the system.
+# If this does not work, try manually compiling the protos.
+# For example
+#   protoc --python_out=. Molecule_Lib/substructure.proto
 
 declare -a pb2=(
   atom_type_ext_pb2.py

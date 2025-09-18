@@ -1,3 +1,8 @@
+config_setting(
+    name = "darwin",
+    constraint_values = ["@platforms//os:osx"]
+)
+
 proto_library(
     name = "gfp_linear_model_proto",
     srcs = [

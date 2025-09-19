@@ -118,7 +118,7 @@ declare -i must_build
 
 must_build=0
 if [[ ! -s 'f2c.tar.gz' ]] ; then
-    wget -o f2c.tar.gz https://www.netlib.org/f2c/src.tgz 
+    wget -O f2c.tar.gz https://www.netlib.org/f2c/src.tgz 
     tar -zxvf f2c.tar.gz
     mv src f2c  # change the non descriptive name
     must_build=1
@@ -126,6 +126,7 @@ fi
 if [[ ${must_build} -eq 1 || ! -s 'f2c/cds.o' ]] ; then  # check for an arbitrary object file
     (cd f2c && make -f makefile.u)
 fi
+exit
 
 must_build=0
 if [[ ! -s 'libf2c.zip' ]] ; then

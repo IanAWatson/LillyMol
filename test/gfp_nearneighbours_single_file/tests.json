@@ -1,0 +1,14 @@
+{
+  "executable": "gfp_nearneighbours_single_file",
+  "test": [
+
+    {
+      "name": "case_1",
+      "args": [
+        "-p -z -T 0.2 -F FPDSC,w=0.2 -F NCSELW,nc,w=0.8 -V a=0.3 -V b=1.7 -j 3 ${LILLYMOL_HOME}/data/pubchem.gfp"
+      ]
+    }
+
+  ]
+
+}

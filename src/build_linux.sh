@@ -124,21 +124,18 @@ if [[ ! -s 'f2c.tar.gz' ]] ; then
     must_build=1
 fi
 if [[ ${must_build} -eq 1 || ! -s 'f2c/cds.o' ]] ; then  # check for an arbitrary object file
-    cd f2c && make -f makefile.u
-    cd ..
+    (cd f2c && make -f makefile.u)
 fi
 
 must_build=0
 if [[ ! -s 'libf2c.zip' ]] ; then
     wget https://www.netlib.org/f2c/libf2c.zip
     mkdir libf2c
-    cd libf2c && unzip ../libf2c.zip
+    (cd libf2c && unzip ../libf2c.zip)
     must_build=1
-    cd ..
 fi
 if [[ ${must_build} -eq 1 || ! -s 'libf2c/libf2c.a' ]] ; then
-    cd libf2c && make -f makefile.u
-    cd ..
+    (cd libf2c && make -f makefile.u)
 fi
 
 # You should examine the BerkeleyDB license terms, it is not necessarily free.

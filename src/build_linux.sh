@@ -126,7 +126,6 @@ fi
 if [[ ${must_build} -eq 1 || ! -s 'f2c/cds.o' ]] ; then  # check for an arbitrary object file
     (cd f2c && make -f makefile.u)
 fi
-exit
 
 must_build=0
 if [[ ! -s 'libf2c.zip' ]] ; then
@@ -377,11 +376,11 @@ LILLYMOL_HOME=${REPO_HOME} ./uncompress_and_install.sh
 # There are a great many other protos that could be compiled for the platform.
 # bazel query 'kind("proto_library", ...:all)'
 
-if [[ $(uname) == 'Darwin' ]] ; then
+#if [[ $(uname) == 'Darwin' ]] ; then
   (cd ${REPO_HOME}/test && protoc --ruby_out=. lillymol_tests.proto)
-  (cd ${REPO_HOME}/src && protoc --python_out=. xgboost/xgboost_model.proto && cp src/xgboost/xgboost_model_pb2.py ${REPO_HOME}/contrib/bin/xgbd )
-  (cd ${REPO_HOME}/src && protoc --python_out=. xgboost/random_forest_model.proto && cp src/xgboost/random_forest_model_pb2.py ${REPO_HOME}/contrib/bin/xgbd )
-  (cd ${REPO_HOME}/src && protoc --python_out=. Utilities/General/linear_scaling.proto && cp src/Utilities/General/linear_scaling_pb2.py ${REPO_HOME}/contrib/bin/xgbd )
+  (cd ${REPO_HOME}/src && protoc --python_out=. xgboost/xgboost_model.proto && cp xgboost/xgboost_model_pb2.py ${REPO_HOME}/contrib/bin/xgbd )
+  (cd ${REPO_HOME}/src && protoc --python_out=. xgboost/random_forest_model.proto && cp xgboost/random_forest_model_pb2.py ${REPO_HOME}/contrib/bin/xgbd )
+  (cd ${REPO_HOME}/src && protoc --python_out=. Utilities/General/linear_scaling.proto && cp Utilities/General/linear_scaling_pb2.py ${REPO_HOME}/contrib/bin/xgbd )
 fi
 
 # Python if requested, build, install and test.

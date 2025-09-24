@@ -733,6 +733,7 @@ molecule_subset(data_source_and_type<Molecule>& input, Molecule_Output_Object& o
 
     if (create_subsets_by_bond) {
       if (!molecule_subset_by_bond(*m, tmp, output)) {
+        cerr << "Returning 0\n";
         return 0;
       }
     } else if (!molecule_subset(*m, tmp, output)) {
@@ -1052,7 +1053,7 @@ molecule_subset(int argc, char** argv) {
     }
   }
 
-  if (0 == cl.number_elements()) {
+  if (cl.empty()) {
     cerr << "Insufficient arguments\n";
     usage(2);
   }

@@ -1,0 +1,13 @@
+{
+  "executable": "gfp_spread_standard",
+  "test": [
+    {
+      "name": "case_1",
+      "args": [
+           "-h 4 ${LILLYMOL_HOME}/data/pubchem_example.gfp"
+      ]
+    }
+
+  ]
+
+}

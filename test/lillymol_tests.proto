@@ -35,21 +35,23 @@ message TestCase {
   optional string difftool = 4;
   // Sometimes the difftool needs options.
 
+  optional string diff_options = 5;
+
   // Ignored by the test driver.
-  repeated string comment = 5;
+  repeated string comment = 6;
 
   // Files that might be in the out directory, but which will not
   // be compared with newly generated files. Typically that might
   // be stderr.
-  repeated string ignore_file = 6;
+  repeated string ignore_file = 7;
 
   // Some tests may be expected to exit with a nonzero return code.
-  optional bool non_zero_rc_expected = 7;
+  optional bool non_zero_rc_expected = 8;
 
   // We can sidestep temporarily broken tests.
-  optional bool broken_do_not_evaluate = 8;
+  optional bool broken_do_not_evaluate = 9;
 
-  // The tool that does the needs a way of passing the name of
+  // The tool that implements the test needs a way of passing the name of
   // the executable around, and for convenience it stores it here.
   // Do not enter data for this value - it will be ignored.
   optional string executable = 14;

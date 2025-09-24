@@ -1,0 +1,43 @@
+{
+  "executable": "common_names",
+  "test": [
+    {
+      "name": "isotopes",
+      "args": [
+           "-I -S output #{indir}/in.smi"
+      ]
+    },
+
+    {
+      "name": "chirality",
+      "args": [
+           "-c -S output -v #{indir}/in.smi"
+      ]
+    },
+
+    {
+      "name": "case_1",
+      "args": [
+           " -S output -s 10000 -D + -v #{indir}/input1.smi #{indir}/input2.smi"
+      ]
+    },
+
+    {
+      "name": "largest_fragment",
+      "args": [
+           " -l -S output #{indir}/in.smi"
+      ]
+    },
+
+    {
+      "name": "etrans",
+      "args": [
+           " -T I=Cl -T Br=Cl -S output #{indir}/in.smi"
+      ]
+    }
+
+
+
+
+  ]
+}

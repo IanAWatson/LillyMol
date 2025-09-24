@@ -1,0 +1,13 @@
+{
+  "executable": "iwstats",
+  "test": [
+    {
+      "name": "case_1",
+      "args": [
+           "-j -e 2 -p 3 ${LILLYMOL_HOME}/data/descriptor.txt"
+      ]
+    }
+
+  ]
+
+}

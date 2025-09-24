@@ -378,9 +378,11 @@ LILLYMOL_HOME=${REPO_HOME} ./uncompress_and_install.sh
 
 #if [[ $(uname) == 'Darwin' ]] ; then
   (cd ${REPO_HOME}/test && protoc --ruby_out=. lillymol_tests.proto)
-  (cd ${REPO_HOME}/src && protoc --python_out=. xgboost/xgboost_model.proto && cp xgboost/xgboost_model_pb2.py ${REPO_HOME}/contrib/bin/xgbd )
-  (cd ${REPO_HOME}/src && protoc --python_out=. xgboost/random_forest_model.proto && cp xgboost/random_forest_model_pb2.py ${REPO_HOME}/contrib/bin/xgbd )
-  (cd ${REPO_HOME}/src && protoc --python_out=. Utilities/General/linear_scaling.proto && cp Utilities/General/linear_scaling_pb2.py ${REPO_HOME}/contrib/bin/xgbd )
+  if [[ -v BUILD_XGBOOST ]] ; then
+    (cd ${REPO_HOME}/src && protoc --python_out=. xgboost/xgboost_model.proto && cp xgboost/xgboost_model_pb2.py ${REPO_HOME}/contrib/bin/xgbd )
+    (cd ${REPO_HOME}/src && protoc --python_out=. xgboost/random_forest_model.proto && cp xgboost/random_forest_model_pb2.py ${REPO_HOME}/contrib/bin/xgbd )
+    (cd ${REPO_HOME}/src && protoc --python_out=. Utilities/General/linear_scaling.proto && cp Utilities/General/linear_scaling_pb2.py ${REPO_HOME}/contrib/bin/xgbd )
+  fi
 fi
 
 # Python if requested, build, install and test.

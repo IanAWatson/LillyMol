@@ -1,0 +1,13 @@
+{
+  "executable": "ring_substitution",
+  "test": [
+    {
+      "name": "case_1",
+      "args": [
+           "#{indir}/test.smi"
+      ]
+    }
+
+  ]
+
+}

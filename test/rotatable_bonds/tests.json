@@ -1,0 +1,13 @@
+{
+  "executable": "rotatable_bonds",
+  "test": [
+    {
+      "name": "case_1",
+      "args": [
+           "#{indir}/pubchem_example.smi"
+      ]
+    }
+
+  ]
+
+}

@@ -63,6 +63,14 @@ def expand_env(str)
   end
 end
 
+def diff_options(proto)
+  if proto.has_diff_options?
+    return proto.diff_options
+  else
+    return ""
+  end
+end
+
 # Return true if `fname1` and `fname2` have identical contents.
 # If their sizes are the same, compare the md5 sums. Otherwise
 # shell out to diff.
@@ -85,9 +93,9 @@ def files_the_same(proto, fname1, fname2)
 
   rc = if proto.has_difftool?
          # $stderr << "Executing #{proto.difftool} #{fname1} #{fname2}\n"
-         system("#{proto.difftool} #{fname2} #{fname1}")
+         system("#{proto.difftool} #{diff_options(proto)} #{fname2} #{fname1}")
        else
-         system("diff -w #{fname1} #{fname2}")
+         system("diff -w #{diff_options(proto)} #{fname1} #{fname2}")
        end
 
   if rc 

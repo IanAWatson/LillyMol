@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 # Parts of LillyMol come in compressed form or with obfuscated file names.
 # Convert those.

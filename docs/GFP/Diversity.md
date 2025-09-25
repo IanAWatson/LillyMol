@@ -70,7 +70,7 @@ We run 8 OMP threads, and report progress to stderr every 10k
 molecules selcted.  On fairly recent hardware, this takes
 about 6 hours. The number of computations performed is large:
 N for the first molecule, N-1 for the second, N-2 for the
-third, so 2.24M factorial.
+third, so something on the order of $2.2M^2/2$.
 
 But the molecules are selected sequentially, so if smaller numbers
 of molecules are needed, that can be relatively fast. For example

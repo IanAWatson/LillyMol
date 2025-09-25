@@ -46,6 +46,8 @@ problems, please raise an issue.
 
 - install [homebrew](https://brew.sh)
 - `brew install bazelisk libomp wget gnutls`
+- `brew install ruby protobuf`
+- `gem install google-protobuf`
 - clone repo
 - `cd /path/to/LillyMol`
 - `export LILLYMOL_HOME=/path/to/LillyMol`

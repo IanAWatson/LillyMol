@@ -20,7 +20,7 @@ ENV LILLYMOL_HOME=/LillyMol \
     BUILD_PYTHON=1 \
     BUILD_GO=1
 
-RUN apt-get install -y golang
+RUN apt-get install -y golang protobuf-compiler 
 
 RUN ./build_linux.sh
 

@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 # The default build can generate executables that may not be needed.
 # This scipt is designed to be run from the Docker container after the

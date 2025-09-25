@@ -376,7 +376,7 @@ LILLYMOL_HOME=${REPO_HOME} ./uncompress_and_install.sh
 # There are a great many other protos that could be compiled for the platform.
 # bazel query 'kind("proto_library", ...:all)'
 
-#if [[ $(uname) == 'Darwin' ]] ; then
+if [[ $(uname) == 'Darwin' ]] ; then
   (cd ${REPO_HOME}/test && protoc --ruby_out=. lillymol_tests.proto)
   if [[ -v BUILD_XGBOOST ]] ; then
     (cd ${REPO_HOME}/src && protoc --python_out=. xgboost/xgboost_model.proto && cp xgboost/xgboost_model_pb2.py ${REPO_HOME}/contrib/bin/xgbd )

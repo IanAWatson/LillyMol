@@ -39,13 +39,14 @@ Other system components that are needed
 * wget
 * unzip
 * libz-dev
+* xz
 
 ## MacOs
 The Mac installation is new and not completely tested. If you encounter
 problems, please raise an issue.
 
 - install [homebrew](https://brew.sh)
-- `brew install bazelisk libomp wget gnutls`
+- `brew install bazelisk libomp wget gnutls xz`
 - `brew install ruby protobuf`
 - `gem install google-protobuf`
 - clone repo

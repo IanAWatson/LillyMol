@@ -7,15 +7,19 @@
 dicer_fragments_dir="${LILLYMOL_HOME}/data/dicer_fragments/"
 if [[ -s "${dicer_fragments_dir}/dicer_fragments.tar.xz" ]] ; then
   echo "Uncompressing fragments"
-  cd ${dicer_fragments_dir} && tar Jxf dicer_fragments.tar.xz
+  (cd ${dicer_fragments_dir} && tar Jxf dicer_fragments.tar.xz)
+fi
+
+chembl_sidechains="${LILLYMOL_HOME}/data/chembl_sidechains.textproto.xz"
+if [[ -s ${chembl_sidechains} ]] ; then
+  echo "Uncompressing CHEMBL sidechains"
+  xz --decompress ${chembl_sidechains}
 fi
 
 ring_replacement="${LILLYMOL_HOME}/data/ring_replacement/"
 
 if [[ -d "${ring_replacement}" ]] ; then
   if [[ $(uname) == "Linux" ]] ; then
-    cd ${LILLYMOL_HOME}/data/ring_replacement && ./to_linux.sh
-  elif [[ $(uname) == "Darwin" ]] ; then
-    cd ${LILLYMOL_HOME}/data/ring_replacement && ./to_mac.sh
+    (cd ${LILLYMOL_HOME}/data/ring_replacement && ./to_linux.sh)
   fi
 fi

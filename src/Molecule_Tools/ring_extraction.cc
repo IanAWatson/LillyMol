@@ -313,12 +313,16 @@ ExtractRings::ExtractRings() {
 
 void
 DisplayDashXOption(std::ostream& output) {
-  output << " -X sss     substructure search the starting molecule as a check\n";
-  output << " -X a:A     letters assigned to aromatic and aliphatic rings\n";
-  output << " -X noarom  generate smarts that do not specify aromaticity,\n";
-  output << "            this enables replacing aromatic with aliphatic rings and vice verse\n";
-  output << " -X degsqb  write the degree designator as a bracketed range rather than >\n";
-  output << " -X list=<fname>  write a list of all files generated to <fname\n";
+  // clang-format off
+  output << R"( -X sss     substructure search the starting molecule as a check
+ -X a:A     strings assigned to aromatic and aliphatic rings
+            -X Ar:Al is used for generating the files in the LillyMol distribution
+ -X noarom  generate smarts that do not specify aromaticity,
+            this enables replacing aromatic with aliphatic rings and vice verse
+ -X degsqb  write the degree designator as a bracketed range rather than >
+ -X list=<fname>  write a list of all files generated to <fname>
+)";
+  // clang-format on
 
   ::exit(0);
 }
@@ -878,7 +882,7 @@ ExtractRings::IsotopeOfExocyclicAtom(Molecule& m,
 // We are applying some kind of isotope to an atom. If we have atom types
 // use that, otherwise _isotope.
 isotope_t
-ExtractRings::IsotopeForAtom(Molecule& m, atom_number_t zatom, 
+ExtractRings::IsotopeForAtom(Molecule& m, atom_number_t zatom,
                              int sys_num,
                              const PerMoleculeArrays& data) const {
 //cerr << "IsotopeForAtom " << atom_number << " atypes " << atypes.get() << " value " << atypes[atom_number] << '\n';
@@ -886,7 +890,7 @@ ExtractRings::IsotopeForAtom(Molecule& m, atom_number_t zatom,
   if (data.atype) {
     return IsotopeOfExocyclicAtom(m, zatom, data.ring_sys, sys_num, data.atype);
   }
-  
+
   return _isotope;
 }
 
@@ -1409,7 +1413,7 @@ ExtractRings::GenerateRing(Molecule& parent,
     const auto n = iter_usmi->second.n();
     iter_usmi->second.set_n(n + 1);
   }
-  
+ 
   return 1;
 }
 

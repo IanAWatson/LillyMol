@@ -6,7 +6,7 @@ RUN apt-get update && \
 
 RUN apt-get install npm -y && \
     npm install -g @bazel/bazelisk && \
-    apt-get install libblas-dev liblapack-dev libzmq3-dev -y
+    apt-get install libblas-dev liblapack-dev libzmq3-dev xz-utils -y
 
 RUN pip install pandas scipy absl-py pybind11 protobuf
 
@@ -20,6 +20,7 @@ ENV LILLYMOL_HOME=/LillyMol \
     BUILD_PYTHON=1 \
     BUILD_GO=1
 
+# Protobuf-compiler needs to be installed before build_linux.sh is run.
 RUN apt-get install -y golang protobuf-compiler 
 
 RUN ./build_linux.sh
@@ -37,7 +38,6 @@ RUN apt-get update && \
 
 RUN gem install google-protobuf -v 3.21.12
 
-# Note to Xuyan - this line might be a duplicate of line 11
 RUN pip install pandas scipy absl-py pybind11 protobuf
 
 COPY --from=build /LillyMol /LillyMol
@@ -46,6 +46,3 @@ ENV LILLYMOL_HOME=/LillyMol \
     BUILD_DIR=Linux
 
 WORKDIR /LillyMol
-
-RUN protoc -I=. --ruby_out=. test/lillymol_tests.proto
-

@@ -90,9 +90,17 @@ end
 
 mc_first_pass_options << ' -A I -A ipp'
 
-iwdemerit      = "#{ianhome}/bin/Linux/iwdemerit"
-mc_first_pass  = "#{ianhome}/bin/Linux/tp_first_pass"
-tsubstructure  = "#{ianhome}/bin/Linux/tsubstructure"
+if RUBY_PLATFORM.match(/linux/)
+  uname = 'Linux'
+elsif RUBY_PLATFORM.match(/arwin/)
+  uname = 'Darwin'
+else
+  $stderr << "Unrecognised RUBY_PLATFORM ${RUBY_PLATFORM}, assuming Linux\n"
+  uname = 'Linux'
+end
+iwdemerit      = "#{ianhome}/bin/#{uname}/iwdemerit"
+mc_first_pass  = "#{ianhome}/bin/#{uname}/tp_first_pass"
+tsubstructure  = "#{ianhome}/bin/#{uname}/tsubstructure"
 
 query_dir = "#{ianhome}/data/LillyMedchemRules"
 

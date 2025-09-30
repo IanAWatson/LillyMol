@@ -1,5 +1,6 @@
 {
   "executable": "gfp_naive_bayesian",
+  "difftool": "${LILLYMOL_HOME}/test/same_number_lines.sh",
   "test": [
     {
       "name": "case_1",

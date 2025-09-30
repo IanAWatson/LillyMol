@@ -162,6 +162,20 @@ cc_binary(
 # )
 
 cc_binary(
+    name = "gfp_collection_fingerprint",
+    srcs = [
+        "gfp_collection_fingerprint.cc",
+    ],
+    deps = [
+        ":gfp",
+        "//Foundational/cmdline:iwcmdline",
+        "//Foundational/data_source:iwstring_data_source",
+        "//Foundational/iw_tdt",
+        "//Foundational/iwmisc",
+    ],
+)
+
+cc_binary(
     name = "gfp_compare_collections",
     srcs = [
         "gfp_compare_collections.cc",

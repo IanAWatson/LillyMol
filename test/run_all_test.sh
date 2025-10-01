@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 export UNAME=$(uname)
 export OSTYPE=$(uname)

@@ -368,6 +368,8 @@ jfilecompare(const const_IWSubstring& token1, int col, const const_IWSubstring& 
     return 0;
   }
 
+#ifdef WRONG
+  // If we have this, we cannot detect that 1.0e-02 and 0.001 are the same.
   if (0.0 == tolerance && 0.0 == noise) {
     cerr.flush();
     //  cerr << "No tolerance or noise '" << token2 << "', id '" << id << "'\n";
@@ -375,6 +377,7 @@ jfilecompare(const const_IWSubstring& token1, int col, const const_IWSubstring& 
 
     return 1;
   }
+#endif
 
   double v1, v2;
 
@@ -409,6 +412,7 @@ jfilecompare(const const_IWSubstring& token1, int col, const const_IWSubstring& 
     return 1;
   }
 
+  // cerr << "Difference " << abs(v1 - v2) << '\n';
   report_mismatch(token1, col, token2, differences_this_record, id);
 
   return 1;

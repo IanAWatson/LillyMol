@@ -132,6 +132,7 @@ class Options
       @copy_failures_dir = ""
     end
     $stderr << "copy_failures_dir starts at #{@copy_failures_dir}\n" if verbose
+    FileUtils.mkdir_p(@copy_failures_dir) unless File.directory?(@copy_failures_dir)
 
     @tmpdir = ""
 
@@ -580,7 +581,7 @@ def get_sorted_subdirectories(dirname)
 end
 
 def main
-  cl = IWCmdline.new('-v-copy_fail=dir-rx=s-help')
+  cl = IWCmdline.new('-v-copy_fail=s-rx=s-help')
 
   if cl.option_present('help')
     usage

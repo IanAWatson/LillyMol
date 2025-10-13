@@ -1,0 +1,13 @@
+{
+  "executable": "fetch_smiles_quick",
+  "test": [
+    {
+      "name": "case_1",
+      "args": [
+           "-j -c 1 -C 2 -X notInRecord -Y notInIdentifier #{indir}/record.w  #{indir}/structures.smi"
+      ]
+    }
+
+  ]
+
+}

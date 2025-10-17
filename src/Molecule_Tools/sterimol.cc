@@ -17,6 +17,7 @@
 #include <algorithm>
 #include <iostream>
 #include <memory>
+#include <numbers>
 
 #include "Foundational/accumulator/accumulator.h"
 #include "Foundational/iwmisc/misc.h"
@@ -26,7 +27,7 @@
 
 using std::cerr;
 
-static angle_t rotation_angle = 5.0 * M_PI / 180.0;
+static angle_t rotation_angle = 5.0 * std::numbers::pi / 180.0;
 
 angle_t
 default_sterimol_rotation_angle() {

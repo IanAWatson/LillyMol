@@ -12,6 +12,7 @@
 #include <iostream>
 #include <limits>
 #include <memory>
+#include <numbers>
 
 #include "Foundational/cmdline/cmdline.h"
 #include "Foundational/histogram/iwhistogram.h"
@@ -134,7 +135,7 @@ write_fingerprint_precise(Molecule& m, const atomic_number_t* z, const double* x
 static double
 normal_function(double mean, double std, double x)
 {
-  return exp(-(x - mean) * (x - mean) / (std * std + std * std)) / std / sqrt(2.0 * M_PI);
+  return exp(-(x - mean) * (x - mean) / (std * std + std * std)) / std / sqrt(2.0 * std::numbers::pi);
 }
 
 static int

@@ -92,7 +92,7 @@ def files_the_same(proto, fname1, fname2)
   end
 
   rc = if proto.has_difftool?
-         $stderr << "Executing #{proto.difftool} #{fname1} #{fname2}\n"
+         # $stderr << "Executing #{proto.difftool} #{fname1} #{fname2}\n"
          system("#{proto.difftool} #{difftool_options(proto)} #{fname2} #{fname1}")
        else
          system("diff -w #{difftool_options(proto)} #{fname1} #{fname2}")
@@ -402,7 +402,7 @@ def run_case_proto(options, proto, test_dir, test_name, parent_tmpdir)
   system("/bin/ls -l #{mytmp}") if options.verbose
 
   # Some difference tools may have been built here.
-  $stderr << "Difftool in proto #{proto.difftool}\n"
+  # $stderr << "Difftool in proto #{proto.difftool}\n"
   if proto.has_difftool?
     if proto.difftool =~ /same_structures/
       proto.difftool = options.same_structures

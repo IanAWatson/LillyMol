@@ -6,7 +6,7 @@
       "args": [
            "-n 9 -d tab #{indir}/input.txt"
       ],
-      "diff_options": "-I records"
+      "difftool_options": "-I records"
     }
 
   ]

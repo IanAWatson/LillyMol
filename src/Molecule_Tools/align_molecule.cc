@@ -4,6 +4,7 @@
 
 #include <iostream>
 #include <memory>
+#include <numbers>
 
 #include "Foundational/cmdline/cmdline.h"
 
@@ -202,11 +203,11 @@ do_matched_atoms_in_quadrant(Molecule& m, const Set_of_Atoms& e, int dimensional
   ymin = ymin / static_cast<coord_t>(n);
 
   if (xmin < 0.0 && (1 == matched_atoms_in_quadrant || 4 == matched_atoms_in_quadrant)) {
-    m.rotate_atoms(yaxis, M_PI);
+    m.rotate_atoms(yaxis, std::numbers::pi);
   }
 
   if (ymin < 0.0 && (1 == matched_atoms_in_quadrant || 2 == matched_atoms_in_quadrant)) {
-    m.rotate_atoms(xaxis, M_PI);
+    m.rotate_atoms(xaxis, std::numbers::pi);
   }
 
   return output.write(m);
@@ -424,7 +425,7 @@ align_molecule(Molecule& m, const Set_of_Atoms& e)
     theta = -theta;
   }
 
-  m.rotate_atoms(rotation_axis, theta + M_PI);
+  m.rotate_atoms(rotation_axis, theta + std::numbers::pi);
 
   // By convention, y_atom should have a positive Y coordinate
 

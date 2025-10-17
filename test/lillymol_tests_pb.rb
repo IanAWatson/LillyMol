@@ -10,7 +10,7 @@ Google::Protobuf::DescriptorPool.generated_pool.build do
       repeated :preamble, :string, 2
       repeated :args, :string, 3
       proto3_optional :difftool, :string, 4
-      proto3_optional :diff_options, :string, 5
+      proto3_optional :difftool_options, :string, 5
       repeated :comment, :string, 6
       repeated :ignore_file, :string, 7
       proto3_optional :non_zero_rc_expected, :bool, 8

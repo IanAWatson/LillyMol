@@ -1,7 +1,6 @@
 {
   "executable": "gfp_to_descriptors_multiple",
   "difftool": "jfilecompare",
-  "difftool_options": "-t 1.0-e07 -b",
     "test": [
         {
           "name": "case_1",

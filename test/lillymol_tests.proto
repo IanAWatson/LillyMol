@@ -30,12 +30,11 @@ message TestCase {
   //  args = "-i smi -o smi -S correct ... #{indir}/input.smi"
   repeated string args = 3;
 
-  // By default the test driver uses diff to discern differences between
-  // files. That can be changed.
+  // By default, each test inherits the diff tool from the outer TestCases
+  // message, but each test can specify its own diff.
   optional string difftool = 4;
-  // Sometimes the difftool needs options.
-
-  optional string diff_options = 5;
+  // Specific test needs difftool options.
+  optional string difftool_options = 5;
 
   // Ignored by the test driver.
   repeated string comment = 6;

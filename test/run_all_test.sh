@@ -9,5 +9,6 @@ if [[ ! -v LILLYMOL_HOME ]] ; then
 fi
 
 echo "LILLYMOL_HOME ${LILLYMOL_HOME}"
+export PATH=${LILLYMOL_HOME}/bin/${OSTYPE}:$PATH
 
 exec ruby run_all_test.rb "$@"

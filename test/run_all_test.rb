@@ -63,9 +63,9 @@ def expand_env(str)
   end
 end
 
-def diff_options(proto)
-  if proto.has_diff_options?
-    return proto.diff_options
+def difftool_options(proto)
+  if proto.has_difftool_options?
+    return proto.difftool_options
   else
     return ""
   end
@@ -92,10 +92,10 @@ def files_the_same(proto, fname1, fname2)
   end
 
   rc = if proto.has_difftool?
-         # $stderr << "Executing #{proto.difftool} #{fname1} #{fname2}\n"
-         system("#{proto.difftool} #{diff_options(proto)} #{fname2} #{fname1}")
+         $stderr << "Executing #{proto.difftool} #{fname1} #{fname2}\n"
+         system("#{proto.difftool} #{difftool_options(proto)} #{fname2} #{fname1}")
        else
-         system("diff -w #{diff_options(proto)} #{fname1} #{fname2}")
+         system("diff -w #{difftool_options(proto)} #{fname1} #{fname2}")
        end
 
   if rc 
@@ -128,11 +128,11 @@ class Options
     # User can specify a directory into which we copy files with diffs.
     if cl.option_present('copy_fail')
       @copy_failures_dir = cl.value('copy_fail')
+      FileUtils.mkdir_p(@copy_failures_dir) unless File.directory?(@copy_failures_dir)
     else
       @copy_failures_dir = ""
     end
     $stderr << "copy_failures_dir starts at #{@copy_failures_dir}\n" if verbose
-    FileUtils.mkdir_p(@copy_failures_dir) unless File.directory?(@copy_failures_dir)
 
     @tmpdir = ""
 
@@ -292,6 +292,16 @@ def maybe_append_stdout_stderr(options, cmd, output_file)
   return "#{cmd} 2> .stderr"
 end
 
+# If `exe` is the name of a LillyMol executable, return the full path.
+# This is designed for things like same_structures, jfilecompare...
+def maybe_lillymol_executable(options, exe)
+  path = File.join(options.lillymol_home, 'bin', options.build_dir, exe)
+  return path if File.executable?(path)
+
+  # Not a LillyMol executable, return unchanged
+  return exe
+end
+
 # Getting output files is complicated by the fact that some tests
 # may have separate directories based on UNAME.
 # If there are files to be ignored in `proto` enforce that.
@@ -392,11 +402,15 @@ def run_case_proto(options, proto, test_dir, test_name, parent_tmpdir)
   system("/bin/ls -l #{mytmp}") if options.verbose
 
   # Some difference tools may have been built here.
+  $stderr << "Difftool in proto #{proto.difftool}\n"
   if proto.has_difftool?
-    if proto.difftool == 'same_structures'
+    if proto.difftool =~ /same_structures/
       proto.difftool = options.same_structures
-    elsif proto.difftool == 'jfilecompare'
+    elsif proto.difftool =~ /jfilecompare/
       proto.difftool = options.jfilecompare
+    end
+    if proto.has_difftool_options?
+      proto.difftool << ' ' << proto.difftool_options
     end
   end
 
@@ -461,6 +475,13 @@ def run_tests_in_dir(options, dirname, parent_tmpdir)
   return 0, 0 if proto.only_inside_lilly && ! $inside_lilly
 
   return 0, 0 if proto.broken_do_not_evaluate
+
+  if proto.has_difftool?
+    proto.difftool = maybe_lillymol_executable(options, proto.difftool)
+  else
+    difftool = 'diff -w'
+    proto.difftool_options = '-w'
+  end
 
   passed = 0
   failed = 0

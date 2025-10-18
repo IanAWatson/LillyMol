@@ -66,6 +66,8 @@ message TestCases {
   repeated TestCase test = 2;
 
   // Individual tests can "inherit" this difftool.
+  // The script run_all_tests.sh adds LILLYMOL_HOME/bin/$(UNAME) to PATH
+  // so this can be any LillyMol executable.
   optional string difftool = 3;
   optional string difftool_options = 6;
 

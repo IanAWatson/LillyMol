@@ -92,7 +92,7 @@ def files_the_same(proto, fname1, fname2)
   end
 
   rc = if proto.has_difftool?
-         # $stderr << "Executing #{proto.difftool} #{fname1} #{fname2}\n"
+         $stderr << "Executing #{proto.difftool} #{proto.difftool_options} #{fname1} #{fname2}\n"
          system("#{proto.difftool} #{difftool_options(proto)} #{fname2} #{fname1}")
        else
          system("diff -w #{difftool_options(proto)} #{fname1} #{fname2}")
@@ -116,7 +116,7 @@ def to_single_line(lines)
 end
 
 class Options
-  attr_accessor :lillymol_home, :build_dir, :tmpdir, :ostype, :verbose, :copy_failures_dir, :only_process_rx, :same_structures, :jfilecompare
+  attr_accessor :lillymol_home, :build_dir, :tmpdir, :ostype, :verbose, :copy_failures_dir, :only_process_r 
 
   def initialize(cl)
     @lillymol_home = ENV['LILLYMOL_HOME']
@@ -144,10 +144,6 @@ class Options
     if cl.option_present('rx')
       set_only_process_regex(cl.values('rx'))
     end
-
-    # Tests using same_structures can use this as a short-cut for getting the path.
-    @same_structures = File.join(@lillymol_home, 'bin', @build_dir, 'same_structures')
-    @jfilecompare = File.join(@lillymol_home, 'bin', @build_dir, 'jfilecompare')
   end
 
   def set_only_process_regex(rx)
@@ -400,19 +396,6 @@ def run_case_proto(options, proto, test_dir, test_name, parent_tmpdir)
   all_files_same = true
 
   system("/bin/ls -l #{mytmp}") if options.verbose
-
-  # Some difference tools may have been built here.
-  # $stderr << "Difftool in proto #{proto.difftool}\n"
-  if proto.has_difftool?
-    if proto.difftool =~ /same_structures/
-      proto.difftool = options.same_structures
-    elsif proto.difftool =~ /jfilecompare/
-      proto.difftool = options.jfilecompare
-    end
-    if proto.has_difftool_options?
-      proto.difftool << ' ' << proto.difftool_options
-    end
-  end
 
   # Check that the files match.
   output_file.each do |correct|

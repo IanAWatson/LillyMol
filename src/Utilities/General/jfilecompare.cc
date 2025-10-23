@@ -571,6 +571,9 @@ jfilecompare(iwstring_data_source& input1, const IWString& header1, int columns_
     cerr << header1 << '\n';
     cerr << header2 << '\n';
 
+    // To ensure a non zero return code.
+    records_differing = 1;
+
     return 0;
   }
 

@@ -2,6 +2,9 @@
   "executable": "dicer",
   "difftool": "same_structures",
   "difftool_options": "-S 1",
+  "default_command_components": [
+      "-c"
+    ],
     "test": [
         {
           "name": "case_1",

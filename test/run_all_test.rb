@@ -365,12 +365,12 @@ def run_case_proto(options, proto, test_dir, test_name, parent_tmpdir)
   args = eval("\"" + args + "\"")
 
   if (proto.preamble.size > 0)
-    cmd = proto.preamble.join("\n") << "\n"
+    cmd = "cd #{mytmp} && " << eval("\"" + proto.preamble.join("\n") << "\n" + "\"")
   else
     cmd = ""
   end
 
-  cmd = "cd #{mytmp} && #{exe} "
+  cmd << "cd #{mytmp} && #{exe} "
   if proto.default_command_components.size > 0
     cmd << eval("\"" + proto.default_command_components.join(' ') + "\"")
   end
@@ -379,9 +379,9 @@ def run_case_proto(options, proto, test_dir, test_name, parent_tmpdir)
 
   cmd = expand_env(cmd)
 
-  if proto.preamble.size > 0
-    cmd = proto.preamble.join("\n") << "\n" << cmd
-  end
+# if proto.preamble.size > 0
+#   cmd = proto.preamble.join("\n") << "\n" << cmd
+# end
 
   $stderr << "Executing #{cmd}\n" if options.verbose
 

@@ -463,7 +463,7 @@ do_rotate_about_z_axis(Molecule& m) {
   Coordinates zaxis(static_cast<coord_t>(0.0), static_cast<coord_t>(0.0),
                     static_cast<coord_t>(1.0));
 
-  m.rotate_atoms(zaxis, std::numbers:pi * 0.5);
+  m.rotate_atoms(zaxis, std::numbers::pi * 0.5);
 
   return;
 }
@@ -1268,7 +1268,7 @@ tshadow(Molecule& m, const Atom** atom, Shadow_Tmp& stmp,
   Coordinates yaxis(static_cast<coord_t>(0.0), static_cast<coord_t>(1.0),
                     static_cast<coord_t>(0.0));
 
-  m.rotate_atoms(yaxis, std::numbers:pi * 0.5);
+  m.rotate_atoms(yaxis, std::numbers::pi * 0.5);
 
   auto a2 = sa.shadow_area(m, vdw);
 
@@ -1282,7 +1282,7 @@ tshadow(Molecule& m, const Atom** atom, Shadow_Tmp& stmp,
   Coordinates zaxis(static_cast<coord_t>(0.0), static_cast<coord_t>(0.0),
                     static_cast<coord_t>(1.0));
 
-  m.rotate_atoms(zaxis, std::numbers:pi * 0.5);
+  m.rotate_atoms(zaxis, std::numbers::pi * 0.5);
 
   do_write_to_stream_for_oriented_molecules(m, 3);
 

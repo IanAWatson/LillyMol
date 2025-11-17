@@ -99,6 +99,10 @@ static int initial_nbr_list_size = 100;
 
 static int take_first_token_of_name_field = 0;
 
+// Output will look like
+// smiles id PARENT distance
+static int append_needle_to_each_neighbour = 0;
+
 static Distance_Scaling distance_scaling;
 
 /*
@@ -197,12 +201,12 @@ display_dash_x_options(std::ostream & os)
   os << " -X tcol=<col>      just write column <col> from the target molecules\n";
   os << " -X ncol=<col>      just write column <col> from the neighbour molecules\n";
   os << " -X ftn             take the first token of both target and neighbour molecules\n";
-//os << " -X TABS            create tab separated output rather than space separated\n";
   os << " -X minextra=n      neighbours must have at least     <n> atoms more than target\n";
   os << " -X maxextra=n      neighbours must have no more than <n> atoms more than target\n";
   os << " -X nosmi           input does not contain smiles\n";
   os << " -X random          random subset of neighbours (requires -n option)\n";
   os << " -X brs             biased random subset of neighbours (requires -n option)\n";
+  os << " -X appneedle       append the name of the needle to each neighbour record\n";
   os << " -X SMITAG=<tag>    Set smiles     tag to <tag>, default " << smiles_tag << '\n';
   os << " -X IDTAG=<tag>     Set identifier tag to <tag>, default " << identifier_tag << '\n';
   os << " -X DISTAG=<tag>    Set distance   tag to <tag>, default " << distance_tag << '\n';
@@ -472,7 +476,8 @@ AppendAfterId(const IWString& id,
 }
 
 static int
-write_neighbour_list(const resizable_array_p<Smiles_ID_Dist_UID> &neighbours,
+write_neighbour_list(const IWString& needle_id,
+                     const resizable_array_p<Smiles_ID_Dist_UID> &neighbours,
                      const IWString &target_smiles,
                      const IW_STL_Hash_Map_String& append_to_id,
                      IWString_and_File_Descriptor &output) {
@@ -506,6 +511,10 @@ write_neighbour_list(const resizable_array_p<Smiles_ID_Dist_UID> &neighbours,
       AppendAfterId(sid->id(), append_to_id, output);
     }
     output << output_separator;
+
+    if (append_needle_to_each_neighbour) {
+      output << needle_id << output_separator;
+    }
 
     if (append_neighbour_number_to_each_neighbour) {
       output << (i + 1) << output_separator;
@@ -890,7 +899,7 @@ process_molecule(const IWString &smiles, const IWString &id,
     molecules_written++;
   }
 
-  int rc = write_neighbour_list(neighbours, smiles, append_to_id, output);
+  int rc = write_neighbour_list(id, neighbours, smiles, append_to_id, output);
 
   // cerr << "After write_neighbour_list '" << output << "'\n";
 
@@ -2020,8 +2029,7 @@ plotnn(int argc, char **argv) {
     }
   }
 
-  if (cl.option_present('x'))  // must be handled after the -n option
-  {
+  if (cl.option_present('x')) {  // must be handled after the -n option
     print_target_molecules = 0;
 
     if (verbose) {
@@ -2309,6 +2317,11 @@ plotnn(int argc, char **argv) {
         if (verbose) {
           cerr << "Will choose a random set of neighbours, biased toward close "
                   "neighbours\n";
+        }
+      } else if (x == "appneedle") {
+        append_needle_to_each_neighbour = 1;
+        if (verbose) {
+          cerr << "Will append the needle id to each output record\n";
         }
       } else if ("random" == x) {
         choose_neighbours_at_random = 1;

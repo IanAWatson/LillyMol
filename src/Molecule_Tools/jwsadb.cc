@@ -1801,7 +1801,6 @@ jwsa(Molecule& m, IWString_and_File_Descriptor& output, double atom_partial_char
         }
       }
       if (0.0 != total_surface_area) {
-        cerr << "Computing ratio " << JW_AromSA << " total_surface_area " << total_surface_area << '\n';
         JW_AromRa = JW_AromSA / total_surface_area;
       }
     }

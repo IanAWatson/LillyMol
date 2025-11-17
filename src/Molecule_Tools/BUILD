@@ -1082,6 +1082,7 @@ cc_binary(
     deps = [
         ":demerit_cc_proto",
         ":iwdemerit_lib",
+        ":ladderane",
         "//Molecule_Lib:iwmolecule",
         "//Molecule_Lib:moleculeio",
         "//Molecule_Lib:substructure_cc_proto",
@@ -2174,6 +2175,19 @@ cc_library(
     deps = [
         ":dicer_fragments_cc_proto",
         ":mformula",
+        "//Molecule_Lib:iwmolecule",
+    ],
+)
+
+cc_library(
+    name = "ladderane",
+    srcs = [
+        "ladderane.cc",
+    ],
+    hdrs = [
+        "ladderane.h",
+    ],
+    deps = [
         "//Molecule_Lib:iwmolecule",
     ],
 )
@@ -3539,6 +3553,20 @@ cc_test(
     deps = [
         ":demerit",
         ":iwdemerit_lib",
+        "//Molecule_Lib:moleculeio",
+        "@googletest//:gtest",
+        "@googletest//:gtest_main",
+    ],
+)
+
+cc_test(
+    name = "ladderane_test",
+    srcs = [
+        "ladderane_test.cc",
+    ],
+    deps = [
+        ":ladderane",
+        "//Molecule_Lib:iwmolecule",
         "//Molecule_Lib:moleculeio",
         "@googletest//:gtest",
         "@googletest//:gtest_main",

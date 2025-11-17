@@ -1043,6 +1043,8 @@ Chemical_Standardisation::_do_remove_hydrogens(Molecule& m) {
     return 0;
   }
 
+  std::unique_ptr<int[]> to_remove(new_int(matoms));
+
   int rc = 0;
 
   for (int i = m.natoms() - 1; i >= 0; i--) {
@@ -1096,9 +1098,13 @@ Chemical_Standardisation::_do_remove_hydrogens(Molecule& m) {
     }
 
     //  const atom_number_t j = a->other(i, 0);
-    m.remove_atom(i);
+    to_remove[i] = 1;
     //  cerr << "AFTER removing H residual j IH " << m.implicit_hydrogens(j) << '\n';
     rc++;
+  }
+
+  if (rc) {
+    m.remove_atoms(to_remove.get());
   }
 
   // cerr << "After removing explicit Hydrogens\n";

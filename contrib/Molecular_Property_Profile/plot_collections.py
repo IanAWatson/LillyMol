@@ -36,8 +36,8 @@ flags.DEFINE_multi_string("compare", [], "collections to plot (the stems from ge
 flags.DEFINE_string("feature_descriptions", "", "File containing feature descriptions")
 flags.DEFINE_list("color", [], "CSV list of color for each collection")
 flags.DEFINE_string("stem", "", "name stem for .png files")
-flags.DEFINE_float('X', 0.0, "Figure size (X) for .png output")
-flags.DEFINE_float('Y', 0.0, "Figure size (Y) for .png output")
+flags.DEFINE_float('X', 0.0, "X plot length, in inches, for .png output")
+flags.DEFINE_float('Y', 0.0, "Y plot height, in inches, for .png output")
 flags.DEFINE_float('xmin', -1.0, "manually set lower limit")
 flags.DEFINE_float('xmax', -1.0, "manually set upper limit")
 flags.DEFINE_float('width', 0.0, 'Width of bars in bar plots')
@@ -468,6 +468,10 @@ def plot_profiles(args):
   if FLAGS.legend is not None:
     options.stream_for_legends = open(FLAGS.legend, 'w')
   options.int2c = FLAGS.int2c
+
+  if options.x > 10.0 or options.y > 10.0:
+    logging.fatal("X %f or 5 %f dimension too large (inches)", options.x, options.y)
+    return
 
   # Note there is no checking of the length of the color
   # array with the number of collections.

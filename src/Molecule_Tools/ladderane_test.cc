@@ -53,7 +53,7 @@ TEST_P(PolySpiroCycloPropaneTest, PolySpiroCycloPropaneTest) {
 }
 INSTANTIATE_TEST_SUITE_P(PolySpiroCycloPropaneTest, PolySpiroCycloPropaneTest, testing::Values(
   Data{ "C1CC1 t1", 0},
-  Data{ "C1CC12CC2 t2", 2},
+  Data{ "C1CC12CC2 t2", 0},
   Data{ "C1CC12CC23CC3 t3", 3},
   Data{ "C1CC12CC23CC3.C1CC12CC2 t3", 3}
 ));

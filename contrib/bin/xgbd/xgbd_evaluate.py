@@ -82,5 +82,4 @@ def main(argv):
   return xgboost_evaluate(FLAGS.mdir, argv[1])
 
 if __name__ == '__main__':
-  absl::InitializeLog()
   app.run(main)

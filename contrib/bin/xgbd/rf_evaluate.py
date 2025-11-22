@@ -1,4 +1,4 @@
-# Evaluate an xgboost descriptor model built with xgboost_make
+# Evaluate a random forest descriptor model built with rf_make_make
 
 import os
 import sys

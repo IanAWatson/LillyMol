@@ -7,11 +7,12 @@ import sys
 from typing import List
 
 import pandas as pd
-import xgbd.xgboost_model_pb2
 from absl import app, flags, logging
 from google.protobuf import text_format
 from matplotlib import pyplot
 from xgboost import XGBClassifier, XGBRegressor, plot_importance
+# import xgbd.xgboost_model_pb2
+from xgbd import xgboost_model_pb2
 
 FLAGS = flags.FLAGS
 

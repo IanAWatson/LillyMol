@@ -5,6 +5,7 @@ import os
 import subprocess
 
 import joblib
+import numpy as np
 import pandas as pd
 import random_forest_model_pb2
 from absl import app, flags, logging
@@ -91,7 +92,6 @@ def keywords_from(proto):
     result['verbose'] = True
 
   return result
-
 def classification(x, y, options: Options):
   """build a classification model
   """

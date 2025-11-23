@@ -457,8 +457,8 @@ SvmModel::PreprocessSupportVectors() {
 // and use it to establish the _class_labels array.
 int
 SvmModel::ReadClassLabelTranslation(const IWString& dir, const std::string& fname) {
-  std::optional<ClassLabelTranslation::ClassLabelTranslation> mapping =
-    ReadBinaryProto<ClassLabelTranslation::ClassLabelTranslation>(dir, fname);
+  std::optional<class_label_translation::ClassLabelTranslation> mapping =
+    ReadBinaryProto<class_label_translation::ClassLabelTranslation>(dir, fname);
   if (! mapping) {
     cerr << "SvmModel::ReadClassLabelTranslation:cannot read '" << fname << "'\n";
     return 0;

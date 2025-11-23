@@ -6,4 +6,6 @@ fi
 
 export PATH=${LILLYMOL_HOME}/contrib/bin:$PATH
 
+export PYTHONPATH=$(dirname $0):$PYTHONPATH
+
 exec ruby ${LILLYMOL_HOME}/contrib/bin/xgbd/rf_evaluate.rb "$@"

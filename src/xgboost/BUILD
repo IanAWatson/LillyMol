@@ -86,6 +86,7 @@ cc_binary(
         "//Foundational/cmdline_v2",
         "//Foundational/data_source:iwstring_data_source",
         "//Foundational/iwmisc",
+        "//Utilities/General:class_label_translation_cc_proto",
         "//Utilities/General:linear_scaling",
         "@third_party//:dlmc",
         "@third_party//:xgboost",

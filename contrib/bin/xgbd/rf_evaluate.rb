@@ -83,15 +83,7 @@ def rf_evaluate_smiles(fname, mdir, proto, cl)
 end
 
 def rf_evaluate_descriptors(fname, mdir, proto, cl)
-  cmd = "rf_evaluate_sklearn.sh -mdir #{mdir}"
-
-  rescaling = File.join(mdir, 'rescaling.textproto')
-  if File.size?(rescaling)
-    # TODO ianwatson finish implementation
-    # cmd << 
-  end
-
-  cmd << " #{fname}"
+  cmd = "python #{__dir__}/rf_evaluate.py --mdir #{mdir} #{fname}"
 
   $stderr << "Executing #{cmd}\n" if cl.option_present('v')
   system(cmd)

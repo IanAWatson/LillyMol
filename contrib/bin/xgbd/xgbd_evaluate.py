@@ -8,6 +8,7 @@ import xgboost_model_pb2
 from absl import app, flags, logging
 from google.protobuf import text_format
 from xgboost import XGBClassifier, XGBRegressor
+from xgbd import class_label_translation_pb2
 
 FLAGS = flags.FLAGS
 
@@ -45,6 +46,28 @@ def get_model(mdir: str)->tuple:
 
   return model, proto.response
 
+def read_class_label_translation(mdir:string)->bool:
+  """Read the ClassLabelTransation proto in `mdir`.
+  """
+  fname = os.path.join(mdir, 'class_label_translation.dat')
+  with optn(fname, "rb") as input:
+    serialised = input.read()
+
+  proto = class_label_translation_pb2.ClassLabelTranslation()
+  proto.ParseFromString(serialised)
+
+  return proto
+
+def to_class(labels:List[string], value)
+  """Given a list of class labels and a model prediction, return the label for that score.
+  """
+  if value <= 0.5:
+    return labels[0]
+  else:
+    return labels[1]
+ 
+end
+
 def xgboost_evaluate(mdir: str, fname: str)->bool:
   """Read `fname` as descriptors for a model in `mdir`
   """
@@ -57,13 +80,24 @@ def xgboost_evaluate(mdir: str, fname: str)->bool:
     logging.error("Invalid mode in %s", mdir)
     return False
 
+  print(f"classification {model.classification}")
+  if model.classification:
+    xref = read_class_label_translation(mdir)
+    classes = [] * 2
+    for k, v in enumerate(xref):
+      classes[v] = k
+
   data = pd.read_csv(fname, sep=' ', header=0)
 
   logging.info("Evaluating %d rows", len(data))
   results = model.predict(data.iloc[:,1:])
   print(f"Id XGBD_{response}")
-  for i in range(len(results)):
-    print(f"{data.iloc[i,0]} {results[i]:.4f}")
+  if model.classification:
+    for i in range(len(results)):
+      printf(f"{data.iloc[i,0]} {to_class(classes, results[i]):.4f}")
+  else:
+    for i in range(len(results)):
+      print(f"{data.iloc[i,0]} {results[i]:.4f}")
 
   return True
 

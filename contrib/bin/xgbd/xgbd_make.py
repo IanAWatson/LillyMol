@@ -6,13 +6,16 @@ import subprocess
 import sys
 from typing import List
 
+import numpy as np
 import pandas as pd
 from absl import app, flags, logging
 from google.protobuf import text_format
+from google.protobuf import json_format
 from matplotlib import pyplot
 from xgboost import XGBClassifier, XGBRegressor, plot_importance
 # import xgbd.xgboost_model_pb2
 from xgbd import xgboost_model_pb2
+from xgbd import class_label_translation_pb2
 
 FLAGS = flags.FLAGS
 
@@ -61,16 +64,54 @@ class Options:
 def to_array(input:str) -> List[str]:
   return input.split(' ')
 
+def write_class_label_translation(options: Options, categories:np.array, class_counts:np.array)->bool:
+  """Write the class label proto to the model directory.
+  """
+  proto = class_label_translation_pb2.ClassLabelTranslation()
+  proto.to_numeric[categories[0]] = 0
+  proto.to_numeric[categories[1]] = 1
+
+
+  fname = os.path.join(options.mdir, "class_label_translation.dat")
+  with open(fname, "wb") as output:
+    serialised = proto.SerializeToString()
+    output.write(serialised)
+
+  fname = os.path.join(options.mdir, "class_label_translation.json")
+  with open(fname, "w") as output:
+    output.write(json_format.MessageToJson(proto))
+
+  return True
+
 def classification(x, y, options: Options)->bool:
   """build a classification model
     Args:
       x: feature matrix
       y: response - must be translated to 0,1. Not implemented...
   """
+  categories, counts = np.unique(y, return_counts=True)
+  print(type(y))
+  if len(categories) != 2:
+    logging.error("Must be two classes %d not possible\n", len(categories))
+    return False
+  if counts[0] <= counts[1]:
+    logging.info("less")
+    y = (y == categories[0]).astype(int)
+    print(y)
+  else:
+    y = (y != categories[0]).astype(int)
+    counts[0], counts[1] = counts[1], counts[0]
+    categories[0], categories[1] = categories[1], categories[0]
+    logging.info("greater")
+  write_class_label_translation(options, categories, counts)
+  print(categories)
+  print(counts)
   booster = XGBClassifier(verbosity=options.verbosity)
   booster.fit(x, y)
 
   booster.save_model(os.path.join(options.mdir, "xgboost.json"))
+
+  return True
 
 def regression(x, y, options: Options):
   """build a regression model.
@@ -254,6 +295,10 @@ def main(argv):
   options.max_num_features = FLAGS.max_num_features
   options.feature_importance = FLAGS.feature_importance
   options.verbosity = FLAGS.xgverbosity
+
+  if flags.classification and flags.rescore:
+    logging.error("The --classification and --rescore options are incompatible")
+    return False
 
   # Build the proto first.
   # After that is done, we check for command line arguments that would

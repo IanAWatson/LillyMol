@@ -25,7 +25,7 @@ of the original molecules.
 The `evidence` tool reads an activity file and a nearest neighbours file
 and, for each molecule, gathers statistics about the molecule, its activity
 and the activity of its neighbours. The tool is designed for use in an
-interactive structure examination tool like Spotfile, DataWarrior or similar.
+interactive structure examination tool like Spotfire, DataWarrior or similar.
 
 In addition to reporting minimal statistics about the nearest neighbours,
 the tool calculates a number of pseudo knn 'models' for each target molecule,

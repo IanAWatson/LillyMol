@@ -56,7 +56,7 @@ with no `-X` option.
 ## TLDR
 A common use of this tool might look like
 ```
-activity_consistency -E train.activity -e 2 -l -c -x -g all -T I=Cl -T Br=Cl
+activity_consistency -X train.activity -e 2 -l -c -x -g all -T I=Cl -T Br=Cl
         -M max -M merged -v train.smi
 ```
 New files `merged.activity` and `merged.smi` are created, containing
@@ -64,6 +64,22 @@ merged information about structural duplicates.
 
 Where there are multiple molecules with equivalent smiles, the maximum
 value of the observed activity is written to `merged.activity`..
+
+`train.activity` should be a space separated tabular file.
+```
+ID Activity
+ID1 2.3
+ID2 0.3
+
+```
+
+Or if the activity is in the smiles file
+```
+C methane 3.5
+CC ethane 0.4
+
+```
+and use -e 2 since the activity is the second token in the name 'methane 3.5'.
 
 ## Options
 

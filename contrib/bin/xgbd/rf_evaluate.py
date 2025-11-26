@@ -112,7 +112,10 @@ def main(argv):
     logging.error("must specify model directory via the --mdir option")
     return 1
 
-  return random_forest_evaluate(FLAGS.mdir, argv[1])
+  if not random_forest_evaluate(FLAGS.mdir, argv[1]):
+    return 1
+
+  return 0
 
 if __name__ == '__main__':
   app.run(main)

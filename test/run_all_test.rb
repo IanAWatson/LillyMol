@@ -365,7 +365,10 @@ def run_case_proto(options, proto, test_dir, test_name, parent_tmpdir)
   args = eval("\"" + args + "\"")
 
   if (proto.preamble.size > 0)
-    cmd = "cd #{mytmp} && " << eval("\"" + proto.preamble.join("\n") << "\n" + "\"")
+    cmd = ""
+    proto.preamble.each do |p|
+      cmd << "cd #{mytmp} && " << eval("\"" + proto.preamble.join("\n") << "\n" + "\"")
+    end
   else
     cmd = ""
   end

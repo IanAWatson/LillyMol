@@ -1822,9 +1822,9 @@ SubstituentIdentification::_look_for_new_substituents(
 
   uint32_t new_molecules_produced = 0;
 
-  cerr << "Radii " << max_shell_radius_formed << " and _min_shell_radius " << _min_shell_radius << '\n';
+//cerr << "Radii " << max_shell_radius_formed << " and _min_shell_radius " << _min_shell_radius << '\n';
   for (int r = max_shell_radius_formed; r >= _min_shell_radius; --r) {
-    cerr << "Looking for " << b[r] << " at radius " << r << '\n';
+//  cerr << "Looking for " << b[r] << " at radius " << r << '\n';
     DBKey dbkey{r, b[r]};
 
     const int tmp = _look_for_new_substituents(m, zatom, fragment_lost,

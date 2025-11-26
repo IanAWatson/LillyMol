@@ -1161,7 +1161,7 @@ operator += (std::string & lhs, const const_IWSubstring & rhs)
 #endif
 
 #ifdef _DB_CXX_H_
-extern IWString & operator << (const Dbt &, IWString_and_File_Descriptor &);
+extern IWString & operator << (IWString & output, const Dbt& dbt);
 #endif
 
 //extern IWString & operator << (IWString &, const IWString &);

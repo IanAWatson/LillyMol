@@ -2,7 +2,6 @@
 
 export UNAME=$(uname)
 export OSTYPE=$(uname)
-echo "using UNAME ${UNAME}"
 
 if [[ ! -v LILLYMOL_HOME ]] ; then
   export LILLYMOL_HOME=$(dirname $(realpath $(dirname $0)))

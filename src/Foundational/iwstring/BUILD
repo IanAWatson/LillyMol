@@ -15,6 +15,7 @@ cc_library(
     srcs = [
         "IWString_class.cc",
         "append_number.cc",
+        "bdb.cc",
         "hexprint.cc",
         "iw_stl_hash_map.cc",
         "iwgetline.cc",

@@ -11,6 +11,8 @@
 
 #include "db_cxx.h"
 
+#include "BerkeleyDB/iwstring_bdb.h"
+
 #include "Foundational/cmdline/cmdline.h"
 #include "Foundational/iwmisc/misc.h"
 #include "Foundational/iwmisc/report_progress.h"

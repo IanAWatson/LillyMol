@@ -273,6 +273,8 @@ ApplicationName(int argc, char** argv) {
     }
   }
 
+  output.flush();
+
   if (verbose) {
     options.Report(cerr);
   }

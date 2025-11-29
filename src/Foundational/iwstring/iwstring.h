@@ -1160,10 +1160,6 @@ operator += (std::string & lhs, const const_IWSubstring & rhs)
 
 #endif
 
-#ifdef _DB_CXX_H_
-extern IWString & operator << (IWString & output, const Dbt& dbt);
-#endif
-
 //extern IWString & operator << (IWString &, const IWString &);
 //extern IWString & operator << (IWString &, const char *);
 //extern IWString & operator << (IWString &, const const_IWSubstring &);

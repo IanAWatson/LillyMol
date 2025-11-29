@@ -87,7 +87,7 @@ class data_source_and_type : public iwstring_data_source {
   int next_molecule(T&);
   T* next_molecule();
 
-  int molecules_remaining();
+  uint64_t molecules_remaining();
 
   int
   connection_table_errors_encountered() const {
@@ -591,7 +591,7 @@ data_source_and_type<T>::_rx_for_input_type() const {
 }
 
 template <typename T>
-int
+uint64_t
 data_source_and_type<T>::molecules_remaining() {
   if (FILE_TYPE_INVALID == _input_type) {
     std::cerr << "data_source_and_type::molecules_remaining: no type specified\n";

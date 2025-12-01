@@ -2116,6 +2116,18 @@ cc_binary(
     ],
 )
 
+cc_binary(
+   name = "confs2indices",
+   srcs = [
+       "confs2indices.cc",
+   ],
+   deps = [
+        "//Foundational/cmdline:iwcmdline",
+        "//Molecule_Lib:iwmolecule",
+        "//Molecule_Lib:moleculeio",
+   ],
+)
+
 
 cc_library(
     name = "dicer_api",

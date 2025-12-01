@@ -434,6 +434,9 @@ static IWString_and_File_Descriptor bit_smiles_cross_reference;
 
 static int allow_cc_bonds_to_break = 0;
 
+// All C-[CD>2] bonds can break.
+static int break_cc_bonds_at_highly_connected = 0;
+
 static int use_terminal_atom_type = 0;
 static int perceive_terminal_groups_only_in_original_molecule =
     0;  // misguided, the terminal status is about the complementary fragment...
@@ -651,6 +654,7 @@ reset_variables() {
   vf_structures_per_page = 0;
   write_smiles_and_complementary_smiles = 0;
   allow_cc_bonds_to_break = 0;
+  break_cc_bonds_at_highly_connected = 0;
   use_terminal_atom_type = 0;
   perceive_terminal_groups_only_in_original_molecule = 0;
   change_element_for_heteroatoms_with_hydrogens = 0;
@@ -6636,6 +6640,19 @@ Breakages::discard_breakages_that_result_in_fragments_too_small(
   return rc;
 }
 
+// Return true if either `a1` or `a2` have connectivity > 2
+static bool
+AtLeastOneHighlyConnected(const Molecule& m, atom_number_t a1, atom_number_t a2) {
+  if (m.ncon(a1) > 2) {
+    return true;
+  }
+  if (m.ncon(a2) > 2) {
+    return true;
+  }
+
+  return false;
+}
+
 /*
    The hard coded rules are
    aromatic - *
@@ -6747,6 +6764,14 @@ Breakages::identify_bonds_to_break_hard_coded_rules(Molecule& m) {
     }
 
     if (allow_cc_bonds_to_break && 6 == z1 && 6 == z2) {
+      Chain_Bond_Breakage* b = new Chain_Bond_Breakage(a1, a2);
+      _transformations.add(b);
+      rc++;
+      continue;
+    }
+
+    if (break_cc_bonds_at_highly_connected && z1 == 6 && z2 == 6 &&
+        AtLeastOneHighlyConnected(m, a1, a2)) {
       Chain_Bond_Breakage* b = new Chain_Bond_Breakage(a1, a2);
       _transformations.add(b);
       rc++;
@@ -7357,6 +7382,7 @@ display_misc_B_options(std::ostream& os) {
   os << " -B atype=<tag>    Calculate atom type and dump it in frag/comp pairs\n";
   os << " -B term           perceive terminal groups\n";
   os << " -B bscb           allow Carbon-Carbon single bonds to break\n";
+  os << " -B bCCD3          allow C-[CD>2] bonds to break\n";
   os << " -B eH             change O,N and S with Hydrogens to other elements\n";
   os << " -B xsub           do not report fragments that are exact subsets of others\n";
   os << " -B nosmi          suppress output of fragment smiles\n";
@@ -7830,6 +7856,11 @@ dicer(int argc, char** argv) {
         allow_cc_bonds_to_break = 1;
         if (verbose) {
           cerr << "Will allow Carbon-Carbon single bonds to break\n";
+        }
+      } else if (b == "bCCD3") {
+        break_cc_bonds_at_highly_connected = 1;
+        if (verbose) {
+          cerr << "C-C bonds at highly connected Carbon atoms will be broken\n";
         }
       } else if ("eH" == b) {
         change_element_for_heteroatoms_with_hydrogens = 1;

@@ -134,6 +134,11 @@ Perceive terminal groups. By default, single atom terminal groups are
 not produced.
 #### bscb
 Allow Carbon-Carbon chain single bonds to break. By default, these are not broken.
+#### bCCD3
+Allow Carbon-Carbon chain single bonds to break only if one of the atoms has
+more than 2 connections.
+#### brcb
+Break all non ring bonds from a ring atom to a non ring atom.
 #### xsub
 Do not report fragments that are exact subsets of others. This does not work
 very well, and always causes run-time problems. Best to not use.

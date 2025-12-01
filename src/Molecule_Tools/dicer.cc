@@ -3637,13 +3637,20 @@ do_apply_atomic_number_isotopic_labels(Molecule& m, const atom_number_t j1,
   return m.set_isotope(j1, z2);
 }
 
+static int
+MaybeIncrementIsotope(Molecule& m, atom_number_t zatom) {
+  isotope_t iso = m.isotope(zatom);
+  if (iso >= static_cast<isotope_t>(increment_isotope_for_join_points)) {
+    return 0;
+  }
+
+  return m.set_isotope(zatom, iso + increment_isotope_for_join_points);
+}
 static void
 do_apply_isotopic_labels(Molecule& m, const atom_number_t a1, const atom_number_t a2) {
   if (increment_isotope_for_join_points) {
-    m.set_isotope(
-        a1, m.isotope(a1) + increment_isotope_for_join_points + isotope_for_join_points);
-    m.set_isotope(
-        a2, m.isotope(a2) + increment_isotope_for_join_points + isotope_for_join_points);
+    MaybeIncrementIsotope(m, a1);
+    MaybeIncrementIsotope(m, a2);
   } else {
     m.set_isotope(a1, isotope_for_join_points);
     m.set_isotope(a2, isotope_for_join_points);
@@ -5898,10 +5905,9 @@ Ring_Bond_Breakage::_process(Molecule& m, Dicer_Arguments& dicer_args,
   // cerr << "Residual ring contains " << r.size() << " " << r << '\n';
 
   if (isotope_for_join_points > 0) {
-    if (increment_isotope_for_join_points)  // not implemented here
-    {
+    if (increment_isotope_for_join_points) {  // not implemented here
       mcopy.set_isotope(r[0], isotope_for_join_points);
-      mcopy.set_isotope(r.last_item(), isotope_for_join_points);
+      mcopy.set_isotope(r.back(), isotope_for_join_points);
     } else {
       mcopy.set_isotope(r[0], isotope_for_join_points);
       mcopy.set_isotope(r.last_item(), isotope_for_join_points);

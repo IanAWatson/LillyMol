@@ -36,8 +36,16 @@ if [[ ! -x ${run_python} ]] ; then
   exit 1
 fi
 
+declare -i failures=0
 for file in ${here}/pybind/*_test.py ; do
   ${run_python} ${file}
+  if [[ $? -ne 0 ]] ; then
+    echo "${file} failed"
+    failures=$(($failures + 1))
+  fi
 done
 
 echo 'Python unit tests complete'
+if [[ ${failures} -gt 0 ]] ; then
+  echo "${failures} python tests failed"
+fi

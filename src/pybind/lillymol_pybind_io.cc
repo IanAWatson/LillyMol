@@ -1,3 +1,4 @@
+#include <cstdint>
 #include <iostream>
 #include <memory>
 #include <optional>
@@ -278,7 +279,7 @@ PYBIND11_MODULE(lillymol_io, io)
       }
     )
     .def("molecules_remaining",
-      [](ReaderContext& me) {
+      [](ReaderContext& me)->uint64_t {
         if (! me._reader) {
           return 0;
         }

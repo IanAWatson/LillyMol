@@ -31,6 +31,8 @@ def rdkit_descriptors(argv):
     return 1
 
   calc = MoleculeDescriptors.MolecularDescriptorCalculator([x[0] for x in Descriptors._descList])
+  names = calc.GetDescriptorNames()
+  print("ID", " ".join(names))
   with open(argv[1], "r") as input:
     for line in input:
       f = line.rstrip().split(' ')

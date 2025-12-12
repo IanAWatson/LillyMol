@@ -160,7 +160,9 @@ def build_random_forest_model(descriptor_fname: str,
 
   x = combined.iloc[:,2:]
   features = x.columns
-  x.apply(pd.to_numeric).to_numpy()
+  x.apply(pd.to_numeric).to_numpy(dtype=np.float64)
+  # Suppress values that overflow float32.
+  x[x>1.0e+37] = 1.0e+37
 
   rc = False
   if options.classification:

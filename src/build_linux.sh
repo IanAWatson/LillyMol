@@ -200,9 +200,9 @@ if [[ -v BUILD_INCHI ]] ; then
 fi
 
 if [[ -v BUILD_NLOPT ]] ; then
-  git clone https://github.com/stevengj/nlopt/archive/v2.7.1.tar.gz
+  git clone https://github.com/stevengj/nlopt/
   (cd nlopt && mkdir build)
-  (cd nlopt/build && cmake -DCMAKE_INSTALL_PREFIX=${REPO_HOME}/third_party)
+  (cd nlopt/build && cmake -DBUILD_SHARED_LIBS=NO -DCMAKE_INSTALL_PREFIX=${REPO_HOME}/third_party)
   (cd nlopt/build && make -j ${THREADS})
   (cd nlopt/build && make install)
   BUILD_NLOPT=1

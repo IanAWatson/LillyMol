@@ -236,7 +236,7 @@ if [[ ${inside_lilly} -eq 1 && -d '/node/scratch' ]] ; then
 elif [[ $(df -TP ${HOME}) =~ 'nfs' ]] ; then
     echo "Your HOME dir is an NFS mounted file system. bazel will not work."
     echo "Will attempt to use /tmp/ for bazel cache, that will need to be changed."
-    bazel_options='--output_user_root=/tmp'
+    bazel_options='--output_user_root=/tmp/bazel_${USER}'
 else
     # Even if outside Lilly, you may still need to set this
     bazel_options=""

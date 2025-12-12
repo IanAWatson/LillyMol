@@ -1307,7 +1307,7 @@ Main(int argc, char** argv) {
             " ave " << static_cast<float>(acc_nbrs.average()) << '\n';
     auto now = std::chrono::system_clock::now();
     auto elapsed_seconds = std::chrono::duration_cast<std::chrono::seconds>(now - tzero);
-    cerr << "Reading data took " << elapsed_seconds << " seconds\n";
+    cerr << "Reading data took " << elapsed_seconds.count() << " seconds\n";
   }
 
   if (cl.option_present('W')) {

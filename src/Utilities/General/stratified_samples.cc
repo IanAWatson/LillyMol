@@ -278,10 +278,7 @@ ID_Stratum_Selected::initialise(const const_IWSubstring& buffer)
     buffer.nextword(c, i);
   } else {
     const_IWSubstring token;
-    int col = 1;
-    while (buffer.nextword(token, i)) {
-      col++;
-
+    for (int col = 0; buffer.nextword(token, i); ++col) {
       if (col == activity_column) {
         c = token;
         break;
@@ -289,7 +286,7 @@ ID_Stratum_Selected::initialise(const const_IWSubstring& buffer)
     }
   }
 
-  if (0 == c.length()) {
+  if (c.empty()) {
     cerr << "ID_Stratum_Selected::initialise:no activity data for '" << _id << "'\n";
     return 0;
   }

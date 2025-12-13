@@ -83,6 +83,9 @@ UseScalingLine(const const_IWSubstring& buffer,
   int i = 0;
   const_IWSubstring token;
   IWString id;
+  // If we discard a calculation, just resize output to this size.
+  const uint32_t initial_size = output.size();
+
   for(int col = 0; buffer.nextword(token, i, input_separator); ++col) {
     if (col == 0) {
       id = token;
@@ -102,7 +105,8 @@ UseScalingLine(const const_IWSubstring& buffer,
 
     if (identifiers_to_process.empty()) {
     } else if (! identifiers_to_process.contains(id)) {
-      continue;
+      output.resize_keep_storage(initial_size);
+      return 1;
     }
 
     if (action == Action::kScaleToRange) {

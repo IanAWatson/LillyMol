@@ -9200,7 +9200,7 @@ usage(int rc)
   cerr << "  -G ...         fingerprint specification\n";    
   cerr << "  -B ...         other optional features\n";
   cerr << "  -s .           include the smiles as a descriptor - for now . means first descriptor\n";
-  cerr << "  -S             zero value for SD2 in Polar Surface Area computations\n";
+  cerr << "  -S             zero value for all Sulphur atoms in Polar Surface Area computations\n";
   cerr << "  -d             write normally integer descriptors as floats\n";
   cerr << "  -z             write empty descriptors for zero atom molecules\n";
   cerr << "  -i <type>      specify input file type\n";
@@ -9346,9 +9346,9 @@ iwdescr(int argc, char ** argv)
   }
 
   if (cl.option_present('S')) {
-    nvrtspsa::set_non_zero_constribution_for_SD2(0);
+    nvrtspsa::set_zero_for_all_sulphur_atoms(1);
     if (verbose) {
-      cerr << "SD2 atoms given zero weight in PSA calculations\n";
+      cerr << "All Sulphur atoms assigned zero contribution in Novartis PSA computation\n";
     }
   }
 

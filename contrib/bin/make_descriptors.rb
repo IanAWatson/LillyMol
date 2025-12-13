@@ -142,7 +142,7 @@ def do_single_descriptor(d, fname, cl)
 
   cmd << "rcorina.sh #{corina_options(cl)} -u #{input_for_next_stage}|" if d.threed
 
-  cmd << "#{d.programme} -i smi -"
+  cmd << "#{d.programme} #{d.extra} -i smi -"
   cmd << ' > ' << cl.value('o') if cl.option_present('o')
 
   $stderr << cmd << "\n" if cl.option_present('v')
@@ -387,6 +387,8 @@ def main
       to_compute << v
     elsif cl.option_present(k.upcase)
       # don't bother checking duplicates, too rare.
+      already_present.add(k)
+      to_compute << v
       v.extra = cl.value(k.upcase)
     end
   end

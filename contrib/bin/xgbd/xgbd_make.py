@@ -296,7 +296,7 @@ def main(argv):
   options.feature_importance = FLAGS.feature_importance
   options.verbosity = FLAGS.xgverbosity
 
-  if flags.classification and flags.rescore:
+  if FLAGS.classification and FLAGS.rescore:
     logging.error("The --classification and --rescore options are incompatible")
     return False
 

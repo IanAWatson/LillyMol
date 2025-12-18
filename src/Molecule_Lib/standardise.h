@@ -404,6 +404,7 @@ class IWStandard_Current_Molecule
 #define CS_LACTIM_LACTAM_RING "ltltr"
 #define CS_REVERSE_NITRO "rvnitro"
 #define CS_REVERSE_NV5 "rvnv5"
+#define CS_NV5DO "rvnv5o"
 #define CS_ISOXAZOLE  "isoxazole"
 #define CS_ARGUAN "arguan"
 #define CS_PYRAZOLONE "pyrazolone"
@@ -512,6 +513,7 @@ class Chemical_Standardisation
     Chemical_Transformation _transform_back_to_nplus_nminus;
     Chemical_Transformation _transform_nv5_to_charge_separated;
     Chemical_Transformation _transform_to_charge_separated_azid;
+    Chemical_Transformation _transform_nv5_oxygen_to_charge_separated;
 
     Chemical_Transformation _transform_obvious_implicit_hydrogen_errors;
 
@@ -653,8 +655,10 @@ class Chemical_Standardisation
     int _process_lactim_in_isolated_aromatic_ring (Molecule & m, Possible_Lactim_Lactam & p,
                                                 IWStandard_Current_Molecule & current_molecule_data);
 
-    int  _do_transform_reverse_nitro (Molecule &, IWStandard_Current_Molecule & current_molecule_data);
-//    int  _do_transform_reverse_azid  (Molecule &, IWStandard_Current_Molecule & current_molecule_data);
+    int  _do_transform_reverse_nitro(Molecule &, IWStandard_Current_Molecule & current_molecule_data);
+    // int  _do_transform_reverse_azid(Molecule& m, IWStandard_Current_Molecule& current_molecule_data);
+    int _do_nv5_oxygen_to_charge_separated( Molecule& m,
+        IWStandard_Current_Molecule& current_molecule_data);
 
     int  _do_transform_pyrazolone (Molecule & m, int * atom_already_changed, IWStandard_Current_Molecule & current_molecule_data);
     int  _do_transform_pyrazolone (Molecule & m, standardisation::KetoEnol keto_enol, const Set_of_Atoms & ri, const int ring_is_fused, int * atom_already_changed, IWStandard_Current_Molecule & current_molecule_data);

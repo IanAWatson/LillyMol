@@ -123,6 +123,7 @@ struct DescriptorsToCompute {
   int spinach_descriptors = 1;
   int symmetry_descriptors = 1;
   int long_carbon_chains = 1;
+  int saturated_chains = 1;
 #ifdef MCGOWAN
   int mcgowan = 1;
 #endif
@@ -169,6 +170,7 @@ DescriptorsToCompute::SetAll(int s) {
   symmetry_descriptors = s;
   psa = s;
   long_carbon_chains = s;
+  saturated_chains = s;
 #ifdef MCGOWAN
   mcgowan = s;
 #endif  // MCGOWAN
@@ -208,6 +210,7 @@ DescriptorsToCompute::DisplayUsage(char flag) const {
   cerr << dash_o << "rssr          enable ring substitution ratio descriptors\n";
   cerr << dash_o << "spch          enable spinach related descriptors\n";
   cerr << dash_o << "spcgrp        enable specific group descriptors\n";
+  cerr << dash_o << "satchain      enable computation of saturated chain descriptors\n";
   cerr << dash_o << "symm          enable symmetry related descriptors\n";
   cerr << dash_o << "xlogp         enable xlogp\n";
   // clang-format on
@@ -362,6 +365,11 @@ DescriptorsToCompute::Initialise(Command_Line& cl) {
       compute_xlogp = 1;
       if (verbose) {
         cerr << "xlogp will be computed\n";
+      }
+    } else if (o == "satchain") {
+      saturated_chains = 1;
+      if (verbose) {
+        cerr << "Saturated chain descriptors computed\n";
       }
     } else if (o.starts_with("F:")) {
       o.remove_leading_chars(2);
@@ -536,6 +544,11 @@ static int ignore_molecules_with_no_atoms = 0;
 // Internal Hydrogen bonding extremeties.
 static int shortest_internal_hydrogen_bond_separation = 3;
 static int longest_internal_hydrogen_bond_separation = 6;
+
+// For maximum concordance with RDKit, we need to transform
+// charge neutralised forms back to charge separated.
+static int perform_psa_on_charge_separated_forms = 0;
+static Chemical_Standardisation rvnitro;
 
 // Many of the features are int forms.
 static IWDigits iwdigits;
@@ -765,6 +778,10 @@ enum IWDescr_Enum
   iwdescr_nvrtspsa,
   iwdescr_mxlencchain2,
   iwdescr_mxlencchain3,
+  // Saturated chain features.
+  iwdescr_nsatchain,
+  iwdescr_mxsatchain,
+  iwdescr_fsatchain,
 #ifdef MCGOWAN
   iwdescr_mcgowan,
 #endif
@@ -1325,8 +1342,11 @@ fill_descriptor_extremeties (Descriptor * d,
   d[iwdescr_fsdrngalal].set_min_max_resolution(0.0f, 2.0f, resolution);
   d[iwdescr_nchiral].set_min_max_resolution(0.0f, 5.821545f, resolution);
   d[iwdescr_nvrtspsa].set_min_max_resolution(0.0f, 220.2642f, resolution);
-  d[iwdescr_mxlencchain2].set_min_max_resolution(0.0f, 20.0, resolution);
-  d[iwdescr_mxlencchain3].set_min_max_resolution(0.0f, 20.0, resolution);
+  d[iwdescr_mxlencchain2].set_min_max_resolution(0.0f, 20.0f, resolution);
+  d[iwdescr_mxlencchain3].set_min_max_resolution(0.0f, 20.0f, resolution);
+  d[iwdescr_nsatchain].set_min_max_resolution(0.0f, 20.0f, resolution);
+  d[iwdescr_mxsatchain].set_min_max_resolution(0.0f, 20.0f, resolution);
+  d[iwdescr_fsatchain].set_min_max_resolution(0.0f, 1.0f, resolution);
 #ifdef MCGOWAN
   d[iwdescr_mcgowan].set_min_max_resolution(50.0f, 900.0f, resolution);
 #endif
@@ -2055,6 +2075,11 @@ allocate_descriptors()
   if (descriptors_to_compute.long_carbon_chains) {
     descriptor[iwdescr_mxlencchain2].set_best_fingerprint(1);
     descriptor[iwdescr_mxlencchain3].set_best_fingerprint(1);
+  }
+  if (descriptors_to_compute.saturated_chains) {
+    descriptor[iwdescr_nsatchain].set_name("nsatchain");
+    descriptor[iwdescr_mxsatchain].set_name("mxsatchain");
+    descriptor[iwdescr_fsatchain].set_name("fsatchain");
   }
   descriptor[iwdescr_natoms].set_best_fingerprint(1);
   descriptor[iwdescr_frafus].set_best_fingerprint(1);
@@ -5255,6 +5280,87 @@ ComputeLongCarbonChains(const Molecule& m, const atomic_number_t* z,
 }
 
 static int
+ComputeSaturatedChain(Molecule& m,
+                      atom_number_t zatom,
+                      const int* ncon,
+                      const int* ring_membership,
+                      int* already_done) {
+  int rc = 1;
+  already_done[zatom] = 1;
+
+  for (const Bond* b : m[zatom]) {
+    atom_number_t o = b->other(zatom);
+    if (ring_membership[o]) {
+      continue;
+    }
+    if (already_done[o]) {
+      continue;
+    }
+    if (ncon[o] != 2) {
+      continue;
+    }
+    if (! m.saturated(o)) {
+      continue;
+    }
+
+    rc += ComputeSaturatedChain(m, o, ncon, ring_membership, already_done);
+  }
+
+  return rc;
+}
+        
+
+static int
+ComputeSaturatedChains(Molecule& m, 
+                       const int* ncon,
+                       const int* ring_membership,
+                       int* already_done) {
+  int number_regions = 0;
+  int atoms_in_regions = 0;
+  int largest_region = 0;
+
+  const int matoms = m.natoms();
+  for (int i = 0; i < matoms; ++i) {
+    // cerr << i << " ring_membership " << ring_membership[i] << " ncon " << ncon[i] << " saturated " << m.saturated(i) << '\n';
+    if (ring_membership[i]) {
+      continue;
+    }
+
+    if (ncon[i] != 2) {
+      continue;
+    }
+
+    if (already_done[i]) {
+      continue;
+    }
+
+    if (! m.saturated(i)) {
+      continue;
+    }
+
+    int tmp = ComputeSaturatedChain(m, i, ncon, ring_membership, already_done);
+    if (tmp < 3) {  // an arbitrary choice.
+      continue;
+    }
+    ++number_regions;
+    atoms_in_regions += tmp;
+    if (tmp > largest_region) {
+      largest_region = tmp;
+    }
+  }
+
+  if (number_regions == 0) {
+    return 1;
+  }
+
+  descriptor[iwdescr_nsatchain].set(number_regions);
+  descriptor[iwdescr_mxsatchain].set(largest_region);
+  descriptor[iwdescr_fsatchain].set(iwmisc::Fraction<float>(atoms_in_regions, matoms));
+
+  return 1;
+}
+
+static int
 compute_radha_entropy_descriptors(Molecule & m,
                                   atom_number_t zatom,
                                   const int * ncon,
@@ -7998,6 +8104,11 @@ compute_topological_descriptors(Molecule & m,
     std::fill_n(already_done, matoms, 0);
   }
 
+  if (descriptors_to_compute.saturated_chains) {
+    ComputeSaturatedChains(m, ncon, ring_membership, already_done);
+    std::fill_n(already_done, matoms, 0);
+  }
+
   if (descriptors_to_compute.specific_groups) {
     compute_amine_count(m, atom, z, ncon, ring_membership, already_done);
     compute_pyridine_pyrrole(m, atom, z, ncon, ring_membership);
@@ -8601,9 +8712,7 @@ iwdescriptors(Molecule & m,
 
 // It looks as if the Novartis PSA descriptor should be done before charges are assigned
 
-  if (descriptors_to_compute.psa) {
-    descriptor[iwdescr_nvrtspsa].set(static_cast<float>(novartis_polar_surface_area(m, z, atom, is_aromatic)));
-  }
+  descriptor[iwdescr_nvrtspsa].set(static_cast<float>(novartis_polar_surface_area(m, z, atom, is_aromatic)));
 
 #ifdef MCGOWAN
   if (descriptors_to_compute.mcgowan) {
@@ -9200,7 +9309,7 @@ usage(int rc)
   cerr << "  -G ...         fingerprint specification\n";    
   cerr << "  -B ...         other optional features\n";
   cerr << "  -s .           include the smiles as a descriptor - for now . means first descriptor\n";
-  cerr << "  -S             zero value for all Sulphur atoms in Polar Surface Area computations\n";
+  cerr << "  -S             the TPSA computation is done for maximum compatibility with RDKit\n";
   cerr << "  -d             write normally integer descriptors as floats\n";
   cerr << "  -z             write empty descriptors for zero atom molecules\n";
   cerr << "  -i <type>      specify input file type\n";
@@ -9347,8 +9456,10 @@ iwdescr(int argc, char ** argv)
 
   if (cl.option_present('S')) {
     nvrtspsa::set_zero_for_all_sulphur_atoms(1);
+    nvrtspsa::set_zero_for_all_phosphorus_atoms(1);
+    nvrtspsa::set_convert_to_charge_separated(1);
     if (verbose) {
-      cerr << "All Sulphur atoms assigned zero contribution in Novartis PSA computation\n";
+      cerr << "TPSA computation done with maximum RDKit compatability\n";
     }
   }
 

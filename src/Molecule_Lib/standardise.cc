@@ -844,11 +844,21 @@ Chemical_Standardisation::Activate(const IWString& directive, const int verbose)
     }
   } else if (CS_REVERSE_NV5 == tmp) {
     if (negation) {
+      _transform_back_to_nplus_nminus.deactivate();
       _transform_to_charge_separated_azid.deactivate();
       _transform_to_charge_separated_azid.deactivate();
+      _transform_nv5_oxygen_to_charge_separated.deactivate();
     } else {
       _transform_back_to_nplus_nminus.activate();
       _transform_to_charge_separated_azid.activate();
+      _transform_to_charge_separated_azid.activate();
+      _transform_nv5_oxygen_to_charge_separated.activate();
+    }
+  } else if (tmp == CS_NV5DO) {
+    if (negation) {
+      _transform_nv5_oxygen_to_charge_separated.deactivate();
+    } else {
+      _transform_nv5_oxygen_to_charge_separated.activate();
     }
   } else if (CS_KETO_ENOL == tmp) {
     if (negation) {
@@ -3895,6 +3905,10 @@ Chemical_Standardisation::_process(Molecule& m,
     rc += _do_transform_azid_to_charge_separated(m, current_molecule_data);
   }
 
+  if (_transform_nv5_oxygen_to_charge_separated.active()) {
+    rc += _do_nv5_oxygen_to_charge_separated(m, current_molecule_data);
+  }
+
   if (_transform_obvious_implicit_hydrogen_errors.active()) {
     rc += _do_transform_implicit_hydrogen_known_errors(m, current_molecule_data);
   }
@@ -4052,7 +4066,7 @@ Chemical_Standardisation::_process(Molecule& m) {
   }
 
   if (!_processing_needed(current_molecule_data)) {
-    // cerr << //"Processing not needed\n";
+    // cerr << "Processing not needed\n";
     return rc;
   }
 
@@ -4103,9 +4117,16 @@ Chemical_Standardisation::report(std::ostream& os) const {
     _transform_nplus_ominus.report(os);
   }
 
+#ifdef NO_LONGER_USED_NV5
   if (_transform_nv5_to_charge_separated.active()) {
     os << "  Nv5 ";
     _transform_nv5_to_charge_separated.report(os);
+  }
+#endif
+
+  if (_transform_nv5_oxygen_to_charge_separated.active()) {
+    os << "  [Nv5]=O to charged ";
+    _transform_nv5_oxygen_to_charge_separated.report(os);
   }
 
   if (_transform_plus_minus.active()) {
@@ -4617,13 +4638,90 @@ HasTripleBond(const Molecule& m, atom_number_t n) {
   return 0;
 }
 
+// Convert N=O to [N+]-[O-] making sure we do NOT hit Nitro groups.
+// There will be a double bond between `nitrogen` and `oxygen`.
+static int
+Nv5OxygenToChargeSeparated(Molecule& m, atom_number_t nitrogen, atom_number_t oxygen) {
+  int nbonds = 2;  // we know there is a double bond to `oxygen`.
+
+  // cerr << "Nv5OxygenToChargeSeparated starting with atoms " << m.smarts_equivalent_for_atom(nitrogen) << " and " << m.smarts_equivalent_for_atom(oxygen) << '\n';
+  for (const Bond* b : m[nitrogen]) {
+    atom_number_t o = b->other(nitrogen);
+    if (o == oxygen) {
+      continue;
+    }
+
+    if (b->is_double_bond()) {
+      if (m.atomic_number(o) == 8) {  // Nitro, do not process
+        return 0;
+      }
+      nbonds += 2;
+    } else if (b->is_single_bond()) {
+      ++nbonds;
+    } else {  // skip azids, handled elsewhere.
+      return 0;
+    }
+  }
+
+  if (nbonds != 5) {
+    return 0;
+  }
+
+  m.set_formal_charge(nitrogen, 1);
+  m.set_formal_charge(oxygen, -1);
+  m.set_bond_type_between_atoms(nitrogen, oxygen, SINGLE_BOND);
+
+  return 1;
+}
+
+// Convert N=O to [N+]-[O-] making sure we do NOT hit Nitro groups.
+int
+Chemical_Standardisation::_do_nv5_oxygen_to_charge_separated(
+        Molecule& m,
+        IWStandard_Current_Molecule& current_molecule_data) {
+  const atomic_number_t* z = current_molecule_data.atomic_number();
+
+  // cerr << m.smiles() << " _do_nv5_oxygen_to_charge_separated begin\n";
+
+  int rc = 0;
+
+  for (const Bond* b : m.bond_list()) {
+    if (! b->is_double_bond()) {
+      continue;
+    }
+
+    const atom_number_t a1 = b->a1();
+    const atom_number_t a2 = b->a2();
+    if (z[a1] == 7 && z[a2] == 8) {
+      rc += Nv5OxygenToChargeSeparated(m, a1, a2);
+    } else if (z[a1] == 8 && z[a2] == 7) {
+      rc += Nv5OxygenToChargeSeparated(m, a2, a1);
+    }
+  }
+
+  if (rc == 0) {
+    return 0;
+  }
+
+  _transform_nv5_oxygen_to_charge_separated.extra(rc);
+
+  if (_verbose) {
+    cerr << "Transformed " << rc << " 5 valent Nitrogen=O to charge separated form\n";
+  }
+
+  if (_append_string_depending_on_what_changed) {
+    _append_to_changed_molecules << " STD:NV5OS";
+  }
+  
+  return rc;
+}
+
 #ifdef NO_LONGER_USED_NV5
 int
 Chemical_Standardisation::_do_nv5_to_charge_separated(
     Molecule& m, IWStandard_Current_Molecule& current_molecule_data) {
   // Jan 2024. Turned off. Not clear if this is doing anything useful.
   return 0;
-  cerr << "_do_nv5_to_charge_separated begin\n";
   const atomic_number_t* z = current_molecule_data.atomic_number();
   const int* ncon = current_molecule_data.ncon();
   const Atom* const* atoms = current_molecule_data.atoms();
@@ -4676,6 +4774,7 @@ Chemical_Standardisation::_do_nv5_to_charge_separated(
     rc += _do_nv5_to_charge_separated(m, i, current_molecule_data);
   }
 
+#ifdef NO_LONGER_USED_NV5
   if (rc) {
     _transform_nv5_to_charge_separated.extra(rc);
 
@@ -4687,6 +4786,7 @@ Chemical_Standardisation::_do_nv5_to_charge_separated(
       _append_to_changed_molecules << " STD:RNV5";
     }
   }
+#endif
 
   return rc;
 }
@@ -7217,10 +7317,6 @@ Chemical_Standardisation::_do_transform_back_to_nplus_nminus(
 
   return rc;
 }
-
-/*
-  Convert N#N=N- to [N-]=[N+]=N-
-*/
 
 int
 Chemical_Standardisation::_do_transform_azid_to_charge_separated(
@@ -9816,7 +9912,7 @@ Chemical_Standardisation::_processing_needed(
       (current_molecule_data.sulphur() && (_transform_amino_thiazole.active() ||
                                            _transform_misdrawn_sulfonamide.active())) ||
       (current_molecule_data.oxygens() && _transform_enol_to_keto.active()) ||
-      (_transform_nv5_to_charge_separated.active() && current_molecule_data.oxygens() &&
+      (_transform_nitro_reverse.active() && current_molecule_data.oxygens() &&
        current_molecule_data.nitrogens()) ||
       _transform_to_4_pyridone.active() ||
       (_transform_sulfonyl_urea.active() && current_molecule_data.sulphur() > 0) ||
@@ -9828,7 +9924,9 @@ Chemical_Standardisation::_processing_needed(
        current_molecule_data.nitrogens() > 1) ||
       (_transform_oxo_pyrimidine.active() && current_molecule_data.nitrogens() > 1) ||
       (_transform_isotopes.active() && current_molecule_data.isotope() > 0) ||
-      (_transform_indole_hydrogen.active() && current_molecule_data.nitrogens() > 1)) {
+      (_transform_indole_hydrogen.active() && current_molecule_data.nitrogens() > 1) ||
+      (_transform_nv5_oxygen_to_charge_separated.active() && current_molecule_data.nitrogens() > 0)
+      ) {
     return 1;
   }
 

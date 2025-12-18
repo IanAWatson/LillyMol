@@ -3,11 +3,13 @@
 #include <iostream>
 #include <memory>
 
+#include "Foundational/cmdline/cmdline.h"
+
 #include "Molecule_Lib/aromatic.h"
 #include "Molecule_Lib/molecule.h"
+#include "Molecule_Lib/standardise.h"
 
 using std::cerr;
-using std::endl;
 
 namespace nvrtspsa {
 
@@ -43,6 +45,60 @@ set_zero_for_all_sulphur_atoms(int s) {
   zero_for_all_sulphur_atoms = s;
 }
 
+int zero_for_all_phosphorus_atoms = 0;
+
+void set_zero_for_all_phosphorus_atoms(int s) {
+  zero_for_all_phosphorus_atoms = s;
+}
+
+int convert_to_charge_separated = 0;
+void set_convert_to_charge_separated(int s) {
+  convert_to_charge_separated = s;
+}
+
+void
+DisplayOptions(char flag) {
+  cerr << " -" << flag << " rvstd        convert to charge separated forms - best compat with RDKit\n";
+  cerr << " -" << flag << " zeroP        Phosphorus atoms make zero contribution\n";
+  cerr << " -" << flag << " zeroS        Sulphur atoms make zero contribution\n";
+  cerr << " -" << flag << " zeroU        all unclassified atoms make zero contribution\n";
+  cerr << " -" << flag << " RDKit        as close as possible to the RDKit implementation\n";
+
+}
+
+int
+InitialiseOptions(const Command_Line& cl, char flag) {
+  if (! cl.option_present(flag)) {
+    return 1;
+  }
+
+  IWString s;
+  for (int i = 0; cl.value(flag, s, i); ++i) {
+    if (s == "rvstd") {
+      convert_to_charge_separated = 1;
+    } else if (s == "zeroP") {
+      zero_for_all_phosphorus_atoms = 1;
+    } else if (s == "zeroU") {
+      return_zero_for_unclassified_atoms = 1;
+    } else if (s == "zeroS") {
+      zero_for_all_sulphur_atoms = 1;
+    } else if (s == "RDKit") {
+      convert_to_charge_separated = 1;
+      zero_for_all_phosphorus_atoms = 1;
+      zero_for_all_sulphur_atoms = 1;
+    } else if (s == "help") {
+      DisplayOptions(flag);
+      return 1;
+    } else {
+      cerr << "Unrecognised nvrtspsa -" << flag << " qualifier '" << s << "'\n";
+      DisplayOptions(flag);
+      return 0;
+    }
+  }
+
+  return 1;
+}
+
 }  // namespace nvrtspsa
 
 static void
@@ -64,12 +120,12 @@ report_novartis_psa_unclassified_atom(Molecule &m, atom_number_t zatom, const At
     cerr << '-' << (-fc);
   }
 
-  cerr << "' atom in Novartis Polar Surface area, atom " << zatom << endl;
+  cerr << "' atom in Novartis Polar Surface area, atom " << zatom << '\n';;
   cerr << a.ncon() << " connections, ";
   if (a.formal_charge()) {
     cerr << "charge " << a.formal_charge() << ", ";
   }
-  cerr << hcount << " hydrogens, aromatic " << is_aromatic << endl;
+  cerr << hcount << " hydrogens, aromatic " << is_aromatic << '\n';;
 
   return;
 }
@@ -77,15 +133,16 @@ report_novartis_psa_unclassified_atom(Molecule &m, atom_number_t zatom, const At
 static double
 novartis_polar_surface_area_nitrogen(Molecule &m, atom_number_t zatom, Atom &a,
                                      int is_aromatic) {
-  int ncon = a.ncon();
+  // cerr << m.smiles() << " nitrogen atom " << m.smarts_equivalent_for_atom(zatom) << " atom " << zatom << '\n';
 
   int aromatic_bonds = 0;
   int single_bonds = 0;
   int double_bonds = 0;
   int triple_bonds = 0;
 
-  for (int i = 0; i < ncon; i++) {
-    const Bond *b = a[i];
+  for (const Bond* b : a) {
+    //b->debug_print(cerr);
+    //cerr << "single " << b->is_single_bond() << " double " << b->is_double_bond() << " other " << m.smarts_equivalent_for_atom(b->other(zatom)) << '\n';
 
     if (b->is_aromatic()) {
       aromatic_bonds++;
@@ -98,9 +155,10 @@ novartis_polar_surface_area_nitrogen(Molecule &m, atom_number_t zatom, Atom &a,
     }
   }
 
-  int hcount = a.implicit_hydrogens();
-
+  const int hcount = a.implicit_hydrogens();
+  const int ncon = a.ncon();
   formal_charge_t fc = a.formal_charge();
+  // cerr << "Nitrogen atom " << m.smarts_equivalent_for_atom(zatom) << " single " << single_bonds << " double_bonds " << double_bonds << " fc " << fc << " arom " << is_aromatic << '\n';
 
   if (is_aromatic) {
     if (0 == fc && 0 == hcount && 2 == ncon && 2 == aromatic_bonds) {  // [n](:*):*
@@ -198,12 +256,13 @@ novartis_polar_surface_area_nitrogen(Molecule &m, atom_number_t zatom, Atom &a,
     }
   }
 
+  // cerr << "unclassified nitrogen\n";
   report_novartis_psa_unclassified_atom(m, zatom, a, hcount, is_aromatic);
 
   if (nvrtspsa::return_zero_for_unclassified_atoms) {
     return 0.0;
   } else {
-    return 5.0;  // just a guess
+    return 30.5 - ncon * 8.2 + hcount * 1.5;
   }
 }
 
@@ -357,6 +416,10 @@ novartis_polar_surface_area_sulphur(Molecule &m, atom_number_t zatom, Atom &a,
 static double
 novartis_polar_surface_area_phosphorus(Molecule &m, atom_number_t zatom, Atom &a,
                                        int is_aromatic) {
+  if (nvrtspsa::zero_for_all_phosphorus_atoms) {
+    return 0.0;
+  }
+
   int ncon = a.ncon();
 
   int aromatic_bonds = 0;
@@ -407,7 +470,7 @@ novartis_polar_surface_area_phosphorus(Molecule &m, atom_number_t zatom, Atom &a
   }
 }
 
-// #define DEBUG_NOVARTIS_POLAR_SURFACE_AREA
+#define DEBUG_NOVARTIS_POLAR_SURFACE_AREA
 
 /*
   Polar surface areas from
@@ -415,16 +478,17 @@ novartis_polar_surface_area_phosphorus(Molecule &m, atom_number_t zatom, Atom &a
 */
 
 double
-novartis_polar_surface_area(Molecule &m, const atomic_number_t *z, const Atom **atom,
+novartis_polar_surface_area_inner(Molecule &m, const atomic_number_t *z, const Atom **atom,
                             const int *is_aromatic) {
-  const int matoms = m.natoms();
-
   double result = 0.0;
+
+  const int matoms = m.natoms();
 
 #ifdef DEBUG_NOVARTIS_POLAR_SURFACE_AREA
   cerr << "novartis_polar_surface_area:processing " << m.smiles() << ' ' << m.name()
        << " with " << matoms << " atoms\n";
 #endif
+
   for (int i = 0; i < matoms; i++) {
     if (6 == z[i]) {
       continue;
@@ -451,26 +515,62 @@ novartis_polar_surface_area(Molecule &m, const atomic_number_t *z, const Atom **
 #ifdef DEBUG_NOVARTIS_POLAR_SURFACE_AREA
     if (0.0 != delta) {
       cerr << "atom " << i << ' ' << m.smarts_equivalent_for_atom(i) << " value " << delta
-           << " result so far " << result << endl;
+           << " result so far " << result << '\n';;
     }
 #endif
   }
 
 #ifdef DEBUG_NOVARTIS_POLAR_SURFACE_AREA
-  cerr << "Total " << result << endl;
+  cerr << "Total " << result << '\n';;
 #endif
 
   return result;
 }
 
+
+double
+novartis_polar_surface_area(Molecule &m, const atomic_number_t *z, const Atom **atom,
+                            const int *is_aromatic) {
+  // This is a public API entry point, so make sure aromaticity is OK.
+  // Because of what we are doing in iwdescr to reverse standardisations.
+  m.compute_aromaticity_if_needed();
+
+  const int matoms = m.natoms();
+
+  // cerr << "convert_to_charge_separated " << nvrtspsa::convert_to_charge_separated << '\n';
+  if (! nvrtspsa::convert_to_charge_separated) {
+    return novartis_polar_surface_area_inner(m, z, atom, is_aromatic);
+  }
+
+  Molecule mcopy(m);
+  static std::unique_ptr<Chemical_Standardisation> chemical_standardisation;
+  if (! chemical_standardisation) {
+    chemical_standardisation = std::make_unique<Chemical_Standardisation>();
+    chemical_standardisation->Activate(CS_REVERSE_NITRO, 0);
+    chemical_standardisation->Activate(CS_REVERSE_NV5, 0);
+  }
+
+  chemical_standardisation->process(mcopy);
+
+  mcopy.compute_aromaticity_if_needed();
+
+  const Atom **my_atom = new const Atom *[matoms];
+  std::unique_ptr<const Atom *[]> free_atom(my_atom);
+  mcopy.atoms(my_atom);
+  // cerr << mcopy.smiles() << " transformed to charge separated\n";
+  return novartis_polar_surface_area_inner(mcopy, z, my_atom, is_aromatic);
+}
+
 double
 novartis_polar_surface_area(Molecule &m) {
-  int matoms = m.natoms();
+  const int matoms = m.natoms();
 
   if (0 == matoms) {
     cerr << "Cannot compute polar surface area of molecule w/ no atoms\n";
     return 0.0;
   }
+
+  // cerr << m.smiles() << " beginnig novartis_polar_surface_area\n";
 
   int aromsave = global_aromaticity_type();
 
@@ -479,10 +579,6 @@ novartis_polar_surface_area(Molecule &m) {
   atomic_number_t *z = new atomic_number_t[matoms];
   std::unique_ptr<atomic_number_t[]> free_z(z);
   m.atomic_numbers(z);
-
-  const Atom **atom = new const Atom *[matoms];
-  std::unique_ptr<const Atom *[]> free_atom(atom);
-  m.atoms(atom);
 
   int *is_aromatic = new int[matoms];
   std::unique_ptr<int[]> free_is_aromatic(is_aromatic);
@@ -493,7 +589,11 @@ novartis_polar_surface_area(Molecule &m) {
     is_aromatic[i] = m.is_aromatic(i);
   }
 
-  int rc = novartis_polar_surface_area(m, z, atom, is_aromatic);
+  const Atom **atom = new const Atom *[matoms];
+  std::unique_ptr<const Atom *[]> free_atom(atom);
+  m.atoms(atom);
+
+  double rc = novartis_polar_surface_area(m, z, atom, is_aromatic);
 
   set_global_aromaticity_type(aromsave);
 

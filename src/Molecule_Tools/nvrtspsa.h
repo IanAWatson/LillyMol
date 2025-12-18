@@ -5,6 +5,8 @@
 
 #include "Molecule_Lib/molecule.h"
 
+class Command_Line;
+
 extern double novartis_polar_surface_area (Molecule & m);
 
 extern double novartis_polar_surface_area (Molecule & m, 
@@ -23,6 +25,18 @@ void set_non_zero_constribution_for_SD2(int s);
 
 // Looks like the RDKit implementation assigns 0.0 to all Sulphur atoms.
 void set_zero_for_all_sulphur_atoms(int s);
+
+void set_zero_for_all_phosphorus_atoms(int s);
+
+// In order to get best condordance with RDKit, which is the reference
+// implementation, we need to reverse standardise molecules.
+// This is expensive, so it is optional.
+// Note that the molecule being passed is not altered, a copy of
+// that input molecule is made, and the copy is altered.
+void set_convert_to_charge_separated(int s);
+
+// A function that can process a command line option specifying...
+int InitialiseOptions(const Command_Line& cl, char flag);
 
 // Class for performing Novartis Polar Surface Area calculations.
 // Note, currently this code just calls the standalone functions above.

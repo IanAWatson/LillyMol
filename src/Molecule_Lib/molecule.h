@@ -654,7 +654,7 @@ class __attribute__((visibility("default"))) Molecule : private resizable_array_
 
   //  Fractional atomic charges
 
-  Set_of_Charges* _charges;  // not yet implemented, using old way
+  Set_of_Charges* _charges;
 
   //  The set of atom types can be used to hold any information
 
@@ -1508,7 +1508,10 @@ class __attribute__((visibility("default"))) Molecule : private resizable_array_
     invalidate_charges();
   }
 
-  //  Set_of_Charges * partial_charges() const;
+  // This will fail badly if _charges has not been allocated.
+  const Set_of_Charges& partial_charges() const {
+    return *_charges;
+  }
 
   const IWString& partial_charge_type() const;
 

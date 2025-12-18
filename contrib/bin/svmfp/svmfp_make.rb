@@ -23,6 +23,7 @@ def usage(retcod)
   $stderr << " -flatten      flatten sparse fingerprint counts to 1\n"
   $stderr << " -lightgbm ... -lightgbm build a lightgbm model\n"
   $stderr << " -catboost ... -catboost build a catboost model\n"
+  $stderr << " -rescore       rescore the training set to establish a linear correction\n"
   $stderr << " -v            verbose output\n"
 
   exit retcod
@@ -99,7 +100,8 @@ end
 cmdline = IWCmdline.new('-v-mdir=s-A=sfile-C-gfp=close-svml=close-p=ipos-w=fraction-flatten-gfp_make=xfile' \
                         '-svm_learn=xfile-gfp_to_svm_lite=xfile-lightgbm=close-lightgbm_config=sfile' \
                         '-catboost=close' \
-                        '-xgboost=close-xgboost_config=sfile-xgb_test=sfile')
+                        '-xgboost=close-xgboost_config=sfile-xgb_test=sfile' \
+                        '-rescore')
 if cmdline.unrecognised_options_encountered
   $stderr << "unrecognised_options_encountered\n"
   usage(1)
@@ -338,4 +340,14 @@ else
   model.support_vectors = 'support_vectors.gfp'
   File.write("#{mdir}/model.dat", GfpModel::SvmfpModel.encode(model))
   File.write("#{mdir}/model.json", GfpModel::SvmfpModel.encode_json(model))
+end
+
+if cl.option_present('rescore')
+  train_pred = File.join(mdir, 'train.pred')
+  cmd = "svmfp_evaluate.sh -mdir #{mdir} ${mdir}/train.smi > #{train_pred}"
+  execute_cmd(cmd, verbose, [train_pred]"
+
+  scaling_file = File.join(mdir, 'output_scaling')
+  cmd = "iwstats -E #{train_activity} -p 2 -C #{scaling_file} #{train_pred}"
+  execute_cmd(cmd, verbose, [scaling_file])
 end

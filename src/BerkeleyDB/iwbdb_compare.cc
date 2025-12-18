@@ -37,6 +37,8 @@ static IWString_and_File_Descriptor stream_for_new_and_changed_keys;
 static IWString_and_File_Descriptor stream_for_new_keys;
 static IWString_and_File_Descriptor stream_for_changed_data;
 
+static int swap_new_kv_column_order = 0;
+
 static int write_key_of_updates_first = 1;
 
 static int display_no_match_message = 0;
@@ -72,6 +74,7 @@ usage(int rc) {
   cerr << " -D <fname>      write new and changed keys to <fname>\n";
   cerr << " -K <fname>      write new keys to <fname>\n";
   cerr << " -V <fname>      write keys with new values to <fname>\n";
+  cerr << " -x              swap order of columns in the -K and -V files, useful for selimsteg type db's\n";
   cerr << " -u <pattern>    unpack pattern for the data\n";
   cerr << " -U <pattern>    unpack pattern for the key\n";
   cerr << " -r <number>     report progess every <number> comparisons done\n";
@@ -302,7 +305,11 @@ process_no_match_for(const Dbt& zkey, const Dbt& zdata, std::ostream& os) {
 static int
 process_new_value_for_key(const Dbt& zkey, const Dbt& reference_value, const Dbt& zdata) {
   if (stream_for_changed_data.is_open()) {
-    stream_for_changed_data << zkey << ' ' << reference_value << '\n';
+    if (swap_new_kv_column_order) {
+      stream_for_changed_data << reference_value << ' ' << zkey << '\n';
+    } else {
+      stream_for_changed_data << zkey << ' ' << reference_value << '\n';
+    }
     stream_for_changed_data.write_if_buffer_holds_more_than(32768);
   }
 
@@ -318,7 +325,11 @@ process_new_value_for_key(const Dbt& zkey, const Dbt& reference_value, const Dbt
 static int
 process_new_key(const Dbt& zkey, const Dbt& zdata) {
   if (stream_for_new_keys.is_open()) {
-    stream_for_new_keys << zkey << ' ' << zdata << '\n';
+    if (swap_new_kv_column_order) {
+      stream_for_new_keys << zdata << ' ' << zkey << '\n';
+    } else {
+      stream_for_new_keys << zkey << ' ' << zdata << '\n';
+    }
     stream_for_new_keys.write_if_buffer_holds_more_than(32768);
   }
 
@@ -397,7 +408,7 @@ iwbdb_compare(int ndb, Db** db, IWString_and_File_Descriptor& output) {
 
 static int
 iwbdb_compare(int argc, char** argv) {
-  Command_Line cl(argc, argv, "vbwR:D:squ:U:r:o:K:V:");
+  Command_Line cl(argc, argv, "vbwR:D:squ:U:r:o:K:V:x");
 
   if (cl.unrecognised_options_encountered()) {
     cerr << "Unrecognised options encountered\n";
@@ -554,6 +565,13 @@ iwbdb_compare(int argc, char** argv) {
 
     if (verbose) {
       cerr << "Items with changed data written to '" << fname << "'\n";
+    }
+  }
+
+  if (cl.option_present('x')) {
+    swap_new_kv_column_order = 1;
+    if (verbose) {
+      cerr << "Will swap the order of columns in the new -K and -V files\n";
     }
   }
 

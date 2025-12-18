@@ -812,8 +812,7 @@ Molecule::set_bond_type_between_atoms(atom_number_t a1, atom_number_t a2, bond_t
   assert(OK_BOND_TYPE(bt));
 
   Bond * b = const_cast<Bond *>(_things[a1]->bond_to_atom(a2));    // loss of const OK
-  if (nullptr == b)
-  {
+  if (nullptr == b) {
     cerr << "Molecule::set_bond_type_between_atoms: atoms " << a1 << " and " << a2
          << ", no bond found\n";
     abort();
@@ -840,8 +839,7 @@ Molecule::set_bond_type_between_atoms(atom_number_t a1, atom_number_t a2, bond_t
   // Jan 99. If we have just placed a double bond, we need to remove any
   // chiral centres which may have been at either end.
 
-  if (! b->is_single_bond())
-  {
+  if (! b->is_single_bond()) {
     if (nullptr != chiral_centre_at_atom(a1))
       remove_chiral_centre_at_atom(a1);
 
@@ -852,8 +850,7 @@ Molecule::set_bond_type_between_atoms(atom_number_t a1, atom_number_t a2, bond_t
   // Check to see if any cis-trans bonds need to be adjusted
 
   // double bond in middle of cis trans group was made into a single bond
-  if (! b->is_double_bond() && b->part_of_cis_trans_grouping())
-  {
+  if (! b->is_double_bond() && b->part_of_cis_trans_grouping()) {
     b->set_part_of_cis_trans_grouping(0);
   }
 

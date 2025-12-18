@@ -65,6 +65,7 @@ usage(int rc) {
   -z            assign zero contribution to unclassified atoms.
   -T ...        tabular descriptor output, enter '-T help' for info. Can do filtering.
   -X ...        miscellaneous other options, enter '-X help' for info.
+  -W ...        options for controlling the TPSA computation, Enter '-W help' for info.
   -l            reduce to largest fragment.
   -i <type>     input specification.
   -g ...        chemical standardisation options.
@@ -270,7 +271,7 @@ DisplayDashTOptions(std::ostream& output) {
 
 static int
 psafp(int argc, char** argv) {
-  Command_Line cl(argc, argv, "vA:E:i:g:lfJ:p:zX:T:");
+  Command_Line cl(argc, argv, "vA:E:i:g:lfJ:p:zX:T:W:");
 
   if (cl.unrecognised_options_encountered()) {
     cerr << "Unrecognised options encountered\n";
@@ -325,6 +326,13 @@ psafp(int argc, char** argv) {
 
     if (verbose) {
       cerr << "Unclassified atoms assigned zero value in psa computation\n";
+    }
+  }
+
+  if (cl.option_present('W')) {
+    if (! nvrtspsa::InitialiseOptions(cl, 'W')) {
+      cerr << "Cannot initialise options for Novartis TPSA computation (-W)\n";
+      return 1;
     }
   }
 

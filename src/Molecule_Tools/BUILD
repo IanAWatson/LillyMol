@@ -1214,6 +1214,20 @@ cc_binary(
 )
 
 cc_binary(
+    name = "labute",
+    srcs = [
+        "labute.cc",
+        "e_state_computation_procedure.cc",  # needs a library
+        "e_state_computation_procedure.h",
+    ],
+    deps = [
+        "//Foundational/iwmisc:sparse_fp_creator",
+        "//Molecule_Lib:iwmolecule",
+        "//Molecule_Lib:moleculeio",
+    ],
+)
+
+cc_binary(
     name = "ligand_protein_interactions",
     srcs = [
         "ligand_protein_interactions.cc",
@@ -3606,6 +3620,19 @@ cc_test(
     ],
     deps = [
         ":mpr",
+        "//Molecule_Lib:moleculeio",
+        "@googletest//:gtest",
+        "@googletest//:gtest_main",
+    ],
+)
+
+cc_test(
+    name = "nvrtspsa_test",
+    srcs = [
+        "nvrtspsa_test.cc",
+    ],
+    deps = [
+        "nvrtspsa",
         "//Molecule_Lib:moleculeio",
         "@googletest//:gtest",
         "@googletest//:gtest_main",

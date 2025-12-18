@@ -293,7 +293,7 @@ Bond::debug_print (std::ostream & os) const
 {
   assert(os.good());
 
-  os << "Bond between " << _a1 << " and " << _a2 << " with bond type ";
+  os << "Bond between " << _a1 << " and " << _a2 << " bt " << _btype << " bond type ";
   if (IS_SINGLE_BOND(_btype))
     os << '1';
   else if (IS_DOUBLE_BOND(_btype))

@@ -288,6 +288,7 @@ def main
   descriptors = {}
   descriptors['abr'] = Descriptor.new('abraham.sh', false, 17)
   descriptors['ap'] = Descriptor.new('ap.sh', false, 10.6)
+  descriptors['asa'] = Descriptor.new('labute.sh', false, 2.1)
   descriptors['chgfp'] = Descriptor.new('chgfp.sh', false, 8.2)
   descriptors['cip'] = Descriptor.new('cip_labeler.sh --descriptors', false, 11.3)
   descriptors['cmi'] = Descriptor.new('cmi.sh', false, 24.4)

@@ -208,6 +208,14 @@ if [[ -v BUILD_NLOPT ]] ; then
   BUILD_NLOPT=1
 fi
 
+if [[ -v BUILD_LIGHTGBM ]] ; then
+  git clone --recursive https://github.com/microsoft/LightGBM
+  (cd LightGBM && cmake -B build -DBUILD_STATIC_LIB=ON -DCMAKE_INSTALL_PREFIX=${REPO_HOME}/third_party/ -S .)
+  (cd LightGBM && cmake --build build -j 4)
+  (cd LightGBM && #cmake --install build/ --prefix=${REPO_HOME}/third_party)
+  BUILD_LIGHTGBM=1
+fi
+
 # Step 3: build LillyMol executables
 echo "Builds and installs LillyMol executables"
 echo ""

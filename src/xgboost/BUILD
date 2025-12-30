@@ -11,6 +11,9 @@ proto_library(
     tags = [
         "xgboost",
     ],
+    visibility = [
+        "//visibility:public",
+    ],
 )
 
 cc_proto_library(

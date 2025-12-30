@@ -1,6 +1,11 @@
 load("@com_google_protobuf//bazel:py_proto_library.bzl", "py_proto_library")
 load("@rules_proto//proto:defs.bzl", "proto_library")
 
+config_setting(
+    name = "darwin",
+    constraint_values = ["@platforms//os:osx"]
+)
+
 proto_library(
     name = "class_label_translation_proto",
     srcs = [
@@ -15,6 +20,26 @@ cc_proto_library(
     ],
     deps = [
         "class_label_translation_proto",
+    ],
+)
+
+proto_library(
+    name = "interpolate_qualified_proto",
+    srcs = [
+        "interpolate_qualified.proto",
+    ],
+    deps = [
+        "//xgboost:xgboost_model_proto",
+    ],
+)
+
+cc_proto_library(
+    name = "interpolate_qualified_cc_proto",
+    deps = [
+        "interpolate_qualified_proto",
+    ],
+    visibility = [
+        "//visibility:public",
     ],
 )
 
@@ -514,6 +539,40 @@ cc_binary(
         "//Foundational/data_source:iwstring_data_source",
         "//Foundational/iwmisc",
         "//Foundational/iwqsort",
+    ],
+)
+
+cc_binary(
+    name = "interpolate_qualified",
+    srcs = [
+        "interpolate_qualified.cc",
+    ],
+    deps = [
+        ":interpolate_qualified_cc_proto",
+        "//Foundational/accumulator",
+        "//Foundational/cmdline_v2",
+        "//Foundational/data_source:iwstring_data_source",
+        "//Foundational/iwmisc",
+        "//Foundational/iwstring:absl_hash",
+        "//Foundational/iwstring",
+        "//xgboost:xgboost_model_cc_proto",
+        "@third_party//:xgboost",
+    ] + 
+      select( {
+      "darwin": [ "@homebrew_openmp"],
+      "//conditions:default": []
+    }),
+    copts = select({
+        ":darwin": ["-Xclang", "-fopenmp"],
+        "//conditions:default": ["-fopenmp"]
+    }),
+    linkopts = select ({
+        ":darwin": ["-Xclang", "-fopenmp"],
+        "//conditions:default": ["-lgomp"]
+    }),
+    tags = [
+        "lightgbm",
+        "omp",
     ],
 )
 

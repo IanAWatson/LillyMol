@@ -342,12 +342,12 @@ else
   File.write("#{mdir}/model.json", GfpModel::SvmfpModel.encode_json(model))
 end
 
-if cl.option_present('rescore')
+if cmdline.option_present('rescore')
   train_pred = File.join(mdir, 'train.pred')
-  cmd = "svmfp_evaluate.sh -mdir #{mdir} ${mdir}/train.smi > #{train_pred}"
-  execute_cmd(cmd, verbose, [train_pred]"
+  cmd = "svmfp_evaluate.sh -mdir #{mdir} #{mdir}/train.smi > #{train_pred}"
+  execute_cmd(cmd, verbose, [train_pred])
 
-  scaling_file = File.join(mdir, 'output_scaling')
+  scaling_file = File.join(mdir, 'output_scaling.dat')
   cmd = "iwstats -E #{train_activity} -p 2 -C #{scaling_file} #{train_pred}"
   execute_cmd(cmd, verbose, [scaling_file])
 end

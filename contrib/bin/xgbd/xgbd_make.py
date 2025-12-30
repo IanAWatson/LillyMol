@@ -194,7 +194,7 @@ def build_xgboost_model(descriptor_fname: str,
                         descriptors.set_index("Name")], axis=1, join='inner').reset_index() 
   if len(combined) != len(descriptors):
     logging.error("Combined set has %d rows, need %d", len(combined), len(descriptors))
-    return FALSE
+    return False
 
   if not os.path.isdir(options.mdir):
     os.mkdir(options.mdir)

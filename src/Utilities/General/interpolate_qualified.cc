@@ -4,6 +4,8 @@
 #include <cstdint>
 #include <iostream>
 #include <optional>
+#include <random>
+#include <ranges>
 #include <string>
 #include <vector>
 
@@ -21,6 +23,7 @@
 #include "Foundational/accumulator/accumulator.h"
 #include "Foundational/cmdline_v2/cmdline_v2.h"
 #include "Foundational/data_source/iwstring_data_source.h"
+#include "Foundational/iwmisc/misc.h"
 #include "Foundational/iwmisc/proto_support.h"
 #include "Foundational/iwstring/absl_hash.h"
 #include "Foundational/iwstring/iwstring.h"
@@ -186,8 +189,11 @@ class Measurement {
 
     void AnotherEstimate(float s) {
       _qualified->AnotherEstimate(s);
-
     }
+
+    // If we are unqualified, return the activity.
+    // If we are qualified, get the best estimate.
+    float BestEstimate() const;
 };
 
 Measurement::Measurement(const IWString& s, float a, int q, const float* x) {
@@ -202,6 +208,19 @@ Measurement::Measurement(const IWString& s, float a, int q, const float* x) {
   _qualified = std::make_unique<QualifiedData>(a, q);
 
   return;
+}
+
+float
+Measurement::BestEstimate() const {
+  if (_qualified == nullptr) {
+    return *_y;
+  }
+
+  if (std::optional<float> q = _qualified->BestEstimate(); q) {
+    return *q;
+  }
+
+  return _qualified->initial_activity();
 }
 
 class Data {
@@ -228,6 +247,9 @@ class Data {
     // This will be passed to the learner as the response.
     float* _y;
 
+    // The features for the test set.
+    float* _xtest;
+
     Accumulator<double> _acc_activity;
 
     // As we load the _x and _y arrays, this is the number of values for
@@ -248,6 +270,12 @@ class Data {
     interpolate_qualified::InterpolateQualifiedConfig _config;
 
     std::string _config_json;
+
+    // By default, we just cycle through the qualified values in batches.
+    // But instead, we can choose the batches randomly.
+    int _choose_batches_randomly;
+    // When selecting random subsets, keep track of which items alread selected.
+    int* _selected;
 
     int _num_iterations;
 
@@ -270,13 +298,16 @@ class Data {
     int ReadActivityRecord(const const_IWSubstring& buffer);
     int StoreFeatureNames(const const_IWSubstring& buffer);
 
-    DMatrixHandle CreateDmatrixHandle(uint32_t offset, uint32_t nrows, float* y);
+    DMatrixHandle CreateDmatrixHandle(float* xstart, uint32_t nrows, float* y);
     BoosterHandle CreateBooster(DMatrixHandle dmats[]);
 
     int GetNextBatch();
+    int GetNextRandomBatch();
     int GeneratePredictions(DMatrixHandle& training_data, DMatrixHandle& test_data);
 
     int UpdatePredictions(uint64_t const* out_shape, uint64_t out_dim, const float* out_result);
+
+    int CountSuccessfulExtrapolations() const;
 
     int BuildAndScore();
 
@@ -308,9 +339,12 @@ Data::Data() {
   _ignore_no_descriptors = 0;
   _x = nullptr;
   _y = nullptr;
+  _xtest = nullptr;
   _num_iterations = 500;
   _stem = "/tmp/intplq";
   _add_initial_expt = 0;
+  _choose_batches_randomly = 0;
+  _selected = nullptr;
 }
 
 Data::~Data() {
@@ -328,6 +362,10 @@ Data::~Data() {
 
   delete [] _x;
   delete [] _y;
+  delete [] _xtest;
+  if (_selected != nullptr) {
+    delete [] _selected;
+  }
 }
 
 int
@@ -413,6 +451,7 @@ Data::Initialise(Command_Line_v2& cl) {
   _x = new float[_nrows * _ncols];
   cerr << "Y array sized to " << _nrows << " rows\n";
   _y = new float[_nrows];
+  _xtest = new float[_initial_qualified_count * _ncols];
 
   if (_nrows != _id_to_descriptors.size()) {
     cerr << "Data::Initialise:size mismatch, _nrows " << _nrows << " but " <<
@@ -429,21 +468,6 @@ Data::Initialise(Command_Line_v2& cl) {
     _y[i] = *s;
   }
 
-#ifdef NOT_NEEDED
-  // For both the qualified and unqualified measurements, give them
-  // pointers to their descriptors.
-  for (Measurement* m : _activity) {
-    auto iter = _id_to_descriptors.find(m->id());
-    m->SetX(iter->second);
-  }
-
-  for (Measurement* m : _qualified_activity) {
-    auto iter = _id_to_descriptors.find(m->id());
-    m->SetX(iter->second);
-  }
-#endif
-
-  // Have the unqualified data copy their X values to the training set array
   for (uint32_t i = 0; i < _activity.size(); ++i) {
     _activity[i]->CopyX(_x + i * _ncols, _ncols);
   }
@@ -456,6 +480,14 @@ Data::Initialise(Command_Line_v2& cl) {
     if (_verbose) {
       cerr << "Batch size " << _batch_size << '\n';
     }
+  }
+
+  if (cl.option_present("rand")) {
+    _choose_batches_randomly = 1;
+    if (_verbose) {
+      cerr << "Subsets will be chosen randomly\n";
+    }
+    _selected = new int[_qualified_activity.size()];
   }
 
   if (cl.option_present('S')) {
@@ -762,11 +794,11 @@ WriteDMatrixHandle(DMatrixHandle& dmatrix, IWString& fname) {
 }
 
 DMatrixHandle
-Data::CreateDmatrixHandle(uint32_t offset, uint32_t nrows, float* y) {
+Data::CreateDmatrixHandle(float* xstart, uint32_t nrows, float* y) {
   static constexpr float kMissingValue = std::numeric_limits<float>::max();
 
   DMatrixHandle rc;
-  safe_xgboost(XGDMatrixCreateFromMat(_x + offset, nrows, _ncols, kMissingValue, &rc));
+  safe_xgboost(XGDMatrixCreateFromMat(xstart, nrows, _ncols, kMissingValue, &rc));
   if (y != nullptr) {
     safe_xgboost(XGDMatrixSetFloatInfo(rc, "label", y, nrows));
   }
@@ -804,26 +836,16 @@ Data::Optimise() {
 
   // First step is to build a model on unqualified and predict qualified.
 
-  cerr << "Starting training set\n";
-
-  cerr << "Going to booster\n";
-
-  uint32_t initial_offset = _activity.size() * _ncols;
   for (int i = 0; i < _qualified_activity.number_elements(); ++i) {
-    _qualified_activity[i]->CopyX(_x + initial_offset + i * _ncols, _ncols);
+    _qualified_activity[i]->CopyX(_xtest + i * _ncols, _ncols);
   }
 
   BuildAndScore();
 
-#ifdef QWQEQWE
-  static const char* config = R"({
-  "type": 0,
-  "training": false,
-  "iteration_begin": 0,
-  "iteration_end": 100,
-  "strict_shape": false
-})";
-#endif
+  if (_verbose) {
+    int successful = CountSuccessfulExtrapolations();
+    cerr << "After initial model, " << successful << " successful extrapolations\n";
+  }
 
   uint32_t nsteps = _qualified_activity.size() / _batch_size;
   if (nsteps * _batch_size < _qualified_activity.size()) {
@@ -832,16 +854,20 @@ Data::Optimise() {
 
   for (uint32_t i = 0; i < nsteps; ++i) {
     if (_verbose) {
-      cerr << "Begin step " << i << '\n';
+      cerr << "Begin step " << i << " _activity contains " << _activity.size() << '\n';
     }
 
-    // After model prediction we will examine what happened to those added here.
     int bsize = GetNextBatch();
     if (bsize == 0) {
       break;
     }
 
     BuildAndScore();
+  }
+
+  if (_verbose) {
+    int successful = CountSuccessfulExtrapolations();
+    cerr << "After batched models, " << successful << " successful extrapolations\n";
   }
 
   int improved = 0;
@@ -866,8 +892,6 @@ Data::Optimise() {
     cerr << "Improved " << improved << " of " << qualified << " qualified values\n";
   }
 
-  // Now focus on those that have not improved.
-
   // The last items in the _activity array are the qualified.
   uint32_t istart = _activity.size() - _initial_qualified_count;
 
@@ -882,6 +906,7 @@ Data::Optimise() {
     if (q->successes()) {
       continue;
     }
+    // No successes, move back to qualified.
     _qualified_activity << _activity[i];
     _activity.remove_no_delete(i);
   }
@@ -903,8 +928,9 @@ Data::Optimise() {
       _y[i] = *a;
     }
   }
+
   for (uint32_t i = 0; i < _qualified_activity.size(); ++i) {
-    _qualified_activity[i]->CopyX(_x + _activity.size() * _ncols + i * _ncols, _ncols);
+    _qualified_activity[i]->CopyX(_xtest + i * _ncols, _ncols);
   }
 
   BuildAndScore();
@@ -922,19 +948,26 @@ Data::Optimise() {
   cerr << "Final round finds " << improved << " of " << _qualified_activity.size() << " now extrapolated\n";
  }
 
+ if (_verbose) {
+   uint32_t successes = CountSuccessfulExtrapolations();
+   cerr << "Of " << _initial_qualified_count << " starting qualified measurements, extrapolated " <<
+           successes << " fractional " << iwmisc::Fraction<float>(successes, _initial_qualified_count)
+           << '\n';
+ }
+
   return WriteExtrapolatedResults();
 }
 
 int
 Data::BuildAndScore() {
-  DMatrixHandle training_data = CreateDmatrixHandle(0, _activity.size(), _y);
+  DMatrixHandle training_data = CreateDmatrixHandle(_x, _activity.size(), _y);
 
   BoosterHandle booster = CreateBooster(&training_data);
   for (int i = 0; i < _num_iterations; ++i) {
     safe_xgboost(XGBoosterUpdateOneIter(booster, i, training_data));
   }
 
-  DMatrixHandle dtest = CreateDmatrixHandle(_activity.size() * _ncols, _qualified_activity.size(), nullptr);
+  DMatrixHandle dtest = CreateDmatrixHandle(_xtest, _qualified_activity.size(), nullptr);
 
   /* Shape of output prediction */
   uint64_t const* out_shape;
@@ -958,6 +991,80 @@ Data::BuildAndScore() {
   XGDMatrixFree(training_data);
   XGDMatrixFree(dtest);
   XGBoosterFree(booster);
+
+  return 1;
+}
+
+int
+Data::CountSuccessfulExtrapolations() const {
+  int rc = 0;
+
+  for (const Measurement* m : _qualified_activity) {
+    const std::unique_ptr<QualifiedData>& q = m->qualified();
+    if (q->successes()) {
+      ++rc;
+    }
+  }
+
+  for (const Measurement* m : _activity | std::views::reverse) {
+    if (! m->HasQualified()) {
+      break;
+    }
+    const std::unique_ptr<QualifiedData>& q = m->qualified();
+    if (q->successes()) {
+      ++rc;
+    }
+  }
+    
+  return rc;
+}
+
+int
+Data::GetNextRandomBatch() {
+  uint32_t nsel = std::min(_batch_size, _qualified_activity.size());
+
+  std::fill_n(_selected, _qualified_activity.size(), 0);
+
+  static std::random_device rd;
+  std::mt19937 gen(rd());
+  std::uniform_int_distribution<uint32_t> u(0, _qualified_activity.size() - 1);
+
+  uint32_t count = 0;
+  for (uint32_t i = 0; i < 2 * nsel; ++i) {
+    int j = u(gen);
+    if (_selected[j]) {
+      continue;
+    }
+    _selected[j] = 1;
+    ++count;
+    if (count == nsel) {
+      break;
+    }
+  }
+
+  uint32_t x_index = _activity.size() * _ncols;
+  uint32_t y_index = _activity.size();
+
+  for (int i = _qualified_activity.number_elements() - 1; i >= 0; --i) {
+    if (_selected[i] == 0) {
+      continue;
+    }
+
+    Measurement* m = _qualified_activity[i];
+    _qualified_activity.remove_no_delete(i);
+
+    m->CopyX(_x + x_index, _ncols);
+    x_index += _ncols;
+    _y[y_index] = m->BestEstimate();
+    ++y_index;
+    _activity << m;
+  }
+
+  x_index = 0;
+  for (uint32_t i = 0; i < _qualified_activity.size(); ++i) {
+    _qualified_activity[i]->CopyX(_xtest + x_index, _ncols);
+    x_index += _ncols;
+  }
 
   return 1;
 }
@@ -1035,6 +1142,10 @@ Data::GetNextBatch() {
     return 0;
   }
 
+  if (_choose_batches_randomly) {
+    return GetNextRandomBatch();
+  }
+
   // Start copying into the _x array here.
   uint32_t initial_x_index = _activity.size() * _ncols;
   uint32_t initial_y_index = _activity.size();
@@ -1042,12 +1153,12 @@ Data::GetNextBatch() {
   for (uint32_t i = 0; i < n; ++i) {
     _activity << _qualified_activity.pop();
     _activity.back()->CopyX(_x + initial_x_index + i * _ncols, _ncols);
-    _y[initial_y_index + i] = _activity.back()->InitialActivity();
+    _y[initial_y_index + i] = _activity.back()->BestEstimate();
   }
 
   // Copy the remaining qualified values to their proper location.
   for (uint32_t i = 0; i < _qualified_activity.size(); ++i) {
-    _qualified_activity[i]->CopyX(_x + _activity.size() * _ncols + i * _ncols, _ncols);
+    _qualified_activity[i]->CopyX(_xtest + i * _ncols, _ncols);
   }
 
   return n;
@@ -1061,7 +1172,7 @@ Data::GeneratePredictions(DMatrixHandle& training_data, DMatrixHandle& test_data
 
 int
 Data::UpdatePredictions(uint64_t const* out_shape, uint64_t out_dim, const float* out_result) {
-  cerr << "UpdatePredictions out_dim " << out_dim << " shape " << *out_shape << '\n';
+  // cerr << "UpdatePredictions out_dim " << out_dim << " shape " << *out_shape << '\n';
   Accumulator<double> acc_expt;
   Accumulator<double> acc_pred;
   Accumulator<double> diffs;
@@ -1161,7 +1272,7 @@ imputed value is used.
 
 int
 Main(int argc, char** argv) {
-  Command_Line_v2 cl(argc, argv, "-v-X=sfile-Y=sfile-i=s-batch=ipos-h=int-b-xgboost=sfile-S=s-initial");
+  Command_Line_v2 cl(argc, argv, "-v-X=sfile-Y=sfile-i=s-batch=ipos-h=int-b-xgboost=sfile-S=s-initial-rand");
   if (cl.unrecognised_options_encountered()) {
     cerr << "unknown_options_encountered\n";
     Usage(1);

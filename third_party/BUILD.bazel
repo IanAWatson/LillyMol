@@ -10,7 +10,11 @@ cc_library(
 
 cc_library(
     name = "berkeley_shared",
-    srcs = ["BDB/lib/libdb_cxx.so", "BDB/lib/libdb.so"],
+    srcs = select({
+        "@platforms//os:macos": ["BDB/lib/libdb_cxx.dylib", "BDB/lib/libdb.dylib"],
+        "@platforms//os:linux": ["BDB/lib/libdb_cxx.so", "BDB/lib/libdb.so"],
+        "//conditions:default": [],
+    }),
     hdrs = ["BDB/include/db_cxx.h", "BDB/include/db.h" ],
     strip_include_prefix = "BDB/include",
     visibility = ["//visibility:public"],
@@ -34,9 +38,11 @@ cc_library(
 
 cc_library(
     name = "xgboost",
-    srcs = [
-        "lib/libxgboost.so",
-    ],
+    srcs = select({
+        "@platforms//os:macos": ["lib/libxgboost.dylib"],
+        "@platforms//os:linux": ["lib/libxgboost.so"],
+        "//conditions:default": [],
+    }),
     hdrs =
         glob(
             ["include/xgboost/**"],

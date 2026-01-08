@@ -2,6 +2,7 @@
   Group identical molecules together and study their activities
 */
 
+#include <cstdint>
 #include <iostream>
 #include <memory>
 #include <random>
@@ -12,10 +13,10 @@
 #include "Foundational/accumulator/accumulator.h"
 #include "Foundational/cmdline/cmdline.h"
 #include "Foundational/iwmisc/misc.h"
-#include "Foundational/iwmisc/numeric_data_from_file.h"
 #include "Foundational/iwqsort/iwqsort.h"
 #include "Foundational/iwstring/iw_stl_hash_map.h"
 #include "Foundational/iwstring/iw_stl_hash_set.h"
+#include "Foundational/iwstring/iwstring.h"
 
 #include "Molecule_Lib/allowed_elements.h"
 #include "Molecule_Lib/aromatic.h"
@@ -27,11 +28,11 @@
 
 using std::cerr;
 
-const char *prog_name = nullptr;
+const char* prog_name = nullptr;
 
 static int verbose = 0;
 
-static unsigned int molecules_read = 0;
+static uint32_t molecules_read = 0;
 
 static int remove_leading_zeros_from_identifiers = 0;
 
@@ -59,6 +60,8 @@ static IWString_and_File_Descriptor stream_for_inconsistent_groups;
 
 static int activity_column = 1;
 
+static IWString missing_value = '.';
+
 static int take_first_of_multi_valued_data = 0;
 static int take_average_of_multi_valued_data = 0;
 static int take_max_of_multi_valued_data = 0;
@@ -67,6 +70,7 @@ static int vote_for_multi_valued_data = 0;  // not implemented
 static int remove_multi_valued_data = 0;
 static int make_replicate_molecules_of_multi_valued_data = 0;
 static int take_random_value_from_range_of_multi_valued_data = 0;
+static int retain_multi_valued_data = 0;
 static int discard_inconsistent_class_assignments = 0;
 
 static int discarded_for_inconsistent_class_assignments = 0;
@@ -102,11 +106,96 @@ static int write_random_value_from_range_of_each_group = 0;
 
 static Elements_to_Remove elements_to_remove;
 
+struct MaybeQualified {
+ public:
+  int qualifier;
+  float activity;
+
+ public:
+  MaybeQualified();
+  MaybeQualified(int q, float a) : qualifier(q), activity(a) {
+  }
+
+  int Build(const_IWSubstring token);
+
+  bool operator<(float rhs) const {
+    return activity < rhs;
+  }
+
+  MaybeQualified& operator=(float rhs) {
+    // Should we adjust `qualifier`?
+    activity = rhs;
+    return *this;
+  }
+
+  operator float() const {
+    return activity;
+  }
+
+  void set_activity(float s) {
+    activity = s;
+  }
+
+  bool operator <(const MaybeQualified& rhs) const {
+    return activity < rhs.activity;
+  }
+  bool operator >(const MaybeQualified& rhs) const {
+    return activity > rhs.activity;
+  }
+};
+
+MaybeQualified::MaybeQualified() {
+  qualifier = 0;
+  activity = 0.0f;
+}
+
+int
+MaybeQualified::Build(const_IWSubstring token) {  // note local copy
+  if (token.empty()) {
+    return 0;
+  }
+  // cerr << "Building from '" << token << "'\n";
+
+  if (token[0] == '=') {
+    qualifier = 0;
+    ++token;
+  } else if (token[0] == '<') {
+    qualifier = -1;
+    ++token;
+  } else if (token[0] == '>') {
+    qualifier = 1;
+    ++token;
+  }
+
+  if (!token.numeric_value(activity)) {
+    cerr << "MaybeQualified::Build:invalid numeric '" << token << "'\n";
+    return 0;
+  }
+  // cerr << "build: activity " << activity << '\n';
+
+  return 1;
+}
+
+template <typename T>
+T&
+operator<<(T& output, const MaybeQualified& s) {
+  if (s.qualifier == 0) {
+  } else if (s.qualifier == -1) {
+    output << '<';
+  } else if (s.qualifier == 1) {
+    output << '>';
+  }
+
+  output << s.activity;
+
+  return output;
+}
+
 /*
   We may read in multi-valued data - same identifier, different values
 */
 
-typedef IW_STL_Hash_Map<IWString, resizable_array<float> *> ID_to_Activity;
+typedef IW_STL_Hash_Map<IWString, resizable_array<MaybeQualified>*> ID_to_Activity;
 
 /*
   If we read in class data, we need to be able to write the same
@@ -179,30 +268,37 @@ class Smiles_ID_Activity {
  private:
   IWString _smiles;
   IWString _id;
-  float _activity;
+  MaybeQualified _activity;
 
  public:
-  Smiles_ID_Activity(const IWString &smi, const IWString &id, float act)
-      : _smiles(smi), _id(id), _activity(act) {
+  Smiles_ID_Activity(const IWString& smi, const IWString& id, MaybeQualified mqd)
+      : _smiles(smi), _id(id), _activity(mqd) {
   }
 
-  const IWString &id() const {
+  const IWString&
+  id() const {
     return _id;
   }
 
-  float activity() const {
+  float
+  activity() const {
+    return _activity.activity;
+  }
+
+  const MaybeQualified maybe_qualified() const {
     return _activity;
   }
 
-  void set_activity(float s) {
-    _activity = s;
+  void
+  set_activity(float s) {
+    _activity.activity = s;
   }
 
-  int do_write(IWString_and_File_Descriptor &output) const;
+  int do_write(IWString_and_File_Descriptor& output) const;
 };
 
 int
-Smiles_ID_Activity::do_write(IWString_and_File_Descriptor &output) const {
+Smiles_ID_Activity::do_write(IWString_and_File_Descriptor& output) const {
   output << _smiles << ' ' << _id << ' ';
 
   if (0 == negative_class.length()) {  // not a classification problem
@@ -221,12 +317,12 @@ Smiles_ID_Activity::do_write(IWString_and_File_Descriptor &output) const {
 class Smiles_ID_Activity_Comparator {
  private:
  public:
-  int operator()(const Smiles_ID_Activity *, const Smiles_ID_Activity *) const;
+  int operator()(const Smiles_ID_Activity*, const Smiles_ID_Activity*) const;
 };
 
 int
-Smiles_ID_Activity_Comparator::operator()(const Smiles_ID_Activity *sida1,
-                                          const Smiles_ID_Activity *sida2) const {
+Smiles_ID_Activity_Comparator::operator()(const Smiles_ID_Activity* sida1,
+                                          const Smiles_ID_Activity* sida2) const {
   if (sida1->activity() < sida2->activity()) {
     return -1;
   }
@@ -247,71 +343,87 @@ class Group_of_Molecules : public IWString {
 
   resizable_array_p<Smiles_ID_Activity> _sida;
 
+  // Will be set if any of the values stored are qualified.
+  int _qualified_values_present;
+
   std::mt19937_64 _rng;
 
   //  private functions
 
   int _identify_item_with_max_activity() const;
   int _identify_item_with_activity_closest_to_average() const;
-  int _identify_most_common_item(int &tied) const;
+  int _identify_most_common_item(int& tied) const;
 
-  int _write_max_activity(const Smiles_ID_Activity *sida,
-                          IWString_and_File_Descriptor &stream_for_smiles,
-                          IWString_and_File_Descriptor &stream_for_activity) const;
+  int _write_max_activity(const Smiles_ID_Activity* sida,
+                          IWString_and_File_Descriptor& stream_for_smiles,
+                          IWString_and_File_Descriptor& stream_for_activity) const;
+
+  template <typename Op> int LargestOrSmallestQualified(int qual, Op op) const;
 
  public:
-  Group_of_Molecules(const IWString &s) : IWString(s), _rng(rd()){};
+  Group_of_Molecules(const IWString& s) : IWString(s), _rng(rd()){
+    _qualified_values_present = 0;
+  };
 
-  int n() const {
+  int
+  n() const {
     return _activity.n();
   }
 
-  int extra(const IWString &smi, const IWString &id, activity_type_t act);
+  int extra(const IWString& smi, const IWString& id, MaybeQualified mqd);
 
   float max_difference() const;
 
   int is_within_tolerance(float t) const;
   int min_and_max_within_ratio(float t) const;
 
-  int write_structure_group(IWString_and_File_Descriptor &output);
+  // If qualified values are present, we may be able to simplify the stored values.
+  int MaybeHandleQualifiedValues();
 
-  int write_first_member(IWString_and_File_Descriptor &output) const;
+  int write_structure_group(IWString_and_File_Descriptor& output);
 
-  int write_merged_data(IWString_and_File_Descriptor &output) const;
+  int write_first_member(IWString_and_File_Descriptor& output) const;
 
-  int write_max_activity(IWString_and_File_Descriptor &,
-                         IWString_and_File_Descriptor &) const;
-  int write_random_item(IWString_and_File_Descriptor &, IWString_and_File_Descriptor &);
-  int write_median_item(IWString_and_File_Descriptor &stream_for_smiles,
-                        IWString_and_File_Descriptor &stream_for_activity);
+  int write_merged_data(IWString_and_File_Descriptor& output) const;
+
+  int write_max_activity(IWString_and_File_Descriptor&,
+                         IWString_and_File_Descriptor&) const;
+  int write_random_item(IWString_and_File_Descriptor&, IWString_and_File_Descriptor&);
+  int write_median_item(IWString_and_File_Descriptor& stream_for_smiles,
+                        IWString_and_File_Descriptor& stream_for_activity);
   int write_item_closest_to_average(
-      IWString_and_File_Descriptor &stream_for_smiles,
-      IWString_and_File_Descriptor &stream_for_activity) const;
-  int write_most_common_item(IWString_and_File_Descriptor &stream_for_smiles,
-                             IWString_and_File_Descriptor &stream_for_activity) const;
+      IWString_and_File_Descriptor& stream_for_smiles,
+      IWString_and_File_Descriptor& stream_for_activity) const;
+  int write_most_common_item(IWString_and_File_Descriptor& stream_for_smiles,
+                             IWString_and_File_Descriptor& stream_for_activity) const;
   int write_if_classes_consistent(
-      IWString_and_File_Descriptor &stream_for_smiles,
-      IWString_and_File_Descriptor &stream_for_activity) const;
-  int write_first_member(IWString_and_File_Descriptor &stream_for_smiles,
-                         IWString_and_File_Descriptor &stream_for_activity) const;
+      IWString_and_File_Descriptor& stream_for_smiles,
+      IWString_and_File_Descriptor& stream_for_activity) const;
+  int write_first_member(IWString_and_File_Descriptor& stream_for_smiles,
+                         IWString_and_File_Descriptor& stream_for_activity) const;
 
   int write_random_value_from_range_of_each_group(
-      IWString_and_File_Descriptor &stream_for_smiles,
-      IWString_and_File_Descriptor &stream_for_activity);
+      IWString_and_File_Descriptor& stream_for_smiles,
+      IWString_and_File_Descriptor& stream_for_activity);
 
-  int write_tabular_output(IWString_and_File_Descriptor &) const;
+  int write_tabular_output(IWString_and_File_Descriptor&) const;
 };
 
 template class resizable_array_p<Smiles_ID_Activity>;
-template class resizable_array_base<Smiles_ID_Activity *>;
+template class resizable_array_base<Smiles_ID_Activity*>;
 
 int
-Group_of_Molecules::extra(const IWString &smi, const IWString &id, activity_type_t act) {
-  _activity.extra(act);
+Group_of_Molecules::extra(const IWString& smi, const IWString& id, MaybeQualified mqd) {
+  _activity.extra(mqd.activity);
+  // cerr << "After adding " << mqd << ' ' << _activity << '\n';
 
-  Smiles_ID_Activity *t = new Smiles_ID_Activity(smi, id, act);
+  Smiles_ID_Activity* t = new Smiles_ID_Activity(smi, id, mqd);
 
   _sida.add(t);
+
+  if (mqd.qualifier != 0) {
+    ++_qualified_values_present;
+  }
 
   return 1;
 }
@@ -349,7 +461,7 @@ Group_of_Molecules::min_and_max_within_ratio(float t) const {
 }
 
 int
-Group_of_Molecules::write_structure_group(IWString_and_File_Descriptor &output) {
+Group_of_Molecules::write_structure_group(IWString_and_File_Descriptor& output) {
   output << (*this) << ' ';
 
   if (only_display_common_group) {
@@ -385,7 +497,7 @@ Group_of_Molecules::write_structure_group(IWString_and_File_Descriptor &output) 
 }
 
 int
-Group_of_Molecules::write_first_member(IWString_and_File_Descriptor &output) const {
+Group_of_Molecules::write_first_member(IWString_and_File_Descriptor& output) const {
   assert(_sida.number_elements() > 0);
 
   return _sida[0]->do_write(output);
@@ -394,7 +506,7 @@ Group_of_Molecules::write_first_member(IWString_and_File_Descriptor &output) con
 class Group_of_Molecules_Comparator {
  private:
  public:
-  int operator()(const Group_of_Molecules *, const Group_of_Molecules *) const;
+  int operator()(const Group_of_Molecules*, const Group_of_Molecules*) const;
 };
 
 /*
@@ -403,7 +515,7 @@ class Group_of_Molecules_Comparator {
 */
 
 int
-Group_of_Molecules::write_merged_data(IWString_and_File_Descriptor &output) const {
+Group_of_Molecules::write_merged_data(IWString_and_File_Descriptor& output) const {
   assert(_sida.number_elements() > 1);
 
   output << (*this) << ' ';
@@ -411,7 +523,7 @@ Group_of_Molecules::write_merged_data(IWString_and_File_Descriptor &output) cons
   Accumulator<float> acc;
 
   for (int i = 0; i < _sida.number_elements(); i++) {
-    const Smiles_ID_Activity *s = _sida[i];
+    const Smiles_ID_Activity* s = _sida[i];
 
     if (i > 0) {
       output << ':';
@@ -430,13 +542,13 @@ Group_of_Molecules::write_merged_data(IWString_and_File_Descriptor &output) cons
 
 int
 Group_of_Molecules::_write_max_activity(
-    const Smiles_ID_Activity *sida, IWString_and_File_Descriptor &stream_for_smiles,
-    IWString_and_File_Descriptor &stream_for_activity) const {
+    const Smiles_ID_Activity* sida, IWString_and_File_Descriptor& stream_for_smiles,
+    IWString_and_File_Descriptor& stream_for_activity) const {
   sida->do_write(stream_for_smiles);
 
   // cerr << "class_name_to_number " << class_name_to_number.size() << '\n';
   if (class_name_to_number.empty()) {
-    stream_for_activity << sida->id() << ' ' << sida->activity();
+    stream_for_activity << sida->id() << ' ' << sida->maybe_qualified();
   } else if (sida->activity() < 0.0F) {
     stream_for_activity << sida->id() << ' ' << negative_class;
   } else {
@@ -470,7 +582,7 @@ Group_of_Molecules::_identify_item_with_max_activity() const {
 }
 
 int
-Group_of_Molecules::_identify_most_common_item(int &tied) const  // vote
+Group_of_Molecules::_identify_most_common_item(int& tied) const  // vote
 {
   tied = 0;
 
@@ -539,13 +651,11 @@ int
 Group_of_Molecules::_identify_item_with_activity_closest_to_average() const {
   int n = _sida.number_elements();
 
-  if (1 == n)  // won't happen
-  {
+  if (1 == n) [[unlikely]] {  // won't happen
     return 0;
   }
 
-  if (2 == n)  // if just two items, we take the one with highest activity
-  {
+  if (2 == n) {  // if just two items, we take the one with highest activity
     if (_sida[0]->activity() > _sida[1]->activity()) {
       return 0;
     } else {
@@ -578,8 +688,8 @@ Group_of_Molecules::_identify_item_with_activity_closest_to_average() const {
 
 int
 Group_of_Molecules::write_max_activity(
-    IWString_and_File_Descriptor &stream_for_smiles,
-    IWString_and_File_Descriptor &stream_for_activity) const {
+    IWString_and_File_Descriptor& stream_for_smiles,
+    IWString_and_File_Descriptor& stream_for_activity) const {
   int n = _sida.number_elements();
 
   if (1 == n) {
@@ -594,8 +704,8 @@ Group_of_Molecules::write_max_activity(
 
 int
 Group_of_Molecules::write_item_closest_to_average(
-    IWString_and_File_Descriptor &stream_for_smiles,
-    IWString_and_File_Descriptor &stream_for_activity) const {
+    IWString_and_File_Descriptor& stream_for_smiles,
+    IWString_and_File_Descriptor& stream_for_activity) const {
   if (1 == _sida.number_elements()) {
     return _write_max_activity(_sida[0], stream_for_smiles, stream_for_activity);
   }
@@ -615,8 +725,8 @@ Group_of_Molecules::write_item_closest_to_average(
 }
 
 int
-Group_of_Molecules::write_median_item(IWString_and_File_Descriptor &stream_for_smiles,
-                                      IWString_and_File_Descriptor &stream_for_activity) {
+Group_of_Molecules::write_median_item(IWString_and_File_Descriptor& stream_for_smiles,
+                                      IWString_and_File_Descriptor& stream_for_activity) {
   int n = _sida.number_elements();
 
   if (n <= 2) {
@@ -649,8 +759,8 @@ Group_of_Molecules::write_median_item(IWString_and_File_Descriptor &stream_for_s
 }
 
 int
-Group_of_Molecules::write_random_item(IWString_and_File_Descriptor &stream_for_smiles,
-                                      IWString_and_File_Descriptor &stream_for_activity) {
+Group_of_Molecules::write_random_item(IWString_and_File_Descriptor& stream_for_smiles,
+                                      IWString_and_File_Descriptor& stream_for_activity) {
   int n = _sida.number_elements();
 
   if (1 == n) {
@@ -666,8 +776,8 @@ Group_of_Molecules::write_random_item(IWString_and_File_Descriptor &stream_for_s
 
 int
 Group_of_Molecules::write_most_common_item(
-    IWString_and_File_Descriptor &stream_for_smiles,
-    IWString_and_File_Descriptor &stream_for_activity) const {
+    IWString_and_File_Descriptor& stream_for_smiles,
+    IWString_and_File_Descriptor& stream_for_activity) const {
   int tied;
 
   int m = _identify_most_common_item(tied);
@@ -677,15 +787,15 @@ Group_of_Molecules::write_most_common_item(
 
 int
 Group_of_Molecules::write_first_member(
-    IWString_and_File_Descriptor &stream_for_smiles,
-    IWString_and_File_Descriptor &stream_for_activity) const {
+    IWString_and_File_Descriptor& stream_for_smiles,
+    IWString_and_File_Descriptor& stream_for_activity) const {
   return _write_max_activity(_sida[0], stream_for_smiles, stream_for_activity);
 }
 
 int
 Group_of_Molecules::write_if_classes_consistent(
-    IWString_and_File_Descriptor &stream_for_smiles,
-    IWString_and_File_Descriptor &stream_for_activity) const {
+    IWString_and_File_Descriptor& stream_for_smiles,
+    IWString_and_File_Descriptor& stream_for_activity) const {
   int n = _sida.number_elements();
 
   if (1 == n) {
@@ -710,8 +820,8 @@ Group_of_Molecules::write_if_classes_consistent(
 
 int
 Group_of_Molecules::write_random_value_from_range_of_each_group(
-    IWString_and_File_Descriptor &stream_for_smiles,
-    IWString_and_File_Descriptor &stream_for_activity) {
+    IWString_and_File_Descriptor& stream_for_smiles,
+    IWString_and_File_Descriptor& stream_for_activity) {
   if (1 == _sida.number_elements()) {
     return _write_max_activity(_sida[0], stream_for_smiles, stream_for_activity);
   }
@@ -743,7 +853,7 @@ Group_of_Molecules::write_random_value_from_range_of_each_group(
 }
 
 int
-Group_of_Molecules::write_tabular_output(IWString_and_File_Descriptor &output) const {
+Group_of_Molecules::write_tabular_output(IWString_and_File_Descriptor& output) const {
   int n = _sida.number_elements();
 
   if (1 == n) {
@@ -763,9 +873,121 @@ Group_of_Molecules::write_tabular_output(IWString_and_File_Descriptor &output) c
   return 1;
 }
 
+// Return the index in _sida of the qualified value with the
+// highest or lowest activity value as determined by `op` which
+// should be either std::less or std::greater
+// `qual` will be -1 or +1.
+// Clearly we could then choose our own `op` based on that value,
+// but this seems a little easier.
+template <typename Op>
 int
-Group_of_Molecules_Comparator::operator()(const Group_of_Molecules *g1,
-                                          const Group_of_Molecules *g2) const {
+Group_of_Molecules::LargestOrSmallestQualified(int qual, Op op) const {
+  int rc = -1;
+  float acc_qualified = 0.0;
+  for (int i = 0; i < _sida.number_elements(); ++i) {
+    const Smiles_ID_Activity* s = _sida[i];
+
+    const MaybeQualified& mqd = s->maybe_qualified();
+    if (mqd.qualifier != qual) {
+      continue;
+    }
+
+    if (rc < 0 || op(mqd.activity, acc_qualified)) {
+      rc = i;
+      acc_qualified = mqd.activity;
+    }
+  }
+
+  return rc;
+}
+
+int
+Group_of_Molecules::MaybeHandleQualifiedValues() {
+  if (! _qualified_values_present) {
+    return 1;
+  }
+
+  if (_sida.size() == 1) {
+    return 1;
+  }
+
+  _sida.iwqsort_lambda([](const Smiles_ID_Activity* sid1, const Smiles_ID_Activity* sid2) {
+    const MaybeQualified& mq1 = sid1->maybe_qualified();
+    const MaybeQualified& mq2 = sid2->maybe_qualified();
+    if (mq1 < mq2) {
+      return -1;
+    }
+
+    if (mq1 > mq2) {
+      return 1;
+    }
+
+    if (mq1.qualifier == mq2.qualifier) {
+      return 0;
+    }
+
+    if (mq1.qualifier < mq2.qualifier) {
+      return -1;
+    }
+
+    return 1;
+  });
+
+#ifdef DEBUG_MAYBEHANDLEQUALIFIEDVALUES
+  cerr << "After sortin";
+  for (const auto* s: _sida) {
+    cerr << ' ' << s->maybe_qualified();
+  }
+  cerr << '\n';
+#endif
+
+  // any < measurement that is not the lowest value can be removed.
+  //  1 3 <4 5   # Remove the <4
+  // But <2 2 3 4     is not changed.
+  // nor is <2 <2 3 4 
+
+  const float lowest_value = _sida.front()->activity();
+
+  for (int i = _sida.number_elements() - 1; i > 0; --i) {
+    const Smiles_ID_Activity* s = _sida[i];
+    const MaybeQualified& mqd = s->maybe_qualified();
+    if (mqd.qualifier != -1) {
+      continue;
+    }
+    if (mqd.activity > lowest_value) {  // greater than very important here.
+      // cerr << "Removing " << i << " activity " << mqd.activity << " lowest_value " << lowest_value << ' ' << (mqd.activity - lowest_value) << '\n';
+      _sida.remove_item(i);
+    }
+  }
+
+  const float highest_value = _sida.back()->activity();
+
+  for (int i = _sida.number_elements() - 2; i >= 0; --i) {
+    const Smiles_ID_Activity* s = _sida[i];
+    const MaybeQualified& mqd = s->maybe_qualified();
+    if (mqd.qualifier != 1) {
+      continue;
+    }
+    if (mqd.activity < highest_value) {  // less than very important here.
+      // cerr << "Removing " << i << " activity " << mqd.activity << " highest_value " << highest_value << ' ' << (mqd.activity - highest_value) << '\n';
+      _sida.remove_item(i);
+    }
+  }
+
+#ifdef DEBUG_MAYBEHANDLEQUALIFIEDVALUES
+  cerr << "After rationalising";
+  for (const auto* s: _sida) {
+    cerr << ' ' << s->maybe_qualified();
+  }
+  cerr << '\n';
+#endif
+
+  return 1;
+}
+
+int
+Group_of_Molecules_Comparator::operator()(const Group_of_Molecules* g1,
+                                          const Group_of_Molecules* g2) const {
   float d1 = g1->max_difference();
   float d2 = g2->max_difference();
 
@@ -781,7 +1003,7 @@ Group_of_Molecules_Comparator::operator()(const Group_of_Molecules *g1,
 }
 
 static void
-preprocess(Molecule &m) {
+preprocess(Molecule& m) {
   if (chemical_standardisation.active()) {
     chemical_standardisation.process(m);
   }
@@ -789,22 +1011,23 @@ preprocess(Molecule &m) {
   return;
 }
 
+// this is hard coded for space separated names.
 static int
-fetch_activity_from_token_of_name(IWString &id, const ID_to_Activity &id_to_activity,
-                                  resizable_array<float> &activity) {
+fetch_activity_from_token_of_name(IWString& id, const ID_to_Activity& id_to_activity,
+                                  resizable_array<MaybeQualified>& activity) {
   const_IWSubstring token;
   if (!id.word(activity_column, token)) {
     cerr << "Not enough tokens in name '" << id << "'\n";
     return 0;
   }
 
-  float a;
-  if (!token.numeric_value(a)) {
-    cerr << "Invalid activity token '" << token << "'\n";
+  MaybeQualified mq;
+  if (!mq.Build(token)) {
+    cerr << "fetch_activity_from_token_of_name:invalid activity token '" << id << "'\n";
     return 0;
   }
 
-  activity.add(a);
+  activity.add(mq);
 
   id.truncate_at_first(' ');
 
@@ -812,9 +1035,9 @@ fetch_activity_from_token_of_name(IWString &id, const ID_to_Activity &id_to_acti
 }
 
 static int
-fetch_activity(const ID_to_Activity &id_to_activity, IWString &id,
-               resizable_array<float> &activity) {
-  if (0 == id_to_activity.size()) {
+fetch_activity(const ID_to_Activity& id_to_activity, IWString& id,
+               resizable_array<MaybeQualified>& activity) {
+  if (id_to_activity.empty()) {
     return fetch_activity_from_token_of_name(id, id_to_activity, activity);
   }
 
@@ -848,7 +1071,7 @@ fetch_activity(const ID_to_Activity &id_to_activity, IWString &id,
 }
 
 static int
-perform_transformations(Molecule &m) {
+perform_transformations(Molecule& m) {
   if (reduce_to_largest_fragment) {
     m.reduce_to_largest_fragment_carefully();
   }
@@ -877,7 +1100,7 @@ perform_transformations(Molecule &m) {
 }
 
 static int
-discarded_for_atom_count(const Molecule &m) {
+discarded_for_atom_count(const Molecule& m) {
   const auto matoms = m.natoms();
   if (matoms < lower_atom_count_cutoff) {
     if (verbose) {
@@ -899,8 +1122,8 @@ discarded_for_atom_count(const Molecule &m) {
 }
 
 static int
-contains_non_allowed_elements(const Molecule &m,
-                              const Allowed_Elements &allowed_elements) {
+contains_non_allowed_elements(const Molecule& m,
+                              const Allowed_Elements& allowed_elements) {
   if (allowed_elements.contains_non_allowed_atoms(m)) {
     cerr << m.name() << " rejected for non allowed elements\n";
     molecules_discarded_for_non_allowed_elements++;
@@ -911,7 +1134,7 @@ contains_non_allowed_elements(const Molecule &m,
 }
 
 static int
-discarded_for_covalently_bonded_non_organics(const Molecule &m) {
+discarded_for_covalently_bonded_non_organics(const Molecule& m) {
   if (m.organic_only()) {
     return 0;
   }
@@ -919,7 +1142,7 @@ discarded_for_covalently_bonded_non_organics(const Molecule &m) {
   const int matoms = m.natoms();
 
   for (int i = 0; i < matoms; ++i) {
-    const Atom *a = m.atomi(i);
+    const Atom* a = m.atomi(i);
 
     if (a->element()->organic()) {
       continue;
@@ -938,9 +1161,9 @@ discarded_for_covalently_bonded_non_organics(const Molecule &m) {
 */
 
 static int
-group_molecules(Molecule &m, const ID_to_Activity &id_to_activity,
-                IW_STL_Hash_Map<IWString, Group_of_Molecules *> &structure_group,
-                IW_STL_Hash_Set &chirality_removed) {
+group_molecules(Molecule& m, const ID_to_Activity& id_to_activity,
+                IW_STL_Hash_Map<IWString, Group_of_Molecules*>& structure_group,
+                IW_STL_Hash_Set& chirality_removed) {
   if (contains_non_allowed_elements(
           m, allowed_elements)) {  // check before any frgment reduction
     return 1;
@@ -952,7 +1175,7 @@ group_molecules(Molecule &m, const ID_to_Activity &id_to_activity,
 
   IWString mname = m.name();
 
-  resizable_array<float> activity;
+  resizable_array<MaybeQualified> activity;
 
   if (!fetch_activity(id_to_activity, mname, activity)) {
     cerr << "No activity data for '" << mname << "'\n";
@@ -1008,9 +1231,9 @@ group_molecules(Molecule &m, const ID_to_Activity &id_to_activity,
     usmi = m.unique_smiles();
   }
 
-  const auto &f = structure_group.find(usmi);
+  const auto& f = structure_group.find(usmi);
 
-  Group_of_Molecules *g;
+  Group_of_Molecules* g;
 
   if (f == structure_group.end()) {
     g = new Group_of_Molecules(usmi);
@@ -1031,11 +1254,11 @@ group_molecules(Molecule &m, const ID_to_Activity &id_to_activity,
 }
 
 static int
-group_molecules(data_source_and_type<Molecule> &input,
-                const ID_to_Activity &id_to_activity,
-                IW_STL_Hash_Map<IWString, Group_of_Molecules *> &structure_group,
-                IW_STL_Hash_Set &chirality_removed) {
-  Molecule *m;
+group_molecules(data_source_and_type<Molecule>& input,
+                const ID_to_Activity& id_to_activity,
+                IW_STL_Hash_Map<IWString, Group_of_Molecules*>& structure_group,
+                IW_STL_Hash_Set& chirality_removed) {
+  Molecule* m;
   while (nullptr != (m = input.next_molecule())) {
     molecules_read++;
 
@@ -1054,10 +1277,10 @@ group_molecules(data_source_and_type<Molecule> &input,
 }
 
 static int
-group_molecules(const char *fname, FileType input_type,
-                const ID_to_Activity &id_to_activity,
-                IW_STL_Hash_Map<IWString, Group_of_Molecules *> &structure_group,
-                IW_STL_Hash_Set &chirality_removed) {
+group_molecules(const char* fname, FileType input_type,
+                const ID_to_Activity& id_to_activity,
+                IW_STL_Hash_Map<IWString, Group_of_Molecules*>& structure_group,
+                IW_STL_Hash_Set& chirality_removed) {
   assert(nullptr != fname);
 
   if (FILE_TYPE_INVALID == input_type) {
@@ -1079,7 +1302,7 @@ group_molecules(const char *fname, FileType input_type,
 }
 
 static int
-check_for_within_tolerance(const Group_of_Molecules &g,
+check_for_within_tolerance(const Group_of_Molecules& g,
                            const float max_difference_for_merging) {
   if (check_tolerances_by_ratio_method) {
     return g.min_and_max_within_ratio(max_difference_for_merging);
@@ -1089,16 +1312,16 @@ check_for_within_tolerance(const Group_of_Molecules &g,
 }
 
 static int
-do_merge_output(const IW_STL_Hash_Map<IWString, Group_of_Molecules *> &structure_group,
-                IWString_and_File_Descriptor &output) {
-  int molecules_written = 0;
-  int groups_within_tolerance = 0;
-  int groups_outside_tolerance = 0;
+do_merge_output(const IW_STL_Hash_Map<IWString, Group_of_Molecules*>& structure_group,
+                IWString_and_File_Descriptor& output) {
+  uint32_t molecules_written = 0;
+  uint32_t groups_within_tolerance = 0;
+  uint32_t groups_outside_tolerance = 0;
 
   Accumulator<float> acc;
 
-  for (auto i : structure_group) {
-    Group_of_Molecules *g = i.second;
+  for (auto iter : structure_group) {
+    Group_of_Molecules* g = iter.second;
 
     if (1 == g->n()) {
       g->write_first_member(output);
@@ -1141,13 +1364,15 @@ do_merge_output(const IW_STL_Hash_Map<IWString, Group_of_Molecules *> &structure
 
 static int
 write_reconciled_data(
-    const IW_STL_Hash_Map<IWString, Group_of_Molecules *> &structure_group,
-    IWString_and_File_Descriptor &stream_for_smiles,
-    IWString_and_File_Descriptor &stream_for_activity) {
+    const IW_STL_Hash_Map<IWString, Group_of_Molecules*>& structure_group,
+    IWString_and_File_Descriptor& stream_for_smiles,
+    IWString_and_File_Descriptor& stream_for_activity) {
   int groups_outside_tolerance = 0;
 
-  for (auto i : structure_group) {
-    Group_of_Molecules *g = i.second;  // not const because the median method does a sort
+  for (auto iter : structure_group) {
+    Group_of_Molecules* g = iter.second;  // not const because the median method does a sort
+
+    g->MaybeHandleQualifiedValues();
 
     if (1 == g->n()) {
       g->write_first_member(stream_for_smiles, stream_for_activity);
@@ -1194,10 +1419,10 @@ write_reconciled_data(
 
 static int
 count_items_per_structure(
-    const IW_STL_Hash_Map<IWString, Group_of_Molecules *> &structure_group,
-    extending_resizable_array<int> &items_per_structure) {
-  for (auto i : structure_group) {
-    const Group_of_Molecules *g = i.second;
+    const IW_STL_Hash_Map<IWString, Group_of_Molecules*>& structure_group,
+    extending_resizable_array<int>& items_per_structure) {
+  for (auto iter : structure_group) {
+    const Group_of_Molecules* g = iter.second;
 
     int n = g->n();
 
@@ -1217,8 +1442,8 @@ count_items_per_structure(
 
 static int
 write_reconciled_data(
-    const IW_STL_Hash_Map<IWString, Group_of_Molecules *> &structure_group,
-    const IWString &stem) {
+    const IW_STL_Hash_Map<IWString, Group_of_Molecules*>& structure_group,
+    const IWString& stem) {
   IWString_and_File_Descriptor stream_for_smiles;
   IWString_and_File_Descriptor stream_for_activity;
 
@@ -1249,29 +1474,56 @@ write_reconciled_data(
 }
 
 static float
-average(const resizable_array<float> &v) {
-  const auto n = v.number_elements();
-
+average(const resizable_array<MaybeQualified>& v) {
   float sum = 0.0f;
-  for (auto x : v) {
+  for (float x : v) {
     sum += x;
   }
 
-  return sum / static_cast<float>(n);
+  return sum / static_cast<float>(v.size());
+}
+
+static float
+max_val(const resizable_array<MaybeQualified>& v) {
+  float rc = v[0];
+
+  for (uint32_t i = 1; i < v.size(); ++i) {
+    if (v[i] > rc) {
+      rc = v[i];
+    }
+  }
+
+  return rc;
+}
+
+static float
+min_val(const resizable_array<MaybeQualified>& v) {
+  float rc = v[0];
+  cerr << "Minv value " << rc << '\n';
+
+  for (uint32_t i = 1; i < v.size(); ++i) {
+    if (v[i] < rc) {
+      rc = v[i];
+      cerr << v[i] << " update min to " << rc << '\n';
+    }
+  }
+
+  cerr << "Returjning " << rc  << '\n';
+  return rc;
 }
 
 static void
-update_global_accumulators(const resizable_array<float> &v, Accumulator<float> &acc_diff,
-                           int &number_zero_differences, const float arange) {
+update_global_accumulators(const resizable_array<MaybeQualified>& v, Accumulator<float>& acc_diff,
+                           int& number_zero_differences, const float arange) {
   // const auto ave = average(v);
 
-  const auto n = v.size();
+  const uint32_t n = v.size();
 
-  for (unsigned int i = 0; i < n; ++i) {
+  for (uint32_t i = 0; i < n; ++i) {
     const auto vi = v[i];
 
-    for (unsigned int j = i + i; j < n; ++j) {
-      const auto d = fabsf(v[j] - vi);
+    for (uint32_t j = i + i; j < n; ++j) {
+      const float d = fabsf(v[j] - vi);
 
       if (d < (0.01f * arange)) {
         number_zero_differences++;
@@ -1285,14 +1537,11 @@ update_global_accumulators(const resizable_array<float> &v, Accumulator<float> &
 }
 
 static int
-write_multi_valued_information(const IWString &id, resizable_array<float> &acc,
-                               IWString_and_File_Descriptor &output) {
+write_multi_valued_information(const IWString& id, resizable_array<MaybeQualified>& acc,
+                               IWString_and_File_Descriptor& output) {
   const char sep = ' ';
 
-  output << id << sep << acc.number_elements() << sep << acc.min_val() << sep
-         << acc.max_val() << sep << static_cast<float>(average(acc));
-
-  acc.iwqsort_lambda([](const float f1, const float f2) {
+  acc.iwqsort_lambda([](const MaybeQualified& f1, const MaybeQualified& f2) {
     if (f1 < f2) {
       return -1;
     }
@@ -1303,6 +1552,9 @@ write_multi_valued_information(const IWString &id, resizable_array<float> &acc,
 
     return 0;
   });
+
+  output << id << sep << acc.size() << sep << acc.front() << sep
+         << acc.back() << sep << static_cast<float>(average(acc));
 
   for (auto x : acc) {
     output << sep << x;
@@ -1315,14 +1567,14 @@ write_multi_valued_information(const IWString &id, resizable_array<float> &acc,
 }
 
 static int
-handle_multi_valued_activities(ID_to_Activity &id_to_activity) {
+handle_multi_valued_activities(ID_to_Activity& id_to_activity) {
   float min_activity = std::numeric_limits<float>::max();
   float max_activity = -min_activity;
 
   for (auto i : id_to_activity) {
-    const auto *acc = i.second;
+    const auto* acc = i.second;
 
-    const auto n = acc->size();
+    const uint32_t n = acc->size();
 
     if (1 == n) {
       const auto v0 = acc->item(0);
@@ -1333,7 +1585,7 @@ handle_multi_valued_activities(ID_to_Activity &id_to_activity) {
         max_activity = v0;
       }
     } else {
-      for (unsigned int j = 0; j < n; ++j) {
+      for (uint32_t j = 0; j < n; ++j) {
         const auto vj = acc->item(j);
         if (vj < min_activity) {
           min_activity = vj;
@@ -1350,38 +1602,37 @@ handle_multi_valued_activities(ID_to_Activity &id_to_activity) {
   Accumulator<float> acc_diff;
   int zero_diff = 0;
 
-  for (ID_to_Activity::iterator i = id_to_activity.begin(); i != id_to_activity.end();
-       ++i) {
-    auto *acc = (*i).second;
+  for (auto iter : id_to_activity) {
+    auto* acc = iter.second;
 
-    if (1 == acc->number_elements()) {
+    if (acc->size() == 1) {
       continue;
     }
 
     update_global_accumulators(*acc, acc_diff, zero_diff, max_activity - min_activity);
 
     if (stream_for_multi_valued_data.is_open()) {
-      write_multi_valued_information(i->first, *acc, stream_for_multi_valued_data);
+      write_multi_valued_information(iter.first, *acc, stream_for_multi_valued_data);
     }
 
     if (take_average_of_multi_valued_data) {
       double a = average(*acc);
       acc->resize_keep_storage(0);
-      acc->add(a);
+      acc->add(MaybeQualified(0, a));
     } else if (take_max_of_multi_valued_data) {
-      double a = acc->max_val();
+      double a = max_val(*acc);
       acc->resize_keep_storage(0);
-      acc->add(a);
+      acc->add(MaybeQualified(0, a));
     } else if (take_min_of_multi_valued_data) {
-      double a = acc->min_val();
+      double a = min_val(*acc);
       acc->resize_keep_storage(0);
-      acc->add(a);
+      acc->add(MaybeQualified(0, a));
     } else if (take_random_value_from_range_of_multi_valued_data) {
-      std::uniform_real_distribution<double> u(acc->min_val(), acc->max_val());
+      std::uniform_real_distribution<double> u(min_val(*acc), max_val(*acc));
       acc->resize_keep_storage(0);
-      acc->add(u(rng));
+      acc->add(MaybeQualified(0, u(rng)));
     } else if (vote_for_multi_valued_data) {
-      if (acc->min_val() != acc->max_val()) {
+      if (min_val(*acc) != max_val(*acc)) {
         acc->resize_keep_storage(0);
       }
     }
@@ -1405,7 +1656,7 @@ handle_multi_valued_activities(ID_to_Activity &id_to_activity) {
 }
 
 static int
-read_activity_record(const const_IWSubstring &buffer, ID_to_Activity &id_to_activity) {
+read_activity_record(const const_IWSubstring& buffer, ID_to_Activity& id_to_activity) {
   static bool first_call = true;
 
   IWString id;
@@ -1426,6 +1677,7 @@ read_activity_record(const const_IWSubstring &buffer, ID_to_Activity &id_to_acti
     }
     //  cerr << "Buffer '" << buffer << "', extracted '" << token << "'\n";
   } else {
+    // does not handle consecutive delimiters... TODO:ianwatson
     if (!buffer.word(activity_column, token)) {
       cerr << "Cannot fetch token for experimental data, activity_column "
            << activity_column << '\n';
@@ -1433,26 +1685,33 @@ read_activity_record(const const_IWSubstring &buffer, ID_to_Activity &id_to_acti
     }
   }
 
-  if (0 == token.length())  // how could that happen?
-  {
+  if (token.empty()) {  // how could that happen?
     cerr << "Cannot extract activity token, activity_column " << activity_column << '\n';
     return 0;
   }
 
   float a;
+  // cerr << "Examining '" << token << "' first_call " << first_call << '\n';
+
+  MaybeQualified mqd;
 
   if (token.numeric_value(a)) {  // great
+    mqd.set_activity(a);
     first_call = false;
-  } else if (first_call)  // header record in activity file
-  {
+  } else if (token[0] == '=' || token[0] == '<' || token[0] == '>') {
+    if (! mqd.Build(token)) {
+      cerr << "read_activity_record:invalid qualified value '" << token << "'\n";
+      return 0;
+    }
+  } else if (first_call) {  // header record in activity file
     activity_name = token;
     first_call = false;
     return 1;
-  } else if ('.' == token) {
+  } else if (missing_value == token) {
     cerr << "Ignoring missing value for '" << id << "'\n";
     return 1;
   } else {
-    unsigned int s = class_name_to_number.size();
+    uint32_t s = class_name_to_number.size();
 
     const auto f = class_name_to_number.find(token);
 
@@ -1476,8 +1735,8 @@ read_activity_record(const const_IWSubstring &buffer, ID_to_Activity &id_to_acti
   ID_to_Activity::iterator f = id_to_activity.find(id);
 
   if (f == id_to_activity.end()) {
-    resizable_array<float> *tmp = new resizable_array<float>;
-    tmp->add(a);
+    resizable_array<MaybeQualified>* tmp = new resizable_array<MaybeQualified>;
+    tmp->add(mqd);
 
     id_to_activity[id] = tmp;
 
@@ -1492,13 +1751,13 @@ read_activity_record(const const_IWSubstring &buffer, ID_to_Activity &id_to_acti
     return 1;
   }
 
-  (*f).second->add(a);
+  (*f).second->add(mqd);
 
   return 1;
 }
 
 static int
-read_activity_data(iwstring_data_source &input, ID_to_Activity &id_to_activity) {
+read_activity_data(iwstring_data_source& input, ID_to_Activity& id_to_activity) {
   input.set_translate_tabs(1);
   input.set_strip_trailing_blanks(1);
 
@@ -1519,7 +1778,7 @@ read_activity_data(iwstring_data_source &input, ID_to_Activity &id_to_activity) 
 }
 
 static int
-read_activity_data(const char *fname, ID_to_Activity &id_to_activity) {
+read_activity_data(const char* fname, ID_to_Activity& id_to_activity) {
   iwstring_data_source input(fname);
 
   if (!input.good()) {
@@ -1531,8 +1790,8 @@ read_activity_data(const char *fname, ID_to_Activity &id_to_activity) {
 }
 
 static int
-do_write_tabular_output(const Group_of_Molecules *const *gm, const int n,
-                        IWString_and_File_Descriptor &output) {
+do_write_tabular_output(const Group_of_Molecules* const* gm, const int n,
+                        IWString_and_File_Descriptor& output) {
   output << "N\tMinval\tMaxval\tRange\tAverage\tID\tActivity\n";
 
   for (int i = 0; i < n; i++) {
@@ -1547,10 +1806,11 @@ do_write_tabular_output(const Group_of_Molecules *const *gm, const int n,
 }
 
 static void
-display_dash_V_options(std::ostream &os) {
+display_dash_V_options(std::ostream& os) {
   os << " -V first         take first of multi-valued activity data\n";
   os << " -V ave           take average of multi-valued activity data\n";
   os << " -V max           take max value of multi-valued activity data\n";
+  os << " -V keep          keep all multi-valued activity data\n";
   os << " -V WRITE=<fname> write duplicate info to <fname>\n";
   os << " -V append        append all values associated with each id\n";
   // os << " -V rm            remove all multi-valued activity data\n";
@@ -1560,13 +1820,13 @@ display_dash_V_options(std::ostream &os) {
 
 // Free some data structures
 static void
-FreeMemory(ID_to_Activity &id_to_activity,
-           IW_STL_Hash_Map<IWString, Group_of_Molecules *> &structure_group) {
+FreeMemory(ID_to_Activity& id_to_activity,
+           IW_STL_Hash_Map<IWString, Group_of_Molecules*>& structure_group) {
   for (auto i : id_to_activity) {
     delete i.second;
   }
 
-  for (auto &i : structure_group) {
+  for (auto& i : structure_group) {
     delete i.second;
   }
 
@@ -1574,7 +1834,7 @@ FreeMemory(ID_to_Activity &id_to_activity,
 }
 
 static int
-activity_consistency(int argc, char **argv) {
+activity_consistency(int argc, char** argv) {
   Command_Line cl(argc, argv, "vA:E:i:g:lX:caT:szmN:O:t:rxM:V:e:K:W:U:b:B:");
 
   if (cl.unrecognised_options_encountered()) {
@@ -1707,6 +1967,12 @@ activity_consistency(int argc, char **argv) {
           cerr << "Duplicate data associated with same ID gets counted as extra sample\n";
         }
         specifications_given++;
+      } else if (lcv == "keep") {
+        retain_multi_valued_data = 1;
+        if (verbose) {
+          cerr << "Will retain all values where the same id has multiple measurements\n";
+        }
+        ++specifications_given;
       } else if ("range" == lcv) {
         take_random_value_from_range_of_multi_valued_data = 1;
         if (verbose) {
@@ -1772,7 +2038,7 @@ activity_consistency(int argc, char **argv) {
   ID_to_Activity id_to_activity;
 
   if (cl.option_present('X')) {
-    const char *x = cl.option_value('X');
+    const char* x = cl.option_value('X');
 
     if (!read_activity_data(x, id_to_activity)) {
       cerr << "Cannot read activity data (-X), file '" << x << "'\n";
@@ -1794,7 +2060,7 @@ activity_consistency(int argc, char **argv) {
     int multi_valued_data_present = 0;  // same ID with multiple data values
 
     for (auto i : id_to_activity) {
-      const auto *acc = i.second;
+      const auto* acc = i.second;
 
       int n = acc->number_elements();
 
@@ -1826,6 +2092,7 @@ activity_consistency(int argc, char **argv) {
         ;
       } else if (make_replicate_molecules_of_multi_valued_data) {
         ;
+      } else if (retain_multi_valued_data) {
       } else {
         cerr << "Must specify some handling of multi-valued data via the -V option\n";
         display_dash_V_options(cerr);
@@ -1855,7 +2122,7 @@ activity_consistency(int argc, char **argv) {
   }
 
   if (cl.option_present('N')) {
-    const char *n = cl.option_value('N');
+    const char* n = cl.option_value('N');
 
     if (!stream_for_non_duplicates.open(n)) {
       cerr << "Cannot open stream for non duplicates '" << n << "'\n";
@@ -1913,7 +2180,7 @@ activity_consistency(int argc, char **argv) {
   IWString_and_File_Descriptor stream_for_tabular_output;
 
   if (cl.option_present('U')) {
-    const char *u = cl.option_value('U');
+    const char* u = cl.option_value('U');
 
     if (!stream_for_tabular_output.open(u)) {
       cerr << "Cannot open stream for tabular output '" << u << "'\n";
@@ -1951,17 +2218,22 @@ activity_consistency(int argc, char **argv) {
     }
   }
 
+  if (cl.option_present('m') && cl.option_present('t')) {
+    cerr << "Sorry, the -m and -t options cannot be used together\n";
+    usage(5);
+  }
+
   set_copy_name_in_molecule_copy_constructor(1);
 
-  IW_STL_Hash_Map<IWString, Group_of_Molecules *> structure_group;
+  IW_STL_Hash_Map<IWString, Group_of_Molecules*> structure_group;
 
   IW_STL_Hash_Set chirality_removed;
 
   int rc = 0;
-  for (int i = 0; i < cl.number_elements(); i++) {
-    if (!group_molecules(cl[i], input_type, id_to_activity, structure_group,
+  for (const char* fname : cl) {
+    if (!group_molecules(fname, input_type, id_to_activity, structure_group,
                          chirality_removed)) {
-      cerr << "Cannot read molecules from '" << cl[i] << "'\n";
+      cerr << "Cannot read molecules from '" << fname << "'\n";
       return 4;
     }
   }
@@ -1973,11 +2245,6 @@ activity_consistency(int argc, char **argv) {
 
   if (molecules_read == structure_group.size()) {
     cerr << "No duplicate structures encountered\n";
-  }
-
-  if (cl.option_present('m') && cl.option_present('t')) {
-    cerr << "Sorry, the -m and -t options cannot be used together\n";
-    usage(5);
   }
 
   if (cl.option_present('s') && cl.option_present('t')) {
@@ -2110,7 +2377,7 @@ activity_consistency(int argc, char **argv) {
   }
 
   for (auto i : structure_group) {
-    const Group_of_Molecules *g = i.second;
+    const Group_of_Molecules* g = i.second;
 
     int n = g->n();
 
@@ -2139,15 +2406,15 @@ activity_consistency(int argc, char **argv) {
     cerr << "No multi-valued structures encountered???\n";
   }
 
-  Group_of_Molecules **gm = new Group_of_Molecules *[items_to_display];
-  std::unique_ptr<Group_of_Molecules *[]> free_gm(gm);
+  Group_of_Molecules** gm = new Group_of_Molecules*[items_to_display];
+  std::unique_ptr<Group_of_Molecules*[]> free_gm(gm);
 
   items_to_display = 0;
 
   Accumulator<float> range_acc;
 
   for (auto i : structure_group) {
-    Group_of_Molecules *g = i.second;
+    Group_of_Molecules* g = i.second;
 
     int n = g->n();
 
@@ -2186,7 +2453,7 @@ activity_consistency(int argc, char **argv) {
   IWString_and_File_Descriptor output(1);
 
   for (int i = 0; i < items_to_display; i++) {
-    Group_of_Molecules *g = gm[i];
+    Group_of_Molecules* g = gm[i];
 
     g->write_structure_group(output);
 
@@ -2225,7 +2492,7 @@ activity_consistency(int argc, char **argv) {
 }
 
 int
-main(int argc, char **argv) {
+main(int argc, char** argv) {
   prog_name = argv[0];
 
   int rc = activity_consistency(argc, argv);

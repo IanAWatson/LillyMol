@@ -65,7 +65,7 @@ int
 ok_header_record(const const_IWSubstring& header) {
   const_IWSubstring token;
   int i = 0;
-  for (int col = 0; header.nextword(token, i, csv_separator); ++col) {
+  for (int col = 0; header.nextword_single_delimiter(token, i, csv_separator); ++col) {
     if (token == smiles_column_name) {
       smiles_column = col;
     } else if (token == id_column_name) {

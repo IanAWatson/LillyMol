@@ -2,10 +2,22 @@
   "executable": "activity_consistency",
   "test": [
     {
+      "name": "case_1",
+      "args": [
+          "-a -l -e 2 -X #{indir}/pubchem_in.act #{indir}/pubchem.smi"
+      ]
+    },
+    {
       "name": "case_2",
       "args": [
-          "-l -e 2 -X #{test_dir}/case_2/in/pubchem_in.act",
-          " #{test_dir}/case_2/in/pubchem.smi"
+          "-l -e 2 -X #{indir}/pubchem_in.act #{indir}/pubchem.smi"
+      ]
+    },
+
+    {
+      "name": "qualified",
+      "args": [
+          "-V extra -M Mfile -M ave -e 2 -X #{indir}/in.activity #{indir}/in.smi"
       ]
     }
   ]

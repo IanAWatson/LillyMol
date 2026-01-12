@@ -1156,16 +1156,37 @@ discarded_for_covalently_bonded_non_organics(const Molecule& m) {
   return 0;
 }
 
-/*
-  We always return 1
-*/
+
+// Return true if `mname` or its first token, is in `seen`.
+static int
+AlreadyProcessed(const IWString& mname,
+                IW_STL_Hash_Set& seen) {
+  if (! mname.contains(' ')) {
+    if (seen.contains(mname)) {
+      return 1;
+    }
+
+    seen.insert(mname);
+
+    return 0;
+  }
+
+  IWString tmp(mname);
+  tmp.truncate_at_first(' ');
+  if (seen.contains(tmp)) {
+    return 1;
+  }
+
+  seen.insert(tmp);
+  return 0;
+}
 
 static int
 group_molecules(Molecule& m, const ID_to_Activity& id_to_activity,
                 IW_STL_Hash_Map<IWString, Group_of_Molecules*>& structure_group,
                 IW_STL_Hash_Set& chirality_removed) {
-  if (contains_non_allowed_elements(
-          m, allowed_elements)) {  // check before any frgment reduction
+  // check before any fragment reduction
+  if (contains_non_allowed_elements(m, allowed_elements)) {
     return 1;
   }
 
@@ -1174,6 +1195,12 @@ group_molecules(Molecule& m, const ID_to_Activity& id_to_activity,
   }
 
   IWString mname = m.name();
+
+  static IW_STL_Hash_Set seen;
+
+  if (AlreadyProcessed(mname, seen)) {
+    return 1;
+  }
 
   resizable_array<MaybeQualified> activity;
 

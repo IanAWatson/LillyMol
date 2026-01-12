@@ -179,6 +179,8 @@ class Measurement {
       return _qualified;
     }
 
+    int ConvertToUnqualified();
+
     void CopyX(float* destination, uint32_t ncols) const {
       std::copy_n(_x, ncols, destination);
     }
@@ -221,6 +223,14 @@ Measurement::BestEstimate() const {
   }
 
   return _qualified->initial_activity();
+}
+
+int
+Measurement::ConvertToUnqualified() {
+  _y = _qualified->initial_activity();;
+  _qualified.release();
+
+  return 1;
 }
 
 class Data {
@@ -300,6 +310,8 @@ class Data {
 
     DMatrixHandle CreateDmatrixHandle(float* xstart, uint32_t nrows, float* y);
     BoosterHandle CreateBooster(DMatrixHandle dmats[]);
+
+    int UnconsiderAtExtrema();
 
     int GetNextBatch();
     int GetNextRandomBatch();
@@ -829,10 +841,44 @@ Data::CreateBooster(DMatrixHandle dmats[]) {
   return booster;
 }
 
+// qualified values that are at the min or max values do not need to be processed.
+int
+Data::UnconsiderAtExtrema() {
+  float minval = _activity[0]->InitialActivity();
+  float maxval = _activity[0]->InitialActivity();
+  for (const Measurement* m : _activity) {
+    const float v = m->InitialActivity();
+    if (v < minval) {
+      minval = v;
+    } else if (v > maxval) {
+      maxval = v;
+    }
+  }
+
+  int rc = 0;
+  for (int i = _qualified_activity.number_elements() - 1; i>= 0; --i) {
+    const std::unique_ptr<QualifiedData>& q = _qualified_activity[i]->qualified();
+    if (q->initial_activity() <= minval ||
+        q->initial_activity() >= maxval) {
+      Measurement* m = _qualified_activity[i];
+      _qualified_activity.remove_no_delete(i);
+      m->ConvertToUnqualified();
+      _activity << m;
+      ++rc;
+    }
+  }
+
+  if (_verbose) {
+    cerr << "Turned off " << rc << " qualified items at extrema\n";
+  }
+
+  return rc;
+}
 
 
 int
 Data::Optimise() {
+  UnconsiderAtExtrema();
 
   // First step is to build a model on unqualified and predict qualified.
 

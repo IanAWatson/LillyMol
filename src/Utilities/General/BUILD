@@ -571,6 +571,7 @@ cc_binary(
         "//conditions:default": ["-lgomp"]
     }),
     tags = [
+        "xgboost",
         "lightgbm",
         "omp",
     ],

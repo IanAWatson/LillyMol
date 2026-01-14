@@ -792,7 +792,11 @@ fetch_smiles_quick(int argc, char** argv) {
   } else if (cl.option_present('K')) {
     IWString k;
     for (int i = 0; cl.value('K', k, i); ++i) {
-      identifiers_to_fetch[k] = "";
+      int j = 0;
+      IWString token;
+      while (k.nextword(token, j, '.')) {
+        identifiers_to_fetch[token] = "";
+      }
     }
     clstart = 0;
   } else if (cl.number_elements() < 2) {

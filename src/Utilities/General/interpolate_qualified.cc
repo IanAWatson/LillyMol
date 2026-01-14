@@ -844,10 +844,10 @@ Data::CreateBooster(DMatrixHandle dmats[]) {
 // qualified values that are at the min or max values do not need to be processed.
 int
 Data::UnconsiderAtExtrema() {
-  float minval = _activity[0]->InitialActivity();
-  float maxval = _activity[0]->InitialActivity();
+  float minval = *_activity[0]->y();
+  float maxval = *_activity[0]->y();
   for (const Measurement* m : _activity) {
-    const float v = m->InitialActivity();
+    const float v = *m->y();
     if (v < minval) {
       minval = v;
     } else if (v > maxval) {

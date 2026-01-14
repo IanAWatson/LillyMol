@@ -260,8 +260,9 @@ cc_binary(
         "class_label_translation.cc",
     ],
     deps = [
+        ":class_label_translation_cc_proto",
         "//Foundational/accumulator",
-        "//Foundational/cmdline:iwcmdline",
+        "//Foundational/cmdline_v2:cmdline_v2",
         "//Foundational/data_source:iwstring_data_source",
         "//Foundational/iwmisc",
         "//Foundational/iwqsort",
@@ -572,7 +573,6 @@ cc_binary(
     }),
     tags = [
         "xgboost",
-        "lightgbm",
         "omp",
     ],
 )

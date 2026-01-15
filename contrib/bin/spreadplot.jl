@@ -29,6 +29,7 @@ function main()
     @argumentoptional Float32 threshold "--dist"
     @argumentoptional String label "--label"
     @argumentoptional String title "--title"
+    @argumentdefault String "png" format "--format"
     @argumentdefault Int32 4 lwd "--lwd"
     @argumentdefault String "green" colour "--color"
 
@@ -54,7 +55,7 @@ function main()
     plot!([0, length(distance)], [y, y], linestyle=:dash, color=:grey, label="Dist $(threshold) count $(ndx)")
   end
 
-  savefig("$(stem).png")
+  savefig("$(stem).$(format)")
 end
 
 main()

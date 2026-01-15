@@ -814,6 +814,7 @@ cc_binary(
         "//Foundational/iwmisc:sparse_fp_creator",
         "//Foundational/iwqsort",
         "//Utilities/General:class_label_translation_cc_proto",
+        "//Utilities/General:linear_scaling",
         "//Utilities/General:scaler",
         "//Utilities/GFP_Tools:gfp",
     ],

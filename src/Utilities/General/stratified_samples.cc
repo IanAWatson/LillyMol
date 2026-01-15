@@ -262,7 +262,7 @@ ID_Stratum_Selected::initialise(const const_IWSubstring& buffer)
 
   _id_converted_to_number = -1;
 
-  if (_id.numeric_value(_id_converted_to_number)) {  // breat
+  if (_id.numeric_value(_id_converted_to_number)) {  // great
     ;
   } else {
     const_IWSubstring tmp(_id);
@@ -288,6 +288,7 @@ ID_Stratum_Selected::initialise(const const_IWSubstring& buffer)
 
   if (c.empty()) {
     cerr << "ID_Stratum_Selected::initialise:no activity data for '" << _id << "'\n";
+    cerr << buffer << '\n';
     return 0;
   }
 
@@ -1002,13 +1003,14 @@ read_smiles(iwstring_data_source& input, IW_STL_Hash_Map_String& id_to_smiles)
   while (input.next_record(buffer)) {
     IWString smiles, id;
 
-    if (!buffer.split(smiles, ' ', id) || 0 == smiles.length() || 0 == id.length()) {
+    int i = 0;
+    if (! buffer.nextword(smiles, i) || ! buffer.nextword(id, i) ||
+          smiles.empty() || id.empty()) {
       cerr << "Cannot split into smiles and id '" << buffer << "'\n";
       return 0;
     }
 
-    id.truncate_at_first(' ');
-
+    // cerr << "id '" << id << "' smiles '" << smiles << "'\n";
     id_to_smiles[id] = smiles;
   }
 

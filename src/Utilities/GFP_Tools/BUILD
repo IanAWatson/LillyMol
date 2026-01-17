@@ -699,6 +699,21 @@ cc_binary(
         "//Foundational/histogram:iwhistogram",
     ],
 )
+cc_binary(
+    name = "gfp_group_spread",
+    srcs = [
+        "gfp_group_spread.cc",
+    ],
+    deps = [
+        ":gfp_standard",
+        "//Foundational/accumulator",
+        "//Foundational/cmdline:iwcmdline",
+        "//Foundational/iwstring:absl_hash",
+        "//Foundational/data_source:iwstring_data_source",
+        "//Foundational/iw_tdt",
+        "@com_google_absl//absl/container:flat_hash_map",
+    ],
+)
 
 cc_binary(
     name = "gfp_profile_activity_by_bits",

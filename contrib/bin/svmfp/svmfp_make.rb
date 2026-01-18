@@ -347,7 +347,7 @@ if cmdline.option_present('rescore')
   cmd = "svmfp_evaluate.sh -mdir #{mdir} #{mdir}/train.smi > #{train_pred}"
   execute_cmd(cmd, verbose, [train_pred])
 
-  scaling_file = File.join(mdir, 'output_scaling.dat')
-  cmd = "iwstats -E #{train_activity} -p 2 -C #{scaling_file} #{train_pred}"
-  execute_cmd(cmd, verbose, [scaling_file])
+  scaling_file = File.join(mdir, 'output_scaling')
+  cmd = "iwstats -w -Y allequals -E #{train_activity} -p 2 -C #{scaling_file} #{train_pred}"
+  execute_cmd(cmd, verbose, ["#{scaling_file}.dat"])
 end

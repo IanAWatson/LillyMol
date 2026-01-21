@@ -12607,9 +12607,8 @@ IndoleHydrogenTransfer(Molecule& m, const Set_of_Atoms& ring,
     rc = DoIndoleSwitch(m, indole1, current_molecule_data);
   } else if (indole2.c2 != kInvalidAtomNumber) {
     rc = DoIndoleSwitch(m, indole2, current_molecule_data);
-  } else {
-    cerr << "Should not get here\n";
-    rc = 0;
+  } else {  // a "double" indole, cannot process.
+    return 0;
   }
 
   return rc;

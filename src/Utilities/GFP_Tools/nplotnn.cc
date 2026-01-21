@@ -2685,16 +2685,18 @@ plotnn(int argc, char **argv) {
 
     cerr << zero_distance_neighbours << " exact matches\n";
 
-    cerr << "Furthest distances between " << furthest_neighbour_stats.minval() << " and "
-         << furthest_neighbour_stats.maxval();
-    if (furthest_neighbour_stats.n() > 1) {
-      cerr << " ave " << furthest_neighbour_stats.average();
-    }
-    cerr << '\n';
+    if (neighbours_per_structure > 1) {
+      cerr << "Furthest distances between " << furthest_neighbour_stats.minval() << " and "
+           << furthest_neighbour_stats.maxval();
+      if (furthest_neighbour_stats.n() > 1) {
+        cerr << " ave " << furthest_neighbour_stats.average();
+      }
+      cerr << '\n';
 
-    for (int i = 0; i < neighbour_count.number_elements(); i++) {
-      if (neighbour_count[i]) {
-        cerr << neighbour_count[i] << " molecules had " << i << " neighbours\n";
+      for (int i = 0; i < neighbour_count.number_elements(); i++) {
+        if (neighbour_count[i]) {
+          cerr << neighbour_count[i] << " molecules had " << i << " neighbours\n";
+        }
       }
     }
 

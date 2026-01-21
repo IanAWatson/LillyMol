@@ -359,7 +359,7 @@ Options::WriteHeader(IWString_and_File_Descriptor& output) const {
   }
 
   for (uint32_t i = 0; i < _number_buckets; ++i) {
-    output << _output_separator << _descriptor_prefix << "_vsa" << i;
+    output << _output_separator << _descriptor_prefix << "vsa" << i;
   }
 
   output << '\n';
@@ -910,6 +910,7 @@ Main(int argc, char** argv) {
       return 1;
     }
   } else {
+    options.WriteHeader(output);
     for (const char * fname : cl) {
       if (! LabuteApproximateSurfaceArea(options, fname, input_type, output)) {
         cerr << "LabuteApproximateSurfaceArea::fatal error processing '" << fname << "'\n";

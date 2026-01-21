@@ -348,6 +348,6 @@ if cmdline.option_present('rescore')
   execute_cmd(cmd, verbose, [train_pred])
 
   scaling_file = File.join(mdir, 'output_scaling')
-  cmd = "iwstats -w -Y allequals -E #{train_activity} -p 2 -C #{scaling_file} #{train_pred}"
+  cmd = "iwstats -w -Y allequals -E #{activity_file} -p 2 -C #{scaling_file} #{train_pred}"
   execute_cmd(cmd, verbose, ["#{scaling_file}.dat"])
 end

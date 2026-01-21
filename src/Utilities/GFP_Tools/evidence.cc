@@ -461,8 +461,6 @@ class Evidence {
     EvidenceData::Options _config;
 
     // We need some hashes while ingesting the data.
-    //IW_STL_Hash_Map_float _id_to_activity;
-    //IW_STL_Hash_Map_int _id_to_ndx;
     absl::flat_hash_map<std::string, float> _id_to_activity;
     absl::flat_hash_map<std::string, int> _id_to_ndx;
 
@@ -525,7 +523,7 @@ class Evidence {
     int WeightedAverage();
     int WeightedAverage(int nbrs);
 
-    int Process(float* values);
+    int Process2();
 
   public:
     Evidence();
@@ -836,6 +834,7 @@ Evidence::ReadNbrList(TFDataReader& input) {
     }
   }
 
+#define ECHO_NBRS
 #ifdef ECHO_NBRS
   if (_verbose) {
     PrintNbrs(cerr);
@@ -845,15 +844,72 @@ Evidence::ReadNbrList(TFDataReader& input) {
   return 1;
 }
 
+// These next two functions should be compiled, but I could never get
+// template <typename T>
+// std::optional<absl::flat_hash_map<std::string, T>::const_iterator>
+// to compile. I am not sure why. TODO:ianwatson figure this out one day...
+
+// Lookup `name` in `zhash` and if it is found, return the iterator.
+// If not found, lookup the first token in `name` instead.
+std::optional<absl::flat_hash_map<std::string, float>::const_iterator >
+GetItem(const std::string& name, absl::flat_hash_map<std::string, float>& zhash) {
+  auto iter = zhash.find(name);
+  if (iter != zhash.end()) {
+    return iter;
+  }
+
+  auto f = name.find(' ');
+  if (f < 0) {
+    return std::nullopt;
+  }
+
+  std::string tmp(name);
+  tmp.resize(f);
+
+  iter = zhash.find(tmp);
+  if (iter != zhash.end()) {
+    return iter;
+  }
+
+  return std::nullopt;
+}
+
+std::optional<absl::flat_hash_map<std::string, int>::const_iterator >
+GetItem(const std::string& name, absl::flat_hash_map<std::string, int>& zhash) {
+  auto iter = zhash.find(name);
+  if (iter != zhash.end()) {
+    return iter;
+  }
+
+  auto f = name.find(' ');
+  if (f < 0) {
+    return std::nullopt;
+  }
+
+  std::string tmp(name);
+  tmp.resize(f);
+
+  iter = zhash.find(tmp);
+  if (iter != zhash.end()) {
+    return iter;
+  }
+
+  return std::nullopt;
+}
+
 int
 Evidence::Initialise(const nnbr::NearNeighbours& proto) {
-  const auto iter_ndx = _id_to_ndx.find(proto.name());
-  if (iter_ndx == _id_to_ndx.end()) {
+  auto maybe_iter = GetItem(proto.name(), _id_to_ndx);
+
+  if (! maybe_iter) {
     cerr << "Evidence::Initialise:no index for '" << proto.name() << "'\n";
     return 0;
   }
 
-  Item<float>& item = _item[iter_ndx->second];
+  cerr << "Initialise: ";
+  cerr << proto.ShortDebugString() << '\n';
+  cerr << "index " << maybe_iter.value()->second << '\n';
+  Item<float>& item = _item[maybe_iter.value()->second];
 
   const uint32_t nbrs = proto.nbr().size();
 
@@ -867,18 +923,19 @@ Evidence::Initialise(const nnbr::NearNeighbours& proto) {
       return 1;
     }
 
-    const auto iter_ndx = _id_to_ndx.find(nbr.id());
-    if (iter_ndx == _id_to_ndx.end()) {
+    auto maybe_iter_ndx = GetItem(nbr.id(), _id_to_ndx);
+    if (! maybe_iter_ndx) {
       cerr << "Evidence::Initialise:cannot find '" << nbr.id() << "'\n";
       return 0;
     }
-    const auto iter_activity = _id_to_activity.find(nbr.id());
-    if (iter_activity == _id_to_activity.end()) {
+    auto maybe_iter_activity = GetItem(nbr.id(), _id_to_activity);
+    if (! maybe_iter_activity) {
       cerr << "Evidence::Initialise:no activity for '" << nbr.id() << "'\n";
       return 0;
     }
 
-    item.AddNbr(i, nbr.dist(), iter_activity->second, iter_ndx->second);
+    cerr << "nbr " << _item[maybe_iter_ndx.value()->second].id() << " act " << maybe_iter_activity.value()->second << '\n';
+    item.AddNbr(i, nbr.dist(), maybe_iter_activity.value()->second, maybe_iter_ndx.value()->second);
   }
 
   return 1;
@@ -903,6 +960,9 @@ Evidence::PrintNbrs(std::ostream& output) const {
 
 int
 Evidence::Process() {
+  for (int i = 0; i < _number_items; ++i) {
+    cerr << "Process: " << i << ' ' << _item[i].id() << '\n';
+  }
   // The first result is always the shortest distance.
   ShortestDistance();
 
@@ -926,10 +986,7 @@ Evidence::Process() {
     WeightedAverage();
   }
 
-  // This is not needed...
-  std::unique_ptr<float[]> values = std::make_unique<float[]>(_header.size());
-
-  return Process(values.get());
+  return Process2();
 }
 
 // `ndx_and_value` must be sorted by value.
@@ -953,23 +1010,27 @@ AssignPercentileRanks(NdxValue<float>* ndx_and_value,
 }
 
 int
-Evidence::Process(float* values) {
+Evidence::Process2() {
   std::unique_ptr<NdxValue<float>[]> ndx_and_value = std::make_unique<NdxValue<float>[]>(_number_items);
 
+  cerr << "Sorgint " << _header.size() << " columns and " << _number_items << " items\n";
   int number_columns = _header.size();
   for (int i = 0; i < number_columns; ++i) {
     for (int j = 0; j < _number_items; ++j) {
       ndx_and_value[j].ndx = j;
       ndx_and_value[j].value = _item[j].result(i);
+      cerr << j << " B4 sort " << _item[j].id() << '\n';
     }
 
     std::sort(ndx_and_value.get(), ndx_and_value.get() + _number_items,
                         [](const NdxValue<float>& nv1,
                                 const NdxValue<float>& nv2) {
+                cerr << " cmp " << nv1.value << " and " << nv2.value << '\n';
                 return nv1.value < nv2.value;
               });
     AssignPercentileRanks(ndx_and_value.get(), _number_items);
     for (int j = 0; j < _number_items; ++j) {
+      cerr << "after sort " << j << ' ' << _item[j].id() << '\n';
       Item<float>& item = _item[ndx_and_value[j].ndx];
       item.AddPercentile(ndx_and_value[j].percentile);
     }
@@ -1108,8 +1169,10 @@ Evidence::WriteResults(IWString_and_File_Descriptor& output) const {
   }
   output << '\n';
 
+  cerr << "Writing " << _number_items << " items\n";
   for (int i = 0; i < _number_items; ++i) {
     MaybeWriteSmiles(_item[i].id(), output);
+    cerr << i << " id " << _item[i].id() << '\n';
 
     output << _item[i].id() << _output_separator << _item[i].activity();
 

@@ -29,9 +29,9 @@ bazel_dep(name = "highwayhash", version = "0.0.0-20240305-5ad3bf8")
 #bazel_dep(name = "fast_float", version = "6.1.6")
 
 bazel_dep(name = "google_benchmark", version = "1.9.4", repo_name="benchmark")
-bazel_dep(name = "googletest", version = "1.17.0")
+bazel_dep(name = "googletest", version = "1.17.0.bcr.2")
 bazel_dep(name = "nanobind_bazel", version = "2.8.0")
-bazel_dep(name = "onetbb", version = "2022.1.0", repo_name="onetbb")
+bazel_dep(name = "onetbb", version = "2022.2.0", repo_name="onetbb")
 bazel_dep(name = "platforms", version = "1.0.0")
 # Version 27.0 works for c++, but does not work with python 3.11
 bazel_dep(name = "protobuf", version = "33.4", repo_name="com_google_protobuf")
@@ -113,6 +113,7 @@ new_local_repository(
     name = "python",
     path = "/home/ian/.local/share/uv/python/cpython-3.13.0-linux-x86_64-gnu/include/python3.13",
     build_file_content = """
+load("@rules_cc//cc:defs.bzl", "cc_binary", "cc_proto_library", "cc_library", "cc_test")
 cc_library(
     name = "python",
     hdrs = glob(
@@ -130,6 +131,7 @@ new_local_repository(
   name = "nlopt",
   path = "/lrlhps/users/rx87690/third_party",
   build_file_content = """
+load("@rules_cc//cc:defs.bzl", "cc_binary", "cc_proto_library", "cc_library", "cc_test")
 cc_library(
   name = "nlopt",
   hdrs = [

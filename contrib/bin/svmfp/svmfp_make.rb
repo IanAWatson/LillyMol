@@ -18,8 +18,9 @@ def usage(retcod)
   $stderr << " -C            classification model\n"
   $stderr << " -gfp ... -gfp fingerprint specification (to gfp_make)\n"
   $stderr << " -p <support>  support level for bit inclusion\n"
-  $stderr << " -svml ... -svml  passed directly to svm_learn\n"
+  $stderr << " -m <ram>          MB of RAM used for the cache. Default 500\n"
   $stderr << " -w <width>    svm_learn tube width (default 0.1)\n"
+  $stderr << " -svml ... -svml  passed directly to svm_learn\n"
   $stderr << " -flatten      flatten sparse fingerprint counts to 1\n"
   $stderr << " -lightgbm ... -lightgbm build a lightgbm model\n"
   $stderr << " -catboost ... -catboost build a catboost model\n"
@@ -101,6 +102,7 @@ cmdline = IWCmdline.new('-v-mdir=s-A=sfile-C-gfp=close-svml=close-p=ipos-w=fract
                         '-svm_learn=xfile-gfp_to_svm_lite=xfile-lightgbm=close-lightgbm_config=sfile' \
                         '-catboost=close' \
                         '-xgboost=close-xgboost_config=sfile-xgb_test=sfile' \
+                        '-m=ipos' \
                         '-rescore')
 if cmdline.unrecognised_options_encountered
   $stderr << "unrecognised_options_encountered\n"
@@ -153,6 +155,7 @@ svm_learn_options = if cmdline.option_present('svml')
                     end
 
 svm_learn_options = "#{svm_learn_options} -w #{cmdline.value('w')}" if cmdline.option_present('w')
+svm_learn_options = "#{svm_learn_options} -m #{cmdline.value('m')}" if cmdline.option_present('m')
 
 # the alternate model forms will be nil if not specified.
 lightgbm = cmdline.value('lightgbm')

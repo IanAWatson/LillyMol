@@ -79,6 +79,7 @@ Usage(int rc) {
   cerr << " -mdir <dir>     one or more model directories\n";
   cerr << " -cwrite ...     what to write for classification models, '-cwrite help' for info\n";
   cerr << " -sas <n>        write the score as string with <n> digits of accuracy\n";
+  cerr << " -o <char>       output separator (default space). Note that '-o tab' works\n";
   cerr << " -v              verbose output\n";
   // clang-format on
 
@@ -401,6 +402,9 @@ SvmModel::Initialise(const GfpModel::SvmfpModel& model_proto,
       cerr << "SvmModel::Initialise:cannot initialise linear scaling '" << tmp << "'\n";
       return 0;
     }
+    if (verbose) {
+      cerr << "Read linear scaling function, slope " << maybe_proto->slope() << '\n';
+    }
   }
 
   return 1;
@@ -678,7 +682,7 @@ GfpSvmfpEvaluate(const char * fname,
 
 int
 GfpSvmfpEvaluate(int argc, char** argv) {
-  Command_Line_v2 cl(argc, argv, "-v-M=sfile-cwrite=s-sas=ipos");
+  Command_Line_v2 cl(argc, argv, "-v-M=sfile-cwrite=s-sas=ipos-o=s");
   if (cl.unrecognised_options_encountered()) {
     cerr << "unrecognised_options_encountered\n";
     Usage(1);
@@ -740,6 +744,16 @@ GfpSvmfpEvaluate(int argc, char** argv) {
     cl.value("sas", npoints);
     fraction_as_string.set_leading_string(IWString(output_separator));
     fraction_as_string.initialise(-1.2, 1.2, npoints);
+  }
+
+  if (cl.option_present('o')) {
+    IWString o = cl.string_value('o');
+    constexpr int kMessage = 1;
+    if (! char_name_to_char(o, kMessage)) {
+      cerr << "Invalid output character specification -o '" << o << "'\n";
+      return 0;
+    }
+    output_separator = o[0];
   }
 
   if (cl.empty()) {

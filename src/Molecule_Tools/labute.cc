@@ -491,13 +491,13 @@ Options::CommonOutput(Molecule& m, const float* vi,
     return FingerprintOutput(m, asa, acc_charge, total_abs, max_min_distance, output);
   }
 
+  // First token of name. Perhaps this should be optional.
   const IWString& id = m.name();
-  if (id.contains(' ')) [[ unlikely ]] {
-    IWString tmp(id);
-    tmp.gsub(' ', '_');
-    output << tmp;
-  } else {
-    output << id;
+  for (char c : id) {
+    if (c == ' ') {
+      break;
+    }
+    output << c;
   }
 
   output << _output_separator << asa;

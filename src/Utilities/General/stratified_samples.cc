@@ -5,6 +5,7 @@
 #include <stdlib.h>
 
 #include <algorithm>
+#include <cctype>
 #include <memory>
 #include <random>
 
@@ -128,7 +129,7 @@ etc.
  -M <fname>     smiles file, if specified, smiles files will be generated for each split.
  -K             drop input values for which smiles not available
  -b <start>     normally files produced start with 0, start with <start> instead
- -C             produce an extra chronological split
+ -C             produce an extra chronological split - non numeric characters removed from the name.
  -v             verbose output
 )";
   // clang-format on
@@ -265,7 +266,12 @@ ID_Stratum_Selected::initialise(const const_IWSubstring& buffer)
   if (_id.numeric_value(_id_converted_to_number)) {  // great
     ;
   } else {
-    const_IWSubstring tmp(_id);
+    IWString tmp;
+    for (char c : _id) {
+      if (std::isdigit(c)) {
+        tmp << c;
+      }
+    }
     tmp.remove_leading_chars('0');
     if (!tmp.numeric_value(_id_converted_to_number)) {
       _id_converted_to_number = -1;
@@ -495,8 +501,7 @@ do_chronological_split(resizable_array_p<ID_Stratum_Selected>& idds,
 }
 
 static int
-do_chronological_split(resizable_array_p<ID_Stratum_Selected>& idds, const int ndx)
-{
+do_chronological_split(resizable_array_p<ID_Stratum_Selected>& idds, const int ndx) {
   idds.iwqsort_lambda([](const ID_Stratum_Selected* s1, const ID_Stratum_Selected* s2) {
     return s1->id_converted_to_number() < s2->id_converted_to_number();
   });

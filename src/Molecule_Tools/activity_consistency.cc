@@ -66,6 +66,7 @@ static int take_first_of_multi_valued_data = 0;
 static int take_average_of_multi_valued_data = 0;
 static int take_max_of_multi_valued_data = 0;
 static int take_min_of_multi_valued_data = 0;
+static int take_geometric_mean_of_multi_values_data = 0;
 static int vote_for_multi_valued_data = 0;  // not implemented
 static int remove_multi_valued_data = 0;
 static int make_replicate_molecules_of_multi_valued_data = 0;
@@ -1541,7 +1542,7 @@ min_val(const resizable_array<MaybeQualified>& v) {
 
 static void
 update_global_accumulators(const resizable_array<MaybeQualified>& v, Accumulator<float>& acc_diff,
-                           int& number_zero_differences, const float arange) {
+                           int& number_zero_differences, const float arange, double& product) {
   // const auto ave = average(v);
 
   const uint32_t n = v.size();
@@ -1556,11 +1557,10 @@ update_global_accumulators(const resizable_array<MaybeQualified>& v, Accumulator
         number_zero_differences++;
       } else {
         acc_diff.extra(d);
+        product *= vi;
       }
     }
   }
-
-  return;
 }
 
 static int
@@ -1629,6 +1629,8 @@ handle_multi_valued_activities(ID_to_Activity& id_to_activity) {
   Accumulator<float> acc_diff;
   int zero_diff = 0;
 
+  double product = 0.0;
+
   for (auto iter : id_to_activity) {
     auto* acc = iter.second;
 
@@ -1636,7 +1638,7 @@ handle_multi_valued_activities(ID_to_Activity& id_to_activity) {
       continue;
     }
 
-    update_global_accumulators(*acc, acc_diff, zero_diff, max_activity - min_activity);
+    update_global_accumulators(*acc, acc_diff, zero_diff, max_activity - min_activity, product);
 
     if (stream_for_multi_valued_data.is_open()) {
       write_multi_valued_information(iter.first, *acc, stream_for_multi_valued_data);
@@ -1658,6 +1660,11 @@ handle_multi_valued_activities(ID_to_Activity& id_to_activity) {
       std::uniform_real_distribution<double> u(min_val(*acc), max_val(*acc));
       acc->resize_keep_storage(0);
       acc->add(MaybeQualified(0, u(rng)));
+    } else if (take_geometric_mean_of_multi_values_data) {
+      uint32_t n = acc->size();
+      acc->resize_keep_storage(0);
+      acc->add(MaybeQualified(0, product / n));
+      // todo:ianwatson implement this.
     } else if (vote_for_multi_valued_data) {
       if (min_val(*acc) != max_val(*acc)) {
         acc->resize_keep_storage(0);
@@ -2111,6 +2118,8 @@ activity_consistency(int argc, char** argv) {
         ;
       } else if (take_min_of_multi_valued_data) {
         ;
+      } else if (take_geometric_mean_of_multi_values_data) {
+        ;
       } else if (take_average_of_multi_valued_data) {
         ;
       } else if (take_first_of_multi_valued_data) {  // will not happen here
@@ -2339,6 +2348,12 @@ activity_consistency(int argc, char** argv) {
           cerr << "Will take the smallest activity value of a multi-structure group\n";
         }
         write_specifications++;
+      } else if (m == "geom") {
+        take_geometric_mean_of_multi_values_data = 1;
+        if (verbose) {
+          cerr << "Will take the geometric mean activity value of a multi-structure group\n";
+        }
+        ++write_specifications;
       } else if ("rmdup" == m || "rm" == m) {
         remove_multi_valued_data = 1;
 
@@ -2381,6 +2396,7 @@ activity_consistency(int argc, char** argv) {
     if (class_name_to_number.size() > 0) {
       take_max_of_multi_valued_data = 0;
       take_min_of_multi_valued_data = 0;
+      take_geometric_mean_of_multi_values_data = 0;
       vote_for_multi_valued_data = 1;
     }
   }

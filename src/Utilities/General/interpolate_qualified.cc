@@ -262,6 +262,10 @@ class Data {
 
     Accumulator<double> _acc_activity;
 
+    // When predictions are made, we can optionally truncate those values to
+    // the observed range of values. Probably a good idea.
+    int _truncate_predicted_values_to_experimental_range;
+
     // As we load the _x and _y arrays, this is the number of values for
     // in the training set.
     int _training_set_size;
@@ -312,6 +316,7 @@ class Data {
     BoosterHandle CreateBooster(DMatrixHandle dmats[]);
 
     int UnconsiderAtExtrema();
+    float MaybeTruncateToRange(float v) const;
 
     int GetNextBatch();
     int GetNextRandomBatch();
@@ -352,6 +357,7 @@ Data::Data() {
   _x = nullptr;
   _y = nullptr;
   _xtest = nullptr;
+  _truncate_predicted_values_to_experimental_range = 0;
   _num_iterations = 500;
   _stem = "/tmp/intplq";
   _add_initial_expt = 0;
@@ -482,6 +488,13 @@ Data::Initialise(Command_Line_v2& cl) {
 
   for (uint32_t i = 0; i < _activity.size(); ++i) {
     _activity[i]->CopyX(_x + i * _ncols, _ncols);
+  }
+
+  if (cl.option_present("trunc")) {
+    _truncate_predicted_values_to_experimental_range = 1;
+    if (_verbose) {
+      cerr << "Interpolated values will be truncated to the experimental range\n";
+    }
   }
 
   if (cl.option_present("batch")) {
@@ -1216,6 +1229,23 @@ Data::GeneratePredictions(DMatrixHandle& training_data, DMatrixHandle& test_data
   return 1;
 }
 
+float
+Data::MaybeTruncateToRange(float v) const {
+  if (! _truncate_predicted_values_to_experimental_range) {
+    return v;
+  }
+
+  if (v < _acc_activity.minval()) {
+    return _acc_activity.minval();
+  }
+
+  if (v > _acc_activity.maxval()) {
+    return _acc_activity.maxval();
+  }
+
+  return v;
+}
+
 int
 Data::UpdatePredictions(uint64_t const* out_shape, uint64_t out_dim, const float* out_result) {
   // cerr << "UpdatePredictions out_dim " << out_dim << " shape " << *out_shape << '\n';
@@ -1225,7 +1255,7 @@ Data::UpdatePredictions(uint64_t const* out_shape, uint64_t out_dim, const float
 
   for (uint64_t i = 0; i < *out_shape; ++i) {
     float expt = _qualified_activity[i]->InitialActivity();
-    float pred = out_result[i];
+    float pred = MaybeTruncateToRange(out_result[i]);
     acc_pred.extra(pred);
     // cerr << "  i " << i << ' ' << _qualified_activity[i]->id() << " expt " << expt << " pred " << pred << '\n';
     diffs.extra(std::abs(expt - pred));
@@ -1309,7 +1339,11 @@ imputed value is used.
  -Y <fname>             Activity file.
  -i <sep>               Input file separator, default ' '.
  -b                     Ignore activity values (Y) with no descriptors (X).
+ -batch <size>          Number of qualified values per batch.
+ -rand                  Form batches randomly - rather than sequentially.
+ -trunc                 Truncate any predicted value to the range of experimental values.
  -S <stem>              Write updated activity file to <stem>.activity.
+ -initial               Also write the initial (qualified) values to the output file.
  -v                     Verbose output.
 )";
 
@@ -1318,7 +1352,7 @@ imputed value is used.
 
 int
 Main(int argc, char** argv) {
-  Command_Line_v2 cl(argc, argv, "-v-X=sfile-Y=sfile-i=s-batch=ipos-h=int-b-xgboost=sfile-S=s-initial-rand");
+  Command_Line_v2 cl(argc, argv, "-v-X=sfile-Y=sfile-i=s-batch=ipos-h=int-b-xgboost=sfile-S=s-initial-rand-trunc");
   if (cl.unrecognised_options_encountered()) {
     cerr << "unknown_options_encountered\n";
     Usage(1);

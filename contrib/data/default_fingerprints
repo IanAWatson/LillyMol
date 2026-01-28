@@ -1,0 +1,14 @@
+-ECC3
+-ECC3 -ecbig
+-EC3:T -ecbig
+-EC3:AY -ecbig
+-MAPTT8
+-MAP10:AY2
+-ECC3 -ecbig -ALOGP
+-ECC3 -ecbig -ALOGP20
+-ECC3 -ecbig -XLOGP
+-ECC3 -ecbig -XLOGP20
+-ECC3 -ecbig -ALOGP -RS
+-ECC3 -ecbig -ALOGP -CATS12
+-ECC3 -ecbig -ALOGP -CATS12
+-ECC3 -ecbig -ALOGP -CATSP12 -RS

@@ -135,6 +135,9 @@ The following descriptors are computed.
 | lflxchn | the longest flexible chain in the molecule |
 | fnflxchn | fraction of non-ring atoms that are in flexible chains |
 | rkentrpy | entropic measure of flexibility - defined by radha |
+| nsatchain | number of fully saturated chain regions |
+| mxsatchain | number of atoms in the largest saturated chain region |
+| fsatchain | fraction of atoms in saturated chain regions |
 | spchtro | number of heteroatoms in the spinach |
 | nrnspch | number of non-ring non-spinach atoms. chain atoms joining rings |
 | fnrnspc | fraction of non-spinach atoms that are non-ring |
@@ -396,3 +399,12 @@ iwdescr.sh -G w_natoms:10 -G w_nrings:20 ...
 ```
 which will produce a fingerprint based on two of the features computed. This is
 also available in `gfp_make` via the `-W` option.
+
+## Other options
+Note that some of these options will be applied by default in the shell wrapper, 'iwdescr.sh'.
+
+The -S option performs the Novartis Topological Polar Surface Area computation in ways that
+best replicate the implementation in RDKit. This is more expensive.
+
+The -b option enables some distance matrix based Hydrogen Bonding features. This should be made
+part of the -O option discussed above.

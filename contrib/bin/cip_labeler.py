@@ -1,3 +1,4 @@
+#!/usr/bin/env python
 # Label stereo centres with rdCIPLabeler
 # R and S sites are assigned an isotopic label according to R or S.
 

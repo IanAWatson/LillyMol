@@ -210,6 +210,8 @@ my $join_existing_file = "";
 my $chirality_fingerprint_opts = "";
 my $chirality_fingerprint_default_options = "-e 5 -r 2 -y 1 -M fpnochiral";
 
+my $cip = "";
+
 my $seek_to = 0;
 my $stop_at = 0;
 
@@ -309,6 +311,7 @@ sub usage
   print STDERR " -JOIN <fname>  use tdt_join to merge in the contents of an existing .gfp file\n" if ($expert);
   print STDERR " -CHIRAL ... -CHIRAL  chirality fingerprint, use -CHIRAL DEF -CHIRAL for default '$chirality_fingerprint_default_options'.\n" if $expert;
   print STDERR "                Options between -CHIRAL flags are passed to chirality_fingerprint.sh\n" if $expert;
+  print STDERR " -CIP <rad>     Use RDKit to apply R/S labels and generate EC type fingerrpint to radius <rad>\n" if $expert;
   print STDERR " -bindir <dir>  search in <dir> for binaries\n" if ($expert);
   print STDERR " -flush         flush after each molecule\n" if ($expert);
   print STDERR " -i <qualifier> input qualifiers to the first pipe stage\n" if ($expert);
@@ -1861,6 +1864,11 @@ OPTION: while ($argptr < @ARGV)
     $chirality_fingerprint_opts =~ s/^ *//;  # no leading spaces
     $fingerprints_specified++;
   }
+  elsif ($opt eq "-CIP")
+  {
+    $cip = $ARGV[$argptr++];
+    $fingerprints_specified++;
+  }
   elsif ($opt =~ /^-seek=(\d+)/)
   {
     $seek_to = $1;
@@ -1883,6 +1891,8 @@ OPTION: while ($argptr < @ARGV)
 $fingerprints_specified++ if length($reactions);
 
 $fingerprints_specified++ if (@EZ);
+
+print STDERR "${fingerprints_specified} fingerprints_specified\n";
 
 #print STDERR "extra iwfp options '$extra_iwfp_options'\n" if ($verbose);
 
@@ -3524,6 +3534,18 @@ if (length($chirality_fingerprint_opts) > 0)
   $chirality_fingerprint_pipe = "${chirality_fingerprint_exe} -f -";
 }
 
+my $cip_fingerprint_first = "false";  # Do not allow this, too complicated.
+my $cip_fingerprint_pipe;
+
+if (length($cip) > 0) 
+{
+  my $iwecfp = find_executable('iwecfp');
+  $cip_fingerprint_pipe = "cip_labeler.py -R 8 -S 9 -f - |" .+
+                         "${iwecfp} -Y pchiral -g all -R ${cip} -J NCPCH -P UST:ARY -m -q PROTO:$ENV{LILLYMOL_HOME}/data/queries/89.qry -f -";
+}
+
+print STDERR "${cip_fingerprint_pipe} cip_fingerprint_pipe\n";
+
 my $first = 1;
 
 # Build the command once and then substitute the actual file name
@@ -4338,6 +4360,20 @@ while ($fingerprints_specified > 0)
       $cmd .= "|${chirality_fingerprint_pipe}";
     }
     $chirality_fingerprint_first = "";
+    $fingerprints_specified--;
+  }
+  elsif (length($cip_fingerprint_pipe) > 0)
+  {
+    if ($first)
+    {
+      print STDERR "Sorry, -CIP fingerprint cannot be the only fingerprint\n";
+      exit 2;
+    }
+    else
+    {
+      $cmd .= "|${cip_fingerprint_pipe}";
+    }
+    $cip_fingerprint_pipe = "";
     $fingerprints_specified--;
   }
   elsif ($user_insert)

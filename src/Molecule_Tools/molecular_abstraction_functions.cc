@@ -1166,6 +1166,10 @@ Molecular_Abstraction_CScaffold::build(const Molecular_Abstraction_Directives_No
     }
   }
 
+  if (_isotope) {
+    _keep_attached_heteroatom = 1;
+  }
+
   return 1;
 }
 

@@ -19,8 +19,7 @@
 #include "google/protobuf/io/zero_copy_stream_impl.h"
 #include "google/protobuf/text_format.h"
 
-#include "highwayhash/highwayhash_target.h"
-#include "highwayhash/instruction_sets.h"
+#include "xxhash.h"
 
 #define RESIZABLE_ARRAY_IMPLEMENTATION 1
 #define IWQSORT_FO_IMPLEMENTATION
@@ -2430,25 +2429,17 @@ Dicer_Arguments::MaybeAddToHash(const IWString& smiles) {
 
 // We are using hashed smiles as bit numbers, so a lot of the global hashes
 // do not need to be updated.
-// Note that we do a very bad thing by taking the first 32 bits of the
-// highwayhash result. That is always a bad idea, but it is expected to be
-// OK for this use.
 int
 Dicer_Arguments::MaybeAddToSmilesHash(const IWString& smiles) {
-  using highwayhash::HHKey;
-  using highwayhash::HighwayHash;
-  using highwayhash::InstructionSets;
 
-  HH_ALIGNAS(32) const HHKey key = {55, 66, 77, 88};
-  highwayhash::HHResult64 result;
-  InstructionSets::Run<HighwayHash>(key, smiles.data(), smiles.length(), &result);
+  static constexpr uint32_t kSeed = 3177520567;
 
-  // Improper treatment of hash result;
-  const uint32_t* h = reinterpret_cast<const uint32_t*>(&result);
+  const XXH32_hash_t h = XXH32(smiles.data(), smiles.length(), kSeed);
+  // cerr << smiles << " hash " << h << '\n';
 
-  auto iter = _fragments_found_this_molecule.find(*h);
+  auto iter = _fragments_found_this_molecule.find(h);
   if (iter == _fragments_found_this_molecule.end()) {
-    _fragments_found_this_molecule[*h] = 1;
+    _fragments_found_this_molecule[h] = 1;
   } else {
     ++iter->second;
   }

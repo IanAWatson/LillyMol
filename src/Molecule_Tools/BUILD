@@ -638,7 +638,7 @@ cc_binary(
         "//Molecule_Lib:moleculeio",
         "//Molecule_Lib:substructure_cc_proto",
         "@com_google_protobuf//:protobuf",
-        "@highwayhash",
+        "@xxhash",
     ],
 )
 

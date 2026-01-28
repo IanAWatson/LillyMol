@@ -43,7 +43,7 @@ def get_pre_split(train_stem, test_stem)
       train_files << train_smi
       test_files << test_smi
       next
-    elif ndx == 0
+    elsif ndx == 0
       # Ok to miss index 0, maybe the numbering sequence starts with 1
     else
       return train_files, test_files
@@ -148,7 +148,7 @@ def model_tuning
   else
     if cl.option_present('nsplit')
       nsplit = cl.value('nsplit')
-    elif cl.option_present('niter')
+    elsif cl.option_present('niter')
       nsplit = cl.value('niter')
     else
       nsplit = 10

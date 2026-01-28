@@ -1892,7 +1892,7 @@ $fingerprints_specified++ if length($reactions);
 
 $fingerprints_specified++ if (@EZ);
 
-print STDERR "${fingerprints_specified} fingerprints_specified\n";
+# print STDERR "${fingerprints_specified} fingerprints_specified\n";
 
 #print STDERR "extra iwfp options '$extra_iwfp_options'\n" if ($verbose);
 
@@ -3543,8 +3543,6 @@ if (length($cip) > 0)
   $cip_fingerprint_pipe = "cip_labeler.py -R 8 -S 9 -f - |" .+
                          "${iwecfp} -Y pchiral -g all -R ${cip} -J NCPCH -P UST:ARY -m -q PROTO:$ENV{LILLYMOL_HOME}/data/queries/89.qry -f -";
 }
-
-print STDERR "${cip_fingerprint_pipe} cip_fingerprint_pipe\n";
 
 my $first = 1;
 

@@ -209,6 +209,23 @@ class Molecular_Abstraction_Scaffold : public Molecular_Abstraction_Base_Class {
   int process(Molecule_With_Info_About_Parent&, IWString_and_File_Descriptor&);
 };
 
+class Molecular_Abstraction_CScaffold : public Molecular_Abstraction_Base_Class {
+  int _keep_attached_heteroatom;
+
+ private:
+  //  private function
+    int ExtendCarbonFromScaffold(Molecule& m, atom_number_t prev, atom_number_t zatom, int* spinach);
+
+ public:
+  Molecular_Abstraction_CScaffold();
+
+  int debug_print(std::ostream&) const;
+
+  int build(const Molecular_Abstraction_Directives_Node&);
+
+  int process(Molecule_With_Info_About_Parent&, IWString_and_File_Descriptor&);
+};
+
 class Molecular_Abstraction_Change_Bond_Type : public Molecular_Abstraction_Base_Class {
  private:
   Single_Substructure_Query _smarts;

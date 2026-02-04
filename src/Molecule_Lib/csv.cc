@@ -112,7 +112,7 @@ Molecule::read_molecule_csv_ds(iwstring_data_source & input) {
   const_IWSubstring token;
   const_IWSubstring smi;
   int i = 0;
-  for (int col = 0; buffer.nextword(token, i, lillymol_csv::csv_separator); ++col) {
+  for (int col = 0; buffer.nextword_single_delimiter(token, i, lillymol_csv::csv_separator); ++col) {
     if (col == lillymol_csv::smiles_column) {
       smi = token;
       if (_molecule_name.length() > 0 && ! lillymol_csv::all_tokens_to_name) {

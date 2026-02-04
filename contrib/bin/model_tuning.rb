@@ -4,7 +4,9 @@
 
 require_relative 'lib/iwcmdline.rb'
 
-def usage
+def usage(cl)
+  expert = cl.option_present('expert')
+
   $stderr << "Build svmfp models with different fingerprints\n"
   $stderr << " -A <fname>           activity file.\n"
   $stderr << " -trpct <pct>         percent of dataset to use for training\n"
@@ -13,7 +15,9 @@ def usage
   $stderr << " -nsplit <nsplit>     number of splits to create\n"
   $stderr << " -keep_models         do NOT remove model directories\n"
   $stderr << " -chrono              make an extra chronological split - uses numeric values in ids\n"
-  $stderr << " -svml ... -svml      passed to svmfp_make\n"
+  $stderr << " -iwstats ... -iwstats passed to iwstats\n" if expert
+  $stderr << " -svml ... -svml      passed to svmfp_make\n" if expert
+  $stderr << " -expert              more options\n" unless expert
   $stderr << " -v                   verbose output\n"
 
   exit(1)
@@ -78,19 +82,19 @@ end
 def model_tuning
   cl = IWCmdline.new('-v-trpct=ipos-nsplit=ipos-niter=ipos-A=sfile-fp=sfile-fpextra=s' +
                      '-catboost=close-xgboost=close-lightgbm=close-lightgbm_config=sfile' +
-                     '-dfile=sfile-ps-chrono' +
+                     '-dfile=sfile-ps-chrono-iwstats=close-expert' +
                      '-i=ipos-svml=close-keep_models')
 
   if cl.unrecognised_options_encountered
     $stderr << "unrecognised_options_encountered\n"
-    usage
+    usage(cl)
   end
 
   verbose = cl.option_present('v')
 
   if ARGV.empty?
     $stderr << "Must specify smiles file\n"
-    usage
+    usage(cl)
   end
 
   smiles = ARGV[0]
@@ -101,7 +105,7 @@ def model_tuning
     x = cl.value('trpct')
     if x < 0 || x > 100
       $stderr << "The training percent (-trpct) option must be a valid percent\n"
-      usage
+      usage(cl)
     end
   end
   prefix = "A#{trpct}"
@@ -114,13 +118,18 @@ def model_tuning
   catboost = cl.values('catboost')
   xgboost = cl.values('xgboost')
 
-  if ! cl.option_present('fp')
-    $stderr << "Must specify file of fingerprints via the -fp option\n"
-    usage
+  fingerprint_files = []
+  if cl.option_present('fp')
+    fingerprint_files = cl.values('fp')
+  else
+    lillymol_home = ENV['LILLYMOL_HOME']
+    fp = File.join(lillymol_home, 'contrib', 'data', 'default_fingerprints')
+    raise "Missing or empty default_fingerprints #{fp}" unless File.size?(fp) > 0
+    fingerprint_files << fp
   end
 
   fingerprints = []
-  cl.values('fp').each do |fname|
+  fingerprint_files.each do |fname|
     fingerprints.push(*File.readlines(fname).map { |fp| fp.chomp})
   end
 
@@ -133,7 +142,7 @@ def model_tuning
 
   unless cl.option_present('A')
     $stderr << "Must specify activity file via the -A option\n"
-    usage
+    usage(cl)
   end
 
   activity_fname = cl.value('A')
@@ -193,6 +202,7 @@ def model_tuning
     iwstats = 'confusion_matrix.rb'
   else
     iwstats = "iwstats -w -Y allequals -p 2 -E #{activity_fname}"
+    iwstats << ' ' << cl.value('iwstats') if cl.option_present('iwstats')
   end
 
   svmfp_make = "time svmfp_make.sh -A #{activity_fname}"

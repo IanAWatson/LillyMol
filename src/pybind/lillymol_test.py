@@ -950,6 +950,12 @@ class TestLillyMol(absltest.TestCase):
     self.assertNotEqual(usmi, m.unique_smiles())
     self.assertFalse('@' in m.unique_smiles())
 
+  def test_revert_all_directional_bonds_to_non_directional(self):
+    m = Molecule()
+    self.assertTrue(m.build_from_smiles(r"C\C=C\F"))
+    m.revert_all_directional_bonds_to_non_directional()
+    self.assertEqual(m.smiles(), "CC=CF")
+
   def test_iterate_chiral_centres(self):
     m = Molecule();
     self.assertTrue(m.build_from_smiles("O[C@H]1[C@@H](O)C[C@@H](N)[C@H]1O CHEMBL268037"))

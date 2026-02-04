@@ -107,6 +107,8 @@ static int write_random_value_from_range_of_each_group = 0;
 
 static Elements_to_Remove elements_to_remove;
 
+static int ignore_no_activity = 0;
+
 struct MaybeQualified {
  public:
   int qualifier;
@@ -254,6 +256,7 @@ usage(int rc) {
   cerr << "  -b <natoms>   lower atom count cutoff\n";
   cerr << "  -B <natoms>   lower atom count cutoff\n";
   cerr << "  -z            remove leading 0's from identifiers\n";
+  cerr << "  -Y ...        other options, enter '-Y help' for info\n";
   cerr << "  -l            reduce to largest fragment\n";
   cerr << "  -i <type>     input specification\n";
   cerr << "  -g ...        chemical standardisation options\n";
@@ -1207,7 +1210,7 @@ group_molecules(Molecule& m, const ID_to_Activity& id_to_activity,
 
   if (!fetch_activity(id_to_activity, mname, activity)) {
     cerr << "No activity data for '" << mname << "'\n";
-    return 0;
+    return ignore_no_activity;
   }
 
   mname.truncate_at_first(' ');
@@ -1868,8 +1871,16 @@ FreeMemory(ID_to_Activity& id_to_activity,
 }
 
 static int
+DisplayDashYOption(int rc) {
+  cerr << "The following -Y qualifiers are recognised\n";
+  cerr << " -Y ignore_no_activity         discard smiles with no activity data - otherwise fatal\n";
+
+  ::exit(rc);
+}
+
+static int
 activity_consistency(int argc, char** argv) {
-  Command_Line cl(argc, argv, "vA:E:i:g:lX:caT:szmN:O:t:rxM:V:e:K:W:U:b:B:");
+  Command_Line cl(argc, argv, "vA:E:i:g:lX:caT:szmN:O:t:rxM:V:e:K:W:U:b:B:Y:");
 
   if (cl.unrecognised_options_encountered()) {
     cerr << "Unrecognised options encountered\n";
@@ -1954,6 +1965,23 @@ activity_consistency(int argc, char** argv) {
 
     if (verbose) {
       cerr << "Will compare molecules in their graph form\n";
+    }
+  }
+
+  if (cl.option_present('Y')) {
+    IWString y;
+    for (int i = 0; cl.value('Y', y, i); ++i) {
+      if (y == "ignore_no_activity") {
+        ignore_no_activity = 1;
+        if (verbose) {
+          cerr << "Will ignore missing activity values\n";
+        }
+      } else if (y == "help") {
+        DisplayDashYOption(0);
+      } else {
+        cerr << "Unrecognised -Y qualifier '" << y << "'\n";
+        DisplayDashYOption(1);
+      }
     }
   }
 

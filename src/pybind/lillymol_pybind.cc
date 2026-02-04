@@ -771,6 +771,7 @@ PYBIND11_MODULE(lillymol, m)
                   py::return_value_policy::copy,
                   "List of chiral centres"
                 )
+                .def("revert_all_directional_bonds_to_non_directional", &Molecule::revert_all_directional_bonds_to_non_directional, "remove bond directionality (cis/trans)")
                 .def("bonds",
                   [](const Molecule& m)->std::vector<const Bond*>{
                     std::vector<const Bond*> result;

@@ -1102,6 +1102,8 @@ iwecfp(Molecule& m, IWString_and_File_Descriptor& output)
       smarts_for_centre_of_shell = m.smarts_equivalent_for_atom(i);
       centre_of_shell = i;
       centre_atom_isotope = m.isotope(i);
+    } else {
+      centre_atom_isotope = 0;
     }
 
     if (0 == min_shell_radius) {

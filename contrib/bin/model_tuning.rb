@@ -12,6 +12,7 @@ def usage
   $stderr << " -fpextra <fp>        duplicate the fingerprint array and add <fp> to each\n"
   $stderr << " -nsplit <nsplit>     number of splits to create\n"
   $stderr << " -keep_models         do NOT remove model directories\n"
+  $stderr << " -chrono              make an extra chronological split - uses numeric values in ids\n"
   $stderr << " -svml ... -svml      passed to svmfp_make\n"
   $stderr << " -v                   verbose output\n"
 
@@ -77,7 +78,7 @@ end
 def model_tuning
   cl = IWCmdline.new('-v-trpct=ipos-nsplit=ipos-niter=ipos-A=sfile-fp=sfile-fpextra=s' +
                      '-catboost=close-xgboost=close-lightgbm=close-lightgbm_config=sfile' +
-                     '-dfile=sfile-ps' +
+                     '-dfile=sfile-ps-chrono' +
                      '-i=ipos-svml=close-keep_models')
 
   if cl.unrecognised_options_encountered
@@ -154,7 +155,11 @@ def model_tuning
       nsplit = 10
     end
 
-    cmd = "stratified_samples -s 1 -N #{nsplit} -p #{trpct} -R #{train_stem} -E #{test_stem} -M #{smiles} #{activity_fname}"
+    cmd = "stratified_samples -s 1 -N #{nsplit} -p #{trpct} -R #{train_stem} -E #{test_stem} -M #{smiles}"
+    if cl.option_present('chrono')
+      cmd << ' -C'
+    end
+    cmd << " #{activity_fname}"
     execute_cmd(cmd, verbose, ["#{train_stem}0.smi", "#{test_stem}0.smi"])
     train_files = (0..nsplit).map { |i| "#{train_stem}#{i}.smi"}
     test_files = (0..nsplit).map { |i| "#{test_stem}#{i}.smi"}

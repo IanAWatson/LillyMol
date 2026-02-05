@@ -489,13 +489,12 @@ do_chronological_split(resizable_array_p<ID_Stratum_Selected>& idds,
 {
   const int n = idds.number_elements();
 
-  const int ntrain = n - records_to_select;
-  for (int i = 0; i < ntrain; ++i) {
+  for (int i = 0; i < records_to_select; ++i) {
     idds[i]->do_write(training_set_output);
   }
 
   if (test_set_output.is_open()) {
-    for (int i = ntrain; i < n; ++i) {
+    for (int i = records_to_select; i < n; ++i) {
       idds[i]->do_write(test_set_output);
     }
   }
@@ -504,9 +503,30 @@ do_chronological_split(resizable_array_p<ID_Stratum_Selected>& idds,
 }
 
 static int
+write_smiles(const resizable_array_p<ID_Stratum_Selected>& idds,
+             int istart, int istop,
+             IWString_and_File_Descriptor& output) {
+  for (int i = istart; i < istop; ++i) {
+    const auto f = id_to_smiles.find(idds[i]->id());
+
+    output << f->second << ' ' << f->first << '\n';
+
+    output.write_if_buffer_holds_more_than(4096);
+  }
+
+  return 1;
+}
+
+static int
 do_chronological_split(resizable_array_p<ID_Stratum_Selected>& idds, const int ndx) {
   idds.iwqsort_lambda([](const ID_Stratum_Selected* s1, const ID_Stratum_Selected* s2) {
-    return s1->id_converted_to_number() < s2->id_converted_to_number();
+    if (s1->id_converted_to_number() < s2->id_converted_to_number()) {
+      return -1;
+    } else if (s1->id_converted_to_number() > s2->id_converted_to_number()) {
+      return 1;
+    } else {
+      return 0;
+    }
   });
 
   IWString fname;
@@ -528,7 +548,34 @@ do_chronological_split(resizable_array_p<ID_Stratum_Selected>& idds, const int n
     }
   }
 
-  return do_chronological_split(idds, training_set_output, test_set_output);
+  do_chronological_split(idds, training_set_output, test_set_output);
+
+  if (id_to_smiles.empty()) {
+    return 1;
+  }
+
+  fname = stem_for_training_set;
+  fname << ndx << ".smi";
+  IWString_and_File_Descriptor train_set_smiles;
+  if (! train_set_smiles.open(fname.c_str())) {
+    cerr << "Cannot open chronological training set output '" << fname << "'\n";
+    return 0;
+  }
+  write_smiles(idds, 0, records_to_select, train_set_smiles);
+  
+  if (stem_for_test_set.empty()) {
+    return 1;
+  }
+
+  fname = stem_for_test_set;
+  fname << ndx << ".smi";
+  IWString_and_File_Descriptor test_set_smiles;
+  if (! test_set_smiles.open(fname)) {
+    cerr << "Cannot open chronological set output '" << fname << "'\n";
+    return 0;
+  }
+  
+  return write_smiles(idds, records_to_select, idds.number_elements(), test_set_smiles);
 }
 
 static int

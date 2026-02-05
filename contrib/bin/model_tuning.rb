@@ -11,7 +11,7 @@ def usage(cl)
   $stderr << " -A <fname>           activity file.\n"
   $stderr << " -trpct <pct>         percent of dataset to use for training\n"
   $stderr << " -fp <fname>          file of fingerprints to try\n"
-  $stderr << " -fpextra <fp>        duplicate the fingerprint array and add <fp> to each\n"
+  $stderr << " -fpextra <fp> -fpextra   duplicate the fingerprint array and add <fp> to each\n"
   $stderr << " -nsplit <nsplit>     number of splits to create\n"
   $stderr << " -keep_models         do NOT remove model directories\n"
   $stderr << " -chrono              make an extra chronological split - uses numeric values in ids\n"
@@ -80,7 +80,7 @@ def fetch_split_descriptor_files(train_smiles, test_smiles, haystack, verbose)
 end
 
 def model_tuning
-  cl = IWCmdline.new('-v-trpct=ipos-nsplit=ipos-niter=ipos-A=sfile-fp=sfile-fpextra=s' +
+  cl = IWCmdline.new('-v-trpct=ipos-nsplit=ipos-niter=ipos-A=sfile-fp=sfile-fpextra=close' +
                      '-catboost=close-xgboost=close-lightgbm=close-lightgbm_config=sfile' +
                      '-dfile=sfile-ps-chrono-iwstats=close-expert' +
                      '-i=ipos-svml=close-keep_models')

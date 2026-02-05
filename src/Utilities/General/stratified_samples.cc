@@ -6,6 +6,7 @@
 
 #include <algorithm>
 #include <cctype>
+#include <cstdint>
 #include <memory>
 #include <random>
 
@@ -156,7 +157,9 @@ class ID_Stratum_Selected
 
   int _times_selected_across_splits;
 
-  int _id_converted_to_number;
+  // We could make this unsigned. The comparison with -1 would still be OK,
+  // just a very unlikely collision. Or we could make it std::optional<uint64_t>.
+  int64_t _id_converted_to_number;
 
  public:
   ID_Stratum_Selected();
@@ -214,7 +217,7 @@ class ID_Stratum_Selected
   int
   do_write(IWString_and_File_Descriptor&) const;
 
-  int
+  int64_t
   id_converted_to_number() const
   {
     return _id_converted_to_number;

@@ -796,8 +796,9 @@ PYBIND11_MODULE(lillymol, m)
                   [](Molecule& m) {
                     return m.transform_to_non_isotopic_form();
                   },
-                  "Remove isotopes"
+                  "Convert isotopes to non isotopic")
                 )
+                .def("transform_to_non_isotopic_form", &Molecule::transform_to_non_isotopic_form, "Convert isotopes to non isotopic")
                 .def("isotope", &Molecule::isotope, "Isotope on atom")
                 .def("set_isotope", 
                   [](Molecule& m, atom_number_t zatom, isotope_t iso) {

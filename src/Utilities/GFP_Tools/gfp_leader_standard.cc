@@ -579,6 +579,9 @@ gfp_leader_standard(int argc, char ** argv)
     }
 
     omp_set_num_threads(h);
+    if (verbose) {
+      cerr << "Running with " << h << " threads\n";
+    }
   }
 
   if (cl.option_present('A'))

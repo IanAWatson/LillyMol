@@ -2787,6 +2787,13 @@ identify_the_one_still_active(const int* score, atom_number_t& n0, atom_number_t
   return 1;
 }
 
+// We are starting with a  
+static int
+resolve_by_shell_expansion(const Molecule& m, atom_number_t& n1, atom_number_t& n2,
+                           const atom_number_t carbon,
+                           IWStandard_Current_Molecule& current_molecule_data) {
+}
+
 /*
   Kind of like what we do in path_scoring, but we do not look at the bond types
 */
@@ -2819,9 +2826,9 @@ resolve_by_shell_expansion(const Molecule& m, atom_number_t& n1, atom_number_t& 
   cerr << " starting molecule\n";
 #endif
 
-  Set_of_Atoms e1[3],
-      e2[3];  // edge atoms for each iteration. We keep two sets and alternate between
-              // them - using one as current and the other as next
+  // edge atoms for each iteration. We keep two sets and alternate between
+  // them - using one as current and the other as next
+  Set_of_Atoms e1[3], e2[3];
 
   int score[3];
   for (int i = 0; i < 3; ++i) {
@@ -2934,7 +2941,7 @@ CollectAttachedNitrogenAtoms( Molecule& m, const atom_number_t carbon,
   }
 
   // cerr << "CollectAttachedNitrogenAtoms n1 " << n1 << " n2 " << n2 << " doubly_bonded_n " << doubly_bonded_n << '\n';
-  if (n1 == kInvalidAtomNumber || n2 == kInvalidAtomNumber ||
+  if (n2 == kInvalidAtomNumber || n1 == kInvalidAtomNumber ||
       kInvalidAtomNumber == doubly_bonded_n) {
     return 0;
   }
@@ -3082,7 +3089,6 @@ Chemical_Standardisation::_do_transform_guanidine(
 
   int ng = g.number_elements();
 
-// #define DEBUG_DO_TRANSFORM_GUANIDINE
 #ifdef DEBUG_DO_TRANSFORM_GUANIDINE
   cerr << "Transforming guanidine, ng " << ng << '\n';
   cerr << m.smiles() << ' ' << m.name() << '\n';
@@ -3145,7 +3151,20 @@ Chemical_Standardisation::_do_transform_guanidine(
     if (ncon[doubly_bonded_n] == 1) [[unlikely]] {  // should not happen, removed above.
       continue; // correct as is.
     } 
-    
+
+    // Cannot change anything.
+    if (ncon[first_nh] == 3 && ncon[second_nh] == 3) {
+      continue;
+    }
+
+    // things like CNC(N(C)C)=NC 
+    // If only one of these N atoms was doubly connected, we could theoretically
+    // resolve the other two.
+    // TODO:ianwatson investigate.
+    if (ncon[first_nh] == 3 || ncon[second_nh] == 3) {
+      continue;
+    }
+
     ResolveGuanidineByConnectivity(m, c, first_nh, second_nh, doubly_bonded_n, current_molecule_data);
 
     m.set_bond_type_between_atoms(c, doubly_bonded_n, SINGLE_BOND);

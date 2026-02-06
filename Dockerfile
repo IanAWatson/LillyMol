@@ -22,6 +22,7 @@ ENV LILLYMOL_HOME=/LillyMol \
 
 # Protobuf-compiler needs to be installed before build_linux.sh is run.
 RUN apt-get install -y golang protobuf-compiler 
+RUN apt-get install -y cmake
 
 RUN ./build_linux.sh
 

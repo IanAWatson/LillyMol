@@ -8912,10 +8912,10 @@ Chemical_Standardisation::_do_transform_pyrazolone_new(
       if (ncon[a] != 3) {
       } else if (exocyclic_status[a].atom == kInvalidAtomNumber) {
       } else if (keto_enol == standardisation::KetoEnol::kToEnol &&
-                 exocyclic_status[a].btype == DOUBLE_BOND) {
+                 exocyclic_status[a].bond->is_double_bond()) {
         exocyclic_index << i;
       } else if (keto_enol == standardisation::KetoEnol::kToKeto &&
-                 exocyclic_status[a].btype == SINGLE_BOND) {
+                 exocyclic_status[a].bond->is_single_bond()) {
         exocyclic_index << i;
       }
 
@@ -9024,13 +9024,7 @@ Chemical_Standardisation::_do_transform_pyrazolone_new(
       return standardisation::Status::kAlreadyCorrect;
     }
   } else if (keto_enol == standardisation::KetoEnol::kToKeto) {
-    if (exocyclic_status[carbon].btype == DOUBLE_BOND) {
-      return standardisation::Status::kAlreadyCorrect;
-    }
-    // This can happen if another transformation has altered the exocyclic status.
-    // Points to a larger issue, perhaps that other transformation should adjust...
-    // TODO:ianwatson investigate
-    if (m.bond_between_atoms(carbon, exocyclic)->is_double_bond()) {
+    if (exocyclic_status[carbon].bond->is_double_bond()) {
       return standardisation::Status::kAlreadyCorrect;
     }
   }
@@ -9114,11 +9108,11 @@ Chemical_Standardisation::_do_transform_pyrazolone_new(
 
   if (keto_enol == standardisation::KetoEnol::kToKeto) {
     if (exocyclic_status[c1].atom != kInvalidAtomNumber && 
-        exocyclic_status[c1].btype == DOUBLE_BOND) {
+        exocyclic_status[c1].bond->is_double_bond()) {
       return standardisation::Status::kUnchanged;
     }
     if (exocyclic_status[c2].atom != kInvalidAtomNumber &&
-        exocyclic_status[c2].btype == DOUBLE_BOND) {
+        exocyclic_status[c2].bond->is_double_bond()) {
       return standardisation::Status::kUnchanged;
     }
   }
@@ -9884,11 +9878,7 @@ IWStandard_Current_Molecule::FillExocyclicStatus(Molecule& m) {
     }
 
     _exocyclic_status[o].atom = i;
-    if (b->is_single_bond()) {
-      _exocyclic_status[o].btype = SINGLE_BOND;
-    } else if (b->is_double_bond()) {
-      _exocyclic_status[o].btype = DOUBLE_BOND;
-    }
+    _exocyclic_status[o].bond = b;
   }
 
 #ifdef DEBUG_EXOCYCLIC_STATUS

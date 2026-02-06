@@ -191,12 +191,13 @@ class Possible_Lactim_Lactam
 // this struct will be initialised if there is a singly connected
 // exocyclic atom attached to it. If 
 struct ExocyclicStatus {
+  // The ring atom from which the bond attaches to an exocyclic atom, bond->other(atom).
   atom_number_t atom;
-  bond_type_t btype;
+  const Bond* bond;
 
   ExocyclicStatus() {
     atom = kInvalidAtomNumber;
-    btype = 0;
+    bond = nullptr;
   }
 };
 

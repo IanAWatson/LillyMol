@@ -8992,7 +8992,15 @@ Chemical_Standardisation::_do_transform_pyrazolone_new(
   const int* ncon = current_molecule_data.ncon();
   const ExocyclicStatus* exocyclic_status = current_molecule_data.exocyclic_status();
 
-  // cerr << "ncon[n2] " << ncon[n2] << " nbonds " << m.nbonds(n1) << '\n';
+#ifdef DEBUG_DO_TRANSFORM_PYRAZOLE
+  cerr << "_do_transform_pyrazolone_new: ncon[n2] " << ncon[n2] << " nbonds " << m.nbonds(n1) << '\n';
+  if (keto_enol == standardisation::KetoEnol::kToKeto) {
+    cerr << " to keto\n";
+  } else {
+    cerr << " to enol\n";
+  }
+  cerr << m.smiles() << '\n';
+#endif
 
   if (m.nbonds(n1) == 5) {
     return standardisation::Status::kUnchanged;
@@ -9017,6 +9025,12 @@ Chemical_Standardisation::_do_transform_pyrazolone_new(
     }
   } else if (keto_enol == standardisation::KetoEnol::kToKeto) {
     if (exocyclic_status[carbon].btype == DOUBLE_BOND) {
+      return standardisation::Status::kAlreadyCorrect;
+    }
+    // This can happen if another transformation has altered the exocyclic status.
+    // Points to a larger issue, perhaps that other transformation should adjust...
+    // TODO:ianwatson investigate
+    if (m.bond_between_atoms(carbon, exocyclic)->is_double_bond()) {
       return standardisation::Status::kAlreadyCorrect;
     }
   }

@@ -685,7 +685,10 @@ INSTANTIATE_TEST_SUITE_P(TestStandardisationKetoEnol, TestStandardisationKetoEno
                 "Oc1[n][nH]c(c1C)C"},
 
   ForStdKetoEnol{{"pyrazolone"}, standardisation::KetoEnol::kToKeto, "C1(=CC(=NN1)O)N toKeto",
-                "O=c1cc(N)[nH][nH]1"}
+                "O=c1cc(N)[nH][nH]1"},
+  // Another transformation changes the exocyclic bond
+  ForStdKetoEnol{{"pyrazolone", "enol-fused"}, standardisation::KetoEnol::kToKeto, "OC1=NN(C)C2=NC(C)=CC(C)=C12 toKeto",
+                "O=c1[nH][n](c2[n]c(cc(c12)C)C)C"}
 
 
 ));

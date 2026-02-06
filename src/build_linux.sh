@@ -138,6 +138,17 @@ if [[ ${must_build} -eq 1 || ! -s 'libf2c/libf2c.a' ]] ; then
     (cd libf2c && make -f makefile.u)
 fi
 
+if [[ ! -d 'dragonbox' ]] ; then
+  git clone https://github.com/jk-jeon/dragonbox
+  # We fix a specific version because third_party/BUILD.bazel needs the full path
+  # of the inlcude directory.
+  # We could do something clever with links...
+  (cd dragonbox && git -c advice.detachedHead=false checkout 1.1.3)
+  (cd dragonbox && mkdir build)
+  (cd dragonbox/build && cmake -DCMAKE_INSTALL_PREFIX=${third_party} ..)
+  (cd dragonbox/build && make install)
+fi
+
 # You should examine the BerkeleyDB license terms, it is not necessarily free.
 if [[ -v BUILD_BDB ]] ; then
     must_build=0
@@ -215,6 +226,8 @@ if [[ -v BUILD_LIGHTGBM ]] ; then
   (cd LightGBM && cmake --install build --prefix=${REPO_HOME}/third_party)
   BUILD_LIGHTGBM=1
 fi
+
+exit
 
 # Step 3: build LillyMol executables
 echo "Builds and installs LillyMol executables"

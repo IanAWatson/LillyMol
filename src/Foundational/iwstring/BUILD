@@ -30,6 +30,7 @@ cc_library(
         "remove_suffix.cc",
         "string_change.cc",
         "string_relationals.cc",
+        "string_to_float.cc",
         "tokenise_with_quotes.cc",
         "unhtml.cc",
     ],

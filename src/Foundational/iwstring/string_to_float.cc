@@ -1,5 +1,6 @@
 // Those IWString member functions associated with string to float conversions
 
+// #define USE_DRAGONBOX
 #ifdef USE_DRAGONBOX
 #include "dragonbox/dragonbox_to_chars.h"
 #endif
@@ -80,9 +81,19 @@ IWString::append_number_dragonbox(float f) {
   constexpr int kBufferLength = 1 + // for '\0'
     jkj::dragonbox::max_output_string_length<jkj::dragonbox::ieee754_binary64>;
 
-  char buffer[kBufferLength];
+  this->make_room_for_extra_items(kBufferLength);
 
-  char* end_ptr = jkj::dragonbox::to_chars_n(x, buffer);
+  int initial_number_elements = _number_elements;
+  char* end_ptr = jkj::dragonbox::to_chars_n(f, _things + _number_elements);
+
+  _number_elements = end_ptr - _things;
+
+  for (int i = _number_elements - 2; i > initial_number_elements; --i) {
+    if (_things[i] == 'E') {
+      _things[i] = 'e';
+      break;
+    }
+  }
 
 }
 #endif

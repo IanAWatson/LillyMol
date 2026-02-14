@@ -631,9 +631,11 @@ class IWString : public resizable_array<char>
     void append_number (double, int);      // 2nd arg is the precision
     void append_number (float, const char *);
 
-    // Fast and platform independent.
+#ifdef USE_DRAGONBOX
+    // Too hard to control precision.
     void append_number_dragonbox(float f);
     void append_number_dragonbox(double f);
+#endif
 
     // Moved const around to match calls in tsclass and descriptor_file_to_01_fingerprints
     // int append_hex(const unsigned char * v, const int n);

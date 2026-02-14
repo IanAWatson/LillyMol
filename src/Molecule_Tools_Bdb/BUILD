@@ -5,6 +5,20 @@ load("@com_google_protobuf//bazel:cc_proto_library.bzl", "cc_proto_library")
 package(default_visibility = ["//visibility:public"])
 
 proto_library(
+    name = "conformer_database_proto",
+    srcs = [
+        "conformer_database.proto",
+    ],
+)
+
+cc_proto_library(
+    name = "conformer_database_cc_proto",
+    deps = [
+        ":conformer_database_proto",
+    ],
+)
+
+proto_library(
     name = "dicer_fragment_complement_proto",
     srcs = [
         "dicer_fragment_complement.proto",
@@ -69,6 +83,36 @@ cc_binary(
     tags = ["berkeleydb"],
     deps = [
         ":storage_conditions",
+        "//Foundational/cmdline:iwcmdline",
+        "//Molecule_Lib:iwmolecule",
+        "//Molecule_Lib:moleculeio",
+        "@third_party//:berkeley_static",
+        "@com_google_protobuf//:protobuf",
+    ],
+)
+
+cc_binary(
+    name = "conformer_database_lookup",
+    srcs = [
+        "conformer_database_lookup.cc",
+    ],
+    deps = [
+        "conformer_database_cc_proto",
+        "//Foundational/cmdline:iwcmdline",
+        "//Molecule_Lib:iwmolecule",
+        "//Molecule_Lib:moleculeio",
+        "@third_party//:berkeley_static",
+        "@com_google_protobuf//:protobuf",
+    ],
+)
+
+cc_binary(
+    name = "conformer_database_store",
+    srcs = [
+        "conformer_database_store.cc",
+    ],
+    deps = [
+        "conformer_database_cc_proto",
         "//Foundational/cmdline:iwcmdline",
         "//Molecule_Lib:iwmolecule",
         "//Molecule_Lib:moleculeio",

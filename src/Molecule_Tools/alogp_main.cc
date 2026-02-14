@@ -1069,7 +1069,7 @@ Options::LogD(Molecule& m, double logp) {
     }
   }
 
-  cerr << "Find nneg " << nneg << " npos " << npos << " logp " << logp << '\n';
+  // cerr << "Find nneg " << nneg << " npos " << npos << " logp " << logp << '\n';
 
   if (0 == npos && 0 == nneg) [[unlikely]] {  // really should have been picked up before
     return logp - kNeutralUncharged;
@@ -1128,7 +1128,7 @@ Options::LogD(Molecule& m, double logp) {
     }
   }
 
-  cerr << "Offset " << offset << " returning " << (logp + offset) << '\n';
+  // cerr << "Offset " << offset << " returning " << (logp + offset) << '\n';
 
   return logp + offset;
 }

@@ -231,7 +231,7 @@ tstandardise(Molecule& m, IWString_and_File_Descriptor& output)
       //    cerr << tmp.smiles() << '\n';
     }
 
-    int changes = chemical_standardisation.process(tmp);
+    const int changes = chemical_standardisation.process(tmp);
 
     if (changes != starting_structure_changed_by_chemical_standardisation) {
       cerr << "Potential problems for '" << m.name() << "', parent "

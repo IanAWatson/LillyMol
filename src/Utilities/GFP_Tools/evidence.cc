@@ -61,13 +61,14 @@ Usage(int rc) {
   cerr << "Computes measures of internal consistency for a series of measured values based on how\n";
   cerr << "consistent the values are across the neighbours\n";
   cerr << "Takes a single argument, a TFDataRecord serialized nnbr::NearNeighbours protos, such as\n";
-  cerr << "might be produced by the -T option to nn2proto\n";
+  cerr << "might be produced by the -T option to nn2proto or the -S option for gfp_nearneighbours_single_file_tbb\n";
   cerr << "The following arguments are recognised\n";
   cerr << " -config <fname>     an EvidenceData::Options textproto file with options\n";
   cerr << " -A <fname>          descriptor file containing activity values for each molecule\n";
   cerr << " -smiles <fname>     smiles for each molecule, will be included in the output\n";
   cerr << " -C                  data is classlfication type (not implemented)\n";
   cerr << " -diff               for each column generated, insert an extra column with difference from actual\n";
+//cerr << " -nbrs <n>           include on each output record the <n> nearest neighbours\n";
   cerr << " -v                  verbose output\n";
   // clang-format on
 
@@ -480,6 +481,9 @@ class Evidence {
     // If a smiles file has been specified.
     absl::flat_hash_map<IWString, IWString> _id_to_smiles;
 
+    // We can optionally write some number of neighbours.
+    int _nbrs_to_write;
+
     char _input_separator;
     char _output_separator;
 
@@ -547,6 +551,8 @@ Evidence::Evidence() {
   _item = nullptr;
   _number_items = 0;
 
+  _nbrs_to_write = 0;
+
   _input_separator = ' ';
   _output_separator = ' ';
 }
@@ -592,6 +598,17 @@ Evidence::Initialise(Command_Line_v2& cl) {
   if (! cl.option_present('A')) {
     cerr << "Evidence::Initialise:must specify the activity file via the -A option\n";
     Usage(1);
+  }
+
+  if (cl.option_present("nbrs")) {
+    if (! cl.value("nbrs", _nbrs_to_write) || _nbrs_to_write <= 0) {
+      cerr << "Evidence::Initialise:the -nbrs option must be a whole +ve number\n";
+      return 0;
+    }
+
+    if (_verbose) {
+      cerr << "Will include " << _nbrs_to_write << " neighbours with each output record\n";
+    }
   }
 
   IW_STL_Hash_Map_String id_to_activity_string;
@@ -844,7 +861,7 @@ Evidence::ReadNbrList(TFDataReader& input) {
   return 1;
 }
 
-// These next two functions should be compiled, but I could never get
+// These next two functions should be combined, but I could never get
 // template <typename T>
 // std::optional<absl::flat_hash_map<std::string, T>::const_iterator>
 // to compile. I am not sure why. TODO:ianwatson figure this out one day...
@@ -906,12 +923,17 @@ Evidence::Initialise(const nnbr::NearNeighbours& proto) {
     return 0;
   }
 
-  cerr << "Initialise: ";
-  cerr << proto.ShortDebugString() << '\n';
-  cerr << "index " << maybe_iter.value()->second << '\n';
+//cerr << "Initialise: ";
+//cerr << proto.ShortDebugString() << '\n';
+//cerr << "index " << maybe_iter.value()->second << '\n';
   Item<float>& item = _item[maybe_iter.value()->second];
 
   const uint32_t nbrs = proto.nbr().size();
+
+  // Cannot do anything with these.
+  if (nbrs == 0) {
+    return 1;
+  }
 
   item.AllocateNbrs(nbrs);
 
@@ -934,7 +956,7 @@ Evidence::Initialise(const nnbr::NearNeighbours& proto) {
       return 0;
     }
 
-    cerr << "nbr " << _item[maybe_iter_ndx.value()->second].id() << " act " << maybe_iter_activity.value()->second << '\n';
+//  cerr << "nbr " << _item[maybe_iter_ndx.value()->second].id() << " act " << maybe_iter_activity.value()->second << '\n';
     item.AddNbr(i, nbr.dist(), maybe_iter_activity.value()->second, maybe_iter_ndx.value()->second);
   }
 
@@ -1009,28 +1031,29 @@ AssignPercentileRanks(NdxValue<float>* ndx_and_value,
   return;
 }
 
+// Note this is not fully implemented...
 int
 Evidence::Process2() {
   std::unique_ptr<NdxValue<float>[]> ndx_and_value = std::make_unique<NdxValue<float>[]>(_number_items);
 
-  cerr << "Sorgint " << _header.size() << " columns and " << _number_items << " items\n";
+  // cerr << "Sorgint " << _header.size() << " columns and " << _number_items << " items\n";
   int number_columns = _header.size();
   for (int i = 0; i < number_columns; ++i) {
     for (int j = 0; j < _number_items; ++j) {
       ndx_and_value[j].ndx = j;
       ndx_and_value[j].value = _item[j].result(i);
-      cerr << j << " B4 sort " << _item[j].id() << '\n';
+      // cerr << j << " B4 sort " << _item[j].id() << '\n';
     }
 
     std::sort(ndx_and_value.get(), ndx_and_value.get() + _number_items,
                         [](const NdxValue<float>& nv1,
                                 const NdxValue<float>& nv2) {
-                cerr << " cmp " << nv1.value << " and " << nv2.value << '\n';
+                // cerr << " cmp " << nv1.value << " and " << nv2.value << '\n';
                 return nv1.value < nv2.value;
               });
     AssignPercentileRanks(ndx_and_value.get(), _number_items);
     for (int j = 0; j < _number_items; ++j) {
-      cerr << "after sort " << j << ' ' << _item[j].id() << '\n';
+      // cerr << "after sort " << j << ' ' << _item[j].id() << '\n';
       Item<float>& item = _item[ndx_and_value[j].ndx];
       item.AddPercentile(ndx_and_value[j].percentile);
     }
@@ -1164,6 +1187,10 @@ Evidence::WriteResults(IWString_and_File_Descriptor& output) const {
   }
 
   output << "ID" << _output_separator << "Activity";
+
+  if (_nbrs_to_write) {
+  }
+
   for (const IWString* h : _header) {
     output << _output_separator << *h;
   }
@@ -1172,7 +1199,7 @@ Evidence::WriteResults(IWString_and_File_Descriptor& output) const {
   cerr << "Writing " << _number_items << " items\n";
   for (int i = 0; i < _number_items; ++i) {
     MaybeWriteSmiles(_item[i].id(), output);
-    cerr << i << " id " << _item[i].id() << '\n';
+    // cerr << i << " id " << _item[i].id() << '\n';
 
     output << _item[i].id() << _output_separator << _item[i].activity();
 
@@ -1204,7 +1231,7 @@ Evidence::MaybeWriteSmiles(const IWString& id, IWString_and_File_Descriptor& out
 
 int
 Main(int argc, char** argv) {
-  Command_Line_v2 cl(argc, argv, "-v-A=s-C-config=sfile-diff-smiles=sfile");
+  Command_Line_v2 cl(argc, argv, "-v-A=s-C-config=sfile-diff-smiles=sfile-nbrs=ipos");
   if (cl.unrecognised_options_encountered()) {
     cerr << "Unrecognised options encountered\n";
     Usage(1);

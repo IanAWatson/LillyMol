@@ -2770,8 +2770,6 @@ write_numbered_smiles(const Molecule& m, std::ostream& output) {
 static int
 identify_the_one_still_active(const int* score, atom_number_t& n0, atom_number_t& n1,
                               atom_number_t& n2) {
-  for (int i = 0; i < 3; ++i) {
-  }
   // cerr << "identify_the_one_still_active scores " << score[0] << ' ' << score[1] << ' '
   // << score[2] << '\n';
   if (score[0] == score[1]) {  // n2 is distinct
@@ -2785,13 +2783,6 @@ identify_the_one_still_active(const int* score, atom_number_t& n0, atom_number_t
   }
 
   return 1;
-}
-
-// We are starting with a  
-static int
-resolve_by_shell_expansion(const Molecule& m, atom_number_t& n1, atom_number_t& n2,
-                           const atom_number_t carbon,
-                           IWStandard_Current_Molecule& current_molecule_data) {
 }
 
 /*

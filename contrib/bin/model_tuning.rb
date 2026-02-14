@@ -102,12 +102,13 @@ def model_tuning
 
   trpct = 80
   if cl.option_present('trpct')
-    x = cl.value('trpct')
-    if x < 0 || x > 100
+    trpct = cl.value('trpct')
+    if trpct < 0 || trpct > 100
       $stderr << "The training percent (-trpct) option must be a valid percent\n"
       usage(cl)
     end
   end
+
   prefix = "A#{trpct}"
 
   # Not fully implemented...
@@ -167,6 +168,7 @@ def model_tuning
     cmd = "stratified_samples -s 1 -N #{nsplit} -p #{trpct} -R #{train_stem} -E #{test_stem} -M #{smiles}"
     if cl.option_present('chrono')
       cmd << ' -C'
+      nsplit += 1
     end
     cmd << " #{activity_fname}"
     execute_cmd(cmd, verbose, ["#{train_stem}0.smi", "#{test_stem}0.smi"])
@@ -208,7 +210,7 @@ def model_tuning
   svmfp_make = "time svmfp_make.sh -A #{activity_fname}"
   svmfp_make << " -p #{support}" if support > 1
   svmfp_make << " -C" if classification
-  svmfp_make << cl.value('svml') if cl.option_present('svml')
+  svmfp_make << ' ' << cl.value('svml') if cl.option_present('svml')
 
   fingerprints.each do |fp|
     fps = fp.gsub(/ /, '')

@@ -498,4 +498,22 @@ INSTANTIATE_TEST_SUITE_P(TestSaturation, TestSaturation, testing::Values(
   SmilesAtomValue{"CNS(=O)(=O)C", {0, 1, 2, 3, 4, 5}, {1, 1, 0, 0, 0, 1}}
 ));
 
+TEST(TestAtomOrderInSmiles, Test1) {
+  Molecule m;
+  EXPECT_TRUE(m.build_from_smiles("CN"));
+  const int matoms = m.natoms();
+
+  EXPECT_EQ(m.smiles(), "CN");
+
+  const resizable_array<atom_number_t>& aoit1 = m.atom_order_in_smiles();
+  for (int i = 0; i < matoms; ++i) {
+    EXPECT_EQ(aoit1[i], i);
+  }
+
+  EXPECT_EQ(m.smiles_starting_with_atom(1), "NC");
+  const resizable_array<atom_number_t>& aoit2 = m.atom_order_in_smiles();
+  EXPECT_EQ(aoit2[0], 1);
+  EXPECT_EQ(aoit2[1], 0);
+}
+
 }  // namespace

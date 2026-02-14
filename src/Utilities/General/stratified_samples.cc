@@ -103,7 +103,7 @@ usage(int rc)
   cerr << R"(Performs multiple stratified samplings of a file.
 Given all.smi and all.activity, generate 10 splits with 80% train:
 
-stratified_samples -v -E TEST -R TRAIN -N 10 -p 80 -s 1 -S .activity -M all.smiles all.activity
+stratified_samples -v -R TRAIN -E TEST -N 10 -p 80 -s 1 -S .activity -M all.smiles all.activity
 
 Generates files
 TRAIN0.activity
@@ -126,7 +126,7 @@ etc.
  -a sample=<x>  within the most active items selected above, randomly sample fraction <x> of them
  -a expand=<x>  rather than an equal number of less active items, multiply the number active by <x>
  -i             just write the identifiers, not whole records
- -S <suffix>    create files with suffix <suffix>
+ -S <suffix>    create activity files with suffix <suffix>
  -M <fname>     smiles file, if specified, smiles files will be generated for each split.
  -K             drop input values for which smiles not available
  -b <start>     normally files produced start with 0, start with <start> instead
@@ -489,10 +489,12 @@ do_chronological_split(resizable_array_p<ID_Stratum_Selected>& idds,
 {
   const int n = idds.number_elements();
 
+  training_set_output << *header_records[0] << '\n';
   for (int i = 0; i < records_to_select; ++i) {
     idds[i]->do_write(training_set_output);
   }
 
+  training_set_output << *header_records[0] << '\n';
   if (test_set_output.is_open()) {
     for (int i = records_to_select; i < n; ++i) {
       idds[i]->do_write(test_set_output);

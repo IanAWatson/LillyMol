@@ -602,7 +602,7 @@ enum BondedStatus {
   kOkNotBonded
 };
 
-class __attribute__((visibility("default"))) Molecule : private resizable_array_p<Atom> {
+class __attribute__((visibility("default"))) Molecule : protected resizable_array_p<Atom> {
  private:
   BondList _bond_list;
 

@@ -1000,7 +1000,7 @@ GetMaybeLongElement(const char* smiles,
                     int& atomic_mass,
                     const Element* & result) {
 
-  assert(*smiles = kOpenBracket);
+  assert(*smiles == kOpenBracket);
 
   // cerr << "GetMaybeLongElement char " << *smiles << " characters_to_process " << characters_to_process << '\n';
 

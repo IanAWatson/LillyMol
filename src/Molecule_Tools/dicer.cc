@@ -31,6 +31,7 @@
 #include "Foundational/data_source/tfdatarecord.h"
 #include "Foundational/iwmisc/iw_time.h"
 #include "Foundational/iwmisc/misc.h"
+#include "Foundational/iwmisc/report_progress.h"
 #include "Foundational/iwmisc/sparse_fp_creator.h"
 #include "Foundational/iwqsort/iwqsort.h"
 #include "Foundational/iwstring/iw_stl_hash_map.h"
@@ -242,6 +243,8 @@ static int reject_breakages_that_result_in_fragments_too_small = 0;
 
 static int write_smiles = 1;
 static int write_parent_smiles = 1;
+
+static Report_Progress report_progress;
 
 // We can write fragments in several forms.
 //   1. classical form, smiles one per line
@@ -7259,6 +7262,10 @@ dicer(data_source_and_type<Molecule>& input, DicerFragmentOutput& output) {
   while (nullptr != (m = input.next_molecule())) {
     molecules_read++;
 
+    if (report_progress()) {
+      cerr << "Processed " << molecules_read << " molecules\n";
+    }
+
     std::unique_ptr<Molecule> free_m(m);
 
     clock_t t0;
@@ -7419,6 +7426,7 @@ display_misc_B_options(std::ostream& os) {
   os << " -B lostchiral     check each fragment for lost chirality\n";
   os << " -B recap          work like Recap - break all breakable bonds at once\n";
   os << " -B nooutput       suppress writing diced fragments, useful with the '-B fragstat' option\n";
+  os << " -B rpt=<n>        report progress every <n> molecules processed\n";
   os << " -B help           this message\n";
   // clang-format on
 
@@ -8143,6 +8151,17 @@ dicer(int argc, char** argv) {
         if (verbose) {
           cerr << "Fragments will NOT be indexed by unique smiles - do not use "
                   "fragstat!\n";
+        }
+      } else if (b.starts_with("rpt=")) {
+        b.remove_leading_chars(4);
+        uint64_t rpt;
+        if (! b.numeric_value(rpt)) {
+          cerr << "Invalid rpt= qualifier '" << b << "'\n";
+          return 1;
+        }
+        report_progress.set_report_every(rpt);
+        if (verbose) {
+          cerr << "Will report progress every " << rpt << " molecules\n";
         }
       } else if ("help" == b) {
         display_misc_B_options(cerr);

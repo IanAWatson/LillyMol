@@ -11,6 +11,7 @@
 #define COMPILING_SMILES_CC
 
 #include "chiral_centre.h"
+#include "create_components.h"
 #include "molecule.h"
 #include "path.h"
 
@@ -897,6 +898,7 @@ Molecule::create_components(const int* fragID,
   return fcntr;
 }
 
+#ifdef NOW_IN_SEPARATEFILE
 template <typename T>
 int
 Molecule::create_components(resizable_array_p<T>& components) {
@@ -942,6 +944,7 @@ Molecule::create_components(resizable_array_p<T>& components) {
 
   return nf;
 }
+#endif
 
 template int Molecule::create_components(resizable_array_p<Molecule>&);
 

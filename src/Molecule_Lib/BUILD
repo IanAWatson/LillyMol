@@ -375,6 +375,7 @@ cc_library(
         "collection_template.h",
         "coordinate_box.h",
         "coordinates.h",
+        "create_components.h",
         "dihedral.h",
         "donor_acceptor.h",
         "element.h",

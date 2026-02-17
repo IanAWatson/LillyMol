@@ -14,7 +14,6 @@
 
 #include "Foundational/iwaray/iwaray.h"
 #include "Foundational/cmdline/cmdline.h"
-#include "Foundational/iwmisc/report_progress.h"
 
 #include "Molecule_Lib/aromatic.h"
 #include "Molecule_Lib/element.h"
@@ -44,6 +43,15 @@ Usage(int rc) {
   cerr << __FILE__ << " compiled " << __DATE__ << " " << __TIME__ << '\n';
 #endif
   // clang-format on
+  cerr << R"(Looks up molecules in a BerkeleyDB database built by conformer_database_store.
+conformer_database_lookup -d /path/to/database.bdb -o ISIS -S - file.smi > conformer.sdf
+
+ -d <dbname>            name of database built by conformer_database_store.
+ -U <fname>             write molecules not found to <fname>.smi.
+ -g ...                 chemical standardisation applied to the lookup key.
+                          conformers retain any explicit Hydrogen atoms stored.
+ -v                     verbose output
+)";
   // clang-format on
   // clang-format off
 
@@ -65,13 +73,13 @@ class ConformerDB{
     int _remove_chirality;
     int _reduce_to_largest_fragment;
 
-    Report_Progress _report_progress;
-
     IWString_and_File_Descriptor _stream_for_not_found;
 
     int _verbose;
 
     // Private functions
+
+    int HandleMoleculeNotFound(Molecule& m);
 
   public:
     ConformerDB();
@@ -134,7 +142,7 @@ ConformerDB::Initialise(Command_Line& cl) {
     }
 
     if (_verbose) {
-      cerr << "Smiles will be written to database '" << dbname << "'\n";
+      cerr << "Opened " << dbname << "'\n";
     }
   }
 
@@ -156,6 +164,18 @@ ConformerDB::Initialise(Command_Line& cl) {
     _reduce_to_largest_fragment = 1;
     if (_verbose) {
       cerr << "Will reduce to the largest fragment\n";
+    }
+  }
+
+  if (cl.option_present('U')) {
+    IWString fname = cl.string_value('U');
+    fname.EnsureEndsWith(".smi");
+    if (! _stream_for_not_found.open(fname)) {
+      cerr << "ConformerDB::initialise:cannot open stream for molecules not found '" << fname << "'\n";
+      return 0;
+    }
+    if (_verbose) {
+      cerr << "Molecules not found in db written to '" << fname << "'\n";
     }
   }
 
@@ -189,8 +209,7 @@ ConformerDB::Process(Molecule& m,
   if (int rc = _db->get(NULL, &zkey, &zdata, 0); rc == 0) {
     ++_molecules_found;
   } else if (rc == DB_NOTFOUND) {
-    cerr << "Did not find '" << usmi << "'\n";
-    return 1;
+    return HandleMoleculeNotFound(m);
   } else {
     _db->err(rc, "Unspecified error on lookup");
     return 0;
@@ -231,6 +250,20 @@ ConformerDB::Process(Molecule& m,
     }
     fromdb.invalidate_smiles();
     output.write(fromdb);
+  }
+
+  return 1;
+}
+
+int
+ConformerDB::HandleMoleculeNotFound(Molecule& m) {
+  if (_verbose > 1) {
+    cerr << m.name() << " not found\n";
+  }
+
+  if (_stream_for_not_found.is_open()) {
+    _stream_for_not_found << m.smiles() << ' ' << m.name() << '\n';
+    _stream_for_not_found.write_if_buffer_holds_more_than(4096);
   }
 
   return 1;
@@ -287,7 +320,7 @@ ConformerDatabaseLookup(ConformerDB& cdb,
 
 int
 Main(int argc, char** argv) {
-  Command_Line cl(argc, argv, "vA:E:g:d:i:o:r:S:cl");
+  Command_Line cl(argc, argv, "vA:E:g:d:i:o:S:clU:");
   if (cl.unrecognised_options_encountered()) {
     cerr << "Unrecognised options encountered\n";
     Usage(1);
@@ -327,6 +360,10 @@ Main(int argc, char** argv) {
 
   Molecule_Output_Object output;
   if (cl.option_present('o')) {
+    MDL_File_Supporting_Material* mdlfos = global_default_MDL_File_Supporting_Material();
+    output.add_output_type(FILE_TYPE_SDF);
+    mdlfos->set_write_isis_standard(1);
+    mdlfos->set_write_mdl_charges_as_m_chg(1);
   } else {
     output.add_output_type(FILE_TYPE_SMI);
     lillymol::set_include_coordinates_with_smiles(1);

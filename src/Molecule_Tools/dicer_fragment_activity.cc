@@ -312,18 +312,44 @@ AddToFragments(const dicer_data::DicedMolecule& parent,
   return 1;
 }
 
+// Look for `name` in `activity`.
+// If found, return the iter.
+// If not found, see if there is a space in `name` and try the first token.
+std::optional<const absl::flat_hash_map<std::string, double>::const_iterator>
+FindActivity(const std::string& name,
+              const absl::flat_hash_map<std::string, double>& activity) {
+  const auto iter = activity.find(name);
+  if (iter != activity.end()) {
+    return iter;
+  }
+
+  size_t space = name.find(' ');
+  if (space == std::string::npos) {
+    return std::nullopt;
+  }
+
+  std::string tmp(name);
+  tmp.resize(space);
+  const auto iter2 = activity.find(tmp);
+  if (iter2 == activity.end()) {
+    return iter2;
+  }
+
+  return std::nullopt;
+}
+
 int
 ReadDicerData(const dicer_data::DicedMolecule& proto,
               const absl::flat_hash_map<std::string, double>& activity,
               absl::flat_hash_map<std::string, Fragment>& fragment_data) {
-  const auto iter = activity.find(proto.name());
-  if (iter == activity.end()) {
+  std::optional<const absl::flat_hash_map<std::string, double>::const_iterator> iter = FindActivity(proto.name(), activity);
+  if (! iter) {
     cerr << "ReadDicerData:no activity for '" << proto.name() << "'\n";
     return 0;
-  }
+   }
 
   for (const auto& fragment : proto.fragment()) {
-    AddToFragments(proto, fragment, iter->second, fragment_data);
+    AddToFragments(proto, fragment, iter.value()->second, fragment_data);
   }
 
   return 1;

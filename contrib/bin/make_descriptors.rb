@@ -295,6 +295,7 @@ def main
   descriptors['cnk'] = Descriptor.new('cnk.sh', false, 23.1)
   descriptors['comma'] = Descriptor.new('comma.sh', true, 31.1)
   descriptors['dbf'] = Descriptor.new('dbf.sh', true, 12.2)
+  descriptors['ecfp'] = Descriptor.new('iwecfp_fixed.sh', false, 3.2)
   descriptors['estate'] = Descriptor.new('jwestate.sh', false, 4.4)
   descriptors['ghose'] = Descriptor.new('ghose_crippen.sh -a -a', false, 16.6)
   descriptors['ha'] = Descriptor.new('ha.sh', false, 14.8)

@@ -40,8 +40,23 @@ Usage(int rc) {
   cerr << __FILE__ << " compiled " << __DATE__ << " " << __TIME__ << '\n';
 #endif
   // clang-format on
-  // clang-format on
+
   // clang-format off
+  cerr << R"(Builds a berkeleyDB database of conformers.
+Generate 3D structures, with the conformers for each molecule adjacent to each other.
+
+conformer_database_store -d /path/to/database.bdb file.sdf
+
+The key to the database is the (Hydrogen suppressed) unique smiles of the molecule, and
+the data is a serialized conformer_database.Conformers proto that contains the smiles
+with Hydrogens and the coordinates.
+
+ -d <dbname>            name of database to be created.
+ -r <n>                 report progress every <n> molecules processed.
+ -g ...                 chemical standardisation. Applied to the database key, stored conformers keep H's.
+ -v                     verbose output.
+)";
+  // clang-format on
 
   ::exit(rc);
 }

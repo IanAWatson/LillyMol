@@ -18,6 +18,7 @@
 #include "Molecule_Lib/aromatic.h"
 #include "Molecule_Lib/element.h"
 #include "Molecule_Lib/istream_and_type.h"
+#include "Molecule_Lib/mdl.h"
 #include "Molecule_Lib/molecule.h"
 #include "Molecule_Lib/output.h"
 #include "Molecule_Lib/smiles.h"

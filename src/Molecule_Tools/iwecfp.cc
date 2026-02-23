@@ -546,7 +546,7 @@ WriteFixedWidthFingerprint(Molecule& m, uint32_t nbits,
 static int
 WriteDescriptorFileRow(Molecule& m, uint32_t ncols, const Sparse_Fingerprint_Creator& sfc,
                        IWString_and_File_Descriptor& output) {
-  output << m.name();
+  append_first_token_of_name(m.name(), output);
   // We assume that `ncols` will not change from on invocation to the next.
   static std::unique_ptr<int[]> count = std::make_unique<int[]>(ncols);
 

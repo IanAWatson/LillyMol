@@ -307,7 +307,7 @@ def main
   descriptors['jwdp'] = Descriptor.new('jwdip.sh', true, 3.9)
   descriptors['jwmc'] = Descriptor.new('jwmolconn.sh', false, 62.1)
   descriptors['marvin'] = Descriptor.new('marvin.v2.sh', false, 461)
-  descriptors['medv'] = Descriptor.new('jwmedv.sh', false, 7.1)
+  descriptors['medv'] = Descriptor.new('jwmedv.sh -f', false, 7.1)
   descriptors['mk'] = Descriptor.new('maccskeys.sh', false, 5.4)
   descriptors['morse'] = Descriptor.new('jwmorse.sh -f', true, 95.1)
   # descriptors['ms'] = Descriptor.new('unknown.sh', true)

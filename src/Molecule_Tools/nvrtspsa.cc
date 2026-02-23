@@ -470,7 +470,7 @@ novartis_polar_surface_area_phosphorus(Molecule &m, atom_number_t zatom, Atom &a
   }
 }
 
-#define DEBUG_NOVARTIS_POLAR_SURFACE_AREA
+// #define DEBUG_NOVARTIS_POLAR_SURFACE_AREA
 
 /*
   Polar surface areas from

@@ -17,8 +17,9 @@
 
 #include "Molecule_Lib/aromatic.h"
 #include "Molecule_Lib/element.h"
-#include "Molecule_Lib/molecule.h"
 #include "Molecule_Lib/istream_and_type.h"
+#include "Molecule_Lib/molecule.h"
+#include "Molecule_Lib/moleculeio.h"
 #include "Molecule_Lib/standardise.h"
 
 #ifdef BUILD_BAZEL
@@ -61,6 +62,24 @@ with Hydrogens and the coordinates.
   ::exit(rc);
 }
 
+// If we have specified a tag for conformer energies, each molecule will have
+// an associated energy.
+class MoleculeWithEnergy : public Molecule {
+  private:
+    float _energy;
+  public:
+    MoleculeWithEnergy() {
+      _energy = 0.0f;
+    }
+
+    float energy() const {
+      return _energy;
+    }
+    void set_energy(float s) {
+      _energy = s;
+    }
+};
+
 class ConformerDB{
   private:
     std::unique_ptr<Db> _db;
@@ -74,22 +93,30 @@ class ConformerDB{
 
     Report_Progress _report_progress;
 
+    // If the energy of the conformer is in the .sdf file,
+    // this is the tag line.
+    IWString _energy_tag;
+
     int _verbose;
 
     // Private functions
+
+    int NextSetOfConformers(data_source_and_type<MoleculeWithEnergy>& input,
+                    resizable_array_p<MoleculeWithEnergy>& molecules);
+    int GetEnergy(MoleculeWithEnergy& m);
 
   public:
     ConformerDB();
     ~ConformerDB();
 
-    int WriteConformers(Molecule& m, const conformer_database::Conformers& conformers);
-    int AddConformer(Molecule& m,
+    int WriteConformers(MoleculeWithEnergy& m, const conformer_database::Conformers& conformers);
+    int AddConformer(MoleculeWithEnergy& m,
         const std::unique_ptr<int[]>& atom_order_in_smiles,
         conformer_database::Conformers& proto);
 
     int Initialise(Command_Line& cl);
 
-    int Process(data_source_and_type<Molecule>& input);
+    int Process(data_source_and_type<MoleculeWithEnergy>& input);
 
     int Report(std::ostream& output) const;
 };
@@ -151,14 +178,24 @@ ConformerDB::Initialise(Command_Line& cl) {
     }
   }
 
+  if (cl.option_present('G')) {
+    IWString g = cl.string_value('G');
+    _energy_tag << ">  <" << g << '>';
+    if (_verbose) {
+      cerr << "Energy in sdf tag '" << _energy_tag << "'\n";
+    }
+    moleculeio::set_read_extra_text_info(1);
+  }
+
   return 1;
 }
 
 int
-ConformerDB::AddConformer(Molecule& m,
+ConformerDB::AddConformer(MoleculeWithEnergy& m,
         const std::unique_ptr<int[]>& atom_order_in_smiles,
         conformer_database::Conformers& proto) {
   conformer_database::Conformer* c  = proto.mutable_conformers()->Add();
+  c->set_energy(m.energy());
   const int matoms = m.natoms();
   c->mutable_xyz()->Resize(matoms * 3, 0.0f);
   for (int i = 0; i < matoms; ++i) {
@@ -173,7 +210,7 @@ ConformerDB::AddConformer(Molecule& m,
 }
 
 int
-Reset(Molecule& m, std::unique_ptr<int[]>& atom_order_in_smiles,
+Reset(MoleculeWithEnergy& m, std::unique_ptr<int[]>& atom_order_in_smiles,
       conformer_database::Conformers& proto) {
   proto.Clear();
   const IWString& n = m.name();
@@ -194,14 +231,19 @@ Reset(Molecule& m, std::unique_ptr<int[]>& atom_order_in_smiles,
 }
 
 int
-ConformerDB::WriteConformers(Molecule& m, const conformer_database::Conformers& conformers) {
+ConformerDB::WriteConformers(MoleculeWithEnergy& m, const conformer_database::Conformers& conformers) {
   // This will happen on the first call.
   if (conformers.conformers_size() == 0) [[ unlikely]] {
     return 1;
   }
 
+  if (_report_progress()) {
+    cerr << "Stored conformers for " << _molecules_read << " molecules\n";
+  }
+
   _number_conformers[conformers.conformers_size()]++;
 
+  // Even though conformers may have explicit Hydrogens, the database key does not.
   m.remove_all(1);
 
   if (_chemical_standardisation.active()) {
@@ -210,10 +252,10 @@ ConformerDB::WriteConformers(Molecule& m, const conformer_database::Conformers& 
 
   const IWString& usmi = m.unique_smiles();
 
+  // For now, duplicates are discarded. Too hard...
   Dbt dkey((void *) usmi.rawdata(), usmi.length());
   Dbt zdata;
-  int rc = _db->get(NULL, &dkey, &zdata, 0);
-  if (rc == 0) {
+  if (int rc = _db->get(NULL, &dkey, &zdata, 0); rc == 0) {
     ++_duplicates;
     if (_verbose > 1) {
       cerr << "ConformerDB::WriteConformers:existing data found\n";
@@ -228,19 +270,13 @@ ConformerDB::WriteConformers(Molecule& m, const conformer_database::Conformers& 
   zdata.set_data(serialized.data());
   zdata.set_size(serialized.size());
 
-  rc = _db->put(NULL, &dkey, &zdata, 0);
-  if (rc == 0) {
-    if (_report_progress()) {
-      cerr << "Stored conformers for " << _molecules_read << " molecules\n";
-    }
-
+  if (int rc = _db->put(NULL, &dkey, &zdata, 0); rc == 0) {
     return 1;
+  } else {
+    cerr << "Error storing " << m.name() << '\n';
+    _db->err(rc, "");
+    return 0;
   }
-
-  cerr << "Error storing " << m.name() << '\n';
-  _db->err(rc, "");
-
-  return 0;
 }
 
 int
@@ -256,12 +292,57 @@ ConformerDB::Report(std::ostream& output) const {
   return 1;
 }
 
+// Look through the text_info in `m` and find the _energy_tag record.
+// The next record should hold the energy.
+// Set m.energy with the resulting value.
 int
-NextSetOfConformers(data_source_and_type<Molecule>& input,
-                    resizable_array_p<Molecule>& molecules) {
+ConformerDB::GetEnergy(MoleculeWithEnergy& m) {
+  // We should not have been called if the tag was empty.
+  if (_energy_tag.empty()) [[unlikely]] {
+    return 0;
+  }
+
+  const int n = m.number_records_text_info();
+  if (n == 0) {
+    cerr << "ConformerDB::GetEnergy:no text records in " << m.name() << '\n';
+    return 0;
+  }
+
+  for (int i = 0; i < n; ++i) {
+    const IWString& s = m.text_info(i);
+    if (! s.starts_with(_energy_tag)) {
+      continue;
+    }
+
+    if (i == (n - 1)) [[unlikely]] {
+      cerr << "ConformerDB::GetEnergy:truncated text info " << m.name() << '\n';
+      return 0;
+    }
+
+    const IWString& e = m.text_info(i + 1);
+    float tmp;
+    if (! e.numeric_value(tmp)) {
+      cerr << "ConformerDB::GetEnergy:invalid energy value '" << e << "' for " << m.name() << '\n';
+      return 0;
+    }
+
+    m.set_energy(tmp);
+    return 1;
+  }
+
+  cerr << "ConformerDB::GetEnergy:did not find " << _energy_tag << " in " << m.name() << '\n';
+  return 0;
+}
+
+// Return a set of conformers - share same name and number of atoms.
+int
+ConformerDB::NextSetOfConformers(data_source_and_type<MoleculeWithEnergy>& input,
+                    resizable_array_p<MoleculeWithEnergy>& molecules) {
   molecules.resize_keep_storage(0);
 
-  static Molecule* next_molecule = nullptr;
+  // We detect end of a group when we read a molecule with a different name.
+  // We retain that molecule here and it becomes the first member of the next group.
+  static MoleculeWithEnergy* next_molecule = nullptr;
 
   IWString mname;
   // all molecules in a set of conformers must have the same number of atoms.
@@ -274,9 +355,14 @@ NextSetOfConformers(data_source_and_type<Molecule>& input,
     next_molecule = nullptr;
   }
 
-  Molecule * m;
+  MoleculeWithEnergy * m;
   while ((m = input.next_molecule()) != nullptr) {
-    if (mname.empty()) [[ unlikely ]] {
+    if (_energy_tag.size() > 0 && ! GetEnergy(*m)) {
+      cerr << "ConformerDB::NextSetOfConformers:cannot retrieve energy\n";
+      return 0;
+    }
+
+    if (mname.empty()) [[ unlikely ]] {  // first time called only.
       mname = m->name();
       natoms = m->natoms();
       molecules << m;
@@ -294,12 +380,13 @@ NextSetOfConformers(data_source_and_type<Molecule>& input,
     }
   }
 
+  // Normal EOF
   return molecules.number_elements();
 }
 
 int
-ConformerDB::Process(data_source_and_type<Molecule>& input) {
-  resizable_array_p<Molecule> conformers;
+ConformerDB::Process(data_source_and_type<MoleculeWithEnergy>& input) {
+  resizable_array_p<MoleculeWithEnergy> conformers;
 
   while (NextSetOfConformers(input, conformers)) {
     _molecules_read += conformers.size();
@@ -308,7 +395,7 @@ ConformerDB::Process(data_source_and_type<Molecule>& input) {
     conformer_database::Conformers proto;
     Reset(*conformers[0], atom_order_in_smiles, proto);
 
-    for (Molecule* m : conformers) {
+    for (MoleculeWithEnergy* m : conformers) {
       AddConformer(*m, atom_order_in_smiles, proto);
     }
     WriteConformers(*conformers[0], proto);
@@ -324,7 +411,7 @@ ConformerDatabaseStore(ConformerDB& cdb, const char* fname, FileType input_type)
     assert(0 != input_type);
   }
 
-  data_source_and_type<Molecule> input(input_type, fname);
+  data_source_and_type<MoleculeWithEnergy> input(input_type, fname);
   if (!input.good()) {
     cerr << "Cannot open '" << fname << "'\n";
     return 0;
@@ -335,7 +422,7 @@ ConformerDatabaseStore(ConformerDB& cdb, const char* fname, FileType input_type)
 
 int
 Main(int argc, char** argv) {
-  Command_Line cl(argc, argv, "vA:E:g:d:i:r:");
+  Command_Line cl(argc, argv, "vA:E:g:d:i:r:G:");
   if (cl.unrecognised_options_encountered()) {
     cerr << "Unrecognised options encountered\n";
     Usage(1);

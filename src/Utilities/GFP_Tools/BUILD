@@ -1114,8 +1114,11 @@ cc_binary(
         ":nearneighbours_cc_proto",
         "//Foundational/accumulator",
         "//Foundational/cmdline:iwcmdline",
+        "//Foundational/data_source:iwstring_data_source",
         "//Foundational/data_source:iwtfdata_record",
         "//Foundational/iwmisc",
+        "//Foundational/iwstring:absl_hash",
+        "@com_google_absl//absl/container:flat_hash_map",
     ],
 )
 

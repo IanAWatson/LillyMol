@@ -109,6 +109,9 @@ static Elements_to_Remove elements_to_remove;
 
 static int ignore_no_activity = 0;
 
+// Output separator when creating -M activity file.
+static char output_separator = ' ';
+
 struct MaybeQualified {
  public:
   int qualifier;
@@ -137,6 +140,10 @@ struct MaybeQualified {
 
   void set_activity(float s) {
     activity = s;
+  }
+
+  void set_qualifier(int s) {
+    qualifier = s;
   }
 
   bool operator <(const MaybeQualified& rhs) const {
@@ -222,47 +229,50 @@ usage(int rc) {
 #endif
   // clang-format on
   // clang-format off
-  cerr << "Examines a set of activity data for duplicate structures, and optionally generates\n";
-  cerr << "a smiles and activity file that contain consolidated values\n";
-  cerr << "A typical usage might be (continuous response)\n";
-  cerr << " activity_consistency -T I=Cl -T Br=Cl -X train.activity -l -c -g all -M consistent -M max -v train.smi\n";
-  cerr << " where heavy halogens are merged, small fragments and chirality discarded, and chemical\n";
-  cerr << " standardisation applied. Where multiple values for a smiles are found, use the max value\n";
-  cerr << "Write 'consistent.activity' and 'consistent.smi' with the consolidated data\n";
-  cerr << "  -X <fname>    experimental data\n";
-  cerr << "  -e <col>      activity is column <col> in the -X file\n";
-  cerr << "  -e <n>        activity is token <n> in the molecule name (no -X)\n";
-  cerr << "  -a            reduce to graph form\n";
-  cerr << "  -c            ignore chirality\n";
-  cerr << "  -x            ignore cis-trans bonds\n";
-  cerr << "  -m            only display common structure record of groups\n";
-  cerr << "  -t <tol>      activity difference for items to be merged\n";
-  cerr << "  -r            interpret the -t option as a ratio between activities\n";
-  cerr << "  -O <fname>    write groups outside tolerance to <fname>\n";
-  cerr << "  -N <fname>    write non duplicates to <fname> - cannot use with -t,-O\n";
-  cerr << "  -M <stem>     write new smiles and activity files with max activity \n";
-  cerr << "  -M max        write max activity to the -M file\n";
-  cerr << "  -M ave        write average activity to the -M file\n";
-  cerr << "  -M median     write median activity to the -M file\n";
-  cerr << "  -M rand       write a random example to the -M file\n";
-  cerr << "  -M range      write a random value from within the range to the -M file\n";
-  cerr << "  -M rmdup      discard all duplicate structures\n";
-  cerr << "  -M rminc      discard structures with inconsistent class assignments\n";
-  cerr << "  -T ...        standard element transformation options\n";
-  cerr << "  -V ...        what to do with multi-valued activities (-V help for info)\n";
-  cerr << "  -K <ele>      remove elements of type <ele>\n";
-  cerr << "  -W ...        specification of allowed elements\n";
-  cerr << "  -U <fname>    tabular output format\n";
-  cerr << "  -b <natoms>   lower atom count cutoff\n";
-  cerr << "  -B <natoms>   lower atom count cutoff\n";
-  cerr << "  -z            remove leading 0's from identifiers\n";
-  cerr << "  -Y ...        other options, enter '-Y help' for info\n";
-  cerr << "  -l            reduce to largest fragment\n";
-  cerr << "  -i <type>     input specification\n";
-  cerr << "  -g ...        chemical standardisation options\n";
-  cerr << "  -E ...        standard element specifications\n";
-  cerr << "  -A ...        standard aromaticity specifications\n";
-  cerr << "  -v            verbose output\n";
+  cerr << R"(Examines a set of activity data for duplicate structures, and optionally generates
+a smiles and activity file that contain consolidated values
+A typical usage might be (continuous response)
+activity_consistency -T I=Cl -T Br=Cl -X train.activity -l -c -g all -M consistent -M max -v train.smi
+where heavy halogens are merged, small fragments and chirality discarded, and chemical
+standardisation applied. Where multiple values for a smiles are found, use the max value.
+
+This will create 'consistent.activity' and 'consistent.smi' which contain one value for each grouping
+and can be used for model building.
+
+ -X <fname>    tabular experimental data file, id->activity. Enter '-X help' for more info.
+ -e <col>      when using a -X file, the activity is column <col> in that file.
+ -e <n>        without a -X file, activity is token <n> in the molecule name.
+ -a            reduce to graph form.
+ -c            ignore chirality.
+ -x            ignore cis-trans bonds.
+ -m            only display common structure record of groups.
+ -t <tol>      activity difference for items to be merged.
+ -r            interpret the -t option as a ratio between activities.
+ -O <fname>    write groups outside tolerance to <fname>.
+ -N <fname>    write non duplicates to <fname> - cannot use with -t,-O.
+ -M <stem>     write new smiles and activity files with max activity .
+ -M max        write max activity to the -M file.
+ -M ave        write average activity to the -M file.
+ -M median     write median activity to the -M file.
+ -M rand       write a random example to the -M file.
+ -M range      write a random value from within the range to the -M file.
+ -M rmdup      discard all duplicate structures.
+ -M rminc      discard structures with inconsistent class assignments.
+ -T ...        standard element transformation options.
+ -V ...        what to do with multi-valued activities (-V help for info).
+ -K <ele>      remove elements of type <ele>.
+ -W ...        specification of allowed elements.
+ -U <fname>    tabular output format.
+ -b <natoms>   lower atom count cutoff.
+ -B <natoms>   lower atom count cutoff.
+ -Y ...        other options, enter '-Y help' for info.
+ -l            reduce to largest fragment.
+ -i <type>     input specification.
+ -g ...        chemical standardisation options.
+ -E ...        standard element specifications.
+ -A ...        standard aromaticity specifications.
+ -v            verbose output.
+)";
   // clang-format on
 
   exit(rc);
@@ -466,7 +476,7 @@ Group_of_Molecules::min_and_max_within_ratio(float t) const {
 
 int
 Group_of_Molecules::write_structure_group(IWString_and_File_Descriptor& output) {
-  output << (*this) << ' ';
+  output << (*this) << output_separator;
 
   if (only_display_common_group) {
     for (int i = 0; i < _sida.number_elements(); i++) {
@@ -522,7 +532,7 @@ int
 Group_of_Molecules::write_merged_data(IWString_and_File_Descriptor& output) const {
   assert(_sida.number_elements() > 1);
 
-  output << (*this) << ' ';
+  output << (*this) << output_separator;
 
   Accumulator<float> acc;
 
@@ -538,7 +548,7 @@ Group_of_Molecules::write_merged_data(IWString_and_File_Descriptor& output) cons
     acc.extra(s->activity());
   }
 
-  output << ' ' << static_cast<float>(acc.average()) << " N = " << _sida.number_elements()
+  output << output_separator << static_cast<float>(acc.average()) << " N = " << _sida.number_elements()
          << '\n';
 
   return 1;
@@ -552,11 +562,11 @@ Group_of_Molecules::_write_max_activity(
 
   // cerr << "class_name_to_number " << class_name_to_number.size() << '\n';
   if (class_name_to_number.empty()) {
-    stream_for_activity << sida->id() << ' ' << sida->maybe_qualified();
+    stream_for_activity << sida->id() << output_separator << sida->maybe_qualified();
   } else if (sida->activity() < 0.0F) {
-    stream_for_activity << sida->id() << ' ' << negative_class;
+    stream_for_activity << sida->id() << output_separator << negative_class;
   } else {
-    stream_for_activity << sida->id() << ' ' << positive_class;
+    stream_for_activity << sida->id() << output_separator << positive_class;
   }
 
   stream_for_activity << '\n';
@@ -1494,7 +1504,7 @@ write_reconciled_data(
     return 0;
   }
 
-  stream_for_activity << "ID ";
+  stream_for_activity << "ID" << output_separator;
   if (activity_name.empty()) {
     stream_for_activity << "activity" << '\n';
   } else {
@@ -1569,8 +1579,6 @@ update_global_accumulators(const resizable_array<MaybeQualified>& v, Accumulator
 static int
 write_multi_valued_information(const IWString& id, resizable_array<MaybeQualified>& acc,
                                IWString_and_File_Descriptor& output) {
-  const char sep = ' ';
-
   acc.iwqsort_lambda([](const MaybeQualified& f1, const MaybeQualified& f2) {
     if (f1 < f2) {
       return -1;
@@ -1583,11 +1591,11 @@ write_multi_valued_information(const IWString& id, resizable_array<MaybeQualifie
     return 0;
   });
 
-  output << id << sep << acc.size() << sep << acc.front() << sep
-         << acc.back() << sep << static_cast<float>(average(acc));
+  output << id << output_separator << acc.size() << output_separator << acc.front() << output_separator
+         << acc.back() << output_separator << static_cast<float>(average(acc));
 
   for (auto x : acc) {
-    output << sep << x;
+    output << output_separator << x;
   }
   output << '\n';
 
@@ -1692,65 +1700,74 @@ handle_multi_valued_activities(ID_to_Activity& id_to_activity) {
   return 1;
 }
 
+// We need to accommodate space separated input that may have multiple spaces
+// as well as more strict separators. Branch depending on the value of `input_separator`.
 static int
-read_activity_record(const const_IWSubstring& buffer, ID_to_Activity& id_to_activity) {
+NextWord(const const_IWSubstring& buffer, char input_separator,
+           int& i, const_IWSubstring& result) {
+  if (input_separator == ' ') {
+    return buffer.nextword(result, i, input_separator);
+  } else {
+    return buffer.nextword_single_delimiter(result, i, input_separator);
+  }
+}
+
+static int
+read_activity_record(const const_IWSubstring& buffer,
+                     char input_separator,
+                     std::optional<int>& qualifier_column,
+                     ID_to_Activity& id_to_activity) {
   static bool first_call = true;
 
   IWString id;
+  const_IWSubstring activity;
+  const_IWSubstring qualifier;
 
   int i = 0;
-  buffer.nextword(id, i);
+  const_IWSubstring token;
+  for (int col = 0; NextWord(buffer, input_separator, i, token); ++col) {
+    if (col == 0) {
+      id = token;
+    } else if (col == activity_column) {
+      activity = token;
+    } else if (qualifier_column && col == *qualifier_column) {
+      qualifier = token;
+    }
+  }
+
+  if (id.empty() || activity.empty()) {
+    cerr << "read_activity_record:no identifier and/or activity\n";
+    return 0;
+  }
 
   if (remove_leading_zeros_from_identifiers) {
     id.remove_leading_chars('0');
   }
 
-  const_IWSubstring token;
-
-  if (1 == activity_column) {
-    if (!buffer.nextword(token, i)) {
-      cerr << "NO experimental data available\n";
-      return 0;
-    }
-    //  cerr << "Buffer '" << buffer << "', extracted '" << token << "'\n";
-  } else {
-    // does not handle consecutive delimiters... TODO:ianwatson
-    if (!buffer.word(activity_column, token)) {
-      cerr << "Cannot fetch token for experimental data, activity_column "
-           << activity_column << '\n';
-      return 0;
-    }
+  // First time called will be the header record with the name of the response.
+  if (first_call) {
+    activity_name = activity;
+    first_call = false;
+    return 1;
   }
-
-  if (token.empty()) {  // how could that happen?
-    cerr << "Cannot extract activity token, activity_column " << activity_column << '\n';
-    return 0;
-  }
-
-  float a;
-  // cerr << "Examining '" << token << "' first_call " << first_call << '\n';
 
   MaybeQualified mqd;
 
-  if (token.numeric_value(a)) {  // great
+  float a;
+  if (activity.numeric_value(a)) {  // great
     mqd.set_activity(a);
-    first_call = false;
-  } else if (token[0] == '=' || token[0] == '<' || token[0] == '>') {
-    if (! mqd.Build(token)) {
-      cerr << "read_activity_record:invalid qualified value '" << token << "'\n";
+  } else if (activity[0] == '=' || activity[0] == '<' || activity[0] == '>') {
+    if (! mqd.Build(activity)) {
+      cerr << "read_activity_record:invalid qualified value '" << activity << "'\n";
       return 0;
     }
-  } else if (first_call) {  // header record in activity file
-    activity_name = token;
-    first_call = false;
-    return 1;
-  } else if (missing_value == token) {
+  } else if (missing_value == activity) {
     cerr << "Ignoring missing value for '" << id << "'\n";
     return 1;
   } else {
     uint32_t s = class_name_to_number.size();
 
-    const auto f = class_name_to_number.find(token);
+    const auto f = class_name_to_number.find(activity);
 
     if (f != class_name_to_number.end()) {
       a = (*f).second;
@@ -1760,13 +1777,25 @@ read_activity_record(const const_IWSubstring& buffer, ID_to_Activity& id_to_acti
       a = -1.0f;
     } else if (1 == s) {
       class_name_to_number[token] = 1.0f;
-      positive_class = token;
+      positive_class = activity;
       a = 1.0f;
     } else {
-      cerr << "Non numeric experimental value '" << token
+      cerr << "Non numeric experimental value '" << activity
            << "', maybe too many classes\n";
       return 0;
     }
+  }
+
+  if (qualifier.empty()) {
+  } else if (qualifier[0] == '<') {
+    mqd.set_qualifier(-1);
+  } else if (qualifier[0] == '>') {
+    mqd.set_qualifier(1);
+  } else if (qualifier[0] == '=') {
+    // ignore.
+  } else {
+    cerr << "read_activity_record:unrecognised activity qualifier '" << qualifier << "'\n";
+    return 0;
   }
 
   ID_to_Activity::iterator f = id_to_activity.find(id);
@@ -1794,7 +1823,10 @@ read_activity_record(const const_IWSubstring& buffer, ID_to_Activity& id_to_acti
 }
 
 static int
-read_activity_data(iwstring_data_source& input, ID_to_Activity& id_to_activity) {
+read_activity_data(iwstring_data_source& input,
+                   char input_separator,
+                   std::optional<int>& qualifier_column,
+                   ID_to_Activity& id_to_activity) {
   input.set_translate_tabs(1);
   input.set_strip_trailing_blanks(1);
 
@@ -1805,7 +1837,7 @@ read_activity_data(iwstring_data_source& input, ID_to_Activity& id_to_activity) 
       continue;
     }
 
-    if (!read_activity_record(buffer, id_to_activity)) {
+    if (!read_activity_record(buffer, input_separator, qualifier_column, id_to_activity)) {
       cerr << "Bad activity data record '" << buffer << "'\n";
       return 0;
     }
@@ -1815,7 +1847,10 @@ read_activity_data(iwstring_data_source& input, ID_to_Activity& id_to_activity) 
 }
 
 static int
-read_activity_data(const char* fname, ID_to_Activity& id_to_activity) {
+read_activity_data(IWString& fname,
+                   char input_separator,
+                   std::optional<int>& qualifier_column,
+                   ID_to_Activity& id_to_activity) {
   iwstring_data_source input(fname);
 
   if (!input.good()) {
@@ -1823,7 +1858,7 @@ read_activity_data(const char* fname, ID_to_Activity& id_to_activity) {
     return 0;
   }
 
-  return read_activity_data(input, id_to_activity);
+  return read_activity_data(input, input_separator, qualifier_column, id_to_activity);
 }
 
 static int
@@ -1873,7 +1908,10 @@ FreeMemory(ID_to_Activity& id_to_activity,
 static int
 DisplayDashYOption(int rc) {
   cerr << "The following -Y qualifiers are recognised\n";
+  cerr << " -Y osep=<char>                output separator for tabular files\n";
+  cerr << " -Y sep=<char>                 output separator for tabular files\n";
   cerr << " -Y ignore_no_activity         discard smiles with no activity data - otherwise fatal\n";
+  cerr << " -Y rmlz                       remove leading zero's from identifiers\n";
 
   ::exit(rc);
 }
@@ -1976,6 +2014,18 @@ activity_consistency(int argc, char** argv) {
         if (verbose) {
           cerr << "Will ignore missing activity values\n";
         }
+      } else if (y == "rmlz") {
+        remove_leading_zeros_from_identifiers = 1;
+        if (verbose) {
+          cerr << "Will remove leading zero's from identifiers\n";
+        }
+      } else if (y.starts_with("sep=")) {
+        y.remove_leading_chars(4);
+        if (! char_name_to_char(y, 1)) {
+          cerr << "Invalid osep= directive '" << y << "'\n";
+          return 1;
+        }
+        output_separator = y[0];
       } else if (y == "help") {
         DisplayDashYOption(0);
       } else {
@@ -2053,7 +2103,7 @@ activity_consistency(int argc, char** argv) {
           cerr << "Multi valued data written to '" << v << "'\n";
         }
 
-        stream_for_multi_valued_data << "ID N Min Max Ave ...\n";
+        stream_for_multi_valued_data << "ID" << output_separator << "N" << output_separator << "Min" << output_separator << "Max" << output_separator << "Ave...\n";
       } else if ("help" == lcv) {
         display_dash_V_options(cerr);
       } else {
@@ -2100,9 +2150,41 @@ activity_consistency(int argc, char** argv) {
   ID_to_Activity id_to_activity;
 
   if (cl.option_present('X')) {
-    const char* x = cl.option_value('X');
+    IWString fname;
+    std::optional<int> qualifier_column;
+    char input_separator = ' ';
 
-    if (!read_activity_data(x, id_to_activity)) {
+    IWString x;
+    for (int i = 0; cl.value('X', x, i); ++i) {
+      if (x.starts_with("qcol=")) {
+        x.remove_leading_chars(5);
+        int col;
+        if (! x.numeric_value(col) || col < 1) {
+          cerr << "Invalid qualifier column specificiation '" << x << "'\n";
+          return 1;
+        }
+        if (verbose) {
+          cerr << "Activity qualifier in column " << col << " of -X file\n";
+        }
+        qualifier_column = col - 1;
+      } else if (x.starts_with("sep=")) {
+        x.remove_leading_chars(4);
+        if (! char_name_to_char(x, 1)) {
+          cerr << "Invalid input file separator specification '" << x << "'\n";
+          return 0;
+        }
+        input_separator = x[0];
+      } else {
+        fname = x;
+      }
+    }
+
+    if (fname.empty()) {
+      cerr << "Must specify file containing activity data via the -X option\n";
+      usage(1);
+    }
+
+    if (!read_activity_data(fname, input_separator, qualifier_column, id_to_activity)) {
       cerr << "Cannot read activity data (-X), file '" << x << "'\n";
       return 8;
     }

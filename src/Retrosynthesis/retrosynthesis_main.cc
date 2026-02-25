@@ -42,6 +42,9 @@ class Options {
     // The thing that does all the work.
     Retrosynthesis _retrosynthesis;
 
+    // Count of molecules that never match any of the top level queries.
+    uint64_t _no_matches;
+
   public:
     Options();
 
@@ -55,6 +58,7 @@ class Options {
 Options::Options() {
   _verbose = 0;
   _molecules_read = 0;
+  _no_matches = 0;
 }
 
 int
@@ -92,11 +96,15 @@ Options::Process(Molecule& m, IWString_and_File_Descriptor& output) {
   result.set_parent_molecule(m);
   cerr << "Calling _retrosynthesis\n";
   if (! _retrosynthesis.Process(m, result)) {
-    return 0;
+    return 1;
   }
 
   cerr << "REsult is " << result << '\n';
   result.DebugPrint("", cerr);
+  if (result.empty()) {
+    ++_no_matches;
+    return 1;
+  }
 
   return 1;
 }
@@ -104,6 +112,7 @@ Options::Process(Molecule& m, IWString_and_File_Descriptor& output) {
 int
 Options::Report(std::ostream& output) const {
   output << "Read " << _molecules_read << " molecules\n";
+  output << _no_matches << " molecules did not match any query\n";
 
   return 1;
 }

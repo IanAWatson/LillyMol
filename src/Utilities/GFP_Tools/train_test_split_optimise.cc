@@ -14,13 +14,18 @@
 #include <tuple>
 #include <unordered_map>
 
+#include "absl/container/flat_hash_map.h"
+
 #define REPORT_PROGRESS_IMPLEMENTATION
 
 #include "Foundational/accumulator/accumulator.h"
 #include "Foundational/cmdline/cmdline.h"
+#include "Foundational/data_source/iwstring_data_source.h"
 #include "Foundational/data_source/tfdatarecord.h"
 #include "Foundational/iwmisc/misc.h"
 #include "Foundational/iwmisc/report_progress.h"
+#include "Foundational/iwstring/absl_hash.h"
+#include "Foundational/iwstring/iwstring.h"
 
 #ifdef BUILD_BAZEL
 #include "Utilities/GFP_Tools/nearneighbours.pb.h"
@@ -42,19 +47,19 @@ Usage(int rc) {
 #endif
 // clang-format on
 // clang-format off
-  cerr << "Uses TFDataRecord nn data to generate optimized train/test splits\n";
-  cerr << " -f <train_fraction> fraction of data in the train split\n";
-  cerr << " -n <nsplit>         number of splits needed\n";
-  cerr << " -S <stem>           write splits to <stem>, <stem>R and <stem>E\n";
-  // Interesting/necessary idea, TODO:ianwatson figure something out.
-  //cerr << " -s ...              stratified sampling...\n";
-  cerr << " -o <nopt>           number of optimisation steps to try per split\n";
-  cerr << " -t <sec>            run each split for <sec> seconds\n";
-  cerr << " -r <n>              report progress every <n> steps\n";
-//  enable once I figure out why this does not work.
-//  cerr << " -T <dist>           discard neighbours <dist>\n";
-  cerr << " -x <n>              abandon optimisation of <n> steps since last switch accepted\n";
-  cerr << " -v                  verbose output\n";
+  cerr << R"(Uses TFDataRecord nn data to generate optimized train/test splits
+gfp_nearneighbours_single_file_tbb -h 16 -S file.nn.tfdata file.gfp
+use file.nn for this tool.
+ -f <train_fraction> fraction of data in the train split
+ -n <nsplit>         number of splits needed.
+ -S <stem>           write splits to <stem>, <stem>R and <stem>E.
+ -C <fname>          weighted samples. A mapping from ID to number of instances.
+ -o <nopt>           number of optimisation steps to try per split.
+ -t <sec>            run each split for <sec> seconds.
+ -r <n>              report progress every <n> steps.
+ -x <n>              abandon optimisation of <n> steps since last switch accepted.
+ -v                  verbose output.
+)";
 // clang-format on
   
   ::exit(rc);
@@ -83,6 +88,8 @@ class Needle {
     uint32_t _number_nbrs;
     Nbr* _nbrs;
 
+    uint32_t _count;
+
   public:
     Needle();
     ~Needle();
@@ -104,6 +111,13 @@ class Needle {
 
     void invert_train() {
       _train = !_train;
+    }
+
+    uint32_t count() const {
+      return _count;
+    }
+    void set_count(uint32_t s) {
+      _count = s;
     }
 
     uint32_t Neighbour(uint32_t ndx) const {
@@ -129,6 +143,7 @@ Needle::Needle() {
   _train = 0;
   _number_nbrs = 0;
   _nbrs = nullptr;
+  _count = 1;
 }
 
 Needle::~Needle() {
@@ -197,14 +212,26 @@ Needle::Build(const nnbr::NearNeighbours& proto,
 
 
 // For each neighbour update the distance stored in `nbrdist`
+
 void
 Needle::SetNbrDistances(uint32_t* nbrdist) const {
-  for (uint32_t i = 0; i < _number_nbrs; ++i) {
-    const Nbr& nbr = _nbrs[i];
-    uint32_t id = nbr._id;
-    nbrdist[id] = nbr._dist;
+  // For efficiency we duplicate the two loops so we do not
+  // have an if statement deep inside the loop.
+  if (_count == 1) [[ likely ]] {
+    for (uint32_t i = 0; i < _number_nbrs; ++i) {
+      const Nbr& nbr = _nbrs[i];
+      uint32_t id = nbr._id;
+      nbrdist[id] = nbr._dist;
+    }
+  } else {
+    for (uint32_t i = 0; i < _number_nbrs; ++i) {
+      const Nbr& nbr = _nbrs[i];
+      uint32_t id = nbr._id;
+      nbrdist[id] = nbr._dist * _count;
+    }
   }
 }
+
 
 #ifdef NO_LONGER_USED
 // For each neighbour update the distance stored in `nbrdist`
@@ -257,6 +284,8 @@ class Optimise {
     // The -f option.
     float _fraction_train;
 
+    absl::flat_hash_map<IWString, uint32_t> _id_to_count;
+
     std::mt19937 _rng;
 
     std::unique_ptr<std::uniform_int_distribution<uint32_t>> _uniform;
@@ -303,6 +332,12 @@ class Optimise {
                             std::unordered_map<std::string, std::uint32_t>& id_to_ndx);
     uint32_t ReadNeighbours(const char* fname,
                             const std::unordered_map<std::string, uint32_t>& id_to_ndx);
+    int ReadCounts(IWString& fname);
+    int ReadCounts(iwstring_data_source& input);
+    int ReadCount(const const_IWSubstring& buffer);
+
+     uint32_t GetCount(const IWString& id) const;
+
     int RandomSplit();
 
     uint64_t FormKey(uint32_t i, uint32_t j) const;
@@ -465,6 +500,17 @@ Optimise::Initialise(const Command_Line& cl) {
     }
   }
 
+  if (cl.option_present('C')) {
+    IWString fname = cl.string_value('C');
+    if (! ReadCounts(fname)) {
+      cerr << "Cannot read count data '" << fname << "'\n";
+      return 0;
+    }
+    if (_verbose) {
+      cerr << "Read " << _id_to_count.size() << " count data records from '" << fname << "'\n";
+    }
+  }
+
   if (cl.option_present('S')) {
     cl.value('S', _stem);
     if (_verbose) {
@@ -491,6 +537,60 @@ Optimise::ReportSize(std::ostream& output) const {
   }
 
   output << "Distance matrix holds " << _distance.size() << " items, max " << _max_distance << '\n';
+
+  return 1;
+}
+
+int
+Optimise::ReadCounts(IWString& fname) {
+  iwstring_data_source input(fname.null_terminated_chars());
+  if (! input.good()) {
+    cerr << "Optimise::ReadCounts:cannot open '" << fname << "'\n";
+    return 0;
+  }
+
+  return ReadCounts(input);
+}
+
+int
+Optimise::ReadCounts(iwstring_data_source& input) {
+  const_IWSubstring buffer;
+  if (! input.next_record(buffer)) {
+    cerr << "Optimise::ReadCounts:cannot read header record\n";
+    return 0;
+  }
+
+  while (input.next_record(buffer)) {
+    if (! ReadCount(buffer)) {
+      cerr << "Optimise::ReadCounts:invalid data '" << buffer << "'\n";
+      return 0;
+    }
+  }
+
+  return _id_to_count.size();
+}
+
+int
+Optimise::ReadCount(const const_IWSubstring& buffer) {
+  static constexpr char kInputSeparator = ' ';
+
+  int i = 0;
+  IWString id;
+  const_IWSubstring scount;
+  if (! buffer.nextword(id, i, kInputSeparator) ||
+      ! buffer.nextword(scount, i, kInputSeparator) ||
+      id.empty() || scount.empty()) {
+    cerr << "Optimise::ReadCount:cannot split\n";
+    return 0;
+  }
+
+  uint32_t count;
+  if (! scount.numeric_value(count) || count == 0) {
+    cerr << "Optimise::ReadCount:invalid count " << count << '\n';
+    return 0;
+  }
+
+  _id_to_count[id] = count;
 
   return 1;
 }
@@ -665,6 +765,21 @@ Optimise::ChooseTwo() {
   return std::make_tuple(i1, i2);
 }
 
+uint32_t
+Optimise::GetCount(const IWString& id) const {
+  if (_id_to_count.empty()) {
+    return 1;
+  }
+
+  const auto iter = _id_to_count.find(id);
+  if (iter == _id_to_count.end()) {
+    cerr << "Optimise::GetCount:no count for '" << id << "'\n";
+    return 1;
+  }
+
+  return iter->second;
+}
+
 
 uint32_t
 Optimise::ReadNeighbours(const char* fname,
@@ -700,10 +815,15 @@ Optimise::ReadNeighbours(const char* fname,
       return 0;
     }
 
+    const uint32_t count1 = GetCount(tmp);
+    _needle[ndx].set_count(count1);
+
     for (const nnbr::Nbr& nbr : needle->nbr()) {
       const auto iter = id_to_ndx.find(nbr.id());
       uint64_t key = FormKey(ndx, iter->second);
-      _distance[key] = DistanceToInt(nbr.dist());
+      const uint64_t count2 = GetCount(nbr.id());
+
+      _distance[key] = DistanceToInt(nbr.dist()) * (count1 * count2);
     }
   }
 
@@ -821,7 +941,7 @@ Optimise::MakeSplit(int split) {
 
     int64_t delta = 0;   // a signed quantity
     for (uint32_t i = 0; i < _number_needles; ++i) {
-      if (i == i1 || i == i2) {
+      if (i == i1 || i == i2) [[ unlikely ]] {
         continue;
       }
 
@@ -853,6 +973,7 @@ Optimise::MakeSplit(int split) {
       if (i == i1 || i == i2) {
         continue;
       }
+
       uint32_t d = id_dist[i];
       // cerr <<  "  adj " << i2 << " to " << n << " dist " << d << " train2 " << train2 << " nbr " << _needle[n].in_train() << '\n';
 
@@ -1123,7 +1244,7 @@ Optimise::Report(std::ostream& output) const {
 
 int
 Main(int argc, char** argv) {
-  Command_Line cl(argc, argv, "vf:S:n:o:r:T:s:t:x:");
+  Command_Line cl(argc, argv, "vf:S:n:o:r:T:s:t:x:C:");
   if (cl.unrecognised_options_encountered()) {
     cerr << "unrecognised_options_encountered\n";
     Usage(1);

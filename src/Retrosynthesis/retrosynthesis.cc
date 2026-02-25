@@ -60,6 +60,30 @@ Preprocessor::Process(Molecule& m) {
 
 MoleculeAndFragmentation::MoleculeAndFragmentation() {
   _parent = nullptr;
+  _atom_numbers = nullptr;
+  _generated_by = -1;
+}
+
+MoleculeAndFragmentation::~MoleculeAndFragmentation() {
+  if (_atom_numbers != nullptr) {
+    delete [] _atom_numbers;
+  }
+}
+
+int
+MoleculeAndFragmentation::set_parent_molecule(const Molecule& m) {
+  // I think there is a single line way of doing this...
+  Molecule& me = *this;
+  me = m;
+
+  const int matoms = m.natoms();
+  _atom_numbers = new int[matoms];
+  for (int i = 0; i < matoms; ++i) {
+    _atom_numbers[i] = i;
+    me.set_user_specified_atom_void_ptr(i, _atom_numbers + i);
+  }
+
+  return 1;
 }
 
 std::ostream&
@@ -105,8 +129,53 @@ MoleculeAndFragmentation::DebugPrint(const IWString& indentation, std::ostream& 
   return 1;
 }
 
+bool
+MoleculeAndFragmentation::empty() const {
+  if (_found.size() > 0) {
+    return false;
+  }
+
+  if (_notfound.size() > 0) {
+    return false;
+  }
+
+  return true;
+}
+
+int
+MoleculeAndFragmentation::AtomsFound() const {
+  if (_found.empty()) {
+    return 0;
+  }
+
+  int rc = _found.number_elements();
+}
+
+int
+MoleculeAndFragmentation::LabelByMaxFound() {
+  if (empty()) {
+    return 0;
+  }
+
+  const int matoms = m.natoms();
+
+  std::unique_ptr<int[]> found = std::make_unique<int[]>(matoms);
+  std::fill_n(found.get(), matoms, 0);
+
+  int rc = 0;
+  int max_coverage = 0;
+
+  if (! _found.empty()) {
+    for (const MoleculeAndFragmentation* p : _found) {
+    }
+  }
+
+  return rc;
+}
 
 Reaction::Reaction() {
+  _unique_id = 0;
+
   _reaction = nullptr;
   _number_reactions = 0;
 
@@ -191,16 +260,27 @@ Reaction::Build(const ReactionData& proto, Preprocessor& preprocess,
     }
   }
 
-  if (proto.fingerprint_file_size() == 0) {
+  if (proto.fingerprints().empty()) {
     cerr << "Retrosynthesis::Build:no fingerprints\n";
     return 0;
   }
 
-  for (const std::string& fname : proto.fingerprint_file()) {
-    if (! ReadFingerprints(dirname, fname, preprocess)) {
-      cerr << "Retrosynthesis::Build:cannot read fingerprints '" << fname << "'\n";
+  for (const FingerprintData& fpd : proto.fingerprints()) {
+    if (! ReadFingerprints(dirname, fpd, preprocess)) {
+      cerr << "Retrosynthesis::Build:cannot read fingerprint specification\n";
+      cerr << fpd.ShortDebugString() << '\n';
       return 0;
     }
+  }
+
+  if (proto.has_name()) {
+    _name = proto.name();
+  } else {
+    _name = _reaction[0].name();
+  }
+
+  for (int i = 0; i < _number_reactions; ++i) {
+    _reaction[i].set_unique_id(i);
   }
 
   return 1;
@@ -209,6 +289,8 @@ Reaction::Build(const ReactionData& proto, Preprocessor& preprocess,
 Retrosynthesis::Retrosynthesis() {
   _reaction = nullptr;
   _number_reactions = 0;
+
+  _max_number_steps = std::numeric_limits<int>::max();
 
   _verbose = 0;
 
@@ -276,32 +358,15 @@ Retrosynthesis::Build(const RetrosynthesisData& proto, Preprocessor& preprocess,
 }
 
 int
-Reaction::ReadFingerprints(const IWString& dirname, const std::string& fname, Preprocessor& preprocess) {
-  IWString fullpath = MaybeWithDirectoryPrepended(dirname, fname);
-  iwstring_data_source input;
-  if (! input.open(fullpath)) {
-    cerr << "Retrosynthesis::ReadFingerprints:cannot open '" << fname << "'\n";
-    return 0;
-  }
-
-  return ReadFingerprints(input, preprocess);
-}
-
-int
-Reaction::ReadFingerprints(iwstring_data_source& input,
-        Preprocessor& preprocess) {
+Reaction::ReadFingerprints(const IWString& dirname, const FingerprintData& proto, Preprocessor& preprocess) {
   std::unique_ptr<SetOfFingerprints> fp = std::make_unique<SetOfFingerprints>();
-
-  if(! fp->Build(input, preprocess)) {
-    cerr << "Retrosynthesis::ReadFingerprints:error reading fingerprints\n";
+  if (! fp->Build(dirname, proto, preprocess)) {
+    cerr << "Reaction::ReadFingerprints:cannot read\n";
+    cerr << proto.ShortDebugString() << '\n';
     return 0;
   }
 
   const isotope_t iso = fp->isotope();
-  if (iso == 0) {
-    cerr << "return::ReadFingerprints:no isotope or multiple isotopes\n";
-    return 0;
-  }
 
   auto iter = _iso_to_fp.find(iso);
   if (iter != _iso_to_fp.end()) {
@@ -310,6 +375,71 @@ Reaction::ReadFingerprints(iwstring_data_source& input,
   }
 
   _iso_to_fp[iso] = fp.release();
+
+  return 1;
+}
+
+int
+SetOfFingerprints::Build(const IWString& dirname, const FingerprintData& proto, Preprocessor& preprocess) {
+  if (proto.fname().empty()) {
+    cerr << "SetOfFingerprints::Build:no file name in FingerprintData\n";
+    cerr << proto.ShortDebugString() << '\n';
+    return 0;
+  }
+
+  bool proto_has_isotope;
+  if (proto.has_isotope()) {
+    _isotope = proto.isotope();
+    proto_has_isotope = true;
+  } else {
+    proto_has_isotope = false;
+  }
+
+  if (! ReadFingerprints(dirname, proto.fname(), preprocess, proto_has_isotope)) {
+    cerr << "SetOfFingerprints::Build:cannot read fingerprints from '" << proto.fname() << "'\n";
+    return 0;
+  }
+
+  if (proto.has_name()) {
+    _name = proto.name();
+  }
+
+  return 1;
+}
+
+int
+SetOfFingerprints::ReadFingerprints(const IWString& dirname, const std::string& fname,
+                Preprocessor& preprocess, bool proto_has_isotope) {
+  IWString fullpath = MaybeWithDirectoryPrepended(dirname, fname);
+  iwstring_data_source input;
+  if (! input.open(fullpath)) {
+    cerr << "SetOfFingerprints::ReadFingerprints:cannot open '" << fullpath << "'\n";
+    return 0;
+  }
+
+  return ReadFingerprints(input, preprocess, proto_has_isotope);
+}
+
+// Look for the one atom in `m` that has an existing isotope and replace
+// that with `iso`.
+// Fail of `m` contains more than one isotopic atom.
+int
+ReplaceSingleIsotope(Molecule& m, isotope_t iso) {
+  const int matoms = m.natoms();
+  int rc = 0;
+  for (int i = 0; i < matoms; ++i) {
+    if (m.isotope(i) == 0) [[likely]] {
+      continue;
+    }
+
+    if (rc > 0) {
+      cerr << m.smiles() << " ReplaceSingleIsotope:multiple isotopes\n:";
+      return 0;
+    }
+
+    m.set_isotope(i, iso);
+    rc = 1;
+  }
 
   return 1;
 }
@@ -350,6 +480,8 @@ SetOfFingerprints::SetOfFingerprints() {
   _fp = nullptr;
   _number_fingerprints = 0;
   _isotope = 0;
+  _min_natoms = 0;
+  _max_natoms = std::numeric_limits<int>::max();
 }
 
 SetOfFingerprints::~SetOfFingerprints() {
@@ -359,15 +491,18 @@ SetOfFingerprints::~SetOfFingerprints() {
 }
 
 int
-SetOfFingerprints::Build(iwstring_data_source& input,
-        Preprocessor& preprocess) {
+SetOfFingerprints::ReadFingerprints(iwstring_data_source& input,
+        Preprocessor& preprocess,
+        bool proto_has_isotope) {
   _number_fingerprints = input.count_records_starting_with(identifier_tag);
   if (_number_fingerprints == 0) {
-    cerr << "Retrosynthesis::ReadFingerprints:no fingerprints in file\n";
+    cerr << "SetOfFingerprints::ReadFingerprints:no fingerprints in file\n";
     return 0;
   }
 
   _fp = new IW_General_Fingerprint[_number_fingerprints];
+
+  _max_natoms = 0;  // tested below.
 
   IW_TDT tdt;
   for (int ndx = 0; tdt.next(input); ++ndx) {
@@ -398,7 +533,20 @@ SetOfFingerprints::Build(iwstring_data_source& input,
 
     preprocess.Process(m);
 
-    if (atom_number_t a = SingleIsotope(m); a == kInvalidAtomNumber) {
+    if (_max_natoms == 0) [[ unlikely]] {  // first call only
+      _min_natoms = m.natoms();
+      _max_natoms = m.natoms();
+    } else if (m.natoms() < _min_natoms) {
+      _min_natoms = m.natoms();
+    } else if (m.natoms() > _max_natoms) {
+      _max_natoms = m.natoms();
+    }
+
+    if (proto_has_isotope) {
+      if (! ReplaceSingleIsotope(m, _isotope)) {
+        return 0;
+      }
+    } else if (atom_number_t a = SingleIsotope(m); a == kInvalidAtomNumber) {
       cerr << smiles << " no isotope\n";
       return 0;
     } else if (_isotope == 0) {
@@ -422,7 +570,15 @@ SetOfFingerprints::Build(iwstring_data_source& input,
 int
 SetOfFingerprints::InDatabase(Molecule& m) {
   const IWString& usmi = m.unique_smiles();
-  cerr << _isotope << " looking for " << m.smiles() << '\n';
+  cerr << _name << " iso " << _isotope << ' ' << _name << " looking for " << m.aromatic_smiles() << '\n';
+
+  const int matoms = m.natoms();
+  if (matoms < _min_natoms) {
+    return 0;
+  }
+  if (matoms > _max_natoms) {
+    return 0;
+  }
 
   if (auto iter = _usmi_to_id.find(usmi); iter == _usmi_to_id.end()) {
     return 0;
@@ -434,20 +590,19 @@ SetOfFingerprints::InDatabase(Molecule& m) {
 
 int
 Retrosynthesis::Process(Molecule& m, MoleculeAndFragmentation& results) {
-  const int matoms = m.natoms();
-  std::unique_ptr<int[]> atom_number = std::make_unique<int[]>(matoms);
-  for (int i = 0; i < matoms; ++i) {
-    atom_number[i] = i;
-    m.set_user_specified_atom_void_ptr(i, atom_number.get() + i);
-  }
 
   cerr << "Retrosynthesis has " << _number_reactions << " reactions\n";
 
-  return Process2(m, results);
+  return Process2(m, 0, results);
 }
 
 int
-Retrosynthesis::Process2(Molecule& m, MoleculeAndFragmentation& results) {
+Retrosynthesis::Process2(Molecule& m, int recursion, MoleculeAndFragmentation& results) {
+  cerr << "recursion " << recursion << " to " << _max_number_steps << '\n';
+  if (recursion >= _max_number_steps) {
+    return 0;
+  }
+
   int rc = 0;
 
   for (int i = 0; i < _number_reactions; ++i) {
@@ -464,7 +619,7 @@ Retrosynthesis::Process2(Molecule& m, MoleculeAndFragmentation& results) {
   }
 
   for (MoleculeAndFragmentation* subset : results.notfound()) {
-    rc += Process2(*subset, *subset);
+    rc += Process2(*subset, recursion + 1, *subset);
   }
 
   return rc;
@@ -474,9 +629,11 @@ int
 Reaction::Process(Molecule& m, MoleculeAndFragmentation& results) {
   int rc = 0;
 
+  cerr << "Reaction::Process " << _number_reactions << " reactions " << m.aromatic_smiles() << '\n';
   Substructure_Results sresults;
   for (int i = 0; i < _number_reactions; ++i) {
     if (_reaction[i].substructure_search(m, sresults) == 0) {
+      cerr << "No match to query\n";
       continue;
     }
     cerr << "match to qeruy\n";
@@ -513,6 +670,8 @@ Reaction::ProcessMatch(Molecule& m, MoleculeAndFragmentation& results) {
     if (single_isotope == kInvalidAtomNumber) [[unlikely]] {
       continue;
     }
+
+    f->set_generated_by(_unique_id);
 
     // f->set_isotope(single_isotope, 1);
     cerr << "Looking for " << f->smiles() << '\n';

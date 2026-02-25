@@ -46,15 +46,25 @@ class MoleculeAndFragmentation : public Molecule {
 
     resizable_array_p<MoleculeAndFragmentation> _notfound;
 
+    // We use the user_specified_void_ptr of each atom so that fragments
+    // know their origins.
+    int* _atom_numbers;
+
+    // When dealing with products, each product must know the reaction uinque id
+    // that generated it.
+
+    int _generated_by;
+
   public:
     MoleculeAndFragmentation();
+    ~MoleculeAndFragmentation();
 
-    void set_parent_molecule(const Molecule& m) {
-      Molecule::operator=(m);
-    }
+    int set_parent_molecule(const Molecule& m);
 
     int DebugPrint(std::ostream& output) const;
     int DebugPrint(const IWString& indentation, std::ostream& output);
+
+    bool empty() const;
 
     resizable_array_p<MoleculeAndFragmentation>& found() {
       return _found;
@@ -70,6 +80,14 @@ class MoleculeAndFragmentation : public Molecule {
       return _notfound.size();
     }
 
+    void set_generated_by(int s) {
+      _generated_by = s;
+    }
+
+    int generated_by() const {
+      return _generated_by;
+    }
+
     // Assume ownership of `m` in the _found array.
     void BeenFound(MoleculeAndFragmentation* m) {
       _found << m;
@@ -77,6 +95,10 @@ class MoleculeAndFragmentation : public Molecule {
     void NotFound(MoleculeAndFragmentation* m) {
       _notfound << m;
     }
+
+    // recursively look at the _found arrays and figure out the maximum
+    // number of parent atoms covered.
+    int BestCoverage() const;
 };
 
 std::ostream&
@@ -91,12 +113,33 @@ class SetOfFingerprints {
     // a mapping from the unique smiles of a building block to its name.
     absl::flat_hash_map<IWString, IWString> _usmi_to_id;
 
+    // We keep track of the smallest and largest building block.
+    // We can avoid searches when a query molecule is out of range.
+    int _min_natoms;
+    int _max_natoms;
+
+    IWString _name;
+
+  // Private functions
+    int ReadFingerprints(iwstring_data_source& input,
+        Preprocessor& preprocess,
+        bool proto_has_isotope);
+    int ReadFingerprints(const IWString& dirname, const std::string& fname,
+                Preprocessor& preprocess, bool proto_has_isotope);
+
   public:
     SetOfFingerprints();
     ~SetOfFingerprints();
 
-    int Build(IWString& fname, Preprocessor& preprocess);
+    int Build(const IWString& dirname, const FingerprintData& proto, Preprocessor& preprocess);
     int Build(iwstring_data_source& input, Preprocessor& preprocess);
+
+    void set_name(const IWString& s) {
+      _name = s;
+    }
+    const IWString& name() const {
+      return _name;
+    }
 
     isotope_t isotope() const {
       return _isotope;
@@ -109,6 +152,9 @@ class SetOfFingerprints {
 // A reversed reaction generates 
 class Reaction {
   private:
+    // Each reaction is assigned a unique id.
+    int _unique_id;
+
     // Perhaps it will be necessary to have multiple reactions to
     // handle a specific set of building blocks - boronic...
     IWReaction* _reaction;
@@ -124,8 +170,9 @@ class Reaction {
     absl::flat_hash_map<int, SetOfFingerprints*> _iso_to_fp;
 
   // private functions
-    int ReadFingerprints(const IWString& dirname, const std::string& fname, Preprocessor& preprocess);
-    int ReadFingerprints(iwstring_data_source & input, Preprocessor& preprocess);
+//  int ReadFingerprints(const IWString& dirname, const std::string& fname, Preprocessor& preprocess);
+//  int ReadFingerprints(iwstring_data_source & input, Preprocessor& preprocess);
+    int ReadFingerprints(const IWString& dirname, const FingerprintData& proto, Preprocessor& preprocess);
 
     int ProcessMatch(Molecule& m, MoleculeAndFragmentation& results);
     int InDatabase(Molecule& m);
@@ -140,6 +187,13 @@ class Reaction {
       return _name;
     }
 
+    void set_unique_id(int s) {
+      _unique_id = s;
+    }
+    int unique_id() const {
+      return _unique_id;
+    }
+
     int Process(Molecule& m, MoleculeAndFragmentation& result);
 };
 
@@ -147,6 +201,8 @@ class Retrosynthesis {
   private:
     Reaction* _reaction;
     int _number_reactions;
+
+    int _max_number_steps;
 
     int _verbose;
 
@@ -156,7 +212,7 @@ class Retrosynthesis {
     int ReadFingerprints(IWString& fname);
     int ReadFingerprints(iwstring_data_source& input);
 
-    int Process2(Molecule& m, MoleculeAndFragmentation& results);
+    int Process2(Molecule& m, int recursion, MoleculeAndFragmentation& results);
 
   public:
     Retrosynthesis();
@@ -164,7 +220,11 @@ class Retrosynthesis {
 
     int Initialise(Command_Line& cl, Preprocessor& preprocess);
 
-    int Process(Molecule& m, MoleculeAndFragmentation& results);
+    int number_reactions() const {
+      return _number_reactions;
+    }
+
+    int Process(int rxn, Molecule& m, MoleculeAndFragmentation& results);
 };  // class Retrosynthesis
 
 }  // namespace retrosynthesis

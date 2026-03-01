@@ -128,7 +128,9 @@ Fragment::WriteResult(const std::string& smiles, uint32_t nmolecules,
 
   float ave = _activity.average();
 
-  output << smiles << kSep << _parent << kSep << _natoms << kSep << _activity.n() << kSep
+  output << smiles << kSep;
+  append_first_token_of_name(_parent, output);
+  output << kSep << _natoms << kSep << _activity.n() << kSep
          << iwmisc::Fraction<float>(_activity.n(), nmolecules) << kSep
          << _activity.minval() << kSep << ave << kSep << _activity.maxval() << kSep
          << static_cast<float>(ave - mean_activity) << '\n';
@@ -331,7 +333,7 @@ FindActivity(const std::string& name,
   std::string tmp(name);
   tmp.resize(space);
   const auto iter2 = activity.find(tmp);
-  if (iter2 == activity.end()) {
+  if (iter2 != activity.end()) {
     return iter2;
   }
 

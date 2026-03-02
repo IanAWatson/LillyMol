@@ -61,6 +61,7 @@ static float relative_error_threshold = static_cast<float>(0.0);
 static int range_normal_relative_error = 0;
 
 static char input_separator = ' ';
+static char activity_data_file_input_separator = ' ';
 
 static IWString activity_name;
 
@@ -186,7 +187,8 @@ Can have the experimental data in a separate file, or as a column in the predict
  -C <fname>     write slope and intercept for line of best fit to <fname>.  Enter '-C help' for info.
  -H <fname>     write coverage data - prediction error vs coverage - to <fname>.txt. Also creates <fname>.jl for plotting.
  -Y ...         miscellaneous and obscure options, enter '-Y help' for info
- -i <char>      input column separator (default ' ') use '-i tab' for tsv
+ -i <char>      input column separator in predicted file (default ' ') use '-i tab' for tsv
+    expt=<char> input column separator in -E file.
  -v             verbose output
 )";
   // clang-format on
@@ -2297,6 +2299,19 @@ iwstats(const IW_STL_Hash_Map_int::const_iterator& f,
   return rc;
 }
 
+// Nextword functionality that changes depending on `sep`.
+int
+NextWord(const const_IWSubstring& buffer,
+         int& i,
+         char sep,
+         IWString& result) {
+  if (sep == ' ') {
+    return buffer.nextword(result, i, sep);
+  } else {
+    return buffer.nextword_single_delimiter(result, i, sep);
+  }
+}
+
 static int
 read_id_activity_hash_record(const const_IWSubstring& buffer,
                              IW_STL_Hash_Map<IWString, IWString>& id_activity_hash,
@@ -2304,7 +2319,7 @@ read_id_activity_hash_record(const const_IWSubstring& buffer,
   int i = 0;
   IWString id;
 
-  if (!buffer.nextword(id, i, input_separator)) {
+  if (! NextWord(buffer, i, activity_data_file_input_separator, id)) {
     cerr << "Cannot extract identifier from input '" << buffer << "'\n";
     return 0;
   }
@@ -2315,21 +2330,21 @@ read_id_activity_hash_record(const const_IWSubstring& buffer,
 
   IWString act;
 
-  if (!buffer.nextword(act, i, input_separator)) {
+  if (! NextWord(buffer, i, activity_data_file_input_separator, act)) {
     cerr << "Cannot extract second token from record '" << buffer << "'\n";
     return 0;
   }
 
   if (experimental_column > 1) {
-    for (auto col = 1; col < experimental_column; ++col) {
-      if (!buffer.nextword(act, i, input_separator)) {
+    for (int col = 1; col < experimental_column; ++col) {
+      if (! NextWord(buffer, i, activity_data_file_input_separator, act)) {
         cerr << "Cannot find experimental data column '" << buffer << "'\n";
         return 0;
       }
     }
   }
 
-  if (0 == id_activity_hash.size()) {
+  if (id_activity_hash.empty()) {
     activity_name = act;
   }
 
@@ -2551,13 +2566,24 @@ iwstats(int argc, char** argv) {
   verbose = cl.option_count('v');
 
   if (cl.option_present('i')) {
-    IWString i = cl.string_value('i');
-    if (!char_name_to_char(i)) {
-      cerr << "Unrecognised input separator specification '" << i << "'\n";
-      return 2;
+    IWString opt;
+    for (int i = 0; cl.value('i', opt, i); ++i) {
+      if (opt.starts_with("expt=")) {
+        opt.remove_leading_chars(5);
+        if (! char_name_to_char(opt)) {
+          cerr << "Unrecognised experimental file input separator '" << opt << "'\n";
+          return 1;
+        }
+        activity_data_file_input_separator = opt[0];
+      }
+      else {
+        if (! char_name_to_char(opt)) {
+          cerr << "Unrecognised input separator specification '" << opt << "'\n";
+          return 1;
+        }
+        input_separator = opt[0];
+      }
     }
-
-    input_separator = i[0];
   }
 
   if (cl.option_present('j')) {

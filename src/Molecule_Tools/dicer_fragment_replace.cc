@@ -1539,7 +1539,7 @@ RetrieveFragmentBeingRemoved(Molecule& m,
 
   result->Build(my_molecule);
 
-  assert(my_molecule.natoms == matoms - m.natoms());
+  assert(my_molecule.natoms() == matoms - m.natoms());
 
   return matoms - m.natoms();
 }

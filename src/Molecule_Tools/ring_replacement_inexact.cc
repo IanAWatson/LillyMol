@@ -1594,8 +1594,8 @@ Options::ReplaceRingSystemPreserveRingSubstitution(Molecule& m,
                 const SubstituentsForRingSystem& substituents,
                 const Replacement& replacement,
                 IWString_and_File_Descriptor& output) {
-  assert(_rids.size() > 1);
 
+  // TODO: ianwatson implement this.
   return 1;
 }
 

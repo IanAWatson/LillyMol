@@ -264,7 +264,9 @@ class const_IWSubstring
     int prevword (IWString &, int &, char = ' ') const;
     int prevword (const_IWSubstring &, int &, char = ' ') const;
 
-    template <typename T> int nextword_single_delimiter(T &, int &, char = '	') const;
+    template <typename T> int nextword_single_delimiter(T& result, int& i, char separator = '	') const;
+    // If `separator` is space, calls nextword, otherwise nextword_single_delimiter.
+    template <typename T> int NextWord(T& result, int& i, char separator = ' ') const;
 
     int expand_environment_variables(IWString & destination) const;
 
@@ -501,7 +503,9 @@ class IWString : public resizable_array<char>
     int nextword (const_IWSubstring &, int &, char = ' ') const;
     int prevword (IWString &, int &, char = ' ') const;
 
-    template <typename T> int nextword_single_delimiter(T &, int &, char = '	') const;
+    template <typename T> int nextword_single_delimiter(T& result, int& i, char separator = '	') const;
+    // If `separator` is space, calls nextword, otherwise nextword_single_delimiter.
+    template <typename T> int NextWord(T& result, int& i, char separator = ' ') const;
 
     const_IWSubstring substr (int, int = -1) const;
 
@@ -1207,6 +1211,13 @@ extern void set_default_iwstring_double_concatenation_precision (int s);
 extern int char_name_to_char(IWString & s, int message_if_unrecognised=1);
 
 extern void char_name_to_char_usage(const IWString & s);
+
+// Return a likely token separator given a file name.
+// For example if `fname` ends with ".csv", return ','.
+// Returns ' ' by default.
+namespace iwstring {
+extern char SeparatorFromFileName(const const_IWSubstring& fname);
+}   // namespace iwstring
 
 /*
   Append a number to an ostream or IWString with a given width

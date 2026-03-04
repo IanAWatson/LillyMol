@@ -1145,6 +1145,29 @@ TEST(TestPrevword, TestAll) {
   EXPECT_EQ(result, "world hello");
 }
 
+TEST(TestNextword, TestAdaptive) {
+  std::vector<std::string> data{"hello", "world", "from", "foo"};
+  IWString foo;
+  for (const std::string& t : data) {
+    foo.append_with_spacer(t, ' ');
+  }
+
+  int i = 0;
+  IWString token;
+  for (int ndx = 0; foo.NextWord(token, i); ++ndx) {
+    EXPECT_TRUE(iwstring::Equals(token, data[ndx])) << " got '" << token << " expected '" << data[ndx] << "'";
+  }
+
+  foo.resize_keep_storage(0);
+  for (const std::string& t : data) {
+    foo.append_with_spacer(t, ',');
+  }
+
+  for (int ndx = 0; foo.NextWord(token, i); ++ndx) {
+    EXPECT_TRUE(iwstring::Equals(token, data[ndx])) << " got '" << token << " expected '" << data[ndx] << "'";
+  }
+}
+
 TEST(TestNextword, TestAll) {
   IWString foo = "hello world from foo";
   int i = 0;

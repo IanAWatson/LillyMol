@@ -463,7 +463,7 @@ establish_column_titles(const const_IWSubstring& buffer, int experimental_column
   int col = 0;
   int i = 0;
   const_IWSubstring token;
-  while (buffer.nextword(token, i, input_separator)) {
+  while (buffer.NextWord(token, i, input_separator)) {
     column_titles[col] = token;
 
     // expt column doesn't really mean the same thing when just a name cross reference.
@@ -601,7 +601,7 @@ Predicted_Values::parse_buffer(const const_IWSubstring& buffer, int experimental
   IWString token;
   int col = 0;
 
-  while (buffer.nextword(token, i, input_separator)) {
+  while (buffer.NextWord(token, i, input_separator)) {
     int prediction_index = -1;
 
     if (col == experimental_column) {
@@ -2299,19 +2299,6 @@ iwstats(const IW_STL_Hash_Map_int::const_iterator& f,
   return rc;
 }
 
-// Nextword functionality that changes depending on `sep`.
-int
-NextWord(const const_IWSubstring& buffer,
-         int& i,
-         char sep,
-         IWString& result) {
-  if (sep == ' ') {
-    return buffer.nextword(result, i, sep);
-  } else {
-    return buffer.nextword_single_delimiter(result, i, sep);
-  }
-}
-
 static int
 read_id_activity_hash_record(const const_IWSubstring& buffer,
                              IW_STL_Hash_Map<IWString, IWString>& id_activity_hash,
@@ -2319,7 +2306,7 @@ read_id_activity_hash_record(const const_IWSubstring& buffer,
   int i = 0;
   IWString id;
 
-  if (! NextWord(buffer, i, activity_data_file_input_separator, id)) {
+  if (! buffer.NextWord(id, i, activity_data_file_input_separator)) {
     cerr << "Cannot extract identifier from input '" << buffer << "'\n";
     return 0;
   }
@@ -2330,14 +2317,14 @@ read_id_activity_hash_record(const const_IWSubstring& buffer,
 
   IWString act;
 
-  if (! NextWord(buffer, i, activity_data_file_input_separator, act)) {
+  if (! buffer.NextWord(act, i, activity_data_file_input_separator)) {
     cerr << "Cannot extract second token from record '" << buffer << "'\n";
     return 0;
   }
 
   if (experimental_column > 1) {
     for (int col = 1; col < experimental_column; ++col) {
-      if (! NextWord(buffer, i, activity_data_file_input_separator, act)) {
+      if (! buffer.NextWord(act, i, activity_data_file_input_separator)) {
         cerr << "Cannot find experimental data column '" << buffer << "'\n";
         return 0;
       }

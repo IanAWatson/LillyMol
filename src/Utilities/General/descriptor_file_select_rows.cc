@@ -217,24 +217,12 @@ descriptor_file_select_rows(const char* fname, IWString_STL_Hash_Set& ids_to_fet
   return descriptor_file_select_rows(input, ids_to_fetch, output);
 }
 
-static bool
-NextWord(const const_IWSubstring& buffer,
-         int& i,
-         char sep,
-         const_IWSubstring& result) {
-  if (sep == ' ') {
-    return buffer.nextword(result, i, ' ');
-  } else {
-    return buffer.nextword_single_delimiter(result, i, sep);
-  }
-}
-
 static int
 read_ids(const const_IWSubstring& buffer, IWString_STL_Hash_Set& ids_to_fetch) {
   IWString id;
   int i = 0;
   const_IWSubstring token;
-  for (int col = 0; NextWord(buffer, i, identifier_file_token_separator, token); ++col) {
+  for (int col = 0; buffer.NextWord(token, i, identifier_file_token_separator); ++col) {
     if (col == identifier_column) {
       id = token;
       break;

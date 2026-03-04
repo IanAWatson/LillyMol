@@ -87,7 +87,7 @@ def perform_class_label_translation_lightgbm(activity_file, mdir, train_activity
 end
 
 def perform_response_scaling(activity_file, mdir, train_smi, train_activity, verbose)
-  cmd = "feature_scaling -bin -C #{mdir}/response_scaling -v -subset #{train_smi} -scol 2 #{activity_file} > #{train_activity}"
+  cmd = "feature_scaling -i auto -bin -C #{mdir}/response_scaling -v -subset #{train_smi} -scol 2 #{activity_file} > #{train_activity}"
   execute_cmd(cmd, verbose, [train_activity])
 end
 
@@ -98,7 +98,7 @@ def get_response_name(activity_file)
   header.split[1]
 end
 
-cmdline = IWCmdline.new('-v-mdir=s-A=sfile-C-gfp=close-svml=close-p=ipos-w=fraction-flatten-gfp_make=xfile' \
+cmdline = IWCmdline.new('-v-mdir=s-A=sfile-activity=sfile-C-gfp=close-svml=close-p=ipos-w=fraction-flatten-gfp_make=xfile' \
                         '-svm_learn=xfile-gfp_to_svm_lite=xfile-lightgbm=close-lightgbm_config=sfile' \
                         '-catboost=close' \
                         '-xgboost=close-xgboost_config=sfile-xgb_test=sfile' \
@@ -111,7 +111,11 @@ end
 
 verbose = cmdline.option_present('v')
 
-unless cmdline.option_present('A')
+if cl.option_present('A')
+  activity_file = cmdline.value('A')
+elsif cl.option_present('activity')
+  activity_file = cmdline.value('activity')
+else
   $stderr << "Must specify activity file via the -A option\n"
   usage(1)
 end
@@ -199,7 +203,6 @@ fingerprints = if cmdline.option_present('gfp')
 flatten_sparse_fingerprints = cmdline.option_present('flatten')
 
 smiles = ARGV[0]
-activity_file = cmdline.value('A')
 
 train_smi = "#{mdir}/train.smi"
 train_gfp = "#{mdir}/train.gfp"
@@ -243,7 +246,7 @@ l = if lightgbm || catboost || xgboost
       ''
     end
 
-cmd = "#{gfp_to_svm_lite} #{f} #{l} -C #{mdir}/#{bit_xref} -A #{train_activity} -S #{mdir}/train "
+cmd = "#{gfp_to_svm_lite} #{f} #{l} -C #{mdir}/#{bit_xref} -A #{train_activity} -A sep=auto -S #{mdir}/train "
 if cmdline.option_present('p')
   support = cmdline.value('p')
   cmd = "#{cmd} -p #{support}"

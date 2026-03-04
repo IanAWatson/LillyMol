@@ -142,21 +142,11 @@ separate_into_id_and_data_2(const const_IWSubstring& buffer, int col, const char
   int j = 0;
   const_IWSubstring token;
 
-  if (' ' == sep) {
-    for (auto c = 0; buffer.nextword(token, j); ++c) {
-      if (c == col) {
-        id = token;
-      } else if (include_identifier_file_info) {
-        zdata.append_with_spacer(token);
-      }
-    }
-  } else {
-    for (auto c = 0; buffer.nextword_single_delimiter(token, j); ++c) {
-      if (c == col) {
-        id = token;
-      } else if (include_identifier_file_info) {
-        zdata.append_with_spacer(token);
-      }
+  for (int c = 0; buffer.NextWord(token, j, sep); ++c) {
+    if (c == col) {
+      id = token;
+    } else if (include_identifier_file_info) {
+      zdata.append_with_spacer(token);
     }
   }
 

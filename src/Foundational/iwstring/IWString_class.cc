@@ -4930,6 +4930,31 @@ template int const_IWSubstring::nextword_single_delimiter<IWString>(IWString&, i
 template int common_nextword_single_delimiter<const_IWSubstring>(char const*, int, int&, char, const_IWSubstring&);
 template int common_nextword_single_delimiter<IWString>(char const*, int, int&, char, IWString&);
 
+template <typename T>
+int
+const_IWSubstring::NextWord(T& result, int& i, char separator) const {
+  if (separator == ' ') {
+    return internal_nextword(result, i, separator, _data, _nchars);
+  } else {
+    return common_nextword_single_delimiter(_data, _nchars, i, separator, result);
+  }
+}
+
+template <typename T>
+int
+IWString::NextWord(T& result, int& i, char separator) const {
+  if (separator == ' ') {
+    return internal_nextword(result, i, separator, _things, _number_elements);
+  } else {
+    return common_nextword_single_delimiter(_things, _number_elements, i, separator, result);
+  }
+}
+
+template int IWString::NextWord<const_IWSubstring>(const_IWSubstring&, int&, char) const;
+template int IWString::NextWord<IWString>(IWString&, int&, char) const;
+template int const_IWSubstring::NextWord<const_IWSubstring>(const_IWSubstring&, int&, char) const;
+template int const_IWSubstring::NextWord<IWString>(IWString&, int&, char) const;
+
 #if defined (IW_STD_STRING_DEFINED)
 const_IWSubstring::const_IWSubstring(const std::string & rhs)
 {
@@ -5498,3 +5523,18 @@ IWString::NumericValueKMG(T& result) const {
 template int IWString::NumericValueKMG(uint64_t&) const;
 template int IWString::NumericValueKMG(uint32_t&) const;
 template int IWString::NumericValueKMG(int32_t&) const;
+
+namespace iwstring {
+char
+SeparatorFromFileName(const const_IWSubstring& fname) {
+  if (fname.ends_with(".csv")) {
+    return ',';
+  }
+  if (fname.ends_with(".tsv")) {
+    return '\t';
+  }
+
+  return ' ';  // Default;
+}
+
+}  // namespace iwstring

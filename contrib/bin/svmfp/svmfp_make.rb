@@ -111,9 +111,9 @@ end
 
 verbose = cmdline.option_present('v')
 
-if cl.option_present('A')
+if cmdline.option_present('A')
   activity_file = cmdline.value('A')
-elsif cl.option_present('activity')
+elsif cmdline.option_present('activity')
   activity_file = cmdline.value('activity')
 else
   $stderr << "Must specify activity file via the -A option\n"

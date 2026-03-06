@@ -180,9 +180,16 @@ static IWString_and_File_Descriptor stream_for_post_breakage;
 
 static int record_presence_and_absence_only = 0;
 
+// A fixed isotope that gets attached at join points.
 static isotope_t isotope_for_join_points = 0;
 
+// As initially implemented, for the MCS tool, this will be a one-time
+// increment of an existing isotopic value.
 static int increment_isotope_for_join_points = 0;
+
+// But if we want the isotopic value to be an indication of how many
+// atoms used to be attached to this atom, we need this setting.
+static int always_increment_isotope = 0;
 
 static int apply_atom_type_isotopic_labels = 0;
 
@@ -633,6 +640,7 @@ reset_variables() {
   record_presence_and_absence_only = 0;
   isotope_for_join_points = 0;
   increment_isotope_for_join_points = 0;
+  always_increment_isotope = 0;
   apply_atom_type_isotopic_labels = 0;
   isotopic_label_is_recursion_depth = 0;
   apply_isotopes_to_complementary_fragments = 0;
@@ -3634,6 +3642,10 @@ do_apply_atomic_number_isotopic_labels(Molecule& m, const atom_number_t j1,
 static int
 MaybeIncrementIsotope(Molecule& m, atom_number_t zatom) {
   isotope_t iso = m.isotope(zatom);
+  if (always_increment_isotope) {
+    return m.set_isotope(zatom, iso + increment_isotope_for_join_points);
+  }
+
   if (iso >= static_cast<isotope_t>(increment_isotope_for_join_points)) {
     return 0;
   }
@@ -3914,6 +3926,14 @@ IdentifyEnvironment(Molecule& m, const atom_number_t zatom) {
   if (use_terminal_atom_type && m.ncon(zatom) == 0) {
     return Env::kTerminal;
   }
+
+#ifdef DEBUG_IDENTIFYENVIRONMENT
+  m.compute_aromaticity_if_needed();
+  write_isotopically_labelled_smiles(m, true, cerr);
+  cerr << '\n';
+  cerr << "IdentifyEnvironment " << zatom << " " << m.smarts_equivalent_for_atom(zatom) << '\n';
+  cerr << m.aromatic_smiles() << " aromatic " << m.is_aromatic(zatom) << '\n';
+#endif
 
   if (m.is_aromatic(zatom)) {
     return Env::kAromatic;
@@ -5473,24 +5493,26 @@ Chain_Bond_Breakage::_process(Molecule& m0, Dicer_Arguments& dicer_args,
   Molecule m(m0);
 
   atom_number_t j1, j2;
-  if (!convert_to_atom_numbers_in_current_molecule(m, a1(), j1, a2(),
-                                                   j2)) {  // not in this fragment
+  // Not in this fragment.
+  if (!convert_to_atom_numbers_in_current_molecule(m, a1(), j1, a2(), j2)) {
     return 0;
   }
 
-  if (!m.are_bonded(j1, j2)) {  // should not happen
+  if (!m.are_bonded(j1, j2)) [[unlikely]] {  // should not happen
     return 0;
   }
-
-  set_isotopes_if_needed(m, j1, j2, dicer_args);
 
 #ifdef DEBUG_BOND_BREAKING
   cerr << "Before breaking bond '" << m.smiles() << "', level "
        << dicer_args.recursion_depth() << '\n';
 #endif
 
+  // In order to get atom types correct, remove the old bond
+  // before discerning atom types.
   assert(m.are_bonded(j1, j2));
   m.remove_bond_between_atoms(j1, j2);
+
+  set_isotopes_if_needed(m, j1, j2, dicer_args);
 
   resizable_array<Molecule*> components;
 
@@ -5498,7 +5520,7 @@ Chain_Bond_Breakage::_process(Molecule& m0, Dicer_Arguments& dicer_args,
     do_write_to_stream_for_post_breakage(m, stream_for_post_breakage);
 
     resizable_array_p<Molecule> c;
-    if (2 != m.create_components(c)) {
+    if (2 != m.create_components(c)) [[unlikely]] {
       cerr << "Huh, created " << c.size() << " fragments during chain bond breakage "
            << m.smiles() << '\n';
       return 0;
@@ -7472,29 +7494,31 @@ dicer(const char* fname, FileType input_type, DicerFragmentOutput& output) {
 static void
 display_dash_i_options(std::ostream& os) {
   // clang-format off
-  os << " -I env           atoms get isotopic labels according to their environment\n";
-  os << " -I enva          specific atoms are added to indicate the environment\n";
-  os << " When the 'env' or 'enva' directives are used, these isotopes or elements are added\n";
-  os << " Descripton               iso element\n";
-  os << " Terminal                 1   Te\n";
-  os << " Aromatic                 2   Ar\n";
-  os << " SaturatedCarbon          3   Cs\n";
-  os << " SaturatedNitrogen        4   Nh\n";
-  os << " SaturatedOxygen          5   Os\n";
-  os << " UnsaturatedCarbon        6   Cu\n";
-  os << " UnsaturatedNitrogen      7   Cu\n";
-  os << " UnsaturatedOxygen        8   Cu\n";
-  os << " AmideCarbon              9   Ac\n";
-  os << " AmideNitrogen           10   Am\n";
-  os << " Halogen                 11   Hg\n";
-  os << " Nitro                   12   No\n";
-  os << " RingCarbonAliphatic     13   Cr\n";
-  os << " RingNitrogenAliphatic   14   Na\n";
-  os << " -I z             atoms labelled by atomic number of neighbour\n";
-  os << " -I ini           atoms labelled by initial atom number (debugging uses)\n";
-  os << " -I <number>      constant isotopic label applied to all join points\n";
-  os << " -I inc=<n>       increment existing isotopic label before labelling join points\n";
-  os << " -I <atype>       the atom typing specified by the -P option\n";
+  os << R"( -I env           atoms get isotopic labels according to their environment
+ -I enva          specific atoms are added to indicate the environment
+ When the 'env' or 'enva' directives are used, these isotopes or elements are added
+ Descripton               iso element
+ Terminal                 1   Te
+ Aromatic                 2   Ar
+ SaturatedCarbon          3   Cs
+ SaturatedNitrogen        4   Nh
+ SaturatedOxygen          5   Os
+ UnsaturatedCarbon        6   Cu
+ UnsaturatedNitrogen      7   Cu
+ UnsaturatedOxygen        8   Cu
+ AmideCarbon              9   Ac
+ AmideNitrogen           10   Am
+ Halogen                 11   Hg
+ Nitro                   12   No
+ RingCarbonAliphatic     13   Cr
+ RingNitrogenAliphatic   14   Na
+ -I z             atoms labelled by atomic number of neighbour
+ -I ini           atoms labelled by initial atom number (debugging uses)
+ -I <number>      constant isotopic label applied to all join points
+ -I inc=<n>       increment existing isotopic label before labelling join points (only one increment)
+ -I INC=<n>       increment all isotopic labels - isotope will be number of connections broken
+ -I <atype>       the atom typing specified by the -P option
+)";
   // clang-format on
 
   exit(0);
@@ -7701,8 +7725,22 @@ dicer(int argc, char** argv) {
 
         if (verbose) {
           cerr << "Will add " << increment_isotope_for_join_points
+               << " to existing isotopic labels at join points - one time addition\n";
+        }
+      } else if (i.starts_with("INC=")) {
+        i.remove_leading_chars(4);
+        if (!i.numeric_value(increment_isotope_for_join_points) ||
+            increment_isotope_for_join_points < 1) {
+          cerr << "The increment isotope values for attachment points directive (-I "
+                  "INC=) must be a whole +ve number\n";
+          return 2;
+        }
+
+        if (verbose) {
+          cerr << "Will add " << increment_isotope_for_join_points
                << " to existing isotopic labels at join points\n";
         }
+        always_increment_isotope = 1;
       } else if ("atype" == i) {
         apply_atom_type_isotopic_labels = 1;
         if (verbose) {

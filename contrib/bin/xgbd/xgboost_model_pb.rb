@@ -6,16 +6,33 @@ require 'google/protobuf'
 Google::Protobuf::DescriptorPool.generated_pool.build do
   add_file("xgboost/xgboost_model.proto", :syntax => :proto3) do
     add_message "xgboost_model.XGBoostParameters" do
-      proto3_optional :eta, :float, 1
-      proto3_optional :max_depth, :uint32, 2
-      proto3_optional :n_estimators, :uint32, 3
-      proto3_optional :min_samples_split, :uint32, 4
-      proto3_optional :subsample, :float, 5
-      proto3_optional :colsample_bytree, :float, 6
-      proto3_optional :colsample_bylevel, :float, 7
-      proto3_optional :colsample_bynode, :float, 8
-      proto3_optional :tree_method, :enum, 9, "xgboost_model.TreeMethod"
-      proto3_optional :scale_pos_weight, :float, 10
+      proto3_optional :max_depth, :uint32, 5
+      proto3_optional :min_child_weight, :float, 6
+      proto3_optional :max_delta_step, :float, 7
+      proto3_optional :subsample, :float, 8
+      proto3_optional :sampling_method, :string, 9
+      proto3_optional :colsample_bytree, :float, 10
+      proto3_optional :colsample_bylevel, :float, 11
+      proto3_optional :colsample_bynode, :float, 12
+      proto3_optional :tree_method, :enum, 17, "xgboost_model.TreeMethod"
+      proto3_optional :scale_pos_weight, :float, 18
+      proto3_optional :n_estimators, :uint32, 19
+      oneof :learning_rate_aliases do
+        optional :eta, :float, 1
+        optional :learning_rate, :float, 2
+      end
+      oneof :min_split_loss_aliases do
+        optional :gamma, :float, 3
+        optional :min_split_loss, :float, 4
+      end
+      oneof :lambda_aliases do
+        optional :lambda, :float, 13
+        optional :reg_lambda, :float, 14
+      end
+      oneof :alpha_aliases do
+        optional :alpha, :float, 15
+        optional :reg_alpha, :float, 16
+      end
     end
     add_message "xgboost_model.LightGbmParameters" do
     end

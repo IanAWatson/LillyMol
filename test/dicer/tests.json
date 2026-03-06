@@ -40,6 +40,14 @@
           "name": "case_9",
           "args": [ "-k 2 -X 5000 -B nbamide -m 5 -M 20 #{datadir}/rand.smi" ],
           "comment": [ "nbamide" ]
+        },
+        {
+          "name": "increment_isotope_one_time",
+          "args": [ "-I inc=10 -B bCCD3 -B brcb #{indir}/in.smi"]
+        },
+        {
+          "name": "always_increment_isotope",
+          "args": [ "-I INC=1 -B bCCD3 -B brcb #{indir}/in.smi"]
         }
     ]
 }

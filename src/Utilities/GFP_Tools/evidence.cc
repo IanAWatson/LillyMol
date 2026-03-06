@@ -982,9 +982,11 @@ Evidence::PrintNbrs(std::ostream& output) const {
 
 int
 Evidence::Process() {
+#ifdef DEBUG_PROCESS
   for (int i = 0; i < _number_items; ++i) {
     cerr << "Process: " << i << ' ' << _item[i].id() << '\n';
   }
+#endif
   // The first result is always the shortest distance.
   ShortestDistance();
 

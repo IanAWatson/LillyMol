@@ -180,6 +180,8 @@ FormulaFingerprint(data_source_and_type<Molecule>& input,
                          IWString_and_File_Descriptor& output) {
   Molecule* m;
   while ((m = input.next_molecule()) != nullptr) {
+    std::unique_ptr<Molecule> free_m(m);
+
     FormulaFingerprint(*m, options, output);
     output.write_if_buffer_holds_more_than(4096);
   }

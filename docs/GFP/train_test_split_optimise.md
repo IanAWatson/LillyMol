@@ -36,7 +36,7 @@ runs the nearest neighbour determination using multiple threads.
 
 Run the optimisation.
 ```
-train_test_split_optimise -f 0.8 -n 10 -S SPLIT -o 1000000 -v -r 10000 file.tfdata
+train_test_split_optimise -f 0.8 -n 10 -S SPLIT -o 1000000 -v -r 10000 -h 8 file.tfdata
 ```
 
 In this case we request 0.8 (80%) `-f 0.8` of the data to be in the train split.
@@ -91,6 +91,10 @@ which takes about 5 minutes per split - on a faster computer than was used earli
 The new option is the -x option, which specifies that if there is a period of
 30k optimisations without any change, the optimisation is abandoned. Again, there
 is no "right" answer for what that number should be.
+
+The application can now run multi-threaded, use the -h option to specify the number
+of threads to use. Note too that the -v option triggers some expensive computations.
+Avoid if you don't need the extra information.
 
 ## Results
 

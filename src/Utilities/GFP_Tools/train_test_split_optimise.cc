@@ -49,11 +49,14 @@ Usage(int rc) {
 // clang-format on
 // clang-format off
   cerr << R"(Uses TFDataRecord nn data to generate optimized train/test splits
-gfp_nearneighbours_single_file_tbb -h 16 -S file.nn.tfdata file.gfp
-use file.nn for this tool.
+Randomly assigns train and test. Then iteratively swaps pairs if the sawp increases the inter-set distance.
+Compute nearest neighbours to a fixed distance - as large as feasible.
+gfp_nearneighbours_single_file_tbb -T 0.35 -h 16 -S file.nn.tfdata file.gfp
+train_test_split_opt -f 0.85 -n 1 -S OPT -o 2000000 -r 20000 -x 20000 -h 8 file.nn.tfdata.
+
  -f <train_fraction> fraction of data in the train split
  -n <nsplit>         number of splits needed.
- -S <stem>           write splits to <stem>, <stem>R and <stem>E.
+ -S <stem>           write splits to <stem>, <stem>R<n> and <stem>E<n>.
  -X                  also write cross split summary stats - expensive to compute.
  -C <fname>          weighted samples. A mapping from ID to number of instances.
  -o <nopt>           number of optimisation steps to try per split.

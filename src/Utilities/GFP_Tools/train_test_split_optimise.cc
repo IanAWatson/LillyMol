@@ -2,6 +2,7 @@
 // the distances across a train/test split one or more train/test splits.
 
 #include <stdlib.h>
+#include <omp.h>
 
 #include <algorithm>
 #include <ctime>
@@ -53,11 +54,13 @@ use file.nn for this tool.
  -f <train_fraction> fraction of data in the train split
  -n <nsplit>         number of splits needed.
  -S <stem>           write splits to <stem>, <stem>R and <stem>E.
+ -X                  also write cross split summary stats - expensive to compute.
  -C <fname>          weighted samples. A mapping from ID to number of instances.
  -o <nopt>           number of optimisation steps to try per split.
  -t <sec>            run each split for <sec> seconds.
  -r <n>              report progress every <n> steps.
  -x <n>              abandon optimisation of <n> steps since last switch accepted.
+ -h <n>              number of OMP threads to use during exact calculation.
  -v                  verbose output.
 )";
 // clang-format on
@@ -309,6 +312,8 @@ class Optimise {
     // One more than the max value of the values in _distance
     uint32_t _max_distance;
 
+    int _nthreads;
+
     // Rather than storing smiles and id with the Needle, we deliberately
     // make a global array of both, hoping to keep the Needle class very
     // small.
@@ -320,6 +325,9 @@ class Optimise {
 
     // The file name stem for the output files, the -S option.
     IWString _stem;
+
+    // This can be expensive so it is optional.
+    int _write_cross_split_summary;
 
     // Activated by the -r option.
     Report_Progress _report_progress;
@@ -392,11 +400,15 @@ Optimise::Optimise() {
   _number_needles = 0;
   _needle = nullptr;
 
+  _nthreads = 0;
+
   _smiles = nullptr;
   _name = nullptr;
   _times_in_train = nullptr;
 
   _abandon_if = 0;
+
+  _write_cross_split_summary = 0;
 
   std::random_device rd;
   _rng.seed(rd());
@@ -518,6 +530,24 @@ Optimise::Initialise(const Command_Line& cl) {
     }
   }
 
+  if (cl.option_present('h')) {
+    if (! cl.value('h', _nthreads) || _nthreads < 1) {
+      cerr << "The number of OMP threads (-h) must be a whole +ve number\n";
+      return 0;
+    }
+    omp_set_num_threads(_nthreads);
+    if (_verbose) {
+      cerr << "Will use " << _nthreads << " OMP threads for exact calculation\n";
+    }
+  }
+
+  if (cl.option_present('X')) {
+    _write_cross_split_summary = 1;
+    if (_verbose) {
+      cerr << "Will write cross split summary files\n";
+    }
+  }
+
   return 1;
 }
 
@@ -536,7 +566,7 @@ Optimise::ReportSize(std::ostream& output) const {
     }
   }
 
-  output << "Distance matrix holds " << _distance.size() << " items, max " << _max_distance << '\n';
+  output << "Distance matrix holds " << _distance.size() << " items, max dist " << _max_distance << '\n';
 
   return 1;
 }
@@ -662,6 +692,7 @@ Optimise::RandomSplit() {
       }
     }
   }
+
   if (_verbose) {
     cerr << "RandomSplit after balancing " << in_train << " in train\n";
   }
@@ -678,6 +709,10 @@ Optimise::RandomSplit() {
 uint64_t
 Optimise::RecomputeCurrentScore() {
   _current_score = 0;
+
+  uint64_t accumulate = 0;
+  cerr << " Begin RecomputeCurrentScore\n";
+#pragma omp parallel for reduction(+:accumulate)
   for (uint32_t i = 0; i < _number_needles; ++i) {
     const int itrain = _needle[i].in_train();
     for (uint32_t j = i + 1; j < _number_needles; ++j) {
@@ -689,11 +724,12 @@ Optimise::RecomputeCurrentScore() {
       const uint32_t d = DistanceOrMax(i, j);
       // cerr << " " << i << " and " << j << " opposite, dist " << d << '\n';
 
-      _current_score += d;
+      accumulate += d;
     }
   }
+  _current_score = accumulate;
 
-  // cerr << "Current score " << _current_score << '\n';
+  cerr << "Current score " << _current_score << '\n';
 
   return _current_score;
 }
@@ -882,7 +918,16 @@ Diff(const uint64_t v1, const uint64_t v2) {
   return - static_cast<int64_t>(v2 - v1);
 }
 
+// #define DEBUG_MAKE_SPLIT
+
 // Starting with a random split, optimize it and write when done.
+// This is still not correct.
+// If run with verbose, after the optimisation the full score is recomputed
+// and there are differences.
+// Failures are rare, I cannot generate any failures with a random set of
+// 10k molecules from Chembl.
+// But 100k reliably generates failures.
+// The resulting splits seem to be just fine.
 int
 Optimise::MakeSplit(int split) {
   std::time_t tzero = 0;
@@ -893,14 +938,15 @@ Optimise::MakeSplit(int split) {
   RandomSplit();
   uint64_t score = RecomputeCurrentScore();
   const uint64_t starting_score = score;
-  const auto [across_split, number_at_max] = AveDistNumberMax();
   if (_verbose) {
+    const auto [across_split, number_at_max] = AveDistNumberMax();
     cerr << "Split " << split << " starting score " << score <<
             " ave dist " << across_split << " at max " << number_at_max << '\n';
   }
 
   // FIrst split, write the random split.
-  if (split == 0) {
+  if (split == 0 && _verbose) {
+    cerr << "WRiting random split status\n";
     WriteRandomSplitStatus();
   }
 
@@ -908,6 +954,7 @@ Optimise::MakeSplit(int split) {
 
   uint32_t steps_accepted = 0;
   uint32_t last_successful_switch = 0;
+  cerr << "Begin " << _nopt << " optimisation steps\n";
 #ifdef DEBUG_MAKE_SPLIT
   cerr << "Will perform " << _nopt << " optimisations\n";
   for (int i = 0; i < _number_needles; ++i) {
@@ -924,13 +971,15 @@ Optimise::MakeSplit(int split) {
     const int train2 = _needle[i2].in_train();
 #ifdef DEBUG_MAKE_SPLIT
     cerr << "Selected " << i1 << " and " << i2 << '\n';
-    for (int i = 0; i < _number_needles; ++i) {
+    for (uint32_t i = 0; i < _number_needles; ++i) {
       cerr << i << " train " << _needle[i].in_train() << '\n';
     }
 #endif
 
     std::fill_n(id_dist.get(), _number_needles, _max_distance);
     _needle[i1].SetNbrDistances(id_dist.get());
+    id_dist[i1] = 0;
+    id_dist[i2] = 0;
 #ifdef DEBUG_MAKE_SPLIT
     cerr << "After setting needle1 ";
     for (uint32_t q = 0; q < _number_needles; ++q) {
@@ -940,16 +989,17 @@ Optimise::MakeSplit(int split) {
 #endif
 
     int64_t delta = 0;   // a signed quantity
+#pragma omp parallel for reduction(+:delta)
     for (uint32_t i = 0; i < _number_needles; ++i) {
-      if (i == i1 || i == i2) [[ unlikely ]] {
-        continue;
-      }
+//    if (i == i1 || i == i2) [[ unlikely ]] {   not needed because the id_dist entries have been zero'd
+//      continue;
+//    }
 
-      uint32_t d = id_dist[i];
+      int32_t d = id_dist[i];
 
       // If both on the same side now, were previously on opposite sides.
       if (_needle[i].in_train() == train1) {
-        delta -= d;
+        delta += -d;
       } else  {  // different sides now, previously same.
         delta += d;
       }
@@ -961,6 +1011,8 @@ Optimise::MakeSplit(int split) {
 
     std::fill_n(id_dist.get(), _number_needles, _max_distance);
     _needle[i2].SetNbrDistances(id_dist.get());
+    id_dist[i1] = 0;
+    id_dist[i2] = 0;
 #ifdef DEBUG_MAKE_SPLIT
     cerr << "After setting needle2 ";
     for (uint32_t q = 0; q < _number_needles; ++q) {
@@ -969,17 +1021,18 @@ Optimise::MakeSplit(int split) {
     cerr << '\n';
 #endif
 
+#pragma omp parallel for reduction(+:delta)
     for (uint32_t i = 0; i < _number_needles; ++i) {
-      if (i == i1 || i == i2) {
-        continue;
-      }
+//    if (i == i1 || i == i2) [[ unlikely ]] {
+//      continue;
+//    }
 
-      uint32_t d = id_dist[i];
+      int32_t d = id_dist[i];
       // cerr <<  "  adj " << i2 << " to " << n << " dist " << d << " train2 " << train2 << " nbr " << _needle[n].in_train() << '\n';
 
       // If both on the same side now, were previously on opposite sides.
       if (_needle[i].in_train() == train2) {
-        delta -= d;
+        delta += -d;
       } else  {  // different sides now, previously same.
         delta += d;
       }
@@ -989,7 +1042,7 @@ Optimise::MakeSplit(int split) {
     cerr << "At end of i2 delta " << delta << '\n';
 #endif
 
-    uint64_t new_score = score + delta;
+    const uint64_t new_score = score + delta;
 #ifdef DEBUG_SWAP_ITEMS
     cerr << "new_score " << new_score << " cmp " << score << '\n';
     for (uint32_t y = 0; y < _number_needles; ++y) {
@@ -998,21 +1051,24 @@ Optimise::MakeSplit(int split) {
 #endif
 
     if (_report_progress() && j > 0) {
+      static uint32_t accepted_last_report = 0;
+      uint32_t accepted_this_period = steps_accepted - accepted_last_report;
+      accepted_last_report = steps_accepted;
+
       cerr << split << ' ' << j << " score " << new_score << " cmp " << starting_score <<
-      " accepted " << steps_accepted << " " << iwmisc::Fraction<float>(steps_accepted, j) << 
+      " accepted " << steps_accepted << " delta " << accepted_this_period << ' ' <<
+      iwmisc::Fraction<float>(steps_accepted, j) <<
       " last successful " << last_successful_switch << '\n';
     }
 
-    // Heuristics to stop this being checked too often.
-    if (_seconds > 0 && j > 500 && j % 1000 == 0 && BreakForTime(tzero, _seconds)) {
-      break;
-    }
-
-    if (_abandon_if > 0 && (j - last_successful_switch > _abandon_if)) {
-      if (_verbose) {
-        cerr << "Abandon optimisation, steps " << j << " last successful " << last_successful_switch << '\n';
-      }
-      break;
+    // No improvement, revert.
+    if (new_score <= score)  [[ likely ]] {
+      _needle[i1].invert_train();
+      _needle[i2].invert_train();
+    } else { // Better, sets more separated, accept.
+      score = new_score;
+      ++steps_accepted;
+      last_successful_switch = j;
     }
 
 #ifdef DEBUG_SWAP_ITEMS
@@ -1021,21 +1077,16 @@ Optimise::MakeSplit(int split) {
     new_score = r;
 #endif
 
-    if (new_score == score) {
-      continue;
+    // Heuristics to stop this being checked too often.
+    if (_seconds > 0 && j > 500 && j % 1000 == 0 && BreakForTime(tzero, _seconds)) [[ unlikely ]] {
+      cerr << "Stopped for  timeout " << j << " steps completed\n";
+      break;
     }
-    // If better, sets more separated, always accept.
-    if (new_score > score) {
-      score = new_score;
-      ++steps_accepted;
-      last_successful_switch = j;
-      continue;
-    }
-    // Worse, revert.
-    if (new_score < score) {
-      _needle[i1].invert_train();
-      _needle[i2].invert_train();
-      continue;
+
+    if (_abandon_if > 0 && (j - last_successful_switch > _abandon_if)) [[ unlikely ]] {
+      cerr << "Abandon optimisation, steps " << j << " last successful " << last_successful_switch << '\n';
+      cerr << "Accepted " << steps_accepted << " switches\n";
+      break;
     }
   }
 
@@ -1085,15 +1136,21 @@ Optimise::WriteSplit(int split) const {
   fname << _stem << 'E' << split << ".smi";
   WriteSmiles(0, fname);
 
-  fname.resize_keep_storage(0);
-  fname << _stem << "_stats" << split << ".txt";
-  WriteCrossSplitSummary(fname);
+  if (_write_cross_split_summary) {
+    fname.resize_keep_storage(0);
+    fname << _stem << "_stats" << split << ".txt";
+    WriteCrossSplitSummary(fname);
+  }
 
   return 1;
 }
 
 int
 Optimise::WriteRandomSplitStatus() const {
+  if (! _write_cross_split_summary) {
+    return 1;
+  }
+
   IWString fname;
   fname << _stem << "_stats_rand.txt";
   return WriteCrossSplitSummary(fname);
@@ -1159,7 +1216,12 @@ Optimise::WriteCrossSplitSummary(IWString& fname) const {
 
 int
 Optimise::WriteCrossSplitSummary(IWString_and_File_Descriptor& output) const {
+
   extending_resizable_array<int> count;
+
+  count.reserve(_max_distance + 1);
+
+  cerr << "WriteCrossSplitSummary\n";
   for (uint32_t i = 0; i < _number_needles; ++i) {
     int itrain = _needle[i].in_train();
     for (uint32_t j = i + 1; j < _number_needles; ++j) {
@@ -1170,6 +1232,7 @@ Optimise::WriteCrossSplitSummary(IWString_and_File_Descriptor& output) const {
       ++count[d];
     }
   }
+  cerr << "WriteCrossSplitSummary finished\n";
 
   constexpr char kSep = ' ';
 
@@ -1188,7 +1251,10 @@ Optimise::WriteCrossSplitSummary(IWString_and_File_Descriptor& output) const {
 
 float
 Optimise::AveDistanceAcrossSplit() const {
-  Accumulator_Int<uint64_t> acc;
+  uint64_t sum = 0;
+  uint64_t n = 1;
+
+#pragma omp parallel for reduction(+:sum, n)
   for (uint64_t i = 0; i < _number_needles; ++i) {
     const int itrain = _needle[i].in_train();
     for (uint64_t j = i + 1; j <_number_needles; ++j) {
@@ -1196,19 +1262,24 @@ Optimise::AveDistanceAcrossSplit() const {
         continue;
       }
       uint32_t d = DistanceOrMax(i, j);
-      acc.extra(d);
+      sum += d;
+      ++n;
     }
   }
 
-  return acc.average();
+  // Do the calc as a double, will be cast to float on return.
+  return iwmisc::Fraction<double>(sum, n);
 }
 
 // Return the average distance of cross-split pairs that are not at the
 // maximum distance, and the number that are at the maximum distance.
 std::tuple<float, uint32_t>
 Optimise::AveDistNumberMax() const {
-  Accumulator_Int<uint64_t> acc;
   uint64_t number_max = 0;
+  uint64_t sum = 0;
+  uint64_t n = 0;
+
+#pragma omp parallel for reduction(+:sum, number_max)
   for (uint64_t i = 0; i < _number_needles; ++i) {
     const int itrain = _needle[i].in_train();
     for (uint64_t j = i + 1; j <_number_needles; ++j) {
@@ -1219,13 +1290,15 @@ Optimise::AveDistNumberMax() const {
       if (d == _max_distance) {
         ++number_max;
       } else {
-        acc.extra(d);
+        sum += d;
+        ++n;
       }
     }
   }
 
-  return std::tuple(acc.average(), number_max);
+  float ave = iwmisc::Fraction<double>(sum, n);
 
+  return std::tuple(ave, number_max);
 }
 
 int
@@ -1244,7 +1317,7 @@ Optimise::Report(std::ostream& output) const {
 
 int
 Main(int argc, char** argv) {
-  Command_Line cl(argc, argv, "vf:S:n:o:r:T:s:t:x:C:");
+  Command_Line cl(argc, argv, "vf:S:n:o:r:T:s:t:x:C:h:X");
   if (cl.unrecognised_options_encountered()) {
     cerr << "unrecognised_options_encountered\n";
     Usage(1);

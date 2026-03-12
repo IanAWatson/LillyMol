@@ -641,7 +641,7 @@ write_statistics_for_neighbour_list(const resizable_array_p<T> &neighbours,
   if (d.n() > 0) {
     output.append_number(static_cast<float>(d.average()), output_precision);
   } else {
-    output << output_separator;
+    output << output_separator << '0';
   }
 
   return;

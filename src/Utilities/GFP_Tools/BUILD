@@ -1110,6 +1110,14 @@ cc_binary(
     srcs = [
         "train_test_split_optimise.cc",
     ],
+    copts = select({
+        ":darwin": ["-Xclang", "-fopenmp"],
+        "//conditions:default": ["-fopenmp -fopt-info-omp"]
+    }),
+    linkopts = select ({
+        ":darwin": ["-Xclang", "-fopenmp"],
+        "//conditions:default": ["-lgomp -fopt-info-omp"]
+    }),
     deps = [
         ":nearneighbours_cc_proto",
         "//Foundational/accumulator",

@@ -21,7 +21,9 @@
 PYBIND11_MAKE_OPAQUE(std::vector<int>);
 #endif
 
+#include "Molecule_Lib/charge_assigner.h"
 #include "Molecule_Lib/chiral_centre.h"
+#include "Molecule_Lib/donor_acceptor.h"
 #include "Molecule_Lib/etrans.h"
 #include "Molecule_Lib/molecule.h"
 #include "Molecule_Lib/mol2graph.pb.h"
@@ -1788,4 +1790,78 @@ PYBIND11_MODULE(lillymol, m)
     .def("set_calculation_type", &quick_rotbond::QuickRotatableBonds::set_calculation_type)
   ;
 
+  py::class_<Charge_Assigner>(m, "ChargeAssigner")
+    .def(py::init([]() {
+      auto instance = std::make_unique<Charge_Assigner>();
+      const char* lillymol_home = getenv("LILLYMOL_HOME");
+      if (lillymol_home == NULL) {
+        std::cerr << "ChargeAssigner:no LILLYMOL_HOME\n";
+        return instance;
+      }
+      IWString data(lillymol_home);
+      data << "/data/queries/charges";
+      if (!instance->BuildFromDir(data)) {
+        std::cerr << "Failed to initialise charge assigner\n";
+        return instance;
+      }
+
+      return instance;
+    }))
+    .def("active", [](const Charge_Assigner& chg)->bool {
+      return chg.active() > 0;
+    })
+    .def("set_min_distance_between_charges", &Charge_Assigner::set_min_distance_between_charges,
+        "specify minimum bond separation between formal charges assigned")
+    .def("process", [](Charge_Assigner& chg, Molecule& m) {
+      const int matoms = m.natoms();
+      if (matoms < 1) {
+        return 0;
+      }
+
+      std::unique_ptr<formal_charge_t[]> charges_assigned = std::make_unique<formal_charge_t[]>(matoms);
+      std::fill_n(charges_assigned.get(), matoms, 0);
+      if (chg.process(m, charges_assigned.get()) == 0) {
+        std::cerr << "No charges assigned\n";
+        return 0;
+      }
+
+      int rc = 0;
+      for (int i = 0; i < matoms; ++i) {
+        if (charges_assigned[i] != 0) {
+          m.set_formal_charge(i, charges_assigned[i]);
+          ++rc;
+        }
+      }
+
+      return rc;
+    }
+  )
+  ;
+
+  py::class_<Donor_Acceptor_Assigner>(m, "DonorAcceptor")
+    .def(py::init([]() {
+      auto instance = std::make_unique<Donor_Acceptor_Assigner>();
+      const char* lillymol_home = getenv("LILLYMOL_HOME");
+      if (lillymol_home == NULL) {
+        std::cerr << "DonorAcceptor:no LILLYMOL_HOME\n";
+        return instance;
+      }
+      IWString data(lillymol_home);
+      data << "/data/queries/hbonds";
+      static constexpr int kVerbose = 0;
+      if (!instance->BuildFromDir(data, kVerbose)) {
+        std::cerr << "Failed to initialise donor acceptor\n";
+        return instance;
+      }
+      instance->set_apply_isotopic_labels(1);
+
+      return instance;
+    }))
+    .def("active", [](const Donor_Acceptor_Assigner& donor_acceptor)->bool {
+      return donor_acceptor.active() > 0;
+    })
+    .def("process", [](Donor_Acceptor_Assigner& donor_acceptor, Molecule& m) {
+      return donor_acceptor.process(m);
+    })
+    ;
 }

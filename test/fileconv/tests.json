@@ -1,0 +1,22 @@
+
+
+{
+  "executable": "fileconv",
+  "difftool": "same_structures",
+  "test": [
+    {
+      "name": "charge_assigner",
+      "args": [
+        "-o usmi -N DIR=DEF -S - #{indir}/in.smi"
+      ]
+    },
+
+    {
+      "name": "donor_acceptor",
+      "args": [
+        "-o usmi -H label -H DIR=DEF -S - #{indir}/in.smi"
+      ]
+    }
+
+  ]
+}

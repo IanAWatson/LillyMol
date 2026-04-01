@@ -769,6 +769,44 @@ in the reaction. For each such reagent, a product will be formed for
 each embedding of the query in 'm', generating `number_reagents * number_matches`
 products. Some molecules may have differing numbers of matches...
 
+## Formal Charge Assignment
+LillyMol contains a set of formal charge rules primarily developed by Robert F Bruns
+at Lilly during the 1990's. These rules have proven robust over the years, with strong
+concordance with other rule sets, with seemingly better results in many cases. From
+the command line the script assign_formal_charges.sh assigns formal charges to a file
+of molecules.
+
+In order to access this functionality from python, a ChargeAssigner object must
+be instantiated.
+```
+chg = ChargeAssigner()
+for mol in mols:
+  chg.process(mol)
+```
+If needed, the return code from `chg.process` is the number of formal charges assigned
+to the molecule.
+
+## Donor Acceptor Assigment.
+LillyMol contains a set of donor acceptor rules primarily developed by Robert F Bruns
+at Lilly during the 1990's. Acknowledge that definitions of donors and acceptors is
+very complex with instances of various weak forms being found in various circumstances.
+The rules apply mostly to strong donors and acceptors. One possibly novel concept is
+the idea of a dual mode atom - something that can function either as a donor or an
+acceptor. An OH atom is the most common example.
+
+Results are returned by placing isotopic labels on the atoms. By convention isotope
+1 is applied for acceptors, isotope 3 for donors, and isotope 2 to atoms which
+can function as either.
+
+A typical use might be
+```
+donor_acceptor = DonorAcceptor()
+for mol in mols:
+  donor_acceptor.process(mol)
+```
+The `process` method returns the number of assignments made. Note that if an atom
+is both acceptor and donor, it will count twice in the return code value.
+
 ## Speed Comparisons
 One speed comparison is described in [tsubstructure](/docs/Workflows/substructure_comparison.md).
 That shows excellent speed from LillyMol python, but in that case there was not much

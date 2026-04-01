@@ -38,7 +38,6 @@ Groups identical molecules and compares activities
   -U <fname>    tabular output format
   -b <natoms>   lower atom count cutoff
   -B <natoms>   lower atom count cutoff
-  -z            remove leading 0's from identifiers
   -l            reduce to largest fragment
   -i <type>     input specification
   -g ...        chemical standardisation options
@@ -210,8 +209,25 @@ usually find it useful to suppress them.
 Upper atom count cutoff.
 
 ### -z
+This is deprecated, use '-Y rmlz' instead.
+
 Remove leading 0's from identifiers. This may be useful in an environment
 where sometimes identifiers are present as '000000123456' and sometimes as '123456'.
 
 ### -l
 reduce to largest fragment.
+
+## -Y
+Various options
+### -Y ignore_no_activity
+If a molecule has no activity data, ignore the molecule.
+
+### -Y rmlz
+This was previously the -z option.
+
+Remove leading 0's from identifiers. This may be useful in an environment
+where sometimes identifiers are present as '000000123456' and sometimes as '123456'.
+
+### -Y sep=\<char\>
+Output file separator when creating tabular files.
+

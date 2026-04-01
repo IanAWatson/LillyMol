@@ -1864,9 +1864,9 @@ OPTION: while ($argptr < @ARGV)
     $chirality_fingerprint_opts =~ s/^ *//;  # no leading spaces
     $fingerprints_specified++;
   }
-  elsif ($opt eq "-CIP")
+  elsif ($opt =~ /^-CIP(\d+)$/)
   {
-    $cip = $ARGV[$argptr++];
+    $cip = $1;
     $fingerprints_specified++;
   }
   elsif ($opt =~ /^-seek=(\d+)/)
@@ -3541,7 +3541,7 @@ if (length($cip) > 0)
 {
   my $iwecfp = find_executable('iwecfp');
   $cip_fingerprint_pipe = "cip_labeler.py -R 8 -S 9 -f - |" .+
-                         "${iwecfp} -Y pchiral -g all -R ${cip} -J NCPCH -P UST:ARY -m -q PROTO:$ENV{LILLYMOL_HOME}/data/queries/89.qry -f -";
+                         "${iwecfp} -Y pchiral -g all -R ${cip} -J NCIP -P UST:ARY -m -q PROTO:$ENV{LILLYMOL_HOME}/data/queries/89.qry -f -";
 }
 
 my $first = 1;

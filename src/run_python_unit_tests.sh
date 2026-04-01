@@ -25,6 +25,10 @@ if [[ ! -s "${libdir}/lillymol.so" ]] ; then
   exit 1
 fi
 
+if [[ ! -v LILLYMOL_HOME ]] ; then
+  export LILLYMOL_HOME=$(dirname $(realpath ${here}))
+fi
+
 if [[ ! -d "${here}/pybind" ]] ; then
   echo "pybind not found ${here}"
   exit 1

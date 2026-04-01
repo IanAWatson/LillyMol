@@ -328,7 +328,9 @@ TSubstructure::NumberMatches(std::vector<Molecule>& mols) {
 
 std::vector<std::string>
 TSubstructure::query_names() const {
-  std::vector<std::string> result(query.size());
+  std::vector<std::string> result;
+  result.reserve(query.size());
+
   for (const Substructure_Query* q : query) {
     result.push_back(q->comment().AsString());
   }

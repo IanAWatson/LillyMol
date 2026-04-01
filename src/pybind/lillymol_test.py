@@ -979,6 +979,34 @@ class TestLillyMol(absltest.TestCase):
     self.assertEqual(m.formal_charge(3), -1)
     self.assertEqual(m.net_formal_charge(), -1)
 
+  def test_charge_assigner(self):
+    chg = ChargeAssigner()
+    m = Molecule();
+    self.assertTrue(m.build_from_smiles("CC(=O)O"))
+    self.assertEqual(chg.process(m), 1)
+    self.assertEqual(m.smiles(), "CC(=O)[O-]")
+
+    self.assertTrue(m.build_from_smiles("CCN(CC)C"))
+    self.assertEqual(chg.process(m), 1)
+    self.assertEqual(m.smiles(), "CC[NH+](C)CC")
+
+  def test_donor_acceptor(self):
+    smiles = [
+      "NC1=CC=NN1 CHEMBL3217770",
+      "O(C)C(=O)NN CHEMBL3183780",
+      "N#CCC(=O)NN CHEMBL2106008"
+    ]
+    expected = [
+      "[2NH2]c1[3nH][1n]cc1",
+      "[1O]=C(OC)[3NH][2NH2]",
+      "[1O]=C([3NH][2NH2])CC#[1N]"
+    ]
+    donor_acceotor = DonorAcceptor();
+    for smi, result in zip(smiles, expected):
+      mol = MolFromSmiles(smi)
+      donor_acceotor.process(mol)
+      self.assertEqual(mol.unique_smiles(), result)
+
   def test_xlogp(self):
     m = Molecule()
     self.assertTrue(m.build_from_smiles("CC(=O)OC1=CC=CC=C1C(=O)O aspirin"))

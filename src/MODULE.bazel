@@ -113,7 +113,7 @@ cc_library (
 # local needs.
 new_local_repository(
     name = "python",
-    path = "/home/ian/.local/share/uv/python/cpython-3.13.0-linux-x86_64-gnu/include/python3.13",
+    path = "/home/stb6199/.local/share/uv/python/cpython-3.14.0-linux-x86_64-gnu/include/python3.14",
     build_file_content = """
 load("@rules_cc//cc:defs.bzl", "cc_binary", "cc_proto_library", "cc_library", "cc_test")
 cc_library(

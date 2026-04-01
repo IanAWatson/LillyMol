@@ -486,7 +486,7 @@ if doitfile
     cmd = "parallel -j #{j} < #{doitfilename}" # TODO: we may want to relocate parallel to a lib/p path instead
   elsif cl.option_present('xargs')
     j = cl.value('xargs')
-    cmd = "xargs -I{} -P #{j} sh -c '{}' < #{doitfilename}"
+    cmd = "xargs -I{} -P #{j} bash -c '{}' < #{doitfilename}"
   else
     cmd = "#{iwqb} "
     cmd << "-qsub #{qsub_options} -qsub " if qsub_options.length > 0

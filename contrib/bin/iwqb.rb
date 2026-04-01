@@ -25,7 +25,7 @@ def usage (rc)
   exit(rc)
 end
 
-cl = IWCmdline.new("-v-expert-stem=s-m-M=ipos-cluster=s-qsub=close-dir=close-sync-N=s-j")
+cl = IWCmdline.new("-v-expert-stem=s-m-M=ipos-cluster=s-qsub=close-dir=close-sync-N=s-j-slurm")
 
 $expert = cl.option_present('expert')
 
@@ -65,6 +65,8 @@ starts_with_hash = Regexp.new('^#')
 master = "iwqb.master#{Process.pid}.sh"
 m = File.open(master, mode='w')
 raise "Cannot open master script '#{master}'" unless (m)
+
+slurm = cl.option_present('slurm')
 
 m.print "#! /bin/bash\n"
 m.print "#\$ -cwd\n"
@@ -133,12 +135,20 @@ if 0 == jobs_created
   exit 3
 end
 
-m.print "eval iwqb${SGE_TASK_ID}\n"
+if slurm
+  m.print "eval iwqb${SLURM_ARRAY_TASK_ID}\n"
+else
+  m.print "eval iwqb${SGE_TASK_ID}\n"
+end
 m.close
 
 system("chmod +x #{master}")
 
-cmd = " qsub -cwd -b y -t 1-#{jobs_created} "
+if slurm
+  cmd = " srun --array=1-#{jobs_created}"
+else
+  cmd = " qsub -cwd -b y -t 1-#{jobs_created} "
+end
 
 if cl.option_present('N')
   cmd << ' -N ' << cl.value('N')

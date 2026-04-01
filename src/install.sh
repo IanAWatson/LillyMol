@@ -48,7 +48,7 @@ fi
 if [[ -d "/node/scratch/${USER}" ]] ; then
   output_user_root="--output_user_root=/node/scratch/${USER}"
 else
-  output_user_root=""
+  output_user_root="--output_user_root=/tmp/bazel_${USER}"
 fi
 
 targets=$(bazelisk ${output_user_root} query "$@" "kind(cc_binary, //...:all ${except} ) union kind(go_binary, //...:all ${except} )")

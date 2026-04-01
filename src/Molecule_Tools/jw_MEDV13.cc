@@ -652,14 +652,12 @@ jwmedv (Molecule &m, IWString_and_File_Descriptor & output)
 
   double medv_descriptors[NUMBER_OF_ATOM_CLASS * NUMBER_OF_ATOM_CLASS];
 
-  auto rc=jwmedv (m, output, atom_class, atom_intrinsic_state_index, atom_intrinsic_state, electrotopological_state_index, medv_descriptors);
+  auto rc=jwmedv(m, output, atom_class, atom_intrinsic_state_index, atom_intrinsic_state, electrotopological_state_index, medv_descriptors);
 
-  if (0==rc) 
-  {
+  if (0==rc) {
     number_of_error++;
     
-    if (verbose)
-    {
+    if (verbose) {
       cerr<<"ERROR"<<"\tMolecule "<<m.name()<<"\tUnrecognizable molecule structure, notify Jibo"<<endl;
     }
   }

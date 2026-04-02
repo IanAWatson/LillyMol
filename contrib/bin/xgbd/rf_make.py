@@ -147,11 +147,13 @@ def build_random_forest_model(descriptor_fname: str,
 
   descriptors.rename(columns={descriptors.columns[0]: "Id"}, inplace=True)
   activity.rename(columns={activity.columns[0]: "Id"}, inplace=True)
-  combined = pd.concat([activity.set_index("Id"),
-                        descriptors.set_index("Id")], axis=1, join='inner').reset_index() 
+# combined = pd.concat([activity.set_index("Id"),
+#                       descriptors.set_index("Id")], axis=1, join='inner').reset_index() 
+  combined = pd.merge(activity.set_index("Id"),
+                        descriptors.set_index("Id"), how='inner', on=["Id"]).reset_index() 
   if len(combined) != len(descriptors):
     logging.error("Combined set has %d rows, need %d", len(combined), len(descriptors))
-    return 1
+#   return 1
 
   if not os.path.isdir(options.mdir):
     os.mkdir(options.mdir)

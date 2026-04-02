@@ -83,6 +83,7 @@ def model_tuning
   cl = IWCmdline.new('-v-trpct=ipos-nsplit=ipos-niter=ipos-A=sfile-fp=sfile-fpextra=close' +
                      '-catboost=close-xgboost=close-lightgbm=close-lightgbm_config=sfile' +
                      '-dfile=sfile-ps-chrono-iwstats=close-expert' +
+                     '-sameline' +
                      '-i=ipos-svml=close-keep_models')
 
   if cl.unrecognised_options_encountered
@@ -198,6 +199,13 @@ def model_tuning
 
   keep_models = cl.option_present('keep_models')
 
+  # MayBe NewLine
+  mbnl = if cl.option_present('sameline')
+           mbnl = ";"
+         else
+           mbnl = "\n"
+         end
+
   cmd_stream = File.open("model_tuning.txt", "w")
 
   if classification
@@ -217,12 +225,13 @@ def model_tuning
     preds = []
     (0...nsplit).each do |split|
       mdir = "#{stem}.#{fps}.#{split}"
-      cmd_stream << "#{svmfp_make} -mdir #{mdir} -gfp #{fp} -gfp #{train_files[split]}\n"
+      cmd_stream << "#{svmfp_make} -mdir #{mdir} -gfp #{fp} -gfp #{train_files[split]}#{mbnl}"
       pred = "#{stem}_#{fps}_#{split}.pred"
-      cmd_stream << "svmfp_evaluate.sh -mdir #{mdir} #{test_files[split]} > #{pred}\n"
+      cmd_stream << "svmfp_evaluate.sh -mdir #{mdir} #{test_files[split]} > #{pred}#{mbnl}"
       preds << pred
-      cmd_stream << "#{iwstats} #{pred} > #{prefix}.#{fps}.#{split}\n"
-      cmd_stream << "rm -r #{mdir}\n" unless keep_models
+      cmd_stream << "#{iwstats} #{pred} > #{prefix}.#{fps}.#{split}#{mbnl}"
+      cmd_stream << "rm -r #{mdir}#{mbnl}" unless keep_models
+      cmd_stream << "\n"
 
       catboost.each_with_index do |cb, ndx|
         c_mdir = "#{mdir}_catboost_#{ndx}"

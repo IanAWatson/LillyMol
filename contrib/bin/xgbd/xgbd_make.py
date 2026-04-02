@@ -7,11 +7,16 @@ import sys
 from typing import List
 
 import numpy as np
+import optuna
+from optuna.samplers import TPESampler
 import pandas as pd
+
 from absl import app, flags, logging
 from google.protobuf import text_format
 from google.protobuf import json_format
 from matplotlib import pyplot
+from sklearn.model_selection import KFold
+from sklearn.metrics import mean_squared_error
 from xgboost import XGBClassifier, XGBRegressor, plot_importance
 # import xgbd.xgboost_model_pb2
 from xgbd import xgboost_model_pb2
@@ -19,20 +24,26 @@ from xgbd import class_label_translation_pb2
 
 FLAGS = flags.FLAGS
 
+flags.DEFINE_integer("min_points", 10, "do NOT build a model if there are fewer than min_points")
 flags.DEFINE_string("activity", "", "Name of training set activity file")
 flags.DEFINE_boolean("classification", False, "True if this is a classification task")
 flags.DEFINE_string("mdir", "", "Directory into which the model is placed")
 flags.DEFINE_integer("max_num_features", 0, "Maximum number of features to plot in variable importance")
 flags.DEFINE_string("feature_importance", "", "Compute feature importance. Use 'def' to use default file")
+flags.DEFINE_boolean("optuna", False, "File containing optuna config")
 flags.DEFINE_integer("xgverbosity", 0, "xgboost verbosity")
 flags.DEFINE_string("proto", "", "A file containing an XGBoostParameters proto")
 flags.DEFINE_float("eta", 0.4, "xgboost learning rate parameter eta")
 flags.DEFINE_integer("max_depth", 5, "xgboost max depth")
 flags.DEFINE_integer("n_estimators", 500, "xboost number of estimators")
 flags.DEFINE_float("subsample", 1.0, "subsample ratio for training instances")
+flags.DEFINE_float("min_child_weight", 1.0, "subsample ratio for training instances")
 flags.DEFINE_float("colsample_bytree", 1.0, "subsampling occurs once for every tree constructed")
 flags.DEFINE_float("colsample_bylevel", 1.0, "subsampling occurs once for every new depth level reached")
 flags.DEFINE_float("colsample_bynode", 1.0, "subsampling occurs once for every time a new split is evaluated")
+flags.DEFINE_float("reg_lambda", 1.0, "L1 regularization")
+flags.DEFINE_float("reg_alpha", 0.0, "L2 regularization")
+flags.DEFINE_float("gamma", 0.0, "minimum loss reduction")
 flags.DEFINE_enum("tree_method", "auto", ["auto", "exact", "approx", "hist"], "tree construction method: auto exact approx hist")
 flags.DEFINE_integer("nthreads", 8, "number of threads to use, default is 8")
 flags.DEFINE_boolean("rescore", False, "Rescore the training set to establish linear correction function")
@@ -40,13 +51,15 @@ flags.DEFINE_boolean("rescore", False, "Rescore the training set to establish li
 
 class Options:
   def __init__(self):
+    self.min_points = 10
     self.classification = False
     self.mdir: str = ""
-    self.max_num_features: int = 10
+    self.max_num_features: int = 15
     self.descriptor_fname: str = ""
     self.activity_fname: str = ""
     self.verbosity = 0
     self.proto = xgboost_model_pb2.XGBoostParameters()
+    self.optuna = ""
 
   def read_proto(self, fname)->bool:
     """Read self.proto from `fname`
@@ -113,6 +126,111 @@ def classification(x, y, options: Options)->bool:
 
   return True
 
+# Optuna objective function
+def objective(trial):
+    param = {
+        'booster': trial.suggest_categorical('booster', ['gbtree', 'dart']),
+        'lambda': trial.suggest_float('lambda', 1e-8, 1.0, log=False),
+        'max_depth': trial.suggest_int('max_depth', 3, 9),
+        'eta': trial.suggest_float('eta', 1e-8, 1.0, log=True),
+        nthreads: nthreads
+    }
+    model = xgb.XGBClassifier(**param)
+    return cross_val_score(model, X_train, y_train, cv=3).mean()
+
+def regression_with_optuna(x, y, options: Options):
+  """build a regression model.
+    Thanks ChatGPT
+  """
+  match options.proto.tree_method:
+    case xgboost_model_pb2.AUTO:
+      tree_method = 'auto'
+    case xgboost_model_pb2.EXACT:
+      tree_method = 'exact'
+    case xgboost_model_pb2.APPROX:
+      tree_method = 'approx'
+    case xgboost_model_pb2.HIST:
+      tree_method = 'hist'
+    case _:
+      tree_method = 'hist'
+
+  x = np.asarray(x)
+  y = np.asarray(y)
+  nthread = None
+  if FLAGS.nthreads > 0:
+    nthread = FLAGS.nthreads
+
+  n_splits = 5
+
+  random_state = None
+  kf = KFold(n_splits=n_splits, shuffle=True, random_state=random_state)
+
+  def objective(trial: optuna.Trial) -> float:
+      params = {
+          # Core
+          "n_estimators": 10_000,  # large; early stopping finds the effective number
+          "learning_rate": trial.suggest_float("learning_rate", 1e-3, 0.3, log=True),
+          "max_depth": trial.suggest_int("max_depth", 2, 12),
+          "min_child_weight": trial.suggest_float("min_child_weight", 1e-3, 50.0, log=True),
+          "subsample": trial.suggest_float("subsample", 0.5, 1.0),
+          "colsample_bytree": trial.suggest_float("colsample_bytree", 0.5, 1.0),
+          "gamma": trial.suggest_float("gamma", 0.0, 10.0),
+          "reg_alpha": trial.suggest_float("reg_alpha", 1e-10, 10.0, log=True),
+          "reg_lambda": trial.suggest_float("reg_lambda", 1e-10, 100.0, log=True),
+
+          # Tree method (change if you want GPU)
+          "tree_method": "hist",
+
+          # Objective / metric
+          "objective": "reg:squarederror",
+          "eval_metric": "rmse",
+
+          # Repro / speed
+          "random_state": random_state,
+          "n_jobs": nthread,
+          "early_stopping_rounds": 200,
+      }
+
+      fold_rmses = []
+      for fold_idx, (tr_idx, va_idx) in enumerate(kf.split(x), start=1):
+          x_tr, x_va = x[tr_idx], x[va_idx]
+          y_tr, y_va = y[tr_idx], y[va_idx]
+
+          model = XGBRegressor(**params)
+
+          # Early stopping: use a validation set within each CV fold
+          model.fit(
+              x_tr,
+              y_tr,
+              eval_set=[(x_va, y_va)],
+              verbose=False,
+          )
+
+          preds = model.predict(x_va)
+          rmse = mean_squared_error(y_va, preds)
+          fold_rmses.append(rmse)
+
+          # Let Optuna prune unpromising trials
+          trial.report(float(np.mean(fold_rmses)), step=fold_idx)
+          if trial.should_prune():
+              raise optuna.TrialPruned()
+
+      return float(np.mean(fold_rmses))
+
+  study = optuna.create_study(
+      direction="minimize",
+      sampler=TPESampler(seed=random_state),
+      pruner=optuna.pruners.MedianPruner(n_startup_trials=10, n_warmup_steps=1),
+  )
+
+  n_trials = 180
+  timeout = 6000
+  study.optimize(objective, n_trials=n_trials, timeout=timeout, show_progress_bar=False)
+
+  print(study.best_params)
+  return study
+
+ 
 def regression(x, y, options: Options):
   """build a regression model.
   """
@@ -128,6 +246,9 @@ def regression(x, y, options: Options):
     case _:
       tree_method = 'hist'
 
+  if options.optuna:
+    return regression_with_optuna(x, y, options)
+  
   nthread = None
   if FLAGS.nthreads > 0:
     nthread = FLAGS.nthreads
@@ -140,6 +261,9 @@ def regression(x, y, options: Options):
                 colsample_bylevel=options.proto.colsample_bylevel,
                 colsample_bynode=options.proto.colsample_bynode,
                 subsample=options.proto.subsample,
+                reg_alpha=options.proto.reg_alpha,
+                reg_lambda=options.proto.reg_lambda,
+                gamma=options.proto.gamma,
                 tree_method=tree_method,
                 nthread=nthread
                 )
@@ -190,11 +314,17 @@ def build_xgboost_model(descriptor_fname: str,
 
   descriptors.rename(columns={descriptors.columns[0]: "Name"}, inplace=True)
   activity.rename(columns={activity.columns[0]: "Name"}, inplace=True)
-  combined = pd.concat([activity.set_index("Name"),
-                        descriptors.set_index("Name")], axis=1, join='inner').reset_index() 
+# combined = pd.concat([activity.set_index("Name"),
+#                       descriptors.set_index("Name")], axis=1, join='inner').reset_index() 
+  combined = pd.merge(activity.set_index("Name"),
+                        descriptors.set_index("Name"), how='inner', on=["Name"]).reset_index() 
   if len(combined) != len(descriptors):
     logging.error("Combined set has %d rows, need %d", len(combined), len(descriptors))
-    return False
+#   return False
+
+  if len(combined) < options.min_points:
+    logging.info("Not enough rows in training set %d", len(combined))
+    return True  # Or should this be False? This is an OK exit, just no model is built
 
   if not os.path.isdir(options.mdir):
     os.mkdir(options.mdir)
@@ -290,10 +420,12 @@ def main(argv):
     return False
 
   options = Options()
+  options.min_points = FLAGS.min_points
   options.classification = FLAGS.classification
   options.mdir = FLAGS.mdir
   options.max_num_features = FLAGS.max_num_features
   options.feature_importance = FLAGS.feature_importance
+  options.optuna = FLAGS.optuna
   options.verbosity = FLAGS.xgverbosity
 
   if FLAGS.classification and FLAGS.rescore:
@@ -330,6 +462,13 @@ def main(argv):
 
   if not options.proto.HasField("colsample_bynode"):
     options.proto.colsample_bynode = FLAGS.colsample_bynode
+  if not options.proto.HasField("reg_alpha"):
+    options.proto.reg_alpha = FLAGS.reg_alpha
+  if not options.proto.HasField("reg_lambda"):
+    options.proto.reg_lambda = FLAGS.reg_lambda
+  if not options.proto.HasField("gamma"):
+    options.proto.gamma = FLAGS.gamma
+
 
   if option_present("tree_method"):
     match FLAGS.tree_method:

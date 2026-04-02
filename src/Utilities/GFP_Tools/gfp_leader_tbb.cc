@@ -14,6 +14,8 @@
 #include "tbb/parallel_for.h"
 #include "tbb/parallel_reduce.h"
 #include "tbb/scalable_allocator.h"
+#include "tbb/global_control.h"
+
 
 #define RESIZABLE_ARRAY_IMPLEMENTATION
 #define RESIZABLE_ARRAY_IWQSORT_IMPLEMENTATION
@@ -951,7 +953,7 @@ class Form_Cluster_Threshold_TBB
   void
   operator()(const tbb::blocked_range<GFP_PL**>& r)
   {
-    cluster.resize(r.end() - r.begin());
+    cluster.reserve(r.end() - r.begin());
     for (GFP_PL** pfp = r.begin(); pfp != r.end(); ++pfp) {
       GFP_PL* fp = *pfp;
 
@@ -1044,9 +1046,9 @@ form_cluster_threshold(int icentre, Cluster& cluster, int cluster_number,
   }
 
   Form_Cluster_Threshold_TBB fct_tbb(leader, my_threshold, cluster_number);
+  static constexpr int kGrainSize = 200;
   tbb::parallel_reduce(tbb::blocked_range<GFP_PL**>(
-                           pool + first_unselected, pool + last_unselected,
-                           calculate_grainsize(last_unselected - first_unselected)),
+                           pool + first_unselected, pool + last_unselected, kGrainSize),
                        fct_tbb);  //,tbb::auto_partitioner());
 
   cluster += fct_tbb.cluster;
@@ -1868,6 +1870,25 @@ leader(int argc, char** argv)
         cerr << "Max cluster size in '" << max_cluster_size_tag << "' tag\n";
       }
     }
+  }
+
+  int nthreads = tbb::this_task_arena::max_concurrency();
+
+  if (cl.option_present('h')) {
+    if (! cl.value('h', nthreads) || nthreads < 2) {
+      cerr << "The number of threads must be a whole +ve number\n";
+      return 1;
+    }
+  }
+
+  tbb::global_control c(tbb::global_control::max_allowed_parallelism, nthreads);
+
+  if (verbose) {
+    cerr << "Will use a max of " << nthreads << " threads\n";
+  }
+
+  if (nthreads > 16) {
+    cerr << "Warning nthreads values above 16 are often ineffective\n";
   }
 
   if (cl.number_elements() > 1) {

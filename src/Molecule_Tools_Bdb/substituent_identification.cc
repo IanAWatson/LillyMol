@@ -51,7 +51,6 @@
 #else
 #include "substituent_identification.pb.h"
 #endif
-
 #include "db_cxx.h"
 
 using std::cerr;
@@ -70,6 +69,9 @@ class Molecule_Specific_Temporary_Arrays {
   int* _processing_status;
   int* _to_remove;
   IWString _molecule_name;
+
+  // If we are writing bit meanings, we need a means of saving isotopes.
+  isotope_t* _isosave;
 
  public:
   Molecule_Specific_Temporary_Arrays(int matoms);
@@ -104,6 +106,9 @@ class Molecule_Specific_Temporary_Arrays {
 
   int bond_constant(const Bond& b, const atom_number_t, const atom_number_t) const;
 
+  // Might need to allocate the array.
+  isotope_t* isosave();
+
   const IWString&
   molecule_name() const {
     return _molecule_name;
@@ -117,6 +122,8 @@ Molecule_Specific_Temporary_Arrays::Molecule_Specific_Temporary_Arrays(int matom
   _processing_status = new int[matoms];
   _to_remove = new int[matoms];
 
+  _isosave = nullptr;
+
   return;
 }
 
@@ -125,6 +132,8 @@ Molecule_Specific_Temporary_Arrays::~Molecule_Specific_Temporary_Arrays() {
   delete[] _aromatic_bond;
   delete[] _processing_status;
   delete[] _to_remove;
+
+  delete [] _isosave;  // Might be nullptr.
 
   return;
 }
@@ -197,6 +206,17 @@ Molecule_Specific_Temporary_Arrays::undo_temporary_saturation(atom_number_t a1,
                                                               atom_number_t a2) {
   _atype[a1]--;
   _atype[a2]--;
+}
+
+isotope_t*
+Molecule_Specific_Temporary_Arrays::isosave() {
+  if (_isosave != nullptr) {
+    return _isosave;
+  }
+
+  _isosave = new isotope_t[_matoms];
+
+  return _isosave;
 }
 
 // There are certain common things used throughout lookups.
@@ -644,6 +664,11 @@ class SubstituentIdentification {
   // set if we are processing matched pairs.
   int _do_matched_pairs;
 
+  // If set, we write a labelled smiles for each newly found bit.
+  int _write_bit_meanings;
+
+  IWString_and_File_Descriptor _stream_for_bit_meanings;
+
   // private functions
 
   void _default_values();
@@ -809,7 +834,7 @@ class SubstituentIdentification {
   void _do_build_database_report(std::ostream& os) const;
   void _do_create_molecules_report(std::ostream& os) const;
 
-  void _associate_substituent_with_bit(int r, uint32_t b, bond_type_t bt,
+  int _associate_substituent_with_bit(int r, uint32_t b, bond_type_t bt,
                                        Molecule& substituent,
                                        const Molecule_Specific_Temporary_Arrays& msta);
   int _compute_environment2x(Molecule& m, int radius, int rmax, uint32_t* rc,
@@ -857,6 +882,11 @@ class SubstituentIdentification {
                IWString_and_File_Descriptor & output);
 
   int AlreadyMadeEnoughMolecules(const UsedDuringLookups& lookup_data) const;
+
+  int WriteBitMeaning(Molecule& m, atom_number_t zatom, int radius,
+                       uint32_t bitnum,
+                       Molecule_Specific_Temporary_Arrays& msta);
+  int OpenBitMeaningsFile(const const_IWSubstring& fname);
 
  public:
   SubstituentIdentification();
@@ -951,6 +981,8 @@ SubstituentIdentification::_default_values() {
   _prepend_smiles_to_textproto = 0;
 
   _do_matched_pairs = 0;
+
+  _write_bit_meanings = 0;
 
   return;
 }
@@ -1973,7 +2005,7 @@ SubstituentIdentification::_look_for_new_substituents_db(
     Dbt& dbkey, IW_STL_Hash_Set& already_processed, IWString_and_File_Descriptor& output) {
   Dbt zdata;
 
-  cerr << "Looking up bit q " << rad_and_bit.b << '\n';
+//cerr << "Looking up bit q " << rad_and_bit.b << '\n';
   if (int s = db.get(NULL, &dbkey, &zdata, 0); s != 0) {
     return 0;
   }
@@ -2888,7 +2920,8 @@ SubstituentIdentification::_enough_examples(const const_IWSubstring& fromdb) con
 // We have formed a new substituent, and the join point is
 // associated with bit `b` and radius `r`.
 // Add this information to the hashed data for radius `r`.
-void
+// Returns true if this is a new bit.
+int
 SubstituentIdentification::_associate_substituent_with_bit(
     int r, uint32_t b, bond_type_t bt, Molecule& substituent,
     const Molecule_Specific_Temporary_Arrays& msta) {
@@ -2897,6 +2930,8 @@ SubstituentIdentification::_associate_substituent_with_bit(
   cerr << "At radius " << r << ", b = " << b << " processing "
        << substituent.unique_smiles() << '\n';
 #endif
+
+  int rc = 0;
 
   // note that we add the attachment type to the end
   IWString usmi(substituent.unique_smiles());
@@ -2913,8 +2948,7 @@ SubstituentIdentification::_associate_substituent_with_bit(
 
   auto f = y.find(b);
 
-  if (f == y.end())  // never seen this bit before
-  {
+  if (f == y.end()) {  // never seen this bit before
     y[b] = std::unordered_map<IWString, ASubstituent, IWStringHash>();
 
     y[b].emplace(usmi, msta.molecule_name());
@@ -2923,12 +2957,9 @@ SubstituentIdentification::_associate_substituent_with_bit(
 #ifdef DEBUG_ASSOCIATE_SUBSTITUENT_WITH_BIT
     cerr << "After starting new bit " << y[b].size() << " items stored\n";
 #endif
-  } else  // bit has been seen before
-  {
+    rc = 1;
+  } else {  // bit has been seen before
     auto& usmi2subs = (*f).second;
-
-    //  unordered_map<IWString, ASubstituent, IWStringHash>::iterator f2 =
-    //  usmi2subs.find(substituent.unique_smiles());
 
     auto f2 = usmi2subs.find(usmi);
 
@@ -2955,9 +2986,10 @@ SubstituentIdentification::_associate_substituent_with_bit(
     }
   }
 
-  return;
+  return rc;
 }
 
+// Used during database builds.
 int
 SubstituentIdentification::_id_attch_pt_and_make_substituent_associations(
     Molecule& anchor, bond_type_t bt, Molecule& substituent,
@@ -2966,7 +2998,7 @@ SubstituentIdentification::_id_attch_pt_and_make_substituent_associations(
 
   const atom_number_t a1 = anchor.atom_with_isotope(1);
 
-  if (INVALID_ATOM_NUMBER == a1) {
+  if (a1 == kInvalidAtomNumber) {
     cerr << "SubstituentIdentification::no atom with isotope 1 in fragment '"
          << anchor.smiles() << "'\n";
     return 0;
@@ -2976,8 +3008,39 @@ SubstituentIdentification::_id_attch_pt_and_make_substituent_associations(
 
   for (int i = 0; i <= max_radius_formed; ++i) {
     //  cerr << "Radius " << i << " bit " << b[i] << '\n';
-    _associate_substituent_with_bit(i, b[i], bt, substituent, msta);
+    if (_associate_substituent_with_bit(i, b[i], bt, substituent, msta) && _write_bit_meanings) {
+      WriteBitMeaning(anchor, a1, i, b[i], msta);
+    }
   }
+
+  return 1;
+}
+
+// Writes the newly found `bitnum` to _stream_for_bit_meanings.
+int
+SubstituentIdentification::WriteBitMeaning(Molecule& m, atom_number_t zatom,
+                        int radius,
+                        uint32_t bitnum,
+                        Molecule_Specific_Temporary_Arrays& msta) {
+  m.get_isotopes(msta.isosave());
+  m.transform_to_non_isotopic_form();
+
+  m.ComputeDistanceMatrixIfNeeded();
+
+  const int matoms = m.natoms();
+  for (int i = 0; i < matoms; ++i) {
+    if (int d = m.bonds_between(zatom, i); d <= radius) {
+      m.set_isotope(i, d + 1);
+    }
+  }
+
+  static constexpr char kSep = ' ';
+  _stream_for_bit_meanings << m.smiles() << kSep << m.name() <<
+                              kSep << radius << kSep << bitnum << '\n';
+
+  _stream_for_bit_meanings.write_if_buffer_holds_more_than(32768);
+
+  m.set_isotopes(msta.isosave());
 
   return 1;
 }
@@ -3113,6 +3176,7 @@ SubstituentIdentification::_divide_molecule(Molecule& m, const atom_number_t a1,
   m.set_isotope(a2, 1);
   resizable_array_p<Molecule> components;
   m.create_components(components);
+
   // cerr << "From " << x << " created " << components[0]->smiles() << " " <<
   // components[1]->smiles() << '\n';
 
@@ -3120,11 +3184,17 @@ SubstituentIdentification::_divide_molecule(Molecule& m, const atom_number_t a1,
   const auto atom_count_1 = components[1]->natoms();
 
   if (_ok_atom_count(atom_count_0) && atom_count_1 >= _min_residual_size) {
+    if (_write_bit_meanings) {
+      components[1]->set_name(m.name());
+    }
     _id_attch_pt_and_make_substituent_associations(*(components[1]), put_back,
                                                    *(components[0]), msta);
   }
 
   if (_ok_atom_count(atom_count_1) && atom_count_0 >= _min_residual_size) {
+    if (_write_bit_meanings) {
+      components[0]->set_name(m.name());
+    }
     _id_attch_pt_and_make_substituent_associations(*(components[0]), put_back,
                                                    *(components[1]), msta);
   }
@@ -3326,6 +3396,7 @@ opendb_read(Db& db, const char* dbname) {
 
 static int
 opendb_write(Db& db, const char* dbname) {
+  cerr << "Opening db for writing '" << dbname << "'\n";
   return opendb(db, dbname, DB_BTREE, DB_CREATE, S_IREAD | S_IWRITE | S_IRGRP | S_IROTH);
 }
 
@@ -3444,6 +3515,24 @@ SubstituentIdentification::SetupTextProtoStream(const const_IWSubstring fname) {
 
   if (_verbose) {
     cerr << "Database contents written as textproto to '" << tmp << "'\n";
+  }
+
+  return 1;
+}
+
+int
+SubstituentIdentification::OpenBitMeaningsFile(const const_IWSubstring& fname) {
+  IWString myfname(fname);
+
+  myfname.EnsureEndsWith(".smi");
+
+  if (! _stream_for_bit_meanings.open(myfname.null_terminated_chars())) {
+    cerr << "SubstituentIdentification::OpenBitMeaningsFile:cannot open '" << fname << "'\n";
+    return 0;
+  }
+
+  if (_verbose) {
+    cerr << "Bit meanings written to " << myfname << '\n';
   }
 
   return 1;
@@ -3857,6 +3946,13 @@ SubstituentIdentification::operator()(int argc, char** argv) {
         if (_verbose) {
           cerr << "All must have queries (-H) must match, rather than any of them\n";
         }
+      } else if (y.starts_with("bitmeanings=")) {
+        y.remove_leading_chars(12);
+        if (! OpenBitMeaningsFile(y)) {
+          cerr << "Cannot open bitmeanings file '" << y << "'\n";
+          return 0;
+        }
+        _write_bit_meanings = 1;
       } else if (y == "help") {
         DisplayDashYOptions(cerr);
       } else {
@@ -3866,8 +3962,11 @@ SubstituentIdentification::operator()(int argc, char** argv) {
     }
   }
 
+  int build_database = 0;
+
   if (cl.option_present('B')) {
     _remove_chirality = 1;
+    build_database = 1;
   }
 
   if (_anchor_query.empty() && !cl.option_present('B') &&
@@ -3942,10 +4041,7 @@ SubstituentIdentification::operator()(int argc, char** argv) {
     return 1;
   }
 
-  if (1 == dcount && _anchor_query.empty() &&
-      0 == _default_new_molecule_starting_points)  // great, building a database
-                                                   // and no queries
-  {
+  if (build_database) {
     _dbs = new Db*[1];
     _ndb = 1;
     _dbs[0] = new Db(0, DB_CXX_NO_EXCEPTIONS);
@@ -4042,18 +4138,16 @@ SubstituentIdentification::operator()(int argc, char** argv) {
 
   IWString_and_File_Descriptor output(1);
 
-  int rc = 0;
-  for (int i = 0; i < cl.number_elements(); i++) {
-    if (!_process_molecules(cl[i], input_type, lookup_data, output)) {
-      rc = i + 1;
-      break;
+  for (const char* fname : cl) {
+    if (!_process_molecules(fname, input_type, lookup_data, output)) {
+      cerr << "Error processing '" << fname << "'\n";
+      return 1;
     }
   }
 
   output.flush();
 
-  if (_anchor_query.empty() &&
-      0 == _default_new_molecule_starting_points) {
+  if (build_database) {
     _write_in_memory_hashes_to_database();
   }
 
@@ -4072,7 +4166,7 @@ SubstituentIdentification::operator()(int argc, char** argv) {
     }
   }
 
-  return rc;
+  return 0;
 }
 
 int

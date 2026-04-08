@@ -1860,6 +1860,7 @@ class __attribute__((visibility("default"))) Molecule : protected resizable_arra
   distance_t longest_intra_molecular_distance() const;
 
   int recompute_distance_matrix();
+  int ComputeDistanceMatrixIfNeeded();
 
   const int* distance_matrix_warning_may_change() {
     if (nullptr == _distance_matrix) {

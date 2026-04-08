@@ -1082,6 +1082,15 @@ Molecule::_recompute_distance_matrix (int (Molecule::*identify_first_atom) (cons
   return 1;
 }*/
 
+int
+Molecule::ComputeDistanceMatrixIfNeeded() {
+  if (_distance_matrix != nullptr) {
+    return 0;
+  }
+
+  return recompute_distance_matrix();
+}
+
 //#define CHECK_DISTANCE_MATRIX
 
 int

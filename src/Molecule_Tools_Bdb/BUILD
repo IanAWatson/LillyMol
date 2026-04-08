@@ -342,6 +342,22 @@ cc_binary(
     ],
 )
 
+cc_binary(
+    name = "substituent_identification_extract",
+    srcs = [
+      "substituent_identification_extract.cc",
+    ],
+    tags = ["berkeleydb"],
+    deps = [
+        ":substituent_identification_cc_proto",
+        "//Foundational/accumulator:accumulator",
+        "//Foundational/cmdline:iwcmdline",
+        "@com_google_absl//absl/strings:string_view",
+        "@third_party//:berkeley_static",
+        "@com_google_protobuf//:protobuf",
+    ],
+)
+
 cc_library(
     name = "iwecfp_database",
     srcs = [

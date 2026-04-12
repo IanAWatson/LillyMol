@@ -37,6 +37,9 @@ namespace evidence {
 using std::cerr;
 using iw_tf_data_record::TFDataReader;
 
+constexpr float kUndefinedValue = -7.231e-24;
+constexpr char kMissing = '.';
+
 // when dealing with values that need to be sorted, use this to
 // keep track of the id of the computed value.
 template <typename T>
@@ -58,18 +61,36 @@ Usage(int rc) {
 #endif
   // clang-format on
   // clang-format off
-  cerr << "Computes measures of internal consistency for a series of measured values based on how\n";
-  cerr << "consistent the values are across the neighbours\n";
-  cerr << "Takes a single argument, a TFDataRecord serialized nnbr::NearNeighbours protos, such as\n";
-  cerr << "might be produced by the -T option to nn2proto or the -S option for gfp_nearneighbours_single_file_tbb\n";
-  cerr << "The following arguments are recognised\n";
-  cerr << " -config <fname>     an EvidenceData::Options textproto file with options\n";
-  cerr << " -A <fname>          descriptor file containing activity values for each molecule\n";
-  cerr << " -smiles <fname>     smiles for each molecule, will be included in the output\n";
-  cerr << " -C                  data is classlfication type (not implemented)\n";
-  cerr << " -diff               for each column generated, insert an extra column with difference from actual\n";
-//cerr << " -nbrs <n>           include on each output record the <n> nearest neighbours\n";
-  cerr << " -v                  verbose output\n";
+  cerr << R"(Computes measures of internal consistency for a series of measured values based on how
+consistent the values are across the neighbours.
+Takes a single argument, a TFDataRecord serialized nnbr::NearNeighbours protos, such as
+might be produced by the -S option to gfp_nearneighbours_single_file_tbb.
+
+Control is governed by an EvidenceData::Options textproto file. A useful set of options
+might be
+
+knn: [2, 5, 10]
+closest_value: [1, 2, 5, 10]
+piecewise_linear {
+  min: 0.15
+  max: 0.4
+}
+
+Place this in a file called 'config.textproto' and use that as the -config option
+
+gfp_make.sh file.smi > file.gfp
+gfp_nearneighbours_single_file_tbb -h 8 -n 10 -S file.nndata file.gfp
+evidence -config config.textproto -smiles file.smi -A file.activity -diff file.nndata
+
+The following arguments are recognised:
+ -config <fname>     an EvidenceData::Options textproto file with options.
+ -A <fname>          descriptor file containing activity values for each molecule\
+ -smiles <fname>     smiles for each molecule, will be included in the output\
+ -addsmi             add the smiles, id and distance of nearest neighbours to the output - needs -smiles.
+ -C                  data is classlfication type (not implemented).
+ -diff               for each column generated, insert an extra column with difference from actual.
+ -v                  verbose output.
+)";
   // clang-format on
 
   ::exit(rc);
@@ -259,10 +280,10 @@ Item<T>::AddNbr(int ndx, float distance, T activity, int uid) {
 template <typename T>
 void
 Item<T>::AppendUndefined(bool append_diff) {
-  _results << _undefined_value;
+  _results << kUndefinedValue;
 
   if (append_diff) {
-    _results << _undefined_value;
+    _results << kUndefinedValue;
   }
 }
 
@@ -276,8 +297,8 @@ Item<T>::MaybeAppendDiff(bool append_diff) {
   }
 
   const float last_result = _results.back();
-  if (last_result == _undefined_value) {
-    _results << _undefined_value;
+  if (last_result == kUndefinedValue) {
+    _results << kUndefinedValue;
     return;
   }
 
@@ -403,7 +424,7 @@ Item<T>::AddPiecewiseLinear(bool append_diff,
   }
 
   if (sum_weights == 0.0f) {
-    _results << _undefined_value;
+    _results << kUndefinedValue;
   } else {
     _results << (tot / sum_weights);
   }
@@ -445,7 +466,7 @@ int
 Item<T>::WriteResults(char sep, IWString_and_File_Descriptor& output) const {
   for (float r : _results) {
     output << sep;
-    if (r == _undefined_value) {
+    if (r == kUndefinedValue) {
       output << kMissing;
     } else {
       output << r;
@@ -787,13 +808,15 @@ Evidence::SetupItems() {
     cerr << "Evidence::SetupItems:HUH range is zero " << min_activity << " to " << max_activity << '\n';
   }
 
+  // Apr 2026. Change to using a fixed value for the undefined value.
+  // TODO:ianwatson clean this up to get rid of setting the undefined value.
   const float undefined_value = min_activity - range;
   if (_verbose) {
     cerr << "Range " << min_activity << ',' << max_activity << " undefined value " <<
             undefined_value << '\n';
   }
   for (int i = 0; i < _number_items; ++i) {
-    _item[i].set_undefined_value(undefined_value);
+    _item[i].set_undefined_value(kUndefinedValue);
   }
 
   return _id_to_ndx.size();

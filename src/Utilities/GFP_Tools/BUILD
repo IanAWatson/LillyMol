@@ -957,9 +957,12 @@ cc_binary(
         "nn2csv.cc",
     ],
     deps = [
+        ":nearneighbours_cc_proto",
         "//Foundational/accumulator",
         "//Foundational/cmdline:iwcmdline",
         "//Foundational/data_source:iwstring_data_source",
+        "//Foundational/data_source:iwtfdata_record",
+        "//Foundational/iwstring:absl_hash",
         "//Foundational/iwqsort",
     ],
 )
@@ -977,6 +980,21 @@ cc_binary(
         "//Foundational/data_source:iwstring_data_source",
         "//Foundational/data_source:iwtfdata_record",
         "//Foundational/iwqsort",
+    ],
+)
+
+cc_binary(
+    name = "nndata2bdb",
+    srcs = [
+        "nndata2bdb.cc",
+    ],
+    deps = [
+        ":nearneighbours_cc_proto",
+        "//Foundational/cmdline_v2:cmdline_v2",
+        "//Foundational/data_source:iwtfdata_record",
+        "//Foundational/iwmisc",
+        "@third_party//:berkeley_static",
+        "@com_google_protobuf//:protobuf",
     ],
 )
 

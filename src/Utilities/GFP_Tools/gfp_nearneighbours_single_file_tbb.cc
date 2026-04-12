@@ -117,6 +117,9 @@ static int nworkers = 2;
 static int write_as_tfdata_record = 0;
 static iw_tf_data_record::TFDataWriter tfdata_writer;
 
+// We can write both a TFDataWriter and to stdout.
+static int also_write_stdout = 0;
+
 /*
   We can encode an integer ID and a floating point distance into a single 64 bit int
   We need methods to compare these
@@ -203,11 +206,13 @@ Encoded_Dist_ID_Sorter::operator()(const uint64_t i1, const uint64_t i2) const
 
 template <typename F>
 int
-write_neighbour_list(const F& target, const F* pool, IWString_and_File_Descriptor& output)
-{
+write_neighbour_list(const F& target, const F* pool, IWString_and_File_Descriptor& output) {
   // Ugly use of global variables...
   if (write_as_tfdata_record) {
-    return NbrsToTFData<F>(target, pool, tfdata_writer);
+    int rc = NbrsToTFData<F>(target, pool, tfdata_writer);
+    if (! also_write_stdout) {
+      return rc;
+    }
   }
 
   const resizable_array<uint64_t>& nbrs = target.nbrs();
@@ -2453,11 +2458,26 @@ nearneighbours(int argc, char** argv)
       return 1;
     }
 
-    IWString fname = cl.string_value('S');
+    IWString fname;
+    const_IWSubstring s;
+    for (int i = 0; cl.value('S', s, i); ++i) {
+      if (s == "stdout") {
+        also_write_stdout = 1;
+      } else {
+        fname = s;
+      }
+    }
+
+    if (fname.empty()) {
+      cerr << "Must specify output file name for TFDataRecord output\n";
+      return 1;
+    }
+
     if (! tfdata_writer.Open(fname)) {
       cerr << "Cannot open stream for TFdataRecord output '" << fname << "'\n";
       return 1;
     }
+
     if (verbose) {
       cerr << "TFdataRecord protos written to '" << fname << "'\n";
     }

@@ -1863,18 +1863,13 @@ cc_binary(
         "ring_replacement.cc",
     ],
     deps = [
-        ":reaction_duplicate",
-        ":replacement_ring_cc_proto",
+        ":ring_replacement_lib",
         ":mformula",
-        "//Foundational/accumulator",
         "//Foundational/cmdline:iwcmdline",
-        "//Foundational/iw_tdt",
         "//Foundational/iwaray",
         "//Foundational/iwmisc",
         "//Molecule_Lib:iwmolecule",
         "//Molecule_Lib:moleculeio",
-        "//Molecule_Lib:substructure_cc_proto",
-        "@com_google_protobuf//:protobuf",
     ],
 )
 
@@ -3324,6 +3319,32 @@ cc_library(
     ],
     deps = [
         "//Molecule_Lib:iwmolecule",
+    ],
+)
+
+cc_library(
+    name = "ring_replacement_lib",
+    srcs = [
+        "ring_replacement_lib.cc",
+    ],
+    hdrs = [
+        "ring_replacement_lib.h",
+    ],
+    deps = [
+        ":reaction_duplicate",
+        ":replacement_ring_cc_proto",
+        ":mformula",
+        "//Foundational/accumulator",
+        "//Foundational/cmdline:iwcmdline",
+        "//Foundational/iwaray",
+        "//Foundational/iwmisc",
+        "//Molecule_Lib:iwmolecule",
+        "//Molecule_Lib:moleculeio",
+        "//Molecule_Lib:substructure_cc_proto",
+        "@com_google_protobuf//:protobuf",
+    ],
+    visibility = [
+        "//visibility:public",
     ],
 )
 

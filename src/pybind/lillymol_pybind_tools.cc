@@ -10,6 +10,7 @@
 
 #include "Molecule_Tools/dicer_api.h"
 #include "Molecule_Tools/nvrtspsa.h"
+#include "Molecule_Tools/ring_replacement_lib.h"
 #include "Molecule_Tools/unique_molecules_api.h"
 #include "Molecule_Tools_Bdb/iwecfp_database_lookup_lib.h"
 #include "Molecule_Tools_Bdb/selimsteg.h"
@@ -199,4 +200,41 @@ PYBIND11_MODULE(lillymol_tools, m)
       "dice the molecule and return fragments and counts"
     )
   ;
+
+    py::class_<ring_replacement::RingReplacement>(m, "RingReplacement")
+    .def(py::init<>())
+    .def("set_ring_atom_smarts",
+      [](ring_replacement::RingReplacement& rp, const std::string& smarts)->bool {
+        return rp.set_ring_atom_smarts(smarts);
+      },
+      "Smarts for an atom in ring/ring systems to be removed"
+    )
+    .def("set_unique_molecules_only", &ring_replacement::RingReplacement::set_unique_molecules_only,
+         "only unique products will be generated"
+    )
+    .def("set_min_support_requirement", &ring_replacement::RingReplacement::set_min_support_requirement,
+         "min number of examples needed for a replacement ring to be used"
+    )
+    .def("set_max_formula_difference", &ring_replacement::RingReplacement::set_max_formula_difference,
+         "specify a maximum difference between the formula of the starting ring and the replacement"
+    )
+    .def("set_remove_isotopes", &ring_replacement::RingReplacement::set_remove_isotopes,
+         "isotopic labels are removed from products")
+    .def("read_replacement_rings",
+      [](ring_replacement::RingReplacement& rp, const std::string& fname)->uint32_t {
+        return rp.ReadReplacementRings(fname);
+      },
+      "Add a set of replacement rings, /path/to/lillymol/data/ring_replacement.6a.smi"
+    )
+    .def("number_replacement_rings", &ring_replacement::RingReplacement::number_replacement_rings,
+         "Return the number of replacement rings read by read_replacement_rings"
+    )
+    .def("process", 
+        [](ring_replacement::RingReplacement& rp, Molecule& m)->std::vector<Molecule> {
+          return rp.Process(m);
+        },
+        "replace rings"
+    )
+  ;
+  
 }

@@ -57,6 +57,9 @@ static char smiles_file_column_separator = ' ';
 
 static int flush_output = 0;
 
+// Useful for fetching things out of textproto files.
+static int tokens_are_quoted = 0;
+
 static void
 usage(int rc) {
 // clang-format off
@@ -93,6 +96,7 @@ usage(int rc) {
   cerr << " -S <stem>      first files are identifier files, last is haystack. Create many subsets\n";
   cerr << " -u <suffix>    suffix for -S files created\n";
   cerr << " -g <ndx>       start number for files created (-g 1 for dopattern)\n";
+  cerr << " -e             tokens may be quoted\n";
   cerr << " -v             verbose output\n";
   // clang-format on
 
@@ -257,18 +261,29 @@ handle_record_not_in_identifier_file(const const_IWSubstring& buffer,
   return 1;
 }
 
+template <typename T> void
+Unquote(T& token) {
+  token.remove_leading_chars(1);
+  token.chop();
+}
+
 static int
 fetch_smiles_quick(const const_IWSubstring& buffer, const IWString& id,
                    const IWString& zdata, IW_STL_Hash_Map_String& identifiers_to_fetch,
                    IWString& output_buffer) {
   IW_STL_Hash_Map_String::const_iterator f = identifiers_to_fetch.find(id);
 
-  bool is_match;
+  bool is_match = false;
 
-  if (f == identifiers_to_fetch.end()) {
-    is_match = false;
-  } else {
+  if (f != identifiers_to_fetch.end()) {
     is_match = true;
+  } else if (tokens_are_quoted && id[0] == '"') {
+    IWString tmp(id);
+    Unquote(tmp);
+    f = identifiers_to_fetch.find(tmp);
+    if (f != identifiers_to_fetch.end()) {
+      is_match = true;
+    }
   }
 
   // if (is_match)
@@ -323,7 +338,12 @@ fetch_smiles_quick(const const_IWSubstring& buffer,
         continue;
       }
 
-      if (!identifiers_to_fetch.contains(token)) {
+      if (identifiers_to_fetch.contains(token)) {
+        ;  // good
+      } else if (tokens_are_quoted && token[0] == '"') {
+        Unquote(token);
+        cerr << "unquoted to '" << token << "'\n";
+      } else {
         continue;
       }
 
@@ -590,7 +610,7 @@ determine_inter_column_separator(const Command_Line& cl, const char flag, char& 
 
 static int
 fetch_smiles_quick(int argc, char** argv) {
-  Command_Line cl(argc, argv, "vc:C:X:Y:wkdzB:an:xF:qbjK:S:u:g:fi:I:h");
+  Command_Line cl(argc, argv, "vc:C:X:Y:wkdzB:an:xF:qbjK:S:u:g:fi:I:he");
 
   if (cl.unrecognised_options_encountered()) {
     cerr << "Unrecognised options encountered\n";
@@ -626,6 +646,13 @@ fetch_smiles_quick(int argc, char** argv) {
   if (cl.option_present('I')) {
     if (!determine_inter_column_separator(cl, 'I', smiles_file_column_separator)) {
       return 1;
+    }
+  }
+
+  if (cl.option_present('e')) {
+    tokens_are_quoted = 1;
+    if (verbose) {
+      cerr << "Will strip quotes from tokens\n";
     }
   }
 

@@ -194,6 +194,7 @@ pybind_extension(
         "//Molecule_Lib:moleculeio",
         "//Molecule_Tools:dicer_api",
         "//Molecule_Tools:nvrtspsa",
+        "//Molecule_Tools:ring_replacement_lib",
         "//Molecule_Tools:unique_molecules_api",
         "//Molecule_Tools_Bdb:iwecfp_database_lookup_lib_shared",
         "//Molecule_Tools_Bdb:selimsteg",

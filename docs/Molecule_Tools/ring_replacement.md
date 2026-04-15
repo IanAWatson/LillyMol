@@ -502,3 +502,42 @@ which can be converted to .sdf form with
 ```
 fileconv -o sdf in.smi
 ```
+
+## Python
+A somewhat limited implementation of ring replacement is available within python.
+
+```
+from lillymol import *
+from lillymol_tools import *
+
+# Instantiate an empty RingReplacement
+rr = RingReplacement()
+# Read the default 6a fused ring set - uses LILLYMOL_HOME to find the directory.
+# Or specify a full path name
+rr.read_replacement_rings("rings_6a.smi")
+# Specify the smarts of an atom in the ring to be replaced.
+# You may, or may not need to do this.
+# In this case, the ring to be removed will have an atom with isotope 1 somewhere
+# in the ring.
+rr.set_ring_atom_smarts("[1c]")
+
+# The staring molecule - note that it must have an isotopic atom in the ring
+# to be removed. But it could be any substructure matching...
+m = MolFromSmiles("O[1c]1cc1(OC)cc1 start")
+
+# Replace the ring in `m`
+products = rr.process(m)
+# Note that the first item in `products` will be the starting molecule.
+for p in products:
+  print(f"{p.aromatic_smiles()} {p.name()}")
+```
+
+```
+# Iterate over a set of molecules
+
+for mol in mols:
+  products = rr.process(mol)
+  for p in products:
+    ...
+```
+

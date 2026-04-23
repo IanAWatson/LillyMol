@@ -5,6 +5,7 @@ using ArgMacros
 using CSV
 using Plots
 using Dierckx
+import Humanize: digitsep
 
 # This supports the --dist option.
 function crossing_point(values::Array, cutoff::Real)::Int
@@ -99,7 +100,8 @@ function main()
   if ! isnothing(threshold)
     ndx = crossing_point(distance, threshold)
     y = distance[ndx]
-    plot!([0, length(distance)], [y, y], linestyle=:dash, color=:grey, label="Dist $(threshold) count $(ndx)")
+    n = digitsep(ndx)
+    plot!([0, length(distance)], [y, y], linestyle=:dash, color=:grey, label="Dist $(threshold) count $(n)")
   end
 
   savefig("$(stem).$(format)")

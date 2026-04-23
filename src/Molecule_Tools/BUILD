@@ -282,6 +282,20 @@ cc_proto_library(
 )
 
 proto_library(
+    name = "reagent_substructure_search_proto",
+    srcs = [
+        "reagent_substructure_search.proto",
+    ]
+)
+
+cc_proto_library(
+    name = "reagent_substructure_search_cc_proto",
+    deps = [
+        "reagent_substructure_search_proto",
+    ]
+)
+
+proto_library(
     name = "reduced_graph_proto",
     srcs = [
         "reduced_graph.proto",
@@ -1779,6 +1793,22 @@ cc_binary(
 )
 
 cc_binary(
+    name = "reagent_substructure_search",
+    srcs = [
+        "reagent_substructure_search.cc",
+    ],
+    deps = [
+        ":mformula",
+        ":reagent_substructure_search_cc_proto",
+        "//Foundational/cmdline:iwcmdline",
+        "//Foundational/data_source:iwtfdata_record",
+        "//Molecule_Lib:iwmolecule",
+        "//Molecule_Lib:moleculeio",
+        "@com_google_absl//absl/container:flat_hash_set",
+    ],
+)
+
+cc_binary(
     name = "ring_closure",
     srcs = [
         "ring_closure_main.cc",
@@ -2182,6 +2212,19 @@ cc_library(
     deps = [
         ":fingerprint_writer",
         "//Foundational/iwmisc:sparse_fp_creator",
+        "//Molecule_Lib:iwmolecule",
+    ],
+)
+
+cc_library(
+    name = "elements_matched",
+    srcs = [
+        "elements_matched.cc",
+    ],
+    hdrs = [
+        "elements_matched.h",
+    ],
+    deps = [
         "//Molecule_Lib:iwmolecule",
     ],
 )
@@ -3052,6 +3095,7 @@ cc_library(
         "remove_duplicate_fragments.h",
     ],
     deps = [
+        ":elements_matched",
         "//Foundational/iwmisc:compile_time",
         "//Molecule_Lib:iwmolecule",
     ],
@@ -3630,6 +3674,20 @@ cc_test(
         ":minor_changes_cc_proto",
         ":minor_changes_lib",
         "//Molecule_Lib:moleculeio",
+        "@googletest//:gtest",
+        "@googletest//:gtest_main",
+    ],
+)
+
+cc_test(
+    name = "mformula_test",
+    srcs = [
+        "mformula_test.cc",
+    ],
+    deps = [
+        ":mformula",
+        "//Molecule_Lib:moleculeio",
+        "//Molecule_Lib:iwmolecule",
         "@googletest//:gtest",
         "@googletest//:gtest_main",
     ],

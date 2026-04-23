@@ -2359,11 +2359,13 @@ FileconvConfig::ExcludeForNonOrganicAndNonPeriodicTable(const Molecule& m) {
 
     if (!ok_non_organics.matches(e)) {
       non_organic_molecules_found++;
+      _elements_matched.Extra(e);
       return 1;
     }
 
     if (!e->is_in_periodic_table()) {
       non_real_elements_found++;
+      _elements_matched.Extra(e);
       return 1;
     }
   }
@@ -2376,11 +2378,13 @@ FileconvConfig::ExcludeForNonOrganic(const Molecule& m) {
   int matoms = m.natoms();
   for (int i = 0; i < matoms; i++) {
     const Element* e = m.elementi(i);
-    if (e->organic())
+    if (e->organic()) {
       continue;
+    }
 
     if (!ok_non_organics.matches(e)) {
       non_organic_molecules_found++;
+      _elements_matched.Extra(e);
       return 1;
     }
   }
@@ -2410,11 +2414,13 @@ FileconvConfig::ExcludeForNonRealElements(const Molecule& m) {
 
 int
 FileconvConfig::ExcludeForAtomTypes(const Molecule& m) {
-  if (exclude_non_real_elements && output_organic_only)
+  if (exclude_non_real_elements && output_organic_only) {
     return ExcludeForNonOrganic(m);
+  }
 
-  if (output_organic_only)
+  if (output_organic_only) {
     return ExcludeForNonOrganic(m);
+  }
 
   return ExcludeForNonRealElements(m);
 }
@@ -5283,18 +5289,27 @@ FileconvConfig::ReportResults(const Command_Line& cl, std::ostream& output) cons
          << " atoms\n";
   }
 
+  bool call_elements_matched_report = false;
   if (output_organic_only && non_organic_molecules_found) {
     cerr << "Skipped " << non_organic_molecules_found
          << " molecules containing non organic atoms\n";
+    call_elements_matched_report = true;
   }
   if (non_real_elements_found) {
     cerr << "Skipped " << non_real_elements_found
          << " molecules containing non-periodic table elements\n";
+    call_elements_matched_report = true;
   }
   if (molecules_excluded_for_non_allowed_elements) {
     cerr << "Skipped " << molecules_excluded_for_non_allowed_elements
          << " molecules with non-allowed elements\n";
+    call_elements_matched_report = true;
   }
+
+  if (call_elements_matched_report) {
+    _elements_matched.Report(cerr);
+  }
+
   if (molecules_below_molecular_weight_cutoff) {
     cerr << "Skipped " << molecules_below_molecular_weight_cutoff
          << " molecules with molecular wieght below " << lower_molecular_weight_cutoff << '\n';

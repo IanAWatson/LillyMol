@@ -20,8 +20,16 @@ class MFormula {
   private:
     int _count[kMFOther + 1];
 
+    // We have the ability to separately consider aromatic forms.
+    // by default, this will be true.
+    // Note that ring perception is also turned off.
+    int _consider_aromatic;
+
     // Some tools may need lazy evaluation.
     int _initialised;
+
+    // Sum of _count.
+    int _natoms;
 
   // Private functions
     void ZeroCountArray();
@@ -29,6 +37,18 @@ class MFormula {
 
   public:
     MFormula();
+
+    // This should be called before any calls to Build.
+    void
+    set_consider_aromatic(int s) {
+      _consider_aromatic = s;
+    }
+
+    // Build from the text in `smiles`, no Molecule interpretation.
+    // Note that something like [Np] would be counted as a Nitrogen atom.
+    // Parsing is for speed, and it assumes well behaved input - organic only.
+    // Nothing aromatic is perceived.
+    int Build(const IWString& smiles);
 
     int Build(Molecule& m);
 
@@ -39,11 +59,32 @@ class MFormula {
       return _initialised;
     }
 
+    // Only organic heavy atoms are counted. Note that this is only valid if
+    // the formula has been built from a string. Change if ever needed.
+    int natoms() const {
+      return _natoms;
+    }
+
     // The absolute difference between individual types.
     uint32_t Diff(const MFormula& rhs) const;
 
+    // Returns true if `this` is a subset of `rhs`.
+    bool IsSubset(const MFormula& rhs) const;
+
     int ToSparseFingerprint(IWString& destination) const;
     int ToFixedCountedFingerprint(IWString& destination) const;
+
+    // These are mostly used by tests.
+    // Note that they do not consider aromatic variants.
+    int Carbon() const;
+    int Nitrogen() const;
+    int Oxygen() const;
+    int Fluorine() const;
+    int Phosphorus() const;
+    int Sulphur() const;
+    int Chlorine() const;
+    int Bromine() const;
+    int Iodine() const;
 
 };
 

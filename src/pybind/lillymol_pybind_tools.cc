@@ -9,6 +9,7 @@
 #include "pybind11/stl.h"
 
 #include "Molecule_Tools/dicer_api.h"
+#include "Molecule_Tools/mformula.h"
 #include "Molecule_Tools/nvrtspsa.h"
 #include "Molecule_Tools/ring_replacement_lib.h"
 #include "Molecule_Tools/unique_molecules_api.h"
@@ -236,5 +237,22 @@ PYBIND11_MODULE(lillymol_tools, m)
         "replace rings"
     )
   ;
+
+  py::class_<mformula::MFormula>(m, "MFormula")
+  .def(py::init<>())
+  .def("build",
+      [](mformula::MFormula& mf, Molecule& m)->int {
+        return mf.Build(m);
+      },
+      "Build the molecular for`m`, returns number of atoms in `m`"
+    )
+  .def("set_consider_aromatic",
+      [](mformula::MFormula mf, bool s) {
+        mf.set_consider_aromatic(s);
+      },
+      "Controls whether aromatic atoms are distinguished - true by default"
+    )
+  ;
+  
   
 }

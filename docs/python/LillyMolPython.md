@@ -254,6 +254,7 @@ The most common methods for a Molecule currently implemented are
 | exact_mass() | Exact Mass |
 | ncon(atom) | Number of edges (bonds) to 'atom' |
 | connections(atom) | List of all atoms attached to 'atom' |
+| other_atom(atom, n) | Atom number of n'th connection to 'atom' |
 | attached_heteroatom_count(atom) | Number of heteroatoms attached to 'atom ' |
 | is_aromatic(atom) | True if 'atom' is aromatic |
 | compute_aromaticity_if_needed() | Compute fragments, rings and aromaticity |

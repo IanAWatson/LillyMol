@@ -425,6 +425,12 @@ PYBIND11_MODULE(lillymol, m)
                   },
                   "Atoms connected to atom"
                 )
+                .def("other_atom",
+                  [](const Molecule& m, atom_number_t zatom, int n)->atom_number_t {
+                    return m.other(zatom, n);
+                  },
+                  "Fetch the atom number of the n'th connection to atom"
+                )
                 .def("attached_heteroatom_count", static_cast<int (Molecule::*)(atom_number_t)const>(&Molecule::attached_heteroatom_count), "Number of heteroatoms attached")
                 //.def("is_aromatic", static_cast<int (Molecule::*)(atom_number_t)>(&Molecule::is_aromatic), "True if atom is aromatic")
                 .def("is_aromatic",

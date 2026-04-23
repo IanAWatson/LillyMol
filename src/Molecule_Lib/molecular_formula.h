@@ -50,7 +50,8 @@ class MolecularFormula {
     // instead of the hash?
     T _count[kNTypes];
 
-    // The highway hash of the counts.
+    // Hash of the counts - facilitates equality comparisons.
+    // Not implemented.
     uint64_t _hash;
 
     // Is the hash valid or not?

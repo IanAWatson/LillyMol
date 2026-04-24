@@ -1631,7 +1631,7 @@ class IWReaction : public Scaffold_Reaction_Site
     void IdentifyMissingElements(const Substructure_Atom& product_molecule, resizable_array<atomic_number_t>& atomic_numbers_lost);
     void IdentifyUnmappedAtomsThatDisappear(const Substructure_Atom& product_molecule, resizable_array<int>& atoms_lost);
 
-    int SetRemoveAtomicNumber(atomic_number_t z) {
+    int SetRemoveAtomicNumber(atomic_number_t z);
 
     int _create_orphan_molecule(const resizable_array<int> & orphan_atoms,
                                 Molecule & orphan_molecule,

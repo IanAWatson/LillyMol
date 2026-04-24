@@ -1801,7 +1801,7 @@ cc_binary(
         ":mformula",
         ":reagent_substructure_search_cc_proto",
         "//Foundational/cmdline:iwcmdline",
-        "//Foundational/data_source:iwtfdata_record",
+        "//Foundational/data_source:iwrecordio",
         "//Molecule_Lib:iwmolecule",
         "//Molecule_Lib:moleculeio",
         "@com_google_absl//absl/container:flat_hash_set",

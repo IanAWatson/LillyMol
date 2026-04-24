@@ -350,6 +350,13 @@
     },
 
     {
+      "name": "smirks_disappearing_element",
+      "args": [
+        "-J rmsmkele -J larf -K F:#{indir}/test.smirks #{indir}/r1.smi #{indir}/r2.smi"
+      ]
+    },
+
+    {
       "name": "smarts_in_rxn_file",
       "args": [
         "-D #{indir}/acid_amine.rxn #{indir}/r1.smi #{indir}/r2.smi"

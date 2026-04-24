@@ -2596,7 +2596,7 @@ msort(int argc, char** argv)
   }
 
   if (cl.option_present('d')) {
-    ascending_order = 1;
+    ascending_order = 0;
 
     if (verbose) {
       cerr << "Descending order sort\n";

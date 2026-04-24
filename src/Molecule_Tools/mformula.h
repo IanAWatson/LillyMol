@@ -70,6 +70,8 @@ class MFormula {
 
     // Returns true if `this` is a subset of `rhs`.
     bool IsSubset(const MFormula& rhs) const;
+    // This version only checks the element counts, not heteroatoms and rings...
+    bool IsElementCountSubset(const MFormula& rhs) const;
 
     int ToSparseFingerprint(IWString& destination) const;
     int ToFixedCountedFingerprint(IWString& destination) const;

@@ -55,7 +55,7 @@ end
 
 def trxn_parallel
 
-  cl = IWCmdlineV2.new("-v-thr=ipos-tmpdir=s-S=s-trxn=xfile-R=sfile-P=sfile-nj-log=s-keeplog")
+  cl = IWCmdlineV2.new("-v-verbose-thr=ipos-tmpdir=s-S=s-trxn=xfile-R=sfile-P=sfile-nj-log=s-keeplog")
 
   verbose = cl.option_present('v')
 
@@ -197,7 +197,7 @@ def trxn_parallel
   $stderr << "Executing #{cmd}\n" if verbose
   system(cmd)
 
-  PSupport::remove_files(smiles_files)
+  #PSupport::remove_files(smiles_files)
 end
 
 trxn_parallel

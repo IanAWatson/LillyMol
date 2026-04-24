@@ -10,6 +10,7 @@
 #include <iostream>
 #include <limits>
 
+#include "Foundational/iwbits/iwbits.h"
 #include "Foundational/iwmisc/misc.h"
 #include "gfp_standard.h"
 
@@ -256,8 +257,10 @@ GFP_Standard::tanimoto(const GFP_Standard &rhs) const {
           " mk " << _nset_mk << ' ' << rhs._nset_mk << " mk2 " << _nset_mk2 << ' ' << rhs._nset_mk2 << '\n';
 #endif
 
+  // Using AVX does not seem to make any difference.
   if (_nset_iw || rhs._nset_iw) {
     int bic = popcount_2fp((const unsigned *)_iw, (const unsigned *)rhs._iw, 64);
+//  int bic = iwbits::BitsInCommonAvx((const uint64_t *)_iw, (const uint64_t *)rhs._iw, 32);
     rc += (static_cast<float>(bic) / static_cast<float>(_nset_iw + rhs._nset_iw - bic));
     ++ndiv;
     assert(rc <= 2.0f);

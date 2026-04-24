@@ -107,7 +107,7 @@ PYBIND11_MODULE(lillymol_tsubstructure, s) {
 
         .def("number_queries", &TSubstructure::number_queries, "Number of queries defined")
         // These behaviour modifiers should be set before any queries are read.
-	.def("set_reduce_to_largest_fragment", &TSubstructure::set_reduce_to_largest_fragment)
+	.def("set_reduce_to_largest_fragment", &TSubstructure::set_reduce_to_largest_fragment, "Transform molecule before matching")
 	.def("set_make_implicit_hydrogens_explicit", &TSubstructure::set_make_implicit_hydrogens_explicit)
         .def("set_label_by_query_number", &TSubstructure::set_label_by_query_number, "Label matched atoms by query number")
 	.def("set_unique_embeddings_only", &TSubstructure::set_unique_embeddings_only, "Only find unique embeddings")

@@ -6,15 +6,19 @@
 #include <iostream>
 #include <memory>
 #include <optional>
+#include <ranges>
 
 #include "absl/container/flat_hash_set.h"
 
 #define RESIZABLE_ARRAY_IMPLEMENTATION
+#define RESIZABLE_ARRAY_IWQSORT_IMPLEMENTATION
 #include "Foundational/accumulator/accumulator.h"
 #include "Foundational/iwaray/iwaray.h"
 #include "Foundational/cmdline/cmdline.h"
-#include "Foundational/data_source/tfdatarecord.h"
+#include "Foundational/data_source/iwrecordio.h"
 #include "Foundational/iwmisc/misc.h"
+#include "Foundational/iwmisc/report_progress.h"
+#include "Foundational/iwqsort/iwqsort.h"
 
 #include "Molecule_Lib/aromatic.h"
 #include "Molecule_Lib/etrans.h"
@@ -49,14 +53,16 @@ Usage(int rc) {
 // clang-format off
   cerr << R"(Reagent substructure search.
 Consumed
- -R <fname>  recordio file of reagent_substructure_search::ReagentData serialized protos,
-                such as might come from Enamine2Reagents.
- -m          minimum number of atoms in reagents.
- -M          maximum number of atoms in reagents.
- -r <ncon>   allowed values for number of connections.
- -O <fname>  write labelled molecules to <fname>.
- -c          remove chirality.
- -v          verbose output.
+ -R <fname>        recordio file of reagent_substructure_search::ReagentData serialized protos,
+                      such as might come from Enamine2Reagents.
+ -X <matches>      max number of substructure matches per molecule - for efficiency, but
+                        may leave some atoms unmatched.
+ -m                minimum number of atoms in reagents.
+ -M                maximum number of atoms in reagents.
+ -d <ncon>         allowed values for number of connections.
+ -O <fname>        write labelled molecules to <fname>.
+ -c                remove chirality.
+ -v                verbose output.
 )";
 // clang-format on
 
@@ -112,6 +118,8 @@ class Coverage {
 
     absl::flat_hash_set<uint32_t>* _by_atom;
 
+    int _atoms_covered;
+
   public:
     Coverage(int n);
     ~Coverage();
@@ -119,15 +127,26 @@ class Coverage {
     // An indication that reagent number `reagent` has matched `atom`.
     void Extra(int atom, int reagent);
 
+    void Update(const Substructure_Results& sresults, int ndx);
+
     float FractionAtomsCovered() const;
 
     uint32_t Count(int atom) const {
       return _by_atom[atom].size();
     }
+
+    int atoms_covered() const {
+      return _atoms_covered;
+    }
+
+    bool all_atoms_covered() const {
+      return _atoms_covered == _natoms;
+    }
 };
 
 Coverage::Coverage(int n) : _natoms(n) {
   _by_atom = new absl::flat_hash_set<uint32_t>[_natoms];
+  _atoms_covered = 0;
 }
 
 Coverage::~Coverage() {
@@ -136,6 +155,10 @@ Coverage::~Coverage() {
 
 void
 Coverage::Extra(int atom, int reagent) {
+  if (_by_atom[atom].empty()) {
+    ++_atoms_covered;
+  }
+
   _by_atom[atom].insert(reagent);
 }
 
@@ -149,6 +172,15 @@ Coverage::FractionAtomsCovered() const {
   }
 
   return iwmisc::Fraction<float>(atoms_matched, _natoms);
+}
+
+void
+Coverage::Update(const Substructure_Results& sresults, int ndx) {
+  for (const Set_of_Atoms* e : sresults.embeddings()) {
+    for (atom_number_t a : *e) {
+      Extra(a, ndx);
+    }
+  }
 }
 
 class Reagent {
@@ -174,14 +206,30 @@ class Reagent {
   public:
     Reagent();
 
+    // Build from `proto`.
+    // Return 1 if successful.
+    // Return 0 if the constraints on min/max atoms are not met.
+    // Return -1 if there is an error.
+    // Should do an enum, but too lazy.
     // `proto` is destroyed.
-    bool BuildFromProto(ReagentData& proto,
+    int BuildFromProto(ReagentData& proto,
                 uint32_t min_natoms,
                 uint32_t max_natoms,
                 const bool* _ok_ncon);
 
     void set_ndx(int s) {
       _ndx = s;
+    }
+
+    uint32_t ndx() const {
+      return _ndx;
+    }
+
+    bool has_formula() const {
+      return _formula != nullptr;
+    }
+    bool has_query() const {
+      return _query != nullptr;
     }
 
     int natoms() const {
@@ -191,49 +239,53 @@ class Reagent {
     int SubstructureSearch(Molecule_to_Match& target,
                            const mformula::MFormula& rhs_mf,
                            const mformula::MFormula& rhs_mf_arom,
-                           Coverage& coverage);
+                           Substructure_Results& sresults);
 };
 
 Reagent::Reagent() {
   _ndx = 0;
 }
 
-bool
+int
 Reagent::BuildFromProto(ReagentData& proto,
                 uint32_t min_natoms,
                 uint32_t max_natoms,
                 const bool* _ok_ncon) {
   if (proto.natoms() < min_natoms) {
-    return false;
+    return 0;
   }
   if (proto.natoms() > max_natoms) {
-    return false;
+    return 0;
   }
 
   if (! _ok_ncon[proto.ncon()]) {
-    return false;
+    return 0;
   }
 
   if (! _formula_smiles.Build(proto.smiles())) {
     cerr << "Reagent::BuildFromProto:invalid smiles '" << proto.smiles() << "'\n";
-    return 0;
+    return -1;
   }
 
   _proto = std::move(proto);
 
-  return true;
+  return 1;
 }
 
 int
 Reagent::SubstructureSearch(Molecule_to_Match& target,
                 const mformula::MFormula& rhs_mf,
                 const mformula::MFormula& rhs_mf_arom,
-                Coverage& coverage) {
+                Substructure_Results& sresults) {
+  // cerr << _proto.smiles() << " SSS\n";
+
   if (static_cast<int32_t>(_proto.natoms()) > target.natoms()) {
+    // cerr << "TOo many atoms in reagent\n";
     return 0;
   }
 
   if (! _formula_smiles.IsSubset(rhs_mf)) {
+    // cerr << "_formula_smiles no match\n";
     return 0;
   }
 
@@ -248,7 +300,8 @@ Reagent::SubstructureSearch(Molecule_to_Match& target,
     _formula->Build(*_m);
   }
 
-  if (! _formula->IsSubset(rhs_mf_arom)) {
+  if (! _formula->IsElementCountSubset(rhs_mf_arom)) {
+    // cerr << "Formula from molecule no match\n";
     return 0;
   }
 
@@ -256,6 +309,8 @@ Reagent::SubstructureSearch(Molecule_to_Match& target,
     static Molecule_to_Query_Specifications mqs;
     mqs.set_substituents_only_at_isotopic_atoms(1);
     mqs.set_must_have_substituent_at_every_isotopic_atom(1);
+    mqs.set_atoms_conserve_ring_membership(1);
+    mqs.set_non_ring_atoms_become_nrings_0(1);
 
     _query = std::make_unique<Substructure_Query>();
     if (! _query->create_from_molecule(*_m, mqs)) {
@@ -264,18 +319,7 @@ Reagent::SubstructureSearch(Molecule_to_Match& target,
     }
   }
 
-  Substructure_Results sresults;
-  if (! _query->substructure_search(target, sresults)) {
-    return 0;
-  }
-
-  for (const Set_of_Atoms* e : sresults.embeddings()) {
-    for (const atom_number_t a : *e) {
-      coverage.Extra(a, _ndx);
-    }
-  }
-
-  return 1;
+  return _query->substructure_search(target, sresults);
 }
 
 constexpr int kMaxNcon = 3;
@@ -300,6 +344,9 @@ class Options {
     // this array.
     bool _ok_ncon[kMaxNcon + 1];
 
+    // For efficiency, we can impose a maximum number of substructure matches.
+    int _max_matches;
+
     // Read from the -R file.
     resizable_array_p<Reagent> _reagent;
 
@@ -311,11 +358,15 @@ class Options {
 
     IWString_and_File_Descriptor _stream_for_labelled_molecules;
 
+    Report_Progress _report_progress;
+
     // private functions
 
     int ReadReagents(IWString& fname);
-    int ReadReagents(iw_tf_data_record::TFDataReader& reader);
+    int ReadReagents(iwrecordio::IWRecordIoReader& reader);
     int AddReagent(reagent_substructure_search::ReagentData& proto);
+    int ReportReagentSizes(std::ostream& output) const;
+    void SortReagentsByAtomCount();
 
     int HandleNoMatches(Molecule& m);
 
@@ -353,6 +404,8 @@ Options::Options() {
 
   _min_natoms = 0;
   _max_natoms = std::numeric_limits<uint32_t>::max();
+
+  _max_matches = std::numeric_limits<int>::max();
 
   std::fill_n(_ok_ncon, 4, true);
 }
@@ -406,10 +459,10 @@ Options::Initialise(Command_Line& cl) {
     }
   }
 
-  if (cl.option_present('r')) {
+  if (cl.option_present('d')) {
     std::fill_n(_ok_ncon, kMaxNcon + 1, true);
     uint32_t r;
-    for (int i = 0; cl.value('r', r, i); ++i) {
+    for (int i = 0; cl.value('d', r, i); ++i) {
       if (r >= kMaxNcon) {
         cerr << "Invalid number of connections " << r << '\n';
         return 0;
@@ -419,9 +472,9 @@ Options::Initialise(Command_Line& cl) {
   }
 
   if (! cl.option_present('R')) {
-    cerr << "Must specify one or more TFDataReader binary files of\n";
+    cerr << "Must specify one or more IWRecordIoReader binary files of\n";
     cerr << "reagent_substructure_search::ReagentData protos via the -R option\n";
-    return 0;
+    Usage(1);
   } else {
     IWString fname;
     for (int i = 0; cl.value('R', fname, i); ++i) {
@@ -430,10 +483,20 @@ Options::Initialise(Command_Line& cl) {
         return 0;
       }
     }
+
+    SortReagentsByAtomCount();
   }
 
   if (_verbose) {
     cerr << "Read " << _reagent.size() << " reagents\n";
+    ReportReagentSizes(cerr);
+  }
+
+  if (cl.option_present('X')) {
+    if (! cl.value('X', _max_matches) || _max_matches < 1) {
+      cerr << "Invalid maximum number of substructure matches (-X)\n";
+      Usage(1);
+    }
   }
 
   if (cl.option_present('O')) {
@@ -448,12 +511,57 @@ Options::Initialise(Command_Line& cl) {
     }
   }
 
+  if (cl.option_present('r')) {
+    if (! _report_progress.initialise(cl, 'r', _verbose)) {
+      cerr << "Options::Initialise:cannot initialise progress reporting -r\n";
+      return 0;
+    }
+  }
+
   return 1;
+}
+
+void
+Options::SortReagentsByAtomCount() {
+  // Sort so that the largest reagents are first.
+  _reagent.iwqsort_lambda([](const Reagent* r1, const Reagent* r2) {
+      if (r1->natoms() > r2->natoms()) {
+        return -1;
+      } else if (r1->natoms() < r2->natoms()) {
+        return 1;
+      } else {
+        return 0;
+      }
+    });
+
+  for (uint32_t i = 0; i < _reagent.size(); ++i) {
+    _reagent[i]->set_ndx(i);
+  }
+}
+
+int
+Options::ReportReagentSizes(std::ostream& output) const {
+  extending_resizable_array<int> reagent_size;
+  for (const Reagent* r : _reagent) {
+    ++reagent_size[r->natoms()];
+  }
+
+  Accumulator<uint32_t> acc_natoms;
+  for (int i = 1; i < reagent_size.number_elements(); ++i) {
+    if (reagent_size[i]) {
+      output << reagent_size[i] << " reagents had " << i << " atoms\n";
+      acc_natoms.extra(i, reagent_size[i]);
+    }
+  }
+
+  output << "Ave " << static_cast<float>(acc_natoms.average()) << '\n';
+
+  return output.good();
 }
 
 int
 Options::ReadReagents(IWString& fname) {
-  iw_tf_data_record::TFDataReader reader(fname);
+  iwrecordio::IWRecordIoReader reader(fname);
   if (! reader.good()) {
     cerr << "Options::ReadReagents:cannot open '" << fname << "'\n";
     return 0;
@@ -463,7 +571,7 @@ Options::ReadReagents(IWString& fname) {
 }
 
 int
-Options::ReadReagents(iw_tf_data_record::TFDataReader& reader) {
+Options::ReadReagents(iwrecordio::IWRecordIoReader& reader) {
   while (1) {
     std::optional<reagent_substructure_search::ReagentData> maybe_proto =
       reader.ReadProto<reagent_substructure_search::ReagentData>();
@@ -490,11 +598,16 @@ int
 Options::AddReagent(reagent_substructure_search::ReagentData& proto) {
   std::unique_ptr<Reagent> rgnt = std::make_unique<Reagent>();
 
-  if (! rgnt->BuildFromProto(proto, _min_natoms, _max_natoms, _ok_ncon)) {
+  if (int rc = rgnt->BuildFromProto(proto, _min_natoms, _max_natoms, _ok_ncon); rc == 1) {
+    // Good, processed below
+  } else if (rc == 0) {  // constraints violated.  // constraints violated.
+    return 1;
+  } else {
+    cerr << "Cannot build Reagent from proto\n";
     return 0;
   }
 
-  rgnt->set_ndx(_reagent.size());
+  rgnt->set_ndx(_reagent.size());  // This later gets overwritten when the _reagent array is sorted.
 
   _reagent << rgnt.release();
 
@@ -505,14 +618,32 @@ int
 Options::Report(std::ostream& output) const {
   output << "Read " << _molecules_read << " molecules\n";
 
-  output << "Coverage btw " << _acc_coverage.minval() << " and " <<
-            _acc_coverage.maxval() << " ave " << _acc_coverage.average() << '\n';
+  if (_acc_coverage.n() > 1) {
+    output << "Coverage btw " << _acc_coverage.minval() << " and " <<
+              _acc_coverage.maxval() << " ave " << _acc_coverage.average() << '\n';
+  }
 
   for (int i = 0; i < _matches.number_elements(); ++i) {
     if (_matches[i]) {
       output << _matches[i] << " molecules matched " << i << " reagents\n";
     }
   }
+
+  uint32_t has_formula = 0;
+  uint32_t has_query = 0;
+  for (const Reagent* r : _reagent) {
+    if (! r->has_formula()) {
+      continue;
+    }
+    ++has_formula;
+    if (r->has_query()) {
+      ++has_query;
+    }
+  }
+
+  output << "Across " << _reagent.size() << " reagents\n";
+  output << has_formula << " have a Molecule and formula computed\n";
+  output << has_query << " have a Substructure_Query instantiated\n";
 
   return 1;
 }
@@ -546,7 +677,12 @@ Options::Preprocess(Molecule& m) {
 int
 Options::Process(Molecule& m,
                  IWString_and_File_Descriptor& output) {
+
   ++_molecules_read;
+
+  if (_report_progress()) {
+    cerr << "Processed " << _molecules_read << " molecules\n";
+  }
 
   const int matoms = m.natoms();
 
@@ -562,12 +698,22 @@ Options::Process(Molecule& m,
   formula_arom.set_consider_aromatic(1);
   formula_arom.Build(m);
 
-  uint32_t matches_found = 0;
+  int matches_found = 0;
   for (Reagent* r : _reagent) {
-    if (! r->SubstructureSearch(target, formula, formula_arom, coverage)) {
+    Substructure_Results sresults;
+    sresults.set_save_query_atoms_matched(0);
+
+    if (! r->SubstructureSearch(target, formula, formula_arom, sresults)) {
       continue;
     }
+
     ++matches_found;
+
+    coverage.Update(sresults, r->ndx());
+
+    if (matches_found > _max_matches) {
+      break;
+    }
   }
 
   if (_verbose) {
@@ -592,7 +738,9 @@ Options::Process(Molecule& m,
       }
     }
 
-    _stream_for_labelled_molecules << tmp.aromatic_smiles() << ' ' << m.name() << '\n';
+    const float f = iwmisc::Fraction<float>(tmp.number_isotopic_atoms(), matoms);
+
+    _stream_for_labelled_molecules << tmp.aromatic_smiles() << ' ' << m.name() << ' ' << f << '\n';
 
     _stream_for_labelled_molecules.write_if_buffer_holds_more_than(32768);
   }
@@ -658,7 +806,7 @@ ApplicationName(Options& options,
 
 int
 Main(int argc, char** argv) {
-  Command_Line cl(argc, argv, "vE:H:N:T:A:lcg:i:m:M:r:O:");
+  Command_Line cl(argc, argv, "vE:T:A:lcg:i:m:M:r:O:R:X:f");
 
   if (cl.unrecognised_options_encountered()) {
     cerr << "Unrecognised options encountered\n";
@@ -713,6 +861,10 @@ Main(int argc, char** argv) {
 
   if (verbose) {
     options.Report(cerr);
+  }
+
+  if (cl.option_present('f')) {
+//  _exit(0);
   }
 
   return 0;

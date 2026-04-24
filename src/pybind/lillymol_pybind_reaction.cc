@@ -277,4 +277,6 @@ PYBIND11_MODULE(lillymol_reaction, rxn)
   ;
 
   rxn.def("set_smirks_lost_atom_means_remove_frgment", &set_smirks_lost_atom_means_remove_frgment, "atoms lost in a smirks are removed");
+  rxn.def("set_smirks_remove_elements_in_lhs_but_missing_in_rhs", &set_smirks_remove_elements_in_lhs_but_missing_in_rhs,
+        "unmapped reagent atoms with elements not in RHS are removed");
 }

@@ -2254,15 +2254,14 @@ Substructure_Atom::identify_atom_numbers(extending_resizable_array<int> & a) con
 }
 
 void
-Substructure_Atom::identify_atom_map_numbers(extending_resizable_array<int> & a) const
-{
+Substructure_Atom::identify_atom_map_numbers(extending_resizable_array<int> & a) const {
 //cerr << "Substructure_Atom::identify_atom_numbers:my number " << _initial_atom_number << '\n';
 
-  if (_atom_map_number >= 0)
+  if (_atom_map_number >= 0) {
     a[_atom_map_number]++;
+  }
 
-  for(Substructure_Atom* c : _children)
-  {
+  for(Substructure_Atom* c : _children) {
     c->identify_atom_map_numbers(a);
   }
 

@@ -1523,6 +1523,7 @@ display_dash_j_qualifiers(std::ostream& os) {
  -H BCMINSEP=<n>    only 3d bump check atoms if they are more than <n> bonds apart.
  -J keepatmn    retain any atom map numbers in output molecules.
  -J larf        in smirks, if an atom is lost, remove the fragment.
+ -J rmsmkele    in smirks, remove all elements that are in the LHS but not in RHS.
  -J rmhsqb      remove unnecessary [] in product molecules.
  -J rmxhbv      remove explicit hydrogens causing bad valences.
  -J coords      include coordinates with smiles output.
@@ -1876,6 +1877,11 @@ trxn(int argc, char** argv) {
         set_smirks_lost_atom_means_remove_frgment(1);
         if (verbose) {
           cerr << "In smirks, lost atoms mean remove fragment\n";
+        }
+      } else if (j == "rmsmkele") {
+        set_smirks_remove_elements_in_lhs_but_missing_in_rhs(1);
+        if (verbose) {
+          cerr << "Will remove elements appearing on LHS of smirks but not on rhs\n";
         }
       } else if (j == "rmhsqb") {
         unset_unnecessary_implicit_hydrogens_known_values = 1;

@@ -1019,7 +1019,7 @@ zatom << "'\n"; return 0;
 
   c->set_centre(centre_query_atom);
 
-#define DEBUG_INITIALISE_CHIRALITY_INFO
+//#define DEBUG_INITIALISE_CHIRALITY_INFO
 #ifdef DEBUG_INITIALISE_CHIRALITY_INFO
   cerr << "Initialising from ";
   numeric->debug_print(cerr);

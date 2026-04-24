@@ -1628,6 +1628,11 @@ class IWReaction : public Scaffold_Reaction_Site
                                     const Substructure_Atom_Specifier & q1,
                                     const Substructure_Atom_Specifier & q2);
 
+    void IdentifyMissingElements(const Substructure_Atom& product_molecule, resizable_array<atomic_number_t>& atomic_numbers_lost);
+    void IdentifyUnmappedAtomsThatDisappear(const Substructure_Atom& product_molecule, resizable_array<int>& atoms_lost);
+
+    int SetRemoveAtomicNumber(atomic_number_t z) {
+
     int _create_orphan_molecule(const resizable_array<int> & orphan_atoms,
                                 Molecule & orphan_molecule,
                                     const Substructure_Query & product_molecule,
@@ -1822,5 +1827,13 @@ extern void set_iwreaction_display_no_atoms_in_query_message (int s);
 extern void set_smirks_lost_atom_means_remove_frgment(int s);
 
 extern void set_iwreaction_display_take_first_reagent_from_each_sidechain_warning_message(const int s);
+
+// Specific to smirks parsing.
+// Will remove U in something like  [U]-[C:1]>>[*:1]
+extern void set_smirks_remove_elements_in_lhs_but_missing_in_rhs(int s);
+
+// Specific to smirks parsing.
+// Will remove U in something like  [U]-[C:1]>>[*:1]
+// extern void set_smirks_remove_unmapped_atoms_in_lhs(int s);
 
 #endif  // MOLECULE_LIB_IWREACTION_H_

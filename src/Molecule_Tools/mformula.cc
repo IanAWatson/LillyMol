@@ -25,7 +25,11 @@ constexpr int kHydrogenOnHeteroatom = 13;
 constexpr int kHydrogenAromatic = 14;
 constexpr int kHydrogen = 15;
 constexpr int kRingAtom = 16;
-// constexpr int kMFOther = 17;
+// constexpr int kMFOther = 17;  in header.
+
+// in some cases, we want to just check element counts.
+// for (int i = 0; i < kLastElement; ++i)
+constexpr int kLastElement = 13;
 
 void
 MFormula::ZeroCountArray() {
@@ -267,6 +271,16 @@ MFormula::Build(const IWString& smiles) {
 bool
 MFormula::IsSubset(const MFormula& rhs) const {
   for (int i = 0; i < kMFOther; ++i) {
+    if (_count[i] > rhs._count[i]) {
+      return false;
+    }
+  }
+
+  return true;
+}
+bool
+MFormula::IsElementCountSubset(const MFormula& rhs) const {
+  for (int i = 0; i <kLastElement; ++i) {
     if (_count[i] > rhs._count[i]) {
       return false;
     }

@@ -132,6 +132,20 @@ model reliability measures, this simple estimator does not provide
 fine grained reliability estimates. There is usually a trend towards
 worse predictions as separation increases, but a very noisy trend.
 
+Apr 2026. From a [Linkedin](https://www.linkedin.com/posts/adlvdl_new-post-in-my-openadmet-pxr-challenge-series-share-7452660505984417792-xbWl/?utm_source=share&utm_medium=member_android&rcm=ACoAAAGkPREBi4z1ycPbEOkW7QgykLUF0bC7tYM)
+post, here is a comparison of the scaffold based splitting used
+in the competition with what can be done with this tool.
+![PXR](Images/pxr_optimized.png)
+The commands were
+```
+cat train.smi test.smi > all.smi
+gfp_make.sh all.smi > all.gfp
+gfp_nearneighbours_single_file_tbb -S all.nn -T 0.45 -h 8 all.gfp
+train_test_split_optimise -f 0.8897 -n 1 -S SPLIT -o 20000000 -r 50000 -x 20000 -h 8 -v all.nn
+```
+The 0.8897 value will replicate the train/test partition in the
+originally specified split.
+
 ## Caution
 The separation is done without regard to any relationship to
 a response, so if a dataset undergoes optimisation with this tool,

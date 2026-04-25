@@ -31,6 +31,20 @@ build:msan --copt=-DGPR_NO_DIRECT_SYSCALLS
 build:msan --linkopt=-fsanitize=memory
 build:msan --action_env=MSAN_OPTIONS=poison_in_dtor=1
 
+# If you want a more convenient way of building against a
+# specific version of python (see [MODULE.bazel](MODULE.bazel))
+
+# A default setting
+# build --@rules_python//python/config_settings:python_version=3.13
+# For a specific version, we assign a meaningful name, py311, but can be anything.
+# build:py311 --@rules_python//python/config_settings:python_version=3.11
+# which enables
+# bazel build ... --config=py311
+
+# --- Intel oneDAL / Hardware Optimizations ---
+# Use this to pass specific SIMD instructions to your C++ compiler
+# build:avx512 --copt=-mavx512f --copt=-mavx512cd
+
 
 # Taken from https://docs.bazel.build/versions/main/tutorial/cc-toolchain-config.html
 # No longer works. TODO:ianwatson re-enable clang as a compiler.

@@ -21,7 +21,7 @@ pybind_extension(
         "//Molecule_Lib:moleculeio",
         "//Molecule_Tools:alogp_lib",
         "//Molecule_Tools:xlogp_lib",
-        "@python",
+#       "@python",
 #       "@third_party//:python",
     ],
 )
@@ -39,7 +39,7 @@ pybind_extension(
         "//Molecule_Lib:linear_fingerprint",
         "//Molecule_Lib:moleculeio",
         "//Molecule_Tools:ec_fingerprint_lib",
-        "@python",
+#       "@python",
     ],
 )
 
@@ -53,7 +53,7 @@ pybind_extension(
         ":molecule",
         "//Molecule_Lib:iwmolecule",
         "//Molecule_Lib:moleculeio",
-        "@python",
+#       "@python",
     ],
 )
 
@@ -65,7 +65,7 @@ pybind_extension(
     deps = [
         "//Molecule_Lib:iwmolecule",
         "//Molecule_Lib:moleculeio",
-        "@python",
+#       "@python",
     ],
 )
 
@@ -77,7 +77,7 @@ pybind_extension(
     deps = [
         "//Molecule_Lib:iwmolecule",
         "//Molecule_Lib:moleculeio",
-        "@python",
+#       "@python",
     ],
 )
 
@@ -89,7 +89,7 @@ pybind_extension(
     deps = [
         "//Molecule_Lib:iwmolecule",
         "//Molecule_Lib:moleculeio",
-        "@python",
+#       "@python",
     ],
 )
 
@@ -101,7 +101,7 @@ pybind_extension(
     deps = [
         "//Molecule_Lib:iwmolecule",
         "//Molecule_Lib:moleculeio",
-        "@python",
+#       "@python",
     ],
 )
 
@@ -113,7 +113,7 @@ pybind_extension(
     deps = [
         "//Molecule_Lib:iwmolecule",
         "//Molecule_Lib:moleculeio",
-        "@python",
+#       "@python",
     ],
 )
 
@@ -125,7 +125,7 @@ pybind_extension(
     deps = [
         "//Molecule_Lib:iwmolecule",
         "//Molecule_Lib:moleculeio",
-        "@python",
+#       "@python",
     ],
 )
 
@@ -152,7 +152,7 @@ pybind_extension(
         "//Molecule_Lib:iwmolecule",
         "//Molecule_Lib:iwreaction",
         "//Molecule_Lib:moleculeio",
-        "@python",
+#       "@python",
     ],
 )
 
@@ -200,7 +200,7 @@ pybind_extension(
         "//Molecule_Tools_Bdb:selimsteg",
         "//Molecule_Tools_Bdb:structure_database_shared",
         "@third_party//:berkeley_shared",
-        "@python",
+#       "@python",
     ],
 )
 

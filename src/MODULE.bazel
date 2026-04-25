@@ -35,7 +35,7 @@ bazel_dep(name = "nanobind_bazel", version = "2.9.2")
 bazel_dep(name = "onetbb", version = "2022.3.0", repo_name="onetbb")
 bazel_dep(name = "platforms", version = "1.0.0")
 # Version 27.0 works for c++, but does not work with python 3.11
-bazel_dep(name = "protobuf", version = "33.4", repo_name="com_google_protobuf")
+bazel_dep(name = "protobuf", version = "34.1", repo_name="com_google_protobuf")
 bazel_dep(name = "pybind11_bazel", version = "3.0.1")
 # bazel_dep(name = "pybind11_protobuf", version = "2.11.1.bzl.3")
 bazel_dep(name = "re2", version = "2025-11-05")
@@ -58,6 +58,26 @@ bazel_dep(name = "rules_ruby", version = "0.20.1")
 bazel_dep(name = "tomlplusplus", version = "3.4.0")
 bazel_dep(name = "xxhash", version = "0.8.3.bcr.1")
 bazel_dep(name = "zlib", version = "1.3.2")
+
+# From Gemini.
+# Register the Python versions you want to support
+python = use_extension("@rules_python//python/extensions:python.bzl", "python")
+python.toolchain(python_version = "3.11")
+python.toolchain(python_version = "3.12")
+python.toolchain(python_version = "3.13", is_default = True)
+use_repo(python, "python_3_13")
+# Can enable multiple versions if needed.
+# use_repo(python, "python_3_11", "python_3_13")
+
+# From Gemini
+# If you find that rules_python isn't finding your uv versions automatically, you can
+# "force" Bazel to look at your local installation in your MODULE.bazel while still
+# using the toolchain system:
+# python.toolchain(
+#     python_version = "3.13",
+#     # This tells Bazel: "Don't download it, use what I have here"
+#     ignore_root_user_error = True, 
+# )
 
 # Local repositories
 
@@ -108,26 +128,29 @@ cc_library (
 )
 """
 )
+# this is no longer needed.
 # in order to build LillyMol pybind11 bindings you will need a python
 # installation with pybind installed with that. Adjust this to meet
 # local needs.
-new_local_repository(
-    name = "python",
-    path = "/home/ian/.local/share/uv/python/cpython-3.13.0-linux-x86_64-gnu/include/python3.13",
-    build_file_content = """
-load("@rules_cc//cc:defs.bzl", "cc_binary", "cc_proto_library", "cc_library", "cc_test")
-cc_library(
-    name = "python",
-    hdrs = glob(
-            ["**/*.h"]
-    ),
-    includes = [
-        ".",
-    ],
-    visibility = ["//visibility:public"],
-)
-"""
-)
+# Note that the script update_python_in_module_bazel.py in this directory
+# can make the required change.
+### new_local_repository(
+###     name = "python",
+###     path = "/home/ian/.local/share/uv/python/cpython-3.13.0-linux-x86_64-gnu/include/python3.13",
+###     build_file_content = """
+### load("@rules_cc//cc:defs.bzl", "cc_binary", "cc_proto_library", "cc_library", "cc_test")
+### cc_library(
+###     name = "python",
+###     hdrs = glob(
+###             ["**/*.h"]
+###     ),
+###     includes = [
+###         ".",
+###     ],
+###     visibility = ["//visibility:public"],
+### )
+### """
+### )
 
 new_local_repository(
   name = "nlopt",

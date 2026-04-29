@@ -2009,85 +2009,9 @@ Substructure_Atom::construct_from_smarts_token(const const_IWSubstring& smarts) 
 
     const_IWSubstring c(mysmarts.rawchars() + i + 3, mysmarts.length() - i - 3);
 
-    if ('x' == c[0]) {
-      _include_in_embedding = 0;
-    } else if (c.starts_with("fsid")) {
-      c.remove_leading_chars(4);
-      if (!isdigit(c[0]))  // only single digit ring ids are allowed in smarts
-      {
-        cerr << "Substructure_Atom::construct_from_smarts_token:invalid fsid qualifier '"
-             << c << "'\n";
-        return 0;
-      }
-      _fused_system_id = c[0] - '0';
-    } else if (c.starts_with("rid")) {
-      c.remove_leading_chars(3);
-      if (!isdigit(c[0])) {  // only single digit ring ids are allowed in smarts
-        cerr << "Substructure_Atom::construct_from_smarts_token:invalid rid qualifier '"
-             << c << "'\n";
-        return 0;
-      }
-      _ring_id = c[0] - '0';
-      _ring_bond_count.set_min(2);
-    } else if (c.starts_with("gid")) {
-      c.remove_leading_chars(3);
-      if (!isdigit(c[0])) {  // only single digit global ids are allowed in smarts
-        cerr << "Substructure_Atom::construct_from_smarts_token:invalid gid qualifier '"
-             << c << "'\n";
-        return 0;
-      }
-      _global_match_id = c[0] - '0';
-    } else if (c.starts_with("fss"))
-      ;
-    else if (c.starts_with("Vy"))
-      ;
-    else if (c.starts_with("Ar"))
-      ;
-    else if (c.starts_with("spch") || c.starts_with("scaf"))
-      ;
-    else if (c.starts_with("hr") || c.starts_with("rh"))
-      ;
-    else if (c.starts_with("rscb"))
-      ;
-    else if (c.starts_with("symd"))
-      ;
-    else if (c.starts_with("symg"))
-      ;
-    else if (c.starts_with("Kl"))
-      ;
-    else if (c.starts_with("organic"))
-      ;
-    else if (c.starts_with("nonorganic"))
-      ;
-    else if (c.starts_with("spiro"))
-      ;
-    else if (c.starts_with("chiral"))
-      ;
-    else if (c.starts_with("cipR") || c.starts_with("cipS"))
-      ;
-    else if (c.starts_with("Nv{")) {
-      c.remove_leading_chars(3);
-      if (!FetchNumericFromBraces(c, _numeric_value)) {
-        cerr << "Substructure_Atom::construct_from_smarts_token:invalid Nv '" << c
-             << "'\n";
-        return 0;
-      }
-    } else if (c.starts_with("Nv"))  // positive integers only
-    {
-      c.remove_leading_chars(2);
-      int nv;
-      if (!isdigit(c[0])) {
-        cerr << "Substructure_Atom::construct_from_smarts_token:invalid Numeric Value "
-                "specifier '"
-             << c << "'\n";
-        return 0;
-      }
-      fetch_numeric(c, nv, c.length());
-      _numeric_value = static_cast<double>(nv);
-    } else {
-      cerr << "Substructure_Atom::construct_from_smiles_token: unrecognised /IW "
-              "qualifier '"
-           << c << "'\n";
+    if (! ParseIWDirective(c)) {
+      cerr << "Substructure_Atom::construct_from_smiles_token:invalid IW directive '" 
+              << c << "'\n";
       return 0;
     }
   }
@@ -2183,6 +2107,104 @@ Substructure_Atom::construct_from_smarts_token(const const_IWSubstring& smarts) 
   assert(ok());
 
   return right_square_bracket + 1;
+}
+
+int
+Substructure_Atom::ParseIWDirective(const_IWSubstring c) {  // note local copy
+  if (c.starts_with("fragid")) {
+    c.remove_leading_chars(6);
+    if (! std::isdigit(c[0])) {  // opnly single digit fragid's are allowed in smarts.
+      cerr << "Substructure_Atom::construct_from_smarts_token:invalid fragid " <<
+              c << '\n';
+      return 0;
+    }
+
+    _fragment_id = c[0] - '0';
+
+    return 1;
+  }
+
+  if ('x' == c[0]) {
+    _include_in_embedding = 0;
+  } else if (c.starts_with("fsid")) {
+    c.remove_leading_chars(4);
+    if (!isdigit(c[0])) {  // only single digit ring ids are allowed in smarts
+      cerr << "Substructure_Atom::construct_from_smarts_token:invalid fsid qualifier '"
+           << c << "'\n";
+      return 0;
+    }
+    _fused_system_id = c[0] - '0';
+  } else if (c.starts_with("rid")) {
+    c.remove_leading_chars(3);
+    if (!isdigit(c[0])) {  // only single digit ring ids are allowed in smarts
+      cerr << "Substructure_Atom::construct_from_smarts_token:invalid rid qualifier '"
+           << c << "'\n";
+      return 0;
+    }
+    _ring_id = c[0] - '0';
+    _ring_bond_count.set_min(2);
+  } else if (c.starts_with("gid")) {
+    c.remove_leading_chars(3);
+    if (!isdigit(c[0])) {  // only single digit global ids are allowed in smarts
+      cerr << "Substructure_Atom::construct_from_smarts_token:invalid gid qualifier '"
+           << c << "'\n";
+      return 0;
+    }
+    _global_match_id = c[0] - '0';
+  } else if (c.starts_with("fss"))
+    ;
+  else if (c.starts_with("Vy"))
+    ;
+  else if (c.starts_with("Ar"))
+    ;
+  else if (c.starts_with("spch") || c.starts_with("scaf"))
+    ;
+  else if (c.starts_with("hr") || c.starts_with("rh"))
+    ;
+  else if (c.starts_with("rscb"))
+    ;
+  else if (c.starts_with("symd"))
+    ;
+  else if (c.starts_with("symg"))
+    ;
+  else if (c.starts_with("Kl"))
+    ;
+  else if (c.starts_with("organic"))
+    ;
+  else if (c.starts_with("nonorganic"))
+    ;
+  else if (c.starts_with("spiro"))
+    ;
+  else if (c.starts_with("chiral"))
+    ;
+  else if (c.starts_with("cipR") || c.starts_with("cipS")) 
+    ;
+  else if (c.starts_with("Nv{")) {
+    c.remove_leading_chars(3);
+    if (!FetchNumericFromBraces(c, _numeric_value)) {
+      cerr << "Substructure_Atom::construct_from_smarts_token:invalid Nv '" << c
+           << "'\n";
+      return 0;
+    }
+  } else if (c.starts_with("Nv")) {  // positive integers only
+    c.remove_leading_chars(2);
+    int nv;
+    if (!isdigit(c[0])) {
+      cerr << "Substructure_Atom::construct_from_smarts_token:invalid Numeric Value "
+              "specifier '"
+           << c << "'\n";
+      return 0;
+    }
+    fetch_numeric(c, nv, c.length());
+    _numeric_value = static_cast<double>(nv);
+  } else {
+    cerr << "Substructure_Atom::construct_from_smiles_token: unrecognised /IW "
+            "qualifier '"
+         << c << "'\n";
+    return 0;
+  }
+
+  return 1;
 }
 
 /*
@@ -3112,6 +3134,8 @@ Substructure_Atom_Specifier::construct_from_smarts_token(
         nchars = 3 + 4 + 1 - 1;  // will fail if more than two digits for fsid
       } else if (c.length() > 3 && c.starts_with("gid")) {
         nchars = 3 + 3 + 1 - 1;  // will fail if more than two digits for gid
+      } else if (c.length() > 3 && c.starts_with("fragid")) {
+        nchars = 3 + 6 + 1 - 1;
       } else if (c.length() > 4 && (c.starts_with("spch") || c.starts_with("scaf"))) {
         const int is_spch = c.starts_with("spch");
         c.remove_leading_chars(4);

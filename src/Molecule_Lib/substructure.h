@@ -1218,6 +1218,8 @@ class Substructure_Atom : public Substructure_Atom_Specifier
       return _atom_type_group;
     }
 
+    int number_fragment_ids() const;
+
     int spinach_match_specified () const;
 
     void adjust_initial_atom_numbers (const int * xref);     // subset of molecule has been used, need to adjust initial atom numbers
@@ -1281,6 +1283,7 @@ class Substructure_Atom : public Substructure_Atom_Specifier
 
     int construct_from_smarts_token (const const_IWSubstring & smarts);
     int construct_from_smarts_token (const char * smarts, int nchars);
+    int ParseIWDirective(const_IWSubstring c);
     int smarts (IWString &) const;
     int add_bond (const msi_object *, int, int, int, extending_resizable_array<Substructure_Atom *> &);
 
@@ -3304,6 +3307,7 @@ class Single_Substructure_Query
     void _determine_if_symmetry_groups_present();
     void _determine_if_unmatched_atom_counts_are_present();
     void _determine_if_atom_type_groups_are_present();
+    void _determine_if_fragment_ids_present();
     int _one_time_initialisations();
 
     int _match_elements_needed(Molecule_to_Match & target_molecule) const;

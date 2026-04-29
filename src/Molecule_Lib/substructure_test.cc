@@ -3114,7 +3114,15 @@ INSTANTIATE_TEST_SUITE_P(TestSubstructureSmartsP, TestSubstructureSmartsP, testi
   SmilesSmartsMatches{"Cc1ccccc1", "[/IWAr1C]", 1},
   SmilesSmartsMatches{"CC", "[/IWAr1C]", 0},
   SmilesSmartsMatches{"CC", "[/IWAr0C]", 2},
-  SmilesSmartsMatches{"c1ccccc1Cc1ccccc1", "[/IWAr2C]", 1}
+  SmilesSmartsMatches{"c1ccccc1Cc1ccccc1", "[/IWAr2C]", 1},
+
+  SmilesSmartsMatches{"CC", "[/IWfragid1C].[/IWfragid1C]", 2},
+  SmilesSmartsMatches{"C.C", "[/IWfragid1C].[/IWfragid1C]", 0},
+  SmilesSmartsMatches{"C.C", "[/IWfragid1C].[/IWfragid2C]", 2},
+
+  // This should be a fatal error, only one fragid.
+  // Currently the error is ignored.
+  SmilesSmartsMatches{"C.C", "[/IWfragid1C].[C]", 2}
 ));
 
 TEST(TestDaylightH, Test1) {

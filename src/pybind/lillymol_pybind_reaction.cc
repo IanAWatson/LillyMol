@@ -273,9 +273,40 @@ PYBIND11_MODULE(lillymol_reaction, rxn)
       },
       "For each scaffold embedding, generate list of products"
     )
-      
+    .def("perform_reaction",
+      [](IWReaction& rxn, std::vector<Molecule>& reagents)->std::optional<Molecule> {
+        Substructure_Results scaffold_sresults;
+        if (rxn.substructure_search(reagents[0], scaffold_sresults) == 0) {
+          std::cerr << "perform_reaction::no match to scaffold " << reagents[0].name() << '\n';
+          return std::nullopt;
+        }
+
+        rxn.remove_no_delete_all_reagents();
+
+        Sidechain_Match_Conditions smc;
+        smc.set_ignore_multiple_substucture_matches(1);
+
+        for (size_t i = 1; i < reagents.size(); ++i) {
+          if (! rxn.add_sidechain_reagent(i - 1, reagents[i], smc)) {
+            std::cerr << "perform_reaction:cannot add " << reagents[i].name() << '\n';
+            return std::nullopt;
+          }
+        }
+
+        Molecule product;
+        if (! rxn.perform_reaction(&reagents[0], scaffold_sresults.embedding(0), product)) {
+          std::cerr << "perform_reaction:reaction failed\n";
+          return std::nullopt;
+        }
+          
+        return product;
+      },
+      "Perform the reaction if there is one embedding in the scaffold and in each sidechain"
+    )
+
   ;
 
+  // These do not work very well.
   rxn.def("set_smirks_lost_atom_means_remove_frgment", &set_smirks_lost_atom_means_remove_frgment, "atoms lost in a smirks are removed");
   rxn.def("set_smirks_remove_elements_in_lhs_but_missing_in_rhs", &set_smirks_remove_elements_in_lhs_but_missing_in_rhs,
         "unmapped reagent atoms with elements not in RHS are removed");

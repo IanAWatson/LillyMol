@@ -98,11 +98,11 @@ IWReaction::_construct_from_smirks(const const_IWSubstring& smirks) {
 
   smirks.from_to(0, first_open_angle - 1, reagents);
 
-  cerr << "Reagents " << reagents << '\n';
+  // cerr << "Reagents " << reagents << '\n';
 
   smirks.from_to(second_open_angle + 1, smirks.length() - 1, products);
 
-  cerr << "products " << products << '\n';
+  // cerr << "products " << products << '\n';
 
   return construct_from_smirks(reagents, products);
 }

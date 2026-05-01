@@ -180,6 +180,13 @@ Write multiple instances to \<fname\>.
 When writing a file containing duplicate identifiers, concatenate
 the identifiers.
 
+#### -V rmzerodiff
+We often find duplicate measurements that are exactly the same as other
+measurements. Real biological assays exhibit considerable variability, so
+an exact duplicate value is more likely an indication of data processing
+artifact than a actual duplicate measurement. With this setting activated
+exact duplicate values are discarded.
+
 ### -K \<ele\>
 Remove elements of type \<ele\>. This is an obscure option. It might be
 useful for removing explicit Hydrogens, but those can also be removed

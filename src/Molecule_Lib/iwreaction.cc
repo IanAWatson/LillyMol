@@ -3699,7 +3699,9 @@ IWReaction::_take_first_reagent_from_each_sidechain(Enumeration_Temporaries & et
 int
 IWReaction::remove_no_delete_all_reagents() {
   for (Sidechain_Reaction_Site* s : _sidechains) {
-    s->remove_no_delete_all_reagents();
+    if (s->number_reagents() > 0) {
+      s->remove_no_delete_all_reagents();
+    }
   }
 
   return _sidechains.number_elements();

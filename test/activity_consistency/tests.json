@@ -33,6 +33,14 @@
       "args": [
           "-V extra -M Mfile -M ave -e 2 -X #{indir}/in.activity -Y sep=comma -X qcol=3 -X sep=comma #{indir}/in.smi"
       ]
+    },
+    {
+      "name": "duplicate_y",
+      "args": [
+          "-V rmzerodiff -M Mfile -X #{indir}/in.activity #{indir}/in.smi"
+      ]
     }
+  ]
+}
   ]
 }

@@ -7517,7 +7517,7 @@ display_dash_i_options(std::ostream& os) {
  -I <number>      constant isotopic label applied to all join points
  -I inc=<n>       increment existing isotopic label before labelling join points (only one increment)
  -I INC=<n>       increment all isotopic labels - isotope will be number of connections broken
- -I <atype>       the atom typing specified by the -P option
+ -I atype         the atom typing specified by the -P option '-P UST:AY -I atype'.
 )";
   // clang-format on
 

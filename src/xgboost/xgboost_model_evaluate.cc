@@ -155,12 +155,13 @@ Options::WriteClassificationResult(float value,
                      const IWString* class_labels,
                      IWString_and_File_Descriptor& output) {
   output << _output_separator;
-  output << value << _output_separator;
   if (value < _class_cutoff) {
     output << class_labels[0];
   } else {
     output << class_labels[1];
   }
+  output << _output_separator;
+  output << value;
   output << '\n';
 
   output.write_if_buffer_holds_more_than(4096);
@@ -402,6 +403,15 @@ XGBDModel::Build(const IWString& mdir) {
   if (! ReadModel(fname)) {
     cerr << "Cannot read model file '" << fname << "'\n";
     return 0;
+  }
+
+  if (_proto.classification()) {
+    IWString fname;
+    fname << mdir << '/' << "class_label_translation.json";
+    if (! ReadClassLabelTranslation(fname)) {
+      cerr << "XGBDModel::Build:cannot read class translation data '" << fname << "'\n";
+      return 0;
+    }
   }
 
   return 1;
@@ -688,6 +698,7 @@ ScoreAndWrite(XGBDModel& model,
     }
   }
 
+  output.flush();
 
   return 1;
 }
@@ -757,7 +768,12 @@ XGBDModelEvaluate(iwstring_data_source& input,
     }
 
     header = buffer;
-    output << "Name" << options.output_separator() << model.response() << '\n';
+
+    output << "Name" << options.output_separator() << model.response();
+    if (model.classification()) {
+      output << options.output_separator() << "numeric";
+    }
+    output << '\n';
   } else if (buffer != header) {
     cerr << "XGBDModelEvaluate:header mismatch\n";
     cerr << header << '\n';

@@ -112,6 +112,11 @@ static int ignore_no_activity = 0;
 // Output separator when creating -M activity file.
 static char output_separator = ' ';
 
+// If we have duplicate experimental values those are probably data
+// handling artifacts, not real duplicate measured values.
+static int discard_identical_values = 0;
+static uint32_t duplicate_experimental_values_discarded = 0;
+
 struct MaybeQualified {
  public:
   int qualifier;
@@ -373,6 +378,7 @@ class Group_of_Molecules : public IWString {
                           IWString_and_File_Descriptor& stream_for_activity) const;
 
   template <typename Op> int LargestOrSmallestQualified(int qual, Op op) const;
+  int IsDuplicateActivity(const MaybeQualified& mqd) const;
 
  public:
   Group_of_Molecules(const IWString& s) : IWString(s), _rng(rd()){
@@ -428,6 +434,10 @@ template class resizable_array_base<Smiles_ID_Activity*>;
 
 int
 Group_of_Molecules::extra(const IWString& smi, const IWString& id, MaybeQualified mqd) {
+  if (discard_identical_values && IsDuplicateActivity(mqd)) {
+    return 0;
+  }
+
   _activity.extra(mqd.activity);
   // cerr << "After adding " << mqd << ' ' << _activity << '\n';
 
@@ -440,6 +450,22 @@ Group_of_Molecules::extra(const IWString& smi, const IWString& id, MaybeQualifie
   }
 
   return 1;
+}
+
+int
+Group_of_Molecules::IsDuplicateActivity(const MaybeQualified& mqd) const {
+  if (_activity.empty()) {  // first item, obviously not a duplicate.
+    return 0;
+  }
+
+  for (const Smiles_ID_Activity* sid : _sida) {
+    if (std::abs(mqd.activity - sid->activity()) < 1.0e-05) {
+      ++duplicate_experimental_values_discarded;
+      return 1;
+    }
+  }
+
+  return 0;
 }
 
 float
@@ -1879,13 +1905,15 @@ do_write_tabular_output(const Group_of_Molecules* const* gm, const int n,
 
 static void
 display_dash_V_options(std::ostream& os) {
-  os << " -V first         take first of multi-valued activity data\n";
-  os << " -V ave           take average of multi-valued activity data\n";
-  os << " -V max           take max value of multi-valued activity data\n";
-  os << " -V keep          keep all multi-valued activity data\n";
-  os << " -V WRITE=<fname> write duplicate info to <fname>\n";
-  os << " -V append        append all values associated with each id\n";
-  // os << " -V rm            remove all multi-valued activity data\n";
+  os << R"( -V first         take first of multi-valued activity data.
+ -V ave           take average of multi-valued activity data.
+ -V max           take max value of multi-valued activity data.
+ -V keep          keep all multi-valued activity data.
+ -V WRITE=<fname> write duplicate info to <fname>.
+ -V append        append all values associated with each id.
+ -V rmzerodiff    discard duplicates where the measured values are identical, likely
+                  not a real measurement, more likely to be a data artifact.
+)";
 
   exit(0);
 }
@@ -2104,6 +2132,11 @@ activity_consistency(int argc, char** argv) {
         }
 
         stream_for_multi_valued_data << "ID" << output_separator << "N" << output_separator << "Min" << output_separator << "Max" << output_separator << "Ave...\n";
+      } else if (v == "rmzerodiff") {
+        discard_identical_values = 1;
+        if (verbose) {
+          cerr << "Will drop cases with identical Y values\n";
+        }
       } else if ("help" == lcv) {
         display_dash_V_options(cerr);
       } else {
@@ -2633,6 +2666,10 @@ activity_consistency(int argc, char** argv) {
     if (molecules_discarded_for_covalent_non_organics) {
       cerr << molecules_discarded_for_covalent_non_organics
            << " discarded for covalently bonded non organics\n";
+    }
+    if (discard_identical_values) {
+      cerr << "Discarded " << duplicate_experimental_values_discarded <<
+              " exact duplicate experimental values\n";
     }
   }
 

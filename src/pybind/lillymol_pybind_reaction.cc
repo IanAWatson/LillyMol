@@ -72,6 +72,12 @@ PYBIND11_MODULE(lillymol_reaction, rxn)
       },
       "Name"
     )
+    .def("set_name",
+      [](IWReaction& rxn, const std::string& name) {
+        rxn.set_comment(name);
+      },
+      "Assign new name to reaction"
+    )
     .def("read",
       [](IWReaction& rxn, const std::string& fname)->bool{
         return ReadReaction(fname, rxn);
@@ -108,6 +114,12 @@ PYBIND11_MODULE(lillymol_reaction, rxn)
         return true;
       },
       ""
+    )
+    .def("write_msi",
+      [](IWReaction& rxn, const std::string& fname) {
+        IWString tmp(fname);
+        return rxn.write_msi(tmp);
+      }
     )
     .def("number_sidechains", &IWReaction::number_sidechains, "Number of sidechains")
     .def("number_sidechains_with_reagents", &IWReaction::number_sidechains_with_reagents, "number_sidechains_with_reagents")

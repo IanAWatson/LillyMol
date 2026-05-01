@@ -1066,7 +1066,7 @@ class __attribute__((visibility("default"))) Molecule : protected resizable_arra
 
   void set_isotope_to_atom_number_no_perturb_canonical_ordering();
 
-  // changed 2016. The set the isotope to the value in the array
+  // changed 2016. Set the isotope to the value in the array
   template <typename T> int set_isotopes(const T*);
 
   int userAtomType(atom_number_t) const;
@@ -1079,7 +1079,7 @@ class __attribute__((visibility("default"))) Molecule : protected resizable_arra
   // For each atomic number (key) number of instances (value);
   std::unordered_map<atomic_number_t, int> ElementCount() const;
 
-  int ncon(int*) const;  // all ncon values
+  int ncon(int*) const;  // ncon for each atom
   int ncon(resizable_array<int>&) const;
   int nbonds(int*) const;  // all nbonds values
   // Max connectivity of any atom.

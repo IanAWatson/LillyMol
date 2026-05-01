@@ -1830,6 +1830,7 @@ extern void set_iwreaction_display_take_first_reagent_from_each_sidechain_warnin
 
 // Specific to smirks parsing.
 // Will remove U in something like  [U]-[C:1]>>[*:1]
+// Does not work very well, creates problems in several cases. TODO:ianwatson fix (low priority).
 extern void set_smirks_remove_elements_in_lhs_but_missing_in_rhs(int s);
 
 // Specific to smirks parsing.

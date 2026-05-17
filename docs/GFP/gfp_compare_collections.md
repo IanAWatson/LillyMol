@@ -86,11 +86,20 @@ regions with very low prevalences - see the numbers in the output above. On the
 other hand the relative tolerance criterion ensures that the entire distribution
 has stabilised. But in very low prevalence areas, that will likely not impact any
 overall measures of the distribution.
- ### -h \<nthreads\>
+### -h \<nthreads\>
 The tool can run across multiple processors with OMP. This is beneficial. For example
 comparing 2400 vrtual molecules against Chembl takes 272 seconds running single
 threaded. Running 8 way parallel this is complete in 92 seconds, a speedup of about
 3 - not wonderful, but worth doing.
+
+As each query fingerprint is processed, different parts of the haystack are
+processed via different threads.
+
+### -b \<batch\>
+Further efficiencies can be gained by processing multiple query fingerprints
+at once. ChatGPT pointed out that if multiple fingerprints are processed at
+once, the overhead of thread creation is them amortized across multiple
+fingerprints. The default is 100 fingerprints per batch.
 
 ## Summary
 It does appear that a very small number of randomly selected molecules can

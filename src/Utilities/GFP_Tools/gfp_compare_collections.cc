@@ -51,6 +51,8 @@ Usage(int rc) {
   exit(rc);
 }
 
+constexpr uint32_t kNBins = 1001;
+
 class Options {
   private:
     int _verbose;
@@ -67,14 +69,18 @@ class Options {
     GFP_Standard* _fp;
     uint32_t _number_fingerprints;
 
+    // From ChatGPT we find that efficiency improves if we can amortize the
+    // overhead of thread creation across multiple fingerprints.
+    // The initial version processed fingerprints one at a time and parallel
+    // processing happened with each fingerprint.
     uint64_t _batch_size = 100;
 
     IWString _stem;
     int _next_fname_index;
 
-    uint64_t _acc[1001];
-    double _distribution[1001];
-    double _previous_distribution[1001];
+    uint64_t _acc[kNBins];
+    double _distribution[kNBins];
+    double _previous_distribution[kNBins];
 
   // Private functions
     int ReadComparisonSet(IWString& fname);
@@ -114,9 +120,9 @@ Options::Options() {
   _number_fingerprints = 0;
   _next_fname_index = 0;
 
-  std::fill_n(_acc, 1001, 0);
-  std::fill_n(_distribution, 1001, 0.0);
-  std::fill_n(_previous_distribution, 1001, 0.0);
+  std::fill_n(_acc, kNBins, 0);
+  std::fill_n(_distribution, kNBins, 0.0);
+  std::fill_n(_previous_distribution, kNBins, 0.0);
 }
 
 Options::~Options() {
@@ -369,7 +375,7 @@ Options::ProcessBatch(const GFP_Standard* queries, uint32_t n,
 
 #pragma omp parallel
   {
-    uint64_t local_acc[1001] = {0};
+    uint64_t local_acc[kNBins] = {0};
 
 #pragma omp for schedule(static)
     for (uint32_t q = 0; q < n; ++q) {
@@ -388,7 +394,7 @@ Options::ProcessBatch(const GFP_Standard* queries, uint32_t n,
 
 #pragma omp critical
     {
-      for (int i = 0; i < 1001; ++i) {
+      for (int i = 0; i < kNBins; ++i) {
         _acc[i] += local_acc[i];
       }
     }
@@ -413,11 +419,11 @@ Options::ProcessBatch(const GFP_Standard* queries, uint32_t n,
 int
 Options::IsConverged() {
   if (_next_fname_index > 0) {
-    std::copy_n(_distribution, 1001, _previous_distribution);
+    std::copy_n(_distribution, kNBins, _previous_distribution);
   }
 
   uint64_t tot = 0;
-  for (int i = 0; i < 1001; ++i) {
+  for (int i = 0; i < kNBins; ++i) {
     tot += _acc[i];
   }
 
@@ -427,7 +433,7 @@ Options::IsConverged() {
   }
 
   const double multiplier = 1.0 / static_cast<double>(tot);
-  for (int i = 0; i < 1001; ++i) {
+  for (int i = 0; i < kNBins; ++i) {
     _distribution[i] = static_cast<double>(_acc[i]) * multiplier;
   }
 
@@ -456,7 +462,7 @@ int
 Options::AtolConverged() const {
   double max_diff = 0.0;
 
-  for (int i = 0; i < 1001; ++i) {
+  for (int i = 0; i < kNBins; ++i) {
     const double d = std::abs(_distribution[i] - _previous_distribution[i]);
     if (d > max_diff) {
       max_diff = d;
@@ -484,7 +490,7 @@ Options::RtolConverged() const {
   int failed = 0;
   double max_rtol = 0.0;
 
-  for (int i = 0; i < 1001; ++i) {
+  for (int i = 0; i < kNBins; ++i) {
     if (_previous_distribution[i] == 0.0 && _distribution[i] > 0.0) {
       failed = 1;
       continue;
@@ -522,7 +528,7 @@ Options::RtolConverged() const {
 int
 Options::WriteDistribution() {
   uint64_t tot = 0;
-  for (int i = 0; i < 1001; ++i) {
+  for (int i = 0; i < kNBins; ++i) {
     tot += _acc[i];
   }
 
@@ -547,7 +553,7 @@ Options::WriteDistribution(uint64_t tot) {
 
   output << "Dist" << kSep << "Fraction\n";
   uint64_t sum = 0;
-  for (int i = 0; i < 1001; ++i) {
+  for (int i = 0; i < kNBins; ++i) {
     float dist = static_cast<float>(i / 1000.0f);
     output << dist << kSep << static_cast<float>(_distribution[i]) << '\n';
 

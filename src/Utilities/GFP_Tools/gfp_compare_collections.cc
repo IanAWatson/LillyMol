@@ -361,6 +361,11 @@ Options::ProcessBatch(const GFP_Standard* queries, uint32_t n,
   if (_verbose > 1) {
     cerr << "ProcessBatch, processed " << _fingerprints_read << " fingerprints\n";
   }
+  
+  // Cache member variables - ChatGPT suggestion.
+  const float max_distance = _max_distance;
+  const uint32_t nfp = _number_fingerprints;
+  GFP_Standard* fp = _fp;
 
 #pragma omp parallel
   {
@@ -370,9 +375,9 @@ Options::ProcessBatch(const GFP_Standard* queries, uint32_t n,
     for (uint32_t q = 0; q < n; ++q) {
       const GFP_Standard& query = queries[q];
 
-      for (uint32_t i = 0; i < _number_fingerprints; ++i) {
-        const float d = query.tanimoto_distance(_fp[i]);
-        if (d > _max_distance) {
+      for (uint32_t i = 0; i < nfp; ++i) {
+        const float d = query.tanimoto_distance(fp[i]);
+        if (d > max_distance) {
           continue;
         }
 
@@ -414,6 +419,11 @@ Options::IsConverged() {
   uint64_t tot = 0;
   for (int i = 0; i < 1001; ++i) {
     tot += _acc[i];
+  }
+
+  if (tot == 0) [[ unlikely ]] { 
+    cerr << "Options::IsConverged:no distances\n";
+    return 0;
   }
 
   const double multiplier = 1.0 / static_cast<double>(tot);
@@ -508,130 +518,6 @@ Options::RtolConverged() const {
 
   return 0;
 }
-
-#ifdef OLD_VERSION_QWEQWE
-int
-Options::Process(GFP_Standard& gfp_standard, int& converged) {
-  const float max_distance = _max_distance;
-  const uint32_t nfp = _number_fingerprints;
-
-#pragma omp parallel
-  {
-    uint64_t local_acc[1001] = {0};
-
-#pragma omp for schedule(static)
-    for (uint32_t i = 0; i < nfp; ++i) {
-      const float d = gfp_standard.tanimoto_distance(_fp[i]);
-      if (d <= max_distance) {
-        const int ndx = static_cast<int>(d * 1000.0f + 0.49999f);
-        ++local_acc[ndx];
-      }
-    }
-
-#pragma omp critical
-    {
-      for (int i = 0; i < 1001; ++i) {
-        _acc[i] += local_acc[i];
-      }
-    }
-
-  }  // #pragma omp parallel
-
-  ++_fingerprints_read;
-  if (_fingerprints_read < _next_sample) {
-    return 1;
-  }
-
-  if (_next_fname_index > 0) {
-    std::copy_n(_distribution, 1001, _previous_distribution);
-  }
-
-  uint64_t tot = 0;
-  for (int i = 0; i < 1001; ++i) {
-    tot += _acc[i];
-  }
-
-  double multiplier = 1.0 / static_cast<float>(tot);
-  for (int i = 0; i < 1001; ++i) {
-    _distribution[i] = static_cast<double>(_acc[i]) * multiplier;
-  }
-
-  converged = 0;
-
-  if (_next_fname_index == 0) {
-  } else if (_absolute_tolerance > 0.0) {
-    double max_diff = 0.0;
-    for (int i = 0; i < 1001; ++i) {
-      double d = std::abs(_distribution[i] - _previous_distribution[i]);
-      if (d > max_diff) {
-        max_diff = d;
-      }
-    }
-
-    if (max_diff <= _absolute_tolerance) {
-      converged = 1;
-    }
-
-    if (_verbose) {
-      cerr << _fingerprints_read << " fingerprints read, max_diff " << max_diff;
-      if (converged) {
-        cerr << " converged\n";
-      } else {
-        cerr << '\n';
-      }
-    }
-  } else if (_relative_tolerance > 0.0) {
-    int failed = 0;
-    double max_rtol = 0.0;
-    for (int i = 0; i < 1001; ++i) {
-      if (_previous_distribution[i] == 0 && _distribution[i] > 0) {
-        failed = 1;
-        continue;
-      }
-
-      double d = std::abs(_distribution[i] - _previous_distribution[i]);
-      if (d == 0.0) {
-        continue;
-      }
-      double ave = (_distribution[i] + _previous_distribution[i]) * 0.5;
-      double rtol = (d / ave);
-      if (rtol > 1.0) {
-        cerr << "rtol " << rtol << ' ' <<  _distribution[i] << ' ' << _previous_distribution[i] << " diff " << d << " ave " << ave << '\n';
-      }
-      if (rtol > max_rtol) {
-        max_rtol = rtol;
-      }
-      if (rtol > _relative_tolerance) {
-        failed = 1;
-        break;
-      }
-    }
-
-    if (! failed) {
-      converged = 1;
-    }
-
-    if (_verbose) {
-      cerr << _fingerprints_read << " fingerprints read, max relative tolerance " << max_rtol;
-      if (failed) {
-        cerr << " failed\n";
-      } else {
-        cerr << " converged\n";
-      }
-    }
-  }
-
-  WriteDistribution(tot);
-
-  _next_sample += _sample_interval;
-
-  if (converged) {
-    return 0;
-  }
-
-  return 1;
-}
-#endif // OLD_VERSION_QWEQWE
 
 int
 Options::WriteDistribution() {

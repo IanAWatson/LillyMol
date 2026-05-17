@@ -43,6 +43,7 @@ Usage(int rc) {
  -r <tol>       Relative tolerance. Converged if every bucketised part of the distribution is within <tol>.
  -a <tol>       Absolute tolerance. Converged if every difference is less than <tol>.
  -S <stem>      output files are written as <stem>_n.csv.
+ -b <size>      batch size. Query fingerprints are processed in groups - default 100.
  -h <threads>   number of OMP threads to use.
  -v             verbose output
 )";
@@ -66,6 +67,8 @@ class Options {
     GFP_Standard* _fp;
     uint32_t _number_fingerprints;
 
+    uint64_t _batch_size = 100;
+
     IWString _stem;
     int _next_fname_index;
 
@@ -80,6 +83,13 @@ class Options {
     int Process(iwstring_data_source& input, int& converged);
     int Process(GFP_Standard& gfp_standard, int& converged);
     int WriteDistribution(uint64_t tot);
+    int WriteDistribution();
+
+    int IsConverged();
+    int AtolConverged() const;
+    int RtolConverged() const;
+    void ProcessBatch(const GFP_Standard* queries, uint32_t n,
+                      int& converged);
 
   public:
     Options();
@@ -173,7 +183,7 @@ Options::Initialise(Command_Line& cl) {
 
   if (cl.option_present('a')) {
     if (! cl.value('a', _absolute_tolerance) || _absolute_tolerance <= 0.0) {
-      cerr << "The convergence tolerance (-t) option must be a +ve number\n";
+      cerr << "The convergence tolerance (-a) option must be a +ve number\n";
       return 0;
     }
 
@@ -204,6 +214,16 @@ Options::Initialise(Command_Line& cl) {
 
     if (_verbose) {
       cerr << "Will only record distances <= " << _max_distance << '\n';
+    }
+  }
+
+  if (cl.option_present('b')) {
+    if (! cl.value('b', _batch_size) || _batch_size < 1) {
+      cerr << "The batch size parameter must be a whole +ve number\n";
+      return 0;
+    }
+    if (_verbose) {
+      cerr << "Query fingerprings processed in batches of size " << _batch_size << '\n';
     }
   }
 
@@ -295,42 +315,227 @@ Options::Process(const char* fname, int& converged) {
 
 int
 Options::Process(iwstring_data_source& input, int& converged) {
+  std::unique_ptr<GFP_Standard[]> batch = std::make_unique<GFP_Standard[]>(_batch_size + 1);
+
   IW_TDT tdt;
   int fatal = 0;
+  uint32_t ndx = 0;
   while (tdt.next(input)) {
-    GFP_Standard gfp_standard;
-    if (FromGfp(tdt, gfp_standard, fatal)) {
-      //  great
+    if (FromGfp(tdt, batch[ndx], fatal)) {
     } else if (fatal) {
-      cerr << "Options::Process:error reading fingerprint, line " << input.lines_read() << '\n';
+      cerr << "Options::Process:error reading fingerprint, line "
+           << input.lines_read() << '\n';
       return 0;
     } else {
       break;
     }
 
-    if (Process(gfp_standard, converged)) {
-      // great
-    } else if (converged) {
-      return 0;
+    ++ndx;
+
+    if (ndx == _batch_size) {
+      ProcessBatch(batch.get(), ndx, converged);
+      if (converged) {
+        ndx = 0;   // batch has been fully processed, now must appear empty.
+        break;
+      }
+
+      ndx = 0;
     }
+  }
+
+  if (ndx > 0) {
+    ProcessBatch(batch.get(), ndx, converged);
+  }
+
+  if (converged) {
+    cerr << "Converged\n";
+    WriteDistribution();
   }
 
   return 1;
 }
 
-int
-Options::Process(GFP_Standard& gfp_standard, int& converged) {
-#pragma omp parallel shared(_acc)
+void
+Options::ProcessBatch(const GFP_Standard* queries, uint32_t n,
+                      int& converged) {
+  if (_verbose > 1) {
+    cerr << "ProcessBatch, processed " << _fingerprints_read << " fingerprints\n";
+  }
+
+#pragma omp parallel
   {
-#pragma omp for schedule(dynamic, 256)
-    for (uint32_t i = 0; i < _number_fingerprints; ++i) {
-      float d = gfp_standard.tanimoto_distance(_fp[i]);
-      if (d > _max_distance) {
-        continue;
+    uint64_t local_acc[1001] = {0};
+
+#pragma omp for schedule(static)
+    for (uint32_t q = 0; q < n; ++q) {
+      const GFP_Standard& query = queries[q];
+
+      for (uint32_t i = 0; i < _number_fingerprints; ++i) {
+        const float d = query.tanimoto_distance(_fp[i]);
+        if (d > _max_distance) {
+          continue;
+        }
+
+        const int ndx = static_cast<int>(d * 1000.0f);
+        ++local_acc[ndx];
       }
-      AddToBinnedDistances(d);
+    }
+
+#pragma omp critical
+    {
+      for (int i = 0; i < 1001; ++i) {
+        _acc[i] += local_acc[i];
+      }
     }
   }
+
+  _fingerprints_read += n;
+
+  if (_fingerprints_read < _next_sample) {
+    return;
+  }
+
+  if (IsConverged()) {
+    cerr << "IsConverged passed\n";
+    converged = 1;
+  }
+
+  _next_sample = _fingerprints_read + _sample_interval;
+}
+
+// Returns true if we have achieved convergence.
+// Not const because it updates _distribution and other variables.
+int
+Options::IsConverged() {
+  if (_next_fname_index > 0) {
+    std::copy_n(_distribution, 1001, _previous_distribution);
+  }
+
+  uint64_t tot = 0;
+  for (int i = 0; i < 1001; ++i) {
+    tot += _acc[i];
+  }
+
+  const double multiplier = 1.0 / static_cast<double>(tot);
+  for (int i = 0; i < 1001; ++i) {
+    _distribution[i] = static_cast<double>(_acc[i]) * multiplier;
+  }
+
+  if (_next_fname_index == 0) {
+    // No previous against which to compare.
+  } else if (_absolute_tolerance > 0.0) {
+    if (AtolConverged()) {
+      return 1;
+    }
+  } else if (_relative_tolerance > 0.0) {
+    if (RtolConverged()) {
+      return 1;
+    }
+  }
+
+  cerr << "Not converged, WriteDistribution\n";
+  WriteDistribution(tot);
+
+  return 0;
+}
+
+// Return true if the distribution is converted via absolute diff.
+// This is slightly inefficient, since we could return false once we
+// have found a difference greater than _absolute_tolerance.
+int
+Options::AtolConverged() const {
+  double max_diff = 0.0;
+
+  for (int i = 0; i < 1001; ++i) {
+    const double d = std::abs(_distribution[i] - _previous_distribution[i]);
+    if (d > max_diff) {
+      max_diff = d;
+    }
+  }
+
+  if (max_diff <= _absolute_tolerance) {
+    return 1;
+  }
+
+  if (_verbose) {
+    cerr << _fingerprints_read << " fingerprints read, rtol max_diff " << max_diff;
+  }
+
+  return 0;
+}
+
+// Returns true of the distribution is converged via the relative
+// tolerance criteria.
+// Slightly inefficient because once a failure in rtol is detected
+// we should return 0 immediately, but we keep going to if _verbose
+// is set, we can return the max_rtol.
+int
+Options::RtolConverged() const {
+  int failed = 0;
+  double max_rtol = 0.0;
+
+  for (int i = 0; i < 1001; ++i) {
+    if (_previous_distribution[i] == 0.0 && _distribution[i] > 0.0) {
+      failed = 1;
+      continue;
+    }
+
+    const double d = std::abs(_distribution[i] - _previous_distribution[i]);
+    if (d == 0.0) {
+      continue;
+    }
+
+    const double ave = (_distribution[i] + _previous_distribution[i]) * 0.5;
+    const double rtol = d / ave;
+
+    if (rtol > max_rtol) {
+      max_rtol = rtol;
+    }
+
+    if (rtol > _relative_tolerance) {
+      failed = 1;
+    }
+  }
+
+  if (! failed) {
+    return 1;
+  }
+
+  if (_verbose) {
+    cerr << _fingerprints_read
+         << " fingerprints read, max relative tolerance " << max_rtol << '\n';
+  }
+
+  return 0;
+}
+
+#ifdef OLD_VERSION_QWEQWE
+int
+Options::Process(GFP_Standard& gfp_standard, int& converged) {
+  const float max_distance = _max_distance;
+  const uint32_t nfp = _number_fingerprints;
+
+#pragma omp parallel
+  {
+    uint64_t local_acc[1001] = {0};
+
+#pragma omp for schedule(static)
+    for (uint32_t i = 0; i < nfp; ++i) {
+      const float d = gfp_standard.tanimoto_distance(_fp[i]);
+      if (d <= max_distance) {
+        const int ndx = static_cast<int>(d * 1000.0f + 0.49999f);
+        ++local_acc[ndx];
+      }
+    }
+
+#pragma omp critical
+    {
+      for (int i = 0; i < 1001; ++i) {
+        _acc[i] += local_acc[i];
+      }
+    }
+
+  }  // #pragma omp parallel
 
   ++_fingerprints_read;
   if (_fingerprints_read < _next_sample) {
@@ -426,11 +631,23 @@ Options::Process(GFP_Standard& gfp_standard, int& converged) {
 
   return 1;
 }
+#endif // OLD_VERSION_QWEQWE
+
+int
+Options::WriteDistribution() {
+  uint64_t tot = 0;
+  for (int i = 0; i < 1001; ++i) {
+    tot += _acc[i];
+  }
+
+  return WriteDistribution(tot);
+}
 
 int
 Options::WriteDistribution(uint64_t tot) {
   IWString fname;
   fname << _stem << _next_fname_index << ".csv";
+  cerr << "WriteDistribution '" << fname << "'\n";
   ++_next_fname_index;
   IWString_and_File_Descriptor output;
   if (! output.open(fname)) {
@@ -443,7 +660,6 @@ Options::WriteDistribution(uint64_t tot) {
   Accumulator<double> stats;
 
   output << "Dist" << kSep << "Fraction\n";
-  float next_distance = 0.05;
   uint64_t sum = 0;
   for (int i = 0; i < 1001; ++i) {
     float dist = static_cast<float>(i / 1000.0f);
@@ -458,22 +674,10 @@ Options::WriteDistribution(uint64_t tot) {
     if (dist > _max_distance) {
       break;
     }
-
-    if (dist < next_distance) {
-      continue;
-    }
-    if (dist > 0.50) {  // uninteresting.
-      continue;
-    }
-    if (dist >= next_distance) {
-      cerr << dist << ' ' << sum << ' ' << static_cast<float>(sum) / static_cast<float>(tot) << '\n';
-      next_distance += 0.05;
-    }
   }
 
   if (_verbose) {
-    cerr << "Average " << static_cast<float>(stats.average()) << " std " << std::sqrt(stats.variance()) << '\n';
-    cerr << stats.minval() << " to " << stats.maxval() << ' ' << stats.sum() << " sum\n";
+    cerr << "Average " << static_cast<float>(stats.average()) << '\n';
   }
 
   return 1;
@@ -493,7 +697,7 @@ Options::Report(std::ostream& output) const {
 
 int
 Main(int argc, char** argv) {
-  Command_Line cl(argc, argv, "vs:S:p:a:r:n:f:h:T:");
+  Command_Line cl(argc, argv, "vs:S:p:a:r:n:f:h:T:b:");
 
   if (cl.unrecognised_options_encountered()) {
     cerr << "Unrecognised options encountered\n";

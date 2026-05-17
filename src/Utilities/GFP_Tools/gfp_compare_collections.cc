@@ -719,7 +719,7 @@ Main(int argc, char** argv) {
 #ifdef USE_OMP
   if (cl.option_present('h')) {
     int h;
-    if (!cl.value('h', h) || h < 0) {
+    if (!cl.value('h', h) || h <= 0) {
       cerr << "The maximum number of threads to use (-h) must be a valid whole +ve "
               "number\n";
       Usage(2);
@@ -742,9 +742,11 @@ Main(int argc, char** argv) {
 
   for (const char* fname : cl) {
     int converged = 0;
-    if (options.Process(fname, converged)) {
-      continue;
+    if (! options.Process(fname, converged)) {
+      cerr << "Error processing '" << fname << "'\n";
+      return 1;
     }
+
     if (converged) {
       break;
     }

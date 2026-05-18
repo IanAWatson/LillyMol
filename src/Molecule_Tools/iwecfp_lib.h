@@ -16,47 +16,64 @@
 
 namespace iwecfp {
 
+// Return codes from Iwecfp::Fingerprint()
+enum class FingerprintResult {
+  kOk,
+  kNoStartAtoms,
+  kFatal
+};
+
 using atype_t = unsigned int;
 
 class Iwecfp {
  private:
   int _verbose = 0;
 
-  int _add_tails = 0;
-  int _reduce_to_largest_fragment = 0;
-
   int _min_shell_radius = 0;
   int _max_shell_radius = 0;
+
   int _additive = 1;
+
   int _each_shell_gets_own_fingerprint = 0;
   int _all_bonds_same_type = 0;
 
-  std::unordered_map<unsigned int, unsigned int> _bits_to_investigate;
+  std::unordered_map<uint32_t, uint32_t> _bits_to_investigate;
   int _looking_for_bit_meanings = 0;
   int _write_smiles_with_bit_meanings = 0;
-  int _bits_found = 0;
+  uint32_t _bits_found = 0;
 
   IWString_and_File_Descriptor _stream_for_bit_meanings;
   IWString_and_File_Descriptor _stream_for_all_bits;
 
+  // Experimental idea. Keeps track of how often each atom
+  // participates in bit formation. At the end, if certain atoms
+  // have been "ignored", generate some more bits centred on 
+  // those atoms. Not sure this is useful.
   int _equalise_atom_coverage = 0;
   int _label_by_visited = 0;
 
-  uint32_t _fixed_width_fingerprint = 0;
-
+  // If set, shells are only started at atoms that match a query.
   resizable_array_p<Substructure_Query> _start_atom_query;
 
+  // If the centre atom of each shell has an isotopic label
+  // use that isotopic value to form a chiral aware shell.
   int _central_atom_possible_chiral = 0;
-  int _bit_replicates = 0;
-  int _bit_replicate_offset = 741;
 
+  // Used by the methods that write bit meanings.
   IWDigits _iwdigits_center;
   IWDigits _iwdigits;
 
+  // Working data for the molecule being processed.
+  // This object is not thread safe.
   Molecule* _current_molecule = nullptr;
-  atom_number_t _centre_of_shell = INVALID_ATOM_NUMBER;
+  atom_number_t _centre_of_shell = kInvalidAtomNumber;
   IWString _smarts_for_centre_of_shell;
   isotope_t _centre_atom_isotope = 0;
+
+  // Experimental idea. As shells are formed, add bonds to the
+  // previous shell as a "tail". Not sure the implementation is
+  // correct. Needs work, do not use for production work.
+  int _add_tails = 0;
 
  public:
   Iwecfp();
@@ -64,7 +81,7 @@ class Iwecfp {
 
   int Initialise(Command_Line& cl);
 
-  int Fingerprint(Molecule& m, const atype_t* atom_constant,
+  FingerprintResult Fingerprint(Molecule& m, const atype_t* atom_constant,
                   Sparse_Fingerprint_Creator* sfc);
 
   int Finalise();

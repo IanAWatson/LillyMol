@@ -1150,6 +1150,26 @@ cc_binary(
 )
 
 cc_binary(
+   name = "iwecfp_v2",
+   srcs = [
+       "iwecfp_main.cc",
+   ],
+   deps = [
+       ":iwecfp_lib",
+        "//Foundational/accumulator",
+        "//Foundational/cmdline:iwcmdline",
+        "//Foundational/data_source:iwtfdata_record",
+        "//Foundational/iwaray",
+        "//Foundational/iwmisc",
+        "//Foundational/iwmisc:sparse_fp_creator",
+        "//Molecule_Lib:iwmolecule",
+        "//Molecule_Lib:moleculeio",
+        "//Molecule_Lib:substructure_cc_proto",
+        "@com_google_protobuf//:protobuf",
+   ],
+)
+
+cc_binary(
     name = "iwecfp_intermolecular",
     srcs = [
         "iwecfp_intermolecular.cc",
@@ -2373,6 +2393,7 @@ cc_binary(
         "skeleton.cc",
     ],
     deps = [
+        ":contiguous_atoms",
         "//Molecule_Lib:iwmolecule",
         "//Molecule_Lib:iwreaction",
         "//Molecule_Lib:moleculeio",
@@ -3022,6 +3043,20 @@ cc_binary(
 )
 
 cc_library(
+    name = "contiguous_atoms",
+    srcs = [
+        "contiguous_atoms.cc",
+    ],
+    hdrs = [
+        "contiguous_atoms.h",
+    ],
+    deps = [
+        "//Molecule_Lib:iwmolecule",
+        "//Molecule_Lib:moleculeio",
+    ],
+)
+
+cc_library(
     name = "demerit",
     srcs = [
         "demerit.cc",
@@ -3174,6 +3209,21 @@ cc_library(
         ":demerit",
         "//Molecule_Lib:iwmolecule",
     ],
+)
+
+cc_library(
+    name = "iwecfp_lib",
+    srcs = [
+        "iwecfp_lib.cc",
+    ],
+    hdrs = [
+        "iwecfp_lib.h",
+    ],
+    deps = [
+        "//Foundational/iwmisc:sparse_fp_creator",
+        "//Molecule_Lib:iwmolecule",
+    ],
+
 )
 
 cc_library(

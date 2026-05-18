@@ -43,7 +43,7 @@ Usage(int rc) {
  -r <tol>       Relative tolerance. Converged if every bucketised part of the distribution is within <tol>.
  -a <tol>       Absolute tolerance. Converged if every difference is less than <tol>.
  -S <stem>      output files are written as <stem>_n.csv.
- -b <size>      batch size. Query fingerprints are processed in groups - default 100.
+ -b <size>      batch size. Query fingerprints are processed in groups - default 10.
  -h <threads>   number of OMP threads to use.
  -v             verbose output
 )";
@@ -73,7 +73,7 @@ class Options {
     // overhead of thread creation across multiple fingerprints.
     // The initial version processed fingerprints one at a time and parallel
     // processing happened with each fingerprint.
-    uint64_t _batch_size = 100;
+    uint64_t _batch_size = 10;
 
     IWString _stem;
     int _next_fname_index;

@@ -1,4 +1,6 @@
+#include <algorithm>
 #include <iostream>
+#include <memory>
 
 #include "Foundational/accumulator/accumulator.h"
 #include "Foundational/cmdline/cmdline.h"
@@ -24,7 +26,7 @@ class Options {
     // Each call to the generator needs an array of Sparse_Fingerprint_Creator.
     // Allocate once and then clear before each call.
     int _nsfc;
-    Sparse_Fingerprint_Creator* _sfc;
+    std::unique_ptr<Sparse_Fingerprint_Creator[]> _sfc;
 
     int _verbose;
 
@@ -116,7 +118,6 @@ class Options {
 
 Options::Options() {
   _nsfc = 0;
-  _sfc = nullptr;
   _verbose = 0;
   _function_as_tdt_filter = 0;
   _flush_after_each_molecule = 0;
@@ -133,9 +134,6 @@ Options::Options() {
 }
 
 Options::~Options() {
-  if (_sfc != nullptr) {
-    delete [] _sfc;
-  }
 }
 
 void
@@ -273,10 +271,10 @@ Options::Initialise(Command_Line& cl) {
   }
 
   if (_each_shell_gets_own_fingerprint) {
-    _sfc = new Sparse_Fingerprint_Creator[_max_shell_radius + 1];
+    _sfc.reset(new Sparse_Fingerprint_Creator[_max_shell_radius + 1]);
     _nsfc = _max_shell_radius + 1;
   } else {
-    _sfc = new Sparse_Fingerprint_Creator[1];
+    _sfc.reset(new Sparse_Fingerprint_Creator[1]);
     _nsfc = 1;
   }
 
@@ -450,7 +448,7 @@ Options::WriteArrayOfFingerprints(Sparse_Fingerprint_Creator* sfc,
   }
 
   if (_bit_replicates > 0) {
-    for (const auto& [b, c] : tmp.bits_found()) {
+    for (const auto& [b, c] : sfc[0].bits_found()) {
       for (int i = 1; i <= _bit_replicates; ++i) {
         const uint32_t newbit = b + i * _bit_replicate_offset;
         tmp.hit_bit(newbit, c);
@@ -551,12 +549,19 @@ Options::Fingerprint(Molecule& m, iwecfp::Iwecfp& generator,
     _sfc[i].clear();
   }
 
-  // Not sure how else this could fail.
-  if (! generator.Fingerprint(m, atom_constant.get(), _sfc)) {
-    return HandleNoStartAtoms(m, output);
+  const iwecfp::FingerprintResult result =
+      generator.Fingerprint(m, atom_constant.get(), _sfc.get());
+
+  switch (result) {
+    case iwecfp::FingerprintResult::kOk:
+      return DoOutput(m, _sfc.get(), output);
+    case iwecfp::FingerprintResult::kNoStartAtoms:
+      return HandleNoStartAtoms(m, output);
+    case iwecfp::FingerprintResult::kFatal:
+      return 0;
   }
 
-  return DoOutput(m, _sfc, output);
+  return DoOutput(m, _sfc.get(), output);
 }
 
 int

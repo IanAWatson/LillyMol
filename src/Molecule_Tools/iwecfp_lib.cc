@@ -133,6 +133,9 @@ Iwecfp::CheckAgainstList(Molecule& m, const IWString& smarts,
   return 1;
 }
 
+// Note that this is quite inefficient since setting the isotope will result
+// in destruction of the distance matrix. This is not used frequently, so
+// ignore for now.
 void
 Iwecfp::WriteLabelledSmiles(const Molecule& m, int centre_of_shell, int radius,
                             IWString_and_File_Descriptor& output) {
@@ -534,7 +537,7 @@ Iwecfp::IdentifyStartAtoms(Molecule& m, int* processing_status, int matched_flag
   return rc;
 }
 
-int
+FingerprintResult
 Iwecfp::Fingerprint(Molecule& m, const atype_t* atom_constant,
                 Sparse_Fingerprint_Creator* sfc) {
   m.compute_aromaticity_if_needed();
@@ -570,7 +573,7 @@ Iwecfp::Fingerprint(Molecule& m, const atype_t* atom_constant,
       if (_verbose) {
         cerr << "Iwecfp:no start atoms defined for " << _start_atom_query.size() << " queries\n";
       }
-      return 0;
+      return FingerprintResult::kNoStartAtoms;
     }
   }
 
@@ -627,7 +630,7 @@ Iwecfp::Fingerprint(Molecule& m, const atype_t* atom_constant,
     _stream_for_all_bits << "|\n";
   }
 
-  return 1;
+  return FingerprintResult::kOk;
 }
 
 void

@@ -449,10 +449,12 @@ Options::WriteArrayOfFingerprints(Sparse_Fingerprint_Creator* sfc,
     tmp.hit_bit(b, c);
   }
 
-  for (const auto& [b, c] : sfc[0].bits_found()) {
-    for (int i = 1; i <= _bit_replicates; ++i) {
-      const uint32_t newbit = b + i * _bit_replicate_offset;
-      tmp.hit_bit(newbit, c);
+  if (_bit_replicates > 0) {
+    for (const auto& [b, c] : tmp.bits_found()) {
+      for (int i = 1; i <= _bit_replicates; ++i) {
+        const uint32_t newbit = b + i * _bit_replicate_offset;
+        tmp.hit_bit(newbit, c);
+      }
     }
   }
 

@@ -1,7 +1,10 @@
 load("@com_google_protobuf//bazel:py_proto_library.bzl", "py_proto_library")
 load("@rules_cc//cc:defs.bzl", "cc_binary", "cc_proto_library", "cc_library", "cc_test")
+load("@rules_proto_grpc_python//:defs.bzl", "python_grpc_library")
 load("@com_google_protobuf//bazel:cc_proto_library.bzl", "cc_proto_library")
-# load("@rules_proto_grpc_cpp//:defs.bzl", "cpp_grpc_compile")
+
+load("@com_google_protobuf//bazel:cc_proto_library.bzl", "cc_proto_library")
+load("@rules_proto_grpc_cpp//:defs.bzl", "cpp_grpc_library")
 
 load("@rules_proto//proto:defs.bzl", "proto_library")
 
@@ -109,6 +112,17 @@ py_proto_library(
         ":nn_request_proto",
         ":nearneighbours_proto",
     ],
+)
+
+cpp_grpc_library(
+    name = "nn_request_cc_grpc",
+    protos = [":nn_request_proto"],
+    deps = [":nearneighbours_cc_proto"],
+)
+
+python_grpc_library(
+    name = "nn_request_py_grpc",
+    protos = [":nn_request_proto"],
 )
 
 #grpc_proto_library(
@@ -422,10 +436,9 @@ cc_binary(
     ],
     tags = [
         "gfp_server",
-        "zeromq",
     ],
     deps = [
-        "nn_request_cc_proto",
+        ":nn_request_cc_grpc",
         "//Foundational/cmdline:iwcmdline",
         "//Foundational/data_source:iwstring_data_source",
         "//Molecule_Lib:iwmfingerprint",
@@ -436,8 +449,6 @@ cc_binary(
         "//Utilities/GFP_Tools:gfp_standard",
         "//Utilities/GFP_Tools:nearneighbours_cc_proto",
         "@com_google_protobuf//:protobuf",
-        "@third_party//:cppzmq",
-        "@third_party//:libzmq",
     ] +
       select( {
       "darwin": [ "@homebrew_openmp"],

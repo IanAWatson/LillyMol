@@ -252,7 +252,7 @@ Iwecfp::GenerateShells(const int matoms, int radius, const int max_radius,
     }
   }
 
-  if (radius > _min_shell_radius) {
+  if (radius >= _min_shell_radius) {
     sfc->hit_bit(sum_so_far);
     if (_centre_atom_isotope) {
       sfc->hit_bit(sum_so_far + _centre_atom_isotope);

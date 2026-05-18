@@ -444,7 +444,7 @@ generate_shells(const int matoms, int radius, const int max_radius, const Atom* 
     }
   }
 
-  if (radius > min_shell_radius) {
+  if (radius >= min_shell_radius) {
 #ifdef DEBUG_ECFP_BITS
     cerr << "Hit bit " << sum_so_far << " at radius " << radius << '\n';
 #endif

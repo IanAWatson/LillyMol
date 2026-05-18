@@ -23,6 +23,7 @@ class Options {
   private:
     // Each call to the generator needs an array of Sparse_Fingerprint_Creator.
     // Allocate once and then clear before each call.
+    int _nsfc;
     Sparse_Fingerprint_Creator* _sfc;
 
     int _verbose;
@@ -114,6 +115,7 @@ class Options {
 };
 
 Options::Options() {
+  _nsfc = 0;
   _sfc = nullptr;
   _verbose = 0;
   _function_as_tdt_filter = 0;
@@ -272,8 +274,10 @@ Options::Initialise(Command_Line& cl) {
 
   if (_each_shell_gets_own_fingerprint) {
     _sfc = new Sparse_Fingerprint_Creator[_max_shell_radius + 1];
+    _nsfc = _max_shell_radius + 1;
   } else {
     _sfc = new Sparse_Fingerprint_Creator[1];
+    _nsfc = 1;
   }
 
   if (_descriptor_file_output && _function_as_tdt_filter) {
@@ -541,11 +545,8 @@ Options::Fingerprint(Molecule& m, iwecfp::Iwecfp& generator,
     return 0;
   }
 
-  std::unique_ptr<Sparse_Fingerprint_Creator[]> sfc;
-  if (generator.each_shell_gets_own_fingerprint()) {
-    sfc.reset(new Sparse_Fingerprint_Creator[generator.max_radius() + 1]);
-  } else {
-    sfc.reset(new Sparse_Fingerprint_Creator[1]);
+  for (int i = 0; i < _nsfc; ++i) {
+    _sfc[i].clear();
   }
 
   // Not sure how else this could fail.

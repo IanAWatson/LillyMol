@@ -749,7 +749,6 @@ Iwecfp::Initialise(Command_Line& cl) {
           cerr << "The addtails directive must be a whole +ve number\n";
           return 0;
         }
-        _add_tails = 1;
         if (_verbose) {
           cerr << "Will fingerprint tails out to radius " << _add_tails << '\n';
         }
@@ -824,7 +823,7 @@ Iwecfp::Initialise(Command_Line& cl) {
       } else if (b == "smilesm") {
         _write_smiles_with_bit_meanings = 2;
       } else if (b == "help") {
-        DisplayDashMOptions(0);
+        DisplayDashBOptions(0);
       } else {
         fname = b;
       }
@@ -869,8 +868,6 @@ Iwecfp::Initialise(Command_Line& cl) {
 
 int
 Iwecfp::Report(std::ostream& output) const {
-  output << "Read " << _molecules_read << " molecules\n";
-
   if (_looking_for_bit_meanings) {
     output << "Found " << _bits_found << " bits in lookup file\n";
     for (const auto& [bit, count] : _bits_to_investigate) {

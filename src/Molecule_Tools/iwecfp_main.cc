@@ -9,7 +9,10 @@
 #include "Molecule_Lib/aromatic.h"
 #include "Molecule_Lib/atom_typing.h"
 #include "Molecule_Lib/element.h"
+#include "Molecule_Lib/istream_and_type.h"
+#include "Molecule_Lib/molecule.h"
 #include "Molecule_Lib/standardise.h"
+
 #include "Molecule_Tools/iwecfp_lib.h"
 
 namespace iwecfp {
@@ -330,6 +333,7 @@ Options::WriteDescriptorFileHeader(IWString_and_File_Descriptor& output) const {
 
 int
 Options::Report(std::ostream& output) const {
+  output << "Generated fingerprints for " << _molecules_read << " molecules\n";
   if (_nbits_acc.n() > 0) {
     output << "Fingerprints had between " << _nbits_acc.minval() << " and "
            << _nbits_acc.maxval() << " ave "
@@ -503,6 +507,8 @@ Options::HandleNoStartAtoms(Molecule& m, IWString_and_File_Descriptor& output) {
 int
 Options::Fingerprint(Molecule& m, iwecfp::Iwecfp& generator,
                      IWString_and_File_Descriptor& output) {
+  ++_molecules_read;
+
   Preprocess(m);
 
   const int matoms = m.natoms();

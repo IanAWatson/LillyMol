@@ -11,9 +11,7 @@
 #include "Foundational/iwmisc/iwdigits.h"
 #include "Foundational/iwmisc/sparse_fp_creator.h"
 
-#include "Molecule_Lib/istream_and_type.h"
 #include "Molecule_Lib/molecule.h"
-#include "Molecule_Lib/standardise.h"
 #include "Molecule_Lib/substructure.h"
 
 namespace iwecfp {
@@ -58,8 +56,6 @@ class Iwecfp {
 
   IWDigits _iwdigits_center;
   IWDigits _iwdigits;
-
-  uint64_t _molecules_read = 0;
 
   Molecule* _current_molecule = nullptr;
   atom_number_t _centre_of_shell = INVALID_ATOM_NUMBER;
@@ -119,8 +115,6 @@ class Iwecfp {
 
   int IdentifyStartAtoms(Molecule& m, int* processing_status, int matched_flag);
   int HandleNoStartAtoms(Molecule& m, IWString_and_File_Descriptor& output);
-
-  int Fingerprint(Molecule& m, IWString_and_File_Descriptor& output);
 };
 
 void Usage(int rc);

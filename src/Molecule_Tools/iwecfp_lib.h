@@ -25,10 +25,6 @@ class Iwecfp {
   int _add_tails = 0;
   int _reduce_to_largest_fragment = 0;
 
-  IWString _smiles_tag = "$SMI<";
-  IWString _identifier_tag = "PCN<";
-  IWString _tag;
-
   int _min_shell_radius = 0;
   int _max_shell_radius = 0;
   int _additive = 1;
@@ -74,7 +70,6 @@ class Iwecfp {
   int Finalise();
   int Report(std::ostream& output) const;
 
-  const IWString& tag() const { return _tag; }
   int verbose() const { return _verbose; }
   int max_radius() const { return _max_shell_radius;}
   int each_shell_gets_own_fingerprint() const { return _each_shell_gets_own_fingerprint;}
@@ -114,7 +109,6 @@ class Iwecfp {
                              Sparse_Fingerprint_Creator* sfc);
 
   int IdentifyStartAtoms(Molecule& m, int* processing_status, int matched_flag);
-  int HandleNoStartAtoms(Molecule& m, IWString_and_File_Descriptor& output);
 };
 
 void Usage(int rc);

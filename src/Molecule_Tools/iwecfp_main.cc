@@ -21,6 +21,10 @@ using std::cerr;
 
 class Options {
   private:
+    // Each call to the generator needs an array of Sparse_Fingerprint_Creator.
+    // Allocate once and then clear before each call.
+    Sparse_Fingerprint_Creator* _sfc;
+
     int _verbose;
 
     int _function_as_tdt_filter;
@@ -48,6 +52,9 @@ class Options {
 
     Accumulator_Int<uint32_t> _nbits_acc;
 
+    // If writing a descriptor file, a write buffer.
+    std::unique_ptr<int[]> _count;
+
     // Preprocessing.
     int _reduce_to_largest_fragment;
 
@@ -72,6 +79,7 @@ class Options {
                                  IWString_and_File_Descriptor& output);
   public:
     Options();
+    ~Options();
 
     int function_as_tdt_filter() const {
       return _function_as_tdt_filter;
@@ -106,6 +114,7 @@ class Options {
 };
 
 Options::Options() {
+  _sfc = nullptr;
   _verbose = 0;
   _function_as_tdt_filter = 0;
   _flush_after_each_molecule = 0;
@@ -119,6 +128,12 @@ Options::Options() {
   _reduce_to_largest_fragment = 0;
   _smiles_tag = "$SMI<";
   _identifier_tag = "PCN<";
+}
+
+Options::~Options() {
+  if (_sfc != nullptr) {
+    delete [] _sfc;
+  }
 }
 
 void
@@ -205,6 +220,7 @@ Options::Initialise(Command_Line& cl) {
         if (_verbose) {
           cerr << "Will write a descriptor file with " << _descriptor_file_output << " columns\n";
         }
+        _count.reset(new int[_descriptor_file_output]);
       } else if (y.starts_with("fixed=")) {
         y.remove_leading_chars(6);
         if (!y.numeric_value(_fixed_width_fingerprint) || _fixed_width_fingerprint < 2) {
@@ -252,6 +268,12 @@ Options::Initialise(Command_Line& cl) {
     }
 
     _each_shell_gets_own_fingerprint = 1;
+  }
+
+  if (_each_shell_gets_own_fingerprint) {
+    _sfc = new Sparse_Fingerprint_Creator[_max_shell_radius + 1];
+  } else {
+    _sfc = new Sparse_Fingerprint_Creator[1];
   }
 
   if (_descriptor_file_output && _function_as_tdt_filter) {
@@ -453,10 +475,9 @@ Options::WriteDescriptorFileRow(Molecule& m, uint32_t ncols,
                                 IWString_and_File_Descriptor& output) {
   append_first_token_of_name(m.name(), output);
 
-  std::unique_ptr<int[]> count = std::make_unique<int[]>(ncols);
-  std::fill_n(count.get(), ncols, 0);
+  std::fill_n(_count.get(), ncols, 0);
 
-  sfc.WriteAsDescriptors(ncols, count.get(), output);
+  sfc.WriteAsDescriptors(ncols, _count.get(), output);
   output << '\n';
 
   return 1;
@@ -528,11 +549,11 @@ Options::Fingerprint(Molecule& m, iwecfp::Iwecfp& generator,
   }
 
   // Not sure how else this could fail.
-  if (! generator.Fingerprint(m, atom_constant.get(), sfc.get())) {
+  if (! generator.Fingerprint(m, atom_constant.get(), _sfc)) {
     return HandleNoStartAtoms(m, output);
   }
 
-  return DoOutput(m, sfc.get(), output);
+  return DoOutput(m, _sfc, output);
 }
 
 int

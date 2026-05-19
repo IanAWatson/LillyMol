@@ -1,269 +1,251 @@
-project(utilities)
-find_package(Protobuf REQUIRED)
-include_directories(SYSTEM ${Protobuf_INCLUDE_DIRS})
+function(lillymol_general_executable name)
+  add_executable(${name} ${ARGN})
+  target_include_directories(${name} PRIVATE ${LILLYMOL_SRC_DIR})
+endfunction()
 
-# tcount
-set(tcount_srcs
-  ${CMAKE_CURRENT_SOURCE_DIR}/tcount.cc
-  ${CMAKE_CURRENT_SOURCE_DIR}/tokens_in_quoted_string.cc
+protobuf_generate_cpp(CLASS_LABEL_TRANSLATION_SRCS CLASS_LABEL_TRANSLATION_HDRS
+  class_label_translation.proto
 )
-set(tcount_libs
-  cmdline
+
+add_library(class_label_translation_cc_proto
+  ${CLASS_LABEL_TRANSLATION_SRCS}
+  ${CLASS_LABEL_TRANSLATION_HDRS}
+)
+
+target_link_libraries(class_label_translation_cc_proto PUBLIC protobuf::libprotobuf)
+target_include_directories(class_label_translation_cc_proto PUBLIC ${CMAKE_CURRENT_BINARY_DIR})
+
+protobuf_generate_cpp(FEATURE_SCALING_SRCS FEATURE_SCALING_HDRS
+  feature_scaling.proto
+)
+
+add_library(feature_scaling_cc_proto
+  ${FEATURE_SCALING_SRCS}
+  ${FEATURE_SCALING_HDRS}
+)
+
+target_link_libraries(feature_scaling_cc_proto PUBLIC protobuf::libprotobuf)
+target_include_directories(feature_scaling_cc_proto PUBLIC ${CMAKE_CURRENT_BINARY_DIR})
+
+add_library(scaler INTERFACE)
+
+target_sources(scaler INTERFACE scaler.h)
+
+target_link_libraries(scaler
+  INTERFACE
+    feature_scaling_cc_proto
+)
+
+add_library(linear_scaling
+  linear_scaling.cc
+)
+
+target_link_libraries(linear_scaling
+  PUBLIC
+    linear_scaling_cc_proto
+    iwmisc
+    iwstring
+)
+
+add_library(ttitem
+  ttitem.cc
+)
+
+target_link_libraries(ttitem
+  PUBLIC
+    iwstring
+)
+
+lillymol_general_executable(average
+  average.cc iwtokeniser.cc
+)
+target_link_libraries(average PRIVATE
+  accumulator iwstring_data_source iwmisc iwstring
+)
+
+lillymol_general_executable(bucketise bucketise.cc)
+target_link_libraries(bucketise PRIVATE
+  accumulator iwcmdline iwstring_data_source iwmisc
+)
+
+lillymol_general_executable(byte_offset_index byte_offset_index.cc)
+target_link_libraries(byte_offset_index PRIVATE
+  accumulator iwcmdline iwstring_data_source iwmisc
+)
+
+lillymol_general_executable(descriptor_file_cat descriptor_file_cat.cc)
+target_link_libraries(descriptor_file_cat PRIVATE
+  accumulator cmdline_v2 iwstring_data_source iwmisc
+)
+
+lillymol_general_executable(descriptor_file_filter descriptor_file_filter.cc)
+target_link_libraries(descriptor_file_filter PRIVATE
+  accumulator iwcmdline iwstring_data_source iwmisc
+)
+
+lillymol_general_executable(descriptor_file_sort descriptor_file_sort.cc)
+target_link_libraries(descriptor_file_sort PRIVATE
+  accumulator iwcmdline iwstring_data_source iwmisc iwqsort
+)
+
+lillymol_general_executable(difference_sort difference_sort.cc)
+target_link_libraries(difference_sort PRIVATE
+  accumulator cmdline_v2 iwstring_data_source iwmisc iwqsort
+)
+
+lillymol_general_executable(distribution distribution.cc)
+target_link_libraries(distribution PRIVATE
+  accumulator iwcmdline iwstring_data_source iwmisc iwqsort
+)
+
+lillymol_general_executable(fetch_sdf fetch_sdf.cc)
+target_link_libraries(fetch_sdf PRIVATE
+  accumulator iwcmdline iwstring_data_source iwmisc
+)
+
+lillymol_general_executable(fetch_sdf_quick fetch_sdf_quick.cc)
+target_link_libraries(fetch_sdf_quick PRIVATE
+  iwstring_data_source iwmisc iwstring
+)
+
+lillymol_general_executable(fetch_smiles
+  fetch_smiles.cc iwtokeniser.cc
+)
+target_link_libraries(fetch_smiles PRIVATE
+  iwstring_data_source iwmisc iwstring
+)
+
+lillymol_general_executable(fetch_smiles_quick
+  fetch_smiles_quick.cc iwtokeniser.cc
+)
+target_link_libraries(fetch_smiles_quick PRIVATE
+  iwstring_data_source iwmisc iwstring
+)
+
+lillymol_general_executable(iwsplit iwsplit.cc)
+target_link_libraries(iwsplit PRIVATE
+  cmdline_v2 iwstring_data_source iwmisc iwstring
+)
+
+lillymol_general_executable(iwcut
+  iwcut.cc iwtokeniser.cc
+)
+target_link_libraries(iwcut PRIVATE
+  iwstring_data_source iwmisc iwstring
+)
+
+lillymol_general_executable(random_column_order random_column_order.cc)
+target_link_libraries(random_column_order PRIVATE
+  iwcmdline iwstring_data_source iwmisc iwstring
+)
+
+lillymol_general_executable(random_records random_records.cc)
+target_link_libraries(random_records PRIVATE
+  accumulator iwcmdline iwstring_data_source iwmisc iwstring
+)
+
+lillymol_general_executable(unique_rows
+  unique_rows.cc iwtokeniser.cc
+)
+target_link_libraries(unique_rows PRIVATE
+  accumulator cmdline_v2 iwstring_data_source iwmisc iwqsort iwstring
+)
+
+lillymol_general_executable(whatsmissing whatsmissing.cc)
+target_link_libraries(whatsmissing PRIVATE
+  accumulator cmdline_v2 iwstring_data_source iwmisc iwstring
+)
+
+if(LILLYMOL_BUILD_TESTS)
+  add_executable(scaler_test scaler_test.cc)
+
+  target_link_libraries(scaler_test PRIVATE
+    scaler
+    feature_scaling_cc_proto
+    GTest::gtest
+    GTest::gtest_main
+  )
+
+  add_test(NAME scaler_test COMMAND scaler_test)
+endif()
+
+lillymol_general_executable(descriptors_to_fingerprint
+  descriptors_to_fingerprint.cc
+)
+target_link_libraries(descriptors_to_fingerprint PRIVATE
   iwstring_data_source
-  iwre2
-  iwstring
-  ${IW_EXTRA_LIBS}
-)
-add_executable(tcount ${tcount_srcs})
-target_link_libraries(tcount LINK_PUBLIC ${tcount_libs})
-
-
-# average
-set(average_srcs
-  ${CMAKE_CURRENT_SOURCE_DIR}/average.cc
-  ${CMAKE_CURRENT_SOURCE_DIR}/iwtokeniser.cc
-  ${CMAKE_CURRENT_SOURCE_DIR}/iwtokeniser.h
-)
-set(average_libs
-  accumulator
-  cmdline
-  iwstring_data_source
-  iwstring
-  iwre2
-  ${IW_EXTRA_LIBS}
-)
-add_executable(average ${average_srcs})
-target_link_libraries(average LINK_PUBLIC ${average_libs})
-
-
-# concat_files
-set(concat_files_srcs
-  ${CMAKE_CURRENT_SOURCE_DIR}/concat_files.cc
-  ${CMAKE_CURRENT_SOURCE_DIR}/iwtokeniser.cc
-)
-set(concat_files_libs
-  accumulator
-  cmdline
   iwmisc
-  iwstring_data_source
+  sparse_fp_creator
   iwstring
-  iwre2
-  ${IW_EXTRA_LIBS}
 )
-add_executable(concat_files ${concat_files_srcs})
-target_link_libraries(concat_files LINK_PUBLIC ${concat_files_libs})
 
-
-# correlate
-set(correlate_srcs
-  ${CMAKE_CURRENT_SOURCE_DIR}/correlate.cc
+lillymol_general_executable(descriptors_to_fingerprint_integer
+  descriptors_to_fingerprint_integer.cc
 )
-set(correlate_libs
-  accumulator
-  cmdline
-  tabular_data
-  iwbits
-  iwstring_data_source
-  iwstring
-  iwre2
-  iwmisc
-  ${IW_EXTRA_LIBS}
-)
-add_executable(correlate ${correlate_srcs})
-target_link_libraries(correlate LINK_PUBLIC ${correlate_libs})
-
-
-# dfilefilter
-set(dfilefilter_srcs
-  ${CMAKE_CURRENT_SOURCE_DIR}/dfilefilter.cc
-)
-set(dfilefilter_libs
-  accumulator
-  cmdline
-  iwstring_data_source
-  iwstring
-  iwmisc
-  iwre2
-  ${IW_EXTRA_LIBS}
-)
-add_executable(dfilefilter ${dfilefilter_srcs})
-target_link_libraries(dfilefilter LINK_PUBLIC ${dfilefilter_libs})
-
-
-# fetch_sdf_quick
-set(fetch_sdf_quick_srcs
-  ${CMAKE_CURRENT_SOURCE_DIR}/fetch_sdf_quick.cc
-)
-set(fetch_sdf_quick_libs
-  accumulator
-  cmdline
-  iwstring_data_source
-  iwstring
-  iwmisc
-  iwre2
-  ${IW_EXTRA_LIBS}
-)
-add_executable(fetch_sdf_quick ${fetch_sdf_quick_srcs})
-target_link_libraries(fetch_sdf_quick LINK_PUBLIC ${fetch_sdf_quick_libs})
-
-# fetch_smiles
-set(fetch_smiles_srcs
-  ${CMAKE_CURRENT_SOURCE_DIR}/fetch_smiles.cc
-)
-set(fetch_smiles_libs
-  accumulator
-  cmdline
-  iwstring_data_source
-  iwstring
-  iwre2
-  ${IW_EXTRA_LIBS}
-)
-add_executable(fetch_smiles ${fetch_smiles_srcs})
-target_link_libraries(fetch_smiles LINK_PUBLIC ${fetch_smiles_libs})
-
-
-# fetch_smiles_quick
-set(fetch_smiles_quick_srcs
-  ${CMAKE_CURRENT_SOURCE_DIR}/fetch_smiles_quick.cc
-)
-set(fetch_smiles_quick_libs
-  accumulator
-  cmdline
-  iwstring_data_source
-  iwstring
-  iwre2
-  ${IW_EXTRA_LIBS}
-)
-add_executable(fetch_smiles_quick ${fetch_smiles_quick_srcs})
-target_link_libraries(fetch_smiles_quick LINK_PUBLIC ${fetch_smiles_quick_libs})
-
-# iwsplit
-set(iwsplit_srcs
-  ${CMAKE_CURRENT_SOURCE_DIR}/iwsplit.cc
-)
-set(iwsplit_libs
-  accumulator
-  cmdline_v2
+target_link_libraries(descriptors_to_fingerprint_integer PRIVATE
+  iwcmdline
   iwstring_data_source
   iwmisc
+  sparse_fp_creator
   iwstring
-  iwre2
-  ${IW_EXTRA_LIBS}
+  absl_hash
 )
-add_executable(iwsplit ${iwsplit_srcs})
-target_link_libraries(iwsplit LINK_PUBLIC ${iwsplit_libs})
 
-# iwcut
-set(iwcut_srcs
-  ${CMAKE_CURRENT_SOURCE_DIR}/iwcut.cc
+lillymol_general_executable(svm_lite_to_gfp
+  svm_lite_to_gfp.cc
 )
-set(iwcut_libs
+target_link_libraries(svm_lite_to_gfp PRIVATE
   accumulator
-  cmdline
+  iwcmdline
+  iwstring_data_source
   iwmisc
-  iwstring_data_source
-  iwstring
-  iwre2
-  ${IW_EXTRA_LIBS}
+  sparse_fp_creator
 )
-add_executable(iwcut ${iwcut_srcs})
-target_link_libraries(iwcut LINK_PUBLIC ${iwcut_libs})
 
-# normalise
-set(normalise_srcs
-  ${CMAKE_CURRENT_SOURCE_DIR}/normalise.cc
-  ${CMAKE_CURRENT_SOURCE_DIR}/iwtokeniser.cc
+lillymol_general_executable(iwstats
+  iwstats.cc
 )
-set(normalise_libs
+target_link_libraries(iwstats PRIVATE
   accumulator
-  cmdline
+  iwcmdline
   iwstring_data_source
-  iwstring
-  iwre2
-  ${IW_EXTRA_LIBS}
-)
-add_executable(normalise ${normalise_srcs})
-target_link_libraries(normalise LINK_PUBLIC ${normalise_libs})
-
-# random_records
-set(random_records_srcs
-  ${CMAKE_CURRENT_SOURCE_DIR}/random_records.cc
-  ${CMAKE_CURRENT_SOURCE_DIR}/iwtokeniser.cc
-)
-set(random_records_libs
-  accumulator
-  cmdline
-  iwstring_data_source
-  iwstring
-  iwre2
-  ${IW_EXTRA_LIBS}
-)
-add_executable(random_records ${random_records_srcs})
-target_link_libraries(random_records LINK_PUBLIC ${random_records_libs})
-
-# unique_rows
-set(unique_rows_srcs
-  ${CMAKE_CURRENT_SOURCE_DIR}/unique_rows.cc
-  ${CMAKE_CURRENT_SOURCE_DIR}/iwtokeniser.cc
-)
-set(unique_rows_libs
-  accumulator
-  cmdline_v2
-  iwstring_data_source
-  iwstring
+  iw_tabular_data
   iwmisc
-  iwre2
-  ${IW_EXTRA_LIBS}
-)
-add_executable(unique_rows ${unique_rows_srcs})
-target_link_libraries(unique_rows LINK_PUBLIC ${unique_rows_libs})
-
-set(proto_src
-  ${CMAKE_CURRENT_SOURCE_DIR}/class_label_translation.proto
-  ${CMAKE_CURRENT_SOURCE_DIR}/feature_scaling.proto
-)
-#protobuf_generate_cpp(PROTO_SRCS PROTO_HDRS ${proto_src})
-#add_library(general_proto_lib ${PROTO_SRCS})
-#target_include_directories(general_proto_lib PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
-
-set(proto_files
-  ${CMAKE_CURRENT_SOURCE_DIR}/class_label_translation.proto
-  ${CMAKE_CURRENT_SOURCE_DIR}/feature_scaling.proto
-)
-set(general_path Utilities/General)
-foreach(fname ${proto_files})
-  get_filename_component(dir ${fname} DIRECTORY)
-  get_filename_component(stem ${fname} NAME_WE)
-  set(PROTO_HDRS "${PROTO_HDRS};${dir}/${stem}.pb.h")
-  set(PROTO_SRCS "${PROTO_SRCS};${dir}/${stem}.pb.cc")
-  set(PROTO_INPUTS "${PROTO_INPUTS};${general_path}/${stem}.proto")
-endforeach()
-
-add_custom_command(
-  OUTPUT ${PROTO_HDRS} ${PROTO_SRCS}
-  COMMAND ${Protobuf_PROTOC_EXECUTABLE}
-  ARGS   --cpp_out . -I .
-         ${PROTO_INPUTS}
-  COMMENT "General running protoc on ${PROTO_INPUTS}"
-  WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/../..
-)
-add_library(general_proto_lib ${PROTO_SRCS})
-target_include_directories(general_proto_lib PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
-
-# class_label_translation
-set(class_label_translation_srcs
-  ${CMAKE_CURRENT_SOURCE_DIR}/class_label_translation.cc
-  ${PROTO_SRCS}
-)
-set(class_label_translation_libs
-  accumulator
-  cmdline_v2
-  iwstring_data_source
   iwstring
-  iwmisc
-  iwre2
-  ${IW_EXTRA_LIBS}
 )
-add_executable(class_label_translation ${class_label_translation_srcs})
-target_link_libraries(class_label_translation LINK_PUBLIC ${class_label_translation_libs} ${Protobuf_LIBRARIES})
 
+lillymol_general_executable(iwstats_summary
+  iwstats_summary.cc
+)
+target_link_libraries(iwstats_summary PRIVATE
+  accumulator
+  iwcmdline
+  iwstring_data_source
+  iw_tabular_data
+  iwmisc
+  iwstring
+)
+
+lillymol_general_executable(dfilefilter
+  descriptor_file_filter.cc
+)
+target_link_libraries(dfilefilter PRIVATE
+  accumulator
+  iwcmdline
+  iwstring_data_source
+  iw_tabular_data
+  iwmisc
+  iwstring
+)
+
+lillymol_general_executable(correlate
+  correlate.cc
+)
+target_link_libraries(correlate PRIVATE
+  accumulator
+  iwcmdline
+  iwstring_data_source
+  iw_tabular_data
+  iwmisc
+  iwstring
+)

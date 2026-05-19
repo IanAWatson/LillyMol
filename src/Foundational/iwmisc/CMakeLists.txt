@@ -1,151 +1,214 @@
-project(iwmisc)
-set(source_files
-  ${CMAKE_CURRENT_SOURCE_DIR}/append_first_token_of_name.cc
-  ${CMAKE_CURRENT_SOURCE_DIR}/dash_d.cc
-  ${CMAKE_CURRENT_SOURCE_DIR}/dash_f.cc
-  ${CMAKE_CURRENT_SOURCE_DIR}/dash_s.cc
-  ${CMAKE_CURRENT_SOURCE_DIR}/dash_x.cc
-  ${CMAKE_CURRENT_SOURCE_DIR}/endian.cc
-  ${CMAKE_CURRENT_SOURCE_DIR}/fetch_via_regexp.cc
-  ${CMAKE_CURRENT_SOURCE_DIR}/fraction_as_string.cc
-  ${CMAKE_CURRENT_SOURCE_DIR}/int_comparator.cc
-  ${CMAKE_CURRENT_SOURCE_DIR}/iwdigits.cc
-  ${CMAKE_CURRENT_SOURCE_DIR}/iwdirname.cc
-  ${CMAKE_CURRENT_SOURCE_DIR}/logical_expression.cc
-  ${CMAKE_CURRENT_SOURCE_DIR}/msi_object.cc
-  ${CMAKE_CURRENT_SOURCE_DIR}/new_double.cc
-  ${CMAKE_CURRENT_SOURCE_DIR}/new_float.cc
-  ${CMAKE_CURRENT_SOURCE_DIR}/new_int.cc
-  ${CMAKE_CURRENT_SOURCE_DIR}/proto_support.cc
-  ${CMAKE_CURRENT_SOURCE_DIR}/report_progress.cc
-  ${CMAKE_CURRENT_SOURCE_DIR}/write_space_suppressed_string.cc
-  ${CMAKE_CURRENT_SOURCE_DIR}/_numeric_data_from_file_int.cc
-  ${CMAKE_CURRENT_SOURCE_DIR}/_numeric_data_from_file_float.cc
-  ${CMAKE_CURRENT_SOURCE_DIR}/_set_or_unset_float.cc
-)
-
-set(header_files
-  ${CMAKE_CURRENT_SOURCE_DIR}/fetch_via_regexp.h
-  ${CMAKE_CURRENT_SOURCE_DIR}/iwarchive.h
-  ${CMAKE_CURRENT_SOURCE_DIR}/iwdigits.h
-  ${CMAKE_CURRENT_SOURCE_DIR}/iwminmax.h
-  ${CMAKE_CURRENT_SOURCE_DIR}/iw_time.h
-  ${CMAKE_CURRENT_SOURCE_DIR}/logical_expression.h
-  ${CMAKE_CURRENT_SOURCE_DIR}/minmaxspc.h
-  ${CMAKE_CURRENT_SOURCE_DIR}/misc.h
-  ${CMAKE_CURRENT_SOURCE_DIR}/msi_object.h
-  ${CMAKE_CURRENT_SOURCE_DIR}/numeric_data_from_file.h
-  ${CMAKE_CURRENT_SOURCE_DIR}/primes.h
-  ${CMAKE_CURRENT_SOURCE_DIR}/proto_support.h
-  ${CMAKE_CURRENT_SOURCE_DIR}/report_progress.h
-  ${CMAKE_CURRENT_SOURCE_DIR}/set_or_unset.h
-  ${CMAKE_CURRENT_SOURCE_DIR}/timsort.hpp
-)
-
-set(iwconfig_header ${CMAKE_CURRENT_SOURCE_DIR}/iwconfig.h)
-
 add_library(iwconfig INTERFACE)
-target_sources(iwconfig INTERFACE "$<BUILD_INTERFACE:${iwconfig_header}>")
-target_include_directories(iwconfig INTERFACE $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>)
 
-add_library(iwmisc ${source_files} )
-
-set(sparse_fp_creator_srcs
-  ${CMAKE_CURRENT_SOURCE_DIR}/sparse_fp_creator.cc
-  ${CMAKE_CURRENT_SOURCE_DIR}/sparse_fp_creator_support.cc
-  ${CMAKE_CURRENT_SOURCE_DIR}/md5c.c
+target_sources(iwconfig
+  INTERFACE
+    iwconfig.h
 )
 
-add_library(sparse_fp_creator ${sparse_fp_creator_srcs})
-
-set(iwre2_srcs
-  ${CMAKE_CURRENT_SOURCE_DIR}/iwre2.cc
-)
-add_library(iwre2 ${iwre2_srcs})
-target_include_directories(iwre2 PUBLIC ${CMAKE_CURRENT_SOURCE_DIR} re2)
-
-
-set(tabular_data_srcs
-  ${CMAKE_CURRENT_SOURCE_DIR}/iw_tabular_data.cc
-)
-add_library(tabular_data ${tabular_data_srcs})
-
-set(memoized_floats_srcs
-  ${CMAKE_CURRENT_SOURCE_DIR}/memoized_floats.cc
-)
-add_library(memoized_floats ${memoized_floats_srcs})
-target_include_directories(memoized_floats PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
-
-
-if(IWTEST)
-enable_testing()
-include(GoogleTest)
-
-set(iwdigits_test_srcs
-  ${CMAKE_CURRENT_SOURCE_DIR}/iwdigits_test.cc
+target_include_directories(iwconfig
+  INTERFACE
+    ${LILLYMOL_SRC_DIR}
 )
 
-set(iwdigits_test_libs
-  iwmisc
-  iwstring
-  gtest
-  gmock
-  gtest_main
+add_library(iwmisc_internal INTERFACE)
+
+target_sources(iwmisc_internal
+  INTERFACE
+    new_array_.h
 )
 
-add_executable(iwdigits_test ${iwdigits_test_srcs})
-target_link_libraries(iwdigits_test LINK_PUBLIC ${iwdigits_test_libs})
-
-add_test(
-    NAME iwdigits_test
-    COMMAND iwdigits_test
-)
-gtest_discover_tests(iwdigits_test)
-
-set(memoized_floats_test_srcs
-  ${CMAKE_CURRENT_SOURCE_DIR}/memoized_floats_test.cc
+target_include_directories(iwmisc_internal
+  INTERFACE
+    ${LILLYMOL_SRC_DIR}
 )
 
-set(memoized_floats_test_libs
-  memoized_floats
-  iwmisc
-  iwstring
-  gtest
-  gmock
-  gtest_main
-)
-add_executable(memoized_floats_test ${memoized_floats_test_srcs})
-target_link_libraries(memoized_floats_test LINK_PUBLIC ${memoized_floats_test_libs})
+if(TARGET tomlplusplus::tomlplusplus)
+  add_library(ltoml INTERFACE)
 
-add_test(
-    NAME memoized_floats_test
-    COMMAND memoized_floats_test
-)
+  target_sources(ltoml
+    INTERFACE
+      toml_support.h
+  )
 
-gtest_discover_tests(memoized_floats_test)
+  target_include_directories(ltoml
+    INTERFACE
+      ${LILLYMOL_SRC_DIR}
+  )
 
-set(iwre2_test_srcs
-  ${CMAKE_CURRENT_SOURCE_DIR}/iwre2_test.cc
-  ${re2}
-)
+  target_link_libraries(ltoml
+    INTERFACE
+      absl::status
+      tomlplusplus::tomlplusplus
+  )
+else()
+  add_library(ltoml INTERFACE)
+endif()
 
-set(iwre2_test_libs
-  iwre2
-  iwmisc
-  iwstring
-  gtest
-  gmock
-  gtest_main
-  re2
+add_library(compile_time
+  compile_time.cc
 )
 
-add_executable(iwre2_test ${iwre2_test_srcs})
-target_link_libraries(iwre2_test LINK_PUBLIC ${iwre2_test_libs})
-
-add_test(
-    NAME iwre2_test
-    COMMAND iwre2_test
+target_include_directories(compile_time
+  PUBLIC
+    ${LILLYMOL_SRC_DIR}
 )
 
-gtest_discover_tests(iwre2_test)
-endif(IWTEST)
+add_library(activity_from_file INTERFACE)
+
+target_sources(activity_from_file
+  INTERFACE
+    activity_data_from_file.h
+)
+
+target_link_libraries(activity_from_file
+  INTERFACE
+    iwcmdline
+    iwstring_data_source
+    iwstring
+)
+
+add_library(iwmisc
+  _iw_write_array_int.cc
+  _iwmaxid_double_int.cc
+  _iwmaxid_float_iwstring.cc
+  _iwmaxid_int_int.cc
+  _iwminid_double_int.cc
+  _iwminmax_float.cc
+  _iwqsort.cc
+  _numeric_data_from_file_float.cc
+  _numeric_data_from_file_int.cc
+  _set_or_unset_float.cc
+  append_first_token_of_name.cc
+  dash_d.cc
+  dash_f.cc
+  dash_s.cc
+  dash_x.cc
+  endian.cc
+  fetch_via_regexp.cc
+  fname.cc
+  fraction_as_string.cc
+  hton_stuff.cc
+  int_comparator.cc
+  iwdigits.cc
+  iwdirname.cc
+  logical_expression.cc
+  msi_object.cc
+  new_double.cc
+  new_float.cc
+  new_int.cc
+  new_unsigned_int.cc
+  proto_support.cc
+  report_progress.cc
+  write_first_token_of_string.cc
+  write_space_suppressed_string.cc
+)
+
+target_include_directories(iwmisc
+  PUBLIC
+    ${LILLYMOL_SRC_DIR}
+)
+
+target_link_libraries(iwmisc
+  PUBLIC
+    iwmisc_internal
+    iwconfig
+    ltoml
+    iwcmdline
+    iwstring_data_source
+    iwqsort
+    protobuf::libprotobuf
+)
+
+add_library(iwre2
+  iwre2.cc
+)
+
+target_include_directories(iwre2
+  PUBLIC
+    ${LILLYMOL_SRC_DIR}
+)
+
+target_link_libraries(iwre2
+  PUBLIC
+    iwstring
+    re2::re2
+)
+
+add_library(sparse_fp_creator
+  sparse_fp_creator.cc
+)
+
+target_include_directories(sparse_fp_creator
+  PUBLIC
+    ${LILLYMOL_SRC_DIR}
+)
+
+target_link_libraries(sparse_fp_creator
+  PUBLIC
+    iwmisc
+    iwstring
+)
+
+protobuf_generate_cpp(
+  NORMALISATION_PROTO_SRCS
+  NORMALISATION_PROTO_HDRS
+  normalisation.proto
+)
+
+add_library(normalisation_cc_proto
+  ${NORMALISATION_PROTO_SRCS}
+  ${NORMALISATION_PROTO_HDRS}
+)
+
+target_include_directories(normalisation_cc_proto
+  PUBLIC
+    ${CMAKE_CURRENT_BINARY_DIR}
+)
+
+target_link_libraries(normalisation_cc_proto
+  PUBLIC
+    protobuf::libprotobuf
+)
+
+add_library(normalisation
+  normalisation.cc
+)
+
+target_include_directories(normalisation
+  PUBLIC
+    ${LILLYMOL_SRC_DIR}
+)
+
+target_link_libraries(normalisation
+  PUBLIC
+    normalisation_cc_proto
+    iwmisc
+    iwstring
+)
+
+add_library(iw_tabular_data
+  iw_tabular_data.cc
+)
+
+target_sources(iw_tabular_data
+  PUBLIC
+    iw_tabular_data.h
+)
+
+target_include_directories(iw_tabular_data
+  PUBLIC
+    ${LILLYMOL_SRC_DIR}
+)
+
+target_link_libraries(iw_tabular_data
+  PUBLIC
+    iwstring_data_source
+    iwbits
+)
+
+target_link_libraries(normalisation
+  PUBLIC
+    normalisation_cc_proto
+    iwmisc
+    iwstring
+)

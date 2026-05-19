@@ -1,6 +1,15 @@
-project(iwhistogram)
-
-set(histogram_srcs
-  ${CMAKE_CURRENT_SOURCE_DIR}/iwhistogram.cc
+add_library(iwhistogram
+  histogram_fp.cc
+  iwhistogram.cc
 )
-add_library(iwhistogram ${histogram_srcs})
+
+target_include_directories(iwhistogram
+  PUBLIC
+    ${LILLYMOL_SRC_DIR}
+)
+
+target_link_libraries(iwhistogram
+  PUBLIC
+    iwbits
+    iwstring
+)

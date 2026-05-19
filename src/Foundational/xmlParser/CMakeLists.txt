@@ -1,6 +1,8 @@
-project(xmlparser)
-set(srcs
-  ${CMAKE_CURRENT_SOURCE_DIR}/xmlParser.cpp
+add_library(xmlparser
+  xmlParser.cpp
 )
 
-add_library(xmlParser ${srcs})
+target_include_directories(xmlparser
+  PUBLIC
+    ${LILLYMOL_SRC_DIR}
+)

@@ -1,6 +1,7 @@
 #ifndef FOUNDATIONAL_IWBITS_IWBITS_H_
 #define FOUNDATIONAL_IWBITS_IWBITS_H_
 
+#include <cstddef>
 #include <iostream>
 
 #define IW_BITS_PER_WORD 32
@@ -9,8 +10,11 @@
 
 class IWString;
 class const_IWSubstring;
+
 /*
-  Byte values in which different bits are turned on
+  Byte values in which different bits are turned on.
+  Not great that these are static variables. Should be hidden.
+  TODO:ianwatson fix sometime.
 */
 
 static const unsigned char one_bit_8[8] = {128, 64, 32, 16, 8, 4, 2, 1};
@@ -86,6 +90,7 @@ static const unsigned int one_bit_32[] = {
   0x00000001 };
 #endif
 
+#ifdef NO_LONGER_NEEDED___
 static const char hex_char [] = {
   '0',
   '1',
@@ -104,6 +109,7 @@ static const char hex_char [] = {
   'e',
   'f'
 };
+#endif
 
 class IW_Bits_Base
 {
@@ -309,6 +315,10 @@ namespace iwbits {
 void InternalHexForm(const unsigned char * s,
                      int nbytes,
                      IWString & destination);
+
+// Used by similarity calculations.
+// Does a word-wise and of `a` and `b` and returns the number of bits set.
+uint64_t BitsInCommonAvx(const uint64_t* a, const uint64_t* b, std::size_t nwords);
 
 }  // namespace iwbits;
 

@@ -9,7 +9,11 @@
 #include "molecule.h"
 #include "set_of_atoms.h"
 #include "space_vector.h"
+#ifdef BUILD_BAZEL
 #include "Molecule_Lib/geometric_constraints.pb.h"
+#else
+#include "geometric_constraints.pb.h"
+#endif
 
 namespace geometric_constraints {
 

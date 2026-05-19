@@ -1,84 +1,147 @@
-cmake_minimum_required(VERSION 3.16.1)
-cmake_policy(SET CMP0077 NEW)
-project(LillyMol)
-# TODO:ianwatson get cmake working with this release
-message(FATAL_ERROR "cmake infrastructure currently not functional")
+cmake_minimum_required(VERSION 3.24)
+project(LillyMol LANGUAGES C CXX)
 
-set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
-# Wrong, causes an extra level
-# set(EXECUTABLE_OUTPUT_PATH ${CMAKE_CURRENT_BINARY_DIR}/build)
-set(IW_EXTRA_LIBS protobuf -lz re2)
-set(CMAKE_INCLUDE_CURRENT_DIR ON)
-include_directories(${CMAKE_CURRENT_SOURCE_DIR})
 
-option(IWTEST "configure for GoogleTest" ON)
+option(LILLYMOL_BUILD_TESTS "Build tests" OFF)
+option(LILLYMOL_BUILD_FILECONV "Build fileconv first-pass target" ON)
 
-if(IWTEST)
-include(CTest)
-enable_testing()
-
-include(FetchContent)
-FetchContent_Declare(
-  googletest
-  URL https://github.com/google/googletest/archive/609281088cfefc76f9d0ce82e1ff6c30cc3591e5.zip
-)
-set(gtest_force_shared_crt ON CACHE BOOL "" FORCE)
-FetchContent_MakeAvailable(googletest)
-#find_package(GTest REQUIRED CONFIG)
-endif(IWTEST)
-
-FetchContent_Declare(
-  re2
-  URL https://github.com/google/re2/archive/refs/heads/main.zip
-)
-FetchContent_MakeAvailable(re2)
-SET(RE2_BUILD_TESTING OFF)
-include_directories(${re2_SOURCE_DIR})
-
-find_package(Git QUIET)
-
-FetchContent_Declare(
-  protobuf
-  URL https://github.com/protocolbuffers/protobuf/archive/refs/heads/master.zip
-  SOURCE_SUBDIR cmake
-  GIT_TAG main
-)
-set(protobuf_BUILD_TESTS OFF)
-#FetchContent_MakeAvailable(protobuf)
-include_directories(${protobuf_SOURCE_DIR})
+find_package(ZLIB REQUIRED)
 find_package(Protobuf REQUIRED)
-include_directories(${protobuf_INCLUDE_DIRS})
-include_directories(${CMAKE_CURRENT_BINARY_DIR})
 
-# For some reason adding protobuf as a library to targets
-# does not work. So, we have a hack.
-set(protobuf_build_dir ${CMAKE_CURRENT_BINARY_DIR}/_deps/protobuf-build)
-set(protobuf_hack -L${protobuf_build_dir} -lprotobuf)
-set(IW_EXTRA_LIBS ${IW_EXTRA_LIBS} ${protobuf_hack})
-include_directories(BEFORE SYSTEM ${CMAKE_CURRENT_BINARY_DIR}/_deps/protobuf-src/src)
+find_package(absl QUIET)
 
-add_compile_options(-march=native)
-add_link_options(-lz)
-SET(CMAKE_EXE_LINKER_FLAGS "-lz")
+set(LILLYMOL_SRC_DIR ${CMAKE_CURRENT_SOURCE_DIR})
 
-add_subdirectory(Foundational/iwaray)
-add_subdirectory(Foundational/accumulator)
-add_subdirectory(Foundational/iwstring)
-add_subdirectory(Foundational/cmdline)
-add_subdirectory(Foundational/cmdline_v2)
-add_subdirectory(Foundational/data_source)
-add_subdirectory(Foundational/histogram)
-add_subdirectory(Foundational/iwbits)
-add_subdirectory(Foundational/iwmisc)
-add_subdirectory(Foundational/iwqsort)
-add_subdirectory(Foundational/iw_tdt)
-add_subdirectory(Foundational/jama)
-add_subdirectory(Foundational/string_data_source)
-add_subdirectory(Foundational/tnt)
-add_subdirectory(Foundational/xmlParser)
-add_subdirectory(Utilities/General)
-add_subdirectory(Utilities/GFP_Tools)
+set(LILLYMOL_ABSL_CRC32C "")
+
+if(TARGET absl::crc32c)
+  set(LILLYMOL_ABSL_CRC32C absl::crc32c)
+elseif(TARGET absl::crc)
+  set(LILLYMOL_ABSL_CRC32C absl::crc)
+else()
+  message(STATUS "Abseil CRC target not found; TensorFlow DataRecord support will be skipped")
+endif()
+
+if(NOT TARGET absl::status)
+  message(FATAL_ERROR "Found Abseil, but target absl::status is missing")
+endif()
+
+find_package(tomlplusplus QUIET)
+
+find_path(RE2_INCLUDE_DIR re2/re2.h)
+find_library(RE2_LIBRARY NAMES re2)
+
+add_library(re2::re2 UNKNOWN IMPORTED)
+set_target_properties(re2::re2 PROPERTIES
+  IMPORTED_LOCATION "${RE2_LIBRARY}"
+  INTERFACE_INCLUDE_DIRECTORIES "${RE2_INCLUDE_DIR}"
+)
+
+option(LILLYMOL_USE_EXISTING_PROTOBUF_FILES
+  "Use existing .pb.cc/.pb.h files instead of running protoc"
+  ON
+)
+
+function(lillymol_proto_library target proto_file)
+  get_filename_component(proto_base "${proto_file}" NAME_WE)
+
+  if(LILLYMOL_USE_EXISTING_PROTOBUF_FILES)
+    add_library(${target}
+      ${CMAKE_CURRENT_SOURCE_DIR}/${proto_base}.pb.cc
+      ${CMAKE_CURRENT_SOURCE_DIR}/${proto_base}.pb.h
+    )
+
+    target_include_directories(${target}
+      PUBLIC
+        ${CMAKE_CURRENT_SOURCE_DIR}
+        ${LILLYMOL_SRC_DIR}
+    )
+  else()
+    protobuf_generate_cpp(${target}_SRCS ${target}_HDRS ${proto_file})
+
+    add_library(${target}
+      ${${target}_SRCS}
+      ${${target}_HDRS}
+    )
+
+    target_include_directories(${target}
+      PUBLIC
+        ${CMAKE_CURRENT_BINARY_DIR}
+        ${LILLYMOL_SRC_DIR}
+    )
+  endif()
+
+  target_link_libraries(${target}
+    PUBLIC
+      ${LILLYMOL_PROTOBUF_LIB}
+      ${ARGN}
+  )
+endfunction()
+
+add_library(lillymol_options INTERFACE)
+target_include_directories(lillymol_options INTERFACE ${CMAKE_CURRENT_SOURCE_DIR})
+target_link_libraries(lillymol_options INTERFACE ZLIB::ZLIB protobuf::libprotobuf re2::re2)
+
+add_subdirectory(Foundational)
 add_subdirectory(Molecule_Lib)
-add_subdirectory(Molecule_Tools)
+
+if(LILLYMOL_BUILD_FILECONV)
+  add_subdirectory(Molecule_Tools)
+endif()
+
+
+# Not sure if this should be here or on BerkeleyDB
+option(LILLYMOL_BUILD_BERKELEYDB "Build Berkeley DB based tools" OFF)
+
+if(LILLYMOL_BUILD_BERKELEYDB)
+  find_path(BERKELEYDB_INCLUDE_DIR db.h)
+  find_library(BERKELEYDB_LIBRARY NAMES db)
+
+  add_library(berkeleydb UNKNOWN IMPORTED)
+  set_target_properties(berkeleydb PROPERTIES
+    IMPORTED_LOCATION "${BERKELEYDB_LIBRARY}"
+    INTERFACE_INCLUDE_DIRECTORIES "${BERKELEYDB_INCLUDE_DIR}"
+  )
+endif()
+
+if(LILLYMOL_BUILD_BERKELEYDB)
+  add_subdirectory(BerkeleyDB)
+endif()
+
+option(LILLYMOL_BUILD_GFP_KNN "Build legacy GFP_Knn tools" ON)
+
+if(LILLYMOL_BUILD_GFP_KNN)
+  add_subdirectory(Utilities/GFP_Knn)
+endif()
+
+option(LILLYMOL_FETCH_DEPS "Download missing third-party dependencies" ON)
+
+if(LILLYMOL_BUILD_TESTS)
+  enable_testing()
+  find_package(GTest QUIET)
+
+  if(NOT TARGET GTest::gtest_main AND LILLYMOL_FETCH_DEPS)
+    include(FetchContent)
+
+    FetchContent_Declare(
+      googletest
+      URL https://github.com/google/googletest/archive/refs/tags/v1.14.0.tar.gz
+    )
+
+    # Helps Windows users; harmless elsewhere.
+    set(gtest_force_shared_crt ON CACHE BOOL "" FORCE)
+
+    FetchContent_MakeAvailable(googletest)
+  endif()
+
+  if(NOT TARGET GTest::gtest_main)
+    message(FATAL_ERROR
+      "GoogleTest not found. Install gtest, configure with "
+      "-DLILLYMOL_FETCH_DEPS=ON, or disable tests with "
+      "-DLILLYMOL_BUILD_TESTS=OFF"
+    )
+  endif()
+endif()

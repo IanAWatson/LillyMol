@@ -3,6 +3,7 @@ cc_library(
     name = "iwbits",
     srcs = [
         "bits_in_common.c",
+        "bits_in_common_avx.cc",
         "du_bin2ascii.cc",
         "fastprint.cc",
         "fixed_bit_vector.cc",
@@ -17,6 +18,9 @@ cc_library(
         "iwbits.h",
         "iwbits_support.h",
         "popcount.h"
+    ],
+    copts = [
+        "-mavx512f -mavx512vpopcntdq",
     ],
     visibility = ["//visibility:public"],
     deps = [

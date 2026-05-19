@@ -1,7 +1,20 @@
-project(jama)
-
-file(GLOB hdrs ${PROJECT_SOURCE_DIR}/*.h)
-
 add_library(jama INTERFACE)
-target_sources(jama INTERFACE "$<BUILD_INTERFACE:${hdrs}>")
-target_include_directories(jama INTERFACE $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>)
+
+target_sources(jama
+  INTERFACE
+    jama_cholesky.h
+    jama_eig.h
+    jama_lu.h
+    jama_qr.h
+    jama_svd.h
+)
+
+target_include_directories(jama
+  INTERFACE
+    ${LILLYMOL_SRC_DIR}
+)
+
+target_link_libraries(jama
+  INTERFACE
+    tnt
+)

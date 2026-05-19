@@ -91,34 +91,6 @@ class Compare_DID {
   }
 };
 
-class GfpGrpcService final : public gfp_server::GfpServer::Service {
- public:
-  explicit GfpGrpcService(GFP_Server& server) : server_(server) {}
-
-  grpc::Status GetNeighbours(
-      grpc::ServerContext* context,
-      const gfp_server::NnRequest* request,
-      gfp_server::Reply* reply) override {
-    server_.DoNearNeighbours(*request, *reply);
-    return grpc::Status::OK;
-  }
-
-  grpc::Status ServerCommand(
-      grpc::ServerContext* context,
-      const gfp_server::ServerRequest* request,
-      gfp_server::Reply* reply) override {
-    int doing_shutdown = 0;
-    server_.DoServerRequest(*request, doing_shutdown, *reply);
-
-    // For SHUTDOWN, you probably want to arrange shutdown outside
-    // this RPC handler rather than calling server->Shutdown() inline.
-    return grpc::Status::OK;
-  }
-
- private:
-  GFP_Server& server_;
-};
-
 class GFP_Server {
  private:
   // The gfp file from which we read fingerprints.
@@ -171,12 +143,11 @@ class GFP_Server {
   int ReloadPool();
   int _do_shutdown();
   void Preprocess(Molecule& m);
-  int DoNearNeighbours(const gfp_server::NnRequest& req,
-                             gfp_server::Reply &reply);
 
-  int DoServerRequest(const gfp_server::ServerRequest& req, int& doing_shutdown,
-                             gfp_server::Reply &reply);
+  int DoNearNeighbours(const gfp_server::NnRequest& req, gfp_server::Reply &reply);
+  int DoServerRequest(const gfp_server::ServerRequest& req, int& doing_shutdown, gfp_server::Reply &reply);
   int SmilesToGfp(const std::string& smiles, GFP_Standard& gfp);
+
 
  public:
   GFP_Server();
@@ -190,9 +161,7 @@ class GFP_Server {
   int tanimoto_from_tdt(IWString&);
   int tanimoto_from_smiles(IWString&);
 
-  int DoNearNeighbours(const gfp_server::NnRequest& req,
-                         gfp_server::Reply& reply);
-
+  int DoNearNeighbours(const gfp_server::NnRequest& req, gfp_server::Reply& reply);
 
   void doit();
 };

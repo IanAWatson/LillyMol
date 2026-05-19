@@ -1,10 +1,10 @@
 load("@com_google_protobuf//bazel:py_proto_library.bzl", "py_proto_library")
 load("@rules_cc//cc:defs.bzl", "cc_binary", "cc_proto_library", "cc_library", "cc_test")
-load("@rules_proto_grpc_python//:defs.bzl", "python_grpc_library")
+# load("@rules_proto_grpc_python//:defs.bzl", "python_grpc_library")
 load("@com_google_protobuf//bazel:cc_proto_library.bzl", "cc_proto_library")
 
 load("@com_google_protobuf//bazel:cc_proto_library.bzl", "cc_proto_library")
-load("@rules_proto_grpc_cpp//:defs.bzl", "cpp_grpc_library")
+# load("@rules_proto_grpc_cpp//:defs.bzl", "cpp_grpc_library")
 
 load("@rules_proto//proto:defs.bzl", "proto_library")
 
@@ -41,19 +41,19 @@ cc_proto_library(
     ],
 )
 
-proto_library(
-    name = "gfp_server_proto",
-    srcs = [
-        "gfp_server.proto",
-    ],
-)
+#proto_library(
+#    name = "gfp_server_proto",
+#    srcs = [
+#        "gfp_server.proto",
+#    ],
+#)
 
-cc_proto_library(
-    name = "gfp_server_cc_proto",
-    deps = [
-        ":gfp_server_proto",
-    ],
-)
+#cc_proto_library(
+#    name = "gfp_server_cc_proto",
+#    deps = [
+#        ":gfp_server_proto",
+#    ],
+#)
 
 proto_library(
     name = "gfp_to_svm_lite_proto",
@@ -128,26 +128,26 @@ py_proto_library(
     ],
 )
 
-cpp_grpc_library(
-    name = "nn_request_cc_grpc",
-    protos = [":nn_request_proto"],
-    deps = [":nearneighbours_cc_proto"],
-)
+#cpp_grpc_library(
+#    name = "nn_request_cc_grpc",
+#    protos = [":nn_request_proto"],
+#    deps = [":nearneighbours_cc_proto"],
+#)
 
-cpp_grpc_library(
-    name = "gfp_server_cc_grpc",
-    protos = [
-        "gfp_server_proto",
-    ],
-    deps = [
-        ":nn_request_cc_proto",
-    ],
-)
-
-python_grpc_library(
-    name = "nn_request_py_grpc",
-    protos = [":nn_request_proto"],
-)
+#cpp_grpc_library(
+#    name = "gfp_server_cc_grpc",
+#    protos = [
+#        "gfp_server_proto",
+#    ],
+#    deps = [
+#        ":nn_request_cc_proto",
+#    ],
+#)
+#
+#python_grpc_library(
+#    name = "nn_request_py_grpc",
+#    protos = [":nn_request_proto"],
+#)
 
 #grpc_proto_library(
 #  name = "nn_request_grpc",
@@ -460,10 +460,9 @@ cc_binary(
     ],
     tags = [
         "gfp_server",
+        "zeromq",
     ],
     deps = [
-        ":nn_request_cc_grpc",
-        ":gfp_server_cc_grpc",
         "//Foundational/cmdline:iwcmdline",
         "//Foundational/data_source:iwstring_data_source",
         "//Molecule_Lib:iwmfingerprint",

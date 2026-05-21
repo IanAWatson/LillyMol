@@ -20,6 +20,7 @@
 #include "Foundational/iwmisc/iwminmax.h"
 #include "Foundational/iwmisc/minmaxspc.h"
 #include "Foundational/iwmisc/misc.h"
+#include "Foundational/iwstring/iwstring_and_file_descriptor.h"
 
 #include "Molecule_Lib/aromatic.h"
 #include "Molecule_Lib/istream_and_type.h"
@@ -35,6 +36,7 @@
 
 using std::cerr;
 using std::endl;
+using iwstring::IWString_and_File_Descriptor;
 
 static int add_properties_to_groups = 0;
 static const char * prop_header[] = {"natoms", "nrings", "amw", "ro5_ohnh", "ro5_on", "nvrtspsa",  "halogen",  "fcsp3",  "ringsys",  "arring",  "alring", "ringatom",  "mxdst"};

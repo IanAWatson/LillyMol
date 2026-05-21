@@ -5,12 +5,14 @@
 
 #include "tfdatarecord.h"
 #include "Foundational/data_source/proto_for_testing.pb.h"
+#include "Foundational/iwstring/iwstring_and_file_descriptor.h"
 
 namespace test_tfdata {
 
 const char * prog_name = nullptr;
 
 using std::cerr;
+using iwstring::IWString_and_File_Descriptor;
 
 void
 Usage(int rc) {

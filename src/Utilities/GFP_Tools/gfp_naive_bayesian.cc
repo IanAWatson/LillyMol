@@ -20,12 +20,14 @@
 #include "Foundational/iwqsort/iwqsort.h"
 #include "Foundational/iwstring/iw_stl_hash_map.h"
 #include "Foundational/iwstring/iw_stl_hash_set.h"
+#include "Foundational/iwstring/iwstring_and_file_descriptor.h"
 
 #include "bit_subset_v2.h"
 #include "gfp.h"
 
 using std::cerr;
 using std::endl;
+using iwstring::IWString_and_File_Descriptor;
 
 #define HEADER_RECORD "# written by gfp_naive_bayesian"
 #define COUNT_FIXED "count_fixed"

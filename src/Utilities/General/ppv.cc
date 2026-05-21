@@ -17,9 +17,11 @@
 #include "Foundational/data_source/iwstring_data_source.h"
 #define ACTIVITY_DATA_IMPLEMENATION_H
 #include "Foundational/iwmisc/activity_data_from_file.h"
+#include "Foundational/iwstring/iwstring_and_file_descriptor.h"
 
 using std::cerr;
 using std::endl;
+using iwstring::IWString_and_File_Descriptor;
 
 const char * prog_name = NULL;
 

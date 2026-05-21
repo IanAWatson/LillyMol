@@ -10,12 +10,13 @@
 
 #include "Foundational/cmdline/cmdline.h"
 #include "Foundational/data_source/iwstring_data_source.h"
+#include "Foundational/iwstring/iwstring_and_file_descriptor.h"
 #include "Foundational/iw_tdt/iw_tdt.h"
 #include "Foundational/iwqsort/iwqsort.h"
 #include "gfp.h"
 
 using std::cerr;
-using std::endl;
+using iwstring::IWString_and_File_Descriptor;
 
 const char *prog_name = nullptr;
 
@@ -318,7 +319,7 @@ process_cluster(resizable_array<Single_Linkage_Object *> &cluster,
 
   if (verbose > 1) {
     cerr << "Formed cluster " << clusters_formed << ", size " << n << ", nsel "
-         << items_selected << endl;
+         << items_selected << '\n';
   }
 
   if (centroid_first) {
@@ -526,7 +527,7 @@ gfp_single_linkage(int argc, char **argv) {
     }
 
     if (verbose) {
-      cerr << "Threshold set to " << threshold << endl;
+      cerr << "Threshold set to " << threshold << '\n';
     }
   }
 
@@ -566,7 +567,7 @@ gfp_single_linkage(int argc, char **argv) {
     }
 
     if (verbose) {
-      cerr << "Shell radius expansion factor set to " << expansion_ratio << endl;
+      cerr << "Shell radius expansion factor set to " << expansion_ratio << '\n';
     }
   }
 
@@ -600,7 +601,7 @@ gfp_single_linkage(int argc, char **argv) {
          << " clusters\n";
     for (int i = 0; i < cluster_size; i++) {
       if (cluster_size[i]) {
-        cerr << cluster_size[i] << " clusters of size " << i << endl;
+        cerr << cluster_size[i] << " clusters of size " << i << '\n';
       }
     }
 

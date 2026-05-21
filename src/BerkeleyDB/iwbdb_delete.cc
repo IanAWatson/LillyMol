@@ -10,12 +10,14 @@
 #include "Foundational/cmdline/cmdline.h"
 #include "Foundational/data_source/iwstring_data_source.h"
 #include "Foundational/iwmisc/iwre2.h"
+#include "Foundational/iwstring/iwstring_and_file_descriptor.h"
 
 #include "db_cxx.h"
 
 #include "re2/re2.h"
 
 using std::cerr;
+using iwstring::IWString_and_File_Descriptor;
 
 static int verbose = 0;
 

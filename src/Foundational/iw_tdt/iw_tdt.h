@@ -6,7 +6,7 @@
 #include "Foundational/iwstring/iwstring.h"
 #include "Foundational/data_source/iwstring_data_source.h"
 #include "Foundational/iwmisc/set_or_unset.h"
-
+#include "Foundational/iwstring/iwstring_and_file_descriptor.h"
 /*
   Variant on the TDT class, hopefully with better efficiency
 
@@ -69,10 +69,10 @@ class IW_TDT
     int echo_dataitem (const IWString & tag, int which_one, std::ostream & output) const { return echo_dataitem (tag.rawchars (), tag.length (), which_one, output);}
     int echo_dataitem (const const_IWSubstring & tag, int which_one, std::ostream & output) const { return echo_dataitem (tag.rawchars (), tag.length (), which_one, output);}
 
-    int echo_dataitem (const const_IWSubstring & tag, int which_one, IWString_and_File_Descriptor & output) const { return echo_dataitem (tag.rawchars (), tag.length (), which_one, output);}
+    int echo_dataitem (const const_IWSubstring & tag, int which_one, iwstring::IWString_and_File_Descriptor & output) const { return echo_dataitem (tag.rawchars (), tag.length (), which_one, output);}
 
     int write_all_except_vbar (std::ostream &) const;
-    int write_all_except_vbar (IWString_and_File_Descriptor &) const;
+    int write_all_except_vbar (iwstring::IWString_and_File_Descriptor &) const;
 
     int dataitem_value (const char * tag, int len_tag, IWString & s, int which_one = 0) const { return _dataitem_value_string (tag, len_tag,                         s, which_one);}
     int dataitem_value (const char * tag,              IWString & s, int which_one = 0) const { return _dataitem_value_string (tag, static_cast<int>(::strlen(tag)), s, which_one);}

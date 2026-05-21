@@ -7,6 +7,7 @@
 #include "Foundational/cmdline/cmdline.h"
 #include "Foundational/iwmisc/misc.h"
 #include "Foundational/iwmisc/sparse_fp_creator.h"
+#include "Foundational/iwstring/iwstring_and_file_descriptor.h"
 
 #include "Molecule_Lib/aromatic.h"
 #include "Molecule_Lib/istream_and_type.h"
@@ -16,6 +17,7 @@
 #include "Molecule_Tools/nvrtspsa.h"
 
 using std::cerr;
+using iwstring::IWString_and_File_Descriptor;
 
 const char* prog_name = nullptr;
 

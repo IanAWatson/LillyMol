@@ -1606,6 +1606,7 @@ cc_binary(
     deps = [
         "//Foundational/cmdline:iwcmdline",
         "//Foundational/iwstring:absl_hash",
+        "//Foundational/iwstring:iwstring_and_file_descriptor",
         "//Molecule_Lib:iwmolecule",
         "//Molecule_Lib:moleculeio",
         "@com_google_absl//absl/container:flat_hash_set",

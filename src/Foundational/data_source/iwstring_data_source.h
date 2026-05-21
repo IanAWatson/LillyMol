@@ -11,6 +11,7 @@
 #include "Foundational/iwstring/iwzlib.h"
 // IL #include "lzma.h"
 #include "Foundational/iwstring/iwstring.h"
+#include "Foundational/iwstring/iwstring_and_file_descriptor.h"
 
 //#define STRING_DEFAULT_BUF_SIZE 4096
 #define STRING_DEFAULT_BUF_SIZE 8192
@@ -86,7 +87,7 @@ class iwstring_data_source
     int   _read_more_data_into_read_buffer ();
     int   _fetch_record_into_buffer ();
     int   _write_read_buffer (std::ostream & output, size_t & nbytes);
-    int   _write_read_buffer (IWString_and_File_Descriptor & output, size_t & nbytes);
+    int   _write_read_buffer (iwstring::IWString_and_File_Descriptor & output, size_t & nbytes);
     int   _copy_read_buffer_to_destination (void * destination, int & nbytes);
     int   _matches_ignore_pattern(const const_IWSubstring& buffer) const;
     int   _matches_filter_pattern(const const_IWSubstring& buffer) const;
@@ -191,10 +192,10 @@ protected:
     uint64_t  count_records_starting_with(const const_IWSubstring &);   // the most common thing we do with regexps
 
     int  echo (std::ostream &, size_t);    // echo's bytes
-    int  echo (IWString_and_File_Descriptor &, size_t);    // echo's bytes
+    int  echo (iwstring::IWString_and_File_Descriptor &, size_t);    // echo's bytes
 
     int echo_records (std::ostream & os, uint64_t necho);    // echo's records
-    int echo_records (IWString_and_File_Descriptor & os, uint64_t necho);    // echo's records
+    int echo_records (iwstring::IWString_and_File_Descriptor & os, uint64_t necho);    // echo's records
 
     int skip_records (uint64_t nskip);
 

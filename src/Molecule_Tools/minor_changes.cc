@@ -23,6 +23,7 @@
 #include "Foundational/iwqsort/iwqsort.h"
 #include "Foundational/iwstring/iwstring.h"
 #include "Foundational/iwstring/iw_stl_hash_set.h"
+#include "Foundational/iwstring/iwstring_and_file_descriptor.h"
 
 #include "Molecule_Lib/atom_typing.h"
 #include "Molecule_Lib/etrans.h"
@@ -47,6 +48,7 @@
 namespace minor_changes {
 
 using std::cerr;
+using iwstring::IWString_and_File_Descriptor;
 
 // By convention the Usage function tells how to use the tool.
 void

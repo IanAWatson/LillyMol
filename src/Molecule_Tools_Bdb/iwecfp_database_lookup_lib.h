@@ -124,7 +124,7 @@ class Count_Example {
 
   //  const IWString & first_example() const {return _first_example;}
 
-  int do_output(IWString_and_File_Descriptor&) const;
+  int do_output(iwstring::IWString_and_File_Descriptor&) const;
 };
 
 /*

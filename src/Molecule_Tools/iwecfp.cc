@@ -16,6 +16,7 @@
 #include "Foundational/iwmisc/misc.h"
 #define SPARSE_FP_CREATOR_IMPLEMENTATION
 #include "Foundational/iwmisc/sparse_fp_creator.h"
+#include "Foundational/iwstring/iwstring_and_file_descriptor.h"
 
 #include "Molecule_Lib/aromatic.h"
 #include "Molecule_Lib/atom_typing.h"
@@ -26,6 +27,7 @@
 #include "Molecule_Lib/target.h"
 
 using std::cerr;
+using iwstring::IWString_and_File_Descriptor;
 
 static Chemical_Standardisation chemical_standardisation;
 

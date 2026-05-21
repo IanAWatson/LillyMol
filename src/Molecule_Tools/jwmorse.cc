@@ -16,6 +16,7 @@
 #include "Foundational/accumulator/accumulator.h"
 #include "Foundational/cmdline/cmdline.h"
 #include "Foundational/iwmisc/misc.h"
+#include "Foundational/iwstring/iwstring_and_file_descriptor.h"
 
 #include "Molecule_Lib/aromatic.h"
 #include "Molecule_Lib/istream_and_type.h"
@@ -24,6 +25,7 @@
 #include "Molecule_Lib/target.h"
 
 using std::cerr;
+using iwstring::IWString_and_File_Descriptor;
 
 #ifndef MOL2
 #define MOL2 15

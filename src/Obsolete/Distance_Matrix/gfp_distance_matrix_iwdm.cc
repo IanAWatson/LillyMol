@@ -13,6 +13,7 @@
 #include "Foundational/data_source/iwstring_data_source.h"
 #include "Foundational/iwmisc/misc.h"
 #include "Foundational/iw_tdt/iw_tdt.h"
+#include "Foundational/iwstring/iwstring_and_file_descriptor.h"
 #include "Obsolete/Distance_Matrix/IWDistanceMatrixBase.h"
 
 #include "Utilities/GFP_Tools/gfp.h"
@@ -20,6 +21,7 @@
 
 using std::cerr;
 using std::endl;
+using iwstring::IWString_and_File_Descriptor;
 
 static int verbose = 0;
 

@@ -12,6 +12,7 @@
 #include "Foundational/cmdline/cmdline.h"
 #include "Foundational/iwmisc/iwre2.h"
 #include "Foundational/iwmisc/report_progress.h"
+#include "Foundational/iwstring/iwstring_and_file_descriptor.h"
 
 #include "db_cxx.h"
 #include "unpack_data.h"
@@ -20,6 +21,7 @@
 #include "re2/re2.h"
 
 using std::cerr;
+using iwstring::IWString_and_File_Descriptor;
 
 static int verbose = 0;
 

@@ -7,6 +7,7 @@
 namespace fingerprint_writer {
 
 using std::cerr;
+using iwstring::IWString_and_File_Descriptor;
 
 int
 OkTag(const IWString& tag) {

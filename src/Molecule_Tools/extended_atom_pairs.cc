@@ -14,6 +14,7 @@
 #include "Foundational/iwmisc/iwdigits.h"
 #include "Foundational/iwmisc/misc.h"
 #include "Foundational/iwmisc/sparse_fp_creator.h"
+#include "Foundational/iwstring/iwstring_and_file_descriptor.h"
 
 #include "Molecule_Lib/aromatic.h"
 #include "Molecule_Lib/atom_typing.h"
@@ -29,6 +30,7 @@ const char* prog_name = nullptr;
 namespace extended_atom_pairs {
 
 using std::cerr;
+using iwstring::IWString_and_File_Descriptor;
 
 typedef unsigned int atype_t;
 typedef unsigned int aptype_t;

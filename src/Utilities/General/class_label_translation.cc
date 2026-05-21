@@ -14,11 +14,13 @@
 #include "Foundational/iwstring/iw_stl_hash_map.h"
 #include "Foundational/iwmisc/iwdigits.h"
 #include "Foundational/iwmisc/proto_support.h"
+#include "Foundational/iwstring/iwstring_and_file_descriptor.h"
 
 #include "Utilities/General/class_label_translation.pb.h"
 
 namespace class_label_translation_main {
 using std::cerr;
+using iwstring::IWString_and_File_Descriptor;
 
 int verbose = 0;
 

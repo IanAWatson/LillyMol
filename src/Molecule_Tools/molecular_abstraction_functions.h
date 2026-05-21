@@ -4,6 +4,7 @@
 #include <iostream>
 
 #include "Foundational/iwstring/iwstring.h"
+#include "Foundational/iwstring/iwstring_and_file_descriptor.h"
 
 #include "Molecule_Lib/atom_typing.h"
 #include "Molecule_Lib/substructure.h"
@@ -43,9 +44,9 @@ class Molecular_Abstraction_Base_Class {
   int _process(const const_IWSubstring&, const char*, int&);
 
   int _do_any_writing_needed(Molecule_With_Info_About_Parent&, int,
-                             IWString_and_File_Descriptor&);
+                             iwstring::IWString_and_File_Descriptor&);
   int _handle_no_match_to_query(Molecule_With_Info_About_Parent& m,
-                                IWString_and_File_Descriptor& output);
+                                iwstring::IWString_and_File_Descriptor& output);
 
   int _identify_scaffold(Molecule_With_Info_About_Parent&, int*, int) const;
   int _is_spinach(Molecule_With_Info_About_Parent& m, int* in_scaffold,
@@ -83,7 +84,7 @@ class Molecular_Abstraction_Base_Class {
   virtual int build(const Molecular_Abstraction_Directives_Node&) = 0;
 
   virtual int process(Molecule_With_Info_About_Parent&,
-                      IWString_and_File_Descriptor&) = 0;
+                      iwstring::IWString_and_File_Descriptor&) = 0;
 };
 
 class Molecular_Abstraction_Transform : public Molecular_Abstraction_Base_Class {
@@ -98,7 +99,7 @@ class Molecular_Abstraction_Transform : public Molecular_Abstraction_Base_Class 
 
   int build(const Molecular_Abstraction_Directives_Node&);
 
-  int process(Molecule_With_Info_About_Parent&, IWString_and_File_Descriptor&);
+  int process(Molecule_With_Info_About_Parent&, iwstring::IWString_and_File_Descriptor&);
 };
 
 class Molecular_Abstraction_All_Transform : public Molecular_Abstraction_Base_Class {
@@ -114,7 +115,7 @@ class Molecular_Abstraction_All_Transform : public Molecular_Abstraction_Base_Cl
 
   int build(const Molecular_Abstraction_Directives_Node&);
 
-  int process(Molecule_With_Info_About_Parent&, IWString_and_File_Descriptor&);
+  int process(Molecule_With_Info_About_Parent&, iwstring::IWString_and_File_Descriptor&);
 };
 
 class Molecular_Abstraction_Remove_Atom : public Molecular_Abstraction_Base_Class {
@@ -134,7 +135,7 @@ class Molecular_Abstraction_Remove_Atom : public Molecular_Abstraction_Base_Clas
 
   int build(const Molecular_Abstraction_Directives_Node&);
 
-  int process(Molecule_With_Info_About_Parent&, IWString_and_File_Descriptor&);
+  int process(Molecule_With_Info_About_Parent&, iwstring::IWString_and_File_Descriptor&);
 };
 
 /*
@@ -160,7 +161,7 @@ class Molecular_Abstraction_Delete_Atoms : public Molecular_Abstraction_Base_Cla
 
   int build(const Molecular_Abstraction_Directives_Node&);
 
-  int process(Molecule_With_Info_About_Parent&, IWString_and_File_Descriptor&);
+  int process(Molecule_With_Info_About_Parent&, iwstring::IWString_and_File_Descriptor&);
 };
 
 class Molecular_Abstraction_Largest_Ring_System
@@ -175,7 +176,7 @@ class Molecular_Abstraction_Largest_Ring_System
 
   int build(const Molecular_Abstraction_Directives_Node&);
 
-  int process(Molecule_With_Info_About_Parent&, IWString_and_File_Descriptor&);
+  int process(Molecule_With_Info_About_Parent&, iwstring::IWString_and_File_Descriptor&);
 };
 
 class Molecular_Abstraction_Rings : public Molecular_Abstraction_Base_Class {
@@ -190,7 +191,7 @@ class Molecular_Abstraction_Rings : public Molecular_Abstraction_Base_Class {
 
   int build(const Molecular_Abstraction_Directives_Node&);
 
-  int process(Molecule_With_Info_About_Parent&, IWString_and_File_Descriptor&);
+  int process(Molecule_With_Info_About_Parent&, iwstring::IWString_and_File_Descriptor&);
 };
 
 class Molecular_Abstraction_Scaffold : public Molecular_Abstraction_Base_Class {
@@ -206,7 +207,7 @@ class Molecular_Abstraction_Scaffold : public Molecular_Abstraction_Base_Class {
 
   int build(const Molecular_Abstraction_Directives_Node&);
 
-  int process(Molecule_With_Info_About_Parent&, IWString_and_File_Descriptor&);
+  int process(Molecule_With_Info_About_Parent&, iwstring::IWString_and_File_Descriptor&);
 };
 
 class Molecular_Abstraction_CScaffold : public Molecular_Abstraction_Base_Class {
@@ -223,7 +224,7 @@ class Molecular_Abstraction_CScaffold : public Molecular_Abstraction_Base_Class 
 
   int build(const Molecular_Abstraction_Directives_Node&);
 
-  int process(Molecule_With_Info_About_Parent&, IWString_and_File_Descriptor&);
+  int process(Molecule_With_Info_About_Parent&, iwstring::IWString_and_File_Descriptor&);
 };
 
 class Molecular_Abstraction_Change_Bond_Type : public Molecular_Abstraction_Base_Class {
@@ -238,7 +239,7 @@ class Molecular_Abstraction_Change_Bond_Type : public Molecular_Abstraction_Base
 
   int build(const Molecular_Abstraction_Directives_Node&);
 
-  int process(Molecule_With_Info_About_Parent&, IWString_and_File_Descriptor&);
+  int process(Molecule_With_Info_About_Parent&, iwstring::IWString_and_File_Descriptor&);
 };
 
 class Molecular_Abstraction_Change_All_Bonds : public Molecular_Abstraction_Base_Class {
@@ -252,7 +253,7 @@ class Molecular_Abstraction_Change_All_Bonds : public Molecular_Abstraction_Base
 
   int build(const Molecular_Abstraction_Directives_Node&);
 
-  int process(Molecule_With_Info_About_Parent&, IWString_and_File_Descriptor&);
+  int process(Molecule_With_Info_About_Parent&, iwstring::IWString_and_File_Descriptor&);
 };
 
 class Molecular_Abstraction_Replace_Linker : public Molecular_Abstraction_Base_Class {
@@ -266,7 +267,7 @@ class Molecular_Abstraction_Replace_Linker : public Molecular_Abstraction_Base_C
 
   int build(const Molecular_Abstraction_Directives_Node&);
 
-  int process(Molecule_With_Info_About_Parent&, IWString_and_File_Descriptor&);
+  int process(Molecule_With_Info_About_Parent&, iwstring::IWString_and_File_Descriptor&);
 };
 
 class Joins_to_Abstract_Ring;
@@ -294,7 +295,7 @@ class Molecular_Abstraction_Abstract_Ring_Form : public Molecular_Abstraction_Ba
 
   int build(const Molecular_Abstraction_Directives_Node&);
 
-  int process(Molecule_With_Info_About_Parent&, IWString_and_File_Descriptor&);
+  int process(Molecule_With_Info_About_Parent&, iwstring::IWString_and_File_Descriptor&);
 };
 
 class Molecular_Abstraction_Fragment : public Molecular_Abstraction_Base_Class {
@@ -314,7 +315,7 @@ class Molecular_Abstraction_Fragment : public Molecular_Abstraction_Base_Class {
 
   int build(const Molecular_Abstraction_Directives_Node&);
 
-  int process(Molecule_With_Info_About_Parent&, IWString_and_File_Descriptor&);
+  int process(Molecule_With_Info_About_Parent&, iwstring::IWString_and_File_Descriptor&);
 };
 
 class Molecular_Abstraction_Place_Isotope : public Molecular_Abstraction_Base_Class {
@@ -338,7 +339,7 @@ class Molecular_Abstraction_Place_Isotope : public Molecular_Abstraction_Base_Cl
 
   int build(const Molecular_Abstraction_Directives_Node&);
 
-  int process(Molecule_With_Info_About_Parent&, IWString_and_File_Descriptor&);
+  int process(Molecule_With_Info_About_Parent&, iwstring::IWString_and_File_Descriptor&);
 };
 
 class Molecular_Abstraction_Place_Charge : public Molecular_Abstraction_Base_Class {
@@ -362,7 +363,7 @@ class Molecular_Abstraction_Place_Charge : public Molecular_Abstraction_Base_Cla
 
   int build(const Molecular_Abstraction_Directives_Node&);
 
-  int process(Molecule_With_Info_About_Parent&, IWString_and_File_Descriptor&);
+  int process(Molecule_With_Info_About_Parent&, iwstring::IWString_and_File_Descriptor&);
 };
 
 class Molecular_Abstraction_Compress_Consecutive
@@ -382,7 +383,7 @@ class Molecular_Abstraction_Compress_Consecutive
 
   int build(const Molecular_Abstraction_Directives_Node&);
 
-  int process(Molecule_With_Info_About_Parent&, IWString_and_File_Descriptor&);
+  int process(Molecule_With_Info_About_Parent&, iwstring::IWString_and_File_Descriptor&);
 };
 
 class Molecular_Abstraction_Ring_Systems : public Molecular_Abstraction_Base_Class {
@@ -401,7 +402,7 @@ class Molecular_Abstraction_Ring_Systems : public Molecular_Abstraction_Base_Cla
 
   int build(const Molecular_Abstraction_Directives_Node&);
 
-  int process(Molecule_With_Info_About_Parent&, IWString_and_File_Descriptor&);
+  int process(Molecule_With_Info_About_Parent&, iwstring::IWString_and_File_Descriptor&);
 };
 
 class Molecular_Abstraction_Remove_Bond : public Molecular_Abstraction_Base_Class {
@@ -419,7 +420,7 @@ class Molecular_Abstraction_Remove_Bond : public Molecular_Abstraction_Base_Clas
 
   int build(const Molecular_Abstraction_Directives_Node&);
 
-  int process(Molecule_With_Info_About_Parent&, IWString_and_File_Descriptor&);
+  int process(Molecule_With_Info_About_Parent&, iwstring::IWString_and_File_Descriptor&);
 };
 
 class Molecular_Abstraction_Remove_Ring_CH2 : public Molecular_Abstraction_Base_Class {
@@ -440,7 +441,7 @@ class Molecular_Abstraction_Remove_Ring_CH2 : public Molecular_Abstraction_Base_
 
   int build(const Molecular_Abstraction_Directives_Node&);
 
-  int process(Molecule_With_Info_About_Parent&, IWString_and_File_Descriptor&);
+  int process(Molecule_With_Info_About_Parent&, iwstring::IWString_and_File_Descriptor&);
 };
 
 class Molecular_Abstraction_Inverse_Scaffold : public Molecular_Abstraction_Base_Class {
@@ -456,7 +457,7 @@ class Molecular_Abstraction_Inverse_Scaffold : public Molecular_Abstraction_Base
 
   int build(const Molecular_Abstraction_Directives_Node&);
 
-  int process(Molecule_With_Info_About_Parent&, IWString_and_File_Descriptor&);
+  int process(Molecule_With_Info_About_Parent&, iwstring::IWString_and_File_Descriptor&);
 };
 
 class Molecular_Abstraction_Substructure_Search
@@ -475,7 +476,7 @@ class Molecular_Abstraction_Substructure_Search
 
   int build(const Molecular_Abstraction_Directives_Node&);
 
-  int process(Molecule_With_Info_About_Parent&, IWString_and_File_Descriptor&);
+  int process(Molecule_With_Info_About_Parent&, iwstring::IWString_and_File_Descriptor&);
 };
 
 class Molecular_Abstraction_Spinach : public Molecular_Abstraction_Base_Class {
@@ -495,7 +496,7 @@ class Molecular_Abstraction_Spinach : public Molecular_Abstraction_Base_Class {
 
   int build(const Molecular_Abstraction_Directives_Node&);
 
-  int process(Molecule_With_Info_About_Parent&, IWString_and_File_Descriptor&);
+  int process(Molecule_With_Info_About_Parent&, iwstring::IWString_and_File_Descriptor&);
 };
 
 class Molecular_Abstraction_Graph : public Molecular_Abstraction_Base_Class {
@@ -511,7 +512,7 @@ class Molecular_Abstraction_Graph : public Molecular_Abstraction_Base_Class {
 
   int build(const Molecular_Abstraction_Directives_Node& madn);
 
-  int process(Molecule_With_Info_About_Parent& m, IWString_and_File_Descriptor& output);
+  int process(Molecule_With_Info_About_Parent& m, iwstring::IWString_and_File_Descriptor& output);
 };
 
 class Set_of_Molecular_Abstractions {
@@ -527,7 +528,7 @@ class Set_of_Molecular_Abstractions {
 
   int build(const Molecular_Abstraction_Directives_Node&);
 
-  int process(Molecule_With_Info_About_Parent& m, IWString_and_File_Descriptor& output);
+  int process(Molecule_With_Info_About_Parent& m, iwstring::IWString_and_File_Descriptor& output);
 
   int what_is_being_written(int& writing_smiles,
                             int& writing_fingerprints) const;  // smiles or fingerprints

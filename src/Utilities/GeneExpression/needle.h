@@ -9,6 +9,7 @@
 #include "Foundational/accumulator/accumulator.h"
 #include "Foundational/iwaray/iwaray.h"
 #include "Foundational/iwstring/iwstring.h"
+#include "Foundational/iwstring/iwstring_and_file_descriptor.h"
 
 #ifdef BUILD_BAZEL
 #include "Utilities/GeneExpression/gene_expression.pb.h"
@@ -138,7 +139,7 @@ class Needle {
 
     // max_genes_in_common is only used if we are also writing the matching gene id's.
     // It is simple to compute so it is always included, but may not get used.
-    int WriteNeighbours(uint32_t max_genes_in_common, IWString_and_File_Descriptor& output);
+    int WriteNeighbours(uint32_t max_genes_in_common, iwstring::IWString_and_File_Descriptor& output);
 
     int number_neighbours() const {
       return _nbr_list.number_elements();

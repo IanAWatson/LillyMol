@@ -8,6 +8,7 @@
 #define BIT_SUBSET_HEADER_RECORD "BitSubSet"
 
 #include "Foundational/data_source/iwstring_data_source.h"
+#include "Foundational/iwstring/iwstring_and_file_descriptor.h"
 
 #include "sparsefp.h"
 #include "dyfp.h"
@@ -30,7 +31,7 @@ class Sparse_Subset
 
     template <typename O> int process (Sparse_Fingerprint & sfp, O op, const int remove_bits_not_mentioned) const; 
 
-    template <typename O> int process_record (const const_IWSubstring & buffer, O op, const int remove_bits_not_mentioned, IWString_and_File_Descriptor & output); 
+    template <typename O> int process_record (const const_IWSubstring & buffer, O op, const int remove_bits_not_mentioned, iwstring::IWString_and_File_Descriptor & output); 
 
     template <typename O> int do_write(O &) const;
 };
@@ -56,7 +57,7 @@ class Dense_Subset
 
     void set_nbits (int s) { _nbits = s;}
 
-    template <typename O> int process_record (const const_IWSubstring & buffer, O op, const int remove_bits_not_mentioned, IWString_and_File_Descriptor & output);
+    template <typename O> int process_record (const const_IWSubstring & buffer, O op, const int remove_bits_not_mentioned, iwstring::IWString_and_File_Descriptor & output);
 
     template <typename O> int do_write(O &) const;
 };
@@ -90,7 +91,7 @@ class GFP_Bit_Subset
     void set_single_fingerprint_processing (int s) { _single_fingerprint_processing = s;}
     int tag_recognised (const const_IWSubstring & s) const;
 
-    template <typename O> int process_record (const_IWSubstring buffer, O op, const int remove_bits_not_mentioned, IWString_and_File_Descriptor & output) const;
+    template <typename O> int process_record (const_IWSubstring buffer, O op, const int remove_bits_not_mentioned, iwstring::IWString_and_File_Descriptor & output) const;
 
     template <typename O> int do_write(O & os) const;
 };
@@ -470,7 +471,7 @@ int
 GFP_Bit_Subset<T>::process_record (const_IWSubstring buffer,        // note local copy
                                    O op,
                                    const int remove_bits_not_mentioned,
-                                   IWString_and_File_Descriptor & output) const
+                                   iwstring::IWString_and_File_Descriptor & output) const
 {
   if (! buffer.ends_with('>'))
   {
@@ -515,7 +516,7 @@ int
 Dense_Subset<T>::process_record (const const_IWSubstring & buffer,
                                  O op,
                                  const int remove_bits_not_mentioned,
-                                 IWString_and_File_Descriptor & output)
+                                 iwstring::IWString_and_File_Descriptor & output)
 {
   IWDYFP dyfp;
 
@@ -558,7 +559,7 @@ int
 Sparse_Subset<T>::process_record (const const_IWSubstring & buffer,
                                   O op,
                                   const int remove_bits_not_mentioned,
-                                  IWString_and_File_Descriptor & output)
+                                  iwstring::IWString_and_File_Descriptor & output)
 {
   Sparse_Fingerprint sfp;
 

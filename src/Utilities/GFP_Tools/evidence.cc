@@ -23,6 +23,7 @@
 #include "Foundational/iwmisc/misc.h"
 #include "Foundational/iwmisc/proto_support.h"
 #include "Foundational/iwstring/iw_stl_hash_map.h"
+#include "Foundational/iwstring/iwstring_and_file_descriptor.h"
 
 #ifdef BUILD_BAZEL
 #include "Utilities/GFP_Tools/nearneighbours.pb.h"
@@ -36,6 +37,7 @@ namespace evidence {
 
 using std::cerr;
 using iw_tf_data_record::TFDataReader;
+using iwstring::IWString_and_File_Descriptor;
 
 constexpr float kUndefinedValue = -7.231e-24;
 constexpr char kMissing = '.';

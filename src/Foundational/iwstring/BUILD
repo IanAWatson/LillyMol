@@ -21,7 +21,6 @@ cc_library(
         "iw_stl_hash_map.cc",
         "iwgetline.cc",
         "iwstring.cc",
-        "iwstring_and_file_descriptor.cc",
         "iwstring_strstream.cc",
         "iwstrncasecmp.cc",
         "iwwrite.cc",
@@ -50,9 +49,24 @@ cc_library(
         # not  implemented yet "@fast_float//:fast_float",
         "//Foundational/iwaray",
         "//Foundational/iwmisc:iwconfig",
-        # "@third_party//:dragonbox",
         "@zlib",
     ],
+)
+
+cc_library(
+    name = "iwstring_and_file_descriptor",
+    srcs = [
+        "iwstring_and_file_descriptor.cc",
+    ],
+    hdrs = [
+        "iwstring_and_file_descriptor.h",
+    ],
+    deps = [
+        ":iwstring",
+        "@zlib",
+        "@zstd",
+    ],
+    visibility = ["//visibility:public"],
 )
 
 cc_binary(
@@ -78,6 +92,19 @@ cc_binary(
     ],
     deps = [
         ":iwstring",
+    ],
+)
+
+cc_binary(
+    name = "test_zstd",
+    srcs = [
+        "test_zstd.cc",
+    ],
+    deps = [
+        ":iwstring",
+        ":iwstring_and_file_descriptor",
+        "//Foundational/cmdline:iwcmdline",
+        "//Foundational/data_source:iwstring_data_source",
     ],
 )
 

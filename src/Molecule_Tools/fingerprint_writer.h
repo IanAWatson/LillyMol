@@ -7,6 +7,7 @@
 #include "Foundational/iwmisc/misc.h"
 #include "Foundational/iwmisc/sparse_fp_creator.h"
 #include "Foundational/iwstring/iwstring.h"
+#include "Foundational/iwstring/iwstring_and_file_descriptor.h"
 
 namespace fingerprint_writer {
 
@@ -59,10 +60,10 @@ class FingerprintWriter {
     void DisplayUsage(char flag, std::ostream& output) const;
 
     // The functions that do the actual writing, depending on what is in _output_type.
-    int WriteFixedFingerprint(const Sparse_Fingerprint_Creator& sfc, IWString_and_File_Descriptor& output);
-    int WriteSparseFingerprint(const Sparse_Fingerprint_Creator& sfc, IWString_and_File_Descriptor& output);
-    int WriteDescriptors(const IWString& mname, const Sparse_Fingerprint_Creator& sfc, IWString_and_File_Descriptor& output);
-    int WriteSvml(const Sparse_Fingerprint_Creator& sfc, IWString_and_File_Descriptor& output);
+    int WriteFixedFingerprint(const Sparse_Fingerprint_Creator& sfc, iwstring::IWString_and_File_Descriptor& output);
+    int WriteSparseFingerprint(const Sparse_Fingerprint_Creator& sfc, iwstring::IWString_and_File_Descriptor& output);
+    int WriteDescriptors(const IWString& mname, const Sparse_Fingerprint_Creator& sfc, iwstring::IWString_and_File_Descriptor& output);
+    int WriteSvml(const Sparse_Fingerprint_Creator& sfc, iwstring::IWString_and_File_Descriptor& output);
 
     int ChangeOutputTypeIfNeeded(const IWString& new_tag);
 
@@ -95,11 +96,11 @@ class FingerprintWriter {
     }
 
     // If we are writing KDescriptor form, then we can write a header.
-    int WriteHeaderIfNeeded(IWString_and_File_Descriptor& output) const;
+    int WriteHeaderIfNeeded(iwstring::IWString_and_File_Descriptor& output) const;
 
     // Write a fingerprint. What gets written, depends on what is in _output_type.
     // `mname` is needed if we are writing descriptors.
-    int WriteFingerprint(const IWString& mname, const Sparse_Fingerprint_Creator& sfc, IWString_and_File_Descriptor& output);
+    int WriteFingerprint(const IWString& mname, const Sparse_Fingerprint_Creator& sfc, iwstring::IWString_and_File_Descriptor& output);
 };
 
 }  // namespace fingerprint_writer

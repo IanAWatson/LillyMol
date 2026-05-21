@@ -16,6 +16,7 @@ using std::ofstream;
 
 #include "Foundational/cmdline/cmdline.h"
 #include "Foundational/iwmisc/misc.h"
+#include "Foundational/iwstring/iwstring_and_file_descriptor.h"
 
 #include "Molecule_Lib/aromatic.h"
 #include "Molecule_Lib/rwsubstructure.h"
@@ -27,6 +28,8 @@ using std::ofstream;
 #include "Molecule_Lib/path.h"
 #include "Molecule_Lib/substructure.h"
 #include "Molecule_Lib/target.h"
+
+using iwstring::IWString_and_File_Descriptor;
 
 typedef enum RxnQueryType
 {

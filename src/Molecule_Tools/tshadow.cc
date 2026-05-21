@@ -17,6 +17,7 @@
 #include "Foundational/jama/jama_qr.h"
 #include "Foundational/jama/jama_svd.h"
 #include "Foundational/tnt/tnt_array2d_utils.h"
+#include "Foundational/iwstring/iwstring_and_file_descriptor.h"
 
 #include "Molecule_Lib/aromatic.h"
 #include "Molecule_Lib/element.h"
@@ -35,6 +36,7 @@
 
 using std::cerr;
 using std::endl;
+using iwstring::IWString_and_File_Descriptor;
 // #define DEBUG_RADIUS_OF_GYRATION_STUFF
 
 #ifdef DEBUG_RADIUS_OF_GYRATION_STUFF

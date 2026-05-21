@@ -4,6 +4,7 @@
 #include <string>
 
 #include "Foundational/data_source/iwstring_data_source.h"
+#include "Foundational/iwstring/iwstring_and_file_descriptor.h"
 
 #include "iwmtypes.h"
 #include "moleculeio.h"
@@ -26,7 +27,7 @@ class data_source_and_type : public iwstring_data_source {
   uint64_t _skip_first;
   uint64_t _do_only;
 
-  IWString_and_File_Descriptor _stream_for_connection_table_errors;
+  iwstring::IWString_and_File_Descriptor _stream_for_connection_table_errors;
 
   //  If we are logging connection table errors, we need to know where the
   //  most recently read molecule started

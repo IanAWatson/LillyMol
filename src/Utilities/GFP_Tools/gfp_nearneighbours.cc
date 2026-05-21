@@ -10,13 +10,14 @@
 #include "Foundational/cmdline/cmdline.h"
 #include "Foundational/data_source/iwstring_data_source.h"
 #include "Foundational/histogram/iwhistogram.h"
+#include "Foundational/iwstring/iwstring_and_file_descriptor.h"
 #include "Foundational/iw_tdt/iw_tdt.h"
 #include "gfp.h"
 #include "sparse_collection.h"
 #include "tversky.h"
 
 using std::cerr;
-using std::endl;
+using iwstring::IWString_and_File_Descriptor;
 
 /*
   gfp_nearneighbours.cc,v 1.3 2002/06/21 19:05:32
@@ -184,7 +185,7 @@ build_pool(iwstring_data_source& input) {
 
     if (items_in_pool == pool_size) {
       if (verbose) {
-        cerr << "Pool is full, max " << pool_size << endl;
+        cerr << "Pool is full, max " << pool_size << '\n';
       }
       break;
     }
@@ -222,12 +223,12 @@ build_pool(const const_IWSubstring& fname) {
 
     pool = new IW_GFP_D_ID[pool_size];
     if (nullptr == pool) {
-      cerr << "Yipes, could not allocate pool of size " << pool_size << endl;
+      cerr << "Yipes, could not allocate pool of size " << pool_size << '\n';
       return 62;
     }
 
     if (verbose) {
-      cerr << "Pool automatically sized to " << pool_size << endl;
+      cerr << "Pool automatically sized to " << pool_size << '\n';
     }
   }
 
@@ -343,7 +344,7 @@ insert_in_neighbour_list(IW_GFP_D_ID** neighbours, int neighbours_to_find,
 
 #ifdef DEBUG_INSERTION
   cerr << "Inserting " << neighbour.distance() << ". To find = " << neighbours_to_find
-       << " found = " << neighbours_found << " where = " << where << endl;
+       << " found = " << neighbours_found << " where = " << where << '\n';
 #endif
 
   if (0 == neighbours_found)  // list is empty, easy...
@@ -376,21 +377,21 @@ insert_in_neighbour_list(IW_GFP_D_ID** neighbours, int neighbours_to_find,
   for (int i = 1; i < neighbours_found; i++) {
     if (neighbours[i - 1]->distance() > neighbours[i]->distance()) {
       cerr << "Sort/insertion failed, out of order, i = " << i << ' '
-           << neighbours[i - ]->distance() << " vs " << neighbours[i]->distance() << endl;
+           << neighbours[i - ]->distance() << " vs " << neighbours[i]->distance() << '\n';
       failure++;
     }
   }
 
 #ifdef DEBUG_INSERTION
-  cerr << "After insertion, Neighbours found = " << neighbours_found << endl;
+  cerr << "After insertion, Neighbours found = " << neighbours_found << '\n';
   for (int i = 0; i < neighbours_found; i++) {
-    cerr << "i = " << i << " distance " << neighbours[i]->distance() << endl;
+    cerr << "i = " << i << " distance " << neighbours[i]->distance() << '\n';
   }
 #endif
 
   if (failure) {
     for (int i = 0; i < neighbours_found; i++) {
-      cerr << "i = " << i << " distance " << neighbours[i]->distance() << endl;
+      cerr << "i = " << i << " distance " << neighbours[i]->distance() << '\n';
     }
 
     exit(87);
@@ -438,7 +439,7 @@ do_neighbour_list_insertion(IW_GFP_D_ID** neighbours,
   for (int j = 0; j < neighbours_found; j++) {
     cerr << "j = " << j << " dist " << neighbours[j]->distance();
     if (neighbours[j]->distance() < t) {
-      cerr << endl;
+      cerr << '\n';
     } else {
       cerr << " *\n";
     }
@@ -451,9 +452,9 @@ do_neighbour_list_insertion(IW_GFP_D_ID** neighbours,
   while (middle > left) {
     similarity_type_t m = neighbours[middle]->distance();
 #ifdef DEBUG_INSERTION
-    cerr << "left " << left << " middle " << middle << " right " << right << endl;
+    cerr << "left " << left << " middle " << middle << " right " << right << '\n';
     cerr << neighbours[left]->distance() << ',' << neighbours[middle]->distance() << ','
-         << neighbours[right]->distance() << endl;
+         << neighbours[right]->distance() << '\n';
 #endif
 
     if (t < m) {
@@ -548,7 +549,7 @@ nearneighbours(IW_GFP_D_ID& fp, IW_GFP_D_ID** neighbours,
 // #define DEBUG_NN
 #ifdef DEBUG_NN
     cerr << "Distance between '" << fp.id() << " and pool " << i << " '" << pool[i].id()
-         << "' is " << t << endl;
+         << "' is " << t << '\n';
 #endif
 
     assert(t >= static_cast<similarity_type_t>(0.0) &&
@@ -736,7 +737,7 @@ usage(int rc) {
   cerr << __FILE__ << " compiled " << __DATE__ << " " << __TIME__ << '\n';
 #endif
 // clang-format on
-  cerr << endl;
+  cerr << '\n';
 
 // clang-format off
   cerr << "Finds near neighbours of a set of fingerprints\n";
@@ -783,7 +784,7 @@ nearneighbours(int argc, char** argv) {
       usage(4);
     }
 
-    cerr << "Tversky parameters " << tversky.a() << " and " << tversky.b() << endl;
+    cerr << "Tversky parameters " << tversky.a() << " and " << tversky.b() << '\n';
   }
 
   if (cl.option_present('f')) {
@@ -854,12 +855,12 @@ nearneighbours(int argc, char** argv) {
 
     pool = new IW_GFP_D_ID[pool_size];
     if (nullptr == pool) {
-      cerr << "Yipes, could not allocate pool of size " << pool_size << endl;
+      cerr << "Yipes, could not allocate pool of size " << pool_size << '\n';
       return 62;
     }
 
     if (verbose) {
-      cerr << "system sized to " << pool_size << endl;
+      cerr << "system sized to " << pool_size << '\n';
     }
   }
 
@@ -916,7 +917,7 @@ nearneighbours(int argc, char** argv) {
 
     if (verbose) {
       cerr << "Distance compuations abandoned if any component > "
-           << abandon_distance_threshold << endl;
+           << abandon_distance_threshold << '\n';
     }
   }
 
@@ -978,7 +979,7 @@ nearneighbours(int argc, char** argv) {
     }
 
     if (verbose) {
-      cerr << "Lower distance threshold set to " << lower_distance_threshold << endl;
+      cerr << "Lower distance threshold set to " << lower_distance_threshold << '\n';
     }
   }
 
@@ -990,7 +991,7 @@ nearneighbours(int argc, char** argv) {
     }
 
     if (verbose) {
-      cerr << "Upper distance threshold set to " << upper_distance_threshold << endl;
+      cerr << "Upper distance threshold set to " << upper_distance_threshold << '\n';
     }
   }
 
@@ -1073,12 +1074,12 @@ nearneighbours(int argc, char** argv) {
   if (verbose) {
     cerr << "Read " << fingerprints_read << " fingerprints\n";
     cerr << "Neighbour distances for " << distance_stats.n() << " neighbours between "
-         << distance_stats.minval() << " and " << distance_stats.maxval() << endl;
+         << distance_stats.minval() << " and " << distance_stats.maxval() << '\n';
     if (distance_stats.n() > 1) {
       cerr << "Average " << distance_stats.average() << " variance "
            << distance_stats.variance();
     }
-    cerr << endl;
+    cerr << '\n';
 
     cerr << "Nearest neighbour distances between "
          << nearest_neighbour_distance_stats.minval() << " and "
@@ -1087,7 +1088,7 @@ nearneighbours(int argc, char** argv) {
       cerr << " ave " << nearest_neighbour_distance_stats.average() << " variance "
            << nearest_neighbour_distance_stats.variance();
     }
-    cerr << endl;
+    cerr << '\n';
 
     if (molecules_rescanned) {
       cerr << molecules_rescanned << " molecules rescanned to get at least "

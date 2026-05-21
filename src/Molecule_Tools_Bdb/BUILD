@@ -352,6 +352,7 @@ cc_binary(
         ":substituent_identification_cc_proto",
         "//Foundational/accumulator:accumulator",
         "//Foundational/cmdline:iwcmdline",
+        "//Foundational/iwstring:iwstring_and_file_descriptor",
         "@com_google_absl//absl/strings:string_view",
         "@third_party//:berkeley_static",
         "@com_google_protobuf//:protobuf",

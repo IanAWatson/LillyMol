@@ -9,6 +9,7 @@
 #include "Foundational/cmdline/cmdline.h"
 #include "Foundational/iwmisc/misc.h"
 #include "Foundational/iwstring/iw_stl_hash_set.h"
+#include "Foundational/iwstring/iwstring_and_file_descriptor.h"
 
 #include "Molecule_Lib/aromatic.h"
 #include "Molecule_Lib/chiral_centre.h"
@@ -20,6 +21,7 @@
 #include "Molecule_Lib/target.h"
 
 using std::cerr;
+using iwstring::IWString_and_File_Descriptor;
 
 static int verbose = 0;
 

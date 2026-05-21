@@ -11,6 +11,7 @@
 #include "Foundational/accumulator/accumulator.h"
 #include "Foundational/cmdline/cmdline.h"
 #include "Foundational/data_source/tfdatarecord.h"
+#include "Foundational/iwstring/iwstring_and_file_descriptor.h"
 
 #include "Molecule_Lib/aromatic.h"
 #include "Molecule_Lib/atom_typing.h"
@@ -30,6 +31,7 @@ namespace three_dimensional_fp {
 
 using std::cerr;
 using iw_tf_data_record::TFDataWriter;
+using iwstring::IWString_and_File_Descriptor;
 
 // By convention the Usage function tells how to use the tool.
 void

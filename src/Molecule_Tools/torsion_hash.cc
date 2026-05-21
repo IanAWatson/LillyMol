@@ -3,6 +3,8 @@
 
 #include <iostream>
 
+#include "Foundational/iwstring/iwstring_and_file_descriptor.h"
+
 #include "torsion_hash.h"
 
 using std::cerr;
@@ -79,8 +81,7 @@ Torsion_Hash::write (std::ostream & output) const
 }
 
 int
-Torsion_Hash::do_write (IWString_and_File_Descriptor & output) const
-{
+Torsion_Hash::do_write (iwstring::IWString_and_File_Descriptor & output) const {
   output << "Stored = " << static_cast<unsigned int>(size()) << '\n';
 
   for (IW_STL_Hash_Map_int::const_iterator i = begin (); i != end (); ++i)

@@ -39,19 +39,19 @@ cc_proto_library(
     ],
 )
 
-proto_library(
-    name = "gfp_server_proto",
-    srcs = [
-        "gfp_server.proto",
-    ],
-)
+#proto_library(
+#    name = "gfp_server_proto",
+#    srcs = [
+#        "gfp_server.proto",
+#    ],
+#)
 
-cc_proto_library(
-    name = "gfp_server_cc_proto",
-    deps = [
-        ":gfp_server_proto",
-    ],
-)
+#cc_proto_library(
+#    name = "gfp_server_cc_proto",
+#    deps = [
+#        ":gfp_server_proto",
+#    ],
+#)
 
 proto_library(
     name = "gfp_to_svm_lite_proto",
@@ -478,10 +478,9 @@ cc_binary(
     ],
     tags = [
         "gfp_server",
+        "zeromq",
     ],
     deps = [
-        ":nn_request_cc_grpc",
-        ":gfp_server_cc_grpc",
         "//Foundational/cmdline:iwcmdline",
         "//Foundational/data_source:iwstring_data_source",
         "//Molecule_Lib:iwmfingerprint",
@@ -492,6 +491,7 @@ cc_binary(
         "//Utilities/GFP_Tools:gfp_standard",
         "//Utilities/GFP_Tools:nearneighbours_cc_proto",
         "@com_google_protobuf//:protobuf",
+        "@zeromq",
     ] +
       select( {
       "darwin": [ "@homebrew_openmp"],

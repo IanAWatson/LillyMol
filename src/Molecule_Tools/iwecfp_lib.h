@@ -10,6 +10,7 @@
 #include "Foundational/cmdline/cmdline.h"
 #include "Foundational/iwmisc/iwdigits.h"
 #include "Foundational/iwmisc/sparse_fp_creator.h"
+#include "Foundational/iwstring/iwstring_and_file_descriptor.h"
 
 #include "Molecule_Lib/molecule.h"
 #include "Molecule_Lib/substructure.h"
@@ -42,8 +43,8 @@ class Iwecfp {
   int _write_smiles_with_bit_meanings = 0;
   uint32_t _bits_found = 0;
 
-  IWString_and_File_Descriptor _stream_for_bit_meanings;
-  IWString_and_File_Descriptor _stream_for_all_bits;
+  iwstring::IWString_and_File_Descriptor _stream_for_bit_meanings;
+  iwstring::IWString_and_File_Descriptor _stream_for_all_bits;
 
   // Experimental idea. Keeps track of how often each atom
   // participates in bit formation. At the end, if certain atoms
@@ -99,11 +100,11 @@ class Iwecfp {
                        atom_number_t centre_of_shell, unsigned int sum_so_far,
                        int radius);
   void WriteLabelledSmiles(const Molecule& m, int centre_of_shell, int radius,
-                           IWString_and_File_Descriptor& output);
+                           iwstring::IWString_and_File_Descriptor& output);
   void WriteBit(int centre_of_shell,
                 const IWString& smarts_for_centre_of_shell,
                 int radius, unsigned int bit, Molecule& m,
-                IWString_and_File_Descriptor& output);
+                iwstring::IWString_and_File_Descriptor& output);
 
   int BondConstant(const Bond* bond) const;
   void Increment(unsigned int& sum_so_far, int bc, atype_t atom_constant) const;

@@ -20,6 +20,7 @@
 #include "Foundational/iwmisc/proto_support.h"
 #include "Foundational/iwmisc/sparse_fp_creator.h"
 #include "Foundational/iw_tdt/iw_tdt.h"
+#include "Foundational/iwstring/iwstring_and_file_descriptor.h"
 
 #include "Utilities/General/linear_scaling.h"
 
@@ -47,6 +48,7 @@ namespace gfp_svmfp_evaluate {
 
 using std::cerr;
 namespace fs = std::filesystem;
+using iwstring::IWString_and_File_Descriptor;
 
 int verbose = 0;
 

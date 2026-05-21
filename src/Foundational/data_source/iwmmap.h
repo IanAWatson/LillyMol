@@ -6,6 +6,7 @@
 
 #include "Foundational/iwmisc/iwre2.h"
 #include "Foundational/iwstring/iwstring.h"
+#include "Foundational/iwstring/iwstring_and_file_descriptor.h"
 
 using std::cerr;
 using std::endl;
@@ -148,10 +149,10 @@ class IW_Storage_Reader : public T
     int    seekg (size_t, const int = 0);
 
     int  echo (std::ostream &, size_t);    // echo's bytes
-    int  echo (IWString_and_File_Descriptor &, size_t);    // echo's bytes
+    int  echo (iwstring::IWString_and_File_Descriptor &, size_t);    // echo's bytes
 
     int echo_records (std::ostream & os, int necho);    // echo's records
-    int echo_records (IWString_and_File_Descriptor & os, int necho);    // echo's records
+    int echo_records (iwstring::IWString_and_File_Descriptor & os, int necho);    // echo's records
 
     int grep (RE2 & rx);
 
@@ -533,7 +534,7 @@ IW_Storage_Reader<T>::echo_records (std::ostream & output, int necho)
 
 template <typename T>
 int
-IW_Storage_Reader<T>::echo_records (IWString_and_File_Descriptor & output, int necho)
+IW_Storage_Reader<T>::echo_records (iwstring::IWString_and_File_Descriptor & output, int necho)
 {
   if (! T::_good || nullptr == T::_p)
     return 0;
@@ -553,7 +554,7 @@ IW_Storage_Reader<T>::echo_records (IWString_and_File_Descriptor & output, int n
 
 template <typename T>
 int
-IW_Storage_Reader<T>::echo (IWString_and_File_Descriptor & output, size_t necho)
+IW_Storage_Reader<T>::echo (iwstring::IWString_and_File_Descriptor & output, size_t necho)
 {
   if (! T::_good || nullptr == T::_p)
     return 0;

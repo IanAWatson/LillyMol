@@ -7,6 +7,7 @@
 
 #include "Foundational/data_source/iwstring_data_source.h"
 #include "Foundational/iwstring/iwstring.h"
+#include "Foundational/iwstring/iwstring_and_file_descriptor.h"
 
 namespace iwrecordio {
 
@@ -86,7 +87,7 @@ class IWRecordIoWriter {
   private:
     // Handy abstraction that already has a file descriptor and
     // methods for writing.
-    IWString_and_File_Descriptor _output;
+    iwstring::IWString_and_File_Descriptor _output;
 
   // private functions
 

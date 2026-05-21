@@ -11,6 +11,7 @@
 #include "Foundational/cmdline_v2/cmdline_v2.h"
 #include "Foundational/data_source/tfdatarecord.h"
 #include "Foundational/iwmisc/report_progress.h"
+#include "Foundational/iwstring/iwstring_and_file_descriptor.h"
 
 #include "gene_expression.h"
 #include "needle.h"
@@ -19,6 +20,7 @@ namespace gene_expression {
 
 using std::cerr;
 using iw_tf_data_record::TFDataReader;
+using iwstring::IWString_and_File_Descriptor;
 
 void
 Usage(int rc) {

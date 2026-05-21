@@ -14,12 +14,14 @@
 #include "Foundational/accumulator/accumulator.h"
 #include "Foundational/iw_tdt/iw_tdt.h"
 #include "Foundational/iwmisc/misc.h"
+#include "Foundational/iwstring/iwstring_and_file_descriptor.h"
 
 #include "Utilities/GFP_Tools/leader.h"
 #include "Utilities/GFP_Tools/tversky.h"
 
 using std::cerr;
 using std::endl;
+using iwstring::IWString_and_File_Descriptor;
 
 static Tversky tversky;
 

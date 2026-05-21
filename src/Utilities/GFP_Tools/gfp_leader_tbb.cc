@@ -23,6 +23,7 @@
 #include "Foundational/accumulator/accumulator.h"
 #include "Foundational/cmdline/cmdline.h"
 #include "Foundational/iw_tdt/iw_tdt.h"
+#include "Foundational/iwstring/iwstring_and_file_descriptor.h"
 #include "Foundational/iwqsort/iwqsort.h"
 
 #define LEADER_PARALLEL_IMPLEMENTATION
@@ -33,6 +34,7 @@
 
 using std::cerr;
 using std::endl;
+using iwstring::IWString_and_File_Descriptor;
 
 static void
 usage(int rc)

@@ -27,6 +27,7 @@
 #include "Foundational/iwmisc/proto_support.h"
 #include "Foundational/iwstring/absl_hash.h"
 #include "Foundational/iwstring/iwstring.h"
+#include "Foundational/iwstring/iwstring_and_file_descriptor.h"
 
 #ifdef BUILD_BAZEL
 #include "Utilities/General/interpolate_qualified.pb.h"
@@ -37,6 +38,7 @@
 namespace model_qualified_values {
 
 using std::cerr;
+using iwstring::IWString_and_File_Descriptor;
 
 #define safe_xgboost(call) {  \
   int err = (call); \

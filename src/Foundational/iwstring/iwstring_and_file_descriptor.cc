@@ -11,9 +11,14 @@
 
 #include "iwstring.h"
 #include "zlib.h"
+#include "zstd.h"
 
 #include <sys/stat.h>
 #include <sys/types.h>
+
+#include "iwstring_and_file_descriptor.h"
+
+namespace iwstring {
 
 using std::cerr;
 
@@ -31,24 +36,49 @@ IWString_and_File_Descriptor::IWString_and_File_Descriptor(int f) : _fd(f) {
   return;
 }
 
+void
+IWString_and_File_Descriptor::FreeZstdRelated() {
+  ZSTD_freeCCtx(_zstd_cctx);
+  _zstd_cctx = nullptr;
+
+  delete [] _zstd_buffer;
+  _zstd_buffer = nullptr;
+  _zstd_buffer_size = 0;
+}
+
 IWString_and_File_Descriptor::~IWString_and_File_Descriptor() {
+  // zstd compression uses _fd, so it can be closed below.
+  cerr << "Destructor buffer contains " << _number_elements << " characters\n";
+  if (_zstd_cctx) {
+    _zstd_compress_and_write(ZSTD_e_end);
+    FreeZstdRelated();
+  }
+
+  cerr << "ADFter _zstd_compress_and_write " << _number_elements << " characters\n";
+
   if (_gzfile) {
     _compress_and_write();
     gzclose(_gzfile);
     _gzfile = nullptr;
-  } else if (_fd < 0)
-    ;
-  else if (_fd == 1) {
+    return;
+  }
+
+  if (_fd < 0) {
+    return;
+  }
+
+  // Special handling for stdout, do not close.
+  if (_fd == 1) {
     IWString::write(_fd);
     return;
-  } else if (0 == IWString::length()) {
-    IW_FD_CLOSE(_fd);
-    _fd = -9;
-  } else {
+  } 
+  
+  if (IWString::length() > 0) {
     IWString::write(_fd);
-    IW_FD_CLOSE(_fd);
-    _fd = -9;
   }
+
+  IW_FD_CLOSE(_fd);
+  _fd = -9;
 
   return;
 }
@@ -73,6 +103,10 @@ IWString_and_File_Descriptor::open(const char* fname) {
     ;
   else if (0 == ::strcmp(fname + strlen_fname - 3, ".gz")) {
     return _open_gzipd_stream(fname);
+  } else if (strlen_fname > 4 && 0 == ::strcmp(fname + strlen_fname - 4, ".zst")) {
+      return _open_zstd_stream(fname);
+  } else if (strlen_fname > 5 && 0 == ::strcmp(fname + strlen_fname - 5, ".zstd")) {
+      return _open_zstd_stream(fname);
   }
 
   int mode;
@@ -123,6 +157,36 @@ IWString_and_File_Descriptor::_open_gzipd_stream(const char* fname) {
        << "'\n";
   return 0;
 }
+int
+IWString_and_File_Descriptor::_open_zstd_stream(const char* fname) {
+  _fd = IW_FD_OPEN(fname, O_WRONLY | O_TRUNC | O_CREAT,
+                   S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH);
+  if (_fd < 0) {
+    cerr << "IWString_and_File_Descriptor::_open_zstd_stream:cannot open '" << fname << "'\n";
+    return 0;
+  }
+
+  _zstd_cctx = ZSTD_createCCtx();
+  if (_zstd_cctx == nullptr) {
+    IW_FD_CLOSE(_fd);
+    _fd = -9;
+    return 0;
+  }
+
+  if (size_t rc = ZSTD_CCtx_setParameter(_zstd_cctx, ZSTD_c_compressionLevel,
+                                         _zstd_compression_level); ZSTD_isError(rc)) {
+    cerr << "ZSTD_CCtx_setParameter failed " << ZSTD_getErrorName(rc) << '\n';
+    return 0;
+  }
+
+  _zstd_buffer_size = ZSTD_CStreamOutSize();
+  if (_zstd_buffer_size == 0) {
+    _zstd_buffer_size = 4096;
+  }
+  _zstd_buffer = new char[_zstd_buffer_size];
+
+  return 1;
+}
 
 int
 IWString_and_File_Descriptor::_do_resize(int keep_storage) {
@@ -147,6 +211,8 @@ IWString_and_File_Descriptor::flush(int keep_storage) {
 
   if (_gzfile) {
     _compress_and_write();
+  } else if (_zstd_cctx) {
+    _zstd_compress_and_write(ZSTD_e_continue);
   } else if (_fd < 0) {
     cerr << "IWString_and_File_Descriptor::flush:no file descriptor\n";
     return 0;
@@ -155,6 +221,43 @@ IWString_and_File_Descriptor::flush(int keep_storage) {
   }
 
   return _do_resize(IWSFD_KEEP_STORAGE_ON_FLUSH);
+}
+
+int
+IWString_and_File_Descriptor::_zstd_compress_and_write(ZSTD_EndDirective mode) {
+  ZSTD_inBuffer input = {_things, static_cast<size_t>(_number_elements), 0};
+  cerr << "_zstd_compress_and_write writing " << _number_elements << " bytes\n";
+
+  do {
+    ZSTD_outBuffer output = {_zstd_buffer, _zstd_buffer_size, 0};
+
+    cerr << "Before ZSTD_compressStream2 pos " << output.pos << " input.pos " << input.pos << '\n';
+    size_t rc = ZSTD_compressStream2(_zstd_cctx, &output, &input, mode);
+    cerr << "Compression returned " << rc << '\n';
+    if (ZSTD_isError(rc)) {
+      cerr << "ZSTD_compressStream2 failed " << ZSTD_getErrorName(rc) << '\n';
+      return 0;
+    }
+
+    cerr << "output.pos " << output.pos << '\n';
+    if (output.pos > 0) {
+      ssize_t written = IW_FD_WRITE(_fd, _zstd_buffer, output.pos);
+      cerr << "WRote " << written << " bytes\n";
+      if (written != static_cast<ssize_t>(output.pos)) {
+        cerr << "IWString_and_File_Descriptor::_zstd_compress_and_write:write failed\n";
+        return 0;
+      }
+    }
+
+    if (mode == ZSTD_e_end && rc == 0) {
+      break;
+    }
+  } while (input.pos < input.size || mode == ZSTD_e_end);
+
+  cerr << "Before resize " << _number_elements << " characters\n";
+  IWString::resize_keep_storage(0);
+
+  return 1;
 }
 
 int
@@ -169,6 +272,14 @@ IWString_and_File_Descriptor::write_whole_blocks_shift_unwritten() {
     }
 
     return _do_resize(IWSFD_KEEP_STORAGE_ON_FLUSH);
+  }
+
+  if (_zstd_buffer != nullptr) {
+    if (! _zstd_compress_and_write(ZSTD_e_end)) {
+      return 0;
+    }
+
+    return 1;
   }
 
   if (_fd < 0) {
@@ -190,12 +301,18 @@ IWString_and_File_Descriptor::close() {
     return 1;
   }
 
+  if (_zstd_cctx) {
+    _zstd_compress_and_write(ZSTD_e_end);
+    FreeZstdRelated();
+    _do_resize(0);
+  }
+
   if (_fd < 0) {
     cerr << "IWString_and_File_Descriptor::close:not open\n";
     return 0;
   }
 
-  if (_number_elements) {
+  if (_number_elements > 0) {
     flush();
   }
 
@@ -277,3 +394,5 @@ IWString_and_File_Descriptor::write(const char* s, size_t nchars) {
 
   return rc;
 }
+
+}  // namespace iwstring

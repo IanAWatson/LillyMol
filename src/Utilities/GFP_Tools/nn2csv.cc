@@ -15,6 +15,7 @@
 #include "Foundational/data_source/iwstring_data_source.h"
 #include "Foundational/data_source/tfdatarecord.h"
 #include "Foundational/iwstring/absl_hash.h"
+#include "Foundational/iwstring/iwstring_and_file_descriptor.h"
 #include "Foundational/iwqsort/iwqsort.h"
 
 #ifdef BUILD_BAZEL
@@ -25,6 +26,7 @@
 
 namespace nn2csv {
 using std::cerr;
+using iwstring::IWString_and_File_Descriptor;
 
 IWString smiles_tag = "$SMI<";
 IWString identifier_tag = "PCN<";

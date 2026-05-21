@@ -22,6 +22,7 @@
 #include "Foundational/cmdline/cmdline.h"
 #include "Foundational/data_source/iwstring_data_source.h"
 #include "Foundational/data_source/tfdatarecord.h"
+#include "Foundational/iwstring/iwstring_and_file_descriptor.h"
 #include "Foundational/iw_tdt/iw_tdt.h"
 #include "Foundational/iwmisc/iwdigits.h"
 #include "Foundational/iwmisc/proto_support.h"
@@ -38,6 +39,7 @@
 #include "nndata.h"
 
 using std::cerr;
+using iwstring::IWString_and_File_Descriptor;
 
 // Must be defined before neighbour_list.h
 static IWString identifier_tag("PCN<");

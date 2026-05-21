@@ -19,6 +19,7 @@
 #include "Foundational/iwmisc/misc.h"
 #include "Foundational/iwmisc/proto_support.h"
 #include "Foundational/iwstring/iw_stl_hash_set.h"
+#include "Foundational/iwstring/iwstring_and_file_descriptor.h"
 
 #include "Molecule_Lib/aromatic.h"
 #include "Molecule_Lib/charge_assigner.h"
@@ -43,6 +44,7 @@
 namespace substituent_enumeration {
 
 using std::cerr;
+using iwstring::IWString_and_File_Descriptor;
 
 // By convention the Usage function tells how to use the tool.
 void

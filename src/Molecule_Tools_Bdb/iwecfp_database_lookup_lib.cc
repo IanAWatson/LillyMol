@@ -15,6 +15,7 @@ using std::cerr;
 using iwecfp_database::Fingerprint_Characteristics;
 using iwecfp_database::Set_of_Bits;
 using iwecfp_database::Bit_Produced;
+using iwstring::IWString_and_File_Descriptor;
 
 int max_hash_size = 0;
 

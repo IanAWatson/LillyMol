@@ -14,6 +14,7 @@
 #include "Foundational/iwmisc/misc.h"
 #include "Foundational/iwmisc/report_progress.h"
 #include "Foundational/iwstring/iw_stl_hash_map.h"
+#include "Foundational/iwstring/iwstring_and_file_descriptor.h"
 
 #include "Molecule_Lib/aromatic.h"
 #include "Molecule_Lib/atom_typing.h"
@@ -33,6 +34,7 @@
 namespace smi2linker {
 
 using std::cerr;
+using iwstring::IWString_and_File_Descriptor;
 
 void
 Usage(int rc) {

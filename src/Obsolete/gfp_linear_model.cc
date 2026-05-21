@@ -9,6 +9,7 @@
 #include "Foundational/data_source/iwstring_data_source.h"
 #include "Foundational/iwstring/iwstring.h"
 #include "Foundational/iw_tdt/iw_tdt.h"
+#include "Foundational/iwstring/iwstring_and_file_descriptor.h"
 
 #ifdef BUILD_BAZEL
 #include "Utilities/GFP_Tools/gfp_linear_model.pb.h"
@@ -19,6 +20,7 @@
 namespace gfp_linear_model {
 
 using std::cerr;
+using iwstring::IWString_and_File_Descriptor;
 
 void Usage(int rc) {
   // clang-format off

@@ -4,13 +4,16 @@
 
 #include <iostream>
 #include <fstream>
-using std::cerr;
-using std::endl;
 
 #include "Foundational/cmdline/cmdline.h"
 #include "Foundational/iwmisc/iwre2.h"
 #include "Foundational/iwstring/iw_stl_hash_multimap.h"
 #include "Foundational/data_source/iwstring_data_source.h"
+#include "Foundational/iwstring/iwstring_and_file_descriptor.h"
+
+using std::cerr;
+using std::endl;
+using iwstring::IWString_and_File_Descriptor;
 
 const char * prog_name = nullptr;
 

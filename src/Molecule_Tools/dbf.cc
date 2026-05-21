@@ -27,6 +27,7 @@ using std::cerr;
 #include "Foundational/iwmisc/misc.h"
 #include "Foundational/iwmisc/sparse_fp_creator.h"
 #include "Foundational/iwqsort/iwqsort.h"
+#include "Foundational/iwstring/iwstring_and_file_descriptor.h"
 
 #include "Molecule_Lib/aromatic.h"
 #include "Molecule_Lib/charge_assigner.h"
@@ -50,6 +51,8 @@ using std::cerr;
 #else
 #include "dbf.pb.h"
 #endif
+
+using iwstring::IWString_and_File_Descriptor;
 
 static Elements_to_Remove elements_to_remove;
 

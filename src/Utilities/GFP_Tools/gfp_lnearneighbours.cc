@@ -15,6 +15,7 @@
 #include "Foundational/cmdline/cmdline.h"
 #include "Foundational/data_source/iwstring_data_source.h"
 #include "Foundational/iw_tdt/iw_tdt.h"
+#include "Foundational/iwstring/iwstring_and_file_descriptor.h"
 #include "Foundational/iwmisc/iwdigits.h"
 #include "Foundational/iwmisc/report_progress.h"
 #include "Foundational/iwqsort/iwqsort.h"
@@ -34,6 +35,7 @@
 #include "tversky.h"
 
 using std::cerr;
+using iwstring::IWString_and_File_Descriptor;
 
 static int fingerprints_processed = 0;
 

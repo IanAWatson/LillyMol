@@ -31,6 +31,7 @@
 #include "Foundational/data_source/tfdatarecord.h"
 #include "Foundational/iwmisc/report_progress.h"
 #include "Foundational/iwstring/iw_stl_hash_map.h"
+#include "Foundational/iwstring/iwstring_and_file_descriptor.h"
 
 #ifdef BUILD_BAZEL
 #include "Molecule_Tools/dicer_fragments.pb.h"
@@ -41,6 +42,7 @@
 namespace dicer_complementary_fragments_collate {
 
 using std::cerr;
+using iwstring::IWString_and_File_Descriptor;
 
 struct SmilesCount {
   std::string smiles;

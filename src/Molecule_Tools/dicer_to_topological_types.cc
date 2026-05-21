@@ -23,6 +23,7 @@
 #include "Foundational/data_source/iwstring_data_source.h"
 #include "Foundational/data_source/tfdatarecord.h"
 #include "Foundational/iwstring/iw_stl_hash_map.h"
+#include "Foundational/iwstring/iwstring_and_file_descriptor.h"
 
 #include "Molecule_Lib/aromatic.h"
 #include "Molecule_Lib/etrans.h"
@@ -42,6 +43,7 @@ namespace dicer_to_topological_types {
 using std::cerr;
 using iw_tf_data_record::TFDataWriter;
 using dicer_data::DicerFragment;
+using iwstring::IWString_and_File_Descriptor;
 
 // By convention the Usage function tells how to use the tool.
 void

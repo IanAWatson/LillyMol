@@ -12,6 +12,7 @@
 #include "Foundational/data_source/iwstring_data_source.h"
 #include "Foundational/data_source/tfdatarecord.h"
 #include "Foundational/iwmisc/misc.h"
+#include "Foundational/iwstring/iwstring_and_file_descriptor.h"
 
 #ifdef BUILD_BAZEL
 #include "Molecule_Tools/dicer_fragments.pb.h"
@@ -23,8 +24,9 @@
 
 namespace dicer_fragment_activity {
 
-using iw_tf_data_record::TFDataReader;
 using std::cerr;
+using iw_tf_data_record::TFDataReader;
+using iwstring::IWString_and_File_Descriptor;
 
 void
 Usage(int rc) {

@@ -14,8 +14,10 @@
 #include "Foundational/iwmisc/set_or_unset.h"
 #include "Foundational/iwqsort/iwqsort.h"
 #include "Foundational/iw_tdt/iw_tdt.h"
+#include "Foundational/iwstring/iwstring_and_file_descriptor.h"
 
 using std::cerr;
+using iwstring::IWString_and_File_Descriptor;
 
 static int verbose = 0;
 

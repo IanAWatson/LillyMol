@@ -19,6 +19,7 @@
 #include "Foundational/iwqsort/iwqsort.h"
 #include "Foundational/iwstring/absl_hash.h"
 #include "Foundational/iwstring/iwstring.h"
+#include "Foundational/iwstring/iwstring_and_file_descriptor.h"
 #include "Foundational/iw_tdt/iw_tdt.h"
 
 #include "gfp_standard.h"
@@ -26,6 +27,7 @@
 namespace gfp_group_spread {
 
 using std::cerr;
+using iwstring::IWString_and_File_Descriptor;
 
 // clang-format off
 static void

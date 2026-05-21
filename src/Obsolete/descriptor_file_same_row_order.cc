@@ -14,6 +14,7 @@
 #include "Foundational/iwstring/iw_stl_hash_map.h"
 
 using std::cerr;
+using iwstring::IWString_and_File_Descriptor;
 
 const char* prog_name = NULL;
 

@@ -15,10 +15,12 @@
 #include "Foundational/iwmisc/misc.h"
 #include "Foundational/iwmisc/sparse_fp_creator.h"
 #include "Foundational/iwstring/absl_hash.h"
+#include "Foundational/iwstring/iwstring_and_file_descriptor.h"
 
 namespace descriptors_to_fingerprint {
 
 using std::cerr;
+using iwstring::IWString_and_File_Descriptor;
 
 void
 Usage(int rc) {

@@ -19,6 +19,7 @@
 #include "Foundational/iwmisc/misc.h"
 #include "Foundational/iwqsort/iwqsort.h"
 #include "Foundational/iwstring/absl_hash.h"
+#include "Foundational/iwstring/iwstring_and_file_descriptor.h"
 
 #include "Molecule_Lib/atom_typing.h"
 #include "Molecule_Lib/etrans.h"
@@ -38,8 +39,9 @@
 
 namespace mol2safe {
 
-using lillymol::RingNumberControl;
 using std::cerr;
+using lillymol::RingNumberControl;
+using iwstring::IWString_and_File_Descriptor;
 
 void
 Usage(int rc) {

@@ -9,6 +9,7 @@ namespace atom_pair_fingerprint {
 
 using std::cerr;
 using std::endl;
+using iwstring::IWString_and_File_Descriptor;
 
 using std::tie;
 

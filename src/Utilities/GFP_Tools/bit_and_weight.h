@@ -4,6 +4,7 @@
 #include <cmath>
 
 #include "Foundational/iwstring/iw_stl_hash_map.h"
+#include "Foundational/iwstring/iwstring_and_file_descriptor.h"
 
 #include "gfp.h"
 
@@ -37,7 +38,7 @@ class Bit_and_Weight
 
     int build_scoring_model (Bit_and_Weight & bw, int population) const;
 
-    int write_scoring_model (const IWString & prefix, IWString_and_File_Descriptor & output) const;
+    int write_scoring_model (const IWString & prefix, iwstring::IWString_and_File_Descriptor & output) const;
 
 };
 
@@ -62,7 +63,7 @@ class Fixed_and_Sparse_Bit_and_Weight
     int build_scoring_model (Fixed_and_Sparse_Bit_and_Weight & rhs,
                                         int population) const;
 
-    int write_scoring_model (IWString_and_File_Descriptor & output) const;
+    int write_scoring_model (iwstring::IWString_and_File_Descriptor & output) const;
 
     void set_fixed_count(int f, int b, double c) { _fp[f].set_count(b, c);}
     void set_sparse_count(int f, int b, double c) { _sparsefp[f].set_count(b, c);}

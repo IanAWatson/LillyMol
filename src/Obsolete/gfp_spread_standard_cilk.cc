@@ -6,6 +6,8 @@
 #include <pthread.h>
 #include <semaphore.h>
 
+#include <iostream>
+
 #include <cilk/cilk.h>
 #include "tbb/scalable_allocator.h"
 
@@ -14,8 +16,11 @@
 #include "Foundational/cmdline/cmdline.h"
 #include "iwrandom.h"
 #include "Foundational/iwmisc/numeric_data_from_file.h"
+#include "Foundational/iwstring/iwstring_and_file_descriptor.h"
 
 #include "gfp_standard.h"
+
+using iwstring::IWString_and_File_Descriptor;
 
 static int verbose = 0;
 

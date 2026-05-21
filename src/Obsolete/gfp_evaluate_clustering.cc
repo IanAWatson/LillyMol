@@ -12,6 +12,7 @@
 #include "Foundational/iwmisc/iwre2.h"
 #include "Foundational/iwstring/iw_stl_hash_map.h"
 #include "Foundational/iw_tdt/iw_tdt.h"
+#include "Foundational/iwstring/iwstring_and_file_descriptor.h"
 
 #include "cluster_eval.h"
 
@@ -19,6 +20,7 @@ using std::cerr;
 using std::cout;
 using std::endl;
 using std::ostream;
+using iwstring::IWString_and_File_Descriptor;
 
 static int verbose = 0;
 

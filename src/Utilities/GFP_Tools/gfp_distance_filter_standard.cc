@@ -13,6 +13,7 @@
 #define IWMINMAX_IMPLEMENTATION
 #include "Foundational/iwmisc/iwminmax.h"
 #include "Foundational/iwmisc/report_progress.h"
+#include "Foundational/iwstring/iwstring_and_file_descriptor.h"
 #include "Foundational/iw_tdt/iw_tdt.h"
 
 #include "Utilities/GFP_Tools/gfp_standard.h"
@@ -24,6 +25,7 @@ template int iwminid<float, int>::try_this(float, int);
 
 using std::cerr;
 using std::endl;
+using iwstring::IWString_and_File_Descriptor;
 
 /*
   Our pool is an array of FP objects

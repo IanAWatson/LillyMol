@@ -8,6 +8,7 @@
 
 #include "Foundational/cmdline/cmdline.h"
 #include "Foundational/data_source/iwstring_data_source.h"
+#include "Foundational/iwstring/iwstring_and_file_descriptor.h"
 // #include "Foundational/iwmisc/proto_support.h"
 
 #ifdef BUILD_BAZEL
@@ -18,6 +19,7 @@
 
 namespace aggregate_replacement_rings {
 using std::cerr;
+using iwstring::IWString_and_File_Descriptor;
 
 void
 Usage(int rc) {

@@ -15,6 +15,7 @@
 #include "Foundational/iwmisc/misc.h"
 #include "Foundational/iwstring/iw_stl_hash_map.h"
 #include "Foundational/iw_tdt/iw_tdt.h"
+#include "Foundational/iwstring/iwstring_and_file_descriptor.h"
 
 #include "Utilities/GFP_Tools/gfp.h"
 #include "Utilities/GFP_Tools/tversky.h"
@@ -24,6 +25,7 @@
 using std::cerr;
 using std::endl;
 using std::pair;
+using iwstring::IWString_and_File_Descriptor;
 
 static int verbose = 0;
 

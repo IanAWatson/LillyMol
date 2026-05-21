@@ -21,6 +21,7 @@
 #include "Foundational/iwmisc/iwdigits.h"
 #include "Foundational/iwmisc/proto_support.h"
 #include "Foundational/iwmisc/sparse_fp_creator.h"
+#include "Foundational/iwstring/iwstring_and_file_descriptor.h"
 
 #include "Utilities/GFP_Tools/bit_subset.h"
 #include "Utilities/GFP_Tools/gfp.h"
@@ -33,6 +34,7 @@
 namespace gfp_to_svm_lite {
 
 using std::cerr;
+using iwstring::IWString_and_File_Descriptor;
 
 // The type of features that are used as feature numbers in the svm_lite input.
 using feature_type_t = uint32_t;

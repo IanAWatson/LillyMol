@@ -3,6 +3,7 @@
 */
 
 #include <functional>
+#include <iostream>
 #include <memory>
 #include <random>
 #include <unordered_map>
@@ -24,6 +25,10 @@ using namespace __gnu_cxx;
 #include "Foundational/cmdline/cmdline.h"
 #include "Foundational/data_source/iwmmap.h"
 #include "Foundational/iwstring/iw_stl_hash_map.h"
+#include "Foundational/iwstring/iwstring_and_file_descriptor.h"
+
+using std::cerr;
+using iwstring::IWString_and_File_Descriptor;
 
 static int verbose = 0;
 

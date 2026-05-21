@@ -21,6 +21,7 @@
 #include "iwstring_data_source.h"
 
 using std::cerr;
+using iwstring::IWString_and_File_Descriptor;
 
 static int
 iw_open_file(const char* fname) {

@@ -20,6 +20,7 @@
 #include "Foundational/iwmisc/report_progress.h"
 #include "Foundational/iwqsort/iwqsort.h"
 #include "Foundational/iwstring/iwstring.h"
+#include "Foundational/iwstring/iwstring_and_file_descriptor.h"
 
 #include "Molecule_Lib/molecule.h"
 #include "Molecule_Lib/molecule_to_query.h"
@@ -34,6 +35,7 @@
 namespace parsimonious_set {
 
 using std::cerr;
+using iwstring::IWString_and_File_Descriptor;
 
 void
 Usage(int rc) {

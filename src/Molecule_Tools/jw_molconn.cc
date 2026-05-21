@@ -11,6 +11,7 @@
 #define RESIZABLE_ARRAY_IMPLEMENTATION
 #include "Foundational/cmdline/cmdline.h"
 #include "Foundational/iwmisc/misc.h"
+#include "Foundational/iwstring/iwstring_and_file_descriptor.h"
 
 #include "Molecule_Lib/aromatic.h"
 #include "Molecule_Lib/istream_and_type.h"
@@ -22,6 +23,7 @@
 #include "jw_path_with_values.h"
 
 using std::cerr;
+using iwstring::IWString_and_File_Descriptor;
 
 using lillymol_estate::value_of_Kier_and_Hall_atom_intrinsic_state;
 using lillymol_estate::determine_atom_e_state_index;

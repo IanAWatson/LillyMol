@@ -15,10 +15,12 @@
 #include "Foundational/cmdline_v2/cmdline_v2.h"
 #include "Foundational/data_source/iwstring_data_source.h"
 #include "Foundational/iwmisc/misc.h"
+#include "Foundational/iwstring/iwstring_and_file_descriptor.h"
 
 #include "re2/re2.h"
 
 using std::cerr;
+using iwstring::IWString_and_File_Descriptor;
 
 const char* prog_name = nullptr;
 

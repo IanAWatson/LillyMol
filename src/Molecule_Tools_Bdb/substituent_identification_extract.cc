@@ -16,6 +16,7 @@
 #include "Foundational/accumulator/accumulator.h"
 #include "Foundational/cmdline/cmdline.h"
 #include "Foundational/iwstring/iwstring.h"
+#include "Foundational/iwstring/iwstring_and_file_descriptor.h"
 
 #ifdef BUILD_BAZEL
 #include "Molecule_Tools_Bdb/substituent_identification.pb.h"
@@ -26,6 +27,7 @@
 namespace substituent_identification {
 
 using std::cerr;
+using iwstring::IWString_and_File_Descriptor;
 
 struct DBKey {
   int radius;

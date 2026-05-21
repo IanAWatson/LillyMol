@@ -186,5 +186,6 @@ cc_library(
     ],
     deps = [
         "//Foundational/iwstring",
+        "//Foundational/iwstring:iwstring_and_file_descriptor",
     ],
 )

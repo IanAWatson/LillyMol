@@ -21,6 +21,7 @@
 #include "Foundational/iwmisc/misc.h"
 #include "Foundational/iwmisc/report_progress.h"
 #include "Foundational/iwstring/iw_stl_hash_map.h"
+#include "Foundational/iwstring/iwstring_and_file_descriptor.h"
 
 #ifdef BUILD_BAZEL
 #include "Molecule_Tools/dicer_fragments.pb.h"
@@ -31,6 +32,7 @@
 namespace dicer_fragments_collate {
 
 using std::cerr;
+using iwstring::IWString_and_File_Descriptor;
 
 // Found that when storing a hash from unique smiles
 // to proto, the memory requirements were very large,

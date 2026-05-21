@@ -6,6 +6,8 @@
 #include "gtest/gtest.h"
 #include "google/protobuf/text_format.h"
 
+#include "Foundational/iwstring/iwstring_and_file_descriptor.h"
+
 #include "Molecule_Lib/istream_and_type.h"
 
 #include "fileconv_opts.h"
@@ -13,6 +15,7 @@
 namespace {
 
 using std::vector;
+using iwstring::IWString_and_File_Descriptor;
 
 class FileconvTest : public testing::Test {
   protected:

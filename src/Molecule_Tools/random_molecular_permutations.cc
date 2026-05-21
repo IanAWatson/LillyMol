@@ -22,6 +22,7 @@
 #include "Foundational/iwmisc/proto_support.h"
 #include "Foundational/iwstring/iw_stl_hash_map.h"
 #include "Foundational/iwstring/iw_stl_hash_set.h"
+#include "Foundational/iwstring/iwstring_and_file_descriptor.h"
 
 #include "Utilities/GFP_Tools/gfp_standard.h"
 #include "Utilities/GFP_Tools/sparse_collection.h"
@@ -44,6 +45,7 @@
 
 using std::cerr;
 using iwmisc::Fraction;
+using iwstring::IWString_and_File_Descriptor;
 
 static int verbose = 0;
 

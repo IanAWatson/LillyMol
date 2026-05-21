@@ -16,6 +16,7 @@
 
 #include "Foundational/iwmisc/iwre2.h"
 #include "Foundational/iwmisc/misc.h"
+#include "Foundational/iwstring/iwstring_and_file_descriptor.h"
 
 #include "Molecule_Lib/is_actually_chiral.h"
 #include "Molecule_Lib/iwmfingerprint.h"
@@ -27,6 +28,7 @@
 #include "re2/re2.h"
 
 using std::cerr;
+using iwstring::IWString_and_File_Descriptor;
 
 static int default_append_count_to_tag = 0;
 

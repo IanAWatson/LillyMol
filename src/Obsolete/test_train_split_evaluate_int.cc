@@ -8,6 +8,7 @@
 #include <stdlib.h>
 
 #include <algorithm>
+#include <iostream>
 #include <memory>
 
 #define RESIZABLE_ARRAY_IMPLEMENTATION
@@ -16,8 +17,12 @@
 #include "Foundational/accumulator/accumulator.h"
 #include "Foundational/data_source/iwstring_data_source.h"
 #include "Foundational/iwstring/iw_stl_hash_map.h"
+#include "Foundational/iwstring/iwstring_and_file_descriptor.h"
 
 #include "nn_results_.h"
+
+using std::cerr;
+using iwstring::IWString_and_File_Descriptor;
 
 const char * prog_name = nullptr;
 

@@ -18,6 +18,7 @@
 #include "Foundational/data_source/iwstring_data_source.h"
 #include "Foundational/iw_tdt/iw_tdt.h"
 #include "Foundational/cmdline/cmdline.h"
+#include "Foundational/iwstring/iwstring_and_file_descriptor.h"
 #include "Foundational/iwmisc/numeric_data_from_file.h"
 
 #include "Utilities/GFP_Tools/gfp_standard.h"
@@ -25,6 +26,7 @@
 using std::cerr;
 using std::endl;
 using std::unique_ptr;
+using iwstring::IWString_and_File_Descriptor;
 
 static int verbose = 0;
 

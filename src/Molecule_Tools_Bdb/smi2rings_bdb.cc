@@ -21,6 +21,7 @@
 #include "Foundational/iwmisc/report_progress.h"
 #include "Foundational/iwstring/absl_hash.h"
 #include "Foundational/iwstring/iw_stl_hash_set.h"
+#include "Foundational/iwstring/iwstring_and_file_descriptor.h"
 
 #include "db_cxx.h"
 
@@ -47,6 +48,7 @@
 #endif
 
 using std::cerr;
+using iwstring::IWString_and_File_Descriptor;
 
 static Chemical_Standardisation chemical_standardisation;
 

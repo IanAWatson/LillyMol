@@ -5,14 +5,17 @@
 #include <iostream>
 #include <unordered_map>
 #include <memory>
-using std::cerr;
-using std::endl;
 
 #include "Foundational/cmdline/cmdline.h"
 #include "Foundational/data_source/iwstring_data_source.h"
 #include "Foundational/iwstring/iwhash.h"
 #include "Foundational/iwmisc/report_progress.h"
 #include "Foundational/iw_tdt/iw_tdt.h"
+#include "Foundational/iwstring/iwstring_and_file_descriptor.h"
+
+using std::cerr;
+using std::endl;
+using iwstring::IWString_and_File_Descriptor;
 
 const char * prog_name = nullptr;
 

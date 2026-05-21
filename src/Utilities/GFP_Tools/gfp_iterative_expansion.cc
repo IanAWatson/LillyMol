@@ -24,7 +24,6 @@
 
 using std::cerr;
 using std::cout;
-using std::endl;
 
 const char* prog_name = nullptr;
 
@@ -274,7 +273,7 @@ Set_of_Fingerprints<T>::build(iwstring_data_source& input)
     } else if (!fatal) {
       continue;
     } else {
-      cerr << "Fatal error building fingerprint " << ndx << endl;
+      cerr << "Fatal error building fingerprint " << ndx << '\n';
       return 0;
     }
   }
@@ -381,7 +380,7 @@ gfp_iterative_expansion_generation_0(
 
     if (verbose) {
       cerr << "In order to retain " << nkeep << " distance cutoff set to "
-           << distance_cutoff << endl;
+           << distance_cutoff << '\n';
     }
 
     for (auto i = 0; i < pool_size; ++i) {
@@ -396,7 +395,7 @@ gfp_iterative_expansion_generation_0(
     cerr << "Generation zero distance histogram\n";
     cerr << "Distance Molecules\n";
     for (auto i = 0; i < 100; ++i) {
-      cerr << static_cast<float>(i) / 100.0f << ' ' << distance_histogram[i] << endl;
+      cerr << static_cast<float>(i) / 100.0f << ' ' << distance_histogram[i] << '\n';
     }
     if (molecules_permanently_excluded) {
       cerr << "Permanently exclude " << molecules_permanently_excluded
@@ -685,7 +684,7 @@ gfp_iterative_expansion(int argc, char** argv)
   auto nextra =
       gfp_iterative_expansion_generation_0(haystack, nbrs, fp, threshold[0], neighbours);
   if (0 == nextra) {
-    cerr << "No neighbours found at generation 0, distance " << threshold[0] << endl;
+    cerr << "No neighbours found at generation 0, distance " << threshold[0] << '\n';
     return 1;
   }
 
@@ -726,7 +725,7 @@ gfp_iterative_expansion(int argc, char** argv)
     if (0 == nextra) {
       if (0 == verbose) {
         cerr << "No neighbours found at generation " << i << " dist " << threshold[i]
-             << endl;
+             << '\n';
       }
       break;
     }
@@ -748,7 +747,7 @@ gfp_iterative_expansion(int argc, char** argv)
 
     std::cout << haystack.smiles(i) << ' ' << haystack.id(i) << ' ' << nbrs[i]._generation
               << ' ' << nbrs[i]._times_found << ' ' << nbrs[i]._parent->id() << ' '
-              << needles.id(ancestor) << endl;
+              << needles.id(ancestor) << '\n';
 
     written++;
   }
@@ -760,11 +759,11 @@ gfp_iterative_expansion(int argc, char** argv)
     //  for (auto i = 0; i < threshold.size(); ++i)
     //  {
     //    cerr << neighbour_count[i] << " neighbours found at generation " << i << " dist
-    //    " << threshold[i] << endl;
+    //    " << threshold[i] << '\n';
     //  }
 
     cerr << "Distances from ancestor between " << acc.minval() << " and " << acc.maxval()
-         << " ave " << static_cast<float>(acc.average()) << endl;
+         << " ave " << static_cast<float>(acc.average()) << '\n';
   }
 
   return 0;

@@ -1,10 +1,12 @@
 #include <stdlib.h>
 
 #include "Foundational/iwmisc/iwre2.h"
+
 #include "iw_tdt.h"
 
 using std::cerr;
 using std::endl;
+using iwstring::IWString_and_File_Descriptor;
 
 IW_TDT::IW_TDT()
 {

@@ -12,6 +12,8 @@ using std::endl;
 
 #include "iwmmap.h"
 
+using iwstring::IWString_and_File_Descriptor;
+
 IW_MMapd_File::IW_MMapd_File()
 {
   _fd = -1;

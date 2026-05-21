@@ -16,11 +16,14 @@
 #include "Foundational/iwmisc/misc.h"
 #include "Foundational/iwmisc/misc.h"
 #include "Foundational/iwmisc/report_progress.h"
+#include "Foundational/iwstring/iwstring_and_file_descriptor.h"
+
 #include "gfp.h"
 #include "sparse_collection.h"
 #include "tversky.h"
 
 using std::cerr;
+using iwstring::IWString_and_File_Descriptor;
 
 static int verbose = 0;
 

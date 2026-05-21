@@ -16,6 +16,7 @@
 #include "Foundational/iwmisc/misc.h"
 #include "Foundational/iwstring/absl_hash.h"
 #include "Foundational/iwstring/iwstring.h"
+#include "Foundational/iwstring/iwstring_and_file_descriptor.h"
 
 #include "Molecule_Lib/aromatic.h"
 #include "Molecule_Lib/atom_typing.h"
@@ -31,6 +32,7 @@
 namespace dicer_mcs {
 
 using std::cerr;
+using iwstring::IWString_and_File_Descriptor;
 
 constexpr char kOpenSquareBracket = '[';
 constexpr char kCloseSquareBracket = ']';

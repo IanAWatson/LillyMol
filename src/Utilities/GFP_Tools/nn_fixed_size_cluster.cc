@@ -10,10 +10,12 @@
 #include "Foundational/data_source/iwstring_data_source.h"
 #include "Foundational/iwmisc/misc.h"
 #include "Foundational/iwstring/iw_stl_hash_map.h"
+#include "Foundational/iwstring/iwstring_and_file_descriptor.h"
 
 namespace fixed_size_cluster {
 
 using std::cerr;
+using iwstring::IWString_and_File_Descriptor;
 
 IWString smiles_tag("$SMI<");
 IWString identifier_tag("PCN<");

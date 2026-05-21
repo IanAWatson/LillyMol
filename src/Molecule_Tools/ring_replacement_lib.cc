@@ -38,6 +38,7 @@ namespace ring_replacement {
 
 using std::cerr;
 using mformula::MFormula;
+using iwstring::IWString_and_File_Descriptor;
 
 void
 Usage(int rc) {

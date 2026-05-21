@@ -2,6 +2,7 @@
 #define UTILITIES_GFP_TOOLS_NNDATA_H
 
 #include "Foundational/iwstring/iwstring.h"
+#include "Foundational/iwstring/iwstring_and_file_descriptor.h"
 
 #include "Utilities/GFP_Tools/nearneighbours.pb.h"
 
@@ -9,7 +10,7 @@ namespace gfp {
 
 // Write `proto` to `output` as text_format.
 int WriteNNData(const nnbr::NearNeighbours& proto,
-                IWString_and_File_Descriptor& output);
+                iwstring::IWString_and_File_Descriptor& output);
 
 }  // namespace gfp
 #endif  // UTILITIES_GFP_TOOLS_NNDATA_H

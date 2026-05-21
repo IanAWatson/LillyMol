@@ -6,6 +6,7 @@
 #include <memory>
 
 #include "Foundational/iwmisc/misc.h"
+#include "Foundational/iwstring/iwstring_and_file_descriptor.h"
 
 #include "atom_typing.h"
 #include "misc2.h"
@@ -16,6 +17,7 @@
 
 using std::cerr;
 using std::endl;
+using iwstring::IWString_and_File_Descriptor;
 
 template <typename T>
 int write_rxn_smiles(const Reaction_Smiles_Options &, T &output);

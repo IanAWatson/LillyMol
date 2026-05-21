@@ -28,6 +28,8 @@ using std::endl;
 #include "Foundational/iwqsort/iwqsort.h"
 #include "Foundational/iwstring/iwstring.h"
 
+using iwstring::IWString_and_File_Descriptor;
+
 #include "sparse_fp_creator.h"
 
 Sparse_Fingerprint_Creator::Sparse_Fingerprint_Creator ()

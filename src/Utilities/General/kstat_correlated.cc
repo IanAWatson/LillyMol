@@ -21,8 +21,10 @@
 #include "Foundational/iwmisc/report_progress.h"
 #include "Foundational/iwstring/iw_stl_hash_map.h"
 #include "Foundational/iwstring/iwstring.h"
+#include "Foundational/iwstring/iwstring_and_file_descriptor.h"
 
 using std::cerr;
+using iwstring::IWString_and_File_Descriptor;
 
 const char* prog_name = NULL;
 

@@ -19,6 +19,7 @@
 #include "Foundational/accumulator/accumulator.h"
 #include "Foundational/data_source/iwstring_data_source.h"
 #include "Foundational/iwstring/iw_stl_hash_map.h"
+#include "Foundational/iwstring/iwstring_and_file_descriptor.h"
 
 /*
   We can convert a distance matrix into a .nn file suitable for nplotnn.
@@ -185,11 +186,11 @@ class IWDistanceMatrixBase : public IW_STL_Hash_Map_int
 
     int do_write (const const_IWSubstring &);
     int do_write (std::ostream &);
-    int do_write (IWString_and_File_Descriptor &);
+    int do_write (iwstring::IWString_and_File_Descriptor &);
     int write_header (std::ostream &) const;
-    int write_header (IWString_and_File_Descriptor &) const;
+    int write_header (iwstring::IWString_and_File_Descriptor &) const;
     int write_data (std::ostream &);
-    int write_data (IWString_and_File_Descriptor &);
+    int write_data (iwstring::IWString_and_File_Descriptor &);
 
     T zvalue (int, int) const;
     T zvalue (const IWString &, const IWString &) const;
@@ -317,7 +318,7 @@ class IWDistanceMatrixMasquerading_as_Byte : public IWDistanceMatrixBase<unsigne
 
     int do_write (const const_IWSubstring &);
     int do_write (std::ostream &);
-    int do_write (IWString_and_File_Descriptor &);
+    int do_write (iwstring::IWString_and_File_Descriptor &);
 
     int set_minval_and_maxval (T, T);
 
@@ -935,7 +936,7 @@ IWDistanceMatrixBase<T>::write_header (std::ostream & output) const
 
 template <typename T>
 int
-IWDistanceMatrixBase<T>::write_header (IWString_and_File_Descriptor & output) const
+IWDistanceMatrixBase<T>::write_header (iwstring::IWString_and_File_Descriptor & output) const
 {
   output << "size " << _number_molecules << '\n';
 
@@ -970,7 +971,7 @@ IWDistanceMatrixBase<T>::do_write (std::ostream & output)
 
 template <typename T>
 int
-IWDistanceMatrixBase<T>::do_write (IWString_and_File_Descriptor & output)
+IWDistanceMatrixBase<T>::do_write (iwstring::IWString_and_File_Descriptor & output)
 {
   write_header(output);
 
@@ -1046,7 +1047,7 @@ IWDistanceMatrixBase<T>::write_data (std::ostream & output)
 
 template <typename T>
 int
-IWDistanceMatrixBase<T>::write_data (IWString_and_File_Descriptor & output)
+IWDistanceMatrixBase<T>::write_data (iwstring::IWString_and_File_Descriptor & output)
 {
   const auto n = items_allocated();
 
@@ -1364,7 +1365,7 @@ IWDistanceMatrixMasquerading_as_Byte<T>::do_write (std::ostream & output)
 
 template <typename T>
 int
-IWDistanceMatrixMasquerading_as_Byte<T>::do_write (IWString_and_File_Descriptor & output)
+IWDistanceMatrixMasquerading_as_Byte<T>::do_write (iwstring::IWString_and_File_Descriptor & output)
 {
   Masquerading_as_Byte<T>::do_write(output);
   return IWDistanceMatrixBase<unsigned char>::do_write(output);

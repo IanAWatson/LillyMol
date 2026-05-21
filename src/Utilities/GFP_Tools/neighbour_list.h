@@ -3,6 +3,8 @@
 
 #include <iostream>
 
+#include "Foundational/iwstring/iwstring_and_file_descriptor.h"
+
 #include "smiles_id_dist.h"
 //#include "neighbour_list.h"
 
@@ -68,7 +70,7 @@ class Neighbour_List
     void extra (const H &, D);
     int  extra (const IWString & smiles, const IWString & id, D d);
     int  write (std::ostream &) const;
-    int  write (IWString_and_File_Descriptor &) const;
+    int  write (iwstring::IWString_and_File_Descriptor &) const;
 
     void remove_distant_neighbours (int, similarity_type_t);
 
@@ -177,7 +179,7 @@ Neighbour_List<D, N, H>::write (std::ostream & os) const
 
 template <typename D, typename N, typename H>
 int
-Neighbour_List<D, N, H>::write (IWString_and_File_Descriptor & output) const
+Neighbour_List<D, N, H>::write (iwstring::IWString_and_File_Descriptor & output) const
 {
   int n = _neighbours.number_elements();
 

@@ -13,6 +13,7 @@
 
 #include "Foundational/iwaray/iwaray.h"
 #include "Foundational/iwmisc/misc.h"
+#include "Foundational/iwstring/iwstring_and_file_descriptor.h"
 
 #include "Molecule_Lib/aromatic.h"
 #include "Molecule_Lib/target.h"
@@ -20,6 +21,7 @@
 namespace iwecfp {
 
 using std::cerr;
+using iwstring::IWString_and_File_Descriptor;
 
 static constexpr int kProcessingFinished = 1;
 static constexpr int kReadyToProcess = 2;

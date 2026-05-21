@@ -15,6 +15,7 @@
 #include "Foundational/accumulator/accumulator.h"
 #include "Foundational/cmdline/cmdline.h"
 #include "Foundational/iw_tdt/iw_tdt.h"
+#include "Foundational/iwstring/iwstring_and_file_descriptor.h"
 
 #define RESIZABLE_ARRAY_IWQSORT_IMPLEMENTATION
 #include "Foundational/iwqsort/iwqsort.h"
@@ -29,6 +30,7 @@
 #endif
 
 using std::cerr;
+using iwstring::IWString_and_File_Descriptor;
 
 static Tversky tversky;
 

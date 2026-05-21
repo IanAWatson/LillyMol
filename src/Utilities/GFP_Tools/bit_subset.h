@@ -7,6 +7,7 @@
 #include "Foundational/iwstring/iwstring.h"
 #include "Foundational/iwstring/iw_stl_hash_map.h"
 #include "Foundational/iwstring/iw_stl_hash_set.h"
+#include "Foundational/iwstring/iwstring_and_file_descriptor.h"
 #include "Utilities/GFP_Tools/dyfp.h"
 #include "Utilities/GFP_Tools/gfp.h"
 
@@ -135,13 +136,13 @@ class BitXref {
     // If that fails, it will return -1.
     // Otherwise returns the number of features written.
     // Returning 0 just means that none of the bits in `gfp` were written.
-    int WriteSvmlFeatures(const IW_General_Fingerprint& gfp, IWString_and_File_Descriptor& output);
+    int WriteSvmlFeatures(const IW_General_Fingerprint& gfp, iwstring::IWString_and_File_Descriptor& output);
 
     // Write the bits in `gfp` in tabular form to `output`.
     // The number of columns is _highest_feature_number.
     // Note there is no leading `output_separator` written. No newline.
     int WriteDsv(const IW_General_Fingerprint& gfp, char output_separator,
-                 IWString_and_File_Descriptor& output);
+                 iwstring::IWString_and_File_Descriptor& output);
 };
 
 }  // namespace bit_subset

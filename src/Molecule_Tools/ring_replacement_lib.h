@@ -14,6 +14,7 @@
 #include "Foundational/iwaray/iwaray.h"
 #include "Foundational/iwstring/iwstring.h"
 #include "Foundational/iwstring/iw_stl_hash_set.h"
+#include "Foundational/iwstring/iwstring_and_file_descriptor.h"
 
 #include "Molecule_Lib/atom_typing.h"
 #include "Molecule_Lib/molecule.h"
@@ -102,7 +103,7 @@ class RingReplacement {
 
     Chemical_Standardisation _chemical_standardisation;
 
-    IWString_and_File_Descriptor _stream_for_unchanged_molecules;
+    iwstring::IWString_and_File_Descriptor _stream_for_unchanged_molecules;
 
   // Private functions.
 
@@ -118,7 +119,7 @@ class RingReplacement {
 
     int Process(resizable_array_p<Molecule>& mols, int ndx, const uint32_t* atypes,
                 const int* process_atom);
-    int Write(const resizable_array_p<Molecule>& mols, IWString_and_File_Descriptor& output);
+    int Write(const resizable_array_p<Molecule>& mols, iwstring::IWString_and_File_Descriptor& output);
     int IdentifyMatchedAtoms(Molecule& m, resizable_array_p<Substructure_Query>& queries,
                              int* process_atom);
 
@@ -150,7 +151,7 @@ class RingReplacement {
 
     int Preprocess(Molecule& m);
 
-    int Process(Molecule& m, IWString_and_File_Descriptor& output);
+    int Process(Molecule& m, iwstring::IWString_and_File_Descriptor& output);
 
     int Report(std::ostream& output);
 };

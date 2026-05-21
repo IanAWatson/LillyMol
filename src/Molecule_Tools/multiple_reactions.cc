@@ -12,6 +12,8 @@
 #include "Foundational/data_source/tfdatarecord.h"
 #include "Foundational/iwmisc/proto_support.h"
 #include "Foundational/iwstring/iw_stl_hash_set.h"
+#include "Foundational/iwstring/iwstring_and_file_descriptor.h"
+
 #include "Molecule_Lib/aromatic.h"
 #include "Molecule_Lib/istream_and_type.h"
 #include "Molecule_Lib/iwreaction.h"
@@ -32,6 +34,7 @@ namespace apply_multiple_reactions {
 
 using std::cerr;
 namespace fs = std::filesystem;
+using iwstring::IWString_and_File_Descriptor;
 
 void
 Usage(int rc)

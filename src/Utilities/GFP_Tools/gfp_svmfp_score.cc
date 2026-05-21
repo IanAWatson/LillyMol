@@ -20,6 +20,7 @@
 #include "Foundational/iw_tdt/iw_tdt.h"
 #include "Foundational/iwqsort/iwqsort.h"
 #include "Foundational/iwstring/iw_stl_hash_map.h"
+#include "Foundational/iwstring/iwstring_and_file_descriptor.h"
 
 #include "gfp_bit_subset.h"
 
@@ -28,6 +29,7 @@
 
 using std::cerr;
 using std::endl;
+using iwstring::IWString_and_File_Descriptor;
 
 static int tdts_read = 0;
 

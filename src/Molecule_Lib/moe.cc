@@ -3,6 +3,7 @@
 #include <iostream>
 
 #include "Foundational/data_source/iwstring_data_source.h"
+#include "Foundational/iwstring/iwstring_and_file_descriptor.h"
 
 #include "molecule.h"
 
@@ -17,7 +18,7 @@ using std::cerr;
 // To make things easier, we do this horrible hacky thing and set up a file
 // to which we can write the Moe fragments as they are read.
 
-IWString_and_File_Descriptor stream_for_moe_fragments;
+iwstring::IWString_and_File_Descriptor stream_for_moe_fragments;
 
 int
 SetupMoeFragmentStream(const_IWSubstring fname) {

@@ -7,6 +7,7 @@
 
 #include "Foundational/iwstring/iw_stl_hash_map.h"
 #include "Foundational/iwbits/iwbits.h"
+#include "Foundational/iwstring/iwstring_and_file_descriptor.h"
 
 #include "timsort.hpp"
 
@@ -62,7 +63,7 @@ class Sparse_Fingerprint_Creator
     int  fill_count_array (const unsigned int * b, int * c, int n) const;
 
     int write_fingerprint (const IWString &, std::ostream &) const;
-    int write_fingerprint (const IWString &, IWString_and_File_Descriptor &) const;
+    int write_fingerprint (const IWString &, iwstring::IWString_and_File_Descriptor &) const;
     int daylight_ascii_form_with_counts_encoded (IWString & dyascii) const;
     int daylight_ascii_form_with_counts_encoded (const const_IWSubstring & tag, IWString & dyascii) const;    // first argument is the TDT tag
     int append_daylight_ascii_form_with_counts_encoded (const const_IWSubstring & tag, IWString & dyascii) const;    // first argument is the TDT tag

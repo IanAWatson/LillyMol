@@ -12,12 +12,11 @@
 #include <iostream>
 #include <memory>
 
-using std::cerr;
-
 #include "Foundational/accumulator/accumulator.h"
 #include "Foundational/cmdline/cmdline.h"
 #include "Foundational/iwmisc/misc.h"
 #include "Foundational/iwmisc/sparse_fp_creator.h"
+#include "Foundational/iwstring/iwstring_and_file_descriptor.h"
 
 #include "Molecule_Lib/allowed_elements.h"
 #include "Molecule_Lib/aromatic.h"
@@ -27,6 +26,9 @@ using std::cerr;
 #include "Molecule_Lib/molecule.h"
 #include "Molecule_Lib/smiles.h"
 #include "Molecule_Lib/standardise.h"
+
+using std::cerr;
+using iwstring::IWString_and_File_Descriptor;
 
 // DEBUG_SWITCH is used to print out debugging msgs
 #ifndef DEBUG_SWITCH

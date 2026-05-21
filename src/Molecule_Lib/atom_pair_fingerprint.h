@@ -6,6 +6,8 @@
 #include <unordered_map>
 
 #include "Foundational/iwmisc/sparse_fp_creator.h"
+#include "Foundational/iwstring/iwstring_and_file_descriptor.h"
+
 #include "Molecule_Lib/molecule.h"
 
 #define DISCERN_ATOM_PAIR_COLLISIONS
@@ -132,7 +134,7 @@ class AtomPairFingerprint {
     int * _coverage;
 
     // A destination if we are writing bit meanings.
-    IWString_and_File_Descriptor _stream_for_bit_meanings;
+    iwstring::IWString_and_File_Descriptor _stream_for_bit_meanings;
 
 //  private functions.
 

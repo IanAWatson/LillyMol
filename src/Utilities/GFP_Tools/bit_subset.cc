@@ -1,12 +1,14 @@
 #include <algorithm>
 
 #include "Foundational/iwmisc/proto_support.h"
+#include "Foundational/iwstring/iwstring_and_file_descriptor.h"
 
 #include "Utilities/GFP_Tools/bit_subset.h"
 
 namespace bit_subset {
 
 using std::cerr;
+using iwstring::IWString_and_File_Descriptor;
 
 BitSubset::BitSubset() {
   _flatten_sparse_counted = 0;

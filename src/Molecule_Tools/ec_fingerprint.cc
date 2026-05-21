@@ -12,6 +12,7 @@
 namespace ec_fingerprint {
 
 using std::cerr;
+using iwstring::IWString_and_File_Descriptor;
 
 ShellInfo::ShellInfo(const Molecule& m, const int* include_atom,
                      const atom_type_t* atom_type)

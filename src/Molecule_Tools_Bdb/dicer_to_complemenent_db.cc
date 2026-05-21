@@ -18,6 +18,7 @@
 #include "Foundational/cmdline/cmdline.h"
 #include "Foundational/data_source/tfdatarecord.h"
 #include "Foundational/iwmisc/misc.h"
+#include "Foundational/iwstring/iwstring_and_file_descriptor.h"
 
 #ifdef BUILD_BAZEL
 #include "Molecule_Tools/dicer_fragments.pb.h"
@@ -28,6 +29,7 @@
 namespace dicer_to_complement_db {
 
 using std::cerr;
+using iwstring::IWString_and_File_Descriptor;
 
 int
 Usage(int rc) {

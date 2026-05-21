@@ -8,8 +8,6 @@
 #include <iostream>
 #include <optional>
 
-using std::cerr;
-
 #include <assert.h>
 #include <ctype.h>
 #include <math.h>
@@ -22,6 +20,7 @@ using std::cerr;
 #include "Foundational/iwmisc/normalisation.h"
 #include "Foundational/iwmisc/proto_support.h"
 #include "Foundational/iwstring/iw_stl_hash_map.h"
+#include "Foundational/iwstring/iwstring_and_file_descriptor.h"
 
 #include "Utilities/General/linear_scaling.h"
 
@@ -30,6 +29,9 @@ using std::cerr;
 #else
 #include "Foundational/iwmisc/normalisation.pb.h"
 #endif
+
+using std::cerr;
+using iwstring::IWString_and_File_Descriptor;
 
 const char* prog_name = nullptr;
 

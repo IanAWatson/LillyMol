@@ -15,8 +15,10 @@
 #include "Foundational/cmdline/cmdline.h"
 #include "Foundational/data_source/iwstring_data_source.h"
 #include "Foundational/iwqsort/iwqsort.h"
+#include "Foundational/iwstring/iwstring_and_file_descriptor.h"
 
 using std::cerr;
+using iwstring::IWString_and_File_Descriptor;
 
 static extending_resizable_array<int> ignore_column;
 static extending_resizable_array<int> process_column;

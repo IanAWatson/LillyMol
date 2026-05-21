@@ -10,9 +10,11 @@
 #include "Foundational/iwmisc/logical_expression.h"
 #include "Foundational/iwmisc/misc.h"
 #include "Foundational/iwmisc/set_or_unset.h"
+#include "Foundational/iwstring/iwstring_and_file_descriptor.h"
 
 using std::cerr;
 using std::endl;
+using iwstring::IWString_and_File_Descriptor;
 
 static int verbose = 0;
 

@@ -28,6 +28,7 @@
 namespace iw_tf_data_record {
 
 using std::cerr;
+using iwstring::IWString_and_File_Descriptor;
 
 unsigned int default_read_buffer_size = 4096; 
 

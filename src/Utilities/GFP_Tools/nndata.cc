@@ -13,6 +13,7 @@
 namespace gfp {
 
 using std::cerr;
+using iwstring::IWString_and_File_Descriptor;
 
 int
 WriteNNData(const nnbr::NearNeighbours& proto, IWString_and_File_Descriptor& output) {

@@ -15,6 +15,7 @@
 #include "Foundational/iwmisc/iwdigits.h"
 #include "Foundational/iwstring/iw_stl_hash_map.h"
 #include "Foundational/iwstring/iw_stl_hash_set.h"
+#include "Foundational/iwstring/iwstring_and_file_descriptor.h"
 #include "Molecule_Lib/molecule.h"
 #include "Molecule_Lib/moleculeio.h"
 #include "Molecule_Lib/smiles.h"
@@ -22,6 +23,7 @@
 #include "smiles_id_dist.h"
 
 using std::cerr;
+using iwstring::IWString_and_File_Descriptor;
 
 static IWString identifier_tag("PCN<");
 

@@ -14,9 +14,11 @@
 #include "Foundational/iwmisc/misc.h"
 #include "Foundational/iwmisc/sparse_fp_creator.h"
 #include "Foundational/iwstring/iw_stl_hash_map.h"
+#include "Foundational/iwstring/iwstring_and_file_descriptor.h"
 
 using std::cerr;
 using std::numeric_limits;
+using iwstring::IWString_and_File_Descriptor;
 
 const char* prog_name = nullptr;
 

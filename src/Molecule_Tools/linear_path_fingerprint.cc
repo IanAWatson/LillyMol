@@ -2,8 +2,6 @@
 #include <iostream>
 #include <memory>
 #include <limits>
-using std::cerr;
-using std::endl;
 
 
 #include "Foundational/cmdline/cmdline.h"
@@ -13,6 +11,7 @@ using std::endl;
 #include "Foundational/iwmisc/md5.h"
 #include "Foundational/iwmisc/misc.h"
 #include "Foundational/iwmisc/sparse_fp_creator.h"
+#include "Foundational/iwstring/iwstring_and_file_descriptor.h"
 
 #include "Molecule_Lib/molecule.h"
 #include "Molecule_Lib/path.h"
@@ -20,6 +19,10 @@ using std::endl;
 #include "Molecule_Tools/linear_path_fingerprint.h"
 
 namespace LFP {
+
+using std::cerr;
+using std::endl;
+using iwstring::IWString_and_File_Descriptor;
 
 #ifdef COMPILE_WITH_WATCH_BITS
 

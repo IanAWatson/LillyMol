@@ -2,11 +2,13 @@
 #include <iostream>
 
 #include "Foundational/iwstring/iwstring.h"
+#include "Foundational/iwstring/iwstring_and_file_descriptor.h"
 
 #include "Molecule_Lib/smiles.h"
 
 using std::cerr;
 using std::endl;
+using iwstring::IWString_and_File_Descriptor;
 
 constexpr char kOpenBrace = '{';
 constexpr char kCloseBrace = '}';

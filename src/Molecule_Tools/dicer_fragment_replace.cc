@@ -18,6 +18,7 @@
 #include "Foundational/iwmisc/combinations.h"
 #include "Foundational/iwmisc/iwre2.h"
 #include "Foundational/iwmisc/misc.h"
+#include "Foundational/iwstring/iwstring_and_file_descriptor.h"
 
 #include "Molecule_Lib/aromatic.h"
 #include "Molecule_Lib/atom_typing.h"
@@ -46,6 +47,7 @@ using iw_tf_data_record::TFDataReader;
 using dicer_data::DicerFragment; 
 using combinations::Combinations;
 using mformula::MFormula;
+using iwstring::IWString_and_File_Descriptor;
 
 // Warning, this will need to be updated when we make the switch globally.
 constexpr int kSingleBond = SINGLE_BOND;

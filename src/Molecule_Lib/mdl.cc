@@ -13,6 +13,7 @@
 #include "Foundational/data_source/string_data_source.h"
 #include "Foundational/iwmisc/iwre2.h"
 #include "Foundational/iwmisc/misc.h"
+#include "Foundational/iwstring/iwstring_and_file_descriptor.h"
 
 #include "aromatic.h"
 #include "atom_alias.h"
@@ -26,6 +27,7 @@
 #include "rwmolecule.h"
 
 using std::cerr;
+using iwstring::IWString_and_File_Descriptor;
 
 void
 MDL_File_Supporting_Material::_default_values() {

@@ -27,6 +27,7 @@
 #include "Foundational/iwqsort/iwqsort.h"
 #include "Foundational/iwstring/iw_stl_hash_map.h"
 #include "Foundational/iwstring/iw_stl_hash_set.h"
+#include "Foundational/iwstring/iwstring_and_file_descriptor.h"
 
 #include "Molecule_Lib/aromatic.h"
 #include "Molecule_Lib/istream_and_type.h"
@@ -36,6 +37,7 @@
 #include "iwecfp_database.h"
 
 using std::cerr;
+using iwstring::IWString_and_File_Descriptor;
 
 using iwecfp_database::Bit_Produced;
 using iwecfp_database::Count_Radius;

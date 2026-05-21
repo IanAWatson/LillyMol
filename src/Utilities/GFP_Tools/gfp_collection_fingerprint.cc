@@ -12,6 +12,7 @@
 #include "Foundational/data_source/iwstring_data_source.h"
 #include "Foundational/iwmisc/sparse_fp_creator.h"
 #include "Foundational/iwstring/iwstring.h"
+#include "Foundational/iwstring/iwstring_and_file_descriptor.h"
 #include "Foundational/iw_tdt/iw_tdt.h"
 
 #include "gfp.h"
@@ -19,6 +20,7 @@
 namespace gfp_collection_fingerprint {
 
 using std::cerr;
+using iwstring::IWString_and_File_Descriptor;
 
 void
 Usage(int rc) {

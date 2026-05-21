@@ -4,10 +4,12 @@
 
 #include "Foundational/cmdline/cmdline.h"
 #include "Foundational/iwmisc/proto_support.h"
+#include "Foundational/iwstring/iwstring_and_file_descriptor.h"
 
 #include "normalisation.h"
 
 using std::cerr;
+using iwstring::IWString_and_File_Descriptor;
 
 static int scaling_type = NRML_MIN_TO_MAX;
 

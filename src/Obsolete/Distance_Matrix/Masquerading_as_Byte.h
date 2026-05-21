@@ -1,15 +1,16 @@
 #ifndef MASQUERADING_AS_BYTE_H
 #define MASQUERADING_AS_BYTE_H
 
+#include <algorithm>
+#include <iostream>
 /*
   When storing distance matrices, we can save a lot of space by encoding
   floats as bytes. We need to know the range
 */
 
 #include "Foundational/data_source/iwstring_data_source.h"
+#include "Foundational/iwstring/iwstring_and_file_descriptor.h"
 
-#include <algorithm>
-#include <iostream>
 
 template <typename T>
 class Masquerading_as_Byte
@@ -42,7 +43,7 @@ class Masquerading_as_Byte
 
     int debug_print (std::ostream &) const;
     int do_write (std::ostream &) const;
-    int do_write (IWString_and_File_Descriptor &) const;
+    int do_write (iwstring::IWString_and_File_Descriptor &) const;
 
     int set_range (T mi, T ma);
     void set_min (T mi) { _minval = mi;};
@@ -191,7 +192,7 @@ Masquerading_as_Byte<T>::do_write (std::ostream & output) const
 
 template <typename T>
 int
-Masquerading_as_Byte<T>::do_write (IWString_and_File_Descriptor & output) const
+Masquerading_as_Byte<T>::do_write (iwstring::IWString_and_File_Descriptor & output) const
 {
   if (0.0 != _minval || 0.0 != _maxval)
   {

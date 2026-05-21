@@ -9,6 +9,7 @@ namespace linear_fingerprint {
 
 using std::cerr;
 using std::endl;
+using iwstring::IWString_and_File_Descriptor;
 
 namespace internal {
 

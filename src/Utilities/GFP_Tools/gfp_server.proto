@@ -1,0 +1,31 @@
+syntax = "proto3";
+
+package gfp_server;
+
+import "Utilities/GFP_Tools/nn_request.proto";
+import "Utilities/GFP_Tools/nearneighbours.proto";
+
+//message Request {
+//  optional string smiles = 1;
+//  optional uint32 nbrs = 2;
+//  optional float max_dist = 3;
+//}
+
+message SmilesIdDistance {
+  optional string smiles = 1;
+  optional string id = 2;
+  optional float dist = 3;
+}
+
+message Result {
+  repeated SmilesIdDistance smiles_id_dist = 1;
+}
+
+service GFPService {
+  rpc Similarity(Request) returns (Reply) {}
+}
+
+service GfpServer {
+  rpc GetNeighbours(NnRequest) returns (Reply);
+  rpc ServerCommand(ServerRequest) returns (Reply);
+}

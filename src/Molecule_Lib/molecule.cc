@@ -13,6 +13,7 @@
 #include "Foundational/iwqsort/iwqsort.h"
 
 #include "Foundational/iwstring/iw_stl_hash_map.h"
+#include "Foundational/iwstring/iwstring_and_file_descriptor.h"
 
 #define COMPILING_CTB
 #define COMPILING_MOLECULE_MAIN
@@ -26,6 +27,7 @@
 
 using std::cerr;
 using std::endl;
+using iwstring::IWString_and_File_Descriptor;
 
 static constexpr int kMoleculeMagicNumber = 7215237;
 

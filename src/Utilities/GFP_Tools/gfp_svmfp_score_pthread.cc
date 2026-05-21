@@ -16,12 +16,14 @@
 #include "Foundational/iwmisc/iwminmax.h"
 #include "Foundational/iwstring/iw_stl_hash_map.h"
 #include "Foundational/iwmisc/normalisation.h"
+#include "Foundational/iwstring/iwstring_and_file_descriptor.h"
 
 #include "Utilities/GFP_Tools/gfp.h"
 #include "Utilities/GFP_Tools/gfp_bit_subset.h"
 
 using std::cerr;
 using std::endl;
+using iwstring::IWString_and_File_Descriptor;
 
 using std::unordered_map;
 

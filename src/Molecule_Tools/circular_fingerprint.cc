@@ -3,6 +3,7 @@
 #include <algorithm>
 
 #include "Foundational/iwmisc/misc.h"
+
 #include "circular_fingerprint.h"
 
 #define PROCESSING_FINISHED 1

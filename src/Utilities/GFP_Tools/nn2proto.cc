@@ -13,6 +13,7 @@
 #include "Foundational/data_source/tfdatarecord.h"
 #include "Foundational/iwmisc/proto_support.h"
 #include "Foundational/iwqsort/iwqsort.h"
+#include "Foundational/iwstring/iwstring_and_file_descriptor.h"
 #ifdef BUILD_BAZEL
 #include "Utilities/GFP_Tools/nearneighbours.pb.h"
 #else
@@ -22,6 +23,7 @@
 
 namespace nn2proto {
 using std::cerr;
+using iwstring::IWString_and_File_Descriptor;
 
 IWString smiles_tag = "$SMI<";
 IWString identifier_tag = "PCN<";

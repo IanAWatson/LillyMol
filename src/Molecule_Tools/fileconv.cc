@@ -9,12 +9,11 @@
 #include <assert.h>
 
 
-using std::cerr;
-
 #include "Foundational/accumulator/accumulator.h"
 #include "Foundational/cmdline/cmdline.h"
 #include "Foundational/iwmisc/misc.h"
 #include "Foundational/iwmisc/report_progress.h"
+#include "Foundational/iwstring/iwstring_and_file_descriptor.h"
 
 #include "Molecule_Lib/molecule.h"
 #include "Molecule_Lib/istream_and_type.h"
@@ -25,6 +24,9 @@ using std::cerr;
 static const char *prog_name;
 
 namespace fileconv {
+
+using std::cerr;
+using iwstring::IWString_and_File_Descriptor;
 
 // When fileconv is processing, there can be a number of output streams.
 struct LocalOptions {

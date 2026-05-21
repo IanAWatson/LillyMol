@@ -9,7 +9,6 @@
 #include <algorithm>
 #include <iostream>
 #include <memory>
-using std::cerr;
 
 #define RESIZABLE_ARRAY_IMPLEMENTATION
 
@@ -19,6 +18,7 @@ using std::cerr;
 #include "Foundational/iwmisc/misc.h"
 #include "Foundational/iwmisc/sparse_fp_creator.h"
 #include "Foundational/iwstring/iw_stl_hash_map.h"
+#include "Foundational/iwstring/iwstring_and_file_descriptor.h"
 
 #include "Molecule_Lib/aromatic.h"
 #include "Molecule_Lib/istream_and_type.h"
@@ -27,6 +27,9 @@ using std::cerr;
 #include "Molecule_Lib/qry_wstats.h"
 #include "Molecule_Lib/standardise.h"
 #include "Molecule_Lib/target.h"
+
+using std::cerr;
+using iwstring::IWString_and_File_Descriptor;
 
 const char *prog_name = nullptr;
 

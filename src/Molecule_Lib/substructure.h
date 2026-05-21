@@ -21,6 +21,7 @@
 #include "Foundational/iwmisc/msi_object.h"
 #include "Foundational/iwmisc/set_or_unset.h"
 #include "Foundational/iwstring/iwstring.h"
+#include "Foundational/iwstring/iwstring_and_file_descriptor.h"
 
 #include "atom_alias.h"
 #include "iwmtypes.h"
@@ -3767,7 +3768,7 @@ class Substructure_Query : public resizable_array_p<Single_Substructure_Query>
     // Write proto representation to 'os'.
     int WriteProto(std::ostream& os) const;
     int WriteProto(IWString& fname) const;
-    int WriteProto(IWString_and_File_Descriptor& output) const;
+    int WriteProto(iwstring::IWString_and_File_Descriptor& output) const;
 
     // Return a proto containing the contents of the Substructure_Query;
     SubstructureSearch::SubstructureQuery BuildProto() const;

@@ -15,6 +15,7 @@
 #include "Foundational/cmdline_v2/cmdline_v2.h"
 #include "Foundational/data_source/iwstring_data_source.h"
 #include "Foundational/iwmisc/iwre2.h"
+#include "Foundational/iwstring/iwstring_and_file_descriptor.h"
 
 #ifdef BUILD_BAZEL
 #include "Molecule_Tools/replacement_ring.pb.h"
@@ -26,6 +27,7 @@ namespace ring_replacement_collate {
 
 using std::cerr;
 namespace fs = std::filesystem;
+using iwstring::IWString_and_File_Descriptor;
 
 void
 Usage(int rc) {

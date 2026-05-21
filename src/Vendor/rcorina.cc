@@ -10,6 +10,7 @@
 
 #include "Foundational/cmdline/cmdline.h"
 #include "Foundational/string_data_source/iwstring_string_data_source.h"
+#include "Foundational/iwstring/iwstring_and_file_descriptor.h"
 
 #include "Molecule_Lib/aromatic.h"
 #include "Molecule_Lib/chiral_centre.h"
@@ -25,6 +26,7 @@
 #include <sys/signal.h>
 
 using std::cerr;
+using iwstring::IWString_and_File_Descriptor;
 
 const char* prog_name = NULL;
 

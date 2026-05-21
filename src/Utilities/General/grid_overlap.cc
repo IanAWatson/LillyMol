@@ -18,6 +18,7 @@
 #include "Foundational/data_source/iwstring_data_source.h"
 #include "Foundational/iwmisc/compile_time.h"
 #include "Foundational/iwmisc/misc.h"
+#include "Foundational/iwstring/iwstring_and_file_descriptor.h"
 
 #ifdef BUILD_BAZEL
 #include "Utilities/GFP_Tools/nearneighbours.pb.h"
@@ -28,6 +29,7 @@
 namespace grid_overlap {
 
 using std::cerr;
+using iwstring::IWString_and_File_Descriptor;
 
 // The grid is read in as (probably) unordered xyz tuples.
 // We discern the spacing and re-order the entries in _value

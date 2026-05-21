@@ -15,9 +15,11 @@
 #include "Foundational/histogram/iwhistogram.h"
 #include "Foundational/iwmisc/iwdigits.h"
 #include "Foundational/iwstring/iw_stl_hash_map.h"
+#include "Foundational/iwstring/iwstring_and_file_descriptor.h"
 
 using std::cerr;
 using std::endl;
+using iwstring::IWString_and_File_Descriptor;
 
 
 static int verbose = 0;

@@ -1,6 +1,7 @@
 #include <iostream>
 
 #include "Foundational/iwmisc/proto_support.h"
+#include "Foundational/iwstring/iwstring_and_file_descriptor.h"
 
 #include "linear_scaling.h"
 
@@ -14,6 +15,7 @@
 namespace linear_scaling {
 
 using std::cerr;
+using iwstring::IWString_and_File_Descriptor;
 
 LinearScaling::LinearScaling() {
   _intercept = 0.0;

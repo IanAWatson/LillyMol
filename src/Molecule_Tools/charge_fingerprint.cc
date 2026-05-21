@@ -5,6 +5,7 @@
 #include "Foundational/cmdline/cmdline.h"
 #include "Foundational/iwmisc/misc.h"
 #include "Foundational/iwmisc/sparse_fp_creator.h"
+#include "Foundational/iwstring/iwstring_and_file_descriptor.h"
 
 #include "Molecule_Lib/aromatic.h"
 #include "Molecule_Lib/charge_assigner.h"
@@ -17,6 +18,7 @@
 namespace charge_fingerprint {
 
 using std::cerr;
+using iwstring::IWString_and_File_Descriptor;
 
 static IWString smiles_tag("$SMI<");
 static IWString identifier_tag("PCN<");

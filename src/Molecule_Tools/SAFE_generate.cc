@@ -19,6 +19,7 @@
 #include "Foundational/iwmisc/matcher.h"
 #include "Foundational/iwmisc/proto_support.h"
 #include "Foundational/iwstring/absl_hash.h"
+#include "Foundational/iwstring/iwstring_and_file_descriptor.h"
 
 #include "Molecule_Lib/aromatic.h"
 #include "Molecule_Lib/atom_typing.h"
@@ -43,6 +44,7 @@
 namespace safe_generate {
 
 using std::cerr;
+using iwstring::IWString_and_File_Descriptor;
 
 constexpr char kPercent = '%';
 

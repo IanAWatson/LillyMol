@@ -22,6 +22,7 @@ cc_library(
         "//Foundational/iwmisc:iwconfig",
         "//Foundational/iwmisc:iwre2",
         "//Foundational/iwstring",
+        "//Foundational/iwstring:iwstring_and_file_descriptor",
         "@re2",
         "@zlib",
     ],

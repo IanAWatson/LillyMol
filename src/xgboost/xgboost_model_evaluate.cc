@@ -12,6 +12,7 @@
 #include "Foundational/data_source/iwstring_data_source.h"
 #include "Foundational/iwmisc/proto_support.h"
 #include "Foundational/iwstring/iw_stl_hash_map.h"
+#include "Foundational/iwstring/iwstring_and_file_descriptor.h"
 
 #include "Utilities/General/linear_scaling.h"
 
@@ -29,6 +30,7 @@
 namespace lillymol_xgboost {
 
 using std::cerr;
+using iwstring::IWString_and_File_Descriptor;
 
 // We are using the C api, since I was not able to find
 // good examples of how to use the C++ API.

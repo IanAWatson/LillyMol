@@ -13,6 +13,7 @@
 #define IWMINMAX_IMPLEMENTATION
 #include "Foundational/iwmisc/iwminmax.h"
 #include "Foundational/iwmisc/report_progress.h"
+#include "Foundational/iwstring/iwstring_and_file_descriptor.h"
 #include "Foundational/iw_tdt/iw_tdt.h"
 
 #include "gfp.h"
@@ -20,6 +21,7 @@
 
 using std::cerr;
 using std::endl;
+using iwstring::IWString_and_File_Descriptor;
 
 #ifdef __GNUG__
 template iwminid<float, int>::iwminid(float, int);

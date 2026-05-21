@@ -51,6 +51,7 @@ cc_library(
         ":gene_expression_cc_proto",
         "//Foundational/accumulator",
         "//Foundational/iwstring",
+        "//Foundational/iwstring:iwstring_and_file_descriptor",
         "@com_google_absl//absl/container:flat_hash_map",
         "@com_google_protobuf//:protobuf",
     ],

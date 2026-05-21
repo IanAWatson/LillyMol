@@ -10,16 +10,18 @@
 #include <limits>
 #include <memory>
 
-using std::cerr;
-
 #include "Foundational/cmdline/cmdline.h"
 #include "Foundational/data_source/iwstring_data_source.h"
 #include "Foundational/iwmisc/iwre2.h"
 #include "Foundational/iwmisc/misc.h"
 #include "Foundational/iwstring/iw_stl_hash_map.h"
 #include "Foundational/iwstring/iw_stl_hash_set.h"
+#include "Foundational/iwstring/iwstring_and_file_descriptor.h"
 
 #include "iwtokeniser.h"
+
+using std::cerr;
+using iwstring::IWString_and_File_Descriptor;
 
 static IWString missing_value = '.';
 

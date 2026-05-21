@@ -1,7 +1,11 @@
 #include <stdlib.h>
 
+#include "Foundational/iwstring/iwstring_and_file_descriptor.h"
+
 #include "misc.h"
 #include "iwdigits.h"
+
+using iwstring::IWString_and_File_Descriptor;
 
 void
 IWDigits::_default_values()

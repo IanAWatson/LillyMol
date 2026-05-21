@@ -1,9 +1,10 @@
 #include <iostream>
 
+#include "iw_tabular_data.h"
+
 using std::cerr;
 using std::endl;
-
-#include "iw_tabular_data.h"
+using iwstring::IWString_and_File_Descriptor;
 
 template <typename T>
 IW_Tabular_Data<T>::IW_Tabular_Data()

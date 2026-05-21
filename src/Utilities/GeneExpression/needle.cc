@@ -9,6 +9,7 @@
 namespace needle {
 
 using std::cerr;
+using iwstring::IWString_and_File_Descriptor;
 
 uint32_t Needle::_number_neighbours = 1;
 double* Needle::_max_possible_association = nullptr;

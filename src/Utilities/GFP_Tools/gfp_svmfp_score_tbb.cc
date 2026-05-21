@@ -21,6 +21,7 @@
 #include "Foundational/data_source/iwstring_data_source.h"
 #include "Foundational/iwmisc/iwminmax.h"
 #include "Foundational/iwstring/iw_stl_hash_map.h"
+#include "Foundational/iwstring/iwstring_and_file_descriptor.h"
 #include "Foundational/iwmisc/normalisation.h"
 
 #include "Utilities/GFP_Tools/gfp.h"
@@ -31,6 +32,7 @@ using std::endl;
 using std::numeric_limits;
 using std::unordered_map;
 using std::ostream;
+using iwstring::IWString_and_File_Descriptor;
 
 static int tdts_read = 0;
 

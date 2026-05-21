@@ -2,6 +2,7 @@
 #define FOUNDATIONAL_IWMISC_NORMALISATION_H_
 
 #include "Foundational/accumulator/accumulator.h"
+#include "Foundational/iwstring/iwstring_and_file_descriptor.h"
 
 #ifdef BUILD_BAZEL
 #include "Foundational/iwmisc/normalisation.pb.h"
@@ -160,7 +161,7 @@ class NColumn : public Accumulator<double> {
 
     int report (int, std::ostream &) const;
 
-    int write_scaling_information(int col, IWString_and_File_Descriptor & output) const;
+    int write_scaling_information(int col, iwstring::IWString_and_File_Descriptor & output) const;
 };
 
 extern int  NColumn_values_out_of_range();

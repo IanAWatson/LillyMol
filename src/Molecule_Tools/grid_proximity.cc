@@ -8,6 +8,7 @@
 #include "Foundational/iwbits/fixed_bit_vector.h"
 #include "Foundational/iwmisc/misc.h"
 #include "Foundational/iwmisc/sparse_fp_creator.h"
+#include "Foundational/iwstring/iwstring_and_file_descriptor.h"
 
 #include "Molecule_Lib/aromatic.h"
 #include "Molecule_Lib/etrans.h"
@@ -23,6 +24,7 @@
 namespace grid_proximity {
 
 using std::cerr;
+using iwstring::IWString_and_File_Descriptor;
 
 IWString smiles_tag("$SMI<");
 IWString identifier_tag("PCN<");

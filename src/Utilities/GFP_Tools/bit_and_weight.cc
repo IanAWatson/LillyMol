@@ -1,5 +1,7 @@
 #include "bit_and_weight.h"
 
+using iwstring::IWString_and_File_Descriptor;
+
 void
 Bit_and_Weight::increment_weight(unsigned int b,
                                  double & rc) const

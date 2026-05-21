@@ -19,6 +19,7 @@
 #include "Foundational/iwmisc/misc.h"
 #include "Foundational/iwmisc/report_progress.h"
 #include "Foundational/iwstring/iw_stl_hash_map.h"
+#include "Foundational/iwstring/iwstring_and_file_descriptor.h"
 
 #include "spread_weights.h"
 
@@ -29,6 +30,8 @@
 #endif
 
 namespace nn_spread {
+
+using iwstring::IWString_and_File_Descriptor;
 
 IWString smiles_tag = "$SMI<";
 IWString identifier_tag = "PCN<";

@@ -22,6 +22,7 @@
 #include "Foundational/iwmisc/iwdigits.h"
 #include "Foundational/iwmisc/misc.h"
 #include "Foundational/iwqsort/iwqsort.h"
+#include "Foundational/iwstring/iwstring_and_file_descriptor.h"
 
 #include "Molecule_Lib/molecule.h"
 #include "Molecule_Lib/molecule_to_query.h"
@@ -37,6 +38,7 @@
 namespace dicer_fragment_lookup_bdb {
 
 using std::cerr;
+using iwstring::IWString_and_File_Descriptor;
 
 struct SmilesNatoms {
   IWString smiles;

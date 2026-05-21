@@ -19,6 +19,7 @@
 #include "Foundational/iwstring/iw_stl_hash_map.h"
 #include "Foundational/iwbits/iwbits.h"
 #include "Foundational/iwmisc/misc.h"
+#include "Foundational/iwstring/iwstring_and_file_descriptor.h"
 
 #include "Molecule_Lib/istream_and_type.h"
 #include "Molecule_Lib/molecule.h"
@@ -31,6 +32,7 @@ using std::endl;
 using std::ostream;
 using std::unique_ptr;
 using std::numeric_limits;
+using iwstring::IWString_and_File_Descriptor;
 
 const char * prog_name = NULL;
 

@@ -9,6 +9,7 @@
 #include "Foundational/data_source/tfdatarecord.h"
 #include "Foundational/iwaray/iwaray.h"
 #include "Foundational/iwstring/iwstring.h"
+#include "Foundational/iwstring/iwstring_and_file_descriptor.h"
 
 namespace iw_tf_data_record {
 
@@ -86,7 +87,7 @@ class TFDataWriter {
   private:
     // Handy abstraction that already has a file descriptor and
     // methods for writing.
-    IWString_and_File_Descriptor _output;
+    iwstring::IWString_and_File_Descriptor _output;
 
   // private functions
 

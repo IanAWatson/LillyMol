@@ -8,6 +8,7 @@
 
 #include "Foundational/iwmisc/misc.h"
 #include "Foundational/iwmisc/sparse_fp_creator.h"
+#include "Foundational/iwstring/iwstring_and_file_descriptor.h"
 
 #include "Molecule_Lib/molecule.h"
 
@@ -127,7 +128,7 @@ class ECFunction
 
     // If the object does any per molecule output.
     virtual int DoAnyOutput(Molecule& m, JobParameters& job_parameters,
-                            IWString_and_File_Descriptor& output) = 0;
+                            iwstring::IWString_and_File_Descriptor& output) = 0;
 };
 
 // A number of the classes that get passed to the templatized EC fingerprint
@@ -136,7 +137,7 @@ class ECFunction
 class ECBaseWithOutput
 {
   protected:
-    IWString_and_File_Descriptor _output;
+    iwstring::IWString_and_File_Descriptor _output;
 
   public:
     int Open(IWString& fname);
@@ -149,7 +150,7 @@ class ProduceFingerprint : public ECFunction
     Sparse_Fingerprint_Creator _sfc;
 
     // private functions
-    int WriteFixedWidthFingerprint(const JobParameters& job_parameters, IWString_and_File_Descriptor& output) const;
+    int WriteFixedWidthFingerprint(const JobParameters& job_parameters, iwstring::IWString_and_File_Descriptor& output) const;
 
   public: 
     ProduceFingerprint() {
@@ -165,7 +166,7 @@ class ProduceFingerprint : public ECFunction
       return 1;
     }
     int DoAnyOutput(Molecule& m, JobParameters& job_parameters, 
-                    IWString_and_File_Descriptor& output) override;
+                    iwstring::IWString_and_File_Descriptor& output) override;
 
     const Sparse_Fingerprint_Creator& sfc() const { return _sfc;}
 };
@@ -191,7 +192,7 @@ class AtomMapCoverage : public ECBaseWithOutput, public ECFunction
 
     int FingerprintingComplete(Molecule& m);
     int DoAnyOutput(Molecule& m, JobParameters& job_parameters,
-                    IWString_and_File_Descriptor& output) {
+                    iwstring::IWString_and_File_Descriptor& output) {
       //TODO:ianwatson implement this.
       return 1;
     }
@@ -215,7 +216,7 @@ class WriteAllBits : public ECBaseWithOutput, public ECFunction
       return 1;
     }
     int DoAnyOutput(Molecule& m, JobParameters& job_parameters,
-                    IWString_and_File_Descriptor& output) {
+                    iwstring::IWString_and_File_Descriptor& output) {
       return 1;
     }
 };
@@ -253,7 +254,7 @@ class ECBitMeanings : public ECBaseWithOutput, public ECFunction
       return 1;
     }
     int DoAnyOutput(Molecule& m, JobParameters& job_parameters,
-                    IWString_and_File_Descriptor& output) ;
+                    iwstring::IWString_and_File_Descriptor& output) ;
 };
 
 // When adjusting magic values in the ECFingerprint object, studying collisions
@@ -286,7 +287,7 @@ class ECCheckCollisions : public ECBaseWithOutput
       return 1;
     }
     int DoAnyOutput(Molecule& m, JobParameters& job_parameters,
-                    IWString_and_File_Descriptor& output) {
+                    iwstring::IWString_and_File_Descriptor& output) {
       return 1;
     }
 };
@@ -340,7 +341,7 @@ class ECBuildPrecedent
       return 1;
     }
     int DoAnyOutput(Molecule& m, JobParameters& job_parameters,
-                    IWString_and_File_Descriptor& output) {
+                    iwstring::IWString_and_File_Descriptor& output) {
       return 1;
     }
 
@@ -406,7 +407,7 @@ class ECUsePrecedent : public ECFunction
     // Once all bits have been generated, and precedent data has been collected, 
     int FingerprintingComplete(Molecule& m);
     int DoAnyOutput(Molecule& m, JobParameters& job_parameters,
-                    IWString_and_File_Descriptor& output);
+                    iwstring::IWString_and_File_Descriptor& output);
     int Report(std::ostream& output) const;
 };
 
@@ -438,7 +439,7 @@ class ECFilterByBits : public ECFunction
       return 1;
     }
     int DoAnyOutput(Molecule& m, JobParameters& job_parameters,
-                    IWString_and_File_Descriptor& output);
+                    iwstring::IWString_and_File_Descriptor& output);
     int Report(std::ostream& output) const;
 };
 

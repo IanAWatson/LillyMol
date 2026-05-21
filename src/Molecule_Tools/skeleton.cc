@@ -6,6 +6,7 @@
 #include <iostream>
 
 #include "Foundational/cmdline/cmdline.h"
+#include "Foundational/iwstring/iwstring_and_file_descriptor.h"
 
 #include "Molecule_Lib/aromatic.h"
 #include "Molecule_Lib/etrans.h"
@@ -17,6 +18,7 @@
 namespace meaningful_name {
 
 using std::cerr;
+using iwstring::IWString_and_File_Descriptor;
 
 // By convention the Usage function tells how to use the tool.
 void

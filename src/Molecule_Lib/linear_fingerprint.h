@@ -4,6 +4,7 @@
 #include <cstdint>
 
 #include "Foundational/iwmisc/sparse_fp_creator.h"
+#include "Foundational/iwstring/iwstring_and_file_descriptor.h"
 
 #include "molecule.h"
 
@@ -94,7 +95,7 @@ class LinearFpStatus {
     Sparse_Fingerprint_Creator& _sfc;
 
     // Passed from caller, we do not own it.
-    IWString_and_File_Descriptor * _stream_for_bit_meanings;
+    iwstring::IWString_and_File_Descriptor * _stream_for_bit_meanings;
 
     // Private functions.
 
@@ -152,7 +153,7 @@ class LinearFpStatus {
                    Sparse_Fingerprint_Creator& sfp);
     ~LinearFpStatus();
 
-    void SetStreamForBitMeanings(IWString_and_File_Descriptor* s) {
+    void SetStreamForBitMeanings(iwstring::IWString_and_File_Descriptor* s) {
       _stream_for_bit_meanings = s;
       _need_to_examine_bits_formed = true;
     }
@@ -168,7 +169,7 @@ class LinearFingerprintGenerator {
 
     // Will be passed as pointer to individual LinearFpStatus that
     // do the actual fingerprinting.
-    IWString_and_File_Descriptor _stream_for_bit_meanings;
+    iwstring::IWString_and_File_Descriptor _stream_for_bit_meanings;
 
   public:
     LinearFingerprintGenerator();

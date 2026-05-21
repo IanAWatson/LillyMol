@@ -19,6 +19,7 @@
 namespace iwrecordio {
 
 using std::cerr;
+using iwstring::IWString_and_File_Descriptor;
 
 constexpr char kNewLine = '\n';
 

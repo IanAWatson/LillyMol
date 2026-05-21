@@ -4,6 +4,7 @@
 #include "Foundational/cmdline/cmdline.h"
 #include "Foundational/iwmisc/misc.h"
 #include "Foundational/iwstring/iwstring.h"
+#include "Foundational/iwstring/iwstring_and_file_descriptor.h"
 
 #include "Molecule_Lib/atom_typing.h"
 #include "Molecule_Lib/istream_and_type.h"
@@ -13,6 +14,8 @@
 #include "topological_torsion.h"
 
 namespace topological_torsion {
+
+using iwstring::IWString_and_File_Descriptor;
 
 IWString smiles_tag("$SMI<");
 IWString identifier_tag("PCN<");

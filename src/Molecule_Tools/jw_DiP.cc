@@ -14,6 +14,7 @@
 #include "Foundational/cmdline/cmdline.h"
 #include "Foundational/iwmisc/iwdigits.h"
 #include "Foundational/iwmisc/misc.h"
+#include "Foundational/iwstring/iwstring_and_file_descriptor.h"
 
 #include "Molecule_Lib/aromatic.h"
 #include "Molecule_Lib/charge_assigner.h"
@@ -32,6 +33,7 @@
 
 using std::cerr;
 using std::endl;
+using iwstring::IWString_and_File_Descriptor;
 
 //DEBUG_SWITCH is used to print out debugging msgs
 #ifndef DEBUG_SWITCH

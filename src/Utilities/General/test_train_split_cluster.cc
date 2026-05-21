@@ -17,6 +17,7 @@
 
 using std::cerr;
 using std::endl;
+using iwstring::IWString_and_File_Descriptor;
 
 const char* prog_name = NULL;
 

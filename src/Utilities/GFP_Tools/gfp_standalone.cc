@@ -21,6 +21,7 @@
 #include "Foundational/iw_tdt/iw_tdt.h"
 #include "Foundational/iwmisc/iwdigits.h"
 #include "Foundational/iwqsort/iwqsort.h"
+#include "Foundational/iwstring/iwstring_and_file_descriptor.h"
 
 #include "Molecule_Lib/aromatic.h"
 #include "Molecule_Lib/istream_and_type.h"
@@ -34,6 +35,7 @@
 #include "Utilities/GFP_Tools/gfp_standard.h"
 
 using std::cerr;
+using iwstring::IWString_and_File_Descriptor;
 
 static const char* prog_name = nullptr;
 

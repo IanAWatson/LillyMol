@@ -13,6 +13,7 @@
 #include "Foundational/iwmisc/combinations.h"
 #include "Foundational/iwstring/absl_hash.h"
 #include "Foundational/iwstring/iwstring.h"
+#include "Foundational/iwstring/iwstring_and_file_descriptor.h"
 
 #include "Molecule_Lib/aromatic.h"
 #include "Molecule_Lib/element.h"
@@ -26,6 +27,7 @@
 namespace internal {
 
 using std::cerr;
+using iwstring::IWString_and_File_Descriptor;
 
 class SetOfMolecules {
   private:
@@ -145,25 +147,25 @@ class SimpleEnumerator {
 
   // private functions;
     int Process(Molecule& m, const Set_of_Atoms& d,
-                IWString_and_File_Descriptor& output);
-    int ProcessNewMolecule(Molecule& m, IWString_and_File_Descriptor& output);
+                iwstring::IWString_and_File_Descriptor& output);
+    int ProcessNewMolecule(Molecule& m, iwstring::IWString_and_File_Descriptor& output);
     int ProcessSingleFragments(Molecule& m, const Set_of_Atoms& d,
-                        IWString_and_File_Descriptor& output);
+                        iwstring::IWString_and_File_Descriptor& output);
     int ProcessMultipleFragments(Molecule& m, const Set_of_Atoms& matched_atoms,
-                        IWString_and_File_Descriptor& output);
+                        iwstring::IWString_and_File_Descriptor& output);
     int MakeMolecule(Molecule& m, const Set_of_Atoms& matched_atom,
                 const std::vector<uint32_t>& frag,
-                IWString_and_File_Descriptor& output);
+                iwstring::IWString_and_File_Descriptor& output);
     int AddSingleFragments(Molecule& m,
                                  const Set_of_Atoms& matched_atoms,
-                                 IWString_and_File_Descriptor& output);
+                                 iwstring::IWString_and_File_Descriptor& output);
 
   public:
     SimpleEnumerator();
 
     int Initialise(Command_Line& cl);
 
-    int Process(Molecule& m, IWString_and_File_Descriptor& output);
+    int Process(Molecule& m, iwstring::IWString_and_File_Descriptor& output);
 
     int Report(std::ostream& output) const;
 };
@@ -309,7 +311,7 @@ void PermGenerator(int n, int k)
 */
 
 int
-SimpleEnumerator::Process(Molecule& m, IWString_and_File_Descriptor& output) {
+SimpleEnumerator::Process(Molecule& m, iwstring::IWString_and_File_Descriptor& output) {
   ++_molecules_processed;
 
   if (_write_starting_molecule) {
@@ -392,7 +394,7 @@ AddBond(Molecule& m, atom_number_t a1, atom_number_t a2) {
 int
 SimpleEnumerator::AddSingleFragments(Molecule& m,
                                  const Set_of_Atoms& matched_atoms,
-                                 IWString_and_File_Descriptor& output) {
+                                 iwstring::IWString_and_File_Descriptor& output) {
   if (matched_atoms.size() != 200005) {
     return 1;
   }
@@ -431,7 +433,7 @@ AscendingOrder(const Set_of_Atoms& matched_atoms) {
 // `matched_atoms` contains atom numbers for the substitution points
 int
 SimpleEnumerator::Process(Molecule& m, const Set_of_Atoms& matched_atoms,
-                 IWString_and_File_Descriptor& output) {
+                 iwstring::IWString_and_File_Descriptor& output) {
 
 #ifdef DEBUG_SIMPLE_ENUMERATOR_PROCESS
   cerr << m.name() <<  " matched atoms";
@@ -453,7 +455,7 @@ SimpleEnumerator::Process(Molecule& m, const Set_of_Atoms& matched_atoms,
 
 int
 SimpleEnumerator::ProcessSingleFragments(Molecule& m, const Set_of_Atoms& matched_atoms,
-                        IWString_and_File_Descriptor& output) {
+                        iwstring::IWString_and_File_Descriptor& output) {
   const int initial_matoms = m.natoms();
   const int n = _molecules.number_elements();
 
@@ -472,7 +474,7 @@ SimpleEnumerator::ProcessSingleFragments(Molecule& m, const Set_of_Atoms& matche
 
 int
 SimpleEnumerator::ProcessMultipleFragments(Molecule& m, const Set_of_Atoms& matched_atoms,
-                        IWString_and_File_Descriptor& output) {
+                        iwstring::IWString_and_File_Descriptor& output) {
   std::vector<uint32_t> count(_combo);
   for (int i = 0; i < _combo; ++i) {
     count[i] = _molecules[i]->size();
@@ -495,7 +497,7 @@ SimpleEnumerator::ProcessMultipleFragments(Molecule& m, const Set_of_Atoms& matc
 int
 SimpleEnumerator::MakeMolecule(Molecule& m, const Set_of_Atoms& matched_atom,
                 const std::vector<uint32_t>& frag,
-                IWString_and_File_Descriptor& output) {
+                iwstring::IWString_and_File_Descriptor& output) {
   const int initial_matoms = m.natoms();
 
   for (int i = 0; i < _combo; ++i) {
@@ -521,7 +523,7 @@ SimpleEnumerator::MakeMolecule(Molecule& m, const Set_of_Atoms& matched_atom,
 }
 
 int
-SimpleEnumerator::ProcessNewMolecule(Molecule& m, IWString_and_File_Descriptor& output) {
+SimpleEnumerator::ProcessNewMolecule(Molecule& m, iwstring::IWString_and_File_Descriptor& output) {
   if (! m.valence_ok()) {
     cerr << "SimpleEnumerator::ProcessNewMolecule:invalid valence\n";
     cerr << m.smiles() << ' ' << m.name() << '\n';
@@ -562,13 +564,13 @@ SimpleEnumerator::Report(std::ostream& output) const {
 int
 PositionalAnalogueScanning(Molecule& m,
                 SimpleEnumerator& options,
-                IWString_and_File_Descriptor& output) {
+                iwstring::IWString_and_File_Descriptor& output) {
   return options.Process(m, output);
 }
 
 int PositionalAnalogueScanning(data_source_and_type<Molecule>& input,
                 SimpleEnumerator& options,
-                IWString_and_File_Descriptor& output) {
+                iwstring::IWString_and_File_Descriptor& output) {
   Molecule* m;
   while ((m = input.next_molecule()) != nullptr) {
     if (! PositionalAnalogueScanning(*m, options, output)) {
@@ -584,7 +586,7 @@ int PositionalAnalogueScanning(data_source_and_type<Molecule>& input,
 
 int
 PositionalAnalogueScanning(const char* fname, SimpleEnumerator& options,
-                        IWString_and_File_Descriptor& output) {
+                        iwstring::IWString_and_File_Descriptor& output) {
   data_source_and_type<Molecule> input(fname);
   if (! input.good()) {
     cerr << "PositionalAnalogueScanning:cannot open '" << fname << "'\n";
@@ -617,7 +619,7 @@ Main(int argc, char** argv) {
     Usage();
   }
 
-  IWString_and_File_Descriptor output(1);
+  iwstring::IWString_and_File_Descriptor output(1);
 
   for (const char* fname : cl) {
     if (! PositionalAnalogueScanning(fname, options, output)) {
@@ -757,21 +759,21 @@ class Options {
     uint32_t _max_products_per_starting_molecule;
 
   // Private functions
-    int MaybeOutput(Molecule& m, IWString_and_File_Descriptor& output);
+    int MaybeOutput(Molecule& m, iwstring::IWString_and_File_Descriptor& output);
     int Process(Molecule& m,
                  const Set_of_Atoms& matched_atoms,
                  int istart,
-                 IWString_and_File_Descriptor& output);
+                 iwstring::IWString_and_File_Descriptor& output);
     int Process(Molecule& m,
                  const std::vector<uint32_t>& indices,
-                 IWString_and_File_Descriptor& output);
+                 iwstring::IWString_and_File_Descriptor& output);
 
   public:
     Options();
 
     int Initialise(Command_Line& cl);
 
-    int Process(Molecule& m, IWString_and_File_Descriptor& output);
+    int Process(Molecule& m, iwstring::IWString_and_File_Descriptor& output);
 
     int Report(std::ostream& output) const;
 };
@@ -891,7 +893,7 @@ Options::Report(std::ostream& output) const {
 
 int
 Options::Process(Molecule& m,
-                 IWString_and_File_Descriptor& output) {
+                 iwstring::IWString_and_File_Descriptor& output) {
   ++_molecules_processed;
 
   _made_this_molecule = 0;
@@ -958,7 +960,7 @@ void PermGenerator(int n, int k)
 int
 Options::Process(Molecule& m,
                  const std::vector<uint32_t>& indices,
-                 IWString_and_File_Descriptor& output) {
+                 iwstring::IWString_and_File_Descriptor& output) {
   Set_of_Atoms matched_atoms;
   for (int i = 0; i < _nq; ++i) {
     int j = indices[i];
@@ -975,7 +977,7 @@ int
 Options::Process(Molecule& m,
                  const Set_of_Atoms& matched_atoms,
                  int istart,
-                 IWString_and_File_Descriptor& output) {
+                 iwstring::IWString_and_File_Descriptor& output) {
   atom_number_t zatom = matched_atoms[istart];
 
   if (m.hcount(zatom) == 0) {
@@ -1007,7 +1009,7 @@ Options::Process(Molecule& m,
 }
 
 int
-Options::MaybeOutput(Molecule& m, IWString_and_File_Descriptor& output) {
+Options::MaybeOutput(Molecule& m, iwstring::IWString_and_File_Descriptor& output) {
   if (! m.valence_ok()) {
     return 0;
   }
@@ -1030,14 +1032,14 @@ Options::MaybeOutput(Molecule& m, IWString_and_File_Descriptor& output) {
 int
 PositionalAnalogueScanning(Molecule& m,
                 Options& options,
-                IWString_and_File_Descriptor& output) {
+                iwstring::IWString_and_File_Descriptor& output) {
   return options.Process(m, output);
 }
 
 int
 PositionalAnalogueScanning(data_source_and_type<Molecule>& input,
                 Options& options,
-                IWString_and_File_Descriptor& output) {
+                iwstring::IWString_and_File_Descriptor& output) {
   Molecule* m;
   while ((m = input.next_molecule()) != nullptr) {
     if (! PositionalAnalogueScanning(*m, options, output)) {
@@ -1052,7 +1054,7 @@ PositionalAnalogueScanning(data_source_and_type<Molecule>& input,
 
 int
 PositionalAnalogueScanning(const char* fname, Options& options,
-                        IWString_and_File_Descriptor& output) {
+                        iwstring::IWString_and_File_Descriptor& output) {
   data_source_and_type<Molecule> input(fname);
   if (! input.good()) {
     cerr << "PositionalAnalogueScanning:cannot open '" << fname << "'\n";
@@ -1085,7 +1087,7 @@ Main(int argc, char** argv) {
     Usage();
   }
 
-  IWString_and_File_Descriptor output(1);
+  iwstring::IWString_and_File_Descriptor output(1);
 
   if (! PositionalAnalogueScanning(cl[0], options, output)) {
     return 1;

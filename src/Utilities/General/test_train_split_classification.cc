@@ -13,10 +13,12 @@
 #include "Foundational/iwmisc/misc.h"
 #define RESIZABLE_ARRAY_IWQSORT_IMPLEMENTATION
 #include "Foundational/iwqsort/iwqsort.h"
+#include "Foundational/iwstring/iwstring_and_file_descriptor.h"
 
 #include "ttitem.h"
 
 using std::cerr;
+using iwstring::IWString_and_File_Descriptor;
 
 const char *prog_name = NULL;
 

@@ -9,8 +9,6 @@
 #include <iostream>
 #include <memory>
 
-using std::cerr;
-
 #define RESIZABLE_ARRAY_IMPLEMENTATION
 
 #include "google/protobuf/text_format.h"
@@ -23,6 +21,7 @@ using std::cerr;
 #include "Foundational/iwstring/absl_hash.h"
 #include "Foundational/iwstring/iw_stl_hash_map.h"
 #include "Foundational/iwstring/iw_stl_hash_set.h"
+#include "Foundational/iwstring/iwstring_and_file_descriptor.h"
 
 #include "Molecule_Lib/aromatic.h"
 #include "Molecule_Lib/element.h"
@@ -45,6 +44,9 @@ using std::cerr;
 #else
 #include "dicer_fragments.pb.h"
 #endif
+
+using std::cerr;
+using iwstring::IWString_and_File_Descriptor;
 
 static int verbose = 0;
 

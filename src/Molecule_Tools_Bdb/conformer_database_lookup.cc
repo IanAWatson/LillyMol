@@ -14,6 +14,7 @@
 
 #include "Foundational/iwaray/iwaray.h"
 #include "Foundational/cmdline/cmdline.h"
+#include "Foundational/iwstring/iwstring_and_file_descriptor.h"
 
 #include "Molecule_Lib/aromatic.h"
 #include "Molecule_Lib/element.h"
@@ -34,6 +35,7 @@
 namespace conformer_database {
 
 using std::cerr;
+using iwstring::IWString_and_File_Descriptor;
 
 void 
 Usage(int rc) {

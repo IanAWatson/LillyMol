@@ -2,6 +2,7 @@
 #include <memory>
 
 #include "Foundational/iwmisc/misc.h"
+#include "Foundational/iwstring/iwstring_and_file_descriptor.h"
 #include "Molecule_Lib/molecule.h"
 
 #include "smi2rings_bdb_lib.h"
@@ -9,6 +10,7 @@
 namespace mol2rings {
 
 using std::cerr;
+using iwstring::IWString_and_File_Descriptor;
 
 // Return true if all members of the array `v` are `value`.
 // There is probably a library function to do this...

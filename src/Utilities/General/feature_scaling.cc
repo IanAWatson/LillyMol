@@ -15,6 +15,7 @@
 #include "Foundational/iwmisc/iwdigits.h"
 #include "Foundational/iwmisc/proto_support.h"
 #include "Foundational/iwstring/iw_stl_hash_set.h"
+#include "Foundational/iwstring/iwstring_and_file_descriptor.h"
 
 #ifdef BUILD_BAZEL
 #include "Utilities/General/feature_scaling.pb.h"
@@ -27,6 +28,7 @@
 namespace feature_scaling {
 
 using std::cerr;
+using iwstring::IWString_and_File_Descriptor;
 
 int verbose = 0;
 

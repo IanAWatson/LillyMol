@@ -1771,34 +1771,37 @@ assign_atom_types(Molecule& m, int typing_to_use, T* atype, const int* ncon) {
 static void
 display_atom_type_specifications(std::ostream& os) {
   // clang-format off
-  os << " -P z              atomic number atom type\n";
-  os << " -P c              \"c\" atom type\n";
-  os << " -P tt             topological torsion atom type\n";
-  os << " -P syb            Sibyl atom type\n";
-  os << " -P pp             Pharmacophore type\n";
-  os << " -P UST:achprtyzne User Specified Type\n";
-  os << "        A          aromatic or not\n";
-  os << "        C          number of connections\n";
-  os << "        E          carbon atoms get one type, all heteroatoms a different type\n";
-  os << "        F          ring fusion\n";
-  os << "        G          atomic symbol hash\n";
-  os << "        H          implicit hydrogen count\n";
-  os << "        I          isotope\n";
-  os << "        K          atomic numbers of connected atoms\n";
-  os << "        L          largest ring\n";
-  os << "        M          all aromatic atoms the same\n";
-  os << "        N          all atoms get the same type\n";
-  os << "        O          formal charge\n";
-  os << "        P          pi electron count\n";
-  os << "        Q          presence or absence of a pi electron\n";
-  os << "        R          ring bond count\n";
-  os << "        S          smallest ring\n";
-  os << "        T          atomic number, but possibly tautomeric nitrogens grouped\n";
-  os << "        U          unsaturation\n";
-  os << "        X          centrality of atom (expensive, uses distance matrix)\n";
-  os << "        Y          atomic number, heavy halogens compressed\n";
-  os << "        Z          atomic numbers\n";
-  os << "              end specification with number for shell expansion\n";
+  os << R"(The following atom types are recognised.
+ -P z              atomic number atom type.
+ -P c              'c' atom type - consists of hcount, pi electrons, aromatic and ncon.
+ -P tt             topological torsion atom type.
+ -P syb            Sibyl atom type.
+ -P pp             Pharmacophore type.
+ -P UST:....       User Specified Type, ... just be combinations of the letters below.
+        A          aromatic or not.
+        B          unsaturated - does not include aromatic, compare 'U'.
+        C          number of connections.
+        E          carbon atoms get one type, all heteroatoms a different type.
+        F          ring fusion.
+        G          atomic symbol hash - useful for non periodic table elements.
+        H          implicit hydrogen count.
+        I          isotope.
+        K          atomic numbers of connected atoms.
+        L          size of largest ring.
+        M          all aromatic atoms the same.
+        N          all atoms get the same type.
+        O          formal charge.
+        P          pi electron count.
+        Q          presence or absence of a pi electron.
+        R          ring bond count.
+        S          size of smallest ring.
+        T          atomic number, but possibly tautomeric nitrogens grouped.
+        U          unsaturation - aromatics are considered unsaturaged - compare 'B'.
+        X          centrality of atom (expensive, uses distance matrix).
+        Y          atomic number, heavy halogens compressed.
+        Z          atomic numbers.
+              end specification with number for shell expansion - UST:AY1 for expansion to immediate nbrs.
+)";
   // clang-format on
 
   exit(1);

@@ -152,11 +152,18 @@ set_smiles_tag(const_IWSubstring s) {
   smiles_tag.back()->EnsureEndsWith(':');
 }
 
-const IWString&
-SmilesTag() {
+void
+InitialiseSmilesTags() {
   if (smiles_tag.empty()) {
     smiles_tag << new IWString("smi:");
     smiles_tag << new IWString("smiles:");
+  }
+}
+
+const IWString&
+SmilesTag() {
+  if (smiles_tag.empty()) {
+    InitialiseSmilesTags();
   }
 
   return *smiles_tag[0];
@@ -164,7 +171,11 @@ SmilesTag() {
 
 bool
 IsSmilesTag(const const_IWSubstring& s) {
-  for (const IWString* tag : smiles_tag) {
+  if (smiles_tag.empty()) {
+    InitialiseSmilesTags();
+  }
+
+  for (const IWString *tag : smiles_tag) {
     if (s == *tag) {
       return true;
     }

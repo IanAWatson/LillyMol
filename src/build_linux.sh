@@ -18,31 +18,11 @@ else
     echo "No bazel/bazelisk, see README.md" && exit 1
 fi
 
-# Step 1: udpate MODULE.bazel and install.bzl
-# Update MODULE.bazel and install.bzl for the current location.
 # Must be invoked from the src directory /path/to/LillyMol/src
 pushd $REPO_HOME/src
 
 if [[ ! -s 'MODULE.bazel' ]] ; then
     echo "Must be invoked in the directory with MODULE.bazel" && exit 1
-fi
-
-# Only build python if requested
-if [[ -v BUILD_PYTHON ]] ; then
-    # Use python to update MODULE.bazel for python locations.
-    if [[ -s 'update_python_in_module_bazel.py' ]] ; then
-        tmpfile="/tmp/MODULE.bazel.${USER}"
-        cp MODULE.bazel ${tmpfile}
-        python3 ./update_python_in_module_bazel.py ${tmpfile} > MODULE.bazel
-        if [[ -s MODULE.bazel ]] ; then
-          echo "MODULE.bazel updated"
-        else
-          echo "Updating MODULE.bazel failed, restoring orignal, python bindings will not work"
-          cp -f ${tmpfile} MODULE.bazel
-        fi
-    else
-        echo "Missing update_python_in_module_bazel.py, MODULE.bazel not updated for python"
-    fi
 fi
 
 # Homebrew openmp

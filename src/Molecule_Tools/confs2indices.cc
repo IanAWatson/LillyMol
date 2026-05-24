@@ -367,7 +367,7 @@ ApplicationName(Options& options,
   }
 
   if (! options.Resize(n)) {
-    cerr << "ApplicationName:cannot initialise for " << n << " molecles\n";
+    cerr << "ApplicationName:cannot initialise for " << n << " molecules\n";
     return 0;
   }
 

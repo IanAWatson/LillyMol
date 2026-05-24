@@ -1,4 +1,4 @@
-// Systematic enumeration around a set of molecles.
+// Systematic enumeration around a set of molecules.
 // Takes a set of molecules and a fragment library,
 // and adds all members of the fragment library to
 // available sites in the molecules.

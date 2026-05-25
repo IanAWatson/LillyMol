@@ -35,16 +35,6 @@ if [[ $(uname) == 'Darwin' ]] ; then
   fi
 fi
 
-# intall.bzl no longer used.
-# install.bzl does need to be updated.
-# echo 'Updating build_deps/install.bzl'
-# if [[ ! -s 'build_deps/install.bzl' ]] ; then
-#     echo "build_deps/install.bzl not found" && exit 1
-# fi
-# Make a copy
-# cp build_deps/install.bzl /tmp/install.bzl.${USER}
-# sed -i -e "s/default *= *\".*\",/default = \"${bindir}\",/" build_deps/install.bzl
-
 # Create bindir if not already present
 bindir=$REPO_HOME/bin/$(uname)
 if [[ ! -d ${bindir} ]] ; then
@@ -116,6 +106,19 @@ if [[ ! -s 'libf2c.zip' ]] ; then
 fi
 if [[ ${must_build} -eq 1 || ! -s 'libf2c/libf2c.a' ]] ; then
     (cd libf2c && make -f makefile.u)
+fi
+
+must_build=0
+if [[ ! -d 'edge-addition-planarity-suite' ]] ; then
+  git clone https://github.com/graph-algorithms/edge-addition-planarity-suite
+  must_build=1
+fi
+
+if [[ ${must_build} == 1 ]] ; then
+  (cd edge-addition-planarity-suite && autoreconf -fi)
+  (cd edge-addition-planarity-suite && ./configure --prefix=${REPO_HOME}/third_party)
+  (cd edge-addition-planarity-suite && make dist)
+  (cd edge-addition-planarity-suite && make install)
 fi
 
 #if [[ ! -d 'dragonbox' ]] ; then

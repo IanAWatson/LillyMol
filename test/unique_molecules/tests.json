@@ -6,6 +6,13 @@
       "args": [
            "-S unique -D duplicate -v -l #{indir}/input.smi"
       ]
+    },
+
+    {
+      "name": "chiral",
+      "args": [
+           "-S unique -D duplicate -c -v -l #{indir}/in.smi"
+      ]
     }
 
   ]

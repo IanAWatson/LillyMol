@@ -1125,6 +1125,7 @@ cc_binary(
         "//Foundational/iwmisc:sparse_fp_creator",
         "//Molecule_Lib:iwmolecule",
         "//Molecule_Lib:moleculeio",
+        "//Molecule_Lib:planarity",
         "//Molecule_Lib:substructure_cc_proto",
         "@com_google_protobuf//:protobuf",
     ],
@@ -1461,6 +1462,7 @@ cc_binary(
         "//Foundational/cmdline:iwcmdline",
         "//Molecule_Lib:iwmolecule",
         "//Molecule_Lib:moleculeio",
+        "//Molecule_Lib:planarity",
         "//Molecule_Tools:nvrtspsa",
     ],
 )
@@ -2393,7 +2395,7 @@ cc_binary(
         "skeleton.cc",
     ],
     deps = [
-        ":contiguous_atoms",
+        "//Molecule_Lib:planarity",
         "//Molecule_Lib:iwmolecule",
         "//Molecule_Lib:iwreaction",
         "//Molecule_Lib:moleculeio",

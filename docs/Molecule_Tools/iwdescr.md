@@ -192,6 +192,7 @@ The following descriptors are computed.
 | trmnlrng | terminal ring (1 connection) |
 | intrnlrng | internal ring (multiple connections) |
 | isolrc | isolated (not fused) rings |
+| planarity | true if the molecule contains a non planar ring system |
 | hperatom | average number of hydrogens per heavy atom |
 | hcount | total number of hydrogen atoms |
 | htroatom | number of heteroatoms |

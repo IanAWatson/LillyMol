@@ -114,3 +114,16 @@ cc_library(
     strip_include_prefix = "InChI/INCHI-1-SRC/INCHI_BASE/src",
     visibility = ["//visibility:public"],
 )
+
+cc_library(
+    name = "planarity",
+    srcs = [
+        "lib/libplanarity.a",
+    ],
+    hdrs = glob(
+            ["include/planarity/c/**/*.h"],
+            allow_empty=False,
+        ),
+    strip_include_prefix = "include/planarity/c",
+    visibility = ["//visibility:public"],
+)

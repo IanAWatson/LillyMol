@@ -18,31 +18,11 @@ else
     echo "No bazel/bazelisk, see README.md" && exit 1
 fi
 
-# Step 1: udpate MODULE.bazel and install.bzl
-# Update MODULE.bazel and install.bzl for the current location.
 # Must be invoked from the src directory /path/to/LillyMol/src
 pushd $REPO_HOME/src
 
 if [[ ! -s 'MODULE.bazel' ]] ; then
     echo "Must be invoked in the directory with MODULE.bazel" && exit 1
-fi
-
-# Only build python if requested
-if [[ -v BUILD_PYTHON ]] ; then
-    # Use python to update MODULE.bazel for python locations.
-    if [[ -s 'update_python_in_module_bazel.py' ]] ; then
-        tmpfile="/tmp/MODULE.bazel.${USER}"
-        cp MODULE.bazel ${tmpfile}
-        python3 ./update_python_in_module_bazel.py ${tmpfile} > MODULE.bazel
-        if [[ -s MODULE.bazel ]] ; then
-          echo "MODULE.bazel updated"
-        else
-          echo "Updating MODULE.bazel failed, restoring orignal, python bindings will not work"
-          cp -f ${tmpfile} MODULE.bazel
-        fi
-    else
-        echo "Missing update_python_in_module_bazel.py, MODULE.bazel not updated for python"
-    fi
 fi
 
 # Homebrew openmp
@@ -54,16 +34,6 @@ if [[ $(uname) == 'Darwin' ]] ; then
     echo "Homebrew openmp already added to MODULE.bazel"
   fi
 fi
-
-# intall.bzl no longer used.
-# install.bzl does need to be updated.
-# echo 'Updating build_deps/install.bzl'
-# if [[ ! -s 'build_deps/install.bzl' ]] ; then
-#     echo "build_deps/install.bzl not found" && exit 1
-# fi
-# Make a copy
-# cp build_deps/install.bzl /tmp/install.bzl.${USER}
-# sed -i -e "s/default *= *\".*\",/default = \"${bindir}\",/" build_deps/install.bzl
 
 # Create bindir if not already present
 bindir=$REPO_HOME/bin/$(uname)
@@ -136,6 +106,19 @@ if [[ ! -s 'libf2c.zip' ]] ; then
 fi
 if [[ ${must_build} -eq 1 || ! -s 'libf2c/libf2c.a' ]] ; then
     (cd libf2c && make -f makefile.u)
+fi
+
+must_build=0
+if [[ ! -d 'edge-addition-planarity-suite' ]] ; then
+  git clone https://github.com/graph-algorithms/edge-addition-planarity-suite
+  must_build=1
+fi
+
+if [[ ${must_build} == 1 ]] ; then
+  (cd edge-addition-planarity-suite && autoreconf -fi)
+  (cd edge-addition-planarity-suite && ./configure --prefix=${REPO_HOME}/third_party)
+  (cd edge-addition-planarity-suite && make dist)
+  (cd edge-addition-planarity-suite && make install)
 fi
 
 #if [[ ! -d 'dragonbox' ]] ; then

@@ -221,6 +221,13 @@
       "args": [
         "#{indir}/in.smi"
       ]
+    },
+
+    {
+      "name": "planarity",
+      "args": [
+        "#{indir}/in.smi"
+      ]
     }
 
   ]

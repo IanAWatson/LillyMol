@@ -71,5 +71,9 @@ message Requirements {
   optional int32 max_chiral = 35;
 
   optional int32 max_number_fragments = 36;
-}
 
+  // True if the molecule has no convex flat representation.
+  // Captures molecules with complex fused rings, but also flat ring
+  // systems like Phenaline.
+  optional bool planar = 37;
+}

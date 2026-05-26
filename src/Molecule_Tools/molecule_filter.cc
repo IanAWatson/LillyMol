@@ -13,6 +13,7 @@
 #include "Molecule_Lib/aromatic.h"
 #include "Molecule_Lib/molecule.h"
 #include "Molecule_Lib/path.h"
+#include "Molecule_Lib/planarity.h"
 #include "Molecule_Lib/rotbond_common.h"
 #include "Molecule_Lib/standardise.h"
 #include "Molecule_Lib/target.h"
@@ -120,6 +121,7 @@ class Options {
 
     uint64_t _matches_exclusion_smarts = 0;
     uint64_t _no_match_required_smarts = 0;
+    uint64_t _no_match_planarity = 0;
 
     // for use with parallel processing.
     off_t _seek_to;
@@ -129,6 +131,8 @@ class Options {
     int Process(Molecule& m);
     int Process(Molecule& m, int matoms, int nrings);
     int MaybeWriteToRejectStream(const const_IWSubstring& line);
+
+    bool OkPlanarity(const Molecule& m);
 
   public:
     Options();
@@ -334,6 +338,10 @@ Options::Report(std::ostream& output) const {
   }
   if (_requirements.has_max_rotatable_bonds()) {
     output << _too_many_rotbond << " too many rotatable bonds " << _requirements.max_rotatable_bonds() << '\n';
+  }
+
+  if (_requirements.has_planar()) {
+    output << _no_match_planarity << " molecules not matchin planarity " << _requirements.planar() << '\n';
   }
 
   if (_requirements.has_min_tpsa()) {
@@ -575,6 +583,31 @@ Options::MaybeWriteToRejectStream(const const_IWSubstring& line) {
   return 1;
 }
 
+bool
+Options::OkPlanarity(const Molecule& m) {
+  iwplanarity::PlanarityResult result = iwplanarity::Planarity(m);
+  if (result.status == iwplanarity::PlanarityStatus::kPlanar) {
+    if (_requirements.planar()) {
+      return true;
+    } else {
+      ++_no_match_planarity;
+      return false;
+    }
+  }
+
+  if (result.status == iwplanarity::PlanarityStatus::kNonPlanar) {
+    if (_requirements.planar()) {
+      return false;
+      ++_no_match_planarity;
+    } else {
+      return true;
+    }
+  }
+
+  cerr << "Options::OkPlanarity:planarity calculation failed\n";
+  return false;
+}
+
 int
 Options::Process(Molecule& m,
                  const int matoms,
@@ -721,6 +754,12 @@ Options::Process(Molecule& m,
     }
     if (_requirements.has_max_rotatable_bonds() && rotb > _requirements.max_rotatable_bonds()) {
       ++_too_many_rotbond;
+      return 0;
+    }
+  }
+
+  if (_requirements.has_planar()) {
+    if (!OkPlanarity(m)) {
       return 0;
     }
   }

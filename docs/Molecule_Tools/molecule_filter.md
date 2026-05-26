@@ -64,6 +64,7 @@ min_sp3_carbon: 1
 max_aromatic_density: 0.8
 max_chiral: 2
 max_number_fragments: 2
+planar: true
 ```
 Note that as written this makes no sense. It would be silly to filter
 on both alogp and xlogp. Choose one. That said, the xlogp implementation

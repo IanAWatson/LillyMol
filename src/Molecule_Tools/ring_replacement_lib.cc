@@ -977,7 +977,7 @@ RingReplacement::ReadReplacementRings(iwstring_data_source& input, int ndx) {
 // molecule in `r`.
 // There are complications however. If this replacement ring has
 // exocyclic =O type groups, we need to rebuild the molecule using
-// the usmi attribute in the proto, since at this stage, the molecle
+// the usmi attribute in the proto, since at this stage, the molecule
 // in `r` will not have those atoms attached.
 int
 RingReplacement::OkWithQueryRequirements(Replacement& r,

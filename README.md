@@ -1,5 +1,7 @@
 # Welcome to the Eli Lilly LillyMol implementation.
 
+See [BUILD](Build.md) for how to build LillyMol.
+
 ## Background
 LillyMol is a set of Linux executables for Cheminformatics. These tools are built
 on a high performance C++ library for Cheminformatics.

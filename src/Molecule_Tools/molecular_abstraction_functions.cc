@@ -327,7 +327,7 @@ Molecular_Abstraction_Base_Class::_parse_isotope_directive(const const_IWSubstri
 }
 
 /*
-  We have begun a request, but it cannot process the molecle. What should we do?
+  We have begun a request, but it cannot process the molecule. What should we do?
 */
 
 int

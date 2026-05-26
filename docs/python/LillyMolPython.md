@@ -66,7 +66,7 @@ ordering unless requested. So if you remove an atom, or bond, it will destroy an
 information it has about those derived quantities. Only if requested will any
 be recomputed.
 
-This has many advantages. For example if a molecle is built from a smiles
+This has many advantages. For example if a molecule is built from a smiles
 and then the only thing ever requested is the number of atoms, that will be
 very cheap. If the number of fragments is requested, then only fragment membership
 is computed. Even if the most expensive derived property, the canonical order,

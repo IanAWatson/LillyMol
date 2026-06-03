@@ -121,9 +121,9 @@ cc_library(
         "lib/libplanarity.a",
     ],
     hdrs = glob(
-            ["include/planarity/c/**/*.h"],
+            ["include/planarity/**"],
             allow_empty=False,
         ),
-    strip_include_prefix = "include/planarity/c",
+    strip_include_prefix = "include/planarity/",
     visibility = ["//visibility:public"],
 )

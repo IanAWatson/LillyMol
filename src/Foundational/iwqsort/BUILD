@@ -25,3 +25,14 @@ cc_library(
         "@onetbb//:tbb",
     ],
 )
+
+cc_binary(
+    name = "test_iwqsort_fo",
+    srcs = [
+       "test_iwqsort_fo.cc",
+    ],
+    deps = [
+        ":iwqsort",
+        "//Foundational/cmdline:iwcmdline",
+    ],
+)

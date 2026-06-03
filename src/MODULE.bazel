@@ -102,6 +102,7 @@ new_local_repository(
     path = "/lrlhps/apps/gc3tk/c3tk-core/lib/corina",
 #   path = "/lrlhps/apps/corina/corina-5.0.0",
     build_file_content = """
+load("@rules_cc//cc:defs.bzl", "cc_library")
 cc_library(
     name = "corina",
     srcs = [
@@ -121,6 +122,7 @@ new_local_repository(
     name = "biobyte",
     path= "/lrlhps/apps/gc3tk/c3tk-core/lib/biobyte/linux-64/",
     build_file_content = """
+load("@rules_cc//cc:defs.bzl", "cc_library")
 cc_library (
     name = "biobyte",
     srcs = [ "lib/libBB.a", "lib/libf2c.a" ],
@@ -150,3 +152,37 @@ cc_library(
 )
 """
 )
+new_local_repository(
+    name = "homebrew_openmp",
+    path = "/opt/homebrew/Cellar/libomp/22.1.6",
+    build_file_content = """
+load("@rules_cc//cc:defs.bzl", "cc_binary", "cc_proto_library", "cc_library", "cc_test")
+cc_library(
+    name = "homebrew_openmp",
+    srcs = [
+       "lib/libomp.a"
+    ],
+    hdrs = glob(["include/*"]),
+    strip_include_prefix = "include",
+    visibility = ["//visibility:public"],
+)
+""",
+)
+
+new_local_repository(
+    name = "homebrew_gnutls",
+    path = "/opt/homebrew/Cellar/gnutls/3.8.13_2/",
+    build_file_content = """
+load("@rules_cc//cc:defs.bzl", "cc_binary", "cc_proto_library", "cc_library", "cc_test")
+cc_library(
+    name = "homebrew_gnutls",
+    hdrs = glob(["include/**/*.h"]),
+    strip_include_prefix = "include",
+    srcs = [
+      "lib/libgnutls.dylib"
+    ],
+    visibility = ["//visibility:public"],
+)
+""",
+)
+

@@ -110,14 +110,21 @@ fi
 
 must_build=0
 if [[ ! -d 'edge-addition-planarity-suite' ]] ; then
-  git clone https://github.com/graph-algorithms/edge-addition-planarity-suite
+  git clone --branch Version_4.0.1.0 --depth 1 https://github.com/graph-algorithms/edge-addition-planarity-suite
+  # There is a bug in this version of planarity
+  python3 - <<'PY'
+from pathlib import Path
+p = Path("edge-addition-planarity-suite/c/graphLib/extensionSystem/graphExtensions.private.h")
+s = p.read_text()
+s = s.replace("typedef struct\n    {", "typedef struct graphExtension\n    {")
+p.write_text(s)
+PY
   must_build=1
 fi
 
 if [[ ${must_build} == 1 ]] ; then
   (cd edge-addition-planarity-suite && autoreconf -fi)
   (cd edge-addition-planarity-suite && ./configure --prefix=${REPO_HOME}/third_party)
-  (cd edge-addition-planarity-suite && make dist)
   (cd edge-addition-planarity-suite && make install)
 fi
 

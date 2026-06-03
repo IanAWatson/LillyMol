@@ -63,11 +63,11 @@ Element_Transformations element_transformations;
   unique smiles for each molecule
 */
 
+IWString* usmi = nullptr;
+
 int max_molecules = 0;
 
 Chemical_Standardisation chemical_standardisation;
-
-IWString* usmi = nullptr;
 
 int write_duplicate_molecules = 0;
 

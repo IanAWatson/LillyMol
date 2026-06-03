@@ -1,6 +1,7 @@
 build --cxxopt=-std=c++23 --cxxopt=-DBUILD_BAZEL
 
 build --enable_bzlmod 
+build --copt=-march=native
 # https://groups.google.com/g/bazel-discuss/c/5cbRuLuTwNg
 build --per_file_copt=external/.*@-Wno-error=maybe-uninitialized
 

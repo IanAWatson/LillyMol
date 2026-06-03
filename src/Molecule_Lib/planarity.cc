@@ -2,7 +2,7 @@
 #include <memory>
 #include <type_traits>
 
-#include "graphLib/graphLib.h"
+#include "graphLib.h"
 
 #include "Molecule_Lib/molecule.h"
 
@@ -31,6 +31,10 @@ BuildEapsGraph(const Molecule& m, graphP g) {
 
 static void
 FillObstructionBonds(graphP g, PlanarityResult& result) {
+#ifdef NO_LONGER_GEING_COMPUTED
+  Newer versions of the graph library do not have these functions.
+  disable for now...
+  TODO:ianwatson investigate newer versions
   for (int e = gp_LowerBoundEdges(g); e < gp_UpperBoundEdges(g); e += 2) {
     if (gp_EdgeNotInUse(g, e)) {
       continue;
@@ -43,6 +47,7 @@ FillObstructionBonds(graphP g, PlanarityResult& result) {
       result.obstruction_bonds.emplace_back(a1 - 1, a2 - 1);
     }
   }
+#endif
 }
 
 // Custom deleter for a graphP.

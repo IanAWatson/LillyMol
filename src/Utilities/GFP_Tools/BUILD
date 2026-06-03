@@ -480,8 +480,6 @@ cc_binary(
         "gfp_server",
     ],
     deps = [
-        ":nn_request_cc_grpc",
-        ":gfp_server_cc_grpc",
         "//Foundational/cmdline:iwcmdline",
         "//Foundational/data_source:iwstring_data_source",
         "//Molecule_Lib:iwmfingerprint",

@@ -39,19 +39,19 @@ cc_proto_library(
     ],
 )
 
-proto_library(
-    name = "gfp_server_proto",
-    srcs = [
-        "gfp_server.proto",
-    ],
-)
+# proto_library(
+#     name = "gfp_server_proto",
+#     srcs = [
+#         "gfp_server.proto",
+#     ],
+# )
 
-cc_proto_library(
-    name = "gfp_server_cc_proto",
-    deps = [
-        ":gfp_server_proto",
-    ],
-)
+# cc_proto_library(
+#     name = "gfp_server_cc_proto",
+#     deps = [
+#         ":gfp_server_proto",
+#     ],
+# )
 
 proto_library(
     name = "gfp_to_svm_lite_proto",

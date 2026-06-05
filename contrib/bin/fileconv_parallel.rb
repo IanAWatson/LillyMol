@@ -27,7 +27,7 @@ end
 
 def fileconv_parallel
 
-  cl = IWCmdlineV2.new("-v-thr=ipos-tmpdir=s-S=s-fileconv=xfile-nj-log=s-keeplog")
+  cl = IWCmdlineV2.new("-v-thr=ipos-tmpdir=s-S=s-L=s-fileconv=xfile-nj-log=s-keeplog")
 
   verbose = cl.option_present('v')
 
@@ -65,6 +65,13 @@ def fileconv_parallel
     tmpdir = cl.value('tmpdir')
 
     Dir.mkdir(tmpdir) unless (FileTest.directory?(tmpdir))
+  end
+
+  lfiles = if cl.option_present('L')
+    stem = cl.value('L')
+    (0..nthreads).map { |i| "#{stem}#{i}" }
+  else
+    []
   end
 
   PSupport::looks_like_multiple_files(ARGV) && exit
@@ -110,6 +117,8 @@ def fileconv_parallel
     cmd << " -i seek=#{offset[i]}"
     cmd << " -i stop=#{offset[i+1]}" if offset[i+1]
       
+    cmd << " -L #{lfiles[i]}" if lfiles.size > 0
+
     cmd << " -S #{output_files[i]}  #{input_file} > #{output_files[i]}"
 
     cmd << " 2> #{log_files[i]}" if log_stem
@@ -127,6 +136,7 @@ def fileconv_parallel
 
   cmd = "#{fileconv} #{common_args}"
 
+  cmd << " -L #{lfiles[0]}" if lfiles.size > 0
   cmd << " -i stop=#{offset[1]} -S #{output_files[0]} #{input_file}"
 
   cmd << " 2>#{log_files[0]}" if log_stem

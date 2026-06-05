@@ -818,14 +818,12 @@ int
 Molecule_Output_Object::would_overwrite_input_files(const Command_Line& cl,
                                                     const const_IWSubstring& proposed_stem) const
 {
-  if (_output_types.empty())
-  {
+  if (_output_types.empty()) {
     cerr << "Molecule_Output_Object::would_overwrite_input_files: no output types\n";
     return 0;
   }
 
-  for (int i = 0; i < cl.number_elements(); i++)
-  {
+  for (int i = 0; i < cl.number_elements(); i++) {
     const char* fname = cl[i];
     if (would_use_name(proposed_stem, fname))
       return 1;

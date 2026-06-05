@@ -112,6 +112,8 @@ must_build=0
 if [[ ! -d 'edge-addition-planarity-suite' ]] ; then
   git clone --branch Version_4.0.1.0 --depth 1 https://github.com/graph-algorithms/edge-addition-planarity-suite
   # There is a bug in this version of planarity
+  # EAPS Version_4.0.1.0 contains a C/C++ incompatibility in
+  # graphExtensions.private.h. Patch before build.
   python3 - <<'PY'
 from pathlib import Path
 p = Path("edge-addition-planarity-suite/c/graphLib/extensionSystem/graphExtensions.private.h")
@@ -125,7 +127,7 @@ fi
 if [[ ${must_build} == 1 ]] ; then
   (cd edge-addition-planarity-suite && autoreconf -fi)
   (cd edge-addition-planarity-suite && ./configure --prefix=${REPO_HOME}/third_party)
-  (cd edge-addition-planarity-suite && make install)
+  (cd edge-addition-planarity-suite && make -j ${THREADS} install)
 fi
 
 #if [[ ! -d 'dragonbox' ]] ; then

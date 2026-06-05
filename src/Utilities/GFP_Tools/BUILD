@@ -401,7 +401,6 @@ cc_binary(
     name = "gfp_leader_tbb",
     srcs = [
         "gfp_leader_tbb.cc",
-        "leader_parallel.cc",
         "leader_parallel.h",
     ],
     linkopts = [
@@ -480,6 +479,7 @@ cc_binary(
         "gfp_server",
     ],
     deps = [
+        "nn_request_cc_proto",
         "//Foundational/cmdline:iwcmdline",
         "//Foundational/data_source:iwstring_data_source",
         "//Molecule_Lib:iwmfingerprint",

@@ -281,6 +281,17 @@ DisplayDashmOptions(std::ostream& output) {
   ::exit(0);
 }
 
+// If '-m help' is in `cl`, invode DisplayDashmOptions.
+void
+MaybeDisplayMHelp(Command_Line& cl) {
+  const_IWSubstring m;
+  for (int i = 0; cl.value('m', m, i); ++i) {
+    if (m == "help") {
+      DisplayDashmOptions(cerr);
+    }
+  }
+}
+
 int verbose = 0;
 static uint64_t molecules_read = 0;
 static uint64_t molecules_which_match = 0;
@@ -1943,6 +1954,10 @@ tsubstructure(int argc, char** argv) {
       usage(5);
     }
   }
+
+  // As a usability aid, quickly check if '-m help' is entered. If so,
+  // call DisplayDashmOptions, which exits.
+  MaybeDisplayMHelp(cl);
 
   int match_first = 0;
   if (cl.option_present('f')) {

@@ -673,6 +673,13 @@
       "args": [
         "-o usmi -q S:#{indir}/atypes -j qnum -m out #{indir}/in.smi"
       ]
+    },
+
+    {
+      "name": "NONMX",
+      "args": [
+        "-s C -m out -m NONMX #{indir}/in.smi"
+      ]
     }
   ]
 

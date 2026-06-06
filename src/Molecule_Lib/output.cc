@@ -835,8 +835,7 @@ Molecule_Output_Object::would_overwrite_input_files(const Command_Line& cl,
 std::ostream&
 Molecule_Output_Object::stream_for_type(int ftype) const
 {
-  for (int i = 0; i < _number_elements; i++)
-  {
+  for (int i = 0; i < _number_elements; i++) {
     if (ftype == _output_types[i])
       return *(_things[i]);
   }

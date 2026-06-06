@@ -670,6 +670,12 @@ PYBIND11_MODULE(lillymol, m)
                   },
                   "True if all atoms valence ok"
                 )
+                .def("valence_ok",
+                  [](Molecule& m, atom_number_t a)->bool {
+                    return m.valence_ok(a);
+                  },
+                  "Returns true of atom a has an ok valence"
+                )
 
                 .def("canonical_rank", static_cast<int (Molecule::*)(atom_number_t)>(&Molecule::canonical_rank), "Atom's canonical rank")
                 .def("canonical_ranks",

@@ -121,41 +121,31 @@ usage(int rc) {
   // clang-format on
   // clang-format off
 //cerr << "  -m REPOrt      report (to the screen) matches\n";
-  cerr << "  -m SEPArate    write matches to each query to a separate stream\n";
-  cerr << "  -m QDT         append query match details to molecule name\n";
-//cerr << "  -m NONM        write non-matching molecules to the matched atom stream\n";
-//cerr << "  -m NONMX       write non-matching molecules to the matched atom stream, but\n";
-  cerr << "                 do not append non-match query details\n";
-  cerr << "  -m alist       write matched atoms as MDL V30 atom lists in the output file\n";
-  cerr << "  -m blist       write matched atoms as MDL V30 bond lists in the output file\n";
-//cerr << "  -m <number>    assign sequential numbers R(%d) to matches written\n";
-  cerr << "  -m <file>      write matched structures to <file>\n";
-  cerr << '\n';
-//cerr << "  -n REPOrt      report (to the screen) non matches\n";
-  cerr << "  -n SEPArate    write matches to each query to a separate stream\n";
-  cerr << "  -n QDT         append query non-match details to molecule name\n";
-//cerr << "  -n <number>    assign sequential numbers R(%d) to non matches written\n";
-  cerr << "  -n <file>      write non matching structures to <file>\n";
+  cerr << "  -m <fname>     write matches to <fname>\n";
+  cerr << "  -m ...         more options for specifying matches file, enter\n";
+  cerr << "      tsubstructure -s c -m help x.smi      for info - must specify query and input file\n";
+  cerr << "  -n <fname>      write non matches to <fname>\n";
   cerr << '\n';
   cerr << "  -q <query>     specify query file\n";
   cerr << "  -q F:file      specify file of queries\n";
   cerr << "  -q S:file      specify file of smarts\n";
   cerr << "  -q M:file      specify file of molecules\n";
-  cerr << "  -P ...         atom typing specification - determine changing atoms and searching match conditions (default=UST:AZUCORS)\n";
+  cerr << "  -q PROTO:file  specify file containing textproto query\n";
+  cerr << "  -q PROTOFILE:file  file containing file names of textproto queries\n";
   cerr << "  -s <smarts>    specify smarts for search\n";
-//cerr << "  -S <smarts>    specify smarts for search (use -s)\n";
   cerr << '\n';
   cerr << "  -j <...>       options for labelling matched atoms. Enter '-j help' for details\n";
   cerr << "  -J <tag>       output Daylight fingerprints with tag <TAG>\n";
   cerr << "  -y <nbits>     specify the number of bits in the fingerprint file\n";
   cerr << "  -a             output hits as DataFrame, each row is a molecule, each column for per query number matches\n";
   cerr << "  -Y <stem>      use <stem> as descriptor name stem - used with the -a option\n";
-  cerr << "  -c             remove chirality before doing any matching\n";
-  cerr << "  -l             reduce to largest fragment before doing search\n";
+  cerr << "  -P ...         atom typing specification - determine changing atoms and searching match conditions (default=UST:AZUCORS)\n";
   cerr << "  -f             only find one embedding of the query (default is to find all)\n";
   cerr << "  -u             find unique matches only\n";
   cerr << "  -k             don't perceive symmetrically equivalent matches\n";
   cerr << "  -r             find one embedding per root atom match\n";
+  cerr << "  -c             remove chirality before doing any matching\n";
+  cerr << "  -l             reduce to largest fragment before doing search\n";
 //cerr << "  -p             respect aromaticity of smarts queries\n";
 //cerr << "  -K             aromatic bonds lose their Kekule forms - no longer match single or double\n";
   cerr << "  -M <...>       miscellaneous query conditions, enter '-M help' for details\n";
@@ -167,8 +157,6 @@ usage(int rc) {
   cerr << "  -o <type>      output type for all molecules written\n";
   display_standard_aromaticity_options(cerr);
   display_standard_chemical_standardisation_options(cerr, 'g');
-//display_standard_charge_assigner_options(cerr, 'N');
-//cerr << "  -H <...>       donor acceptor options. Enter '-H help' for details\n";
   cerr << "  -X <element>   remove elements of type <element> before doing matches\n";
   cerr << "  -T ...         element transformations, enter '-T help' for info\n";
   cerr << "  -E <symbol>    create element with symbol <symbol>\n";
@@ -259,6 +247,40 @@ display_dash_j_options() {
   return;
 }
 
+static void
+DisplayDashmOptions(std::ostream& output) {
+  output << R"(The -m option specifies where molecules that match one or more queries are written
+ -m <fname>     the file name(s) that will be created
+ -m QDT         to each molecule append Query DeTails of the query(s) that matched.
+                output might look like: S=C(N)NN=C(C)C1=CC=CN1 CHEMBL1990108 (4 matches to 'c')
+ -m QDTVB       similar to QDT, but perhaps easier for other tools to parse
+                tsubstructure -s 'c q1' -s 'n q2' -m - -m QDTVB file.smi
+                might generate    CCCCC1=NC(=C(N1)C=O)Cl CHEMBL3933368 |3 matches q1|2 matches q2|
+ -m CSR         Very compressed query details appended   -m CSR
+                might generate    S=C(N)NN=C(C)C1=CC=CN1 CHEMBL1990108 q1:4 q2:1
+ -m CSR:<char>  might generate    C12=C(SNC1=O)CCNC2 CHEMBL171241,q1:3,q2:1
+                to generate a true csv file, also add '-o csv'
+                tsbstructure -m - -m CSR:, -o csv ...
+ -m SEPA        Write the matches to each query to a separate file.
+                By default, all matches are written to the same -m file.
+                tsubstructure -s 'c q1' -s 'n q2' -m FOO -m SEPA
+                will create files FOO0.smi FOO1.smi containing the matches to the first query, q1
+                and FOO1.smi containing the matches to q2.
+ -m NONM        also write the non-matches to the -m file. This is often useful when the -j option
+                is applying isotopic atoms to matched atoms. Some molecules get isotopes
+                assigned, some do not. Note however that this appends details of the queries
+                that did not match. Using '-m NONMX' below, is probably what you want.
+ -m NONMX       also write the non-matches to the -m file. This is often useful when the -j option
+                is applying isotopic atoms to matched atoms. Some molecules get isotopes
+                assigned, some do not.
+ -m proto       Write as protobuf. Experimental only, will change, do not use today.
+ -m alist -m blist   historical interest only, matched atoms are written as SDF files.
+                     Use molecule_subset for this functionality.
+)";
+
+  ::exit(0);
+}
+
 int verbose = 0;
 static uint64_t molecules_read = 0;
 static uint64_t molecules_which_match = 0;
@@ -306,7 +328,7 @@ static int remove_all_chiral_centres = 0;
 
 static int discard_hits_in_non_organic_fragments = 0;
 
-static int hits_in_non_organic_fragments_discarded = 0;
+static uint32_t hits_in_non_organic_fragments_discarded = 0;
 
 /*
   There are two pre-defined output stream, controlled by the 'file'
@@ -363,6 +385,10 @@ static int molecules_with_too_many_hits = 0;
 
 static int label_matched_atoms = 0;
 
+// In order to avoid checking all the possible labellings
+// a single variable that will be set if the -j option is given.
+static int any_matched_atom_labelling_active = 0;
+
 // May 2022. Noticed that if we are processing molecules that
 // have isotopic labels, and we are applying isotopic labels,
 // the result will have lost the existing isotopic labels.
@@ -405,6 +431,15 @@ static int negative_j_offset = 0;
 */
 
 static int label_matched_atoms_via_atom_map_numbers = 0;
+
+// If there are 2 matched atoms, the first query match will
+// get isotopes (1, 2). The second query match will get (3, 4).
+static int label_matched_atoms_sequentially = 0;
+// A very horrible way of handling how to label the
+// matched atoms sequentially. As the matching begins, this
+// must be re-initialised to zero and as each label is applied
+// it is incremented. TODO:ianwatson modernise this.
+static isotope_t next_sequential_matched_atom_isotope = 0;
 
 /*
   Note that the directcolorfile implementation is flawed because we don't check
@@ -947,6 +982,9 @@ apply_isotopic_labels_embedding(const Molecule& m, int query_number,
     } else if (2 == label_by_query_atom_number) {
       iso = qam->item(ndx_for_initial_atom_number)->initial_atom_number();
       ndx_for_initial_atom_number++;
+    } else if (label_matched_atoms_sequentially) {
+      iso = next_sequential_matched_atom_isotope;
+      ++next_sequential_matched_atom_isotope;
     } else if (label_by_query_atom_number > 2) {
       iso = (label_by_query_atom_number * (query_number + 1)) +
             label_matched_atoms * embedding_number + j + 1;
@@ -1093,9 +1131,7 @@ do_single_query(Molecule_to_Match& target, int query_number,
         target.molecule(), query_number, sresults, number_queries);
   }
 
-  if (label_matched_atoms || label_by_query_atom_number || label_by_query_number ||
-      increment_isotopic_labels_to_indicate_queries_matching || positive_j_offset ||
-      negative_j_offset) {
+  if (any_matched_atom_labelling_active) {
     (void)label_atoms_hit(target.molecule(), query_number, sresults, atom_isotopic_label,
                           number_queries);
   } else if (matched_atoms_element) {
@@ -1124,6 +1160,10 @@ static int
 do_all_queries(Molecule& m, resizable_array_p<Substructure_Hit_Statistics>& queries,
                Substructure_Results* sresults, int* hits, const Element** element_labels,
                isotope_t* atom_isotopic_label) {
+  if (label_matched_atoms_sequentially) {
+    next_sequential_matched_atom_isotope = 1;
+  }
+
   int rc = 0;
 
   if (useUserAtomTypes) {
@@ -1270,9 +1310,7 @@ tsubstructure(Molecule& m, resizable_array_p<Substructure_Hit_Statistics>& queri
 
   isotope_t* atom_isotopic_label;
 
-  if (label_matched_atoms || label_by_query_atom_number || label_by_query_number ||
-      increment_isotopic_labels_to_indicate_queries_matching || negative_j_offset ||
-      positive_j_offset) {
+  if (any_matched_atom_labelling_active) {
     atom_isotopic_label = new isotope_t[matoms];
     if (negative_j_offset || positive_j_offset ||
         increment_isotopic_labels_to_indicate_queries_matching ||
@@ -1712,12 +1750,8 @@ parse_set_of_options(Command_Line& cl, char flag,
   int need_to_open_file = 0;
   bool proto_flag_set = false;
 
-  int i = 0;
   IWString tmp;
-  while (cl.value(flag, tmp, i)) {
-    //  cerr << "processing -mn option '" << tmp << "' sw REPO = " << tmp.starts_with
-    //  ("REPO") << '\n';
-
+  for (int i = 0; cl.value(flag, tmp, i); ++i) {
     if (tmp.starts_with("REPO")) {
       report_matches = 1;
       if (verbose) {
@@ -1739,8 +1773,7 @@ parse_set_of_options(Command_Line& cl, char flag,
       }
 
       for (int i = 0; i < queries.number_elements();
-           i++)  // bit of a kludge doing this here
-      {
+           i++) { // bit of a kludge doing this here
         queries[i]->set_use_vertical_bars_for_query_details(1);
       }
     } else if (tmp.starts_with("CSR")) {
@@ -1808,25 +1841,12 @@ parse_set_of_options(Command_Line& cl, char flag,
       if (verbose) {
         cerr << "Matched atoms written as MDL V30 bond lists\n";
       }
-    }
-#ifdef NUMBER_ASSIGNER_NOT_USEFUL_HERE
-    else if (cl.value(flag, j, i)) {
-      if (!number_assigner.initialise(j)) {
-        cerr << "Number assigner initialisation failed\n";
-        return 0;
-      }
-      need_to_open_file = 1;
-      if (verbose) {
-        cerr << match_or_non_match << "ed molecules assigned R(%d) numbers starting with "
-             << j << '\n';
-      }
-    }
-#endif
-    else if (tmp == "proto") {
+    } else if (tmp == "proto") {
       proto_flag_set = true;
       need_to_open_file = 1;
-    } else if (fname.empty())  // not yet set
-    {
+    } else if (tmp == "help") {
+      DisplayDashmOptions(cerr);
+    } else if (fname.empty()) {  // not yet set
       fname = tmp;
       if (verbose) {
         cerr << match_or_non_match << " will be written to stem '" << fname << "'\n";
@@ -1837,8 +1857,6 @@ parse_set_of_options(Command_Line& cl, char flag,
       cerr << "File name already set to '" << fname << "'\n";
       return 0;
     }
-
-    i++;
   }
 
   if (0 == need_to_open_file) {
@@ -2462,9 +2480,10 @@ tsubstructure(int argc, char** argv) {
   // the atom numbering options are complex
 
   if (cl.option_present('j')) {
-    int i = 0;
+    any_matched_atom_labelling_active = 1;
+
     const_IWSubstring j;
-    while (cl.value('j', j, i++)) {
+    for (int i = 0; cl.value('j', j, i); ++i) {
       if (j.starts_with("n=")) {
         j.remove_leading_chars(2);
         if (!j.numeric_value(label_matched_atoms_stop) || label_matched_atoms_stop < 1) {
@@ -2549,6 +2568,11 @@ tsubstructure(int argc, char** argv) {
         if (verbose) {
           cerr << "Will preserve isotopic labels on unmatched atoms\n";
         }
+      } else if (j == "sequential") {
+        label_matched_atoms_sequentially = 1;
+        if (verbose) {
+          cerr << "Will label matched atoms with consecutive isotopic labels\n";
+        }
       } else if ("help" == j) {
         display_dash_j_options();
         return 0;
@@ -2586,7 +2610,8 @@ tsubstructure(int argc, char** argv) {
       ;
     else if (increment_isotopic_labels_to_indicate_queries_matching)
       ;
-    else if (0 == label_matched_atoms && nullptr == matched_atoms_element) {
+    else if (label_matched_atoms_sequentially) {
+    } else if (0 == label_matched_atoms && nullptr == matched_atoms_element) {
       cerr << "Must specify '-j <number>' or '-j <element>' as a -j option\n";
       usage(13);
     }

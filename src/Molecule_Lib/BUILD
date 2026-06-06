@@ -358,6 +358,7 @@ cc_library(
         "tokenise_atomic_smarts.cc",
         "u3b.c",
         "unique.cc",
+        "util.cc",
     ],
     hdrs = [
         "allowed_elements.h",
@@ -427,6 +428,7 @@ cc_library(
         "toggle_kekule_form.h",
         "tokenise_atomic_smarts.h",
         "u3b.h",
+        "util.h",
     ],
     visibility = [
         "//visibility:public",

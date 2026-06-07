@@ -1,6 +1,10 @@
 build --cxxopt=-std=c++23 --cxxopt=-DBUILD_BAZEL
 
+build --macos_minimum_os=10.15
+build --host_macos_minimum_os=10.15
+
 build --enable_bzlmod 
+build --copt=-march=native
 # https://groups.google.com/g/bazel-discuss/c/5cbRuLuTwNg
 build --per_file_copt=external/.*@-Wno-error=maybe-uninitialized
 
@@ -55,3 +59,7 @@ build:msan --action_env=MSAN_OPTIONS=poison_in_dtor=1
 # https://github.com/bazelbuild/bazel/issues/13186
 # test inherits from build, so this was causing recompiles.
 # test --cxxopt=-std=c++20 --cxxopt=-march=sandybridge --cxxopt=-mtune=sandybridge 
+
+# These are needed for MacOS builds inside Lilly.
+# startup --host_jvm_args=-Djavax.net.ssl.trustStore=/Library/Java/JavaVirtualMachines/temurin-26.jdk/Contents/Home/lib/security/cacerts
+# startup --host_jvm_args=-Djavax.net.ssl.trustStorePassword=changeit

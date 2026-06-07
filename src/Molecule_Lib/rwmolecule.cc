@@ -373,6 +373,11 @@ remove_suffix(IWString& fname) {
     return;
   }
 
+  // Happens if someone is writing with a stem like ./foo
+  if (fname.starts_with("./") && fname.count('.') == 1) {
+    return;
+  }
+
   // only remove the suffix if it is a known suffix
 
   const_IWSubstring suffix = fname.substr(period + 1);

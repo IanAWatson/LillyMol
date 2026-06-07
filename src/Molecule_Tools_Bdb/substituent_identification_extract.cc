@@ -61,8 +61,8 @@ class Options {
 
     uint32_t _fail_radius;
 
-    int _min_count;
-    int _max_count;
+    uint32_t _min_count;
+    uint32_t _max_count;
 
     uint32_t _fail_count;
 
@@ -102,6 +102,9 @@ Options::Options() : _db(NULL, DB_CXX_NO_EXCEPTIONS) {
 
   _min_count = 0;
   _max_count = std::numeric_limits<uint32_t>::max();
+
+  _records_read = 0;
+  _records_written = 0;
 
   _fail_count = 0;
 
@@ -238,11 +241,13 @@ Options::List(const DBKey& key, const substituent_identification::Replacements& 
               IWString_and_File_Descriptor& output) {
   if (key.radius < _min_radius || key.radius > _max_radius) {
     ++_fail_radius;
+//  cerr << "Fail radius\n";
     return 1;
   }
 
-  if (proto.replacement_size() < _min_count || proto.replacement_size() > _max_count) {
+  if (uint32_t c = proto.replacement_size(); c < _min_count || c > _max_count) {
     ++_fail_count;
+//  cerr << "Fail count\n";
     return 1;
   }
 

@@ -34,6 +34,13 @@
       "args": [
            " -T I=Cl -T Br=Cl -S output #{indir}/in.smi"
       ]
+    },
+
+    {
+      "name": "dash_y",
+      "args": [
+           " -y -S output #{indir}/in.smi"
+      ]
     }
 
 

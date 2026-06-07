@@ -274,7 +274,7 @@ sub usage
   print STDERR " -SIM <fname>   FP fingerprint  of similarity to molecules in <fname>\n" if ($expert);
   print STDERR " -simopt ... -simopt passed directly to similarity_to_fingerprint (def -T 0.5)\n" if ($expert);
 # print STDERR " -nspch         FP fingerprints of spinach trimmed form\n" if ($expert);
-  print STDERR " -SCF0          FP fingerprint of the molecular scaffold\n";
+  print STDERR " -SCF0          FP fingerprint of the molecular scaffold, -SCFI to differentiate substitution patterns\n";
   print STDERR " -SPINACH       spinach fingerprint\n" if ($expert);
   print STDERR " -MABS ... -MABS FP options for molecular abstractions\n" if ($expert);
   print STDERR " -TSUB ...      FP query/queries for tsubstructure, S:file for smarts\n" if ($expert);

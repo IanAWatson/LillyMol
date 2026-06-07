@@ -17,7 +17,7 @@
 
 #include "absl/strings/string_view.h"
 
-#include <grpcpp/grpcpp.h>
+#include "zmq.hpp"
 
 using std::cerr;
 
@@ -39,12 +39,9 @@ using std::cerr;
 #include "Molecule_Tools/mpr.h"
 #include "Utilities/GFP_Tools/gfp_standard.h"
 
-
 #ifdef BUILD_BAZEL
 #include "Utilities/GFP_Tools/nearneighbours.pb.h"
 #include "Utilities/GFP_Tools/nn_request.pb.h"
-#include "Utilities/GFP_Tools/nn_request.grpc.pb.h"
-#include "Utilities/GFP_Tools/gfp_server.grpc.pb.h"
 #else
 #include "nearneighbours.pb.h"
 #include "nn_request.pb.h"
@@ -143,11 +140,12 @@ class GFP_Server {
   int ReloadPool();
   int _do_shutdown();
   void Preprocess(Molecule& m);
+  int DoNearNeighbours(const gfp_server::NnRequest& req,
+                             gfp_server::Reply &reply);
 
-  int DoNearNeighbours(const gfp_server::NnRequest& req, gfp_server::Reply &reply);
-  int DoServerRequest(const gfp_server::ServerRequest& req, int& doing_shutdown, gfp_server::Reply &reply);
+  int DoServerRequest(const gfp_server::ServerRequest& req, int& doing_shutdown,
+                             gfp_server::Reply &reply);
   int SmilesToGfp(const std::string& smiles, GFP_Standard& gfp);
-
 
  public:
   GFP_Server();
@@ -161,25 +159,7 @@ class GFP_Server {
   int tanimoto_from_tdt(IWString&);
   int tanimoto_from_smiles(IWString&);
 
-  int DoNearNeighbours(const gfp_server::NnRequest& req, gfp_server::Reply& reply);
-
   void doit();
-};
-
-class GfpGrpcService final : public gfp_server::Grpcnnreq::Service {
- public:
-  explicit GfpGrpcService(GFP_Server& server) : server_(server) {}
-
-  grpc::Status GetNeighbours(
-      grpc::ServerContext* context,
-      const gfp_server::NnRequest* request,
-      gfp_server::Reply* reply) override {
-    server_.DoNearNeighbours(*request, *reply);
-    return grpc::Status::OK;
-  }
-
- private:
-  GFP_Server& server_;
 };
 
 GFP_Server::GFP_Server() {
@@ -686,22 +666,6 @@ free_fn(void* v, void* hint) {
   return;
 }
 
-void GFP_Server::doit() {
-  std::string address = absl::StrCat("0.0.0.0:", _input_port);
-
-  GfpGrpcService service(*this);
-
-  grpc::ServerBuilder builder;
-  builder.AddListeningPort(address, grpc::InsecureServerCredentials());
-  builder.RegisterService(&service);
-
-  std::unique_ptr<grpc::Server> server(builder.BuildAndStart());
-  _log_message(IWString("Listening on ") << address);
-
-  server->Wait();
-}
-
-#ifdef DOIT_ZMQ
 void
 GFP_Server::doit() {
   zmq::context_t context(1);
@@ -769,7 +733,6 @@ GFP_Server::doit() {
 
   return;
 }
-#endif
 
 int
 GFP_Server::DoServerRequest(const gfp_server::ServerRequest& req, int& doing_shutdown,

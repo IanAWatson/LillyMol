@@ -3,7 +3,11 @@
 // Molecule_Tools/BUILD and copy and paste an existing executable
 // to add an entry for this new tool.
 
+#include <cstdint>
+#include <cstdlib>
+#include <cstring>
 #include <iostream>
+#include <memory>
 
 #include "Foundational/cmdline/cmdline.h"
 
@@ -11,10 +15,11 @@
 #include "Molecule_Lib/etrans.h"
 #include "Molecule_Lib/istream_and_type.h"
 #include "Molecule_Lib/molecule.h"
+#include "Molecule_Lib/path.h"
 #include "Molecule_Lib/standardise.h"
 #include "Molecule_Lib/target.h"
 
-namespace meaningful_name {
+namespace meaningful_name /* replace all occurrences */ {
 
 using std::cerr;
 
@@ -31,7 +36,15 @@ Usage(int rc) {
 // clang-format off
   cerr << R"(Performs some task on a set of molecules.
  -a          what the -a option does
- -v          verbose output
+# commonly used LillyMol options.
+ -i <type>    input type, -i sdf -i ICTE -i mdlquiet -i SDFID:IDNUMBER
+ -E ...       element options: -E autocreate -E anylength
+ -A ...       aromaticity options: -A 2
+ -g ...       chemical standardisation: -g all
+ -T ...       element transformations: -T I=Cl -T Br=Cl
+ -l           reduce to largest fragment
+ -c           remove chirality
+ -v           verbose output
 )";
 // clang-format on
 
@@ -103,8 +116,9 @@ Options::Initialise(Command_Line& cl) {
   }
 
   if (cl.option_present('T')) {
-    if (!_element_transformations.construct_from_command_line(cl, _verbose, 'T'))
-      Usage(8);
+    if (!_element_transformations.construct_from_command_line(cl, _verbose, 'T')) {
+        Usage(8);
+    }
   }
 
   if (cl.option_present('l')) {
@@ -126,7 +140,7 @@ Options::Initialise(Command_Line& cl) {
 
 int
 Options::Report(std::ostream& output) const {
-  output << "Read " << _molecules_read << " molecules\n";
+  output << "Processed " << _molecules_read << " molecules\n";
   // Other information about what has happened.
 
   return 1;
@@ -171,6 +185,8 @@ Options::Process(Molecule& m,
   return 1;
 }
 
+// Replace all occurrences of ApplicationName with a name appropriate
+// for your application.
 int
 ApplicationName(Options& options,
                 Molecule& m,

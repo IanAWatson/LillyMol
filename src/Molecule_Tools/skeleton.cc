@@ -15,13 +15,15 @@
 #include "Molecule_Lib/etrans.h"
 #include "Molecule_Lib/istream_and_type.h"
 #include "Molecule_Lib/molecule.h"
+#include "Molecule_Lib/molecule_preprocessing.h"
 #include "Molecule_Lib/path.h"
-#include "Molecule_Lib/standardise.h"
 #include "Molecule_Lib/target.h"
 
 namespace meaningful_name /* replace all occurrences */ {
 
 using std::cerr;
+
+using molecule_processing::MoleculePreprocessing;
 
 // By convention the Usage function tells how to use the tool.
 void
@@ -60,11 +62,7 @@ class Options {
   private:
     int _verbose = 0;
 
-    int _reduce_to_largest_fragment = 0;
-
-    int _remove_chirality = 0;
-
-    Chemical_Standardisation _chemical_standardisation;
+    MoleculePreprocessing _preprocessing;
 
     // Not a part of all applications, just an example...
     Element_Transformations _element_transformations;
@@ -99,8 +97,6 @@ class Options {
 
 Options::Options() {
   _verbose = 0;
-  _reduce_to_largest_fragment = 0;
-  _remove_chirality = 0;
   _molecules_read = 0;
 }
 
@@ -109,29 +105,14 @@ Options::Initialise(Command_Line& cl) {
 
   _verbose = cl.option_count('v');
 
-  if (cl.option_present('g')) {
-    if (!_chemical_standardisation.construct_from_command_line(cl, _verbose > 1, 'g')) {
-      Usage(6);
-    }
+  if (! _preprocessing.Initialise(cl)) {
+    cerr << "Options::Initialise:cannot initialise preprocessing\n";
+    return 1;
   }
 
   if (cl.option_present('T')) {
     if (!_element_transformations.construct_from_command_line(cl, _verbose, 'T')) {
         Usage(8);
-    }
-  }
-
-  if (cl.option_present('l')) {
-    _reduce_to_largest_fragment = 1;
-    if (_verbose) {
-      cerr << "Will reduce to largest fragment\n";
-    }
-  }
-
-  if (cl.option_present('c')) {
-    _remove_chirality = 1;
-    if (_verbose) {
-      cerr << "Will remove all chirality\n";
     }
   }
 
@@ -152,17 +133,8 @@ Options::Preprocess(Molecule& m) {
     return 0;
   }
 
-  if (_reduce_to_largest_fragment) {
-    m.reduce_to_largest_fragment_carefully();
-  }
-
-  if (_remove_chirality) {
-    m.remove_all_chiral_centres();
-    m.revert_all_directional_bonds_to_non_directional();
-  }
-
-  if (_chemical_standardisation.active()) {
-    _chemical_standardisation.process(m);
+  if (_preprocessing.active()) {
+    _preprocessing.Process(m);
   }
 
   if (_element_transformations.active()) {

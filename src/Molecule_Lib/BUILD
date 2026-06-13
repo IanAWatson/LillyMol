@@ -312,6 +312,7 @@ cc_library(
         "mol2graph.cc",
         "mol2graph_proto.cc",
         "molecule.cc",
+        "molecule_preprocessing.cc",
         "molecule_smarts.cc",
         "molecule_to_query.cc",
         "moleculeb.cc",
@@ -400,6 +401,7 @@ cc_library(
         "molecule.h",
         "molecule_arom.h",
         "molecule_mdl.h",
+        "molecule_preprocessing.h",
         "molecule_smi.h",
         "molecule_to_query.h",
         "moleculeio.h",
@@ -633,6 +635,7 @@ cc_library(
         "//Foundational/iwmisc:sparse_fp_creator",
         "//Foundational/iwmisc",
         "//Foundational/iwstring",
+        "//Foundational/cmdline:iwcmdline",
     ],
 )
 
@@ -838,6 +841,19 @@ cc_test(
     ],
     deps = [
         "molecular_formula_lib",
+        "@googletest//:gtest_main",
+    ],
+)
+
+cc_test(
+    name = "molecule_preprocessing_test",
+    timeout = "short",
+    srcs = [
+        "molecule_preprocessing_test.cc",
+    ],
+    deps = [
+        ":iwmolecule",
+        ":moleculeio",
         "@googletest//:gtest_main",
     ],
 )

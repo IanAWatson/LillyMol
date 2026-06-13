@@ -256,3 +256,4 @@ The sparse fingerprint representation is especially useful for integer vectors w
 
 Fixed-width fingerprints should be used only when presence/absence information is desired.
 
+There are some example files in [examples](descriptors_to_fingerprint_integer_example/README.md)

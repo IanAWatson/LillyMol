@@ -4,8 +4,10 @@
 // And it is more modern code.
 
 #include <cstdint>
+#include <filesystem>
 #include <iostream>
 #include <memory>
+#include <string>
 #include <vector>
 
 #include "absl/container/flat_hash_map.h"
@@ -19,6 +21,8 @@
 namespace descriptors_to_fingerprint {
 
 using std::cerr;
+
+namespace fs = std::filesystem;
 
 void
 Usage(int rc) {
@@ -56,6 +60,7 @@ Or when adding to an existing fingerprint file
  -s <dummy>     If no smiles specified, use 'dummy' as the smiles for each molecule.
  -r <replicate> When writing sparse fingerprints, number of bit replicates.
  -i <char>      Input token separator, '-i tab' for example. Default is space.
+ -w             When processing multiple input files, generate separate output .gfp files with the same prefixes.
  -v             verbose output.
 )";
   // clang-format on
@@ -92,6 +97,14 @@ class Options {
     int _nbits;
 
     int _bit_replicates;
+
+    // If dealing with fingerprints in separate files, they need to be processed
+    // via one invocation of this tool,
+    // descriptors_to_fingerprint_integer ... file1.dat file2.dat > all.gfp
+    // but usually we then need to separate them back into file1.gfp and file2.gfp.
+    // If this option is in effect those files are automatically created.
+    // descriptors_to_fingerprint_integer -s C -i tab -W . /path/to/file1.txt /path/to/file2.txt
+    IWString _dir_for_separate_output_files;
 
     char _input_separator;
 
@@ -131,6 +144,10 @@ class Options {
 
     int columns_in_input() const {
       return _columns_in_input;
+    }
+
+    const IWString& dir_for_separate_output_files() const {
+      return _dir_for_separate_output_files;
     }
 
     char input_separator() const {
@@ -270,6 +287,23 @@ Options::Initialise(Command_Line& cl) {
     cl.value('i', tmp);
     char_name_to_char(tmp, false);
     _input_separator = tmp[0];
+  }
+
+  if (cl.option_present('W')) {
+    if (cl.size() < 2) {
+      cerr << "The separate output files option, -W only makes sense with multiple input files\n";
+      return 0;
+    }
+    _dir_for_separate_output_files = cl.option_value('W');
+
+    fs::path myPath(_dir_for_separate_output_files.null_terminated_chars());
+    if (! fs::is_directory(myPath)) {
+      cerr << "Options::Initialise: -W value not directory '" << myPath << "'\n";
+      return 0;
+    }
+    if (_verbose) {
+      cerr << "Separate output files created in directory " << _dir_for_separate_output_files << '\n';
+    }
   }
 
   return 1;
@@ -669,6 +703,24 @@ DescriptorsToFingerprints(iwstring_data_source& input, Options& options,
   return 1;
 }
 
+std::string
+MakePath(const IWString& dirname,
+         const std::string& filename,
+         const char* suffix) {
+  std::filesystem::path p(filename);
+
+  // Remove any existing extension.
+  p.replace_extension();
+
+  std::filesystem::path result(dirname.cbegin(), dirname.cend());
+  result /= p.filename();
+
+  result += ".";
+  result += suffix;
+
+  return result.string();
+}
+
 int
 DescriptorsToFingerprints(const char* fname, Options& options,
                           IWString_and_File_Descriptor& output) {
@@ -680,14 +732,28 @@ DescriptorsToFingerprints(const char* fname, Options& options,
 
   if (options.function_as_tdt_filter()) {
     return DescriptorsToFingerprintsFilter(input, options, output);
-  } else {
+  }
+
+  const IWString& dir_for_separate_output_files = options.dir_for_separate_output_files();
+
+  if (dir_for_separate_output_files.empty()) {
     return DescriptorsToFingerprints(input, options, output);
   }
+
+  std::string new_fname = MakePath(dir_for_separate_output_files, fname, "gfp");
+
+  IWString_and_File_Descriptor my_output;
+  if (! my_output.open(new_fname.c_str())) {
+    cerr << "DescriptorsToFingerprints::cannot open '" << new_fname << "'\n";
+    return 0;
+  }
+
+  return DescriptorsToFingerprints(input, options, my_output);
 }
 
 int
 Main(int argc, char** argv) {
-  Command_Line cl(argc, argv, "vD:fS:J:s:r:i:");
+  Command_Line cl(argc, argv, "vD:fS:J:s:r:i:W:");
 
   if (cl.unrecognised_options_encountered()) {
     cerr << "Unrecognised options encountered\n";

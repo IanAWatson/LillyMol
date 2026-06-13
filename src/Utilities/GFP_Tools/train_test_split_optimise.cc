@@ -24,6 +24,7 @@
 #include "Foundational/data_source/iwstring_data_source.h"
 #include "Foundational/data_source/tfdatarecord.h"
 #include "Foundational/iwmisc/misc.h"
+#include "Foundational/iwmisc/iw_tabular_data.h"
 #include "Foundational/iwmisc/report_progress.h"
 #include "Foundational/iwstring/absl_hash.h"
 #include "Foundational/iwstring/iwstring.h"
@@ -50,7 +51,8 @@ Usage(int rc) {
 // clang-format off
   cerr << R"(Uses TFDataRecord nn data to generate optimized train/test splits
 Randomly assigns train and test. Then iteratively swaps pairs if the sawp increases the inter-set distance.
-Compute nearest neighbours to a fixed distance - as large as feasible.
+Reads a set of precomputed nearest neighbours, computed to a fixed distance.
+Make this as large as can reasonably be computed, but do not include unrealistic distances.
 gfp_nearneighbours_single_file_tbb -T 0.35 -h 16 -S file.nn.tfdata file.gfp
 train_test_split_opt -f 0.85 -n 1 -S OPT -o 2000000 -r 20000 -x 20000 -h 8 file.nn.tfdata.
 
@@ -59,6 +61,8 @@ train_test_split_opt -f 0.85 -n 1 -S OPT -o 2000000 -r 20000 -x 20000 -h 8 file.
  -S <stem>           write splits to <stem>, <stem>R<n> and <stem>E<n>.
  -X                  also write cross split summary stats - expensive to compute.
  -C <fname>          weighted samples. A mapping from ID to number of instances.
+ -A <fname>          descriptor file containing activity values.
+                     splits are characterised by activity ranges in train and test splits.
  -o <nopt>           number of optimisation steps to try per split.
  -t <sec>            run each split for <sec> seconds.
  -r <n>              report progress every <n> steps.
@@ -273,6 +277,11 @@ Needle::ClosestDistance() const {
   return _nbrs[0]._dist;
 }
 
+class Metropolis {
+  private:
+  public:
+};
+
 // Handle the overall optimisation of train/test splits.
 class Optimise {
   private:
@@ -323,6 +332,10 @@ class Optimise {
     std::string* _smiles;
     std::string* _name;
 
+    // If the -A option is specified.
+    std::unique_ptr<float[]> _activity;
+    double _average_activity = 0.0f;
+
     // Keep track of how many times each needle appears in train.
     int* _times_in_train;
 
@@ -347,7 +360,9 @@ class Optimise {
     int ReadCounts(iwstring_data_source& input);
     int ReadCount(const const_IWSubstring& buffer);
 
-     uint32_t GetCount(const IWString& id) const;
+    int ReadActivityData(IWString& fname);
+
+    uint32_t GetCount(const IWString& id) const;
 
     int RandomSplit();
 
@@ -374,6 +389,8 @@ class Optimise {
     int WriteCrossSplitSummary(IWString_and_File_Descriptor& output) const;
     int WriteRandomSplitStatus() const;
     void AccumulateStats();
+
+    int MaybeReportActivityDistribution(std::ostream& output) const;
 
   public:
     Optimise();
@@ -550,6 +567,59 @@ Optimise::Initialise(const Command_Line& cl) {
       cerr << "Will write cross split summary files\n";
     }
   }
+
+  if (cl.option_present('A')) {
+    IWString fname = cl.string_value('A');
+    if (! ReadActivityData(fname)) {
+      cerr << "Cannot read activity data from '" << fname << "'\n";
+      return 0;
+    }
+  }
+
+  return 1;
+}
+
+int
+Optimise::ReadActivityData(IWString& fname) {
+  // could/sould use float, but the double template is instantiated...
+  IW_Tabular_Data<double> reader;
+  reader.set_has_header(1);
+  reader.set_first_column_is_identifier(1);
+
+  if (! reader.build(fname.null_terminated_chars(), ' ')) {
+    cerr << "Optimise::ReadActivityData:cannot read activity data from '" << fname << "'\n";
+    return 0;
+  }
+
+  absl::flat_hash_map<IWString, uint32_t> id_to_ndx;
+  for (uint32_t i = 0; i < _number_needles; ++i) {
+    id_to_ndx[_name[i]] = i;
+  }
+
+  _activity = std::make_unique<float[]>(_number_needles);
+
+  // We must have an activity value for each needle.
+  uint32_t values_read = 0;
+
+  for (int i = 0; i < reader.nrows(); ++i) {
+    const IWString& id = reader.ids()[i];
+    const float a = reader.value(i, 0);
+    auto f = id_to_ndx.find(id);
+    if (f == id_to_ndx.end()) {
+      continue;
+    }
+    _activity[f->second] = a;
+    ++values_read;
+  }
+
+  if (values_read != _number_needles) {
+    cerr << "Optimise::ReadActivityData:have " << _number_needles <<
+            " items but only read " << values_read << " activity values\n";
+    return 0;
+  }
+
+  double sum = std::accumulate(_activity.get(), _activity.get() + _number_needles, 0.0);
+  _average_activity = sum / static_cast<float>(_number_needles);
 
   return 1;
 }
@@ -1062,6 +1132,7 @@ Optimise::MakeSplit(int split) {
       " accepted " << steps_accepted << " delta " << accepted_this_period << ' ' <<
       iwmisc::Fraction<float>(steps_accepted, j) <<
       " last successful " << last_successful_switch << '\n';
+      MaybeReportActivityDistribution(cerr);
     }
 
     // No improvement, revert.
@@ -1117,6 +1188,33 @@ Optimise::AccumulateStats() {
       ++_times_in_train[i];
     }
   }
+}
+
+int
+Optimise::MaybeReportActivityDistribution(std::ostream& output) const {
+  if (!_activity) {
+    return 1;
+  }
+
+  Accumulator<double> acc_train, acc_test;
+
+  for (uint32_t i = 0; i < _number_needles; ++i) {
+    if (_needle[i].in_train()) {
+      acc_train.extra(_activity[i]);
+    } else {
+      acc_test.extra(_activity[i]);
+    }
+  }
+
+  output << "train " << static_cast<float>(acc_train.minval()) << ' ' <<
+                        static_cast<float>(acc_train.average()) << ' ' << 
+                        static_cast<float>(acc_train.maxval()) << '\n';
+  output << "test  " << static_cast<float>(acc_test.minval()) << ' ' <<
+                        static_cast<float>(acc_test.average()) << ' ' << 
+                        static_cast<float>(acc_test.maxval()) << '\n';
+  output << "ave   " << static_cast<float>(_average_activity) << '\n';
+
+  return output.good();
 }
 
 // Write the various split files, train and test identifiers, and smiles files.
@@ -1320,7 +1418,7 @@ Optimise::Report(std::ostream& output) const {
 
 int
 Main(int argc, char** argv) {
-  Command_Line cl(argc, argv, "vf:S:n:o:r:T:s:t:x:C:h:X");
+  Command_Line cl(argc, argv, "vf:S:n:o:r:T:s:t:x:C:h:XA:");
   if (cl.unrecognised_options_encountered()) {
     cerr << "unrecognised_options_encountered\n";
     Usage(1);

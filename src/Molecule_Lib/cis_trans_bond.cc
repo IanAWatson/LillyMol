@@ -44,6 +44,10 @@ Molecule::revert_all_directional_bonds_to_non_directional() {
     }
   }
 
+  if (rc) {
+    invalidate_smiles();
+  }
+
   return rc;
 }
 

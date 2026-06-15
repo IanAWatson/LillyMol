@@ -392,65 +392,7 @@ static int molecules_with_too_few_hits = 0;
 static int max_hits_needed = std::numeric_limits<int>::max();
 static int molecules_with_too_many_hits = 0;
 
-//  Sometimes it is interesting to label the matched atoms
-
-static int label_matched_atoms = 0;
-
-// In order to avoid checking all the possible labellings
-// a single variable that will be set if the -j option is given.
-static int any_matched_atom_labelling_active = 0;
-
-// May 2022. Noticed that if we are processing molecules that
-// have isotopic labels, and we are applying isotopic labels,
-// the result will have lost the existing isotopic labels.
-// That seems like a bug, but in order to avoid breaking things,
-// make this an optional behaviour.
-static int preserve_isotopes_with_labelled_atoms = 0;
-
-//  But we may only want to label the first N of the matched atoms
-
-static int label_matched_atoms_stop = -1;
-
-//  Aug 2001, Dan Robertson wanted each labelled match written separately
-//  to a file
-
-static Molecule_Output_Object stream_for_individually_labelled_matches;
-
 static int report_timing = 0;
-
-/*
-  The matched atoms can be labelled as isotopes, or transformed into
-  a new atom type
-*/
-
-static const Element* matched_atoms_element = nullptr;
-
-/*
-  By default, the atoms of each hit are labelled with different isotopes.
-  As an option, we can label them all the same
-*/
-
-static int all_matched_atoms_get_same_isotope = 0;
-
-//  Nov 99. We can apply an isotopic offset to matched atoms
-
-static int positive_j_offset = 0;
-static int negative_j_offset = 0;
-
-/*
-  Aug 2017. Allow use of atom map numbers for matched atoms
-*/
-
-static int label_matched_atoms_via_atom_map_numbers = 0;
-
-// If there are 2 matched atoms, the first query match will
-// get isotopes (1, 2). The second query match will get (3, 4).
-static int label_matched_atoms_sequentially = 0;
-// A very horrible way of handling how to label the
-// matched atoms sequentially. As the matching begins, this
-// must be re-initialised to zero and as each label is applied
-// it is incremented. TODO:ianwatson modernise this.
-static isotope_t next_sequential_matched_atom_isotope = 0;
 
 /*
   Note that the directcolorfile implementation is flawed because we don't check
@@ -462,24 +404,6 @@ static IWString default_directcolorfile_colour("red");
 
 static IWString_and_File_Descriptor stream_for_directcolorfile;
 
-/*
-  Jan 2000. Want a means of determining Substructure_Atom identifiers
-
-  Set to 1 to use inique_id(), set to 2 to use initial_atom_numbers
-*/
-
-static int label_by_query_atom_number = 0;
-
-//  Jul 2002. Want to label by which query has hit
-
-static int label_by_query_number = 0;
-// Jul 2023. Need to differentiate which match it is for each query.
-static int label_by_query_embedding = 0;
-
-//  Dec 2013. For each molecule, we want to know how many of the queries hit a given atom
-
-static int increment_isotopic_labels_to_indicate_queries_matching = 0;
-
 //  Feb 2003. Special thing for Dan Robertson
 
 #ifdef DO_GETPSF
@@ -487,6 +411,583 @@ static IWString getpsf_directory;
 #endif
 
 static int make_implicit_hydrogens_explicit = 0;
+
+// A class to deal with all settings from the -j option.
+// WIP, not implemented yet.
+class LabelMatchedAtoms {
+  private:
+    // The default for something like '-j 1'.
+    int _label_matched_atoms = 0;
+
+    // Will be true if the -j option is successfully processed.
+    int _any_matched_atom_labelling_active = 0;
+
+    int _label_matched_atoms_stop = -1;
+
+    int _all_matched_atoms_get_same_isotope = 0;
+
+    int _label_by_query_atom_number = 0;
+
+    int _label_by_query_number = 0;
+
+    //  Nov 99. We can apply an isotopic offset to matched atoms
+
+    int _positive_j_offset = 0;
+    int _negative_j_offset = 0;
+
+//  Dec 2013. For each molecule, we want to know how many of the queries hit a given atom
+
+    int _increment_isotopic_labels_to_indicate_queries_matching = 0;
+
+    int _label_matched_atoms_via_atom_map_numbers = 0;
+
+    // Each matched atom in each embedding gets a unique sequential number.
+    // THe first embedding with 3 atoms assigns labels 1,2,3, the second embedding
+    // will assign 4,5,6.
+    int _label_matched_atoms_sequentially = 0;
+
+    // When dealing with a molecule being matched, this is a counter
+    // for the next isotope to be assigned. This makes this method
+    // non-thread safe. It could be handled externally, but that would
+    // involve passing arguments to functions that already have a lot
+    // of options.
+    isotope_t _next_sequential_matched_atom_isotope = 0;
+
+
+    // May 2022. Noticed that if we are processing molecules that
+    // have isotopic labels, and we are applying isotopic labels,
+    // the result will have lost the existing isotopic labels.
+    // That seems like a bug, but in order to avoid breaking things,
+    // make this an optional behaviour.
+    int _preserve_isotopes_with_labelled_atoms = 0;
+
+    // Jul 2023. Need to differentiate which match it is for each query.
+    // Note that this is currently not active.
+    int _label_by_query_embedding = 0;
+
+    // The matched atoms can be labelled as isotopes, or transformed into
+    // a new atom type.
+    const Element* _matched_atoms_element = nullptr;
+
+
+    //  Aug 2001, Dan Robertson wanted each labelled match written separately
+    //  to a file
+
+    Molecule_Output_Object _stream_for_individually_labelled_matches;
+
+    int _verbose = 0;
+
+    // private functions
+    int OpenLabelledMultipleMatchesFile(Command_Line& cl, const const_IWSubstring& fname);
+    int ApplyIsotopicLabelsEmbedding(const Molecule& m, int query_number,
+                                const Substructure_Results& sresults,
+                                int embedding_number, isotope_t* atom_isotopic_label,
+                                int number_queries);
+    int IncrementIsotopicLabelsToIndicateQueriesMatching(const Molecule& m,
+                const Set_of_Atoms& embedding, const int na,
+                isotope_t* atom_isotopic_label);
+    int transform_atoms_hit(const Substructure_Results& sresults,
+                    const Element** element_labels) const;
+    int label_match_and_write_to_stream_for_individually_labelled_matches(
+         Molecule& m, int query_number, const Substructure_Results& sresults,
+    int embedding_number, isotope_t* atom_isotopic_label, int number_queries);
+    int label_matches_and_write_to_stream_for_individually_labelled_matches(
+          Molecule& m, int query_number, const Substructure_Results& sresults,
+          int number_queries);
+    int label_matches_and_write_to_stream_for_individually_labelled_matches2(
+         Molecule& m, int query_number, const Substructure_Results& sresults,
+         int number_queries);
+    void do_label_matched_atoms_via_atom_map_numbers(Molecule& m,
+                                            const isotope_t* atom_isotopic_label) const;
+
+  public:
+    int Initialise(Command_Line& cl);
+
+    int active() {
+      return _any_matched_atom_labelling_active;
+    }
+  
+    int label_by_query_atom_number() const {
+      return _label_by_query_atom_number;
+    }
+
+    void reset() {
+      _next_sequential_matched_atom_isotope = 0;
+    }
+
+    int needs_starting_isotopes() const;
+
+    int ApplyIsotopesOrAtomMapNumbers(Molecule& m, const isotope_t* atom_isotopic_label) const;
+    int has_matched_atom_element() const {
+      return _matched_atoms_element != nullptr;
+    }
+    
+    // THis applies all the settings to `m`.
+    int DoLabelMatchedAtoms(Molecule& m, int query_number, const Substructure_Results& sresults,
+                          isotope_t* atom_isotopic_label,
+                          const Element** element_labels,
+                          int number_queries);
+};
+ 
+int
+LabelMatchedAtoms::needs_starting_isotopes() const {
+  if (_negative_j_offset || _positive_j_offset) {
+    return 1;
+  }
+  if (_increment_isotopic_labels_to_indicate_queries_matching) {
+    return 1;
+  }
+  if (_preserve_isotopes_with_labelled_atoms) {
+    return 1;
+  }
+
+  return 0;
+}
+
+int
+LabelMatchedAtoms::OpenLabelledMultipleMatchesFile(Command_Line& cl, const const_IWSubstring& fname) {
+  if (cl.option_present('o')) {
+    if (!_stream_for_individually_labelled_matches.determine_output_types(cl, 'o')) {
+      cerr << "Cannot discern output types for individually labelled matches\n";
+      return 0;
+    }
+  } else {
+    _stream_for_individually_labelled_matches.add_output_type(FILE_TYPE_SMI);
+  }
+
+  if (_stream_for_individually_labelled_matches.would_overwrite_input_files(cl, fname)) {
+    cerr << "Cannot overwrite input file(s)\n";
+    return 0;
+  }
+
+  if (!_stream_for_individually_labelled_matches.new_stem(fname)) {
+    cerr << "Cannot open stream for indivually labelled matches '" << fname << "'\n";
+    return 0;
+  }
+
+  if (verbose) {
+    cerr << "Indivually labelled matches written to '" << fname << "'\n";
+  }
+
+  return 1;
+}
+
+int
+LabelMatchedAtoms::Initialise(Command_Line& cl) {
+  _verbose = cl.option_present('v');
+
+  _any_matched_atom_labelling_active = 1;
+
+  const_IWSubstring j;
+  for (int i = 0; cl.value('j', j, i); ++i) {
+    if (j.starts_with("n=")) {
+      j.remove_leading_chars(2);
+      if (!j.numeric_value(_label_matched_atoms_stop) || _label_matched_atoms_stop < 1) {
+        cerr << "The -j n= specifier must be followed by a whole positive number\n";
+        usage(3);
+      }
+      if (verbose) {
+        cerr << "The first " << _label_matched_atoms_stop
+             << " atoms of each match will be labelled\n";
+      }
+    } else if ("same" == j) {
+      _all_matched_atoms_get_same_isotope = 1;
+      if (verbose) {
+        cerr << "All atoms will be assigned the same isotopic label\n";
+      }
+    } else if ("query" == j) {
+      _label_by_query_atom_number = 1;
+      if (verbose) {
+        cerr << "Will label by matched substructure atom unique identifier\n";
+      }
+    } else if ("iquery" == j) {
+      _label_by_query_atom_number = 2;
+      if (verbose) {
+        cerr << "Will label by matched substructure atom initial atom number\n";
+      }
+    } else if (j.starts_with("mqoffset=")) {
+      j.remove_leading_chars(9);
+      if (!j.numeric_value(_label_by_query_atom_number) ||
+          _label_by_query_atom_number <= 2) {
+        cerr << "Invalid query label offset '" << j << "'\n";
+        return 2;
+      }
+      if (verbose) {
+        cerr << "Multiplicative offset for query number " << _label_by_query_atom_number
+             << '\n';
+      }
+    } else if (j.starts_with("qnum")) {
+      _label_by_query_number = 1;
+      if (verbose) {
+        cerr << "Will label matched atoms by query number\n";
+      }
+    } else if (j.starts_with('+')) {
+      j++;  // '+' is not a valid part of a number
+      if (!j.numeric_value(_positive_j_offset) || _positive_j_offset <= 0) {
+        cerr << "With -j +nnn, the number, nnn must be non-zero\n";
+        usage(44);
+      }
+
+      if (verbose) {
+        cerr << "Positive isotopic offset " << _positive_j_offset << '\n';
+      }
+    } else if (j.starts_with('-')) {
+      if (!j.numeric_value(_negative_j_offset) || _negative_j_offset <= 0) {
+        cerr << "With -j -nnn, the number, nnn must be non-zero\n";
+        usage(44);
+      }
+
+      if (verbose) {
+        cerr << "Negative isotopic offset " << _negative_j_offset << '\n';
+      }
+    } else if (j.starts_with("writeach=")) {
+      j.remove_up_to_first('=');
+
+      if (!OpenLabelledMultipleMatchesFile(cl, j)) {
+        cerr << "Cannot open file for labelled matches '" << j << "'\n";
+        return 0;
+      }
+    } else if ("qmatch" == j) {
+      _increment_isotopic_labels_to_indicate_queries_matching = 1;
+
+      if (verbose) {
+        cerr << "Will increment isotopic labels by the number of queries hitting that "
+                "atom\n";
+      }
+    } else if ("amap" == j) {
+      _label_matched_atoms_via_atom_map_numbers = 1;
+      if (verbose) {
+        cerr << "Will label matched atoms via atom map number\n";
+      }
+    } else if ("noclear" == j) {
+      _preserve_isotopes_with_labelled_atoms = 1;
+      if (verbose) {
+        cerr << "Will preserve isotopic labels on unmatched atoms\n";
+      }
+    } else if (j == "sequential") {
+      _label_matched_atoms_sequentially = 1;
+      if (verbose) {
+        cerr << "Will label matched atoms with consecutive isotopic labels\n";
+      }
+    } else if ("help" == j) {
+      display_dash_j_options();
+      return 0;
+    } else if (j.numeric_value(_label_matched_atoms)) {
+      if (_label_matched_atoms < 0) {
+        cerr << "The -j option requires a whole non-negative number\n";
+        usage(37);
+      }
+      if (verbose) {
+        cerr << "Matched atoms will be isotopically labelled, multiple matches offset "
+             << _label_matched_atoms << '\n';
+      }
+    } else {
+      _matched_atoms_element = get_element_from_symbol_no_case_conversion(j);
+      if (nullptr == _matched_atoms_element) {
+        cerr << "Cannot retrieve element '" << j
+             << "', -j option - should be a whole number\n";
+        return 9;
+      }
+
+      if (verbose) {
+        cerr << "Matched atoms will be changed to type '"
+             << _matched_atoms_element->symbol() << "'\n";
+      }
+    }
+  }
+
+  //  make sure the various option combinations are consistent
+
+  if (_label_by_query_atom_number)
+    ;
+  else if (_label_by_query_number)
+    ;
+  else if (_positive_j_offset || _negative_j_offset)
+    ;
+  else if (_increment_isotopic_labels_to_indicate_queries_matching)
+    ;
+  else if (_label_matched_atoms_sequentially) {
+  } else if (0 == _label_matched_atoms && nullptr == _matched_atoms_element) {
+    cerr << "Must specify '-j <number>' or '-j <element>' as a -j option\n";
+    usage(13);
+  }
+
+  if (_positive_j_offset && _negative_j_offset) {
+    cerr << "Cannot specify both a positive and negative isotopic offset\n";
+    usage(22);
+  }
+
+  if ((_positive_j_offset || _negative_j_offset) && 0 == _label_matched_atoms) {
+    cerr << "Warning, positive (" << _positive_j_offset << ") and/or negative ("
+         << _negative_j_offset
+         << ") specified, but no label for non isotopic atoms. Any resulting negative "
+            "isotopes ignored\n";
+    //    cerr << "In order to isotopically offset matched atoms, an initial value for
+    //    non-isotopic atoms is needed\n"; usage(29);
+  }
+
+  if (_label_by_query_atom_number && _all_matched_atoms_get_same_isotope) {
+    cerr << "Cannot label to query atom number and have all get the same isotope\n";
+    usage(33);
+  }
+
+  return 1;
+}
+
+int
+LabelMatchedAtoms::DoLabelMatchedAtoms(Molecule& m, int query_number, const Substructure_Results& sresults,
+                          isotope_t* atom_isotopic_label,
+                          const Element** element_labels,
+                          int number_queries) {
+  // cerr << "Applying labels to " << m.smiles() << " with " << sresults.number_embeddings() << " matches\n";
+  if (_matched_atoms_element != nullptr) {
+    return transform_atoms_hit(sresults, element_labels);
+  }
+
+  if (_stream_for_individually_labelled_matches.active()) {
+    return label_matches_and_write_to_stream_for_individually_labelled_matches(
+        m, query_number, sresults, number_queries);
+  }
+
+  int ne = sresults.number_embeddings();
+
+  for (int i = 0; i < ne; i++) {
+    ApplyIsotopicLabelsEmbedding(m, query_number, sresults, i, atom_isotopic_label,
+                                 number_queries);
+  }
+
+  return 1;
+}
+
+int
+LabelMatchedAtoms::IncrementIsotopicLabelsToIndicateQueriesMatching(
+    const Molecule& m, const Set_of_Atoms& embedding, const int na,
+    isotope_t* atom_isotopic_label) {
+  const int matoms = m.natoms();
+
+  for (auto i = 0; i < na; ++i) {
+    const atom_number_t j = embedding[i];
+
+    if (j < 0 || j >= matoms) {
+      continue;
+    }
+
+    atom_isotopic_label[j]++;
+  }
+
+  return 1;
+}
+
+int
+LabelMatchedAtoms::ApplyIsotopicLabelsEmbedding(const Molecule& m, int query_number,
+                                const Substructure_Results& sresults,
+                                int embedding_number, isotope_t* atom_isotopic_label,
+                                int number_queries) {
+  const Set_of_Atoms* embedding = sresults.embedding(embedding_number);
+
+  const int matoms = m.natoms();
+
+  // cerr << "Processing embedding " << (*embedding) << '\n';
+
+  int na = embedding->number_elements();  // how many of the matched atoms do we process
+  if (_label_matched_atoms_stop > 0 && na > _label_matched_atoms_stop) {
+    na = _label_matched_atoms_stop;
+  }
+
+  if (_increment_isotopic_labels_to_indicate_queries_matching) {
+    return IncrementIsotopicLabelsToIndicateQueriesMatching(m, *embedding, na, atom_isotopic_label);
+  }
+
+  const Query_Atoms_Matched* qam;
+  if (_label_by_query_atom_number) {
+    qam = sresults.query_atoms_matching(embedding_number);
+  } else {
+    qam = nullptr;
+  }
+
+  // If we are numbering by initial atom number, there may be gaps in
+  // the embedding, for example, someone specifies initial atom numbers
+  // of 0 1 and 9.  The embedding will have 10 entries, but most of them
+  // will be INVALID_ATOM_NUMBER
+
+  // May 2005.  Note that there is a bizzare and complex interplay
+  // between our isotopic labelling and the value of
+  // _respect_initial_atom_numbering within the query object.  The
+  // 'iquery' and 'query' may not work as expected with
+  // _respect_initial_atom_numbering is set.  Too complex to figure out
+  // for something used so seldom - just beware
+
+  int ndx_for_initial_atom_number = 0;
+
+  for (int j = 0; j < na; j++) {
+    const atom_number_t k = embedding->item(j);
+
+    if (k >= 0 && k < matoms)
+      ;
+    else if (INVALID_ATOM_NUMBER == k) {
+      continue;
+    } else {
+      cerr << "apply_isotopic_labels_embedding:invalid atom number in embedding " << k
+           << ", matoms " << matoms << '\n';
+      continue;
+    }
+
+    if (0 == atom_isotopic_label[k])  // definitely not already set
+      ;
+    else if (_positive_j_offset ||
+             _negative_j_offset)  // we cannot distinguish an isotope in the initial
+                                 // molecule from something added elsewhere here.
+      ;
+    else {
+      continue;  // already set by a different query
+    }
+
+    const Atom* ak = m.atomi(k);
+
+    //  Make sure we don't generate the 0 isotope
+
+    int iso;
+    if (_positive_j_offset || _negative_j_offset) {
+      if (ak->is_isotope()) {
+        iso = ak->isotope() + _positive_j_offset + _negative_j_offset;
+      } else {
+        iso = _label_matched_atoms + _positive_j_offset + _negative_j_offset;
+      }
+
+      if (iso < 0) {
+        iso = 0;
+      }
+    } else if (_all_matched_atoms_get_same_isotope) {
+      iso = _label_matched_atoms;
+    } else if (1 == _label_by_query_atom_number) {
+      iso = qam->item(j)->unique_id() + 1;
+    } else if (_label_by_query_number) {
+      iso = query_number + 1;
+    } else if (_label_by_query_embedding) {
+      iso = (query_number + 1) * number_queries + j;
+    } else if (2 == _label_by_query_atom_number) {
+      iso = qam->item(ndx_for_initial_atom_number)->initial_atom_number();
+      ndx_for_initial_atom_number++;
+    } else if (_label_matched_atoms_sequentially) {
+      iso = _next_sequential_matched_atom_isotope;
+      ++_next_sequential_matched_atom_isotope;
+    } else if (_label_by_query_atom_number > 2) {
+      iso = (_label_by_query_atom_number * (query_number + 1)) +
+            _label_matched_atoms * embedding_number + j + 1;
+      ndx_for_initial_atom_number++;
+    } else {
+      iso = _label_matched_atoms * embedding_number + j + 1;
+    }
+
+    atom_isotopic_label[k] = iso;
+  }
+
+  return 1;
+}
+
+
+int
+LabelMatchedAtoms::transform_atoms_hit(const Substructure_Results& sresults,
+                    const Element** element_labels) const {
+  int ne = sresults.number_embeddings();
+
+  for (int i = 0; i < ne; i++) {
+    const Set_of_Atoms* s = sresults.embedding(i);
+    int na = s->number_elements();
+
+    if (_label_matched_atoms_stop > 0 && na > _label_matched_atoms_stop) {
+      na = _label_matched_atoms_stop;
+    }
+
+    for (int j = 0; j < na; j++) {
+      atom_number_t k = s->item(j);
+
+      element_labels[k] = _matched_atoms_element;
+    }
+  }
+
+  return 1;
+}
+
+int
+LabelMatchedAtoms::label_matches_and_write_to_stream_for_individually_labelled_matches2(
+    Molecule& m, int query_number, const Substructure_Results& sresults,
+    int number_queries) {
+  std::unique_ptr<isotope_t[]> atom_isotopic_label =
+      std::make_unique<isotope_t[]>(m.natoms());
+
+  for (uint32_t i = 0; i < sresults.number_embeddings(); i++) {
+    if (i > 0) {
+      m.transform_to_non_isotopic_form();
+    }
+
+    if (!label_match_and_write_to_stream_for_individually_labelled_matches(
+            m, query_number, sresults, i, atom_isotopic_label.get(), number_queries)) {
+      return 0;
+    }
+  }
+
+  return 1;
+}
+
+
+int
+LabelMatchedAtoms::label_match_and_write_to_stream_for_individually_labelled_matches(
+    Molecule& m, int query_number, const Substructure_Results& sresults,
+    int embedding_number, isotope_t* atom_isotopic_label, int number_queries) {
+  std::fill_n(atom_isotopic_label, m.natoms(), 0);
+
+  ApplyIsotopicLabelsEmbedding(m, query_number, sresults, embedding_number,
+                                  atom_isotopic_label, number_queries);
+
+  if (_label_matched_atoms_via_atom_map_numbers) {
+    do_label_matched_atoms_via_atom_map_numbers(m, atom_isotopic_label);
+  } else {
+    m.set_isotopes(atom_isotopic_label);
+  }
+
+  return _stream_for_individually_labelled_matches.write(m);
+}
+
+int
+LabelMatchedAtoms::label_matches_and_write_to_stream_for_individually_labelled_matches(
+        Molecule& m, int query_number, const Substructure_Results& sresults,
+        int number_queries) {
+  Molecule mcopy(m);
+  mcopy.set_name(m.name());
+
+  return label_matches_and_write_to_stream_for_individually_labelled_matches2(
+      mcopy, query_number, sresults, number_queries);
+}
+
+// Raises the question of whether atom_map_numbers should also be unsigned.
+void
+LabelMatchedAtoms::do_label_matched_atoms_via_atom_map_numbers(Molecule& m,
+                                            const isotope_t* atom_isotopic_label) const {
+  const int matoms = m.natoms();
+
+  for (int i = 0; i < matoms; ++i) {
+    m.set_atom_map_number(i, atom_isotopic_label[i]);
+  }
+
+  return;
+}
+
+int
+LabelMatchedAtoms::ApplyIsotopesOrAtomMapNumbers(Molecule& m, const isotope_t* atom_isotopic_label) const {
+  if (_label_matched_atoms_via_atom_map_numbers) {
+    do_label_matched_atoms_via_atom_map_numbers(m, atom_isotopic_label);
+  } else {
+    m.set_isotopes(atom_isotopic_label);
+  }
+
+  return 1;
+}
+
+
+// For now this is static here. Eventually hoist into main atn
+// pass as an argument.
+static LabelMatchedAtoms label_matched_atoms_instance;
 
 static int
 write_mdl_v30_bond_list(Molecule& m, const const_IWSubstring& query_name,
@@ -880,236 +1381,6 @@ WriteAsProto(Molecule& m, const IWString& mname,
 }
 
 static int
-do_increment_isotopic_labels_to_indicate_queries_matching(
-    const Molecule& m, const Set_of_Atoms& embedding, const int na,
-    isotope_t* atom_isotopic_label) {
-  const int matoms = m.natoms();
-
-  for (auto i = 0; i < na; ++i) {
-    const atom_number_t j = embedding[i];
-
-    if (j < 0 || j >= matoms) {
-      continue;
-    }
-
-    atom_isotopic_label[j]++;
-  }
-
-  return 1;
-}
-
-/*
-  apply the labels for a single embedding
-*/
-
-static int
-apply_isotopic_labels_embedding(const Molecule& m, int query_number,
-                                const Substructure_Results& sresults,
-                                int embedding_number, isotope_t* atom_isotopic_label,
-                                int number_queries) {
-  const Set_of_Atoms* embedding = sresults.embedding(embedding_number);
-
-  const int matoms = m.natoms();
-
-  // cerr << "Processing embedding " << (*embedding) << '\n';
-
-  int na = embedding->number_elements();  // how many of the matched atoms do we process
-  if (label_matched_atoms_stop > 0 && na > label_matched_atoms_stop) {
-    na = label_matched_atoms_stop;
-  }
-
-  if (increment_isotopic_labels_to_indicate_queries_matching) {
-    return do_increment_isotopic_labels_to_indicate_queries_matching(m, *embedding, na,
-                                                                     atom_isotopic_label);
-  }
-
-  const Query_Atoms_Matched* qam;
-  if (label_by_query_atom_number) {
-    qam = sresults.query_atoms_matching(embedding_number);
-  } else {
-    qam = nullptr;
-  }
-
-  // If we are numbering by initial atom number, there may be gaps in
-  // the embedding, for example, someone specifies initial atom numbers
-  // of 0 1 and 9.  The embedding will have 10 entries, but most of them
-  // will be INVALID_ATOM_NUMBER
-
-  // May 2005.  Note that there is a bizzare and complex interplay
-  // between our isotopic labelling and the value of
-  // _respect_initial_atom_numbering within the query object.  The
-  // 'iquery' and 'query' may not work as expected with
-  // _respect_initial_atom_numbering is set.  Too complex to figure out
-  // for something used so seldom - just beware
-
-  int ndx_for_initial_atom_number = 0;
-
-  for (int j = 0; j < na; j++) {
-    const atom_number_t k = embedding->item(j);
-
-    if (k >= 0 && k < matoms)
-      ;
-    else if (INVALID_ATOM_NUMBER == k) {
-      continue;
-    } else {
-      cerr << "apply_isotopic_labels_embedding:invalid atom number in embedding " << k
-           << ", matoms " << matoms << '\n';
-      continue;
-    }
-
-    if (0 == atom_isotopic_label[k])  // definitely not already set
-      ;
-    else if (positive_j_offset ||
-             negative_j_offset)  // we cannot distinguish an isotope in the initial
-                                 // molecule from something added elsewhere here.
-      ;
-    else {
-      continue;  // already set by a different query
-    }
-
-    const Atom* ak = m.atomi(k);
-
-    //  Make sure we don't generate the 0 isotope
-
-    int iso;
-    if (positive_j_offset || negative_j_offset) {
-      if (ak->is_isotope()) {
-        iso = ak->isotope() + positive_j_offset + negative_j_offset;
-      } else {
-        iso = label_matched_atoms + positive_j_offset + negative_j_offset;
-      }
-
-      if (iso < 0) {
-        iso = 0;
-      }
-    } else if (all_matched_atoms_get_same_isotope) {
-      iso = label_matched_atoms;
-    } else if (1 == label_by_query_atom_number) {
-      iso = qam->item(j)->unique_id() + 1;
-    } else if (label_by_query_number) {
-      iso = query_number + 1;
-    } else if (label_by_query_embedding) {
-      iso = (query_number + 1) * number_queries + j;
-    } else if (2 == label_by_query_atom_number) {
-      iso = qam->item(ndx_for_initial_atom_number)->initial_atom_number();
-      ndx_for_initial_atom_number++;
-    } else if (label_matched_atoms_sequentially) {
-      iso = next_sequential_matched_atom_isotope;
-      ++next_sequential_matched_atom_isotope;
-    } else if (label_by_query_atom_number > 2) {
-      iso = (label_by_query_atom_number * (query_number + 1)) +
-            label_matched_atoms * embedding_number + j + 1;
-      ndx_for_initial_atom_number++;
-    } else {
-      iso = label_matched_atoms * embedding_number + j + 1;
-    }
-
-    atom_isotopic_label[k] = iso;
-  }
-
-  return 1;
-}
-
-// Raises the question of whether atom_map_numbers should also be unsigned.
-static void
-do_label_matched_atoms_via_atom_map_numbers(Molecule& m,
-                                            const isotope_t* atom_isotopic_label) {
-  const int matoms = m.natoms();
-
-  for (int i = 0; i < matoms; ++i) {
-    m.set_atom_map_number(i, atom_isotopic_label[i]);
-  }
-
-  return;
-}
-
-static int
-label_match_and_write_to_stream_for_individually_labelled_matches(
-    Molecule& m, int query_number, const Substructure_Results& sresults,
-    int embedding_number, isotope_t* atom_isotopic_label, int number_queries) {
-  std::fill_n(atom_isotopic_label, m.natoms(), 0);
-
-  apply_isotopic_labels_embedding(m, query_number, sresults, embedding_number,
-                                  atom_isotopic_label, number_queries);
-
-  if (label_matched_atoms_via_atom_map_numbers) {
-    do_label_matched_atoms_via_atom_map_numbers(m, atom_isotopic_label);
-  } else {
-    m.set_isotopes(atom_isotopic_label);
-  }
-
-  return stream_for_individually_labelled_matches.write(m);
-}
-
-static int
-label_matches_and_write_to_stream_for_individually_labelled_matches(
-    Molecule& m, int query_number, const Substructure_Results& sresults,
-    int number_queries) {
-  std::unique_ptr<isotope_t[]> atom_isotopic_label =
-      std::make_unique<isotope_t[]>(m.natoms());
-
-  for (uint32_t i = 0; i < sresults.number_embeddings(); i++) {
-    if (i > 0) {
-      m.transform_to_non_isotopic_form();
-    }
-
-    if (!label_match_and_write_to_stream_for_individually_labelled_matches(
-            m, query_number, sresults, i, atom_isotopic_label.get(), number_queries)) {
-      return 0;
-    }
-  }
-
-  return 1;
-}
-
-static int
-label_matches_and_write_to_stream_for_individually_labelled_matches(
-    Molecule* m, int query_number, const Substructure_Results& sresults,
-    int number_queries) {
-  Molecule mcopy(*m);
-  mcopy.set_name(m->name());
-
-  return label_matches_and_write_to_stream_for_individually_labelled_matches(
-      mcopy, query_number, sresults, number_queries);
-}
-
-static int
-label_atoms_hit(Molecule* m, int query_number, const Substructure_Results& sresults,
-                isotope_t* atom_isotopic_label, int number_queries) {
-  int ne = sresults.number_embeddings();
-
-  for (int i = 0; i < ne; i++) {
-    apply_isotopic_labels_embedding(*m, query_number, sresults, i, atom_isotopic_label,
-                                    number_queries);
-  }
-
-  return 1;
-}
-
-static int
-transform_atoms_hit(const Substructure_Results& sresults,
-                    const Element** element_labels) {
-  int ne = sresults.number_embeddings();
-
-  for (int i = 0; i < ne; i++) {
-    const Set_of_Atoms* s = sresults.embedding(i);
-    int na = s->number_elements();
-
-    if (label_matched_atoms_stop > 0 && na > label_matched_atoms_stop) {
-      na = label_matched_atoms_stop;
-    }
-
-    for (int j = 0; j < na; j++) {
-      atom_number_t k = s->item(j);
-
-      element_labels[k] = matched_atoms_element;
-    }
-  }
-
-  return 1;
-}
-
-static int
 do_single_query(Molecule_to_Match& target, int query_number,
                 Substructure_Hit_Statistics* query, Substructure_Results& sresults,
                 const Element** element_labels, isotope_t* atom_isotopic_label,
@@ -1137,16 +1408,10 @@ do_single_query(Molecule_to_Match& target, int query_number,
     stream_for_multiple_matches.write(target.molecule());
   }
 
-  if (stream_for_individually_labelled_matches.active()) {
-    label_matches_and_write_to_stream_for_individually_labelled_matches(
-        target.molecule(), query_number, sresults, number_queries);
-  }
-
-  if (any_matched_atom_labelling_active) {
-    (void)label_atoms_hit(target.molecule(), query_number, sresults, atom_isotopic_label,
-                          number_queries);
-  } else if (matched_atoms_element) {
-    (void)transform_atoms_hit(sresults, element_labels);
+  if (label_matched_atoms_instance.active()) {
+    label_matched_atoms_instance.DoLabelMatchedAtoms(*target.molecule(), query_number, sresults,
+                atom_isotopic_label, element_labels, number_queries);
+    return nmatches;
   }
 
   return nmatches;
@@ -1171,9 +1436,7 @@ static int
 do_all_queries(Molecule& m, resizable_array_p<Substructure_Hit_Statistics>& queries,
                Substructure_Results* sresults, int* hits, const Element** element_labels,
                isotope_t* atom_isotopic_label) {
-  if (label_matched_atoms_sequentially) {
-    next_sequential_matched_atom_isotope = 1;
-  }
+  label_matched_atoms_instance.reset();
 
   int rc = 0;
 
@@ -1288,14 +1551,7 @@ do_all_queries(Molecule& m, resizable_array_p<Substructure_Hit_Statistics>& quer
   }
 
   if (atom_isotopic_label) {
-    const int matoms = m.natoms();
-    for (int i = 0; i < matoms; i++) {
-      if (label_matched_atoms_via_atom_map_numbers) {
-        m.set_atom_map_number(i, atom_isotopic_label[i]);
-      } else {
-        m.set_isotope(i, atom_isotopic_label[i]);
-      }
-    }
+    label_matched_atoms_instance.ApplyIsotopesOrAtomMapNumbers(m, atom_isotopic_label);
   }
 
   return rc;
@@ -1321,17 +1577,15 @@ tsubstructure(Molecule& m, resizable_array_p<Substructure_Hit_Statistics>& queri
 
   isotope_t* atom_isotopic_label;
 
-  if (any_matched_atom_labelling_active) {
+  if (! label_matched_atoms_instance.active()) {
+    atom_isotopic_label = nullptr;
+  } else {
     atom_isotopic_label = new isotope_t[matoms];
-    if (negative_j_offset || positive_j_offset ||
-        increment_isotopic_labels_to_indicate_queries_matching ||
-        preserve_isotopes_with_labelled_atoms) {
+    if (label_matched_atoms_instance.needs_starting_isotopes()) {
       m.get_isotopes(atom_isotopic_label);
     } else {
       std::fill_n(atom_isotopic_label, matoms, 0);
     }
-  } else {
-    atom_isotopic_label = nullptr;
   }
 
   // If the queries are appending match details to the molecule name, that
@@ -1343,7 +1597,7 @@ tsubstructure(Molecule& m, resizable_array_p<Substructure_Hit_Statistics>& queri
 
   const Element** new_elements = nullptr;
 
-  if (matched_atoms_element) {
+  if (label_matched_atoms_instance.has_matched_atom_element()) {
     new_elements = new const Element*[matoms];
     for (int i = 0; i < matoms; i++) {
       new_elements[i] = nullptr;
@@ -1578,37 +1832,6 @@ tsubstructure(const char* input_fname, const FileType input_type,
   }
 
   return tsubstructure(input, queries, sresults, queries_matched);
-}
-
-// template class resizable_array_p<Substructure_Hit_Statistics>;
-// template class resizable_array_base<Substructure_Hit_Statistics *>;
-
-static int
-open_labelled_multiple_matches_file(Command_Line& cl, const const_IWSubstring& fname) {
-  if (cl.option_present('o')) {
-    if (!stream_for_individually_labelled_matches.determine_output_types(cl, 'o')) {
-      cerr << "Cannot discern output types for individually labelled matches\n";
-      return 0;
-    }
-  } else {
-    stream_for_individually_labelled_matches.add_output_type(FILE_TYPE_SMI);
-  }
-
-  if (stream_for_individually_labelled_matches.would_overwrite_input_files(cl, fname)) {
-    cerr << "Cannot overwrite input file(s)\n";
-    return 0;
-  }
-
-  if (!stream_for_individually_labelled_matches.new_stem(fname)) {
-    cerr << "Cannot open stream for indivually labelled matches '" << fname << "'\n";
-    return 0;
-  }
-
-  if (verbose) {
-    cerr << "Indivually labelled matches written to '" << fname << "'\n";
-  }
-
-  return 1;
 }
 
 static int
@@ -2492,165 +2715,11 @@ tsubstructure(int argc, char** argv) {
     }
   }
 
-  // the atom numbering options are complex
-
   if (cl.option_present('j')) {
-    any_matched_atom_labelling_active = 1;
-
-    const_IWSubstring j;
-    for (int i = 0; cl.value('j', j, i); ++i) {
-      if (j.starts_with("n=")) {
-        j.remove_leading_chars(2);
-        if (!j.numeric_value(label_matched_atoms_stop) || label_matched_atoms_stop < 1) {
-          cerr << "The -j n= specifier must be followed by a whole positive number\n";
-          usage(3);
-        }
-        if (verbose) {
-          cerr << "The first " << label_matched_atoms_stop
-               << " atoms of each match will be labelled\n";
-        }
-      } else if ("same" == j) {
-        all_matched_atoms_get_same_isotope = 1;
-        if (verbose) {
-          cerr << "All atoms will be assigned the same isotopic label\n";
-        }
-      } else if ("query" == j) {
-        label_by_query_atom_number = 1;
-        if (verbose) {
-          cerr << "Will label by matched substructure atom unique identifier\n";
-        }
-      } else if ("iquery" == j) {
-        label_by_query_atom_number = 2;
-        if (verbose) {
-          cerr << "Will label by matched substructure atom initial atom number\n";
-        }
-      } else if (j.starts_with("mqoffset=")) {
-        j.remove_leading_chars(9);
-        if (!j.numeric_value(label_by_query_atom_number) ||
-            label_by_query_atom_number <= 2) {
-          cerr << "Invalid query label offset '" << j << "'\n";
-          return 2;
-        }
-        if (verbose) {
-          cerr << "Multiplicative offset for query number " << label_by_query_atom_number
-               << '\n';
-        }
-      } else if (j.starts_with("qnum")) {
-        label_by_query_number = 1;
-        if (verbose) {
-          cerr << "Will label matched atoms by query number\n";
-        }
-      } else if (j.starts_with('+')) {
-        j++;  // '+' is not a valid part of a number
-        if (!j.numeric_value(positive_j_offset) || positive_j_offset <= 0) {
-          cerr << "With -j +nnn, the number, nnn must be non-zero\n";
-          usage(44);
-        }
-
-        if (verbose) {
-          cerr << "Positive isotopic offset " << positive_j_offset << '\n';
-        }
-      } else if (j.starts_with('-')) {
-        if (!j.numeric_value(negative_j_offset) || negative_j_offset <= 0) {
-          cerr << "With -j -nnn, the number, nnn must be non-zero\n";
-          usage(44);
-        }
-
-        if (verbose) {
-          cerr << "Negative isotopic offset " << negative_j_offset << '\n';
-        }
-      } else if (j.starts_with("writeach=")) {
-        j.remove_up_to_first('=');
-
-        if (!open_labelled_multiple_matches_file(cl, j)) {
-          cerr << "Cannot open file for labelled matches '" << j << "'\n";
-          return 0;
-        }
-      } else if ("qmatch" == j) {
-        increment_isotopic_labels_to_indicate_queries_matching = 1;
-
-        if (verbose) {
-          cerr << "Will increment isotopic labels by the number of queries hitting that "
-                  "atom\n";
-        }
-      } else if ("amap" == j) {
-        label_matched_atoms_via_atom_map_numbers = 1;
-        if (verbose) {
-          cerr << "Will label matched atoms via atom map number\n";
-        }
-      } else if ("noclear" == j) {
-        preserve_isotopes_with_labelled_atoms = 1;
-        if (verbose) {
-          cerr << "Will preserve isotopic labels on unmatched atoms\n";
-        }
-      } else if (j == "sequential") {
-        label_matched_atoms_sequentially = 1;
-        if (verbose) {
-          cerr << "Will label matched atoms with consecutive isotopic labels\n";
-        }
-      } else if ("help" == j) {
-        display_dash_j_options();
-        return 0;
-      } else if (j.numeric_value(label_matched_atoms)) {
-        if (label_matched_atoms < 0) {
-          cerr << "The -j option requires a whole non-negative number\n";
-          usage(37);
-        }
-        if (verbose) {
-          cerr << "Matched atoms will be isotopically labelled, multiple matches offset "
-               << label_matched_atoms << '\n';
-        }
-      } else {
-        matched_atoms_element = get_element_from_symbol_no_case_conversion(j);
-        if (nullptr == matched_atoms_element) {
-          cerr << "Cannot retrieve element '" << j
-               << "', -j option - should be a whole number\n";
-          return 9;
-        }
-
-        if (verbose) {
-          cerr << "Matched atoms will be changed to type '"
-               << matched_atoms_element->symbol() << "'\n";
-        }
-      }
+    if (! label_matched_atoms_instance.Initialise(cl)) {
+      cerr << "Cannot initialise matched atom labelling\n";
+      return 1;
     }
-
-    //  make sure the various option combinations are consistent
-
-    if (label_by_query_atom_number)
-      ;
-    else if (label_by_query_number)
-      ;
-    else if (positive_j_offset || negative_j_offset)
-      ;
-    else if (increment_isotopic_labels_to_indicate_queries_matching)
-      ;
-    else if (label_matched_atoms_sequentially) {
-    } else if (0 == label_matched_atoms && nullptr == matched_atoms_element) {
-      cerr << "Must specify '-j <number>' or '-j <element>' as a -j option\n";
-      usage(13);
-    }
-
-    if (positive_j_offset && negative_j_offset) {
-      cerr << "Cannot specify both a positive and negative isotopic offset\n";
-      usage(22);
-    }
-
-    if ((positive_j_offset || negative_j_offset) && 0 == label_matched_atoms) {
-      cerr << "Warning, positive (" << positive_j_offset << ") and/or negative ("
-           << negative_j_offset
-           << ") specified, but no label for non isotopic atoms. Any resulting negative "
-              "isotopes ignored\n";
-      //    cerr << "In order to isotopically offset matched atoms, an initial value for
-      //    non-isotopic atoms is needed\n"; usage(29);
-    }
-
-    if (label_by_query_atom_number && all_matched_atoms_get_same_isotope) {
-      cerr << "Cannot label to query atom number and have all get the same isotope\n";
-      usage(33);
-    }
-
-    //  put more checks on label_by_query_atom_number here....
   }
 
   if (work_as_filter)  // no need to check input specifications

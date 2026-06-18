@@ -392,7 +392,7 @@ DisplayFingerprintOptions(std::ostream& output) {
   // clang-format off
   output << R"(The following fingerprint directives are recognised.
  -G FILTER         work as a TDT filter.
- -G RE=<n>         the number of buckets used in discretising the values.
+ -G R=<n>          the number of buckets used in discretising the values.
  -G ALL            use all descriptors to generate the fingerprint.
  -G BEST           from calibration runs, certain descriptors have been designated.
                    as the 'best'. Use these designated to generate the fingerprint.
@@ -648,19 +648,22 @@ IWDescrMainOptions::ReadDescriptorRanges(const IWDescr& iwdescr) {
     return 0;
   }
 
+  const std::span<Descriptor> descriptors = iwdescr.Descriptors();
+
   // Ignore missing descriptors, those may not be turned on. Too complicated
   // otherwise. But what this means is that truly bad input will be silently
   // ignored. What we need is a hash containing all known descriptor names,
   // but that does not exist.
   int rc = 0;
   for (const auto& range : (*maybe_proto).range()) {
-    Descriptor*d = iwdescr.GetDescriptor(range.name());
-    if (d == nullptr) {
+    int ndx = DescriptorNumber(_prefix, range.name(), descriptors);
+    if (ndx < 0) {
       cerr << "ReadDescriptorRanges:no match for '" << range.name() << "'\n";
-    } else {
-      d->set_range(range.min(), range.max());
-      ++rc;
+      continue;
     }
+
+    descriptors[ndx].set_range(range.min(), range.max());
+    ++rc;
   }
 
   return rc;

@@ -1290,7 +1290,6 @@ IWDescr::IWDescrImpl::AllocateDescriptors() {
     SetDescriptorName(iwdescr_fncon3, "fncon3");
     SetDescriptorName(iwdescr_ncon4, "ncon4");
     SetDescriptorName(iwdescr_fncon4, "fncon4");
-    SetDescriptorName(iwdescr_platt, "platt");
   }
   SetDescriptorName(iwdescr_frhc, "frhc");
   SetDescriptorName(iwdescr_mltbd, "mltbd");
@@ -6388,9 +6387,9 @@ IWDescr::IWDescrImpl::ComputeDistanceMatrixDescriptors(Molecule& m, PerMoleculeD
   descriptor[iwdescr_mxdst].set(static_cast<float>(max_eccentricity));
   descriptor[iwdescr_fmxdst].set(iwmisc::Fraction<float>(max_eccentricity, matoms));
 
-  if (min_eccentricity > 0) {
+  if (max_eccentricity > 0) {
     descriptor[iwdescr_ishape].set(static_cast<float>(max_eccentricity - min_eccentricity) /
-                                   static_cast<float>(min_eccentricity));
+                                   static_cast<float>(max_eccentricity));
   }
 
   descriptor[iwdescr_maxdrng].set(max_distance_between_ring_atoms);

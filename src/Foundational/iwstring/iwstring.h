@@ -726,29 +726,6 @@ class IWString : public resizable_array<char>
     IWString & operator << (const std::string_view & s) { this->operator+=(s); return *this;}
 #endif
 
-#ifdef NEVER_A_GOOD_IDEA_AND_NEVER_IMPLEMENTED
-    int operator < (int) const;
-    int operator <= (int) const;
-    int operator > (int) const;
-    int operator >= (int) const;
-    int operator == (int) const;
-    int operator != (int) const;
-
-    int operator < (float) const;
-    int operator <= (float) const;
-    int operator > (float) const;
-    int operator >= (float) const;
-    int operator == (float) const;
-    int operator != (float) const;
-
-    int operator < (double) const;
-    int operator <= (double) const;
-    int operator > (double) const;
-    int operator >= (double) const;
-    int operator == (double) const;
-    int operator != (double) const;
-#endif
-
 //  Change characters between (and including) istart to istop to a new string. Grow or shorten as needed
 
     int change (int istart, int istop, const char * s, int len_s);

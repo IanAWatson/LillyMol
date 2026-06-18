@@ -1132,6 +1132,17 @@ cc_binary(
 )
 
 cc_binary(
+    name = "iwdescr_new",
+    srcs = [
+        "iwdescr_main_target.cc",
+    ],
+    deps = [
+        ":iwdescr_lib",
+        "//Foundational/iwstring:iwstring",
+    ],
+)
+
+cc_binary(
     name = "iwecfp",
     srcs = [
         "iwecfp.cc",
@@ -3196,6 +3207,32 @@ cc_library(
         "//Foundational/data_source:iwstring_data_source",
         "//Foundational/iwmisc",
         "//Molecule_Lib:iwmolecule",
+    ],
+)
+
+cc_library(
+    name = "iwdescr_lib",
+    srcs = [
+        "iwdescr_lib_api_skeleton.cc",
+        "iwdescr_internal.cc",
+        "iwdescr_lib.cc",
+        "qry_wcharge.cc",
+        "qry_wcharge.h",
+    ],
+    hdrs = [
+        "iwdescr_lib.h",
+        "iwdescr_internal.h",
+    ],
+    deps = [
+        ":alogp_lib",
+        ":iwdescr_cc_proto",
+        ":nvrtspsa",
+        ":partial_symmetry",
+        ":xlogp_lib",
+        "//Foundational/accumulator",
+        "//Foundational/iwmisc:sparse_fp_creator",
+        "//Molecule_Lib:iwmolecule",
+        "//Molecule_Lib:planarity",
     ],
 )
 

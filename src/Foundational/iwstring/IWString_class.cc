@@ -4418,6 +4418,19 @@ const_IWSubstring::operator !=(double rhs) const
 }
 #endif
 
+bool
+IWString::operator== (const std::string& rhs) const {
+  if (static_cast<uint32_t>(_number_elements) != rhs.size()) {
+    return false;
+  }
+
+  if (this->strncmp(rhs.data(), rhs.size()) == 0) {
+    return true;
+  } else {
+    return false;
+  }
+}
+
 static int
 common_balance (char open, char close, const char * s, int nchars)
 {

@@ -2,14 +2,11 @@
 #define MOLECULE_TOOLS_IWDESCR_INTERNAL_H_
 
 #include <iosfwd>
+#include <iostream>
 
-#include "Foundational/accumulator/accumulator.h"
-#include "Foundational/cmdline/cmdline.h"
 #include "Foundational/iwmisc/set_or_unset.h"
-#include "Foundational/iwmisc/sparse_fp_creator.h"
 #include "Foundational/iwstring/iwstring.h"
-#include "Foundational/data_source/iwstring_data_source.h"
-#include "Molecule_Tools/qry_wcharge.h"
+class iwstring_data_source;
 
 class const_IWSubstring;
 
@@ -368,10 +365,5 @@ struct DescriptorsToCompute {
   int ReadDescriptorsToCompute(iwstring_data_source& input);
   int Initialise(Command_Line& cl);
 };
-
-// Query_and_Charge_Stats is descriptor-computation state and belongs in IWDescr.
-// The concrete definition currently lives in the monolithic file near the query
-// charge descriptor code. It can be moved here in the same way as Descriptor.
-class Query_and_Charge_Stats;
 
 #endif  // MOLECULE_TOOLS_IWDESCR_INTERNAL_H_

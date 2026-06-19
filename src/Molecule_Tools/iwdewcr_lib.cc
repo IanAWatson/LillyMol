@@ -913,10 +913,6 @@ class IWDescr::IWDescrImpl {
   // public IWDescr::number_descriptors() API.
   int number_descriptors = 0;
 
-  // Charge-query descriptors are computation state. The concrete query class is
-  // supplied by qry_wcharge.h; keep it internal and owned here.
-  resizable_array_p<Query_and_Charge_Stats> charge_queries;
-
   int min_hbond_feature_separation = 0;
   int max_hbond_feature_separation = std::numeric_limits<int>::max();
 
@@ -1191,31 +1187,10 @@ IWDescr::IWDescrImpl::InitialiseDescriptorSelection(Command_Line& cl) {
 
 int
 IWDescr::IWDescrImpl::InitialiseAssigners(Command_Line& cl) {
-  // Move these option blocks from the old driver here:
-  //   * charge_assigner construction/activation
-  //   * donor_acceptor_assigner construction/activation
-  //   * any query-with-charge setup that populates charge_queries
-  // They are integral to descriptor values, not caller I/O.
-
   const int verbose = cl.option_present('v');
 
   // Not sure why this is important.
   set_aromatic_bonds_lose_kekule_identity(0);
-
-  if (cl.option_present('q') && (!process_queries(cl, charge_queries, verbose, 'q'))) {
-    cerr << "cannot process command line queries\n";
-    return 0;
-  }
-
-  if (cl.option_present('f')) {
-    for (int i = 0; i < charge_queries.number_elements(); i++) {
-      charge_queries[i]->set_max_matches_to_find(1);
-    }
-
-    if (verbose) {
-      cerr << "Queries will match only one embedding\n";
-    }
-  }
 
   if (cl.option_present('N')) {
     if (!charge_assigner.construct_from_command_line(cl, (verbose > 1), 'N')) {
@@ -1724,16 +1699,18 @@ IWDescr::IWDescrImpl::VerifyDescriptorNames() const {
   return rc;
 }
 
+// Currently turned off. Descriptors have initialised with Nan values
+// elsewhere.
 void
 IWDescr::IWDescrImpl::InitialiseDescriptorDefaults() {
   if (descriptor == nullptr) {
     return;
   }
 
-  static constexpr float kZero = 0.0f;
-  for (int i = 0; i < number_descriptors; ++i) {
+//static constexpr float kZero = 0.0f;
+//for (int i = 0; i < number_descriptors; ++i) {
 //  descriptor[i].set_default_value(kZero);
-  }
+//}
 }
 
 int
@@ -6915,9 +6892,6 @@ IWDescr::IWDescrImpl::CopyDescriptorsToResults(float* results) const {
     if (descriptor[i].value(v)) {
       results[i] = v;
     } else {
-      // Undefined-value rendering is caller-owned. For the numeric API, leave
-      // unset descriptors as quiet NaN so C++, Python, and NumPy callers can
-      // handle missing values without knowing about the CLI undefined string.
       results[i] = std::numeric_limits<float>::quiet_NaN();
     }
   }

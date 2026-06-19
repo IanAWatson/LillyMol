@@ -2,6 +2,7 @@
 #define MOLECULE_TOOLS_IWDESCR_LIB_H_
 
 #include <memory>
+#include <optional>
 #include <span>
 #include <string>
 
@@ -21,7 +22,8 @@ class Descriptor : public Set_or_Unset<float>, public Accumulator<float> {
   IWString _name;
   int _active;
   uint64_t _zero_value_count;
-  Set_or_Unset<float> _default_value;
+//Set_or_Unset<float> _default_value;
+  std::optional<float>_default_value;
 
   int _fingerprint_replicates;
   float _min;
@@ -61,7 +63,8 @@ class Descriptor : public Set_or_Unset<float>, public Accumulator<float> {
   // Legacy form retained until all call sites pass IWDescr verbosity explicitly.
   void update_statistics();
 
-  void set_default_value(float d) { _default_value.set(d); }
+//void set_default_value(float d) { _default_value.set(d); }
+  void set_default_value(float d) { _default_value = d; }
   void reset();
   void set(int s);
   void set(float s) { Set_or_Unset<float>::set(s); }

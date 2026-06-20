@@ -96,6 +96,56 @@ std::optional<double> XLogP(Molecule& m, int* status);
 void ForTestingSetApplyCorrections(int s);
 void TurnOffNitroxide();
 
+class XLogpGenerator {
+  private:
+    // the xlogp algorithm involves a sum of per atom terms and correction
+    // factors. Adding the correction factors can be turned off, which is
+    // helpful during debugging.
+    bool _apply_corrections = true;
+
+    // The nitroxide correction can be turned off. Again, mostly useful for debugging.
+    bool _apply_nitroxide = true;
+
+    // If set, write warnings to stderr about unclassified atoms.
+    bool _display_unclassified_atom_messages = true;
+
+    // Useful for debugging
+    bool _display_assignements = false;
+
+  public:
+    XLogpGenerator();
+
+    // Read updated parameter values from a textproto file.
+    // Note that these over-write only the values specified in the proto.
+    int ReadNewFragmentParameters(IWString& fname);
+
+    void SetDisplayUnclassifiedAtomMessages(bool s) {
+      _display_unclassified_atom_messages = s;
+    }
+    void SetDisplayAtomAssignments(bool s) {
+      _display_assignements = s;
+    }
+
+    void SetIssueUnclassifiedAtomMessages(int s);
+
+    // If all atoms are classified, return xlogp.
+    std::optional<double> XLogp(Molecule& m);
+    // Return the atom type for each atom as well.
+    std::optional<double> XLogp(Molecule& m, int* status);
+
+    // Functions not for general use.
+
+    // For testing, it can be convenient to turn off the corrections.
+    // Do not use.
+    
+    void ForTestingSetApplyCorrections(bool s) {
+      _apply_corrections = s;
+    }
+    void SetApplyNitroxide(bool s) {
+      _apply_nitroxide = s;
+    }
+};
+
 }  // namespace xlogp
 
 #endif // MOLECULE_TOOLS_XLOGP_H_

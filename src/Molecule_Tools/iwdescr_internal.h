@@ -4,7 +4,6 @@
 #include <iosfwd>
 #include <iostream>
 
-#include "Foundational/iwmisc/set_or_unset.h"
 #include "Foundational/iwstring/iwstring.h"
 class iwstring_data_source;
 

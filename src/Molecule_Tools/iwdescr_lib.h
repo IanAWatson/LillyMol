@@ -17,12 +17,11 @@ class DescriptorsToCompute;
 class Sparse_Fingerprint_Creator;
 
 // 
-class Descriptor : public Set_or_Unset<float>, public Accumulator<float> {
+class Descriptor : public Set_or_Unset<float> {
  private:
   IWString _name;
   int _active;
   uint64_t _zero_value_count;
-//Set_or_Unset<float> _default_value;
   std::optional<float>_default_value;
 
   int _fingerprint_replicates;
@@ -30,6 +29,8 @@ class Descriptor : public Set_or_Unset<float>, public Accumulator<float> {
   float _max;
   float _dy;
   int _best_fingerprint;
+
+  Accumulator<double> _stats;
 
  public:
   Descriptor();
@@ -63,7 +64,6 @@ class Descriptor : public Set_or_Unset<float>, public Accumulator<float> {
   // Legacy form retained until all call sites pass IWDescr verbosity explicitly.
   void update_statistics();
 
-//void set_default_value(float d) { _default_value.set(d); }
   void set_default_value(float d) { _default_value = d; }
   void reset();
   void set(int s);
@@ -175,6 +175,10 @@ class IWDescr {
   // this object directly or a narrower set of wrapper methods.
   DescriptorsToCompute& mutable_descriptors_to_compute();
   const DescriptorsToCompute& descriptors_to_compute() const;
+
+  // Called at the end of a run. For each active descriptor report summary
+  // statistics of the values generated.
+  int ReportDescriptorStatistics(std::ostream& output) const;
 
  private:
   class IWDescrImpl;

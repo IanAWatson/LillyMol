@@ -3213,11 +3213,8 @@ cc_library(
 cc_library(
     name = "iwdescr_lib",
     srcs = [
-        "iwdescr_lib_api_skeleton.cc",
         "iwdescr_internal.cc",
         "iwdescr_lib.cc",
-        "qry_wcharge.cc",
-        "qry_wcharge.h",
     ],
     hdrs = [
         "iwdescr_lib.h",

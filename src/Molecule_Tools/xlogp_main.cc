@@ -165,6 +165,7 @@ DisplayDashJOptions(std::ostream& output) {
 void
 DisplayDashYOptions(std::ostream& output) {
   output << " -Y flush          flush output after each molecule\n";
+  output << " -Y nocorrections  do not apply xlogp corrections, atomic assignments only\n";
   ::exit(0);
 }
 
@@ -239,6 +240,8 @@ Options::Initialise(Command_Line& cl) {
     for (int i = 0; cl.value('Y', y, i); ++i) {
       if (y == "help") {
         DisplayDashYOptions(cerr);
+      } else if (y == "nocorrections") {
+        xlogp::ForTestingSetApplyCorrections(false);
       } else if (y == "flush") {
         _flush_after_every_molecule = 1;
         if (_verbose) {

@@ -805,6 +805,12 @@ MoreThanOneRingBond(Molecule& m, atom_number_t a1, atom_number_t a2,
   for (const Bond * b : m[a1]) {
     atom_number_t o = b->other(a1);
     if (o == a2) {
+      if (b->nrings()) {
+        ++ring_bonds_found;
+        if (ring_bonds_found > 1) {
+          return 1;
+        }
+      }
       return 0;
     }
 
@@ -825,6 +831,28 @@ MoreThanOneRingBond(Molecule& m, atom_number_t a1, atom_number_t a2,
   }
 
   return 0;
+}
+
+//Place into `result` all atoms that are between `a1` and `a2`
+int
+AllAtomsBetween(Molecule& m, atom_number_t a1, atom_number_t a2,
+                Set_of_Atoms& result) {
+  result.reserve(8);  // a guess
+
+  int dist = m.bonds_between(a1, a2);
+  const int matoms = m.natoms();
+  for (int i = 0; i < matoms; ++i) {
+    int d1 = m.bonds_between(i, a1);
+    int d2 = m.bonds_between(i, a2);
+    if (d1 >= dist || d2 >= dist) {
+      continue;
+    }
+    if ((d1 + d2) == dist) {
+      result << i;
+    }
+  }
+
+  return result.number_elements();
 }
 
 double
@@ -869,7 +897,7 @@ IntraMolecularHBondCorrection(Molecule& m,
       }
 
       Set_of_Atoms between;
-      m.atoms_between(i, j, between);
+      AllAtomsBetween(m, i, j, between);
       if (between.any_members_set_in_array(already_used.get(), 1)) {
         continue;
       }
@@ -883,7 +911,8 @@ IntraMolecularHBondCorrection(Molecule& m,
       ++rc;
       // We only allow each atom to be in 1 internal intramolecular hbond.
       // Not great, but it would be hard to fix this...
-      break;
+      // This introduces an atom ordering problem. Allow multiple.
+      // break;
     }
   }
 
@@ -1263,13 +1292,12 @@ Nitroxide(Molecule& m,
   return rc * -2.9;
 }
 
+#ifdef THIS_IS_NOT_SSSR_STABLE
 // Look for ortho OH and C[OH] groups in `ring`.
 double
 CatecholLike(Molecule& m,
              const Ring& ring,
              const PerMoleculeData& per_molecule_data) {
-  int ring_size = ring.size();
-
   int previous_was_oh = 0;
 
   atom_number_t last_in_ring = ring.back();
@@ -1282,9 +1310,7 @@ CatecholLike(Molecule& m,
 
   int rc = 0;
 
-  for (int i = 0; i < ring_size; ++i) {
-    atom_number_t zatom = ring[i];
-
+  for (atom_number_t zatom : ring) {
     if (per_molecule_data.ncon[zatom] == 2) {
       previous_was_oh = 0;
       continue;
@@ -1295,16 +1321,20 @@ CatecholLike(Molecule& m,
       continue;
     }
 
-    if (! previous_was_oh) {
+    if (previous_was_oh) {
+      ++rc;
+    } else {
       previous_was_oh = 1;
-      continue;
     }
 
-    ++rc;
     // Deliberate choice to reset - so we do not perceive too many of these.
-    previous_was_oh = 0;
+    // No, this introduces bugs
+    // C1[C@H](O)[C@@H](O)[C@H](O)[C@@H](C)N1CCN CHEMBL270037
+    // Depending on how the ring is traversed, this will cause different results.
+    // previous_was_oh = 0;
   }
 
+  cerr << "Ring size " << ring.size() << " contains " << rc << " catechol\n";
   return rc * 0.53;
 }
 
@@ -1320,6 +1350,34 @@ CatecholLike(Molecule& m,
   }
 
   return rc;
+}
+#endif
+
+// Look for ring bonds with OH or CH2-OH attachments.
+double
+CatecholLike(Molecule& m,
+             const PerMoleculeData& per_molecule_data,
+             const int* status) {
+  const int* ncon = per_molecule_data.ncon;
+
+  int rc = 0;
+
+  for (const Bond* b : m.bond_list()) {
+    if (b->nrings() == 0) {
+      continue;
+    }
+
+    atom_number_t a1 = b->a1();
+    atom_number_t a2 = b->a2();
+    if (ncon[a1] <= 2 || ncon[a2] <= 2) {
+      continue;
+    }
+    if (IsOh(m, a1, per_molecule_data) && IsOh(m, a2, per_molecule_data)) {
+      ++rc;
+    }
+  }
+
+  return rc * 0.53;
 }
 
 // Note that this deliberately matches guanidine forms.
@@ -1392,18 +1450,34 @@ Corrections(Molecule& m,
   double rc = HydropphobicCarbonCorrection(m, per_molecule_data, status);
   rc += AminoAcidCorrection(m, per_molecule_data, status);
   rc += IntraMolecularHBondCorrection(m, per_molecule_data, status);
+#ifdef DEBUG_CORRECTIONS
+  cerr << " rc1 " << rc << '\n';
+#endif
   // IAW corrections.
   rc += HalogenCorrection(m, per_molecule_data, status);
   rc += AmidineCorrection(m, per_molecule_data, status);
+#ifdef DEBUG_CORRECTIONS
+  cerr << " rc2 " << rc << '\n';
+#endif
   rc += CatecholLike(m, per_molecule_data, status);
+#ifdef DEBUG_CORRECTIONS
+  cerr << " rc3 " << rc << '\n';
+#endif
   rc += Nitro(m, per_molecule_data, status);
   rc += TButyl(m, per_molecule_data, status);
   rc += Biphenyl(m, per_molecule_data, status);
   rc += BenzoTriazole(m, per_molecule_data, status);
   rc += Nitroxide(m, per_molecule_data, status);
+#ifdef DEBUG_CORRECTIONS
+  cerr << " rc4 " << rc << '\n';
+#endif
   if (apply_nitroxide) {
     rc += ZwitterionCorrection(m, per_molecule_data, status);
   }
+
+#ifdef DEBUG_CORRECTIONS
+  cerr << " rcf " << rc << '\n';
+#endif
 
   return rc;
 }
@@ -2251,7 +2325,11 @@ ClassifyAromaticCarbon(Molecule& m,
   }
 
   if (m.ncon(zatom) != 3) {
-    cerr << "xlogp::ClassifyAromaticCarbon: invalid aromatic carbon " << m.name() << '\n';
+    if (display_unclassified_atom_messages) {
+      cerr << m.smiles() << ' ' << m.name() <<
+              " xlogp::ClassifyAromaticCarbon: invalid aromatic carbon " <<
+              m.smarts_equivalent_for_atom(zatom) << '\n';
+    }
     return std::nullopt;
   }
 
@@ -2898,6 +2976,9 @@ XLogP(Molecule& m) {
   std::unique_ptr<int[]> status = std::make_unique<int[]>(m.natoms());
 
   return XLogP(m, status.get());
+}
+
+XLogpGenerator::XLogpGenerator() {
 }
 
 } // namespace xlogp

@@ -556,17 +556,16 @@ Descriptor::set_range(float dmin, float dmax) {
 
 int
 Descriptor::report_statistics(std::ostream& os) const {
-  const int nsamples = Accumulator<float>::n();
+  const uint32_t nsamples = _stats.n();
   os << "Descriptor '" << _name << "' " << nsamples << " values sampled\n";
   if (nsamples == 0) {
     return 1;
   }
 
-  os << " between " << Accumulator<float>::minval() << " and "
-     << Accumulator<float>::maxval();
+  os << " between " << _stats.minval() << " and " << _stats.maxval();
   if (nsamples > 1) {
-    os << " ave " << Accumulator<float>::average() << " sd "
-       << Accumulator<float>::variance();
+    os << " ave " << static_cast<float>(_stats.average()) << " sd " <<
+          static_cast<float>(_stats.variance());
   }
 
   os << ' ' << _zero_value_count << " instances of zero\n";
@@ -953,3 +952,21 @@ Descriptor::Descriptor() {
   return;
 }
 
+void
+Descriptor::update_statistics(int verbose) {
+  float v;
+  if (!Set_or_Unset<float>::value(v)) {
+    if (verbose > 2) {
+      cerr << "Descriptor::update_statistics: '" << _name << "' not set\n";
+    }
+    return;
+  }
+
+  _stats.extra(v);
+
+  if (v == 0.0f) {
+    _zero_value_count++;
+  }
+
+  return;
+}

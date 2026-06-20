@@ -10,6 +10,7 @@
 
 #include <algorithm>
 #include <cassert>
+#include <cmath>
 #include <cstdint>
 #include <iostream>
 #include <limits>
@@ -636,6 +637,7 @@ class IWDescr::IWDescrImpl {
     return descriptors_to_compute;
   }
 
+  int ReportDescriptorStatistics(std::ostream& output) const;
  private:
 
   // Per-molecule scratch arrays used by the legacy descriptor driver. Keeping
@@ -916,10 +918,10 @@ class IWDescr::IWDescrImpl {
   int min_hbond_feature_separation = 0;
   int max_hbond_feature_separation = std::numeric_limits<int>::max();
 
-  int max_difference_in_ring_size_for_strongly_fused = 0;
   int compute_spiro_fusions = 1;
   int molecules_with_no_rings = 0;
   int fsdrng_descriptors_consider_just_two_ring_systems = 1;
+  uint32_t max_difference_in_ring_size_for_strongly_fused = 0;
 
   Molecular_Weight_Control mwc;
 
@@ -1010,6 +1012,11 @@ IWDescr::valid_descriptor_index(int i) const {
 Descriptor*
 IWDescr::GetDescriptor(const std::string& name) const {
   return _impl->GetDescriptor(name);
+}
+
+int
+IWDescr::ReportDescriptorStatistics(std::ostream& output) const {
+  return _impl->ReportDescriptorStatistics(output);
 }
 
 IWDescr::IWDescrImpl::PerMoleculeData::PerMoleculeData(Molecule& m) {
@@ -1169,7 +1176,22 @@ IWDescr::IWDescrImpl::Initialise(Command_Line& cl) {
         if (verbose) {
           cerr << "Will not report unclassified atoms\n";
         }
-      } 
+      } else if (b.starts_with("mxsfsdf=")) {
+        // This option is not documented, and should be deprecated.
+        b.remove_leading_chars(8);
+        if (!b.numeric_value(max_difference_in_ring_size_for_strongly_fused) ||
+            max_difference_in_ring_size_for_strongly_fused < 1) {
+          cerr << "The max difference in ring size in a strongly fused system must be "
+                  "positive\n";
+          return 0;
+        }
+
+        if (verbose) {
+          cerr
+              << "Strongly fused ring systems will only grow if the ring sizes differ by "
+              << max_difference_in_ring_size_for_strongly_fused << " atoms or less\n";
+        }
+      }
     }
   }
 
@@ -1862,15 +1884,83 @@ AnyAtomsMoreThanTwoRings(Molecule& m, const Ring& r) {
 }
 
 // Turn off any atom that is in a strongly fused ring.
+// This is unstable wrt SSSR ring determination.
+// Perhaps not as precise as I would like, but it is not dependent on 
+// SSSR ring perception.
 void
-TurnOffStronglyFused(Molecule& m, const int* ncon, int* ok_to_check) {
-  const int nrings = m.nrings();
+TurnOffStronglyFused(Molecule& m, const atomic_number_t* z,
+                        const int* ncon, int* ok_to_check) {
   if (m.nrings() < 2) {
     return;
   }
 
   m.ring_membership();
 
+  // First turn off all ring atoms.
+  const int matoms = m.natoms();
+  for (int i = 0; i < matoms; ++i) {
+    if (m.ring_bond_count(i) > 1) {
+      ok_to_check[i] = 0;
+    }
+  }
+
+  // Identify ring atoms at which we can do expensive chirality computations.
+  auto possible_chiral = [&](atom_number_t zatom)->bool {
+    if (z[zatom] != 6) {
+      return false;
+    }
+    if (ncon[zatom] != 3 && ncon[zatom] != 4) {
+      return false;
+    }
+    if (m.is_aromatic(zatom)) {
+      return false;
+    }
+
+    const int rbc = m.ring_bond_count(zatom);
+
+    if (rbc == 0) {
+      return false;
+    }
+
+    if (rbc > 2) {
+      return false;
+    }
+
+    return true;
+  };
+
+  // All ring atoms have been turned off. Turn back on those that
+  // are eligible - two [D2] connections.
+  for (int i = 0; i < matoms; ++i) {
+    if (m.ring_bond_count(i) == 0) {
+      continue;
+    }
+
+    if (! possible_chiral(i)) {
+      continue;
+    }
+
+    int adjacent_D2 = 0;  // within the ring
+    for (const Bond* b : m[i]) {
+      if (b->nrings() == 0) {
+        continue;
+      }
+      if (! b->is_single_bond()) {
+        continue;
+      }
+
+      atom_number_t o = b->other(i);
+      if (ncon[o] == 2) {
+        ++adjacent_D2;
+      }
+    }
+
+    if (adjacent_D2 == 2) {
+      ok_to_check[i] = 1;
+    }
+  }
+
+#ifdef UNSTABLE_WRT_SSR
   for (int i = 0; i < nrings; ++i) {
     const Ring* ri = m.ringi(i);
     //  cerr << "What abt " << *ri << '\n';
@@ -1906,15 +1996,12 @@ TurnOffStronglyFused(Molecule& m, const int* ncon, int* ok_to_check) {
       previous_atom = a;
     }
   }
+#endif
 }
 
 
 int
 IWDescr::IWDescrImpl::ComputeChiralityDescriptors(Molecule& m, PerMoleculeData& data) {
-  // Migrated from legacy do_compute_chirality_descriptors(m, z, ncon).
-  // TurnOffStronglyFused() and is_actually_chiral() remain file-scope helpers
-  // for now; they do not own IWDescr state and can be revisited after the
-  // descriptor driver compiles.
   const int matoms = data.matoms;
   const atomic_number_t* z = data.atomic_numbers();
   const int* ncon = data.connections();
@@ -1922,7 +2009,7 @@ IWDescr::IWDescrImpl::ComputeChiralityDescriptors(Molecule& m, PerMoleculeData& 
   std::unique_ptr<int[]> ok_to_check;
   if (descriptors_to_compute.perform_expensive_chirality_perception) {
     ok_to_check.reset(new_int(matoms, 1));
-    TurnOffStronglyFused(m, ncon, ok_to_check.get());
+    TurnOffStronglyFused(m, z, ncon, ok_to_check.get());
   }
 
   int chiral_centres = 0;
@@ -3585,10 +3672,6 @@ IWDescr::IWDescrImpl::ComputeSaturatedChainDescriptors(Molecule& m, PerMoleculeD
 int
 IWDescr::IWDescrImpl::ComputeExtendedConjugationDescriptors(Molecule& m,
                                                            PerMoleculeData& data) {
-  // Migrated from legacy compute_extended_conjugation(). This descriptor family
-  // is independent of other optional descriptor families. It uses Molecule's lazy
-  // pi-electron/aromaticity/ring perception and writes IWDescr-owned descriptor
-  // values.
   const int matoms = data.matoms;
   const Atom** atom = data.atoms();
 
@@ -3618,7 +3701,7 @@ IWDescr::IWDescrImpl::ComputeExtendedConjugationDescriptors(Molecule& m,
 
       int pe = 0;
       if (b->is_double_bond() || b->is_triple_bond()) {
-        ;
+        ;  // definitely extend section across these.
       } else if (const_cast<Atom*>(atom[j])->pi_electrons(pe) && pe) {
         ;
       } else {
@@ -3887,6 +3970,8 @@ IWDescr::IWDescrImpl::AtomsNotAlreadyMarked(const Ring& r, int* atom_already_don
   return rc;
 }
 
+#ifdef NO_LONGER_USED
+unstable WRT non-sssr rings
 int
 IWDescr::IWDescrImpl::ComputeExocyclicBonds(Molecule& m, const Ring& r,
                                             const atomic_number_t* z,
@@ -3898,18 +3983,12 @@ IWDescr::IWDescrImpl::ComputeExocyclicBonds(Molecule& m, const Ring& r,
   int rc = 0;
 
   const int ring_size = r.number_elements();
-  for (int i = 0; i < ring_size; ++i) {
-    const atom_number_t j = r[i];
-
+  for (atom_number_t j : r) {
     if (ncon[j] == 2) {
       continue;
     }
 
-    const Atom* a = m.atomi(j);
-
-    for (int k = 0; k < ncon[j]; ++k) {
-      const Bond* b = a->item(k);
-
+    for (const Bond* b : m[j]) {
       if (b->nrings()) {
         continue;
       }
@@ -3934,11 +4013,13 @@ IWDescr::IWDescrImpl::ComputeExocyclicBonds(Molecule& m, const Ring& r,
       if (m.hcount(o)) {
         ++singly_connected_donors;
       }
+      // Cannot break here because there might be two attachments in an aliphatic ring
     }
   }
 
   return rc;
 }
+#endif
 
 int
 IWDescr::IWDescrImpl::JustTerminalGroupsOutsideRing(const Molecule& m, const Ring& r,
@@ -4021,6 +4102,7 @@ IWDescr::IWDescrImpl::ComputeRingDescriptors(Molecule& m, PerMoleculeData& data)
   const int nr = m.nrings();
   const atomic_number_t* z = data.atomic_numbers();
   const int* ncon = data.connections();
+  const int* ring_membership = data.ring_membership_data();
 
   descriptor[iwdescr_trmnlrng].set(0.0f);
   descriptor[iwdescr_intrnlrng].set(0.0f);
@@ -4158,6 +4240,38 @@ IWDescr::IWDescrImpl::ComputeRingDescriptors(Molecule& m, PerMoleculeData& data)
   int singly_connected_heteroatoms = 0;
   int singly_connected_donors = 0;
 
+  // Originally I had a function that traversed each ring looking for singly
+  // connected attachments, but that is unstable when different SSSR ring
+  // determinations are done, so just look for singly connected atoms that are
+  // attached to a ring.
+  // THis is probably more efficient than looking at all bonds attached to
+  // all ring atoms.
+  const int matoms = m.natoms();
+  for (int i = 0; i < matoms; ++i) {
+    if (ncon[i] != 1) {
+      continue;
+    }
+    for (const Bond* b : m[i]) {
+      atom_number_t o = b->other(i);
+      if (ring_membership[o] == 0) {
+        continue;
+      }
+
+      // singly connected atom `i` is bonded to ring atom `o`.
+      ++exocyclic_bonds;
+      if (b->is_double_bond()) {
+        ++double_bond_attachments;
+      }
+
+      if (z[o] != 6) {
+        ++singly_connected_heteroatoms;
+        if (m.hcount(o) > 0) {
+          ++singly_connected_donors;
+        }
+      }
+    }
+  }
+
   int more_than_7_atoms = 0;
 
   m.compute_aromaticity_if_needed();
@@ -4182,10 +4296,11 @@ IWDescr::IWDescrImpl::ComputeRingDescriptors(Molecule& m, PerMoleculeData& data)
       max_heteroatoms_in_ring = hac;
     }
 
-    exocyclic_bonds += ComputeExocyclicBonds(m, *ri, z, ncon, double_bond_attachments,
-                                             singly_connected_attachments,
-                                             singly_connected_heteroatoms,
-                                             singly_connected_donors);
+//  Unstable when non-sssr rings present - computed above.
+//  exocyclic_bonds += ComputeExocyclicBonds(m, *ri, z, ncon, double_bond_attachments,
+//                                           singly_connected_attachments,
+//                                           singly_connected_heteroatoms,
+//                                           singly_connected_donors);
 
     if (!ri->is_fused()) {
       ++isolated_rings;
@@ -4443,9 +4558,6 @@ IWDescr::IWDescrImpl::ComputeRameyDescriptors(Molecule& m, PerMoleculeData& data
 
 int
 IWDescr::IWDescrImpl::ComputeLogPDescriptors(Molecule& m, PerMoleculeData& data) {
-  // Migrated from legacy compute_xlogp(m) and compute_alogp(m). The option
-  // gates stay here because both values are descriptor computation, not output
-  // formatting.
   (void)data;
 
   if (descriptors_to_compute.compute_xlogp) {
@@ -5126,6 +5238,7 @@ IWDescr::IWDescrImpl::ComputeRingChainDescriptors(Molecule& m, PerMoleculeData& 
 }
 
 
+// `r1` and `r2` are fused. Determine whether or not they are strongly fused.
 int
 IWDescr::IWDescrImpl::StronglyFused(const Ring& r1, const Ring& r2, int matoms,
                                     int* tmp) const {
@@ -5147,12 +5260,8 @@ IWDescr::IWDescrImpl::StronglyFused(const Ring& r1, const Ring& r2, int matoms,
     return 1;
   }
 
-  if (r1.number_elements() - r2.number_elements() >
-      max_difference_in_ring_size_for_strongly_fused) {
-    return 0;
-  }
-
-  if (r2.number_elements() - r1.number_elements() >
+  // This works because number_elements() is a signed quantity.
+  if (std::abs(r1.number_elements() - r2.number_elements()) >
       max_difference_in_ring_size_for_strongly_fused) {
     return 0;
   }
@@ -6897,4 +7006,17 @@ IWDescr::IWDescrImpl::CopyDescriptorsToResults(float* results) const {
   }
 
   return 1;
+}
+
+int
+IWDescr::IWDescrImpl::ReportDescriptorStatistics(std::ostream& output) const {
+  for (int i = 0; i < number_descriptors; ++i) {
+    if (! descriptor[i].active()) {
+      continue;
+    }
+
+    descriptor[i].report_statistics(output);
+  }
+
+  return output.good();
 }

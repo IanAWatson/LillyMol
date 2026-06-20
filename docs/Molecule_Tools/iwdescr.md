@@ -5,7 +5,7 @@ descriptors characterize molecular size, composition, connectivity, ring
 systems, flexibility, polarity, hydrogen bonding, symmetry, and related
 structural properties.
 
-The tool generates approximately 270 descriptors when all optional descriptor
+The tool generates approximately 280 descriptors when all optional descriptor
 groups are enabled. These descriptors are designed to be fast to compute and
 have been used extensively in QSAR models and descriptor-importance analyses.
 
@@ -20,7 +20,13 @@ table to `file.w`.
 
 Use the `iwdescr.sh` wrapper provided in `contrib/bin` for normal descriptor
 generation. The wrapper supplies the standard preprocessing and descriptor selection defaults.
-Invoking `iwdescr` directly may produce a different set of columns unless equivalent options are supplied.
+Invoking `iwdescr` directly is seldom recommended.
+
+For larger datasets use iwdescr_parallel.sh
+```
+iwdescr_parallel.sh -thr 16 -S file file.smi 
+```
+which runs iwdescr.sh across 16 threads and creates "file.w". 
 
 ### Wrapper defaults
 
@@ -29,7 +35,7 @@ descriptor groups with `-O all`.
 
 It also uses `-u 0`, which writes `0` for any descriptor value that is not
 computed because the calculation is not applicable to the molecule. This is a
-general missing-value policy, not specific to ring descriptors.
+general missing-value policy, not specific to any particular descriptor.
 
 
 ## Input and output
@@ -811,19 +817,98 @@ gfp_make.sh -W natoms,nrings file.smi
 ```
 
 ## Other options
+The -B option controls some fine grain details of the computation. The usage message is
+```
+ -B quiet               turn off unclassified atom warnings from TPSA computation.
+ -B ranges=<fname>      read fingerprint ranges from <fname>. Input is textproto.
+ -B sep=<char>          output separator, default space. -B sep=, or -B sep=tab, or...
+ -B namexref=<fname>    w.Feature textproto of name translations. See docs for info.
+ -B prefix=<s>          descriptor name prefix, 'w_' by default. Use `-B prefix=none` for no prefix.
+ -B dstats              report individual statistics for each descriptor.
+ -B flush               flush output after each molecule processed.
+ -B float               integer values written as floats, "10" becomes "10."
+ -B rpt=<n>             during testing, report progress every <n> molecules tested.
+ -B wpipe               include smiles as first column of output.
+ -B rpipe               input is a descriptor file with a leading smiles column.
+```
+
+### -B quiet
+By default alog and xlogp calculations can display warning messages about unclassified
+atoms. The `-B quiet` option suppresses those warnings.
+
+### -B ranges=\<fname\>
+This was previously mentioned under fingerprinting. The file is a `w:Ranges`, defined
+in [iwdescr](src/Molecule_Tools/iwdescr.proto) and might look like
+```
+range { name:"w_natoms" min:5 max:50 }
+range { name:"w_nrings" min:0 max:10 }
+```
+### -B sep=
+Discusses previously under output separator.
+
+### -B namexref=\<fname\>
+Discussed previously under name translations.
+
+### -B prefix=\<s\>
+Discussed previously under output prefix.
+
+### -B dstats
+At the end of a run, report statistics for each descriptor.
+
+### -B flush
+Flush the output after each molecule written. Usually not needed.
+
+### -B float
+All values are written in decimal form, so "1" will be written as "1.".
+
+
+### -B rpipe -B wpipe
+Experimental, see below.
+
 
 ### Compatibility
 
 The `-S` option enables the RDKit-compatible Novartis TPSA behavior. The default LillyMol implementation follows the published method as closely as possible. Differences are usually small because they are confined to relatively rare atom cases. Use `-S` when you need closer alignment with RDKit conventions or when reproducing RDKit-based workflows. Either mode may perform better depending on the application.
 
+### Testing
+For any cheminformatics tool it is important that results be invariant
+to the ordering of the atoms. With the `-T` option, iwdescr performs random
+smiles tests and determines whether or not the results are invariant across
+different atom ordering. 
+
+#### -T \<n\>
+
+Generate <n> random smiles variants for testing.
+
+#### -T kg
+
+By default, processing terminates on a failure, use `-T kg` to keep going.
+
+#### -T rpt=\<n\>
+Report progress every <n> molecules tested.
+
+#### -T WRITE=\<fname\>
+Write failing molecules to <fname>. A suffix of ".smi" will be added if not
+specified.
+
+Across Chembl there are
+
 ### Experimental pipelines
 
-`-B wpipe` writes records with a leading SMILES column so the output can be piped into another LillyMol tool that accepts `rpipe` input.
+`-B wpipe` writes records with a leading SMILES column so the output
+can be piped into another LillyMol tool that accepts `rpipe` input.
 
 Example:
 
 ```shell
 iwdescr.sh -B wpipe in.smi | another_tool -B rpipe -
+```
+The header record will have a label "smiles" so the tabular nature of the
+file is preserved
+```
+smiles id natoms ...
+C methane 1 ...
+CC ethane 2  ...
 ```
 
 This mode is experimental and may change.

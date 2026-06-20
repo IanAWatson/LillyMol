@@ -12,9 +12,10 @@
 #include "Foundational/cmdline/cmdline.h"
 #include "Foundational/data_source/iwstring_data_source.h"
 #include "Foundational/iwmisc/proto_support.h"
-#include "Foundational/iwmisc/set_or_unset.h"
 #include "Foundational/iwmisc/iwdigits.h"
 #include "Foundational/iwmisc/misc.h"
+#include "Foundational/iwmisc/report_progress.h"
+#include "Foundational/iwmisc/set_or_unset.h"
 #include "Foundational/iwmisc/sparse_fp_creator.h"
 #include "Foundational/iwstring/iw_stl_hash_map.h"
 #include "Foundational/iwstring/iwstring.h"
@@ -38,7 +39,36 @@ namespace {
 
 using std::cerr;
 
-void Usage(int rc) {
+void
+Usage(int rc) {
+// clang-format off
+#if defined(GIT_HASH) && defined(TODAY)
+  cerr << __FILE__ << " compiled " << TODAY << " git hash " << GIT_HASH << '\n';
+#else
+  cerr << __FILE__ << " compiled " << __DATE__ << " " << __TIME__ << '\n';
+#endif
+  // clang-format on
+  // clang-format off
+  cerr << R"(Computes molecular descriptors.
+Use the shell wrapper iwdescr.sh to establish useful defaults.
+iwdescr.sh file.smi > file.w
+ -O ...                 specify feature sets to compute. Enter '-O help' for info.
+ -F ...                 filter output, write smiles of molecules that pass. Enter '-F help' for info.
+ -G ...                 fingerprint output, enter '-F help' for info.
+ -B ...                 less used and obscure options, enter '-B help' for info.
+ -H ...                 hbond  assigner specification - done in iwdescr.sh
+ -T ...                 tests computed values across different random smiles, enter '-T help' for info.
+ -N ...                 charge assigner specification - done in iwdescr.sh
+ -u <char>              value for uncomputed values.
+ -S                     the TPSA computation is done for maximum compatibility with RDKit.
+ -l                     reduce input molecules to largest fragment - recommended.
+ -i <type>              input type, enter '-i help' for info.
+ -A ...                 standard aromaticity options, enter '-A help' for info.
+ -E ...                 standard element     options, enter '-A help' for info.
+ -v                     verbose output
+)";
+  // clang-format on
+
   ::exit(rc);
 };
 
@@ -55,6 +85,12 @@ class IWDescrMainOptions {
   int _ntest = 0;
   uint32_t _molecules_failing_tests = 0;
   int _keep_going_after_test_failure = 0;
+
+  // If -T WRITE=<fname> is specified.
+  IWString_and_File_Descriptor _stream_for_test_failures;
+
+  // for each descriptor, the number of test failures.
+  std::unique_ptr<uint32_t[]> _descriptor_failure;
 
   // Expected descriptor values used only by the command-line test harness.
   // Main owns allocation/lifetime and compares these against IWDescr::Process
@@ -100,13 +136,20 @@ class IWDescrMainOptions {
   uint32_t _molecules_skipped_by_timer = 0;
 
   int _flush_after_each_molecule = 0;
+
   FileType _input_type = FILE_TYPE_INVALID;
   uint64_t _molecules_read = 0;
 
   // Will be prepended to the names of descriptors in tabular output.
   IWString _prefix = "w_";
 
+  // Integer values will be written a "1." rather than "1".
   int _always_decimal_output = 0;
+
+  // At the end of a run, report the statistics of each feature.
+  int _report_descriptor_statistics = 0;
+
+  Report_Progress _report_progress;
 
   char _output_separator = ' ';
 
@@ -122,6 +165,10 @@ class IWDescrMainOptions {
   bool OutputAsWholeNumber(float v, IWString& output) const;
   int Preprocess(Molecule& m);
   int PerformTests(Molecule& m, IWDescr& iwdescr);
+  int results_are_different(const std::optional<float>* saved_result,
+                      const float* result,
+                      IWDescr& iwdescr,
+                      const IWString& mname);
 
   int WriteMaybeTranslatedName(const IWString& name,
                         IWString_and_File_Descriptor& output) const;
@@ -190,7 +237,8 @@ class IWDescrMainOptions {
 
   void MaybeFlush(IWString_and_File_Descriptor& output) const;
 
-  int Report(std::ostream& output) const;
+  int Report(const IWDescr& iwdescr, std::ostream& output) const;
+  int ReportTestingResults(const IWDescr& iwdescr, std::ostream& output) const;
 };
 
 IWDescrMainOptions::IWDescrMainOptions() {
@@ -201,19 +249,19 @@ void
 DisplayDashBOptions(int rc) {
   cerr << R"(The following -B qualifiers are recognised.
  -B quiet               turn off unclassified atom warnings from TPSA computation.
- -B ranges=<fname>
+ -B ranges=<fname>      read fingerprint ranges from <fname>. Input is textproto.
  -B sep=<char>          output separator, default space. -B sep=, or -B sep=tab, or...
- -B rpipe
- -B wpipe
  -B namexref=<fname>    w.Feature textproto of name translations. See docs for info.
  -B prefix=<s>          descriptor name prefix, 'w_' by default. Use `-B prefix=none` for no prefix.
+ -B dstats              report individual statistics for each descriptor.
  -B flush               flush output after each molecule processed.
  -B float               integer values written as floats, "10" becomes "10."
+ -B wpipe               include smiles as first column of output.
+ -B rpipe               input is a descriptor file with a leading smiles column.
 )";
 
   ::exit(rc);
 }
-
 
 static void
 DisplayFilterOptions(std::ostream& output, int rc) {
@@ -230,6 +278,21 @@ would only write molecules that satisfy all conditions.
 
   ::exit(rc);
 }
+
+static void
+DisplayDashTOptions(std::ostream& output) {
+  output << R"(The -T option performs tests.
+For each molecule read, generate a number of random smiles and check that the computed values
+are the same across all random variants.
+ -T kg              if a molecule fails, do NOT terminate the compuation, keep going.
+ -T rpt=<n>         report progress every <n> molecules tested.
+ -T <n>             for each molecule, generate <n> random smiles variants.
+ -T WRITE=<fname>   write molecules that fail to <fname>.
+)";
+
+  exit(0);
+}
+
 
 int
 IWDescrMainOptions::Initialise(Command_Line& cl) {
@@ -299,10 +362,18 @@ IWDescrMainOptions::Initialise(Command_Line& cl) {
           cerr << "Cannot read name translation data from '" << b << "'\n";
           return 0;
         }
+        if (_verbose) {
+          cerr << _name_translation.size() << " name translations defined\n";
+        }
       } else if (b.starts_with("mxsfsdf=") ||
                  b.starts_with("namexref=")) {
         // Handled by IWDescr or deliberately deferred in this driver.
         continue;
+      } else if (b == "dstats") {
+        _report_descriptor_statistics = 1;
+        if (_verbose) {
+          cerr << "Will report individual descriptor statistics\n";
+        }
       } else if (b == "float") {
         _iwdigits.append_to_each_stored_string(".");
         if (_verbose) {
@@ -334,8 +405,33 @@ IWDescrMainOptions::Initialise(Command_Line& cl) {
     for (int i = 0; cl.value('T', t, i); ++i) {
       if ("kg" == t) {
         _keep_going_after_test_failure = 1;
+      } else if (t.starts_with("rpt=")) {
+        t.remove_leading_chars(4);
+        uint32_t rpt;
+        if (! t.numeric_value(rpt)) {
+          cerr << "Invalid report progress specification '" << t << "'\n";
+          return 0;
+        }
+        _report_progress.set_report_every(rpt);
+        if (_verbose) {
+          cerr << "Will report progress every " << rpt << " molecules processed\n";
+        }
+      } else if (t.starts_with("WRITE=")) {
+        t.remove_leading_chars(6);
+        IWString fname(t);
+        fname.EnsureEndsWith(".smi");
+        if (! _stream_for_test_failures.open(fname)) {
+          cerr << "Cannot open stream for test failures '" << fname << "'\n";
+          return 0;
+        }
+        if (_verbose) {
+          cerr << "Molecules failing tests written to '" << fname << "'\n";
+        }
+      } else if (t == "help") {
+        DisplayDashTOptions(cerr);
       } else if (!t.numeric_value(_ntest) || _ntest < 1) {
-        cerr << "The test option (-T) must be followed by a whole positive number\n";
+        cerr << "The test option (-T) must be followed by a whole positive number '" <<
+                t << "' invalid\n";
         return 0;
       }
     }
@@ -384,6 +480,12 @@ IWDescrMainOptions::InitialiseRangesAndFilters(Command_Line& cl, IWDescr& iwdesc
     return 0;
   }
 
+  if (_ntest > 0) {
+    const int n = iwdescr.number_descriptors();
+    _descriptor_failure = std::make_unique<uint32_t[]>(n);
+    std::fill_n(_descriptor_failure.get(), n, 0);
+  }
+
   return 1;
 }
 
@@ -391,7 +493,7 @@ static void
 DisplayFingerprintOptions(std::ostream& output) {
   // clang-format off
   output << R"(The following fingerprint directives are recognised.
- -G FILTER         work as a TDT filter.
+ -G FILTER         work as a TDT filter, used internally by gfp_make.
  -G R=<n>          the number of buckets used in discretising the values.
  -G ALL            use all descriptors to generate the fingerprint.
  -G BEST           from calibration runs, certain descriptors have been designated.
@@ -401,6 +503,15 @@ DisplayFingerprintOptions(std::ostream& output) {
 
  If any descriptor name is followed by a ':n', that feature will include 'n'.
  replicates of that bit in the output. By default, all features get the same number.
+ -G natoms:10,nrings:5
+ -G natoms -G rotbond: 2
+ The order in which options are specified is important.
+ natoms and rotbond get 10 replicates, alogp gets 20.
+ -G 10 -G natoms,rotbond,alogp:20
+ natoms gets 10 replicates
+ -G natoms:10 -G 20     # '-G 20' has no effect.
+ natoms gets 10, rotbond 20 and nrings gets 3 replicates.
+ -G 10 -G natoms -G 20 -G rotbond -G nrings:3
 )";
 }
 
@@ -762,6 +873,10 @@ values_are_equivalent(const Set_or_Unset<float>& s1, const Set_or_Unset<float>& 
     return 0;
   }
 
+  if (std::isnan(v1) && std::isnan(v2)) {
+    return 1;
+  }
+
   if (fabs(v1 - v2) < 1.0e-05) {
     return 1;
   }
@@ -770,8 +885,8 @@ values_are_equivalent(const Set_or_Unset<float>& s1, const Set_or_Unset<float>& 
 }
 
 // Returns the number of differences between `saved_result` and `result`.
-static int
-results_are_different(const std::optional<float>* saved_result,
+int
+IWDescrMainOptions::results_are_different(const std::optional<float>* saved_result,
                       const float* result,
                       IWDescr& iwdescr,
                       const IWString& mname) {
@@ -796,6 +911,8 @@ results_are_different(const std::optional<float>* saved_result,
       cerr << "Mismatch '" << mname << "'\n";
     }
 
+    ++_descriptor_failure[i];
+
     const IWString& descriptor_name = iwdescr.descriptor_name(i);
     cerr << "Result mismatch, descriptor " << i << " '" << descriptor_name << "'\n";
     cerr << *saved_result[i] << " vs " << result[i] << " diff " <<
@@ -809,14 +926,21 @@ results_are_different(const std::optional<float>* saved_result,
 int
 IWDescrMainOptions::TestIwdescriptors(const IWString* rsmi, IWDescr& iwdescr,
                 const IWString& mname) {
-  // Save the results
-  std::unique_ptr<std::optional<float>[]> saved_result =
-                std::make_unique<std::optional<float>[]>(_ntest);
+  if (_report_progress()) {
+    cerr << "Tested " << _molecules_read << " molecules, " <<
+         _molecules_failing_tests << " failed testing\n";
+  }
 
   const int n = iwdescr.number_descriptors();
 
+  // Save the results
+  std::unique_ptr<std::optional<float>[]> saved_result =
+                std::make_unique<std::optional<float>[]>(n);
+
   static std::unique_ptr<float[]> result = std::make_unique<float[]>(n);
 //std::fill_n(result.get(), 0.0f, n);
+
+  bool written_to_fail_stream = false;
 
   for (int i = 0; i < _ntest; i++) {
     Molecule tmp;
@@ -825,10 +949,9 @@ IWDescrMainOptions::TestIwdescriptors(const IWString* rsmi, IWDescr& iwdescr,
       return 0;
     }
 
-    if (! iwdescr.Process(tmp, result.get())) {
+    if (! iwdescr.Process(tmp, result.get())) [[unlikely]] {
       cerr << "test_iwdescriptors::computation failed\n";
       cerr << rsmi[i] << ' ' << mname << '\n';
-      ++_molecules_failing_tests;
       return 0;
     }
 
@@ -842,6 +965,14 @@ IWDescrMainOptions::TestIwdescriptors(const IWString* rsmi, IWDescr& iwdescr,
       ++_molecules_failing_tests;
       cerr << "Yipes, one or more result mismatches\n";
       cerr << rsmi[i] << " " << mname << " rsmi test failures\n";
+
+      ++_molecules_failing_tests;
+
+      if (_stream_for_test_failures.is_open() && ! written_to_fail_stream) {
+        _stream_for_test_failures << rsmi[i] << ' ' << mname << '\n';
+        _stream_for_test_failures.flush();
+        written_to_fail_stream = true;
+      }
       return 0;
     }
   }
@@ -849,17 +980,16 @@ IWDescrMainOptions::TestIwdescriptors(const IWString* rsmi, IWDescr& iwdescr,
   return 1;
 }
 
-
 //  Doing tests is complicated by the fact that the underlying functions change
 //  the molecule. Generate all the unique smiles variants ahead of time so
 //  all tests start with the unchanged molecule.
 int
 IWDescrMainOptions::PerformTests(Molecule& m, IWDescr& iwdescr) {
   std::unique_ptr<IWString[]> rsmi = std::make_unique<IWString[]>(_ntest);
-  cerr << "Parent smiles " << m.smiles() << '\n';
+  // cerr << "Parent smiles " << m.smiles() << '\n';
   for (int i = 0; i < _ntest; i++) {
     rsmi[i] = m.random_smiles();
-    cerr << rsmi[i] << ' ' << m.name() << '\n';
+    // cerr << rsmi[i] << ' ' << m.name() << '\n';
   }
 
   if (TestIwdescriptors(rsmi.get(), iwdescr, m.name())) {
@@ -879,7 +1009,7 @@ IWDescrMainOptions::PerformTests(Molecule& m, IWDescr& iwdescr) {
 }
 
 int
-IWDescrMainOptions::Report(std::ostream& output) const {
+IWDescrMainOptions::Report(const IWDescr& iwdescr, std::ostream& output) const {
   output << _molecules_read << " molecules read\n";
   if (_ntest > 0) {
     output << "Ran " << _ntest << " tests per molecule " <<
@@ -889,6 +1019,32 @@ IWDescrMainOptions::Report(std::ostream& output) const {
   for (const Descriptor_Filter& f : _descriptor_filter) {
     f.Report(output);
   }
+
+  if (_report_descriptor_statistics) {
+    iwdescr.ReportDescriptorStatistics(output);
+  }
+
+  return 1;
+}
+
+int
+IWDescrMainOptions::ReportTestingResults(const IWDescr& iwdescr,
+                std::ostream& output) const {
+  output << "Tested " << _molecules_read << " countered " << _molecules_failing_tests <<
+            " molecules failing tests\n";
+  const std::span<Descriptor> descriptors = iwdescr.Descriptors();
+
+  int failing_descriptors = 0;
+  for (auto [i, d] : std::views::enumerate(descriptors)) {
+    if (_descriptor_failure[i] == 0) {
+      continue;
+    }
+
+    ++failing_descriptors;
+    output << d.name() << " failed " << _descriptor_failure[i] << " molecules\n";
+  }
+
+  output << failing_descriptors << " descriptors with failed computations\n";
 
   return 1;
 }
@@ -1096,6 +1252,14 @@ IWDescrMainOptions::WriteResults(Molecule& m, const float* results,
 
   output << '\n';
 
+  if (_report_descriptor_statistics) {
+    for (Descriptor& d : iwdescr.Descriptors()) {
+      if (d.active()) {
+        d.update_statistics(_verbose);
+      }
+    }
+  }
+
   return output.good();
 }
 
@@ -1105,6 +1269,7 @@ IWDescrMainOptions::Process(Molecule& m,
                             IWString_and_File_Descriptor& output) {
   ++_molecules_read;
   if (_ntest > 0) {
+    Preprocess(m);
     return PerformTests(m, iwdescr);
   }
 
@@ -1327,8 +1492,12 @@ iwdescr_main(int argc, char** argv) {
 
   output.flush();
 
+  if (cl.option_present('T')) {
+    main_options.ReportTestingResults(iwdescr, cerr);
+  }
+
   if (verbose) {
-    main_options.Report(cerr);
+    main_options.Report(iwdescr, cerr);
   }
 
   return 0;

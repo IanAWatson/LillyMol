@@ -1,6 +1,7 @@
 #ifndef MOLECULE_TOOLS_XLOGP_H_
 #define MOLECULE_TOOLS_XLOGP_H_
 
+#include <array>
 #include <optional>
 
 #ifdef BUILD_BAZEL
@@ -74,70 +75,44 @@ is the winner. But this xlogp appears to be competitive with Marvin.
 
 namespace xlogp {
 
-// Read updated parameter values from a textproto file.
-// Note that these over-write only the values specified in the proto.
-int ReadNewFragmentParameters(IWString& fname);
+struct PerMoleculeData;
 
-// For debugging it can be handy to see in detail which types get
-// assigned to each atom.
-void SetDisplayAtomAssignments(int s);
-
-// It can be useful to suppress unclassified atom warning messages.
-void SetIssueUnclassifiedAtomMessages(int s);
-
-// If all atoms are classified, return xlogp.
-std::optional<double> XLogP(Molecule& m);
-// The user can have the atom types returned.
-std::optional<double> XLogP(Molecule& m, int* status);
-
-// For testing, it can be convenient to turn off the corrections.
-// Do not use.
-
-void ForTestingSetApplyCorrections(int s);
-void TurnOffNitroxide();
-
-class XLogpGenerator {
+class XLogPCalc {
   private:
-    // the xlogp algorithm involves a sum of per atom terms and correction
-    // factors. Adding the correction factors can be turned off, which is
-    // helpful during debugging.
+    friend struct PerMoleculeData;
+
+    static constexpr int kNumberFragmentTypes = 88;
+    std::array<double, kNumberFragmentTypes> _type_to_score;
+
     bool _apply_corrections = true;
-
-    // The nitroxide correction can be turned off. Again, mostly useful for debugging.
     bool _apply_nitroxide = true;
-
-    // If set, write warnings to stderr about unclassified atoms.
     bool _display_unclassified_atom_messages = true;
+    bool _display_assignments = false;
 
-    // Useful for debugging
-    bool _display_assignements = false;
+    int ProcessNewFragmentParameter(const XLogP::XlogpParameter& proto);
+    int ReadNewFragmentParameters(const XLogP::XlogpParameters& proto);
 
   public:
-    XLogpGenerator();
+    XLogPCalc();
 
     // Read updated parameter values from a textproto file.
-    // Note that these over-write only the values specified in the proto.
+    // Only values specified in the proto are overwritten.
     int ReadNewFragmentParameters(IWString& fname);
 
-    void SetDisplayUnclassifiedAtomMessages(bool s) {
+    void SetIssueUnclassifiedAtomMessages(bool s) {
       _display_unclassified_atom_messages = s;
     }
     void SetDisplayAtomAssignments(bool s) {
-      _display_assignements = s;
+      _display_assignments = s;
     }
 
-    void SetIssueUnclassifiedAtomMessages(int s);
+    // The calculation mutates `m`: explicit hydrogen atoms are removed,
+    // aromaticity is recomputed with the Wang-Fu-Lai model, and then
+    // recomputed after restoring the previous global aromaticity model.
+    std::optional<double> LogP(Molecule& m, int* status) const;
+    std::optional<double> LogP(Molecule& m) const;
 
-    // If all atoms are classified, return xlogp.
-    std::optional<double> XLogp(Molecule& m);
-    // Return the atom type for each atom as well.
-    std::optional<double> XLogp(Molecule& m, int* status);
-
-    // Functions not for general use.
-
-    // For testing, it can be convenient to turn off the corrections.
-    // Do not use.
-    
+    // For testing and diagnostics.
     void ForTestingSetApplyCorrections(bool s) {
       _apply_corrections = s;
     }

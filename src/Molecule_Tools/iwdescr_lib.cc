@@ -903,6 +903,7 @@ class IWDescr::IWDescrImpl {
   Charge_Assigner charge_assigner;
   Donor_Acceptor_Assigner donor_acceptor_assigner;
   alogp::ALogP alogp_engine;
+  xlogp::XLogPCalc xlogp_engine;
 
   DescriptorsToCompute descriptors_to_compute;
 
@@ -1172,7 +1173,7 @@ IWDescr::IWDescrImpl::Initialise(Command_Line& cl) {
       if (b == "quiet") {
         nvrtspsa::set_display_psa_unclassified_atom_mesages(0);
         alogp_engine.set_display_error_messages(0);
-        xlogp::SetIssueUnclassifiedAtomMessages(0);
+        xlogp_engine.SetIssueUnclassifiedAtomMessages(false);
         if (verbose) {
           cerr << "Will not report unclassified atoms\n";
         }
@@ -4574,7 +4575,7 @@ IWDescr::IWDescrImpl::ComputeLogPDescriptors(Molecule& m, PerMoleculeData& data)
   (void)data;
 
   if (descriptors_to_compute.compute_xlogp) {
-    std::optional<double> x = xlogp::XLogP(m);
+    std::optional<double> x = xlogp_engine.LogP(m);
     if (x) {
       descriptor[iwdescr_xlogp].set(*x);
     }

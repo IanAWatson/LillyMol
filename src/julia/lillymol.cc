@@ -1997,7 +1997,8 @@ JLCXX_MODULE define_julia_module(jlcxx::Module& mod)
 
   mod.method("xlogp",
     [](Molecule& m) ->std::tuple<float, bool>{
-      auto rc = xlogp::XLogP(m);
+      xlogp::XLogPCalc calc;
+      auto rc = calc.LogP(m);
       if (rc) {
         return std::make_tuple<float, bool>(*rc, true);
       }

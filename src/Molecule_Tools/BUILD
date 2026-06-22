@@ -2305,6 +2305,7 @@ cc_library(
         "//Foundational/cmdline:iwcmdline",
         "//Molecule_Lib:iwmolecule",
         "//Molecule_Lib:moleculeio",
+        "//Molecule_Lib:planarity",
         "//Molecule_Tools:nvrtspsa",
     ],
 )

@@ -1761,7 +1761,8 @@ PYBIND11_MODULE(lillymol, m)
 
   m.def("xlogp",
     [](Molecule& m)->std::optional<float> {
-      std::optional<double> result = xlogp::XLogP(m);
+      xlogp::XLogPCalc calc;
+      std::optional<double> result = calc.LogP(m);
       if (! result) {
         return std::nullopt;
       }

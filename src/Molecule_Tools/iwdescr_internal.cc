@@ -414,7 +414,12 @@ DescriptorNumber(const IWString& prefix, const IWString& dname,
     mydname.remove_leading_chars(prefix.length());
   }
 
+#ifdef LILLYMOL_HAS_CPP23
   for (auto [i, d] : std::views::enumerate(descriptors)) {
+#else
+  for (uint32_t i = 0; i < descriptors.size(); ++i) {
+    const Descriptor& d = descriptors[i];
+#endif
     if (mydname == d.descriptor_name()) {
       return i;
     }

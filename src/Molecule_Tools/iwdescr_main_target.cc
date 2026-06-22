@@ -547,7 +547,12 @@ IWDescrMainOptions::ShowPossibleMatches(const IWString& dname,
 
   cerr << "Looking for '" << mydname << '\n';
   int inactive = 0;
+#ifdef LILLYMOL_HAS_CPP23
   for (auto [i, d] : std::views::enumerate(descriptors)) {
+#else
+  for (uint32_t i = 0; i < descriptors.size(); ++i) {
+    const Descriptor& d = descriptors[i];
+#endif
     const IWString& x = d.descriptor_name();
     if (! d.active()) {
       cerr << "Feature " << i << " inactive\n";
@@ -571,27 +576,6 @@ IWDescrMainOptions::ShowPossibleMatches(const IWString& dname,
 
   return 0;
 }
-
-#ifdef NO_LONGER_USED__F
-// Look for descriptor `name` in `descriptors`.
-// If not found, see if a match can be found by prepending `_prefix`.
-// Note that we do not check d.active(), that might cause problems...
-int
-IWDescrMainOptions::NameToIndex(const IWString& name, const std::span<Descriptor>& descriptors) const {
-  IWString myname(name);
-  if (name.starts_with(_prefix)) {
-    myname.remove_leading_chars(_prefix.length());
-  }
-
-  for (auto [i, d] : std::views::enumerate(descriptors)) {
-    if (d.descriptor_name() == myname) {
-      return i;
-    }
-  }
-
-  return -1;
-}
-#endif
 
 int
 IWDescrMainOptions::InitialiseFingerprints(Command_Line& cl, IWDescr& iwdescr) {
@@ -1062,13 +1046,13 @@ IWDescrMainOptions::ReportTestingResults(const IWDescr& iwdescr,
   const std::span<Descriptor> descriptors = iwdescr.Descriptors();
 
   int failing_descriptors = 0;
-  for (auto [i, d] : std::views::enumerate(descriptors)) {
+  for (uint32_t i = 0; i < descriptors.size(); ++i) {
     if (_descriptor_failure[i] == 0) {
       continue;
     }
 
     ++failing_descriptors;
-    output << d.name() << ' ' << _descriptor_failure[i] << " failures\n";
+    output << descriptors[i].name() << ' ' << _descriptor_failure[i] << " failures\n";
   }
 
   output << failing_descriptors << " descriptors with failed computations\n";

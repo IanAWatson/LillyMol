@@ -3,15 +3,24 @@
 The python bindings come with a small number of tools, mostly derived
 from tools otherwise avaialble as c++ executables.
 
+## Molecular Descriptors
+
+The `IWDescr` class computes the complete set of molecular descriptors provided
+by `iwdescr.sh` and returns them as a NumPy array. See
+[Molecular Descriptors](descriptors.md) for usage, requirements, descriptor
+ordering, and performance information.
+
 ## Selimsteg
-Selimsteg is an anadrome if getsmiles. At Lilly a variety of selimsteg
+Selimsteg is an anadrome of getsmiles. At Lilly a variety of selimsteg
 tools are used to fetch the smiles for an identifier, from BerkeleyDB
 databases which store key/value relationships between identifier and
 smiles. For example
 ```
 selimsteg_chembl -K CHEMBL45466
 ```
-returns `C(=O)NCCCC CHEMBL45466'. Giving a file containing a list of id's
+returns `C(=O)NCCCC CHEMBL45466'.
+
+Giving a file containing a list of id's
 will result in a list of smiles being returned.
 
 There is a python binding that can be used with such databases.

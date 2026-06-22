@@ -5,7 +5,7 @@ python. Development was done with python3.11 but should work with other versions
 ## Required Python Packages
 You will need to install
 ```
-pip install pybind11 absl-py protobuf
+pip install pybind11 absl-py protobuf numpy
 apt install python-dev
 ```
 Make sure that python-dev and libblas-dev are installed at system level.

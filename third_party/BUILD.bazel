@@ -13,7 +13,7 @@ cc_library(
     name = "berkeley_shared",
     srcs = select({
         "@platforms//os:macos": ["BDB/lib/libdb_cxx.dylib", "BDB/lib/libdb.dylib"],
-        "@platforms//os:linux": ["BDB/lib/libdb_cxx.so", "BDB/lib/libdb.so"],
+        "@platforms//os:linux": ["BDB/lib/libdb_cxx-18.1.so", "BDB/lib/libdb-18.1.so"],
         "//conditions:default": [],
     }),
     hdrs = ["BDB/include/db_cxx.h", "BDB/include/db.h" ],
@@ -116,9 +116,22 @@ cc_library(
 )
 
 cc_library(
-    name = "planarity",
+    name = "planarity_static",
     srcs = [
         "lib/libplanarity.a",
+    ],
+    hdrs = glob(
+            ["include/planarity/**"],
+            allow_empty=False,
+        ),
+    strip_include_prefix = "include/planarity/",
+    visibility = ["//visibility:public"],
+)
+
+cc_library(
+    name = "planarity_shared",
+    srcs = [
+        "lib/libplanarity.so.2",
     ],
     hdrs = glob(
             ["include/planarity/**"],

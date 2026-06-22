@@ -1,14 +1,18 @@
 // Bindings for selected tools
 
+#include <memory>
 #include <optional>
+#include <stdexcept>
 #include <string>
 #include <unordered_map>
 
 #include "pybind11/pybind11.h"
+#include "pybind11/numpy.h"
 // to convert C++ STL containers to python list
 #include "pybind11/stl.h"
 
 #include "Molecule_Tools/dicer_api.h"
+#include "Molecule_Tools/iwdescr_lib.h"
 #include "Molecule_Tools/mformula.h"
 #include "Molecule_Tools/nvrtspsa.h"
 #include "Molecule_Tools/ring_replacement_lib.h"
@@ -235,6 +239,40 @@ PYBIND11_MODULE(lillymol_tools, m)
           return rp.Process(m);
         },
         "replace rings"
+    )
+  ;
+
+  py::class_<IWDescr>(m, "IWDescr")
+    .def(py::init([]() {
+      auto result = std::make_unique<IWDescr>();
+      if (! result->InitialiseAll()) {
+        throw std::runtime_error(
+            "Cannot initialise IWDescr; ensure LILLYMOL_HOME is defined and contains "
+            "the standard charge and donor/acceptor queries");
+      }
+      return result;
+    }))
+    .def("feature_names",
+      [](const IWDescr& iwdescr) {
+        std::vector<std::string> result;
+        result.reserve(iwdescr.number_descriptors());
+        for (int i = 0; i < iwdescr.number_descriptors(); ++i) {
+          result.push_back(iwdescr.descriptor_name(i).AsString());
+        }
+        return result;
+      },
+      "Return descriptor names in the same order as process() values"
+    )
+    .def("process",
+      [](IWDescr& iwdescr, Molecule& mol) {
+        py::array_t<float> result(iwdescr.number_descriptors());
+        if (! iwdescr.Process(mol, result.mutable_data())) {
+          throw std::runtime_error("IWDescr calculation failed");
+        }
+        return result;
+      },
+      "Compute all descriptors for one molecule as a float32 NumPy array. "
+      "The molecule may be modified by descriptor calculation"
     )
   ;
 

@@ -301,7 +301,6 @@ Charge_Assigner::BuildFromDefaultEnvs() {
   }
 
   if (const char *s = getenv("LILLYMOL_HOME"); s != nullptr) {
-    cerr << "LILLYMOL_HOME\n";
     IWString path(s);
     path << "/data/queries/charges";
     if (BuildFromDirInner(path)) {

@@ -1332,7 +1332,22 @@ cc_library(
     ],
     deps = [
         ":iwmolecule",
-        "@third_party//:planarity",
+        "@third_party//:planarity_static",
+    ],
+)
+
+cc_library(
+    name = "planarity_shared",
+    srcs = [
+        "planarity.cc",
+    ],
+    hdrs = [
+        "planarity.h",
+    ],
+    visibility = ["//visibility:public"],
+    deps = [
+        ":iwmolecule",
+        "@third_party//:planarity_shared",
     ],
 )
 

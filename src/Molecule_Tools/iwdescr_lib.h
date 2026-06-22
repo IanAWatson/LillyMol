@@ -139,6 +139,10 @@ class IWDescr {
   // outside this class. Caller/output options remain in iwdescr_main.cc.
   int Initialise(Command_Line& cl);
 
+  // Initialise all descriptor families using the standard charge and
+  // donor/acceptor queries below LILLYMOL_HOME. Operates quietly.
+  int InitialiseAll();
+
   // Compute descriptors for `m`. `results` must point to storage for at least
   // number_descriptors() float values. IWDescr does no allocation and no I/O.
   //

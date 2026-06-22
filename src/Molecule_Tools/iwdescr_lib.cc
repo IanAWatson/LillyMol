@@ -12,10 +12,12 @@
 #include <cassert>
 #include <cmath>
 #include <cstdint>
+#include <cstdlib>
 #include <iostream>
 #include <limits>
 #include <memory>
 #include <string>
+#include <unordered_set>
 #include <vector>
 
 #include "Foundational/accumulator/accumulator.h"
@@ -612,6 +614,7 @@ class IWDescr::IWDescrImpl {
   IWDescrImpl& operator=(const IWDescrImpl&) = delete;
 
   int Initialise(Command_Line& cl);
+  int InitialiseAll();
   int Process(Molecule& m, float* results);
 
   int number_descriptors_value() const {
@@ -961,6 +964,11 @@ IWDescr::Initialise(Command_Line& cl) {
 }
 
 int
+IWDescr::InitialiseAll() {
+  return _impl->InitialiseAll();
+}
+
+int
 IWDescr::Process(Molecule& m, float* results) {
   return _impl->Process(m, results);
 }
@@ -1201,6 +1209,42 @@ IWDescr::IWDescrImpl::Initialise(Command_Line& cl) {
   }
 
   return 1;
+}
+
+int
+IWDescr::IWDescrImpl::InitialiseAll() {
+  if (getenv("LILLYMOL_HOME") == nullptr) {
+    cerr << "IWDescr::InitialiseAll:LILLYMOL_HOME is not defined\n";
+    return 0;
+  }
+
+  descriptors_to_compute.SetAll(1);
+  min_hbond_feature_separation = 5;
+
+  set_aromatic_bonds_lose_kekule_identity(0);
+
+  charge_assigner.set_verbose(0);
+  if (! charge_assigner.BuildFromDefaultEnvs()) {
+    cerr << "IWDescr::InitialiseAll:cannot initialise charge assigner\n";
+    return 0;
+  }
+
+  IWString empty;
+  if (! donor_acceptor_assigner.BuildFromDir(empty, 0)) {
+    cerr << "IWDescr::InitialiseAll:cannot initialise donor/acceptor assigner\n";
+    return 0;
+  }
+
+  nvrtspsa::set_display_psa_unclassified_atom_mesages(0);
+  alogp_engine.set_display_error_messages(0);
+  xlogp_engine.SetIssueUnclassifiedAtomMessages(false);
+
+  if (! AllocateDescriptors()) {
+    return 0;
+  }
+  InitialiseDescriptorDefaults();
+
+  return VerifyDescriptorNames();
 }
 
 int
@@ -1712,14 +1756,21 @@ IWDescr::IWDescrImpl::VerifyDescriptorNames() const {
     return 0;
   }
 
-  int rc = 1;
+  std::unordered_set<std::string> names;
+  names.reserve(number_descriptors);
   for (int i = 0; i < number_descriptors; ++i) {
     if (descriptor[i].descriptor_name().empty()) {
-      rc = 0;
+      cerr << "IWDescr::VerifyDescriptorNames:descriptor " << i << " has no name\n";
+      return 0;
+    }
+    const std::string name = descriptor[i].descriptor_name().AsString();
+    if (! names.insert(name).second) {
+      cerr << "IWDescr::VerifyDescriptorNames:duplicate descriptor name '" << name << "'\n";
+      return 0;
     }
   }
 
-  return rc;
+  return 1;
 }
 
 // Currently turned off. Descriptors have initialised with Nan values

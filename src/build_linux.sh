@@ -270,7 +270,8 @@ else
 fi
 
 if [[ -v BUILD_INCHI ]] ; then
-  build_options+=' --config=inchi -DBUILD_INCHI'
+  # might need to also set BUILD_INCHI as a shell variable.
+  build_options+=' --config=inchi'
 fi
 
 # Seems like splitting out the BerkeleyDB components of the python

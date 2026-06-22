@@ -314,7 +314,19 @@ PartialSymmetry::SortAndAssign(int radius) {
   });
 
   // All items that have the same score are symmetric at this radius.
+  if (_score[0].score == _score[1].score) {
+    AssignIfGreater(radius, _symmetric_at_radius[_score[0].atom]);
+    _next_shell << _score[0].atom;
+  }
+  for (int i = 1; i < ndx; ++i) {
+    if (_score[i].score == _score[i-1].score) {
+      AssignIfGreater(radius, _symmetric_at_radius[_score[i].atom]);
+      _next_shell << _score[i].atom;
+    }
+  }
 
+
+#ifdef NEW_VERSION_BUT_PROBLEMATIChhh
   for (int i = 0; i < ndx; ++i) {
     const int iscore = _score[i].score;
     // Look for a sequence of items with the same score.
@@ -339,6 +351,7 @@ PartialSymmetry::SortAndAssign(int radius) {
     // `i` will be incremented by the loop, so subtract one
     i += (length_of_sequence - 1);
   }
+#endif
 
   return 1;
 }

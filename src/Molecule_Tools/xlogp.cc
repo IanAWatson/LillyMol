@@ -807,11 +807,8 @@ MoreThanOneRingBond(Molecule& m, atom_number_t a1, atom_number_t a2,
     if (o == a2) {
       if (b->nrings()) {
         ++ring_bonds_found;
-        if (ring_bonds_found > 1) {
-          return 1;
-        }
       }
-      return 0;
+      return ring_bonds_found > 1;
     }
 
     if (m.bonds_between(o, a2) != d) {
@@ -855,6 +852,8 @@ AllAtomsBetween(Molecule& m, atom_number_t a1, atom_number_t a2,
   return result.number_elements();
 }
 
+// This has atom ordering dependencies which show up in iwdescr.
+// TODO:ianwatson investigate.
 double
 IntraMolecularHBondCorrection(Molecule& m,
             PerMoleculeData& per_molecule_data,
@@ -887,6 +886,7 @@ IntraMolecularHBondCorrection(Molecule& m,
       if (per_molecule_data.atomic_number[i] == per_molecule_data.atomic_number[j]) {
         continue;
       }
+
       if (per_molecule_data.atomic_number[j] == 9) {
       } else if (per_molecule_data.atomic_number[j] == 8 &&
                  per_molecule_data.unsaturation[j] == 1) {
@@ -1437,6 +1437,8 @@ AmidineCorrection(Molecule& m,
 
   return rc * type_to_score[kAmidine];  // 84
 }
+
+// #define DEBUG_CORRECTIONS
 
 double
 Corrections(Molecule& m,

@@ -165,10 +165,12 @@ class IWDescrMainOptions {
   bool OutputAsWholeNumber(float v, IWString& output) const;
   int Preprocess(Molecule& m);
   int PerformTests(Molecule& m, IWDescr& iwdescr);
-  int results_are_different(const std::optional<float>* saved_result,
+  void MaybeReportProgress();
+  int results_are_same(const std::optional<float>* saved_result,
                       const float* result,
                       IWDescr& iwdescr,
-                      const IWString& mname);
+                      const IWString& mname,
+                      resizable_array<int>& failed_descriptors) const;
 
   int WriteMaybeTranslatedName(const IWString& name,
                         IWString_and_File_Descriptor& output) const;
@@ -884,13 +886,14 @@ values_are_equivalent(const Set_or_Unset<float>& s1, const Set_or_Unset<float>& 
   return 0;
 }
 
-// Returns the number of differences between `saved_result` and `result`.
+// The indices of failed desctiptors go in `failed_descriptors`.
 int
-IWDescrMainOptions::results_are_different(const std::optional<float>* saved_result,
+IWDescrMainOptions::results_are_same(const std::optional<float>* saved_result,
                       const float* result,
                       IWDescr& iwdescr,
-                      const IWString& mname) {
-  int rc = 0;
+                      const IWString& mname,
+                      resizable_array<int>& failed_descriptors) const {
+  failed_descriptors.resize_keep_storage(0);
 
   const int n = iwdescr.number_descriptors();
 
@@ -907,7 +910,7 @@ IWDescrMainOptions::results_are_different(const std::optional<float>* saved_resu
       continue;
     }
 
-    if (rc == 0) {
+    if (failed_descriptors.empty()) {  // one of these warnings per molecule.
       cerr << "Mismatch '" << mname << "'\n";
     }
 
@@ -917,19 +920,25 @@ IWDescrMainOptions::results_are_different(const std::optional<float>* saved_resu
     cerr << "Result mismatch, descriptor " << i << " '" << descriptor_name << "'\n";
     cerr << *saved_result[i] << " vs " << result[i] << " diff " <<
                 (*saved_result[i] - result[i]) << '\n';
-    rc++;
+    failed_descriptors << i;
   }
 
-  return rc;
+  // Return true if there are no failed comparisons.
+  return failed_descriptors.empty();
+}
+
+void
+IWDescrMainOptions::MaybeReportProgress() {
+  if (_report_progress()) {
+    cerr << "Tested " << _molecules_read << " molecules, " <<
+         _molecules_failing_tests << " failed testing\n";
+  }
 }
 
 int
 IWDescrMainOptions::TestIwdescriptors(const IWString* rsmi, IWDescr& iwdescr,
                 const IWString& mname) {
-  if (_report_progress()) {
-    cerr << "Tested " << _molecules_read << " molecules, " <<
-         _molecules_failing_tests << " failed testing\n";
-  }
+  MaybeReportProgress();
 
   const int n = iwdescr.number_descriptors();
 
@@ -938,9 +947,10 @@ IWDescrMainOptions::TestIwdescriptors(const IWString* rsmi, IWDescr& iwdescr,
                 std::make_unique<std::optional<float>[]>(n);
 
   static std::unique_ptr<float[]> result = std::make_unique<float[]>(n);
-//std::fill_n(result.get(), 0.0f, n);
 
-  bool written_to_fail_stream = false;
+  IWString failure_reasons;
+  IWString failed_smiles;
+  resizable_array<int> failed_descriptors;
 
   for (int i = 0; i < _ntest; i++) {
     Molecule tmp;
@@ -955,29 +965,47 @@ IWDescrMainOptions::TestIwdescriptors(const IWString* rsmi, IWDescr& iwdescr,
       return 0;
     }
 
-    if (i == 0) {
+    if (i == 0) {  // Store the first results.
       for (int j = 0; j < n; ++j) {
         if (iwdescr.descriptor_active(j)) {
           saved_result[j] = result[j];
         }
       }
-    } else if (results_are_different(saved_result.get(), result.get(), iwdescr, mname)) {
-      ++_molecules_failing_tests;
-      cerr << "Yipes, one or more result mismatches\n";
-      cerr << rsmi[i] << " " << mname << " rsmi test failures\n";
+      continue;
+    }
 
-      ++_molecules_failing_tests;
+    if (results_are_same(saved_result.get(), result.get(), iwdescr, mname, failed_descriptors)) {
+      continue;
+    }
 
-      if (_stream_for_test_failures.is_open() && ! written_to_fail_stream) {
-        _stream_for_test_failures << rsmi[i] << ' ' << mname << '\n';
-        _stream_for_test_failures.flush();
-        written_to_fail_stream = true;
-      }
-      return 0;
+    cerr << "Yipes, one or more result mismatches\n";
+
+    for (int r : failed_descriptors) {
+      failure_reasons.append_with_spacer(iwdescr.descriptor_name(r), ' ');
+    }
+
+    cerr << rsmi[i] << ' ' << mname << " rsmi test failure\n";
+
+    if (failed_smiles.empty()) {
+      failed_smiles = rsmi[i];
     }
   }
 
-  return 1;
+  // If no failures, done.
+  if (failed_smiles.empty()) {
+    return 1;
+  }
+
+  ++_molecules_failing_tests;
+
+  if (! _stream_for_test_failures.is_open()) {
+    return 0;
+  }
+
+  _stream_for_test_failures << failed_smiles << ' ' << mname << ' ' << failure_reasons << '\n';
+  _stream_for_test_failures.flush();
+
+  return 0;
 }
 
 //  Doing tests is complicated by the fact that the underlying functions change
@@ -999,7 +1027,6 @@ IWDescrMainOptions::PerformTests(Molecule& m, IWDescr& iwdescr) {
   cerr << "One or more test failures '" << m.name() << "' molecule "
        << _molecules_read << '\n';
   cerr << m.smiles() << '\n';
-  _molecules_failing_tests++;
 
   if (_keep_going_after_test_failure) {
     return 1;
@@ -1041,7 +1068,7 @@ IWDescrMainOptions::ReportTestingResults(const IWDescr& iwdescr,
     }
 
     ++failing_descriptors;
-    output << d.name() << " failed " << _descriptor_failure[i] << " molecules\n";
+    output << d.name() << ' ' << _descriptor_failure[i] << " failures\n";
   }
 
   output << failing_descriptors << " descriptors with failed computations\n";

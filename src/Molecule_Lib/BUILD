@@ -744,6 +744,19 @@ cc_test(
 )
 
 cc_test(
+    name = "is_actually_chiral_test",
+    timeout = "short",
+    srcs = [
+        "is_actually_chiral_test.cc",
+    ],
+    deps = [
+        ":iwmolecule",
+        ":moleculeio",
+        "@googletest//:gtest_main",
+    ],
+)
+
+cc_test(
     name = "linear_fingerprint_test",
     timeout = "short",
     srcs = ["linear_fingerprint_test.cc"],

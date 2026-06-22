@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <iostream>
 #include <memory>
+#include <utility>
 
 #include "Foundational/iwmisc/misc.h"
 #include "Foundational/iwmisc/proto_support.h"
@@ -433,6 +434,7 @@ ALogP::SaturatedCarbon(PerMoleculeData& pmd, atom_number_t zatom) {
   return 1;
 }
 
+#ifdef OLD_VERSION
 // Return the first atom number that is doubly bonded to `zatom`.
 atom_number_t
 DoublyBondedTo(PerMoleculeData& pmd, atom_number_t zatom) {
@@ -444,6 +446,24 @@ DoublyBondedTo(PerMoleculeData& pmd, atom_number_t zatom) {
   }
 
   return kInvalidAtomNumber;
+}
+#endif
+
+std::pair<atom_number_t, atom_number_t>
+DoublyBondedTo(const PerMoleculeData& pmd, atom_number_t zatom) {
+  atom_number_t a1 = kInvalidAtomNumber;
+  atom_number_t a2 = kInvalidAtomNumber;
+
+  for (const Bond* b : pmd.mol[zatom]) {
+    if (! b->is_double_bond()) {
+    } else if (a1 == kInvalidAtomNumber) {
+      a1 = b->other(zatom);
+    } else {
+      a2 = b->other(zatom);
+    }
+  }
+
+  return {a1, a2};
 }
 
 int
@@ -462,14 +482,15 @@ ALogP::UnSaturatedCarbon(PerMoleculeData& pmd, atom_number_t zatom) {
 
   assert(pmd.double_bond_count[zatom] > 0);
 
-  atom_number_t dbl = DoublyBondedTo(pmd, zatom);
-  if (dbl == kInvalidAtomNumber) {
+  auto [dbl1, dbl2] = DoublyBondedTo(pmd, zatom);
+  if (dbl1 == kInvalidAtomNumber) {
     cerr << "HUH, no doubly bond!! " << Diagnostic(pmd, zatom) << '\n';
     return 0;
   }
 
   // C5 [C]=[A#X] C = Heteratom
-  if (pmd.z[dbl] != 6) {
+  if (pmd.z[dbl1] != 6 ||
+      (dbl2 != kInvalidAtomNumber && pmd.z[dbl2] != 6)) {
     pmd.assigned[zatom] = kC5;
     return 1;
   }

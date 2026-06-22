@@ -891,7 +891,11 @@ Report progress every <n> molecules tested.
 Write failing molecules to <fname>. A suffix of ".smi" will be added if not
 specified.
 
-Across Chembl there are
+Across 2.7M Chembl there are about 3000 molecules that show failures. Many of
+these involve complex fused ring systems where the Smallest Set of Smallest
+Rings paradigm used by LillyMol is problematic - cubane has only 5 SSSR
+rings. Others are due to deep seated bugs or design flaws in LillyMol, which are being
+investigated. The number of failures is unlikely to ever reach zero.
 
 ### Experimental pipelines
 

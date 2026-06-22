@@ -2013,6 +2013,9 @@ IWDescr::IWDescrImpl::ComputeChiralityDescriptors(Molecule& m, PerMoleculeData& 
   }
 
   int chiral_centres = 0;
+#ifdef DEBUG_CHIRALITY
+  Set_of_Atoms cc;
+#endif
 
   for (int i = 0; i < matoms; ++i) {
     if (ncon[i] < 3) {
@@ -2053,8 +2056,18 @@ IWDescr::IWDescrImpl::ComputeChiralityDescriptors(Molecule& m, PerMoleculeData& 
     // checked.
     if (is_actually_chiral(m, i)) {
       ++chiral_centres;
+#ifdef DEBUG_CHIRALITY
+      cc << i;
+#endif
     }
   }
+
+#ifdef DEBUG_CHIRALITY
+  if (cc.size() > 0) {
+    cerr << "Unlabelled chiral centres " << cc << '\n';
+    write_isotopically_labelled_smiles(m, true, cerr);
+  }
+#endif
 
   descriptor[iwdescr_nchiral].set(static_cast<float>(chiral_centres));
 

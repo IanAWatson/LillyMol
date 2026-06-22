@@ -170,11 +170,13 @@ if [[ -v BUILD_BDB ]] ; then
 fi
 
 if [[ -v BUILD_XGBOOST ]] ; then
-  git clone --recursive https://github.com/dmlc/xgboost
-  mkdir xgboost/build
-  (cd xgboost/build && cmake -DCMAKE_INSTALL_PREFIX=${third_party} -DCMAKE_INSTALL_LIBDIR=${third_party}/lib ..)
-  (cd xgboost/build && make -j${THREADS})
-  (cd xgboost/build && make install)
+  if [[ ! -d 'xgboost' ]] ; then
+    git clone --recursive https://github.com/dmlc/xgboost
+    mkdir xgboost/build
+    (cd xgboost/build && cmake -DCMAKE_INSTALL_PREFIX=${third_party} -DCMAKE_INSTALL_LIBDIR=${third_party}/lib ..)
+    (cd xgboost/build && make -j${THREADS})
+    (cd xgboost/build && make install)
+  fi
 fi
 
 if [[ -v BUILD_ZEROMQ ]] ; then
@@ -190,15 +192,15 @@ if [[ -v BUILD_ZEROMQ ]] ; then
 fi
 
 if [[ -v BUILD_INCHI ]] ; then
-  git clone https://github.com/IUPAC-InChI/InChI
-  if [[ ! -d 'InChI/INCHI-1-SRC/INCHI_API/libinchi/gcc/' ]] ; then
-    echo 'INCHI directory InChI/INCHI-1-SRC/INCHI_API/libinchi/gcc/ not found, no Inchi' >&2
-    unset BUILD_INCHI
-  else
-    (cd InChI/INCHI-1-SRC/INCHI_API/libinchi/gcc/ && bash run_make_on_linux.sh)
+  if [[ ! -d 'InChI' ]] ; then
+    git clone https://github.com/IUPAC-InChI/InChI
+    (cd InChI && mkdir build)
+    (cd InChI/build && cmake -DCMAKE_INSTALL_PREFIX=${third_party} -DCMAKE_BUILD_TYPE=Release ../INCHI-1-SRC/INCHI_API/libinchi/src)
+    (cd InChI/build && cmake --build .)
+    # The repo does not have an install target. third_party/BUILD.bazel links directly to the files.
+    # Ensure canonical form for shell variable.
+    BUILD_INCHI=1
   fi
-  # Ensure canonical form for shell variable.
-  BUILD_INCHI=1
 fi
 
 if [[ -v BUILD_NLOPT ]] ; then
@@ -264,6 +266,10 @@ if [[ ${inside_lilly} -eq 1 ]] ; then
   build_options="${build_options} --cxxopt=-march=native --cxxopt=-mtune=native"
 else
   build_options="${build_options} --cxxopt=-march=native --cxxopt=-mtune=native"
+fi
+
+if [[ -v BUILD_INCHI ]] ; then
+  build_options+=' --config=inchi'
 fi
 
 # Seems like splitting out the BerkeleyDB components of the python

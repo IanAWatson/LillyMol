@@ -274,6 +274,51 @@ PYBIND11_MODULE(lillymol_tools, m)
       "Compute all descriptors for one molecule as a float32 NumPy array. "
       "The molecule may be modified by descriptor calculation"
     )
+    .def("process_list",
+      [](IWDescr& iwdescr, std::vector<Molecule*>& mols, bool as_dataframe) {
+        const int nmols = static_cast<int>(mols.size());
+        const int ndescr = iwdescr.number_descriptors();
+
+        py::array_t<float> result({nmols, ndescr});
+        float* ptr = result.mutable_data();
+
+        for (int i = 0; i < nmols; ++i) {
+          if (! iwdescr.Process(*mols[i], ptr + i * ndescr)) {
+            throw std::runtime_error(
+              std::string("IWDescr calculation failed for molecule ") +
+              mols[i]->name().AsString());
+          }
+        }
+
+        if (! as_dataframe) {
+          return py::object(result);
+        }
+
+        // Build column names from descriptor names
+        py::list columns;
+        for (int i = 0; i < ndescr; ++i) {
+          columns.append(iwdescr.descriptor_name(i).AsString());
+        }
+
+        // Build row index from molecule names
+        py::list index;
+        for (int i = 0; i < nmols; ++i) {
+          index.append(mols[i]->name().AsString());
+        }
+
+        py::module_ pd = py::module_::import("pandas");
+        py::object df = pd.attr("DataFrame")(result,
+                                             py::arg("columns") = columns,
+                                             py::arg("index") = index);
+        return df;
+      },
+      py::arg("mols"),
+      py::arg("as_dataframe") = false,
+      "Compute all descriptors for a list of molecules. "
+      "Returns a float32 NumPy array of shape (n_molecules, n_descriptors) by default, "
+      "or a pandas DataFrame (with molecule names as index) if as_dataframe=True."
+    )
+
   ;
 
   py::class_<mformula::MFormula>(m, "MFormula")

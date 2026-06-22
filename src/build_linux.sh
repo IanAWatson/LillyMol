@@ -197,6 +197,7 @@ if [[ -v BUILD_INCHI ]] ; then
     (cd InChI && mkdir build)
     (cd InChI/build && cmake -DCMAKE_INSTALL_PREFIX=${third_party} -DCMAKE_BUILD_TYPE=Release ../INCHI-1-SRC/INCHI_API/libinchi/src)
     (cd InChI/build && cmake --build .)
+    cp --preserve=link InChI/build/lib/libinchi*${suffix} ${REPO_HOME}/lib
     # The repo does not have an install target. third_party/BUILD.bazel links directly to the files.
     # Ensure canonical form for shell variable.
     BUILD_INCHI=1
@@ -269,7 +270,7 @@ else
 fi
 
 if [[ -v BUILD_INCHI ]] ; then
-  build_options+=' --config=inchi'
+  build_options+=' --config=inchi -DBUILD_INCHI'
 fi
 
 # Seems like splitting out the BerkeleyDB components of the python

@@ -255,7 +255,10 @@ PYBIND11_MODULE(lillymol, m)
     .def("active", &Mol2Graph::active, "True if active")
   ;
 
-         py::class_<Molecule>(m, "Molecule")
+  // By adding shared_ptr we avoid copies between C++ and python.
+  // It also enables lists of molecules to be passed as std::vector<Molecule*> which is mutable.
+  // std::vector<Molecule> will create an array of copies.
+         py::class_<Molecule, std::shared_ptr<Molecule>>(m, "Molecule")
 		.def(py::init<>())
                 .def(py::init([](const Molecule& rhs) {
                   return std::unique_ptr<Molecule>(new Molecule(rhs));
@@ -570,24 +573,28 @@ PYBIND11_MODULE(lillymol, m)
                     "For each atom the fragment membership"
                 )
                 .def("create_components",
-                  [](Molecule& m)->std::optional<std::vector<Molecule*>>{
+                      [](Molecule& m)->std::optional<std::vector<std::shared_ptr<Molecule>>>{
                     if (m.number_fragments() < 2) {
                       return std::nullopt;
                     }
-                    std::vector<Molecule*> res;
-                    res.reserve(m.number_fragments());
+
                     resizable_array_p<Molecule> components;
                     if (! m.create_components(components)) {
                       return std::nullopt;
                     }
+
+                    std::vector<std::shared_ptr<Molecule>> res;
+                    res.reserve(components.number_elements());
+
                     for (Molecule* c : components) {
-                      res.push_back(c);
+                      res.emplace_back(c);  // shared_ptr takes ownership
                     }
-                    components.resize_no_delete(0);
+                    components.resize_no_delete(0);    // array no longer owns them
                     return res;
                   },
                   "Split a multi fragment molecule into fragment molecules"
                 )
+
 
                 .def("remove_non_periodic_table_elements", static_cast<int (Molecule::*)()>(&Molecule::remove_all_non_natural_elements), "Remove non periodic table elements")
                 .def("organic_only", static_cast<int (Molecule::*)()const>(&Molecule::organic_only), "True if only organic elements")

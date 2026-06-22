@@ -1,4 +1,6 @@
 #include <algorithm>
+#include <cmath>
+#include <limits>
 
 #include "Foundational/iwmisc/sparse_fp_creator.h"
 
@@ -156,12 +158,30 @@ MFormula::Diff(const MFormula& rhs) const {
   return rc;
 }
 
+void
+MFormula::ApplyLogCountScaling(Sparse_Fingerprint_Creator& sfc) const {
+  const float denom = std::log(_log_d);
+
+  for (int i = 0; i < kMFOther; ++i) {
+    if (_count[i] == 0) {
+      continue;
+    }
+    int c = static_cast<int>(_log_s * std::log(_count[i] + 1) / denom);
+    // We don't worry about overflow in `c`, `sfc` takes care of that.
+    sfc.hit_bit(i, c);
+  }
+}
+
 int
 MFormula::ToSparseFingerprint(IWString& destination) const {
   Sparse_Fingerprint_Creator sfc;
-  for (int i = 0; i <= kMFOther; ++i) {
-    if (_count[i] > 0) {
-      sfc.hit_bit(i, _count[i]);
+  if (_log_s > 0.0f) {
+    ApplyLogCountScaling(sfc);
+  } else {
+    for (int i = 0; i <= kMFOther; ++i) {
+      if (_count[i] > 0) {
+        sfc.hit_bit(i, _count[i]);
+      }
     }
   }
 

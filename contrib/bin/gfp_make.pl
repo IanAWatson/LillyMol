@@ -66,6 +66,7 @@ my $need3d = 0;
 my $jurs = 0;
 
 my $formula = 0;
+my $formula_options = "";
 
 my $tsubstructure_fingerprints_non_colliding = 0;
 my $tsubstructure_bitrep = 0;
@@ -1817,7 +1818,31 @@ OPTION: while ($argptr < @ARGV)
     $formula = 1;
     $fingerprints_specified++;
   }
+  elsif ($opt eq "-formula")
+  {
+    my $gotclose;    # do we find a closing -formula
 
+    $gotclose = 0;
+
+    GET_FCLOSE: while (1)
+    {
+      if ($ARGV[$argptr] eq "-formula") {
+        $gotclose = 1;
+        $argptr++;
+        last GET_FCLOSE;
+      }
+
+      $formula_options .= " $ARGV[$argptr]";
+
+      $argptr++;
+
+      last GET_FCLOSE if ($argptr >= @ARGV);
+    }
+
+    die "The -formula option grouping must be closed" unless ($gotclose);
+    $formula = 1;
+    $fingerprints_specified++;
+  }
   elsif ($opt eq "-tmpdir")
   {
     $tmpdir = $ARGV[$argptr++];
@@ -3467,7 +3492,7 @@ my $formula_cmd_pipe;
 if ($formula)
 {
   my $formula_exe = "formula_fingerprint.sh";
-  my $formula_cmd = "${formula_exe}";
+  my $formula_cmd = "${formula_exe} ${formula_options}";
 
   if ($work_as_filter)
   {

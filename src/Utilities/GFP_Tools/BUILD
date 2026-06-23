@@ -265,6 +265,35 @@ cc_binary(
 )
 
 cc_binary(
+    name = "gfp_diverse_subset",
+    srcs = [
+        "gfp_diverse_subset.cc",
+    ],
+    copts = select({
+        ":darwin": ["-Xclang", "-fopenmp"],
+        "//conditions:default": ["-fopenmp"]
+    }),
+    linkopts = select ({
+        ":darwin": ["-Xclang", "-fopenmp"],
+        "//conditions:default": ["-lgomp"]
+    }),
+    deps = [
+        ":gfp",
+        "//Foundational/cmdline:iwcmdline",
+        "//Foundational/data_source:iwstring_data_source",
+        "//Foundational/iw_tdt",
+        "//Foundational/iwmisc",
+    ] +
+      select( {
+      "darwin": [ "@homebrew_openmp"],
+      "//conditions:default": []
+    }),
+    tags = [
+        "omp",
+    ],
+)
+
+cc_binary(
     name = "gfp_distance_filter",
     srcs = [
         "gfp_distance_filter.cc",

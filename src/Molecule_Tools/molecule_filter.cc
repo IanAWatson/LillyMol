@@ -72,6 +72,8 @@ class Options {
 
     alogp::ALogP _alogp;
 
+    xlogp::XLogPCalc _xlogp;
+
     Chemical_Standardisation _chemical_standardisation;
 
     uint64_t _molecules_read = 0;
@@ -167,7 +169,7 @@ Options::Options() {
   _molecules_read = 0;
   _rotbond.set_calculation_type(quick_rotbond::QuickRotatableBonds::RotBond::kExpensive);
   nvrtspsa::set_display_psa_unclassified_atom_mesages(0);
-  xlogp::SetIssueUnclassifiedAtomMessages(0);
+  _xlogp.SetIssueUnclassifiedAtomMessages(false);
 
   _alogp.set_use_alcohol_for_acid(1);
   _alogp.set_use_alcohol_for_acid(1);
@@ -833,7 +835,7 @@ Options::Process(Molecule& m,
       tmp.reset(new int[matoms]);
     }
     std::fill_n(tmp.get(), matoms, 0);
-    std::optional<double> x = xlogp::XLogP(m, tmp.get());
+    std::optional<double> x = _xlogp.LogP(m, tmp.get());
     if (! x) {
     } else if (_requirements.has_min_xlogp() && *x < _requirements.min_xlogp()) {
       ++_low_xlogp;

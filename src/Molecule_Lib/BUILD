@@ -744,6 +744,19 @@ cc_test(
 )
 
 cc_test(
+    name = "is_actually_chiral_test",
+    timeout = "short",
+    srcs = [
+        "is_actually_chiral_test.cc",
+    ],
+    deps = [
+        ":iwmolecule",
+        ":moleculeio",
+        "@googletest//:gtest_main",
+    ],
+)
+
+cc_test(
     name = "linear_fingerprint_test",
     timeout = "short",
     srcs = ["linear_fingerprint_test.cc"],
@@ -1319,7 +1332,22 @@ cc_library(
     ],
     deps = [
         ":iwmolecule",
-        "@third_party//:planarity",
+        "@third_party//:planarity_static",
+    ],
+)
+
+cc_library(
+    name = "planarity_shared",
+    srcs = [
+        "planarity.cc",
+    ],
+    hdrs = [
+        "planarity.h",
+    ],
+    visibility = ["//visibility:public"],
+    deps = [
+        ":iwmolecule",
+        "@third_party//:planarity_shared",
     ],
 )
 

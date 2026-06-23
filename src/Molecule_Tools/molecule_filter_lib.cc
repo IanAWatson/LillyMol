@@ -52,7 +52,7 @@ void
 MoleculeFilter::InitialiseOptionalFeatures() {
   _rotbond.set_calculation_type(quick_rotbond::QuickRotatableBonds::RotBond::kExpensive);
   nvrtspsa::set_display_psa_unclassified_atom_mesages(0);
-  xlogp::SetIssueUnclassifiedAtomMessages(0);
+  _xlogp.SetIssueUnclassifiedAtomMessages(false);
 
   _alogp.set_use_alcohol_for_acid(1);
   _alogp.set_use_alcohol_for_acid(1);
@@ -299,6 +299,28 @@ Sp3Carbon(Molecule & m) {
   return rc;
 }
 
+bool
+OkPlanarity(const Molecule& m, bool target) {
+  iwplanarity::PlanarityResult result = iwplanarity::Planarity(m);
+  if (result.status == iwplanarity::PlanarityStatus::kPlanar) {
+    if (target) {
+      return true;
+    } else {
+      return false;
+    }
+  }
+
+  if (result.status == iwplanarity::PlanarityStatus::kNonPlanar) {
+    if (target) {
+      return false;
+    } else {
+      return true;
+    }
+  }
+
+  cerr << "OkPlanarity:planarity calculation failed\n";
+  return false;
+}
 
 int
 MoleculeFilter::Ok(Molecule& m) {
@@ -499,7 +521,7 @@ MoleculeFilter::Ok(Molecule& m) {
       tmp.reset(new int[matoms]);
     }
     std::fill_n(tmp.get(), matoms, 0);
-    std::optional<double> x = xlogp::XLogP(m, tmp.get());
+    std::optional<double> x = _xlogp.LogP(m, tmp.get());
     if (! x) {
     } else if (_requirements.has_min_xlogp() && *x < _requirements.min_xlogp()) {
       return 0;
@@ -509,6 +531,13 @@ MoleculeFilter::Ok(Molecule& m) {
       return 0;
     }
   }
+
+  if (_requirements.has_planar()) { 
+    if (! OkPlanarity(m, _requirements.planar())) {
+      return 0;
+    }
+  }
+
 
   return 1;
 }

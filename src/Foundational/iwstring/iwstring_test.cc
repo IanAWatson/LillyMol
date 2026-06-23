@@ -91,6 +91,18 @@ TEST(TestEqualsOperator, TestStd) {
   EXPECT_FALSE(iwstring::Equals(hello, world));
 }
 
+TEST(TestEqualsOperator, TestStdString) {
+  IWString hello = "hello";
+  std::string x = "hello";
+  EXPECT_TRUE(hello == x);
+
+  x = "world";
+  EXPECT_FALSE(hello == x);
+ 
+  hello = "world";
+  EXPECT_TRUE(hello == x);
+}
+
 TEST(TestIWString, TestExpandEnvironmentVariablesNothing) {
   const IWString hello("hello world");
   EXPECT_EQ(hello.ExpandEnvironmentVariables(), hello);

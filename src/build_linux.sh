@@ -62,16 +62,13 @@ if [[ ! -d "${third_party}" ]] ; then
   mkdir -p "${third_party}"
 fi
 
+# Shared library components for python go here.
 lib=$REPO_HOME/lib
 echo "lib in ${lib}"
 
 if [[ ! -d "${lib}" ]] ; then
   mkdir -p "${lib}"
 fi
-
-
-# If you are building with bazel, also need to update this path in WORKSPACE
-# If you are building with cmake, also need to update this path in CMakeLists.txt
 
 # The general stragegy here is that if the source directory does not exist, fetch it.
 # Then, if some artifact of the build/install is absent, go into that directory, and re/build,
@@ -128,6 +125,8 @@ if [[ ${must_build} == 1 ]] ; then
   (cd edge-addition-planarity-suite && autoreconf -fi)
   (cd edge-addition-planarity-suite && ./configure --prefix=${REPO_HOME}/third_party)
   (cd edge-addition-planarity-suite && make -j ${THREADS} install)
+  # Copy shared libraries to our lib folder so python bindings work.
+  (cp --preserve=links lib/libplanarity*.${suffix} ${lib}) || echo "Did not copy Planarity shared libraries"
 fi
 
 #if [[ ! -d 'dragonbox' ]] ; then
@@ -166,16 +165,18 @@ if [[ -v BUILD_BDB ]] ; then
         echo ""
         echo "Ignore error messages from BerkeleyDB install, it is for components we do not use"
         # Copy shared libraries to our lib folder so python bindings work.
-        (cp BDB/lib/lib*.${suffix} ${lib}) || echo "Did not copy BerkeleyDB shared libraries"
+        (cp --preserve=links BDB/lib/lib*.${suffix} ${lib}) || echo "Did not copy BerkeleyDB shared libraries"
     fi
 fi
 
 if [[ -v BUILD_XGBOOST ]] ; then
-  git clone --recursive https://github.com/dmlc/xgboost
-  mkdir xgboost/build
-  (cd xgboost/build && cmake -DCMAKE_INSTALL_PREFIX=${third_party} -DCMAKE_INSTALL_LIBDIR=${third_party}/lib ..)
-  (cd xgboost/build && make -j${THREADS})
-  (cd xgboost/build && make install)
+  if [[ ! -d 'xgboost' ]] ; then
+    git clone --recursive https://github.com/dmlc/xgboost
+    mkdir xgboost/build
+    (cd xgboost/build && cmake -DCMAKE_INSTALL_PREFIX=${third_party} -DCMAKE_INSTALL_LIBDIR=${third_party}/lib ..)
+    (cd xgboost/build && make -j${THREADS})
+    (cd xgboost/build && make install)
+  fi
 fi
 
 if [[ -v BUILD_ZEROMQ ]] ; then
@@ -191,15 +192,16 @@ if [[ -v BUILD_ZEROMQ ]] ; then
 fi
 
 if [[ -v BUILD_INCHI ]] ; then
-  git clone https://github.com/IUPAC-InChI/InChI
-  if [[ ! -d 'InChI/INCHI-1-SRC/INCHI_API/libinchi/gcc/' ]] ; then
-    echo 'INCHI directory InChI/INCHI-1-SRC/INCHI_API/libinchi/gcc/ not found, no Inchi' >&2
-    unset BUILD_INCHI
-  else
-    (cd InChI/INCHI-1-SRC/INCHI_API/libinchi/gcc/ && bash run_make_on_linux.sh)
+  if [[ ! -d 'InChI' ]] ; then
+    git clone https://github.com/IUPAC-InChI/InChI
+    (cd InChI && mkdir build)
+    (cd InChI/build && cmake -DCMAKE_INSTALL_PREFIX=${third_party} -DCMAKE_BUILD_TYPE=Release ../INCHI-1-SRC/INCHI_API/libinchi/src)
+    (cd InChI/build && cmake --build .)
+    cp --preserve=link InChI/build/lib/libinchi*${suffix} ${REPO_HOME}/lib
+    # The repo does not have an install target. third_party/BUILD.bazel links directly to the files.
+    # Ensure canonical form for shell variable.
+    BUILD_INCHI=1
   fi
-  # Ensure canonical form for shell variable.
-  BUILD_INCHI=1
 fi
 
 if [[ -v BUILD_NLOPT ]] ; then
@@ -243,7 +245,7 @@ fi
 
 # If inside Lilly, some local scratch storage
 if [[ ${inside_lilly} -eq 1 && -d '/node/scratch' ]] ; then
-    bazel_options="--output_user_root=/node/scratch/${USER}"
+    bazel_options="--output_user_root=/node/scratch/${USER}/bazel"
 elif [[ $(df -TP ${HOME}) =~ 'nfs' ]] ; then
     echo "Your HOME dir is an NFS mounted file system. bazel will not work."
     echo "Will attempt to use /tmp/ for bazel cache, that will need to be changed."
@@ -265,6 +267,11 @@ if [[ ${inside_lilly} -eq 1 ]] ; then
   build_options="${build_options} --cxxopt=-march=native --cxxopt=-mtune=native"
 else
   build_options="${build_options} --cxxopt=-march=native --cxxopt=-mtune=native"
+fi
+
+if [[ -v BUILD_INCHI ]] ; then
+  # might need to also set BUILD_INCHI as a shell variable.
+  build_options+=' --config=inchi'
 fi
 
 # Seems like splitting out the BerkeleyDB components of the python

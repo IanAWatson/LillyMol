@@ -167,55 +167,6 @@ NCDSC<....>
 |
 ```
 
-## Multiple Files
-Sparse fingerprints contain only non-zero descriptors. Each non-zero descriptor
-value is mapped to a unique sparse bit, and that mapping is accumulated during processing.
-
-For that reason the files
-```text
-name F1 F2 F3
-id1  1   1  1
-id2  0   2  1
-```
-and
-
-```text
-name F1 F2 F3
-id2  0   2  1
-id1  1   1  1
-```
-will generate different mappings of columns to bit numbers. In the first file, a non
-zero F1 will become bit zero, since it is the first non-zero value encountered. In
-the second file, which differs only in line ordering, feature 'F2' will become
-bit zero.
-
-It is important to note that if multiple descriptor files are being converted to
-gfp form for comparison, all descriptor files must be converted during the
-same invocation of `descriptors_to_fingerprint_integer`. 
-
-If files are processed separately, subsequent computations will silently fail,
-the features have been assigned different bit numbers and comparisons will be meaningless.
-
-```bash
-descriptors_to_fingerprint_integer -i , file1.csv file2.csv ... > all.gfp
-```
-ensures that features are translated to bit numbers consistently across
-all input files.
-
-## Maintaining Consistent Bit Assignments Across Multiple Files
-Frequently there will be multiple descriptor files to be processed. It is important that
-they be processed as one single pass by this tool- see above.
-```bash
-descriptors_to_fingerprint_integer -i , file1.csv file2.csv > all.gfp
-```
-But frequently the next task is then to separate 'all.gfp' back into
-separate files. Adding the '-W' option to specify a directory in which
-separate files will be written.
-```bash
-descriptors_to_fingerprint_integer -W . -v -i , file1.csv file2.csv 
-```
-creates 'file1.gfp' and 'file2.gfp' in the current directory.
-
 ## Options
 
 ```text

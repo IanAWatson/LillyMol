@@ -967,7 +967,7 @@ resolved(resizable_array_p<Path_Scoring>& ps, int& stopped) {
   cerr << "Are " << np << " path scoring objects resolved\n";
 #endif
 
-  if (1 == np) {  // hard to imagine this happening
+  if (1 == np) [[unlikely]] {  // hard to imagine this happening
     return 1;
   }
 

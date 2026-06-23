@@ -3,6 +3,7 @@
 
 #include "Molecule_Lib/molecule.h"
 #include "Molecule_Lib/rotbond_common.h"
+#include "Molecule_Lib/planarity.h"
 
 #include "Molecule_Tools/alogp.h"
 #include "Molecule_Tools/nvrtspsa.h"
@@ -21,6 +22,8 @@ class MoleculeFilter {
     quick_rotbond::QuickRotatableBonds _rotbond;
 
     alogp::ALogP _alogp;
+
+    xlogp::XLogPCalc _xlogp;
 
     molecule_filter_data::Requirements _requirements;
 

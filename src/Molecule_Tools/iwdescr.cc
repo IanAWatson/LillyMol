@@ -84,6 +84,7 @@ static IW_STL_Hash_Map_String name_translation;
 static int flush_after_each_molecule = 0;
 
 static alogp::ALogP alogp_engine;
+static xlogp::XLogPCalc xlogp_engine;
 
 // Normally we read a smiles file and produce a descriptor file.
 // Optionally we can read a descriptor file with a smiles as the first
@@ -2899,7 +2900,7 @@ compute_adjacent_ring_fusion_descriptors(Molecule& m, const int* ncon,
 
 static int
 compute_xlogp(Molecule& m) {
-  std::optional<double> x = xlogp::XLogP(m);
+  std::optional<double> x = xlogp_engine.LogP(m);
   if (x) {
     descriptor[iwdescr_xlogp] = *x;
     return 1;
@@ -9470,7 +9471,7 @@ iwdescr(int argc, char** argv) {
     }
   }
 
-  xlogp::SetIssueUnclassifiedAtomMessages(0);
+  xlogp_engine.SetIssueUnclassifiedAtomMessages(false);
 
   FileType input_type = FILE_TYPE_INVALID;
   if (read_descriptor_file_pipeline) {

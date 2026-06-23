@@ -1132,6 +1132,17 @@ cc_binary(
 )
 
 cc_binary(
+    name = "iwdescr_new",
+    srcs = [
+        "iwdescr_main_target.cc",
+    ],
+    deps = [
+        ":iwdescr_lib",
+        "//Foundational/iwstring:iwstring",
+    ],
+)
+
+cc_binary(
     name = "iwecfp",
     srcs = [
         "iwecfp.cc",
@@ -2294,6 +2305,7 @@ cc_library(
         "//Foundational/cmdline:iwcmdline",
         "//Molecule_Lib:iwmolecule",
         "//Molecule_Lib:moleculeio",
+        "//Molecule_Lib:planarity",
         "//Molecule_Tools:nvrtspsa",
     ],
 )
@@ -3200,6 +3212,54 @@ cc_library(
 )
 
 cc_library(
+    name = "iwdescr_lib",
+    visibility = ["//visibility:public"],
+    srcs = [
+        "iwdescr_internal.cc",
+        "iwdescr_lib.cc",
+    ],
+    hdrs = [
+        "iwdescr_lib.h",
+        "iwdescr_internal.h",
+    ],
+    deps = [
+        ":alogp_lib",
+        ":iwdescr_cc_proto",
+        ":nvrtspsa",
+        ":partial_symmetry",
+        ":xlogp_lib",
+        "//Foundational/accumulator",
+        "//Foundational/iwmisc:sparse_fp_creator",
+        "//Molecule_Lib:iwmolecule",
+        "//Molecule_Lib:planarity",
+    ],
+)
+
+cc_library(
+    name = "iwdescr_lib_shared",
+    visibility = ["//visibility:public"],
+    srcs = [
+        "iwdescr_internal.cc",
+        "iwdescr_lib.cc",
+    ],
+    hdrs = [
+        "iwdescr_lib.h",
+        "iwdescr_internal.h",
+    ],
+    deps = [
+        ":alogp_lib",
+        ":iwdescr_cc_proto",
+        ":nvrtspsa",
+        ":partial_symmetry",
+        ":xlogp_lib",
+        "//Foundational/accumulator",
+        "//Foundational/iwmisc:sparse_fp_creator",
+        "//Molecule_Lib:iwmolecule",
+        "//Molecule_Lib:planarity_shared",
+    ],
+)
+
+cc_library(
     name = "iwdemerit_lib",
     srcs = [
         "iwdemerit_lib.cc",
@@ -3852,6 +3912,17 @@ cc_test(
         ":xlogp_lib",
         "//Molecule_Lib:iwmolecule",
         "//Molecule_Lib:iwreaction",
+        "@googletest//:gtest",
+        "@googletest//:gtest_main",
+    ],
+)
+
+cc_test(
+    name = "iwdescr_lib_test",
+    srcs = ["iwdescr_lib_test.cc"],
+    deps = [
+        ":iwdescr_lib",
+        "//Molecule_Lib:iwmolecule",
         "@googletest//:gtest",
         "@googletest//:gtest_main",
     ],

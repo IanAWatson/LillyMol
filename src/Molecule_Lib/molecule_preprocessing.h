@@ -50,6 +50,17 @@ class MoleculePreprocessing {
     }
   }
 
+  // Queries for current states.
+  bool reduce_to_largest_fragment() const {
+    return _reduce_to_largest_fragment;
+  }
+  bool remove_isotopes() const {
+    return _remove_isotopes;
+  }
+  bool remove_chirality() const {
+    return _remove_chirality;
+  }
+
  private:
   bool _active = false;
 

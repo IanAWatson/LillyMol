@@ -193,6 +193,7 @@ pybind_extension(
         "//Molecule_Lib:iwreaction",
         "//Molecule_Lib:moleculeio",
         "//Molecule_Tools:dicer_api",
+        "//Molecule_Tools:iwdescr_lib_shared",
         "//Molecule_Tools:nvrtspsa",
         "//Molecule_Tools:ring_replacement_lib",
         "//Molecule_Tools:unique_molecules_api",
@@ -204,7 +205,18 @@ pybind_extension(
     ],
 )
 
+py_test(
+    name = "lillymol_tools_iwdescr_test",
+    srcs = ["lillymol_tools_iwdescr_test.py"],
+    deps = [
+        ":lillymol",
+        ":lillymol_tools",
+    ],
+)
+
 # Cannot figure out how to make this work. TODO:ianwatson
+# Observe that Codex ran the test above by including
+# --strategy=TestRunner=local --test_env=LILLYMOL_HOME=/home/ian/LillyMol_IWFORK
 #py_test(
 #    name = "test_lillymol",
 #    size = "small",

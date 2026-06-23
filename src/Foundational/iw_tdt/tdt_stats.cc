@@ -36,7 +36,7 @@ class TDT_Tag {
   uint32_t _times_found;
   uint32_t _times_empty;
   int _numeric_values;
-  Accumulator_Int<int> _size;
+  Accumulator_Int<uint64_t> _size;
 
  public:
   TDT_Tag(const const_IWSubstring&);

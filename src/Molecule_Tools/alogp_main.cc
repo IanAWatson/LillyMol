@@ -1260,7 +1260,7 @@ Options::Process(Molecule& m, IWString_and_File_Descriptor& output) {
   }
 
   if (_stream_for_labelled_molecules.is_open()) {
-    _stream_for_labelled_molecules << m.smiles() << ' ' << m.name() << ' ' << *x << '\n';
+    _stream_for_labelled_molecules << m.aromatic_smiles() << ' ' << m.name() << ' ' << *x << '\n';
     _stream_for_labelled_molecules.write_if_buffer_holds_more_than(4096);
   }
 

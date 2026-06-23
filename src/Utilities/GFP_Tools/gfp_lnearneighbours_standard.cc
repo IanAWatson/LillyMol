@@ -1,4 +1,4 @@
-/*
+*
   Near neighbour programme where the pool is huge, and must be
   read sequentially.
 */
@@ -567,7 +567,7 @@ process the output with nplotnn.
  -k               generate nnbr::NearNeighbours textproto output
  -S <fname>       write serialised nnbr::NearNeighbours protos to TFDataRecord file <fname>
                   '-S NOSMI -S fname'    will omit neighbour smiles - much smaller file.
- -x <nthreads>    number of OMP threads to use - default unlimited.
+ -x <nthreads>    number of OMP threads to use - default 1.
  -v               verbose output
 )";
 // clang-format on
@@ -734,6 +734,8 @@ nearneighbours(int argc, char** argv) {
     }
 
     omp_set_num_threads(nthreads);
+  } else {
+    omp_set_num_threads(1);
   }
 
   set_include_newlines_in_tdt(0);

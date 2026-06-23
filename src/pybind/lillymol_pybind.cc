@@ -216,12 +216,6 @@ PYBIND11_MODULE(lillymol, m)
     .def("atom_is_now_implicit_hydrogen", &Chiral_Centre::atom_is_now_implicit_hydrogen)
     .def("atom_is_now_lone_pair", &Chiral_Centre::atom_is_now_lone_pair)
     .def("atom_numbers_are_swapped", &Chiral_Centre::atom_numbers_are_swapped)
-    .def("move_to_end_of_connection_table",
-      [](Molecule& m, atomic_number_t z) {
-        return m.MoveToEndOfConnectionTable(z);
-      },
-      "Move atoms of type 'z' to end of connection table"
-    )
 
     .def("__repr__",
       [](const Chiral_Centre& c) {
@@ -255,10 +249,13 @@ PYBIND11_MODULE(lillymol, m)
     .def("active", &Mol2Graph::active, "True if active")
   ;
 
-         py::class_<Molecule>(m, "Molecule")
+  // By adding shared_ptr we avoid copies between C++ and python.
+  // It also enables lists of molecules to be passed as std::vector<Molecule*> which is mutable.
+  // std::vector<Molecule> will create an array of copies.
+         py::class_<Molecule, std::shared_ptr<Molecule>>(m, "Molecule")
 		.def(py::init<>())
                 .def(py::init([](const Molecule& rhs) {
-                  return std::unique_ptr<Molecule>(new Molecule(rhs));
+                  return std::shared_ptr<Molecule>(new Molecule(rhs));
                 }))
                 .def("ok",
                   [](const Molecule& m)->bool{
@@ -353,12 +350,12 @@ PYBIND11_MODULE(lillymol, m)
                 .def("number_ring_systems", static_cast<int (Molecule::*)()>(&Molecule::number_ring_systems), "Number ring systems")
                 .def("ring", static_cast<const Ring* (Molecule::*)(int)>(&Molecule::ringi), py::return_value_policy::reference, "I'th ring")
                 .def("rings",
-                  [](Molecule& m)->std::vector<const Ring*>{
-                    std::vector<const Ring*> result;
+                  [](Molecule& m)->std::vector<std::unique_ptr<Ring>>{
+                    std::vector<std::unique_ptr<Ring>> result;
                     // Was not able to make this work passing a vector of the actual rings.
                     // Works once or twice then crashes. Does this create a memory leak?
                     for (const Ring* r : m.sssr_rings()) {
-                      result.push_back(new Ring(*r));
+                      result.push_back(std::make_unique<Ring>(*r));
                     }
                     return result;
                   },
@@ -407,7 +404,7 @@ PYBIND11_MODULE(lillymol, m)
                 )
                 .def("label_atoms_by_ring_system_including_spiro_fused_np",
                   [](Molecule& m)-> py::array_t<int> {
-                    py::array_t<float> result = mkarray_via_buffer<int>(m.natoms());
+                    py::array_t<int> result = mkarray_via_buffer<int>(m.natoms());
                     auto req = result.request();
                     int* ptr = static_cast<int*>(req.ptr);
                     m.label_atoms_by_ring_system_including_spiro_fused(ptr);
@@ -570,24 +567,28 @@ PYBIND11_MODULE(lillymol, m)
                     "For each atom the fragment membership"
                 )
                 .def("create_components",
-                  [](Molecule& m)->std::optional<std::vector<Molecule*>>{
+                      [](Molecule& m)->std::optional<std::vector<std::shared_ptr<Molecule>>>{
                     if (m.number_fragments() < 2) {
                       return std::nullopt;
                     }
-                    std::vector<Molecule*> res;
-                    res.reserve(m.number_fragments());
+
                     resizable_array_p<Molecule> components;
                     if (! m.create_components(components)) {
                       return std::nullopt;
                     }
+
+                    std::vector<std::shared_ptr<Molecule>> res;
+                    res.reserve(components.number_elements());
+
                     for (Molecule* c : components) {
-                      res.push_back(c);
+                      res.emplace_back(c);  // shared_ptr takes ownership
                     }
-                    components.resize_no_delete(0);
+                    components.resize_no_delete(0);    // array no longer owns them
                     return res;
                   },
                   "Split a multi fragment molecule into fragment molecules"
                 )
+
 
                 .def("remove_non_periodic_table_elements", static_cast<int (Molecule::*)()>(&Molecule::remove_all_non_natural_elements), "Remove non periodic table elements")
                 .def("organic_only", static_cast<int (Molecule::*)()const>(&Molecule::organic_only), "True if only organic elements")
@@ -598,13 +599,6 @@ PYBIND11_MODULE(lillymol, m)
                   },
                   "True if the atom is organic"
                 )
-                .def("is_organic",
-                  [](const Molecule& m, atom_number_t zatom)->bool {
-                    return m.is_organic(zatom);
-                  },
-                  "True if `zatom` is organic"
-                )
-
                 .def("remove_explicit_hydrogens", static_cast<int (Molecule::*)()>(&Molecule::remove_explicit_hydrogens), "Remove explicit hydrogens")
                 .def("remove_all", static_cast<int (Molecule::*)(atomic_number_t)>(&Molecule::remove_all), "Remove all elements with atomic number")
                 //.def("remove_bonds_to_atom", static_cast<int (Molecule::*)(atomic_number_t, int)>(&Molecule::remove_bonds_to_atom), "Remove all bonds involving atom")
@@ -761,28 +755,27 @@ PYBIND11_MODULE(lillymol, m)
                 .def("number_chiral_centres", static_cast<int (Molecule::*)()const>(&Molecule::chiral_centres), "Number chiral centres")
                 .def("remove_all_chiral_centres", static_cast<int (Molecule::*)()>(&Molecule::remove_all_chiral_centres), "Remove all chiral centres")
                 .def("chiral_centre_at_atom",
-                  [](const Molecule& m, atom_number_t zatom)->std::optional<Chiral_Centre*> {
+                  [](const Molecule& m, atom_number_t zatom)->std::optional<Chiral_Centre> {
                     Chiral_Centre* c = m.chiral_centre_at_atom(zatom);
                     if (c == nullptr) {
                       return std::nullopt;
                     }
-                    return c;
+                    return *c;
                   },
-                  "Chiral centre at atom",
-                  py::return_value_policy::reference
+                  "Chiral centre at atom"
+//                py::return_value_policy::reference
                 )
                 .def("invert_chirality_on_atom", &Molecule::invert_chirality_on_atom, "Invert chirality")
                 .def("remove_chiral_centre_at_atom", &Molecule::remove_chiral_centre_at_atom, "Remove specific chiral centre")
                 .def("chiral_centres",
-                  [](const Molecule& m)->std::vector<Chiral_Centre*>{
-                    std::vector<Chiral_Centre*> result;
+                  [](const Molecule& m)->std::vector<Chiral_Centre>{
+                    std::vector<Chiral_Centre> result;
                     for (const Chiral_Centre* c : m.ChiralCentres()) {
-                      Chiral_Centre* s = new Chiral_Centre(*c);
-                      result.push_back(s);
+                      result.push_back(*c);
                     }
                     return result;
                   },
-                  py::return_value_policy::copy,
+//                py::return_value_policy::copy,
                   "List of chiral centres"
                 )
                 .def("revert_all_directional_bonds_to_non_directional", &Molecule::revert_all_directional_bonds_to_non_directional, "remove bond directionality (cis/trans)")
@@ -796,7 +789,7 @@ PYBIND11_MODULE(lillymol, m)
 
                     return result;
                   },
-                  py::return_value_policy::move
+                  py::return_value_policy::reference
                 )
                 .def("bond",
                   [](const Molecule& m, int ndx)->const Bond* {
@@ -1094,6 +1087,12 @@ PYBIND11_MODULE(lillymol, m)
                   },
                   "Return list of Gasteiger partial charges"
                 )
+                .def("move_to_end_of_connection_table",
+                  [](Molecule& m, atomic_number_t z) {
+                    return m.MoveToEndOfConnectionTable(z);
+                  },
+                  "Move atoms of type 'z' to end of connection table"
+                )
 
                 .def("highest_coordinate_dimensionality", static_cast<int (Molecule::*)()const>(&Molecule::highest_coordinate_dimensionality), "highest coordinate dimensionality")
                 .def("debug_string", static_cast<std::string (Molecule::*)()const>(&Molecule::debug_string), "Dump of internal data structures")
@@ -1267,7 +1266,7 @@ PYBIND11_MODULE(lillymol, m)
       },
       "True if atom_number is bonded"
     )
-    .def("__LEN__",
+    .def("__len__",
       [](const Atom& a) {
         return a.ncon();
       },
@@ -1377,7 +1376,7 @@ PYBIND11_MODULE(lillymol, m)
         } else if (b.is_double_bond()) {
           result << '=';
         } else if (b.is_triple_bond()) {
-          result << '=';
+          result << '#';
         }
         result << b.a2() << '>';
         return std::string(result.data(), result.size());
@@ -1577,8 +1576,8 @@ PYBIND11_MODULE(lillymol, m)
       "True if the ring is fused"
     )
     .def("is_fused_to",
-      [](const Ring& r1, const Ring* r2)->bool{
-        return r1.is_fused_to(r2);
+      [](const Ring& r1, const Ring& r2)->bool{
+        return r1.is_fused_to(&r2);
       },
       "True if rings are fused"
     )
@@ -1721,7 +1720,6 @@ PYBIND11_MODULE(lillymol, m)
   m.def("interpret_D_as_deuterium", &element::interpret_d_as_deuterium, "D means '[2H]'");
   m.def("interpret_T_as_deuterium", &element::interpret_t_as_tritium, "T means '[3H]'");
   m.def("set_display_strange_chemistry_messages", &set_display_strange_chemistry_messages, "turn off messages about bad valences");
-  m.def("set_atomic_symbols_can_have_arbitrary_length", &set_atomic_symbols_can_have_arbitrary_length, "Enable elements like 'Ala', 'Gly'");
   m.def("set_display_smiles_interpretation_error_messages", &set_display_smiles_interpretation_error_messages, "Set smiles error messages");
   m.def("count_atoms_in_smiles",
     [](const std::string& smiles) {
@@ -1761,7 +1759,8 @@ PYBIND11_MODULE(lillymol, m)
 
   m.def("xlogp",
     [](Molecule& m)->std::optional<float> {
-      std::optional<double> result = xlogp::XLogP(m);
+      xlogp::XLogPCalc calc;
+      std::optional<double> result = calc.LogP(m);
       if (! result) {
         return std::nullopt;
       }
@@ -1804,12 +1803,13 @@ PYBIND11_MODULE(lillymol, m)
 
   py::class_<Charge_Assigner>(m, "ChargeAssigner")
     .def(py::init([]() {
-      auto instance = std::make_unique<Charge_Assigner>();
       const char* lillymol_home = getenv("LILLYMOL_HOME");
       if (lillymol_home == NULL) {
         std::cerr << "ChargeAssigner:no LILLYMOL_HOME\n";
-        return instance;
+        throw std::runtime_error("ChargeAssigner::LILLYMOL_HOME not set");
       }
+
+      auto instance = std::make_unique<Charge_Assigner>();
       IWString data(lillymol_home);
       data << "/data/queries/charges";
       if (!instance->BuildFromDir(data)) {
@@ -1852,12 +1852,13 @@ PYBIND11_MODULE(lillymol, m)
 
   py::class_<Donor_Acceptor_Assigner>(m, "DonorAcceptor")
     .def(py::init([]() {
-      auto instance = std::make_unique<Donor_Acceptor_Assigner>();
       const char* lillymol_home = getenv("LILLYMOL_HOME");
       if (lillymol_home == NULL) {
         std::cerr << "DonorAcceptor:no LILLYMOL_HOME\n";
-        return instance;
+        throw std::runtime_error("DonorAcceptor::LILLYMOL_HOME not set");
       }
+
+      auto instance = std::make_unique<Donor_Acceptor_Assigner>();
       IWString data(lillymol_home);
       data << "/data/queries/hbonds";
       static constexpr int kVerbose = 0;

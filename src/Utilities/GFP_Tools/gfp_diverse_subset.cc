@@ -32,6 +32,13 @@ Usage(int rc) {
   cerr << R"(Incrementally selects an input-order-dependent diverse fingerprint subset.
 For each fingerprint, discard it if its distance from any retained fingerprint
 is less than the threshold. Output is SMILES and identifier.
+
+Note that if reading from standard input you must fully specify the fingerprints
+being used. By default, most GFP tools peek at the input file in order to determine
+what fingerprints are present. That does not work with standard input, so fully
+specify the fingerprints to be used.
+... generate fingerprint | gfp_diverse_subset -F FPIW -F FPMK -F FPMK2 -P MPR ... -
+
  -t <dist>      minimum distance from every retained fingerprint (required)
  -s <n>         maximum number of fingerprints to retain
  -x <n>         use OpenMP when <n> fingerprints have been retained (default 1000)
@@ -50,8 +57,8 @@ class Options {
   int _verbose = 0;
   similarity_type_t _threshold = 0.0f;
   int _parallel_crossover = 1000;
-  int _number_threads = 0;
-  int _maximum_retained = 0;
+  int _number_threads = 1;
+  uint32_t _maximum_retained = 0;
 
   IWString _smiles_tag = "$SMI<";
   IWString _identifier_tag = "PCN<";
@@ -65,12 +72,16 @@ class Options {
   uint64_t _fingerprints_discarded = 0;
   uint64_t _comparisons = 0;
 
+  // Private functions.
+
   bool TooCloseSerial(IW_General_Fingerprint& fp);
   bool TooCloseParallel(IW_General_Fingerprint& fp);
   bool TooClose(IW_General_Fingerprint& fp);
 
   int Process(iwstring_data_source& input,
               IWString_and_File_Descriptor& output);
+
+  void MaybeReportProgress();
 
  public:
   int Initialise(Command_Line& cl);
@@ -79,7 +90,7 @@ class Options {
 
   bool Full() const {
     return _maximum_retained > 0 &&
-           _retained.number_elements() >= _maximum_retained;
+           _retained.size() >= _maximum_retained;
   }
 
   int Report(std::ostream& output) const;
@@ -164,27 +175,30 @@ Options::TooCloseSerial(IW_General_Fingerprint& fp) {
 bool
 Options::TooCloseParallel(IW_General_Fingerprint& fp) {
   const int n = _retained.number_elements();
-  std::atomic<bool> too_close(false);
+//std::atomic<bool> too_close(false);
   uint64_t comparisons = 0;
+  bool too_close = false;
 
-#pragma omp parallel for schedule(static) reduction(+ : comparisons)
+#pragma omp parallel for schedule(static) reduction(|| : too_close)
   for (int i = 0; i < n; ++i) {
-    if (too_close.load(std::memory_order_relaxed)) {
-      continue;
-    }
+//  if (too_close.load(std::memory_order_relaxed)) {
+//    continue;
+//  }
 
     if (! can_be_compared(fp, *_retained[i])) {
       continue;
     }
 
-    ++comparisons;
+//  ++comparisons;
     if (fp.distance(*_retained[i]) < _threshold) {
-      too_close.store(true, std::memory_order_relaxed);
+      too_close = true;
+//    too_close.store(true, std::memory_order_relaxed);
     }
   }
 
-  _comparisons += comparisons;
-  return too_close.load(std::memory_order_relaxed);
+//_comparisons += comparisons;
+//return too_close.load(std::memory_order_relaxed);
+  return too_close;
 }
 
 bool
@@ -227,18 +241,19 @@ Options::Process(iwstring_data_source& input,
     }
 
     ++_fingerprints_read;
-    if (_report_progress()) {
-      cerr << "Read " << _fingerprints_read << " fingerprints, retained "
-           << _fingerprints_retained << ", discarded "
-           << _fingerprints_discarded << ", comparisons " << _comparisons << '\n';
-    }
+    MaybeReportProgress();
     if (TooClose(*fp)) {
       ++_fingerprints_discarded;
       continue;
     }
 
     output << smiles << ' ' << identifier << '\n';
-    output.write_if_buffer_holds_more_than(8192);
+    // The calculation slows down over time so give more feedback on progress.
+    if (_retained.size() > 500000) {  // an arbitrarily chosen number.
+      output.flush();
+    } else {
+      output.write_if_buffer_holds_more_than(8192);
+    }
 
     _retained << fp.release();
     ++_fingerprints_retained;
@@ -248,6 +263,17 @@ Options::Process(iwstring_data_source& input,
   }
 
   return output.good();
+}
+
+void
+Options::MaybeReportProgress() {
+  if (! _report_progress()) {
+    return;
+  }
+
+  cerr << "Read " << iwstring::with_commas(_fingerprints_read) << " fingerprints, retained "
+       << iwstring::with_commas(_fingerprints_retained) << ", discarded "
+       << _fingerprints_discarded << ", comparisons " << _comparisons << '\n';
 }
 
 int
@@ -267,14 +293,15 @@ Options::Report(std::ostream& output) const {
   output << "Read " << _fingerprints_read << " fingerprints, retained "
          << _fingerprints_retained << ", discarded "
          << _fingerprints_discarded << '\n';
-  output << _comparisons << " fingerprint comparisons performed\n";
+//output << _comparisons << " fingerprint comparisons performed\n";
+  cerr << "Retained " << _retained.size() << " fingerprints\n";
 
   return output.good();
 }
 
 int
 Main(int argc, char** argv) {
-  Command_Line cl(argc, argv, "vF:t:s:x:h:r:");
+  Command_Line cl(argc, argv, "vF:P:t:s:x:h:r:");
 
   if (cl.unrecognised_options_encountered()) {
     cerr << "Unrecognised options encountered\n";

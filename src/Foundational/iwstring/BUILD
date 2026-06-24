@@ -31,6 +31,7 @@ cc_library(
         "string_change.cc",
         "string_relationals.cc",
         "string_to_float.cc",
+        "string_with_commas.cc",
         "tokenise_with_quotes.cc",
         "unhtml.cc",
     ],
@@ -92,6 +93,18 @@ cc_test(
         "@googletest//:gtest",
         "@googletest//:gtest_main",
     ],
+)
+
+cc_test(
+    name = "string_with_commas_test",
+    srcs = [
+        "string_with_commas_test.cc",
+    ],
+    deps = [
+        ":iwstring",
+        "@googletest//:gtest",
+        "@googletest//:gtest_main",
+    ]
 )
 
 cc_test(

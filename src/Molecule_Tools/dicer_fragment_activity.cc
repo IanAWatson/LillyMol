@@ -73,7 +73,8 @@ for Diff. Hopefully also with a large N value, but that will seldom be the case.
 
  -A <fname>             activity file (id and activity, with a header)
  -tfdata                dicer output generated with '-B serialized_proto'
- -support <n>           discard fragments unles they have at least <n> examples
+ -support <n>           discard fragments unles they have at least <n> examples.
+ -C <natoms>            discard fragments with more than <natoms> atoms.
  -v                     verbose output.
 )";
 
@@ -105,6 +106,10 @@ class Fragment {
   void
   set_natoms(uint32_t s) {
     _natoms = s;
+  }
+
+  uint32_t natoms() const {
+    return _natoms;
   }
 
   uint32_t
@@ -150,6 +155,9 @@ class Options {
 
   char _input_separator;
 
+  uint32_t _max_atoms = 0;
+  uint32_t _suppressed_by_max_atoms = 0;
+
   // this is derived from the activity values read. We do not
   // determine it ourself, it is passed via set_mean_activity.
   double _mean_activity;
@@ -187,6 +195,8 @@ Options::Options() {
   _input_separator = ' ';
   _support = 0;
   _suppressed_by_support_requirement = 0;
+  _max_atoms = 0;
+  _suppressed_by_max_atoms = 0;
   _mean_activity = 0.0;
 }
 
@@ -206,6 +216,16 @@ Options::Initialise(Command_Line_v2& cl) {
     if (_verbose) {
       cerr << "Will only write fragments that are found in " << _support
            << " or more molecules\n";
+    }
+  }
+
+  if (cl.option_present('C')) {
+    if (! cl.value('C', _max_atoms) || _max_atoms < 1) {
+      cerr << "Invalid max atoms directive (-C)\n";
+      return 0;
+    }
+    if (_verbose) {
+      cerr << "Will ignore fragments with more than " << _max_atoms << " atoms\n";
     }
   }
 
@@ -283,6 +303,11 @@ Options::WriteResult(const std::string& smiles, uint32_t nmolecules,
     return 1;
   }
 
+  if (_max_atoms > 0 && fragment.natoms() > _max_atoms) {
+    ++_suppressed_by_max_atoms;
+    return 1;
+  }
+
   return fragment.WriteResult(smiles, nmolecules, _mean_activity, output);
 }
 
@@ -291,6 +316,10 @@ Options::Report(std::ostream& output) const {
   if (_support > 0) {
     output << _suppressed_by_support_requirement << " fragments suppressed by "
            << _support << " support requirement\n";
+  }
+  if (_max_atoms > 0) {
+    output << _suppressed_by_max_atoms << " fragments suppressed by "
+           << _max_atoms << " max atoms requirement\n";
   }
 
   return 1;
@@ -448,7 +477,7 @@ ReadDicerData(const char* fname, Options& options,
 
 int
 Main(int argc, char** argv) {
-  Command_Line_v2 cl(argc, argv, "-v-A=sfile-tfdata-support=ipos");
+  Command_Line_v2 cl(argc, argv, "-v-A=sfile-tfdata-support=ipos-C=ipos");
   if (cl.unrecognised_options_encountered()) {
     cerr << "unrecognised_options_encountered\n";
     Usage(1);

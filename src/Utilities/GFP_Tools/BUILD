@@ -506,6 +506,7 @@ cc_binary(
     ],
     tags = [
         "gfp_server",
+        "zeromq",
     ],
     deps = [
         "nn_request_cc_proto",
@@ -523,7 +524,7 @@ cc_binary(
       select( {
       "darwin": [ "@homebrew_openmp"],
       "//conditions:default": []
-    })
+    }),
 )
 
 # cc_binary(

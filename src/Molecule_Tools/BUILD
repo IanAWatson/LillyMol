@@ -3554,6 +3554,19 @@ cc_library(
 )
 
 cc_library(
+    name = "smarts_for_atom_subset",
+    srcs = ["smarts_for_atom_subset.cc"],
+    hdrs = ["smarts_for_atom_subset.h"],
+    visibility = [
+        "//visibility:public",
+    ],
+    deps = [
+        "//Foundational/iwstring",
+        "//Molecule_Lib:iwmolecule",
+    ],
+)
+
+cc_library(
     name = "surface_area_molvol",
     srcs = [
         "jwrandom_preset_array.h",
@@ -3885,6 +3898,18 @@ cc_test(
         "//Molecule_Lib:moleculeio",
         "@com_google_protobuf//:protobuf",
         "@googletest//:gtest",
+        "@googletest//:gtest_main",
+    ],
+)
+
+cc_test(
+    name = "smarts_for_atom_subset_test",
+    timeout = "short",
+    srcs = ["smarts_for_atom_subset_test.cc"],
+    deps = [
+        ":smarts_for_atom_subset",
+        "//Molecule_Lib:iwmolecule",
+        "//Molecule_Lib:moleculeio",
         "@googletest//:gtest_main",
     ],
 )

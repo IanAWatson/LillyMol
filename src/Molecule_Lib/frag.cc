@@ -1818,7 +1818,7 @@ Molecule::_compute_fragment_information_subset(Fragment_Information& fragment_in
     const int f1 = fragment_membership[a1];
     const int f2 = fragment_membership[a2];
 
-    if (f1 == f2) {
+    if (f1 >= 0 && f1 == f2) {
       bonds_in_fragment[f1]++;
     }
   }

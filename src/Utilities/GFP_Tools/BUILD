@@ -474,7 +474,7 @@ cc_binary(
       select( {
       "darwin": [ "@homebrew_openmp"],
       "//conditions:default": []
-    })
+    }),
 )
 
 # cc_binary(

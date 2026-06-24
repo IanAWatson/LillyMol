@@ -1,4 +1,4 @@
-*
+/*
   Near neighbour programme where the pool is huge, and must be
   read sequentially.
 */

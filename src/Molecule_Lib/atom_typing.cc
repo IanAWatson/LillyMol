@@ -3468,3 +3468,191 @@ template int Atom_Typing_Specification::assign_atom_types<uint64_t>(Molecule&, u
 
 template int assign_atom_types(Molecule&, int, int*, int const*);
 template int assign_atom_types(Molecule&, int, unsigned int*, int const*);
+namespace lillymol {
+constexpr char kOpenSquareBrackets = '[';
+constexpr char kCloseSquareBrackets = ']';
+constexpr char kSemicolon = ';';
+
+void
+AppendAtomicNumber(Molecule& m, atom_number_t zatom, uint32_t atype,
+                   IWString& result) {
+  const bool include_atomic_number = atype & IWATTYPE_USP_Z;
+  const bool include_halogen_equivalent_atomic_number = atype & IWATTYPE_USP_Y;
+  const bool include_aromaticity = atype & IWATTYPE_USP_A;
+
+  // Aromaticity specified, but not atomic number
+  if (include_aromaticity && ! include_atomic_number &&
+      ! include_halogen_equivalent_atomic_number) {
+    if (m.is_aromatic(zatom)) {
+      result << 'a';
+    } else {
+      result << 'A';
+    }
+
+    return;
+  }
+
+  const Atom& a = m[zatom];
+
+  // Aromaticity not specified, just atomic number
+  if (! include_aromaticity &&
+      (include_atomic_number || include_halogen_equivalent_atomic_number)) {
+    atomic_number_t z = a.element()->atomic_number();
+
+    if (include_halogen_equivalent_atomic_number && (z == 35 || z == 53)) {
+      z = 17;  // Chlorine
+    }
+    result << '#' << z;
+    return;
+  }
+
+  // Both aromaticity and atomic number specified.
+  if (m.is_aromatic(zatom)) {
+    result << a.element()->aromatic_symbol();
+  } else {
+    result << '#' << a.element()->atomic_number();
+  }
+}
+
+void
+AppendConnectionCount(Molecule& m, atom_number_t zatom, IWString& result) {
+  if (result.length() > 1) {
+    result << kSemicolon;
+  }
+
+  result << 'D' << m.ncon(zatom);
+}
+
+void
+AppendRingBondCount(Molecule& m, atom_number_t zatom, IWString& result) {
+  if (result.length() > 1) {
+    result << ';';
+  }
+
+  result << 'x' << m.ring_bond_count(zatom);
+}
+
+void
+AppendNoneType(IWString& result) {
+  result << '*';
+}
+
+void
+AppendUnsaturationIncludeArom(Molecule& m, atom_number_t zatom, IWString& result) {
+  if (result.length() > 1) {
+    result << ';';
+  }
+
+  int unsaturation;
+  if (m.is_aromatic(zatom)) {
+    unsaturation = 1;
+  } else {
+    unsaturation = m.unsaturation(zatom);
+  }
+
+  result << 'G' << unsaturation;
+}
+
+void
+AppendSmallestRing(Molecule& m, atom_number_t zatom, IWString& result) {
+  List_of_Ring_Sizes ring_sizes;
+  m.ring_sizes_for_atom(zatom, ring_sizes);
+  if (ring_sizes.empty()) {
+    return;
+  }
+
+  if (result.length() > 1) {
+    result << kSemicolon;
+  }
+
+  result << 'r' << ring_sizes[0];
+}
+
+void
+AppendLargestRing(Molecule& m, atom_number_t zatom, IWString& result) {
+  List_of_Ring_Sizes ring_sizes;
+  m.ring_sizes_for_atom(zatom, ring_sizes);
+  if (ring_sizes.empty()) {
+    return;
+  }
+
+  if (result.length() > 1) {
+    result << kSemicolon;
+  }
+
+  result << 'r' << ring_sizes.back();
+}
+
+void
+AppendUnsaturationExcludeArom(Molecule& m, atom_number_t zatom, IWString& result) {
+  if (m.is_aromatic(zatom)) {
+    return;
+  }
+  if (result.length() > 1) {
+    result << ';';
+  }
+  result << 'G' << m.unsaturation(zatom);
+}
+
+void
+AppendFormalCharge(Molecule& m, atom_number_t zatom, IWString& result) {
+  formal_charge_t q = m.formal_charge(zatom);
+  if (q == 0) {
+    return;
+  }
+  if (result.length() > 1) {
+    result << ';';
+  }
+  // Deliberate decision to not bother handling anything but single + or -.
+  if (q < 0) {
+    result << '-';
+  } else {
+    result << '+';
+  }
+}
+
+IWString
+SmartsForAtomType(Molecule& m, atom_number_t zatom, uint32_t atype) {
+  IWString result;
+  result << kOpenSquareBrackets;
+  if (atype & (IWATTYPE_USP_Z | IWATTYPE_USP_A | IWATTYPE_USP_Y)) {
+    AppendAtomicNumber(m, zatom, atype, result);
+  }
+
+  if (atype & IWATTYPE_USP_C) {
+    AppendConnectionCount(m, zatom, result);
+  }
+
+  if (atype & IWATTYPE_USP_R) {
+    AppendRingBondCount(m, zatom, result);
+  }
+
+  if (atype == IWATTYPE_USP_N) {
+    AppendNoneType(result);
+  }
+
+  if (atype & IWATTYPE_USP_U) {
+    AppendUnsaturationIncludeArom(m, zatom, result);
+  }
+
+  if (atype & IWATTYPE_USP_S) {
+    AppendSmallestRing(m, zatom, result);
+  }
+
+  if (atype & IWATTYPE_USP_L) {
+    AppendLargestRing(m, zatom, result);
+  }
+
+  if (atype & IWATTYPE_USP_B) {
+    AppendUnsaturationExcludeArom(m, zatom, result);
+  }
+  if (atype & IWATTYPE_USP_O) {
+    AppendFormalCharge(m, zatom, result);
+  }
+
+  result << kCloseSquareBrackets;
+
+  return result;
+}
+
+}  // namespace lillymol

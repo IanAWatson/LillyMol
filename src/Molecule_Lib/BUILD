@@ -674,6 +674,17 @@ cc_test(
 )
 
 cc_test(
+    name = "atom_typing_test",
+    timeout = "short",
+    srcs = ["atom_typing_test.cc"],
+    deps = [
+        ":iwmolecule",
+        ":moleculeio",
+        "@googletest//:gtest_main",
+    ],
+)
+
+cc_test(
     name = "cahn_ingold_prelog_test",
     timeout = "short",
     srcs = [

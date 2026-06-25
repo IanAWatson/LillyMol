@@ -175,9 +175,10 @@ necessary.
 A 'wild and crazy' molecule generator. Randomly permuts smiles strings as text, and then attempts
 molecular interpretation on the results. Mostly of theoretical interest.
 
-## speadplot.jl
-Generate plots showing the distances encountere during any of the gfp_spread* variants. Generate 
-fingerprints, run gfp_spread*, post-process with nplotnn -S <fname> and send <fname> to spreadplot.
+## spreadplot.jl
+Generate plots showing the distances encountered during any of the `gfp_spread*` variants. Generate
+fingerprints, run `gfp_spread*`, post-process with `nplotnn -S <fname>`, and send `<fname>` to
+[spreadplot.jl](/docs/GFP/spreadplot.md).
 
 ## svmfp_summarise_results
 Given multiple outputs from iwstats, summarise and aggregate those results.

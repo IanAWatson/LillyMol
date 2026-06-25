@@ -128,8 +128,8 @@ sel,distance
 ...
 ```
 which can be imported into your favourite plotting package. The contrib
-directory contains [spreadplot](/contrib/bin/spreadplot.jl) which is already
-set up to generate plots using this file.
+directory contains [spreadplot.jl](/docs/GFP/spreadplot.md), which is set up to
+generate and interpret diversity plots from this file.
 
 ## First Item
 By default, spread will choose the first item in the file to select first. The

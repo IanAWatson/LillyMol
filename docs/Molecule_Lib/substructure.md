@@ -506,6 +506,36 @@ Note that the required heteroatom count was achieved with two Nitrogen
 atoms and one Oxygen. Note too that there is no constraint on aromaticity,
 specify that as a separate atomic property when needed.
 
+The ring heteroatom count can be quite problematic in the case of
+fused rings. For example when looking for molecules containing large
+carbocyclic rings, it would seem reasonable to look for `[/IWrh0r>7]`
+but that fails for a molecule like 
+![CHEMBL3304657](Images/large_carbocycle.png)
+which reports a match to that query. The problem is that the attributes
+'/IWrh0' and 'r>7' are evaluated independently. The atoms in the
+six membered ring match '/IWrh0' since that ring is a carbocycle.
+Some of those atoms also match 'r>7' since they are **also** in the
+large ring - which is not a carbocycle. At first this was very
+surprising, but in retrospect it is "correct".
+
+There are some solutions. `[IWrh0r>7R1]` restricts the matches
+to atoms that are in just one ring, and for this case that was a
+good solution. The query file
+```
+query {
+  ring_specifier {
+    base {
+      heteroatom_count: 0
+    }
+    min_ring_size: 8
+  }
+}
+```
+Even then, beware of SSSR problems in complex fused systems.
+
+The '/IWrh' directive is very useful in the simple cases, most cases,
+but can be complex when fused rings are involved.
+
 ### /IWorganic /IWnonorganic
 LillyMol has the concept of an 'organic' element. By default these are C, N, O, F, S, P,
 Cl, Br and I only. Therefore `[/IWorganic]` will match any of those elements,

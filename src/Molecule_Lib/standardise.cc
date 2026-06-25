@@ -5865,6 +5865,9 @@ Chemical_Standardisation::_do_isoxazole(
     atom_number_t carbon = kInvalidAtomNumber;
     atom_number_t exocyclic = kInvalidAtomNumber;
     for (const Bond* b : m[a]) {
+      if (b->nrings() == 0) {
+        continue;
+      }
       const atom_number_t o = b->other(a);
       if (z[o] == 8 || z[o] == 16) {
         oxygen = o;

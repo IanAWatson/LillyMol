@@ -1937,7 +1937,7 @@ if ($seek_to > 0 || $stop_at > 0)
     $seek_stop = " -i seek=${seek_to}";
   }
   if ($stop_at > 0) {
-    $seek_to .= " -i stop=${stop_at}";
+    $seek_stop .= " -i stop=${stop_at}";
   }
 }
 else
@@ -3500,7 +3500,7 @@ if ($formula)
   }
   elsif ($work_as_tdt_filter)
   {
-    $formula_first = "${formula_cmd} -f -";
+    $formula_first = "${formula_cmd} ${seek_stop} ${input_qualifiers} -f -";
   }
   else
   {

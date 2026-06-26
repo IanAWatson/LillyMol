@@ -15,6 +15,10 @@ namespace lillymol {
 // therefore not safe to call concurrently.
 IWString SmartsForAtomSubset(Molecule& m, uint32_t atom_type,
                              const int* include_atom);
+// The smarts generated will start with `start_atom` as the first atom
+// in the smarts.
+IWString SmartsForAtomSubset(Molecule& m, atom_number_t start_atom, uint32_t atom_type,
+                             const int* include_atom);
 
 }  // namespace lillymol
 

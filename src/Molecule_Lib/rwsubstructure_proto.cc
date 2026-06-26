@@ -2959,8 +2959,7 @@ Substructure_Query::WriteProto(IWString_and_File_Descriptor& output) const
 }
 
 int
-Substructure_Ring_Base::ConstructFromProto(const SubstructureSearch::SubstructureRingBase& proto)
-{
+Substructure_Ring_Base::ConstructFromProto(const SubstructureSearch::SubstructureRingBase& proto) {
   if (proto.has_match_as_match()) {
     _match_as_match_or_rejection = ! proto.match_as_match();
   }
@@ -2992,6 +2991,10 @@ Substructure_Ring_Base::ConstructFromProto(const SubstructureSearch::Substructur
 
   if (proto.has_ring_extends_to_carbonyl()) {
     _ring_extends_to_carbonyl = proto.ring_extends_to_carbonyl();
+  }
+
+  if (proto.has_environment_sets_global_id()) {
+    _environment_sets_global_id = proto.environment_sets_global_id();
   }
 
   if (!GETVALUES(proto, hits_needed, 0, no_limit))

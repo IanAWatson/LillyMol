@@ -13,15 +13,9 @@
 #include "Molecule_Lib/aromatic.h"
 #include "Molecule_Lib/molecule.h"
 #include "Molecule_Lib/path.h"
-#include "Molecule_Lib/planarity.h"
-#include "Molecule_Lib/rotbond_common.h"
 #include "Molecule_Lib/standardise.h"
-#include "Molecule_Lib/target.h"
 
-#include "Molecule_Tools/alogp.h"
 #include "Molecule_Tools/molecule_filter_lib.h"
-#include "Molecule_Tools/nvrtspsa.h"
-#include "Molecule_Tools/xlogp.h"
 
 #ifdef BUILD_BAZEL
 #include "Molecule_Tools/molecule_filter.pb.h"
@@ -50,6 +44,7 @@ computationally efficient way possible.
  -c             remove chirality
  -l             reduce to largest fragment
  -B <fname>     write rejected molecules to <fname>
+ -u             with utilities, write smiles id overall_utility instead of descriptor table
  -v             verbose output
   )";
 // clang-format on
@@ -70,9 +65,7 @@ class Options {
 
     int _remove_chirality = 0;
 
-    alogp::ALogP _alogp;
-
-    xlogp::XLogPCalc _xlogp;
+    int _write_smiles_with_utility = 0;
 
     Chemical_Standardisation _chemical_standardisation;
 
@@ -81,7 +74,7 @@ class Options {
 
     molecule_filter_data::Requirements _requirements;
 
-    quick_rotbond::QuickRotatableBonds _rotbond;
+    molecule_filter_lib::MoleculeFilter _filter;
 
     IWString_and_File_Descriptor _reject_stream;
 
@@ -130,11 +123,14 @@ class Options {
     off_t _stop_at;
 
   // Private functions
-    int Process(Molecule& m);
     int Process(Molecule& m, int matoms, int nrings);
     int MaybeWriteToRejectStream(const const_IWSubstring& line);
+    int WriteUtilityValues(Molecule& m, int matoms, int nrings,
+                           const const_IWSubstring& smiles,
+                           const const_IWSubstring& id,
+                           IWString_and_File_Descriptor& output);
 
-    bool OkPlanarity(const Molecule& m);
+    void NoteRejection(molecule_filter_lib::RejectionReason rejection_reason);
 
   public:
     Options();
@@ -146,11 +142,17 @@ class Options {
       return _verbose;
     }
 
-    // After each molecule is read, but before any processing
-    // is attempted, do any preprocessing transformations.
-    int Preprocess(Molecule& m);
-
     int Process(const const_IWSubstring& buffer, IWString_and_File_Descriptor& output);
+
+    int has_utilities() const {
+      return _filter.has_utilities();
+    }
+
+    int write_smiles_with_utility() const {
+      return _write_smiles_with_utility;
+    }
+
+    int WriteUtilityHeader(IWString_and_File_Descriptor& output) const;
 
     // If we are seeking and stopping.
     // If _seek_to is set, seek to that offset in `input`.
@@ -166,14 +168,8 @@ Options::Options() {
   _verbose = 0;
   _reduce_to_largest_fragment = 0;
   _remove_chirality = 0;
+  _write_smiles_with_utility = 0;
   _molecules_read = 0;
-  _rotbond.set_calculation_type(quick_rotbond::QuickRotatableBonds::RotBond::kExpensive);
-  nvrtspsa::set_display_psa_unclassified_atom_mesages(0);
-  _xlogp.SetIssueUnclassifiedAtomMessages(false);
-
-  _alogp.set_use_alcohol_for_acid(1);
-  _alogp.set_use_alcohol_for_acid(1);
-  _alogp.set_apply_zwitterion_correction(1);
 
   _seek_to = 0;
   _stop_at = 0;
@@ -201,6 +197,13 @@ Options::Initialise(Command_Line& cl) {
     _remove_chirality = 1;
     if (_verbose) {
       cerr << "Will remove all chirality\n";
+    }
+  }
+
+  if (cl.option_present('u')) {
+    _write_smiles_with_utility = 1;
+    if (_verbose) {
+      cerr << "Will write smiles plus overall utility in utility mode\n";
     }
   }
 
@@ -237,6 +240,11 @@ Options::Initialise(Command_Line& cl) {
     cerr << "Options::Initialise:max distance specified, but largest fragment not selected (-l)\n";
     cerr << "Automatically enabling largest fragment selection\n";
     _reduce_to_largest_fragment = 1;
+  }
+
+  if (! _filter.Build(_requirements)) {
+    cerr << "Options::Initialise:cannot initialise MoleculeFilter\n";
+    return 0;
   }
 
   if (cl.option_present('B')) {
@@ -409,29 +417,18 @@ Options::Report(std::ostream& output) const {
 }
 
 int
-CountHeteroatoms(const Molecule& m) {
-  int rc = 0;
-  m.each_atom_lambda([&rc](const Atom& a) {
-    if (a.atomic_number() != 6) {
-      ++rc;
-    }
-  });
-
-  return rc;
-}
-
-int
-AromaticRingCount(Molecule& m) {
-  m.compute_aromaticity_if_needed();
-
-  int rc = 0;
-  for (const Ring* r : m.sssr_rings()) {
-    if (r->is_aromatic()) {
-      ++rc;
-    }
+Options::WriteUtilityHeader(IWString_and_File_Descriptor& output) const {
+  if (! _filter.has_utilities() || _write_smiles_with_utility) {
+    return 1;
   }
 
-  return rc;
+  output << "Name";
+  for (int i = 0; i < _filter.number_utilities(); ++i) {
+    output << ' ' << _filter.utility(i).name();
+  }
+  output << " overall_utility\n";
+
+  return 1;
 }
 
 // Return true if we examine multiple fragments, which
@@ -555,11 +552,19 @@ Options::Process(const const_IWSubstring& line,
   if (Process(m, matoms, nrings)) {
     ++_molecules_passed;
 
-    // If the structure was altered, write the smiles, otherwise the original line
-    if (smiles_changed) {
-      output << m.smiles() << ' ' << m.name() << '\n';
+    if (_filter.has_utilities()) {
+      const const_IWSubstring output_smiles = smiles_changed ? const_IWSubstring(m.smiles()) : smiles;
+      if (! WriteUtilityValues(m, matoms, nrings, output_smiles, id, output)) {
+        MaybeWriteToRejectStream(line);
+        return 0;
+      }
     } else {
-      output << line << '\n';
+      // If the structure was altered, write the smiles, otherwise the original line
+      if (smiles_changed) {
+        output << m.smiles() << ' ' << id << '\n';
+      } else {
+        output << line << '\n';
+      }
     }
 
     output.write_if_buffer_holds_more_than(4092);
@@ -570,6 +575,33 @@ Options::Process(const const_IWSubstring& line,
   MaybeWriteToRejectStream(line);
 
   return 0;
+}
+
+int
+Options::WriteUtilityValues(Molecule& m, const int matoms, const int nrings,
+                            const const_IWSubstring& smiles,
+                            const const_IWSubstring& id,
+                            IWString_and_File_Descriptor& output) {
+  std::vector<double> utility_values;
+  double overall_utility;
+  if (! _filter.EvaluateUtilities(m, matoms, nrings, utility_values, overall_utility)) {
+    cerr << "Options::WriteUtilityValues:cannot evaluate utility values for '" <<
+            id << "'\n";
+    return 0;
+  }
+
+  if (_write_smiles_with_utility) {
+    output << smiles << ' ' << id << ' ' << overall_utility << '\n';
+    return 1;
+  }
+
+  output << id;
+  for (double value : utility_values) {
+    output << ' ' << value;
+  }
+  output << ' ' << overall_utility << '\n';
+
+  return 1;
 }
 
 int
@@ -585,272 +617,137 @@ Options::MaybeWriteToRejectStream(const const_IWSubstring& line) {
   return 1;
 }
 
-bool
-Options::OkPlanarity(const Molecule& m) {
-  iwplanarity::PlanarityResult result = iwplanarity::Planarity(m);
-  if (result.status == iwplanarity::PlanarityStatus::kPlanar) {
-    if (_requirements.planar()) {
-      return true;
-    } else {
-      ++_no_match_planarity;
-      return false;
-    }
-  }
+void
+Options::NoteRejection(molecule_filter_lib::RejectionReason rejection_reason) {
+  using molecule_filter_lib::RejectionReason;
 
-  if (result.status == iwplanarity::PlanarityStatus::kNonPlanar) {
-    if (_requirements.planar()) {
-      return false;
+  switch (rejection_reason) {
+    case RejectionReason::kPass:
+      return;
+    case RejectionReason::kZeroAtoms:
+      return;
+    case RejectionReason::kTooFewAtoms:
+      ++_too_few_atoms;
+      return;
+    case RejectionReason::kTooManyAtoms:
+      ++_too_many_atoms;
+      return;
+    case RejectionReason::kTooFewRings:
+      ++_too_few_rings;
+      return;
+    case RejectionReason::kTooManyRings:
+      ++_too_many_rings;
+      return;
+    case RejectionReason::kTooFewHeteroatoms:
+      ++_too_few_heteroatoms;
+      return;
+    case RejectionReason::kMinHeteroatomFraction:
+      ++_min_heteroatom_fraction;
+      return;
+    case RejectionReason::kMaxHeteroatomFraction:
+      ++_max_heteroatom_fraction;
+      return;
+    case RejectionReason::kNonOrganic:
+      ++_non_organic;
+      return;
+    case RejectionReason::kIsotope:
+      ++_isotope;
+      return;
+    case RejectionReason::kTooManyChiral:
+      ++_too_many_chiral;
+      return;
+    case RejectionReason::kTooFewAromaticRings:
+      ++_too_few_aromatic_rings;
+      return;
+    case RejectionReason::kTooManyAromaticRings:
+      ++_too_many_aromatic_rings;
+      return;
+    case RejectionReason::kTooFewAliphaticRings:
+      ++_too_few_aliphatic_rings;
+      return;
+    case RejectionReason::kTooManyAliphaticRings:
+      ++_too_many_aliphatic_rings;
+      return;
+    case RejectionReason::kTooFewHba:
+      ++_too_few_hba;
+      return;
+    case RejectionReason::kTooManyHba:
+      ++_too_many_hba;
+      return;
+    case RejectionReason::kTooFewHbd:
+      ++_too_few_hbd;
+      return;
+    case RejectionReason::kTooManyHbd:
+      ++_too_many_hbd;
+      return;
+    case RejectionReason::kTooFewSp3Carbon:
+      ++_too_few_csp3;
+      return;
+    case RejectionReason::kTooManyHalogen:
+      ++_too_many_halogens;
+      return;
+    case RejectionReason::kRingTooLarge:
+      ++_ring_too_large;
+      return;
+    case RejectionReason::kTooFewRotatableBonds:
+      ++_too_few_rotbond;
+      return;
+    case RejectionReason::kTooManyRotatableBonds:
+      ++_too_many_rotbond;
+      return;
+    case RejectionReason::kAromaticDensityTooHigh:
+      ++_aromdens_too_high;
+      return;
+    case RejectionReason::kTooLong:
+      ++_too_long;
+      return;
+    case RejectionReason::kLowTpsa:
+      ++_low_tpsa;
+      return;
+    case RejectionReason::kHighTpsa:
+      ++_high_tpsa;
+      return;
+    case RejectionReason::kRingSystemTooLarge:
+      ++_ring_system_too_large;
+      return;
+    case RejectionReason::kTooManyAromaticRingsInSystem:
+      ++_too_many_aromatic_rings_in_system;
+      return;
+    case RejectionReason::kLowAlogp:
+      ++_low_alogp;
+      return;
+    case RejectionReason::kHighAlogp:
+      ++_high_alogp;
+      return;
+    case RejectionReason::kLowXlogp:
+      ++_low_xlogp;
+      return;
+    case RejectionReason::kHighXlogp:
+      ++_high_xlogp;
+      return;
+    case RejectionReason::kPlanarityMismatch:
       ++_no_match_planarity;
-    } else {
-      return true;
-    }
+      return;
   }
-
-  cerr << "Options::OkPlanarity:planarity calculation failed\n";
-  return false;
 }
 
 int
 Options::Process(Molecule& m,
                  const int matoms,
                  const int nrings) {
-  // cerr << "Processing " << m.smiles() << ' ' << m.name() << ' ' << matoms << '\n';
   if (m.natoms() != matoms) {
     cerr << "Atom count mismatch " << m.natoms() << " vs " << matoms << '\n';
   }
 
-  if (_requirements.has_min_heteroatom_count() ||
-      _requirements.has_min_heteroatom_fraction() ||
-      _requirements.has_max_heteroatom_fraction()) {
-    const int hac = CountHeteroatoms(m);
-
-    if (_requirements.has_min_heteroatom_count() && hac < _requirements.min_heteroatom_count()) {
-      ++_too_few_heteroatoms;
-      return 0;
-    }
-
-    if (_requirements.has_min_heteroatom_fraction() ||
-        _requirements.has_max_heteroatom_fraction()) {
-      const float haf = iwmisc::Fraction<float>(hac, matoms);
-      if (_requirements.has_min_heteroatom_fraction() && haf < _requirements.min_heteroatom_fraction()) {
-        ++_min_heteroatom_fraction;
-        return 0;
-      }
-      if (_requirements.has_max_heteroatom_fraction() && haf > _requirements.max_heteroatom_fraction()) {
-        ++_max_heteroatom_fraction;
-        return 0;
-      }
-    }
+  molecule_filter_lib::RejectionReason rejection_reason;
+  if (_filter.Ok(m, matoms, nrings, rejection_reason)) {
+    return 1;
   }
 
-  if (_requirements.has_exclude_non_organic() && ! m.organic_only()) {
-    ++_non_organic;
-    return 0;
-  }
-
-  if (_requirements.has_exclude_isotopes() && m.number_isotopic_atoms() > 0) {
-    ++_isotope;
-    return 0;
-  }
-
-  if (_requirements.has_max_chiral() &&
-      m.chiral_centres() > _requirements.max_chiral()) {
-    ++_too_many_chiral;
-    return 0;
-  }
-
-  int arc = 0;
-  int need_to_compute_aromatic_rings = 0;
-  if (_requirements.has_min_aromatic_ring_count() ||
-      _requirements.has_max_aromatic_ring_count() ||
-      _requirements.has_max_aromatic_rings_in_system()) {
-    need_to_compute_aromatic_rings = 1;
-  }
-
-  if (need_to_compute_aromatic_rings) {
-    // Check nrings first. If not enough rings if all were aromatic...
-    if (_requirements.has_min_aromatic_ring_count() && nrings < _requirements.min_aromatic_ring_count()) {
-      ++_too_few_aromatic_rings;
-      return 0;
-    }
-
-    arc = AromaticRingCount(m);
-    if (_requirements.has_min_aromatic_ring_count() && arc < _requirements.min_aromatic_ring_count()) {
-      ++_too_few_aromatic_rings;
-      return 0;
-    }
-    if (_requirements.has_max_aromatic_ring_count() && arc > _requirements.max_aromatic_ring_count()) {
-      ++_too_many_aromatic_rings;
-      return 0;
-    }
-  }
-
-  if (_requirements.has_min_aliphatic_ring_count() ||
-      _requirements.has_max_aliphatic_ring_count()) {
-    if (_requirements.has_min_aliphatic_ring_count() && nrings < _requirements.min_aliphatic_ring_count()) {
-      ++_too_few_aliphatic_rings;
-      return 0;
-    }
-    const int alring = nrings - AromaticRingCount(m);
-    if (_requirements.has_min_aliphatic_ring_count() && alring < _requirements.min_aliphatic_ring_count()) {
-      ++_too_few_aliphatic_rings;
-      return 0;
-    }
-    if (_requirements.has_max_aliphatic_ring_count() && alring > _requirements.max_aliphatic_ring_count()) {
-      ++_too_many_aliphatic_rings;
-      return 0;
-    }
-  }
-
-  if (_requirements.has_min_hba() || _requirements.has_max_hba() ||
-      _requirements.has_min_hbd() || _requirements.has_max_hbd()) {
-    int hba, hbd;
-    molecule_filter_lib::RuleOfFive(m, hba, hbd);
-    if (_requirements.has_min_hba() && hba < _requirements.min_hba()) {
-      ++_too_few_hba;
-      return 0;
-    }
-    if (_requirements.has_max_hba() && hba > _requirements.max_hba()) {
-      ++_too_many_hba;
-      return 0;
-    }
-    if (_requirements.has_min_hbd() && hbd < _requirements.min_hbd()) {
-      ++_too_few_hbd;
-      return 0;
-    }
-    if (_requirements.has_max_hbd() && hbd > _requirements.max_hbd()) {
-      ++_too_many_hbd;
-      return 0;
-    }
-  }
-
-  if (_requirements.has_min_sp3_carbon()) {
-    const int csp3 = molecule_filter_lib::Sp3Carbon(m);
-    if (csp3 < _requirements.min_sp3_carbon()) {
-      ++_too_few_csp3;
-      return 0;
-    }
-  }
-
-  if (_requirements.has_max_halogen_count()) {
-    const int h = molecule_filter_lib::HalogenCount(m);
-    if (h > _requirements.max_halogen_count()) {
-      ++_too_many_halogens;
-      return 0;
-    }
-  }
-
-  if (_requirements.has_largest_ring_size()) {
-    int rsze = m.ringi(nrings - 1)->number_elements();
-    if (rsze > _requirements.largest_ring_size()) {
-      ++_ring_too_large;
-      return 0;
-    }
-  }
-
-  if (_requirements.has_min_rotatable_bonds() || _requirements.has_max_rotatable_bonds()) {
-    int rotb = _rotbond.Process(m);
-    if (_requirements.has_min_rotatable_bonds() && rotb < _requirements.min_rotatable_bonds()) {
-      ++_too_few_rotbond;
-      return 0;
-    }
-    if (_requirements.has_max_rotatable_bonds() && rotb > _requirements.max_rotatable_bonds()) {
-      ++_too_many_rotbond;
-      return 0;
-    }
-  }
-
-  if (_requirements.has_planar()) {
-    if (!OkPlanarity(m)) {
-      return 0;
-    }
-  }
-
-  if (_requirements.has_max_aromatic_density()) {
-    const float aromdens = iwmisc::Fraction<float>(m.aromatic_atom_count(), matoms);
-    if (aromdens > _requirements.max_aromatic_density()) {
-      ++_aromdens_too_high;
-      return 0;
-    }
-  }
-
-  if (_requirements.has_max_distance() && matoms > _requirements.max_distance()) {
-    const int d = m.longest_path();
-    if (d > _requirements.max_distance()) {
-      ++_too_long;
-      return 0;
-    }
-  }
-
-  if (_requirements.has_min_tpsa() || _requirements.has_max_tpsa()) {
-    float tpsa = novartis_polar_surface_area(m);
-    if (_requirements.has_min_tpsa() && tpsa < _requirements.min_tpsa()) {
-      ++_low_tpsa;
-      return 0;
-    }
-    if (_requirements.has_max_tpsa() && tpsa > _requirements.max_tpsa()) {
-      ++_high_tpsa;
-      return 0;
-    }
-  }
-
-  // A temporary array that some external functions might need.
-  std::unique_ptr<int[]> tmp;
-
-  if (_requirements.has_max_ring_system_size() ||
-      _requirements.has_max_aromatic_rings_in_system()) {
-    if (nrings < _requirements.max_ring_system_size() &&
-        nrings < _requirements.max_aromatic_rings_in_system()) {
-      // no need to compute.
-    }  else {
-      const auto [max_ring_system_size, max_aromatic_rings_in_system] = 
-          molecule_filter_lib::MaxRingSystemSize(m, tmp);
-      if (_requirements.has_max_ring_system_size() && max_ring_system_size > _requirements.max_ring_system_size()) {
-        ++_ring_system_too_large;
-        return 0;
-      }
-      if (_requirements.has_max_aromatic_rings_in_system() &&
-          max_aromatic_rings_in_system > _requirements.max_aromatic_rings_in_system()) {
-        ++_too_many_aromatic_rings_in_system;
-      }
-    }
-  }
-
-  if (_requirements.has_min_xlogp() || _requirements.has_max_alogp()) {
-    std::optional<double> x = _alogp.LogP(m);
-    if (! x) {
-    } else if (_requirements.has_min_alogp() && *x < _requirements.min_alogp()) {
-      ++_low_alogp;
-      return 0;
-    }
-    if (!x) {
-    } else if (_requirements.has_max_alogp() && *x > _requirements.max_alogp()) {
-      ++_high_alogp;
-      return 0;
-    }
-  }
-
-  if (_requirements.has_min_xlogp() || _requirements.has_max_xlogp()) {
-    if (! tmp) {
-      tmp.reset(new int[matoms]);
-    }
-    std::fill_n(tmp.get(), matoms, 0);
-    std::optional<double> x = _xlogp.LogP(m, tmp.get());
-    if (! x) {
-    } else if (_requirements.has_min_xlogp() && *x < _requirements.min_xlogp()) {
-      ++_low_xlogp;
-      return 0;
-    }
-    if (!x) {
-    } else if (_requirements.has_max_xlogp() && *x > _requirements.max_xlogp()) {
-      ++_high_xlogp;
-      return 0;
-    }
-  }
-
-
-  return 1;
+  NoteRejection(rejection_reason);
+  return 0;
 }
+
 
 int
 Options::SeekIfNeeded(iwstring_data_source& input) const {
@@ -921,7 +818,7 @@ MoleculeFilter(Options& options,
 
 int
 MoleculeFilter(int argc, char** argv) {
-  Command_Line cl(argc, argv, "vE:A:lcg:F:B:i:");
+  Command_Line cl(argc, argv, "vE:A:lcg:F:B:i:u");
 
   if (cl.unrecognised_options_encountered()) {
     cerr << "Unrecognised options encountered\n";
@@ -951,6 +848,10 @@ MoleculeFilter(int argc, char** argv) {
   }
 
   IWString_and_File_Descriptor output(1);
+
+  if (options.has_utilities() && ! options.write_smiles_with_utility()) {
+    options.WriteUtilityHeader(output);
+  }
 
   for (const char * fname : cl) {
     if (! MoleculeFilter(options, fname, output)) {

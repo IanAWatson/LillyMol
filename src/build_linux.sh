@@ -126,7 +126,7 @@ if [[ ${must_build} == 1 ]] ; then
   (cd edge-addition-planarity-suite && ./configure --prefix=${REPO_HOME}/third_party)
   (cd edge-addition-planarity-suite && make -j ${THREADS} install)
   # Copy shared libraries to our lib folder so python bindings work.
-  (cp --preserve=links lib/libplanarity*.${suffix} ${lib}) || echo "Did not copy Planarity shared libraries"
+  (cp lib/libplanarity*.${suffix} ${lib}) || echo "Did not copy Planarity shared libraries"
 fi
 
 #if [[ ! -d 'dragonbox' ]] ; then
@@ -165,7 +165,7 @@ if [[ -v BUILD_BDB ]] ; then
         echo ""
         echo "Ignore error messages from BerkeleyDB install, it is for components we do not use"
         # Copy shared libraries to our lib folder so python bindings work.
-        (cp --preserve=links BDB/lib/lib*.${suffix} ${lib}) || echo "Did not copy BerkeleyDB shared libraries"
+        (cp BDB/lib/lib*.${suffix} ${lib}) || echo "Did not copy BerkeleyDB shared libraries"
     fi
 fi
 
@@ -197,7 +197,7 @@ if [[ -v BUILD_INCHI ]] ; then
     (cd InChI && mkdir build)
     (cd InChI/build && cmake -DCMAKE_INSTALL_PREFIX=${third_party} -DCMAKE_BUILD_TYPE=Release ../INCHI-1-SRC/INCHI_API/libinchi/src)
     (cd InChI/build && cmake --build .)
-    cp --preserve=link InChI/build/lib/libinchi*${suffix} ${REPO_HOME}/lib
+    cp InChI/build/lib/libinchi*${suffix} ${REPO_HOME}/lib
     # The repo does not have an install target. third_party/BUILD.bazel links directly to the files.
     # Ensure canonical form for shell variable.
     BUILD_INCHI=1

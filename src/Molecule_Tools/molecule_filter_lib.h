@@ -1,6 +1,13 @@
 #ifndef MOLECULE_TOOLS_MOLECULE_FILTER_LIB_H_
 #define MOLECULE_TOOLS_MOLECULE_FILTER_LIB_H_
 
+#include <memory>
+#include <optional>
+#include <tuple>
+#include <string>
+#include <string_view>
+#include <vector>
+
 #include "Molecule_Lib/molecule.h"
 #include "Molecule_Lib/rotbond_common.h"
 #include "Molecule_Lib/planarity.h"
@@ -17,6 +24,154 @@
 
 namespace molecule_filter_lib {
 
+enum class RejectionReason : int {
+  kPass = 0,
+  kZeroAtoms,
+  kTooFewAtoms,
+  kTooManyAtoms,
+  kTooFewRings,
+  kTooManyRings,
+  kTooFewHeteroatoms,
+  kMinHeteroatomFraction,
+  kMaxHeteroatomFraction,
+  kNonOrganic,
+  kIsotope,
+  kTooManyChiral,
+  kTooFewAromaticRings,
+  kTooManyAromaticRings,
+  kTooFewAliphaticRings,
+  kTooManyAliphaticRings,
+  kTooFewHba,
+  kTooManyHba,
+  kTooFewHbd,
+  kTooManyHbd,
+  kTooFewSp3Carbon,
+  kTooManyHalogen,
+  kRingTooLarge,
+  kTooFewRotatableBonds,
+  kTooManyRotatableBonds,
+  kAromaticDensityTooHigh,
+  kTooLong,
+  kLowTpsa,
+  kHighTpsa,
+  kRingSystemTooLarge,
+  kTooManyAromaticRingsInSystem,
+  kLowAlogp,
+  kHighAlogp,
+  kLowXlogp,
+  kHighXlogp,
+  kPlanarityMismatch,
+};
+
+enum class Feature : int {
+  kNatoms,
+  kNrings,
+  kHeteroatomCount,
+  kHeteroatomFraction,
+  kAromaticRingCount,
+  kAliphaticRingCount,
+  kRotatableBonds,
+  kMaxRingSystemSize,
+  kAromaticRingsInSystem,
+  kTpsa,
+  kAlogp,
+  kXlogp,
+  kHba,
+  kHbd,
+  kLargestRingSize,
+  kHalogenCount,
+  kMaxDistance,
+  kSp3Carbon,
+  kAromaticDensity,
+  kChiral,
+  kNumberFragments,
+};
+
+std::optional<Feature> FeatureFromName(std::string_view name);
+std::string_view FeatureName(Feature feature);
+
+class Utility {
+  private:
+    std::string _name;
+    Feature _feature = Feature::kNatoms;
+    float _weight = 1.0f;
+    std::vector<double> _x;
+    std::vector<double> _y;
+
+  public:
+    Utility() = default;
+
+    int BuildFromProto(const molecule_filter_data::Utility& proto);
+
+    const std::string& name() const {
+      return _name;
+    }
+
+    Feature feature() const {
+      return _feature;
+    }
+
+    float weight() const {
+      return _weight;
+    }
+
+    int npoints() const {
+      return _x.size();
+    }
+
+    // Return the utility value associated with `value`. Values outside the
+    // specified range are clamped to the nearest endpoint utility.
+    double Value(double value) const;
+};
+
+class FeatureValues {
+  private:
+    Molecule& _m;
+    int _matoms;
+    int _nrings;
+
+    quick_rotbond::QuickRotatableBonds& _rotbond;
+    alogp::ALogP& _alogp;
+    xlogp::XLogPCalc& _xlogp;
+
+    std::unique_ptr<int[]> _tmp;
+
+    std::optional<int> _heteroatom_count;
+    std::optional<int> _aromatic_ring_count;
+    std::optional<int> _rotatable_bonds;
+    std::optional<int> _max_ring_system_size;
+    std::optional<int> _aromatic_rings_in_system;
+    std::optional<double> _tpsa;
+    std::optional<double> _alogp_value;
+    std::optional<double> _xlogp_value;
+    std::optional<int> _hba;
+    std::optional<int> _hbd;
+    std::optional<int> _halogen_count;
+    std::optional<int> _max_distance;
+    std::optional<int> _sp3_carbon;
+    std::optional<int> _number_fragments;
+
+    int HeteroatomCount();
+    int AromaticRingCount();
+    int RotatableBonds();
+    void ComputeRingSystem();
+    std::optional<double> ALogP();
+    std::optional<double> XLogP();
+    void ComputeHbaHbd();
+    int HalogenCount();
+    int MaxDistance();
+    int Sp3Carbon();
+    int NumberFragments();
+
+  public:
+    FeatureValues(Molecule& m, int matoms, int nrings,
+                  quick_rotbond::QuickRotatableBonds& rotbond,
+                  alogp::ALogP& alogp,
+                  xlogp::XLogPCalc& xlogp);
+
+    std::optional<double> Value(Feature feature);
+};
+
 class MoleculeFilter {
   private:
     quick_rotbond::QuickRotatableBonds _rotbond;
@@ -27,10 +182,13 @@ class MoleculeFilter {
 
     molecule_filter_data::Requirements _requirements;
 
+    std::vector<Utility> _utilities;
+
     bool _active;
 
   // private functions
     void InitialiseOptionalFeatures();
+    int BuildUtilities();
 
   public:
     MoleculeFilter();
@@ -42,11 +200,36 @@ class MoleculeFilter {
       return _active;
     }
 
+    int number_utilities() const {
+      return _utilities.size();
+    }
+
+    const Utility& utility(int i) const {
+      return _utilities[i];
+    }
+
+    int has_utilities() const {
+      return ! _utilities.empty();
+    }
+
+    // Compute per-utility values and the overall utility for `m`. Intended to
+    // be called only after the molecule has passed hard filters.
+    int EvaluateUtilities(Molecule& m, int matoms, int nrings,
+                          std::vector<double>& per_feature_utility,
+                          double& overall_utility);
+
     // Copy `proto` to _requirements and initialise.
     int Build(const molecule_filter_data::Requirements& proto);
 
-    // Return true if `m` is consistent with the constratins set in `_requirements`.
+    // Return true if `m` is consistent with the constraints set in `_requirements`.
     int Ok(Molecule& m);
+    int Ok(Molecule& m, RejectionReason& rejection_reason);
+
+    // Same as Ok(Molecule&), but uses caller-supplied atom and ring counts. This
+    // lets command-line tools preserve cheap SMILES-level screening before
+    // constructing a Molecule.
+    int Ok(Molecule& m, int matoms, int nrings);
+    int Ok(Molecule& m, int matoms, int nrings, RejectionReason& rejection_reason);
 };
 
 

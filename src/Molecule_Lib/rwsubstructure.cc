@@ -5833,9 +5833,8 @@ Single_Substructure_Query::create_from_smarts(const IWString &smarts) {
   const_IWSubstring mysmarts = smarts;  // we may want to change it
 
   if (!_parse_and_consume_optional_leading_numeric_qualifiers(mysmarts)) {
-    cerr
-        << "Single_Substructure_Query::create_from_smarts:invalid numeric specification '"
-        << smarts << "'\n";
+    cerr << "Single_Substructure_Query::create_from_smarts:invalid numeric specification '"
+         << smarts << "'\n";
     return 0;
   }
 
@@ -5849,8 +5848,7 @@ Single_Substructure_Query::create_from_smarts(const IWString &smarts) {
     return 0;
   }
 
-  if ('!' == smarts[0])  // hmmm, why not use a leading 0. Is this correct?
-  {
+  if ('!' == smarts[0]) {  // hmmm, why not use a leading 0. Is this correct?
     _rejection = 1;
     mysmarts++;
   }

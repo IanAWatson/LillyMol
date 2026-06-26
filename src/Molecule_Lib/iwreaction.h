@@ -1414,6 +1414,9 @@ class Reaction_Iterator
     int initialise (const IWReaction &);
 
     int active () const { return _active;}
+    int number_sidechains() const {
+      return _number_sidechains;
+    }
 
     void operator ++ (int);
 

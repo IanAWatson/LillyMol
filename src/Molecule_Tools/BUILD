@@ -3819,6 +3819,17 @@ cc_test(
 )
 
 cc_test(
+    name = "molecule_filter_lib_test",
+    timeout = "short",
+    srcs = ["molecule_filter_lib_test.cc"],
+    deps = [
+        ":molecule_filter_lib",
+        "@googletest//:gtest",
+        "@googletest//:gtest_main",
+    ],
+)
+
+cc_test(
     name = "mpr_test",
     srcs = [
         "mpr_test.cc",

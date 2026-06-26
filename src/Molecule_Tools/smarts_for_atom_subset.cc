@@ -20,9 +20,14 @@ class ResetBondAromaticity {
 }  // namespace
 
 IWString
-SmartsForAtomSubset(Molecule& m, uint32_t atom_type,
-                    const int* include_atom) {
+SmartsForAtomSubset(Molecule& m, atom_number_t start_atom,
+                    uint32_t atom_type, const int* include_atom) {
   if (m.empty() || include_atom == nullptr) {
+    return IWString();
+  }
+
+  // Should we issue a warning, or perhaps return a '*'?
+  if (atom_type == 0) {
     return IWString();
   }
 
@@ -50,7 +55,17 @@ SmartsForAtomSubset(Molecule& m, uint32_t atom_type,
   }
 
   ResetBondAromaticity reset_bond_aromaticity;
-  return IWString(m.smiles(smiles_information, include_atom));
+  if (start_atom == kInvalidAtomNumber) {
+    return IWString(m.smiles(smiles_information, include_atom));
+  } else {
+    return IWString(m.smiles_starting_with_atom(start_atom, smiles_information, include_atom));
+  }
+}
+
+IWString
+SmartsForAtomSubset(Molecule& m, uint32_t atom_type,
+                    const int* include_atom) {
+  return SmartsForAtomSubset(m, kInvalidAtomNumber, atom_type, include_atom);
 }
 
 }  // namespace lillymol

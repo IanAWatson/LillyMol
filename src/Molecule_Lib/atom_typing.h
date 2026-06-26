@@ -140,8 +140,8 @@ class QueryAndValue {
 
 class Atom_Typing_Specification {
  private:
-  int _type;
-  unsigned int _user_specified_type;
+  uint32_t _type;
+  uint32_t _user_specified_type;
   int _differentiate_rings;
   int _perform_shell_iteration;
 
@@ -239,15 +239,18 @@ class Atom_Typing_Specification {
 
   int active() const;
 
-  void set_atom_type(int s) {
+  void set_atom_type(uint32_t s) {
     _type = s;
   }  // should probably check validity
 
-  int atom_type() const {
+  uint32_t atom_type() const {
     return _type;
   }
 
   void set_user_specified_type(unsigned int);
+  uint32_t user_specified_type() const {
+    return _user_specified_type;
+  }
 
   int append_to_tag(IWString&) const;
   int string_representation(IWString&) const;

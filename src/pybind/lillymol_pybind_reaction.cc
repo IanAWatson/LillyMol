@@ -61,7 +61,12 @@ PYBIND11_MODULE(lillymol_reaction, rxn)
       "Move to next reagent"
     )
     .def("reagent", &Reaction_Iterator::reagent, "Get reagent for sidechain")
-
+    .def("reset", &Reaction_Iterator::reset, "Reset the iterator")
+    .def("debug_print", [](const Reaction_Iterator& rxnit) {
+      rxnit.debug_print(std::cerr);
+      },
+      "debugging info"
+    )
   ;
 
   py::class_<IWReaction, Substructure_Query>(rxn, "Reaction")
@@ -121,6 +126,23 @@ PYBIND11_MODULE(lillymol_reaction, rxn)
         return rxn.write_msi(tmp);
       }
     )
+    .def("sidechain_name",
+      [](const IWReaction& rxn, int sidechain_number, int reagent_number)->std::optional<std::string> {
+        const Sidechain_Reaction_Site * sidechain = rxn.sidechain(sidechain_number);
+        if (sidechain == nullptr) {
+          return std::nullopt;
+        }
+        const Molecule_and_Embedding* reagent = sidechain->reagent(reagent_number);
+        if (reagent == nullptr) {
+          return std::nullopt;
+        }
+        const IWString& s = reagent->name();
+
+        std::string rc(s.data(), s.length());
+        return rc;
+      },
+      "sidechain_name(sidechain_number, reagent_number)   The name of reagent `reagent_number` in sidechain `sidechain_number`"
+    )
     .def("number_sidechains", &IWReaction::number_sidechains, "Number of sidechains")
     .def("number_sidechains_with_reagents", &IWReaction::number_sidechains_with_reagents, "number_sidechains_with_reagents")
     .def("set_one_embedding_per_start_atom", &IWReaction::set_one_embedding_per_start_atom, "one embedding per start atom")
@@ -139,10 +161,53 @@ PYBIND11_MODULE(lillymol_reaction, rxn)
     .def("remove_no_delete_all_reagents", &IWReaction::remove_no_delete_all_reagents,
          "remove, without destroying, all sidechain reagents"
     )
+    .def("reagent_names",
+      [](const IWReaction& rxn, const Reaction_Iterator& iter)->std::vector<std::string> {
+        const int n = iter.number_sidechains();
+        std::vector<std::string> result(n);
+        for (int i = 0; i < n; ++i) {
+          int j = iter.reagent(i);
+          const Sidechain_Reaction_Site* r = rxn.sidechain(i);
+          const Molecule_and_Embedding* s = r->reagent(j);
+          std::string tmp(s->name().data(), s->name().length());
+          result.emplace_back(std::move(tmp));
+        }
+        return result;
+      },
+      "return the sidechains at the current position"
+    )
     .def("substructure_search",
       [](IWReaction& rxn, Molecule& m, Substructure_Results& sresults) {
         return rxn.substructure_search(m, sresults);
       }
+    )
+    .def("substructure_search_matches",
+      [](IWReaction& rxn, Molecule& m)->std::optional<std::vector<Set_of_Atoms>>{
+        Substructure_Results sresults;
+        if (! rxn.substructure_search(m, sresults)) {
+          return std::nullopt;
+        }
+
+        std::vector<Set_of_Atoms> rc;
+        rc.reserve(sresults.number_embeddings());
+
+        for (const Set_of_Atoms* s : sresults.embeddings()) {
+          rc.push_back(Set_of_Atoms(*s));
+        }
+
+        return rc;
+      },
+      "perform substructure search against scaffold queries"
+    )
+    .def("substructure_search",
+      [](IWReaction& rxn, Molecule& m, Substructure_Results& sresults)->bool {
+        if (! rxn.substructure_search(m, sresults)) {
+          return false;
+        }
+
+        return true;
+      },
+      "perform substructure_search against scaffold queries"
     )
     .def("in_place_transformations",
       [](IWReaction& rxn, Molecule& m)->bool{

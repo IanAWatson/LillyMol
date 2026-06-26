@@ -67,11 +67,11 @@ PYBIND11_MODULE(lillymol_query, q)
       "Substructure search"
     )
     .def("substructure_search_matches",
-      [](Substructure_Query& qry, Molecule& m)->std::vector<Set_of_Atoms>{
+      [](Substructure_Query& qry, Molecule& m)->std::optional<std::vector<Set_of_Atoms>>{
         std::vector<Set_of_Atoms> results;
         Substructure_Results query_results;
         if (! qry.substructure_search(&m, query_results)) {
-          return results;
+          return std::nullopt;
         }
 
         results.reserve(query_results.number_embeddings());

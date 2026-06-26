@@ -1898,7 +1898,7 @@ OPTION: while ($argptr < @ARGV)
   {
     $seek_to = $1;
   }
-  elsif ($opt =~ /^stop=(\d+)/)
+  elsif ($opt =~ /^-stop=(\d+)/)
   {
     $stop_at = $1;
   }

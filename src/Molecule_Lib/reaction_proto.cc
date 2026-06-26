@@ -1383,8 +1383,7 @@ Reaction_Site::ConstructFromProto(const P& proto, const IWString& fname)
 
 int
 Scaffold_Reaction_Site::ConstructFromProto(const ReactionProto::ScaffoldReactionSite& proto,
-                                           const IWString& fname)
-{
+                                           const IWString& fname) {
   if (proto.has_id()) {
     _unique_id = proto.id();
   } else {
@@ -1586,7 +1585,6 @@ int
 Sidechain_Reaction_Site::_add_reagent(const std::string& smiles)
 {
   const_IWSubstring mysmiles(smiles.data(), smiles.length());
-  cerr << "Addomg reagent " << mysmiles << '\n';
 
   Molecule_and_Embedding * mae = new Molecule_and_Embedding();
   if (! mae->build_from_smiles(mysmiles)) {

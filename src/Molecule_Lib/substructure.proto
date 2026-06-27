@@ -365,6 +365,15 @@ message SubstructureRingBase {
   // Optionally we can extend the ring to things like =O and =N
   optional bool ring_extends_to_carbonyl = 25;
 
+  // By default, the environment matched atoms do not set
+  // the global id. We can change that behaviour.
+  // Note that if the environment is a composite
+  //   2cF&&1cOC
+  // Then both the F and OC atoms will be included.
+  // And if it is an OR match, then only the first match
+  // will be recorded.
+  optional bool environment_sets_global_id = 36;
+
 // Not supported from proto. Seems unnecessary.
 //optional string define_heteroatoms = 24;
 //optional string heteroatoms = 25;

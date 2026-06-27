@@ -1,5 +1,6 @@
 load("@com_google_protobuf//bazel:py_proto_library.bzl", "py_proto_library")
 load("@rules_cc//cc:defs.bzl", "cc_binary", "cc_proto_library", "cc_library", "cc_test")
+load("@rules_python//python:defs.bzl", "py_library")
 load("@com_google_protobuf//bazel:cc_proto_library.bzl", "cc_proto_library")
 load("@com_google_protobuf//bazel:cc_proto_library.bzl", "cc_proto_library")
 load("@rules_proto//proto:defs.bzl", "proto_library")
@@ -118,9 +119,26 @@ cc_proto_library(
 
 py_proto_library(
     name = "nn_request_py_proto",
+    visibility = [
+        "//visibility:public",
+    ],
     deps = [
         ":nn_request_proto",
         ":nearneighbours_proto",
+    ],
+)
+
+py_library(
+    name = "gfp_http_server",
+    srcs = [
+        "gfp_http_server.py",
+    ],
+    visibility = [
+        "//visibility:public",
+    ],
+    deps = [
+        ":nn_request_py_proto",
+        "//pybind:lillymol_tools",
     ],
 )
 
@@ -449,33 +467,36 @@ cc_binary(
     ],
 )
 
-cc_binary(
-    name = "gfp_server",
+cc_library(
+    name = "gfp_server_lib",
     srcs = [
-        "gfp_server.cc",
+        "gfp_server_lib.cc",
     ],
-    tags = [
-        "gfp_server",
-        "zeromq",
+    hdrs = [
+        "gfp_server_lib.h",
+    ],
+    visibility = [
+        "//visibility:public",
     ],
     deps = [
-        "nn_request_cc_proto",
-        "//Foundational/cmdline:iwcmdline",
+        ":gfp_standard",
+        ":nearneighbours_cc_proto",
+        ":nn_request_cc_proto",
         "//Foundational/data_source:iwstring_data_source",
+        "//Foundational/iw_tdt",
+        "//Foundational/iwbits",
         "//Molecule_Lib:iwmfingerprint",
         "//Molecule_Lib:iwmolecule",
         "//Molecule_Lib:moleculeio",
         "//Molecule_Tools:maccskeys_fn5_lib",
         "//Molecule_Tools:mpr",
-        "//Utilities/GFP_Tools:gfp_standard",
-        "//Utilities/GFP_Tools:nearneighbours_cc_proto",
         "@com_google_protobuf//:protobuf",
-    ] +
-      select( {
-      "darwin": [ "@homebrew_openmp"],
-      "//conditions:default": []
-    }),
+    ],
 )
+
+# The former ZeroMQ-based gfp_server target has been removed from the build.
+# The replacement service will use the transport-neutral nn_request.proto schema
+# and expose the search engine through pybind/Python HTTP.
 
 # cc_binary(
 #   name = "gfp_server_grpc",

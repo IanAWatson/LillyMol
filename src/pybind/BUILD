@@ -184,6 +184,16 @@ cc_library(
 )
 
 pybind_extension(
+    name = "lillymol_gfp_server",
+    srcs = [
+        "lillymol_pybind_gfp_server.cc",
+    ],
+    deps = [
+        "//Utilities/GFP_Tools:gfp_server_lib",
+    ],
+)
+
+pybind_extension(
     name = "lillymol_tools",
     srcs = [
         "lillymol_pybind_tools.cc",
@@ -211,6 +221,19 @@ py_test(
     deps = [
         ":lillymol",
         ":lillymol_tools",
+    ],
+)
+
+py_test(
+    name = "gfp_http_server_test",
+    srcs = ["gfp_http_server_test.py"],
+    data = [
+        "testdata/rand10.gfp",
+    ],
+    deps = [
+        ":lillymol_gfp_server",
+        "//Utilities/GFP_Tools:gfp_http_server",
+        "//Utilities/GFP_Tools:nn_request_py_proto",
     ],
 )
 

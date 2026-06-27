@@ -18,6 +18,7 @@ declare -a libs=(
 bazel-bin/pybind/lillymol.so
 bazel-bin/pybind/lillymol_io.so
 bazel-bin/pybind/lillymol_fingerprint.so
+bazel-bin/pybind/lillymol_gfp_server.so
 bazel-bin/pybind/lillymol_query.so
 bazel-bin/pybind/lillymol_reaction.so
 bazel-bin/pybind/lillymol_standardise.so
@@ -76,5 +77,22 @@ for proto_pb2 in "${tools_pb2[@]}" ; do
   if [[ ! -s ${dest} || ${source} -nt ${dest} ]] ; then
     echo "Copying ${proto_pb2}"
     cp -f bazel-bin/Molecule_Tools/${proto_pb2} Molecule_Tools
+  fi
+done
+
+declare -a gfp_tools_pb2=(
+  nearneighbours_pb2.py
+  nn_request_pb2.py
+)
+for proto_pb2 in "${gfp_tools_pb2[@]}" ; do
+  source="bazel-bin/Utilities/GFP_Tools/${proto_pb2}"
+  dest="Utilities/GFP_Tools/${proto_pb2}"
+  if [[ ! -s ${source} ]] ; then
+    echo "${source} not found"
+    continue
+  fi
+  if [[ ! -s ${dest} || ${source} -nt ${dest} ]] ; then
+    echo "Copying ${proto_pb2}"
+    cp -f ${source} Utilities/GFP_Tools
   fi
 done

@@ -336,6 +336,7 @@ cc_binary(
         "//Molecule_Lib:iwmolecule",
         "//Molecule_Lib:moleculeio",
         "//Molecule_Tools:mformula",
+        "//Molecule_Tools:smarts_for_atom_subset",
         "@third_party//:berkeley_static",
         "@com_google_absl//absl/container:flat_hash_set",
         "@com_google_protobuf//:protobuf",

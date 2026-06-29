@@ -44,6 +44,8 @@ def usage
   $stderr << "in the directory for that executable. That file controls what gets run.\n"
 
   $stderr << " -rx <rx>                 Only run tests that match regular expression <rx>\n"
+  $stderr << " -bindir <dir>            Directory containing executables to test\n"
+  $stderr << "                          Default: ${LILLYMOL_HOME}/bin/${BUILD_DIR}\n"
   $stderr << " -copy_fail <dir>         Upon failure, copy the test outcomes to <dir> - dir must already exist\n"
 
   exit(0)
@@ -116,11 +118,17 @@ def to_single_line(lines)
 end
 
 class Options
-  attr_accessor :lillymol_home, :build_dir, :tmpdir, :ostype, :verbose, :copy_failures_dir, :only_process_r 
+  attr_accessor :lillymol_home, :build_dir, :binary_dir, :default_binary_dir, :tmpdir, :ostype, :verbose, :copy_failures_dir, :only_process_r
 
   def initialize(cl)
     @lillymol_home = ENV['LILLYMOL_HOME']
     @build_dir = ENV['BUILD_DIR']
+    @default_binary_dir = File.join(@lillymol_home, 'bin', @build_dir)
+    @binary_dir = @default_binary_dir
+
+    if cl.option_present('bindir')
+      @binary_dir = File.expand_path(cl.value('bindir'))
+    end
 
     @verbose = cl.option_present('v')
 
@@ -133,6 +141,7 @@ class Options
       @copy_failures_dir = ""
     end
     $stderr << "copy_failures_dir starts at #{@copy_failures_dir}\n" if verbose
+    $stderr << "Executables read from #{@binary_dir}\n" if verbose
 
     @tmpdir = ""
 
@@ -291,11 +300,26 @@ end
 # If `exe` is the name of a LillyMol executable, return the full path.
 # This is designed for things like same_structures, jfilecompare...
 def maybe_lillymol_executable(options, exe)
-  path = File.join(options.lillymol_home, 'bin', options.build_dir, exe)
-  return path if File.executable?(path)
+  path = find_lillymol_executable(options, exe)
+  return path if path
 
   # Not a LillyMol executable, return unchanged
   return exe
+end
+
+# If `exe` is the name of a LillyMol executable, return the full path.
+# If -bindir was specified and lookup there fails, fall back to the historical
+# ${LILLYMOL_HOME}/bin/${BUILD_DIR} location.
+def find_lillymol_executable(options, exe)
+  path = File.join(options.binary_dir, exe)
+  return path if File.executable?(path)
+
+  return nil if options.binary_dir == options.default_binary_dir
+
+  path = File.join(options.default_binary_dir, exe)
+  return path if File.executable?(path)
+
+  nil
 end
 
 # Getting output files is complicated by the fact that some tests
@@ -348,9 +372,13 @@ def run_case_proto(options, proto, test_dir, test_name, parent_tmpdir)
   args = to_single_line(proto.args)
   # $stderr << "Args are #{args}\n"
 
-  exe = File.join(options.lillymol_home, 'bin', options.build_dir, proto.executable)
-  unless File.executable?(exe)
-    $stderr << "Executable #{exe} missing\n"
+  exe = find_lillymol_executable(options, proto.executable)
+  unless exe
+    $stderr << "Executable #{File.join(options.binary_dir, proto.executable)} missing"
+    if options.binary_dir != options.default_binary_dir
+      $stderr << "; fallback #{File.join(options.default_binary_dir, proto.executable)} also missing"
+    end
+    $stderr << "\n"
     return false
   end
 
@@ -588,7 +616,7 @@ def get_sorted_subdirectories(dirname)
 end
 
 def main
-  cl = IWCmdline.new('-v-copy_fail=s-rx=s-help')
+  cl = IWCmdline.new('-v-copy_fail=s-rx=s-bindir=s-help')
 
   if cl.option_present('help')
     usage

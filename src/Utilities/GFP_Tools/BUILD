@@ -138,7 +138,20 @@ py_library(
     ],
     deps = [
         ":nn_request_py_proto",
-        "//pybind:lillymol_tools",
+        "//pybind:lillymol_gfp_server",
+    ],
+)
+
+py_library(
+    name = "gfp_http_client",
+    srcs = [
+        "gfp_client_app.py",
+    ],
+    visibility = [
+        "//visibility:public",
+    ],
+    deps = [
+        ":nn_request_py_proto",
     ],
 )
 

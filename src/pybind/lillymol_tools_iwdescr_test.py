@@ -1,5 +1,8 @@
 import os
-from absl.testing import absltest
+import sys
+import unittest
+
+sys.path.insert(0, os.path.dirname(__file__))
 
 from lillymol import *
 from lillymol_tools import *
@@ -26,7 +29,7 @@ def _make_molecule(smiles, name):
 # Existing single-molecule tests (unchanged)
 # ---------------------------------------------------------------------------
 
-class TestIWDescr(absltest.TestCase):
+class TestIWDescr(unittest.TestCase):
 
     def test_all_descriptors(self):
         try:
@@ -63,7 +66,7 @@ class TestIWDescr(absltest.TestCase):
 # process_list — NumPy array output
 # ---------------------------------------------------------------------------
 
-class TestProcessListNumpy(absltest.TestCase):
+class TestProcessListNumpy(unittest.TestCase):
 
     def setUp(self):
         _skip_guards(self)
@@ -153,7 +156,7 @@ class TestProcessListNumpy(absltest.TestCase):
 # process_list — pandas DataFrame output
 # ---------------------------------------------------------------------------
 
-class TestProcessListDataFrame(absltest.TestCase):
+class TestProcessListDataFrame(unittest.TestCase):
 
     def setUp(self):
         _skip_guards(self)
@@ -241,4 +244,4 @@ class TestProcessListDataFrame(absltest.TestCase):
 
 
 if __name__ == "__main__":
-    absltest.main()
+    unittest.main()

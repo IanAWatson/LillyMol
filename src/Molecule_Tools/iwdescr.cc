@@ -32,7 +32,6 @@
 #include "Molecule_Lib/molecule.h"
 #include "Molecule_Lib/path.h"
 #include "Molecule_Lib/path_around_ring.h"
-#include "Molecule_Lib/planarity.h"
 #include "Molecule_Lib/rotbond_common.h"
 #include "Molecule_Lib/rwsubstructure.h"
 #include "Molecule_Lib/smiles.h"
@@ -127,7 +126,6 @@ struct DescriptorsToCompute {
   int symmetry_descriptors = 1;
   int long_carbon_chains = 1;
   int saturated_chains = 1;
-  int planarity = 1;
 #ifdef MCGOWAN
   int mcgowan = 1;
 #endif
@@ -175,7 +173,6 @@ DescriptorsToCompute::SetAll(int s) {
   psa = s;
   long_carbon_chains = s;
   saturated_chains = s;
-  planarity = s;
 #ifdef MCGOWAN
   mcgowan = s;
 #endif  // MCGOWAN
@@ -204,7 +201,6 @@ If the feature name starts with '-', the feature is disabled.
  -O ncon          enable ncon and fncon descriptors
  -O pbond         enable polar bond derived descriptors
  -O psa           enable Novartis polar surface area descriptors
- -O planarity     enable convex planarity descriptor
  -O psymm         enable partial symmetry derived descriptors
  -O ramey         enable Ramey (element count) descriptors
  -O rcj           enable ring chain join descriptors
@@ -379,11 +375,6 @@ DescriptorsToCompute::Initialise(Command_Line& cl) {
       saturated_chains = s;
       if (verbose) {
         cerr << "Saturated chain descriptors computed\n";
-      }
-    } else if (o == "planarity") {
-      planarity = s;
-      if (verbose) {
-        cerr << "Will compute planarity descriptors\n";
       }
     } else if (o.starts_with("F:")) {
       o.remove_leading_chars(2);
@@ -669,7 +660,6 @@ enum IWDescr_Enum {
   // iwdescr_scra,
   // iwdescr_scrha,
   // iwdescr_scrd,
-  iwdescr_planarity,
   iwdescr_atmpiele,
   iwdescr_fratmpie,
   iwdescr_unsatura,
@@ -2122,9 +2112,6 @@ allocate_descriptors() {
     descriptor[iwdescr_nsatchain].set_name("nsatchain");
     descriptor[iwdescr_mxsatchain].set_name("mxsatchain");
     descriptor[iwdescr_fsatchain].set_name("fsatchain");
-  }
-  if (descriptors_to_compute.planarity) {
-    descriptor[iwdescr_planarity].set_name("planarity");
   }
   descriptor[iwdescr_natoms].set_best_fingerprint(1);
   descriptor[iwdescr_frafus].set_best_fingerprint(1);
@@ -5292,20 +5279,6 @@ ComputeSaturatedChain(Molecule& m, atom_number_t zatom, const int* ncon,
   return rc;
 }
 
-void
-ComputePlanarity(Molecule& m) {
-  const iwplanarity::PlanarityResult result = iwplanarity::Planarity(m);
-  if (result.status == iwplanarity::PlanarityStatus::kError) {
-    return;
-  }
-
-  if (result.status == iwplanarity::PlanarityStatus::kPlanar) {
-    descriptor[iwdescr_planarity].set(0);
-  } else {
-    descriptor[iwdescr_planarity].set(1);
-  }
-}
-
 static int
 ComputeSaturatedChains(Molecule& m, const int* ncon, const int* ring_membership,
                        int* already_done) {
@@ -8040,10 +8013,6 @@ compute_topological_descriptors(Molecule& m, const atomic_number_t* z, const int
   if (descriptors_to_compute.saturated_chains) {
     ComputeSaturatedChains(m, ncon, ring_membership, already_done);
     std::fill_n(already_done, matoms, 0);
-  }
-
-  if (descriptors_to_compute.planarity) {
-    ComputePlanarity(m);
   }
 
   if (descriptors_to_compute.specific_groups) {

@@ -297,7 +297,10 @@ MPWriteProto(const P& proto,
 
   std::string buffer;
 
-  printer.PrintToString(proto, &buffer);
+  if (!printer.PrintToString(proto, &buffer)) {
+    cerr << "PrintToString failed\n";
+    return 0;
+  }
 
   output << buffer << '\n';
 

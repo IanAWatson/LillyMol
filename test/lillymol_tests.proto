@@ -36,19 +36,27 @@ message TestCase {
   // Specific test needs difftool options.
   optional string difftool_options = 5;
 
+  // After the command is issued and before difftool is issued, arbitrary
+  // commands are executed. They know about #{indir}
+  // These commands must succeed - the test fails otherwise.
+  // This was introduced for dealing with some fingerprint related
+  // tests where the bit ordering might be problematic for a test, but
+  // the overall similarities/distances generated should be the same.
+  repeated string other_commands = 6;
+
   // Ignored by the test driver.
-  repeated string comment = 6;
+  repeated string comment = 7;
 
   // Files that might be in the out directory, but which will not
   // be compared with newly generated files. Typically that might
   // be stderr.
-  repeated string ignore_file = 7;
+  repeated string ignore_file = 8;
 
   // Some tests may be expected to exit with a nonzero return code.
-  optional bool non_zero_rc_expected = 8;
+  optional bool non_zero_rc_expected = 9;
 
   // We can sidestep temporarily broken tests.
-  optional bool broken_do_not_evaluate = 9;
+  optional bool broken_do_not_evaluate = 10;
 
   // The tool that implements the test needs a way of passing the name of
   // the executable around, and for convenience it stores it here.

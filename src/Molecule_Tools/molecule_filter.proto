@@ -72,14 +72,9 @@ message Requirements {
 
   optional int32 max_number_fragments = 36;
 
-  // True if the molecule has no convex flat representation.
-  // Captures molecules with complex fused rings, but also flat ring
-  // systems like Phenaline.
-  optional bool planar = 37;
-
   // Optional utility functions. Not used by the filtering mode.
-  repeated Utility utility = 38;
-  optional UtilityCombination utility_combination = 39;
+  repeated Utility utility = 37;
+  optional UtilityCombination utility_combination = 38;
 }
 
 message Point {

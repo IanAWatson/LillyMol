@@ -85,7 +85,10 @@ WriteProto(Substructure_Query& query, IWString_and_File_Descriptor& output) {
   SubstructureSearch::SubstructureQuery proto = query.BuildProto();
 
   std::string as_string;
-  google::protobuf::TextFormat::PrintToString(proto, &as_string);
+  if (! google::protobuf::TextFormat::PrintToString(proto, &as_string)) {
+    cerr << "PrintToString failed\n";
+    return 0;
+  }
 
   output << as_string;
 
@@ -530,7 +533,10 @@ ToGeometricConstraints(MDL_Molecule& m, const IWString& name_stem,
   }
 
   std::string as_string;
-  google::protobuf::TextFormat::PrintToString(proto, &as_string);
+  if (! google::protobuf::TextFormat::PrintToString(proto, &as_string)) {
+    cerr << "PrintToString failed\n";
+    return 0;
+  }
 
   IWString fname(name_stem);
   fname << "proto";

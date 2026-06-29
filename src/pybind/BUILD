@@ -237,6 +237,15 @@ py_test(
     ],
 )
 
+py_test(
+    name = "gfp_http_client_test",
+    srcs = ["gfp_http_client_test.py"],
+    deps = [
+        "//Utilities/GFP_Tools:gfp_http_client",
+        "//Utilities/GFP_Tools:nn_request_py_proto",
+    ],
+)
+
 # Cannot figure out how to make this work. TODO:ianwatson
 # Observe that Codex ran the test above by including
 # --strategy=TestRunner=local --test_env=LILLYMOL_HOME=/home/ian/LillyMol_IWFORK

@@ -23,7 +23,7 @@ enum class FingerprintResult {
   kFatal
 };
 
-using atype_t = unsigned int;
+using atype_t = uint32_t;
 
 class Iwecfp {
  private:
@@ -84,11 +84,19 @@ class Iwecfp {
   FingerprintResult Fingerprint(Molecule& m, const atype_t* atom_constant,
                   Sparse_Fingerprint_Creator* sfc);
 
+  // Generate a fingerprint for a strict subset of `m`. Shell centres are
+  // restricted to atoms where `include_atom[i]` is non-zero, and shell
+  // expansion never crosses to atoms where `include_atom[i]` is zero.
+  // Atomic properties are taken from `atom_constant` exactly as supplied.
+  FingerprintResult Fingerprint(Molecule& m, const atype_t* atom_constant,
+                  const int* include_atom, Sparse_Fingerprint_Creator* sfc);
+
   int Finalise();
   int Report(std::ostream& output) const;
 
   int verbose() const { return _verbose; }
   int max_radius() const { return _max_shell_radius;}
+  void set_max_radius(int s) { _max_shell_radius = s;}
   int each_shell_gets_own_fingerprint() const { return _each_shell_gets_own_fingerprint;}
 
  private:
@@ -112,12 +120,21 @@ class Iwecfp {
                      const Atom* const* atoms, const atype_t* atom_constant,
                      int* processing_status, unsigned int sum_so_far,
                      Molecule& m, Sparse_Fingerprint_Creator* sfc);
+  int GenerateShellsSubset(int matoms, int radius, int max_radius,
+                     const Atom* const* atoms, const atype_t* atom_constant,
+                     const int* include_atom, int* processing_status,
+                     unsigned int sum_so_far, Molecule& m,
+                     Sparse_Fingerprint_Creator* sfc);
 
   int AddFingerprint(const Sparse_Fingerprint_Creator& from,
                      Sparse_Fingerprint_Creator& to);
   void FormBit(Molecule& m, const atype_t* atom_constant,
                const Atom* const* atoms, atom_number_t zatom, int max_r,
                int* processing_status, Sparse_Fingerprint_Creator* sfc);
+  void FormBitSubset(Molecule& m, const atype_t* atom_constant,
+               const Atom* const* atoms, const int* include_atom,
+               atom_number_t zatom, int max_r, int* processing_status,
+               Sparse_Fingerprint_Creator* sfc);
 
   void IdentifyAtomsWithinRange(Molecule& m, Set_of_Atoms* atoms_within_range);
   int DoEqualiseAtomCoverage(Molecule& m, const Atom* const* atoms,

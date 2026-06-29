@@ -119,7 +119,6 @@ enum IWDescr_Enum {
   // iwdescr_scra,
   // iwdescr_scrha,
   // iwdescr_scrd,
-  iwdescr_planarity,
   iwdescr_atmpiele,
   iwdescr_fratmpie,
   iwdescr_unsatura,
@@ -356,7 +355,6 @@ struct DescriptorsToCompute {
   int symmetry_descriptors = 1;
   int long_carbon_chains = 1;
   int saturated_chains = 1;
-  int planarity = 1;
 
   void SetAll(int s);
   int DisplayUsage(std::ostream& output) const;

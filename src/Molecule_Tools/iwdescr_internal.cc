@@ -38,7 +38,6 @@ DescriptorsToCompute::SetAll(int s) {
   psa = s;
   long_carbon_chains = s;
   saturated_chains = s;
-  planarity = s;
   ring_fusion_descriptors = s;
   ramey_descriptors = s;
 }
@@ -64,7 +63,6 @@ If the feature name starts with '-', the feature is disabled.
  -O ncon          enable ncon and fncon descriptors
  -O pbond         enable polar bond derived descriptors
  -O psa           enable Novartis polar surface area descriptors
- -O planarity     enable convex planarity descriptor
  -O psymm         enable partial symmetry derived descriptors
  -O ramey         enable Ramey (element count) descriptors
  -O rcj           enable ring chain join descriptors
@@ -232,11 +230,6 @@ DescriptorsToCompute::Initialise(Command_Line& cl) {
       saturated_chains = s;
       if (verbose) {
         cerr << "Saturated chain descriptors computed\n";
-      }
-    } else if (o == "planarity") {
-      planarity = s;
-      if (verbose) {
-        cerr << "Will compute planarity descriptors\n";
       }
     } else if (o.starts_with("F:")) {
       o.remove_leading_chars(2);

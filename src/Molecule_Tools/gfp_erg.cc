@@ -1209,7 +1209,7 @@ create_fingerprint_and_write(const IWMFingerprint& fp, const IWString& tag,
 }
 
 static int
-write_molecular_fingerprint(Molecule& m, const int* atype, const IWString& tag,
+write_molecular_fingerprint(Molecule& m, const uint32_t* atype, const IWString& tag,
                             IWString_and_File_Descriptor& output)
 {
   IWMFingerprint fp;
@@ -1285,7 +1285,7 @@ write_ascii_form(const IWString& mname, const float* mol_vector,
 }
 
 static void
-update_molecular_fingerprint(Molecule& m, const int* atype,
+update_molecular_fingerprint(Molecule& m, const uint32_t* atype,
                              Sparse_Fingerprint_Creator& sfc)
 {
   IWMFingerprint fp;
@@ -1349,7 +1349,7 @@ write_molecular_fingerprint(Molecule& m, int nff, Sparse_Fingerprint_Creator& sf
 
 static void
 enumerate_DFS(Molecule& m, resizable_array<float>& mol_vector,
-              Sparse_Fingerprint_Creator& molecular_fingerprint, int* atype,
+              Sparse_Fingerprint_Creator& molecular_fingerprint, uint32_t* atype,
               IWString_and_File_Descriptor& output, resizable_array<int>& fF, int level)
 {
   // cerr << "DFS at level " << level << " of " << fF.size() << "
@@ -1431,7 +1431,7 @@ canonical_handling_of_too_many_flipflops(Molecule& m, Set_of_Atoms& flipFlops)
 }
 
 static void
-assign_atom_types(Molecule& m, int* atype)
+assign_atom_types(Molecule& m, uint32_t* atype)
 {
   const int matoms = m.natoms();
 
@@ -1480,10 +1480,10 @@ generate_property_vector_fF(Molecule& m, resizable_array<float>& mol_vector,
     cerr << m.name() << " has " << flipFlops.size() << " flip-flop atoms\n";
   }
 
-  int* atype = nullptr;
+  uint32_t* atype = nullptr;
 
   if (molecular_fingerprint_tag.length() > 0) {
-    atype = new int[m.natoms()];
+    atype = new uint32_t[m.natoms()];
     assign_atom_types(m, atype);
   }
 

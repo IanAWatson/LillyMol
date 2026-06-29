@@ -885,6 +885,7 @@ cc_binary(
         "fingerprint_substructure.cc",
     ],
     deps = [
+        ":iwecfp_lib",
         "//Foundational/cmdline:iwcmdline",
         "//Molecule_Lib:iwmfingerprint",
         "//Molecule_Lib:iwmolecule",
@@ -1125,7 +1126,6 @@ cc_binary(
         "//Foundational/iwmisc:sparse_fp_creator",
         "//Molecule_Lib:iwmolecule",
         "//Molecule_Lib:moleculeio",
-        "//Molecule_Lib:planarity",
         "//Molecule_Lib:substructure_cc_proto",
         "@com_google_protobuf//:protobuf",
     ],
@@ -1473,7 +1473,6 @@ cc_binary(
         "//Foundational/cmdline:iwcmdline",
         "//Molecule_Lib:iwmolecule",
         "//Molecule_Lib:moleculeio",
-        "//Molecule_Lib:planarity",
         "//Molecule_Tools:nvrtspsa",
     ],
 )
@@ -2305,7 +2304,6 @@ cc_library(
         "//Foundational/cmdline:iwcmdline",
         "//Molecule_Lib:iwmolecule",
         "//Molecule_Lib:moleculeio",
-        "//Molecule_Lib:planarity",
         "//Molecule_Tools:nvrtspsa",
     ],
 )
@@ -2407,7 +2405,6 @@ cc_binary(
         "skeleton.cc",
     ],
     deps = [
-        "//Molecule_Lib:planarity",
         "//Molecule_Lib:iwmolecule",
         "//Molecule_Lib:iwreaction",
         "//Molecule_Lib:moleculeio",
@@ -3231,7 +3228,6 @@ cc_library(
         "//Foundational/accumulator",
         "//Foundational/iwmisc:sparse_fp_creator",
         "//Molecule_Lib:iwmolecule",
-        "//Molecule_Lib:planarity",
     ],
 )
 
@@ -3255,7 +3251,6 @@ cc_library(
         "//Foundational/accumulator",
         "//Foundational/iwmisc:sparse_fp_creator",
         "//Molecule_Lib:iwmolecule",
-        "//Molecule_Lib:planarity_shared",
     ],
 )
 
@@ -3704,6 +3699,19 @@ cc_test(
     srcs = ["ec_fingerprint_test.cc"],
     deps = [
         ":ec_fingerprint_lib",
+        "//Foundational/iwmisc:sparse_fp_creator",
+        "//Molecule_Lib:iwmolecule",
+        "//Molecule_Lib:moleculeio",
+        "@googletest//:gtest_main",
+    ],
+)
+
+cc_test(
+    name = "iwecfp_lib_test",
+    timeout = "short",
+    srcs = ["iwecfp_lib_test.cc"],
+    deps = [
+        ":iwecfp_lib",
         "//Foundational/iwmisc:sparse_fp_creator",
         "//Molecule_Lib:iwmolecule",
         "//Molecule_Lib:moleculeio",

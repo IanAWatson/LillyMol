@@ -1510,14 +1510,20 @@ ExtractRings::WriteRings(IWString_and_File_Descriptor& output,
   std::string buffer;
 
   for (const RplRing::ReplacementRing* r : for_sorting) {
-    printer.PrintToString(*r, &buffer);
+    if (! printer.PrintToString(*r, &buffer)) {
+      cerr << "PrintToString failed\n";
+      return 0;
+    }
     output << buffer << '\n';
     output.write_if_buffer_holds_more_than(8192);
   }
   return 1;
 
   for (const auto& [usmi, r] : rings) {
-    printer.PrintToString(r, &buffer);
+    if (!printer.PrintToString(r, &buffer)) {
+      cerr << "PrintToString failed\n";
+      return 0;
+    }
     output << buffer << '\n';
     output.write_if_buffer_holds_more_than(8192);
   }

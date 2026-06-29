@@ -1987,6 +1987,8 @@ class Substructure_Ring_Base
 
     // May 2022. Extend atoms covered by a global id to attached carbonyl and similar.
     bool _ring_extends_to_carbonyl;
+    // May 2026. Environment matches can also set the global id.
+    bool _environment_sets_global_id;
 
     // June 2022. Implement substituent idea.
     resizable_array_p<Substituent> _substituent;
@@ -1996,6 +1998,9 @@ class Substructure_Ring_Base
 //  private functions
 
     int _construct_environment(const const_IWSubstring &);
+    int SetEnvMatchGlobalId(Molecule_to_Match& target, 
+                        const Query_Atoms_Matched& matched_query_atoms,
+                        std::unique_ptr<int[]>& matched_by_global_specs);
 
   protected:
     int ExtendToCarbonyl(const Molecule& m, int* in_system) const;
@@ -2018,22 +2023,28 @@ class Substructure_Ring_Base
     int ConstructFromProto(const SubstructureSearch::SubstructureRingBase& proto);
     int BuildProto(SubstructureSearch::SubstructureRingBase& proto) const;
 
-    int _environment_matches(Molecule_to_Match &, int *);
-    int _environment_matches(Molecule_to_Match & target,
+//  int _environment_matchesy(Molecule_to_Match &, int *);
+    int _environment_matchesx(Molecule_to_Match & target,
+                                             int * ring,
+                                             std::unique_ptr<int[]>& matched_by_global_specs);
+    int _environment_matches2(Molecule_to_Match & target,
                              int * ring,
-                             int * already_matched);
+                             int * already_matched,
+                             std::unique_ptr<int[]>& matched_by_global_specs);
     int _environment_matches(Molecule_to_Match &, const int *, Substructure_Atom &);
     int _environment_matches(Molecule_to_Match & target,
                              const int * ring,
                              Substructure_Atom & root_atom,
                              int * already_matched);
-    int _environment_matches(Molecule_to_Match & target,
+    int _environment_matches3(Molecule_to_Match & target,
                              Substructure_Atom & root_atom,
                              const int * ring,
-                             int * already_matched);
-    int _environment_matches(Molecule_to_Match & target,
+                             int * already_matched,
+                             std::unique_ptr<int[]>& matched_by_global_specs);
+    int _environment_matches4(Molecule_to_Match & target,
                              Query_Atoms_Matched & matched_query_atoms,
-                             int * previously_matched_atoms);
+                             int * previously_matched_atoms,
+                             std::unique_ptr<int[]>& matched_by_global_specs);
 
 };
 
@@ -2065,7 +2076,8 @@ class Substructure_Ring_Specification : public Substructure_Ring_Base
 
 //  private functions
 
-    int _environment_matches(Molecule_to_Match &, const Ring &);
+    int _environment_matches(Molecule_to_Match &, const Ring &,
+                                             std::unique_ptr<int[]>& matched_by_global_specs);
 
   // private functions.
     int OkSpiroFusionCount(Molecule& m, const Ring& ring) const;

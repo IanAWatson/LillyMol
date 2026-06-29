@@ -278,7 +278,7 @@ Substructure_Environment::matches(int * previously_matched_atoms,
                                   int * anchor_atom_available)
 {
   Query_Atoms_Matched qam;
-  qam.resize(20);    // 20 seems pretty large
+  qam.reserve(20);    // 20 seems pretty large
 
   int nhits = 0;
   int np = _possible_parents.number_elements();

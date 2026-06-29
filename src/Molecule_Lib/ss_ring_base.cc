@@ -32,6 +32,8 @@ Substructure_Ring_Base::Substructure_Ring_Base()
 
   _ring_extends_to_carbonyl = false;
 
+  _environment_sets_global_id = false;
+
   return;
 }
 
@@ -43,13 +45,36 @@ Substructure_Ring_Base::~Substructure_Ring_Base()
   return;
 }
 
+int
+Substructure_Ring_Base::SetEnvMatchGlobalId(Molecule_to_Match& target, 
+                        const Query_Atoms_Matched& matched_query_atoms,
+                        std::unique_ptr<int[]>& matched_by_global_specs) {
+  if (! matched_by_global_specs) {
+    matched_by_global_specs.reset(new_int(target.natoms()));
+  }
+
+  for (const Substructure_Atom* a : matched_query_atoms) {
+    if (! a->include_in_embedding()) {
+      continue;
+    }
+    atom_number_t matched = a->atom_number_matched();
+    if (matched == kInvalidAtomNumber) [[unlikely]] {
+      continue;
+    }
+    matched_by_global_specs[matched] = _set_global_id;
+    target[matched].set_global_id(_set_global_id);
+  }
+
+  return 1;
+}
+
 //#define DEBUG_ENVIRONMENT_MATCHES
 
 int
-Substructure_Ring_Base::_environment_matches(Molecule_to_Match & target,
+Substructure_Ring_Base::_environment_matches4(Molecule_to_Match & target,
                                              Query_Atoms_Matched & matched_query_atoms,
-                                             int * previously_matched_atoms)
-{
+                                             int * previously_matched_atoms,
+                                             std::unique_ptr<int[]>& matched_by_global_specs) {
   int rc = 0;
 
   int atom_to_process = 0;
@@ -58,8 +83,7 @@ Substructure_Ring_Base::_environment_matches(Molecule_to_Match & target,
   cerr << "Processing " << matched_query_atoms.number_elements() << " environment children\n";
 #endif
 
-  while (atom_to_process >= 0)
-  {
+  while (atom_to_process >= 0) {
 #ifdef DEBUG_ENVIRONMENT_MATCHES
     cerr << "Processing child " << atom_to_process << '\n';
 #endif
@@ -92,10 +116,20 @@ Substructure_Ring_Base::_environment_matches(Molecule_to_Match & target,
 
       atom_to_process++;
 
-      if (atom_to_process >= matched_query_atoms.number_elements())      // the == condition is the only one which should ever happen
-      {
+      // the == condition is the only one which should ever happen
+      if (atom_to_process >= matched_query_atoms.number_elements()) {
+        if (_environment_sets_global_id) {
+          SetEnvMatchGlobalId(target, matched_query_atoms, matched_by_global_specs);
+        }
         rc++;
-        break;        // break from while (atom_to_process >= 0) loop, we are only interested in one embedding per start atom
+        // break from while (atom_to_process >= 0) loop, we are only interested in one embedding per start atom
+        // If _environment_sets_global_id is set, then we should continue and label all matches. 
+        if (_environment_sets_global_id) {
+          atom_to_process--;
+          a->release_hold(previously_matched_atoms);
+        } else {
+          break;
+        }
       }
     }
   }
@@ -118,11 +152,11 @@ Substructure_Ring_Base::_environment_matches(Molecule_to_Match & target,
 */
 
 int
-Substructure_Ring_Base::_environment_matches(Molecule_to_Match & target,
-                                             Substructure_Atom & root_atom,
-                                             const int * ring,
-                                             int * already_matched)
-{
+Substructure_Ring_Base::_environment_matches3(Molecule_to_Match & target,
+                                              Substructure_Atom & root_atom,
+                                              const int * ring,
+                                              int * already_matched,
+                                              std::unique_ptr<int[]>& matched_by_global_specs) {
 #ifdef DEBUG_ENVIRONMENT_MATCHES
   cerr << "Start environment match, root atom has " << root_atom.attributes_specified() << " attributes specified\n";
 #endif
@@ -137,8 +171,15 @@ Substructure_Ring_Base::_environment_matches(Molecule_to_Match & target,
 
   int nhits = 0;
 
-  for (int i = 0; i < matoms; i++)
-  {
+  // If we are setting global id's for environment matches, set that now.
+  int set_flag;
+  if (_set_global_id > 0) {
+    set_flag = _set_global_id;
+  } else {
+    set_flag = 1;
+  }
+
+  for (int i = 0; i < matoms; i++) {
     if (0 == copy_ring[i]) {     // not in the ring or already matched
       continue;
     }
@@ -159,24 +200,33 @@ Substructure_Ring_Base::_environment_matches(Molecule_to_Match & target,
       qam.resize_keep_storage(0);
     }
 
-    if (0 == root_atom.add_your_children(qam))    // root atom only, no children
-    {
+    if (0 == root_atom.add_your_children(qam)) {    // root atom only, no children
 #ifdef DEBUG_ENVIRONMENT_SEARCH
       cerr << "Root atom hit, nhits = " << (nhits + 1) << '\n';
 #endif
 
+      if (_environment_sets_global_id) {
+        if (! root_atom.include_in_embedding()) {
+          continue;
+        }
+        atom_number_t matched = root_atom.atom_number_matched();
+        if (matched == kInvalidAtomNumber) [[unlikely]] {
+          continue;
+        }
+        matched_by_global_specs[matched] = _set_global_id;
+        target[matched].set_global_id(_set_global_id);
+      }
       nhits++;
       root_atom.recursive_release_hold();
       continue;
     }
 
-    if (_environment_can_match_in_ring_atoms)
-    {
+    if (_environment_can_match_in_ring_atoms) {
       std::fill_n(already_matched, matoms, 0);
-      already_matched[i] = 1;
+      already_matched[i] = set_flag;
     }
 
-    int tmp = _environment_matches(target, qam, already_matched);
+    int tmp = _environment_matches4(target, qam, already_matched, matched_by_global_specs);
 
 #ifdef DEBUG_ENVIRONMENT_SEARCH
     cerr << "At atom " << i << " matches = " << tmp << '\n';
@@ -184,10 +234,11 @@ Substructure_Ring_Base::_environment_matches(Molecule_to_Match & target,
 
     root_atom.recursive_release_hold();
 
-    already_matched[i] = 1;
+    already_matched[i] = set_flag;
 
-    if (tmp)
+    if (tmp) {
       copy_ring[i] = 0;
+    }
 
     nhits += tmp;
   }
@@ -214,10 +265,10 @@ Substructure_Ring_Base::_environment_matches(Molecule_to_Match & target,
 //#define DEBUG_L1_ENVIRONMENT_MATCHES
 
 int
-Substructure_Ring_Base::_environment_matches(Molecule_to_Match & target,
-                                             int * ring,
-                                             int * already_matched)
-{
+Substructure_Ring_Base::_environment_matches2(Molecule_to_Match & target,
+                                              int * ring,
+                                              int * already_matched,
+                                              std::unique_ptr<int[]>& matched_by_global_specs) {
   int ne = _environment_atom.number_elements();
 #ifdef DEBUG_L1_ENVIRONMENT_MATCHES
   cerr << "Substructure_Ring_Base::_environment_matches: have " << ne << " components to match\n";
@@ -227,7 +278,7 @@ Substructure_Ring_Base::_environment_matches(Molecule_to_Match & target,
     // should check to see if this result is actually needed by _environment_logexp. risky, maybe TODO...
     Substructure_Atom * r = _environment_atom[i];
 
-    int nhits = _environment_matches(target, *r, ring, already_matched);
+    int nhits = _environment_matches3(target, *r, ring, already_matched, matched_by_global_specs);
 
 #ifdef DEBUG_L1_ENVIRONMENT_MATCHES
     cerr << "Result for component " << i << " is " << nhits << '\n';
@@ -266,9 +317,9 @@ Substructure_Ring_Base::_environment_matches(Molecule_to_Match & target,
 */
 
 int
-Substructure_Ring_Base::_environment_matches(Molecule_to_Match & target,
-                                             int * ring)
-{
+Substructure_Ring_Base::_environment_matchesx(Molecule_to_Match & target,
+                                             int * ring,
+                                             std::unique_ptr<int[]>& matched_by_global_specs) {
 #ifdef DEBUG_L1_ENVIRONMENT_MATCHES
   cerr << "Starting _environment_matches, have " << _environment_atom.size() << " components\n";
 #endif
@@ -281,7 +332,7 @@ Substructure_Ring_Base::_environment_matches(Molecule_to_Match & target,
 
   int * already_matched = new int[target.natoms()]; std::unique_ptr<int[]> free_already_matched(already_matched);
 
-  return _environment_matches(target, ring, already_matched);
+  return _environment_matches2(target, ring, already_matched, matched_by_global_specs);
 }
 
 /*

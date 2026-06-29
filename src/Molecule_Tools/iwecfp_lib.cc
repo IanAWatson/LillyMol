@@ -297,6 +297,92 @@ Iwecfp::GenerateShells(const int matoms, int radius, const int max_radius,
   }
 }
 
+int
+Iwecfp::GenerateShellsSubset(const int matoms, int radius, const int max_radius,
+                       const Atom* const* atoms, const atype_t* atom_constant,
+                       const int* include_atom, int* processing_status,
+                       unsigned int sum_so_far, Molecule& m,
+                       Sparse_Fingerprint_Creator* sfc) {
+  ++radius;
+
+  if (_additive) {
+    sum_so_far *= 7879;
+  }
+
+  const int add_tails_here = (_add_tails > 0 && radius <= _add_tails);
+
+  for (int i = 0; i < matoms; ++i) {
+    if (kReadyToProcess != processing_status[i]) {
+      continue;
+    }
+
+    const Atom* ai = atoms[i];
+    const int acon = ai->ncon();
+    const Bond* const* bonds = ai->rawdata();
+
+    for (int j = 0; j < acon; ++j) {
+      const Bond* b = bonds[j];
+      atom_number_t k = b->other(i);
+      if (!include_atom[k]) {
+        continue;
+      }
+
+      if (kProcessingFinished == processing_status[k]) {
+        const int bc = BondConstant(b);
+        Increment(sum_so_far, bc, atom_constant[i]);
+        if (add_tails_here) {
+          sfc->hit_bit(sum_so_far);
+        }
+      } else if (kReadyToProcess == processing_status[k]) {
+        ;
+      } else {
+        processing_status[k] = kNextTime;
+      }
+    }
+  }
+
+  if (radius >= _min_shell_radius) {
+    sfc->hit_bit(sum_so_far);
+    if (_centre_atom_isotope) {
+      sfc->hit_bit(sum_so_far + _centre_atom_isotope);
+    }
+
+    if (_looking_for_bit_meanings) {
+      CheckAgainstList(*_current_molecule, _smarts_for_centre_of_shell,
+                       _centre_of_shell, sum_so_far, radius);
+    } else if (_stream_for_all_bits.is_open()) {
+      WriteBit(_centre_of_shell, _smarts_for_centre_of_shell, radius,
+               sum_so_far, m, _stream_for_all_bits);
+    }
+  }
+
+  if (max_radius > 0 && radius >= max_radius) {
+    return 1;
+  }
+
+  int continue_processing = 0;
+  for (int i = 0; i < matoms; ++i) {
+    if (kReadyToProcess == processing_status[i]) {
+      processing_status[i] = kProcessingFinished;
+    } else if (kNextTime == processing_status[i]) {
+      processing_status[i] = kReadyToProcess;
+      continue_processing = 1;
+    }
+  }
+
+  if (!continue_processing) {
+    return 1;
+  }
+
+  if (_each_shell_gets_own_fingerprint) {
+    return GenerateShellsSubset(matoms, radius, max_radius, atoms, atom_constant,
+                          include_atom, processing_status, sum_so_far, m, sfc + 1);
+  } else {
+    return GenerateShellsSubset(matoms, radius, max_radius, atoms, atom_constant,
+                          include_atom, processing_status, sum_so_far, m, sfc);
+  }
+}
+
 void
 Iwecfp::FormBit(Molecule& m, const atype_t* atom_constant,
                 const Atom* const* atoms, const atom_number_t zatom, int max_r,
@@ -328,6 +414,43 @@ Iwecfp::FormBit(Molecule& m, const atype_t* atom_constant,
   } else {
     GenerateShells(matoms, 0, _max_shell_radius, atoms, atom_constant,
                    processing_status, e, m, sfc);
+  }
+}
+
+void
+Iwecfp::FormBitSubset(Molecule& m, const atype_t* atom_constant,
+                const Atom* const* atoms, const int* include_atom,
+                const atom_number_t zatom, int max_r, int* processing_status,
+                Sparse_Fingerprint_Creator* sfc) {
+  const int matoms = m.natoms();
+
+  std::fill_n(processing_status, matoms, 0);
+  processing_status[zatom] = kProcessingFinished;
+
+  const auto e = atom_constant[zatom];
+  sfc[0].hit_bit(e);
+
+  const Atom* a = atoms[zatom];
+  const int acon = a->ncon();
+
+  if (max_r == 0) {
+    return;
+  }
+
+  for (int i = 0; i < acon; ++i) {
+    const Bond* b = a->item(i);
+    const auto j = b->other(zatom);
+    if (include_atom[j]) {
+      processing_status[j] = kReadyToProcess;
+    }
+  }
+
+  if (_each_shell_gets_own_fingerprint) {
+    GenerateShellsSubset(matoms, 0, _max_shell_radius, atoms, atom_constant,
+                   include_atom, processing_status, e, m, sfc + 1);
+  } else {
+    GenerateShellsSubset(matoms, 0, _max_shell_radius, atoms, atom_constant,
+                   include_atom, processing_status, e, m, sfc);
   }
 }
 
@@ -535,6 +658,120 @@ Iwecfp::IdentifyStartAtoms(Molecule& m, int* processing_status, int matched_flag
   }
 
   return rc;
+}
+
+
+FingerprintResult
+Iwecfp::Fingerprint(Molecule& m, const atype_t* atom_constant,
+                const int* include_atom, Sparse_Fingerprint_Creator* sfc) {
+  if (include_atom == nullptr) {
+    return Fingerprint(m, atom_constant, sfc);
+  }
+
+  if (_equalise_atom_coverage) {
+    cerr << "Iwecfp::Fingerprint:subset fingerprints do not support atom coverage equalisation\n";
+    return FingerprintResult::kFatal;
+  }
+
+  m.compute_aromaticity_if_needed();
+
+  const int matoms = m.natoms();
+
+  Atom** atoms = new Atom*[matoms];
+  std::unique_ptr<Atom*[]> free_atoms(atoms);
+  m.atoms(const_cast<const Atom**>(atoms));
+
+  int set_centre_atom_member_variables = 0;
+  if (_looking_for_bit_meanings || _stream_for_all_bits.is_open()) {
+    set_centre_atom_member_variables = 1;
+    _current_molecule = &m;
+    if (_stream_for_all_bits.is_open()) {
+      _stream_for_all_bits << m.name() << '\n';
+    }
+  }
+
+  if (_central_atom_possible_chiral) {
+    set_centre_atom_member_variables = 1;
+  }
+
+  int* processing_status = new int[matoms];
+  std::unique_ptr<int[]> free_processing_status(processing_status);
+
+  std::unique_ptr<int[]> start_atom_query_match;
+  if (_start_atom_query.size() > 0) {
+    start_atom_query_match = std::make_unique<int[]>(matoms);
+    std::fill_n(start_atom_query_match.get(), matoms, 0);
+
+    if (!IdentifyStartAtoms(m, start_atom_query_match.get(), 1)) {
+      if (_verbose) {
+        cerr << "Iwecfp:no start atoms defined for " << _start_atom_query.size() << " queries\n";
+      }
+      return FingerprintResult::kNoStartAtoms;
+    }
+  }
+
+  int shell_centres = 0;
+  for (int i = 0; i < matoms; ++i) {
+    if (!include_atom[i]) {
+      continue;
+    }
+
+    if (start_atom_query_match && !start_atom_query_match[i]) {
+      continue;
+    }
+
+    ++shell_centres;
+
+    const atype_t e = atom_constant[i];
+
+    if (set_centre_atom_member_variables) {
+      _smarts_for_centre_of_shell = m.smarts_equivalent_for_atom(i);
+      _centre_of_shell = i;
+      _centre_atom_isotope = m.isotope(i);
+    } else {
+      _centre_atom_isotope = 0;
+    }
+
+    if (_min_shell_radius == 0) {
+      sfc[0].hit_bit(e);
+    }
+
+    if (_looking_for_bit_meanings) {
+      CheckAgainstList(m, _smarts_for_centre_of_shell, i, e, 0);
+    } else if (_stream_for_all_bits.is_open()) {
+      WriteBit(i, _smarts_for_centre_of_shell, 0, e, m, _stream_for_all_bits);
+    }
+
+    std::fill_n(processing_status, matoms, 0);
+    processing_status[i] = kProcessingFinished;
+
+    const Atom* ai = atoms[i];
+    const int acon = ai->ncon();
+    for (int j = 0; j < acon; ++j) {
+      atom_number_t k = ai->other(i, j);
+      if (include_atom[k]) {
+        processing_status[k] = kReadyToProcess;
+      }
+    }
+
+    if (_each_shell_gets_own_fingerprint) {
+      GenerateShellsSubset(matoms, 0, _max_shell_radius, const_cast<const Atom* const*>(atoms),
+                     atom_constant, include_atom, processing_status, e, m, sfc + 1);
+    } else {
+      GenerateShellsSubset(matoms, 0, _max_shell_radius, const_cast<const Atom* const*>(atoms),
+                     atom_constant, include_atom, processing_status, e, m, sfc);
+    }
+  }
+
+  if (_stream_for_all_bits.is_open()) {
+    _stream_for_all_bits << "|\n";
+  }
+
+  if (shell_centres == 0) {
+    return FingerprintResult::kNoStartAtoms;
+  }
+
+  return FingerprintResult::kOk;
 }
 
 FingerprintResult

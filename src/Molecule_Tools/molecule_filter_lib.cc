@@ -778,29 +778,6 @@ Sp3Carbon(Molecule & m) {
   return rc;
 }
 
-bool
-OkPlanarity(const Molecule& m, bool target) {
-  iwplanarity::PlanarityResult result = iwplanarity::Planarity(m);
-  if (result.status == iwplanarity::PlanarityStatus::kPlanar) {
-    if (target) {
-      return true;
-    } else {
-      return false;
-    }
-  }
-
-  if (result.status == iwplanarity::PlanarityStatus::kNonPlanar) {
-    if (target) {
-      return false;
-    } else {
-      return true;
-    }
-  }
-
-  cerr << "OkPlanarity:planarity calculation failed\n";
-  return false;
-}
-
 int
 Reject(RejectionReason& rejection_reason, RejectionReason reason) {
   rejection_reason = reason;
@@ -966,12 +943,6 @@ MoleculeFilter::Ok(Molecule& m, const int matoms, const int nrings,
     }
     if (_requirements.has_max_rotatable_bonds() && rotb > _requirements.max_rotatable_bonds()) {
       return Reject(rejection_reason, RejectionReason::kTooManyRotatableBonds);
-    }
-  }
-
-  if (_requirements.has_planar()) { 
-    if (! OkPlanarity(m, _requirements.planar())) {
-      return Reject(rejection_reason, RejectionReason::kPlanarityMismatch);
     }
   }
 

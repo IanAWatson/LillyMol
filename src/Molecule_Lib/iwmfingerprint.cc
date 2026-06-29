@@ -525,7 +525,7 @@ class MFingerprint
     void _set_bits_for_atoms_in_multiple_rings(int direction, int * bvector) const;
 
   public:
-    MFingerprint (Molecule &, Atom_Typing_Specification &, const int * atype);
+    MFingerprint (Molecule &, Atom_Typing_Specification &, const uint32_t * atype);
     ~MFingerprint();
 
     void set_min_heteroatoms_at_path_ends (int);
@@ -546,7 +546,7 @@ class MFingerprint
 
 MFingerprint::MFingerprint (Molecule & m,
                             Atom_Typing_Specification & ats,
-                            const int * atype)
+                            const uint32_t * atype)
 {
   _matoms = m.natoms();
 
@@ -2274,7 +2274,7 @@ IWMFingerprint::construct_fingerprint (Molecule & m,
 
 int 
 IWMFingerprint::construct_fingerprint (Molecule & m,
-                                       const int * atype,
+                                       const uint32_t * atype,
                                        const int * inc)
 {
   return _construct_fingerprint(m, _atom_typing_specification, atype, inc);
@@ -2282,7 +2282,7 @@ IWMFingerprint::construct_fingerprint (Molecule & m,
 
 int 
 IWMFingerprint::construct_fingerprint (Molecule & m,
-                                       const int * atype)
+                                       const uint32_t * atype)
 {
   return _construct_fingerprint(m, _atom_typing_specification, atype, nullptr);
 }
@@ -2307,7 +2307,7 @@ IWMFingerprint::construct_fingerprint_label_by_times_in_path (Molecule & m)
 int
 IWMFingerprint::_construct_fingerprint (Molecule & m,
                                         Atom_Typing_Specification & ats,
-                                        const int * atype,
+                                        const uint32_t * atype,
                                         const int * include_these_atoms)
 {
   assert (nullptr == _bvector);

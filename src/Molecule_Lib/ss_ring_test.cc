@@ -283,6 +283,61 @@ query {
 }
 )pb";
 
+const std::string environment_sets_global_id_single_atom = R"pb(
+query {
+  ring_specifier {
+    base {
+      max_heteroatom_count: 0
+      environment_sets_global_id: true
+      set_global_id: 2
+      environment: "cO"
+      max_ncon: 1
+    }
+    fused: 0
+    aromatic: true
+  }
+  smarts: "[/IWgid2O]"
+}
+)pb";
+
+const std::string environment_sets_global_id_two_atoms = R"pb(
+query {
+  ring_specifier {
+    base {
+      max_heteroatom_count: 0
+      environment_sets_global_id: true
+      set_global_id: 2
+      environment: "cOC"
+      max_ncon: 1
+    }
+    fused: 0
+    aromatic: true
+  }
+  smarts: "[/IWgid2R0]"
+}
+)pb";
+
+const std::string environment_sets_global_id_branched = R"pb(
+query {
+  ring_specifier {
+    base {
+      max_heteroatom_count: 0
+      environment_sets_global_id: true
+      set_global_id: 2
+      environment: "C(C)O"
+    }
+    fused: 0
+    aromatic: false
+  }
+  smarts: "[/IWgid2R0]"
+}
+)pb";
+
+const std::string substituent_sets_global_id = R"pg(
+query {
+]
+)pg";
+
 TEST_P(TestRingSys, TestOperators) {
   const auto params = GetParam();
   ASSERT_TRUE(_mol.build_from_smiles(params.smiles));
@@ -389,7 +444,11 @@ INSTANTIATE_TEST_SUITE_P(TestRingSys, TestRingSys, testing::Values(
   Data{"FC1CC(F)CCC1", f_ring_size, 0},
   Data{"FC1CC(F)C1", f_ring_size, 0},
 
-  Data{"OC(=O)c1ccc(cc1F)c2ccccc2[N+](=O)[O-]", two_ring_sys, 1}
+  Data{"OC(=O)c1ccc(cc1F)c2ccccc2[N+](=O)[O-]", two_ring_sys, 1},
+
+  Data{"Oc1ccccc1 phenol", environment_sets_global_id_single_atom, 1},
+  Data{"COc1ccccc1 methoxy", environment_sets_global_id_two_atoms, 2},
+  Data{"OC1(C)CCC1 branched", environment_sets_global_id_branched, 2}
 ));
 
 const std::string ring_includes_carbonyl = R"pb(

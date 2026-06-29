@@ -1514,7 +1514,10 @@ void
 ProtoToDbt(const P& proto, Dbt& destination, std::string& in_scope) {
   google::protobuf::TextFormat::Printer printer;
   printer.SetSingleLineMode(1);
-  printer.PrintToString(proto, &in_scope);
+  if (! printer.PrintToString(proto, &in_scope)) {
+    cerr << "PrintToString failed\n";
+    return;
+  }
 
   destination.set_data(in_scope.data());
   destination.set_size(in_scope.size());
@@ -2270,7 +2273,10 @@ DoStore(const IWString& usmi,
   printer.SetSingleLineMode(true);
 
   std::string buffer;
-  printer.PrintToString(proto, &buffer);
+  if (! printer.PrintToString(proto, &buffer)) {
+    cerr << "PrintToString failed\n";
+    return 0;
+  }
 
   Dbt dbdata((void*)buffer.data(), buffer.length());
 

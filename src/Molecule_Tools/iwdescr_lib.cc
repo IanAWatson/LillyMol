@@ -30,7 +30,6 @@
 #include "Molecule_Lib/molecule.h"
 #include "Molecule_Lib/path.h"
 #include "Molecule_Lib/path_around_ring.h"
-#include "Molecule_Lib/planarity.h"
 #include "Molecule_Lib/rotbond_common.h"
 #include "Molecule_Lib/rwsubstructure.h"
 #include "Molecule_Lib/standardise.h"
@@ -855,7 +854,6 @@ class IWDescr::IWDescrImpl {
   // avoids putting more local scratch arrays into PerMoleculeData prematurely.
   int ComputeLongCarbonChainDescriptors(Molecule& m, PerMoleculeData& data, int* already_done);
   int ComputeSaturatedChainDescriptors(Molecule& m, PerMoleculeData& data, int* already_done);
-  int ComputePlanarityDescriptor(Molecule& m, PerMoleculeData& data);
   int ComputeSpecificGroupDescriptors(Molecule& m, PerMoleculeData& data, int* already_done);
   int ComputeSimpleHbondDescriptors(Molecule& m, PerMoleculeData& data);
   int ComputeRingDescriptors(Molecule& m, PerMoleculeData& data);
@@ -1690,9 +1688,6 @@ IWDescr::IWDescrImpl::AllocateDescriptors() {
     SetDescriptorName(iwdescr_nsatchain, "nsatchain");
     SetDescriptorName(iwdescr_mxsatchain, "mxsatchain");
     SetDescriptorName(iwdescr_fsatchain, "fsatchain");
-  }
-  if (descriptors_to_compute.planarity) {
-    SetDescriptorName(iwdescr_planarity, "planarity");
   }
   MarkBestFingerprint(iwdescr_natoms);
   MarkBestFingerprint(iwdescr_frafus);
@@ -3180,9 +3175,6 @@ IWDescr::IWDescrImpl::ComputeOptionalSpecificAndHbondDescriptors(
 int
 IWDescr::IWDescrImpl::ComputeOptionalSpecificGroupDescriptors(
     Molecule& m, PerMoleculeData& data) {
-  if (descriptors_to_compute.planarity && ! ComputePlanarityDescriptor(m, data)) {
-    return 0;
-  }
 
   if (descriptors_to_compute.specific_groups &&
       ! ComputeSpecificGroupDescriptors(m, data, data.already_done_data())) {
@@ -3828,26 +3820,6 @@ IWDescr::IWDescrImpl::ComputeExtendedConjugationDescriptors(Molecule& m,
   descriptor[iwdescr_atincnjs].set(static_cast<float>(atoms_in_conjugated_sections));
   descriptor[iwdescr_mxcnjscz].set(static_cast<float>(max_conjugated_section_size));
   descriptor[iwdescr_cinconjs].set(static_cast<float>(carbons_in_conjugated_sections));
-
-  return 1;
-}
-
-int
-IWDescr::IWDescrImpl::ComputePlanarityDescriptor(Molecule& m, PerMoleculeData& data) {
-  // Migrated from legacy ComputePlanarity(m). Planarity is descriptor
-  // computation state, not output policy.
-  (void)data;
-
-  const iwplanarity::PlanarityResult result = iwplanarity::Planarity(m);
-  if (result.status == iwplanarity::PlanarityStatus::kError) {
-    return 1;
-  }
-
-  if (result.status == iwplanarity::PlanarityStatus::kPlanar) {
-    descriptor[iwdescr_planarity].set(0);
-  } else {
-    descriptor[iwdescr_planarity].set(1);
-  }
 
   return 1;
 }

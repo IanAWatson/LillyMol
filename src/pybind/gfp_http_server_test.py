@@ -2,8 +2,6 @@ import os
 import sys
 import unittest
 
-from fastapi.testclient import TestClient
-
 
 def _add_pybind_runfiles_to_path() -> None:
   candidates = ['pybind']
@@ -22,7 +20,15 @@ def _add_pybind_runfiles_to_path() -> None:
 _add_pybind_runfiles_to_path()
 
 from Utilities.GFP_Tools import nn_request_pb2
-from Utilities.GFP_Tools.gfp_http_server import create_app
+
+try:
+  from fastapi.testclient import TestClient
+  from Utilities.GFP_Tools.gfp_http_server import create_app
+  _IMPORT_ERROR = None
+except ModuleNotFoundError as err:
+  TestClient = None
+  create_app = None
+  _IMPORT_ERROR = err
 
 
 def _testdata_path() -> str:
@@ -51,6 +57,9 @@ class GfpHttpServerTest(unittest.TestCase):
   @classmethod
   def setUpClass(cls):
     super().setUpClass()
+    if _IMPORT_ERROR is not None:
+      raise unittest.SkipTest(
+          f'gfp_http_server_test requires optional HTTP server dependencies: {_IMPORT_ERROR}')
     cls.app = create_app(_testdata_path())
     cls.client = TestClient(cls.app)
     cls.query = {

@@ -10,7 +10,6 @@
 
 #include "Molecule_Lib/molecule.h"
 #include "Molecule_Lib/rotbond_common.h"
-#include "Molecule_Lib/planarity.h"
 
 #include "Molecule_Tools/alogp.h"
 #include "Molecule_Tools/nvrtspsa.h"
@@ -60,7 +59,6 @@ enum class RejectionReason : int {
   kHighAlogp,
   kLowXlogp,
   kHighXlogp,
-  kPlanarityMismatch,
 };
 
 enum class Feature : int {

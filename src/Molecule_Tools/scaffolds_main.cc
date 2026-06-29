@@ -214,7 +214,10 @@ LocalOptions::Write(Molecule& parent,
 
   std::string buffer;
 
-  printer.PrintToString(result, &buffer);
+  if (!printer.PrintToString(result, &buffer)) {
+    cerr << "PrintToString failed\n";
+    return 0;
+  }
   output << buffer << '\n';
   output.write_if_buffer_holds_more_than(8192);
 
@@ -281,7 +284,10 @@ LocalOptions::WriteAccumulated(const std::string& usmi,
 
   std::string buffer;
 
-  printer.PrintToString(proto, &buffer);
+  if (!printer.PrintToString(proto, &buffer)) {
+    cerr << "PrintToString failed\n";
+    return 0;
+  }
   _stream_for_all_scaffolds << buffer << '\n';
 
   return 1;

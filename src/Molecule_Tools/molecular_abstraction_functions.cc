@@ -389,8 +389,8 @@ Molecular_Abstraction_Base_Class::_do_any_writing_needed(
     IWMFingerprint fp;
 
     if (_atom_typing_specification.active()) {
-      int* atype = new int[matoms];
-      std::unique_ptr<int[]> free_atype(atype);
+      uint32_t* atype = new uint32_t[matoms];
+      std::unique_ptr<uint32_t[]> free_atype(atype);
       _atom_typing_specification.assign_atom_types(m, atype);
       fp.construct_fingerprint(m, atype, nullptr);
     } else {

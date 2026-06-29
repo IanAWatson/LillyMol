@@ -437,7 +437,8 @@ Substructure_Ring_Specification::matches(Molecule_to_Match & target,
         continue;
     }
 
-    if (_environment_atom.number_elements() && ! _environment_matches(target, *r)) {
+    if (_environment_atom.number_elements() &&
+        ! _environment_matches(target, *r, matched_by_global_specs)) {
       continue;
     }
 
@@ -536,12 +537,12 @@ Substructure_Ring_Specification::OkSpiroFusionCount(Molecule& m, const Ring& rin
 
 int
 Substructure_Ring_Specification::_environment_matches(Molecule_to_Match & target,
-                                   const Ring & r)
-{
+                                   const Ring & r,
+                                   std::unique_ptr<int[]>& matched_by_global_specs) {
   int * tmp = new_int(target.natoms()); std::unique_ptr<int[]> free_tmp(tmp);
 
   r.set_vector(tmp, 1);
-  int nhits = Substructure_Ring_Base::_environment_matches(target, tmp);
+  int nhits = Substructure_Ring_Base::_environment_matchesx(target, tmp, matched_by_global_specs);
 
 //cerr << "Substructure_Ring_Specification::_environment_matches:ring " << r <<  " nhits " << nhits << '\n';
 

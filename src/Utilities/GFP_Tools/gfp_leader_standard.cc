@@ -133,7 +133,7 @@ choose_next_leaders(const int* selected, int n, int* leaders, int leaders_reques
 }
 
 static int
-leader() {
+leader(IWString_and_File_Descriptor& output) {
   int cluster_id = 0;
 
   int icentre;
@@ -195,7 +195,8 @@ leader() {
 }
 
 static int
-leader(int* leaders, int leaders_requested, float* cand_distances) {
+leader(int* leaders, int leaders_requested, float* cand_distances,
+       IWString_and_File_Descriptor& output) {
   int cluster_id = 0;
 
   int leaders_found;
@@ -215,7 +216,7 @@ leader(int* leaders, int leaders_requested, float* cand_distances) {
       start = icentre + 1;
       selected[icentre] = cluster_id;
       distances[icentre] = 0.0f;
-#pragma omp parallel for schedule(dynamic, 256)
+#pragma omp parallel for schedule(static)
       for (int i = start; i < pool_size; ++i) {
         if (!selected[i]) {
           distances[i] = fingerprints[icentre].tanimoto_distance(fingerprints[i]);
@@ -238,7 +239,7 @@ leader(int* leaders, int leaders_requested, float* cand_distances) {
       distances[leaders[0]] = 0.0f;
       distances[leaders[1]] = 0.0f;
 // Ignore compiler warnings about cand_distances being unitialised.
-#pragma omp parallel for schedule(dynamic, 256) private(cand_distances)
+#pragma omp parallel for schedule(static) private(cand_distances)
       for (int i = start; i < pool_size; i++) {
         if (!selected[i]) {
           fingerprints[i].tanimoto_distance_2(fingerprints[leaders[0]],
@@ -562,6 +563,8 @@ gfp_leader_standard(int argc, char** argv) {
 
   int clusters_formed;
 
+  IWString_and_File_Descriptor output(1);
+
   if (cl.option_present('p')) {
     int p;
     if (!cl.value('p', p) || p <= 0 || p > 2) {
@@ -578,17 +581,15 @@ gfp_leader_standard(int argc, char** argv) {
     float* cand_distances = new float[p];
     std::unique_ptr<float[]> free_cand_distances(cand_distances);
 
-    clusters_formed = leader(leaders, p, cand_distances);
+    clusters_formed = leader(leaders, p, cand_distances, output);
   } else {
-    clusters_formed = leader();
+    clusters_formed = leader(output);
   }
 
   if (verbose) {
     cerr << "Clustered " << pool_size << " fingerprints into " << clusters_formed
          << " clusters\n";
   }
-
-  IWString_and_File_Descriptor output(1);
 
   if (write_neighbours_as_protos) {
     WriteNeighboursAsProtos(clusters_formed, output);
@@ -630,7 +631,7 @@ gfp_leader_standard(int argc, char** argv) {
       output << smiles_tag << leader_item[j].smiles() << ">\n";
       output << identifier_tag << leader_item[j].id() << ">\n";
       output << distance_tag << distances[j] << ">\n";
-      output.write_if_buffer_holds_more_than(32768);
+      output.write_if_buffer_holds_more_than(8192);
     }
 
     output << "|\n";

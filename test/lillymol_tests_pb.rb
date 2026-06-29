@@ -11,10 +11,11 @@ Google::Protobuf::DescriptorPool.generated_pool.build do
       repeated :args, :string, 3
       proto3_optional :difftool, :string, 4
       proto3_optional :difftool_options, :string, 5
-      repeated :comment, :string, 6
-      repeated :ignore_file, :string, 7
-      proto3_optional :non_zero_rc_expected, :bool, 8
-      proto3_optional :broken_do_not_evaluate, :bool, 9
+      repeated :other_commands, :string, 6
+      repeated :comment, :string, 7
+      repeated :ignore_file, :string, 8
+      proto3_optional :non_zero_rc_expected, :bool, 9
+      proto3_optional :broken_do_not_evaluate, :bool, 10
       proto3_optional :executable, :string, 14
       repeated :default_command_components, :string, 15
     end

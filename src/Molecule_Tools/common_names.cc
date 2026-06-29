@@ -532,7 +532,10 @@ WriteAsProto(Molecule& m, const IWString& usmi, const Instances& instance,
   }
 
   std::string as_string;
-  printer.PrintToString(proto, &as_string);
+  if (! printer.PrintToString(proto, &as_string)) {
+    cerr << "PrintToString failed\n";
+    return 0;
+  }
   output << as_string << '\n';
   output.write_if_buffer_holds_more_than(8192);
 

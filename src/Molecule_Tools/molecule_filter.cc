@@ -116,7 +116,6 @@ class Options {
 
     uint64_t _matches_exclusion_smarts = 0;
     uint64_t _no_match_required_smarts = 0;
-    uint64_t _no_match_planarity = 0;
 
     // for use with parallel processing.
     off_t _seek_to;
@@ -348,10 +347,6 @@ Options::Report(std::ostream& output) const {
   }
   if (_requirements.has_max_rotatable_bonds()) {
     output << _too_many_rotbond << " too many rotatable bonds " << _requirements.max_rotatable_bonds() << '\n';
-  }
-
-  if (_requirements.has_planar()) {
-    output << _no_match_planarity << " molecules not matchin planarity " << _requirements.planar() << '\n';
   }
 
   if (_requirements.has_min_tpsa()) {
@@ -724,9 +719,6 @@ Options::NoteRejection(molecule_filter_lib::RejectionReason rejection_reason) {
       return;
     case RejectionReason::kHighXlogp:
       ++_high_xlogp;
-      return;
-    case RejectionReason::kPlanarityMismatch:
-      ++_no_match_planarity;
       return;
   }
 }

@@ -45,6 +45,7 @@
 #include "Molecule_Lib/target.h"
 
 #include "Molecule_Tools/mformula.h"
+#include "Molecule_Tools/smarts_for_atom_subset.h"
 
 #ifdef BUILD_BAZEL
 #include "Molecule_Tools_Bdb/substituent_identification.pb.h"
@@ -64,10 +65,16 @@ const char* prog_name = nullptr;
 class Molecule_Specific_Temporary_Arrays {
  public:
   const int _matoms;
-  int* _atype;
+  uint32_t* _atype;
   int* _aromatic_bond;
   int* _processing_status;
   int* _to_remove;
+
+  // If we are generating smarts for the bits, we need a temporary array.
+  // Ideally this would be allocated for each molecule and passed as an
+  // argument, but argument lists are already getting long.
+  int* _include_atom = nullptr;
+
   IWString _molecule_name;
 
   // If we are writing bit meanings, we need a means of saving isotopes.
@@ -88,6 +95,9 @@ class Molecule_Specific_Temporary_Arrays {
   set_processing_status(int s) {
     std::fill_n(_processing_status, _matoms, s);
   }
+
+  // Will allocate the array if it has not been allocated.
+  int* include_atom();
 
   int* to_remove();
 
@@ -117,7 +127,7 @@ class Molecule_Specific_Temporary_Arrays {
 
 Molecule_Specific_Temporary_Arrays::Molecule_Specific_Temporary_Arrays(int matoms)
     : _matoms(matoms) {
-  _atype = new int[matoms];
+  _atype = new uint32_t[matoms];
   _aromatic_bond = new_int(matoms * matoms);
   _processing_status = new int[matoms];
   _to_remove = new int[matoms];
@@ -135,7 +145,18 @@ Molecule_Specific_Temporary_Arrays::~Molecule_Specific_Temporary_Arrays() {
 
   delete [] _isosave;  // Might be nullptr.
 
+  delete [] _include_atom;  // Might be nullptr
+
   return;
+}
+
+int*
+Molecule_Specific_Temporary_Arrays::include_atom() {
+  if (_include_atom == nullptr) {
+    _include_atom = new int[_matoms];
+  }
+
+  return _include_atom;
 }
 
 int
@@ -656,6 +677,12 @@ class SubstituentIdentification {
   Db** _dbs;
   int _ndb;
 
+  // The -K option. This database holds a mapping from bit numbers
+  // to smarts that match at each radius.
+  std::unique_ptr<Db> _bit_database;
+  // If we are writing a bit database we need an atom typing to use.
+  uint32_t _atype;
+
   Numeric_Data_From_File<float> _expt;
 
   int _output_is_textproto;
@@ -831,10 +858,13 @@ class SubstituentIdentification {
 
   //  Functions used during database builds
 
+  int StoreNewBit(Molecule& m, atom_number_t zatom,
+                        uint32_t bitnum, int radius,
+                        Molecule_Specific_Temporary_Arrays& msta);
   void _do_build_database_report(std::ostream& os) const;
   void _do_create_molecules_report(std::ostream& os) const;
 
-  int _associate_substituent_with_bit(int r, uint32_t b, bond_type_t bt,
+  int _associate_substituent_with_bit(Molecule& anchor, int r, uint32_t b, bond_type_t bt,
                                        Molecule& substituent,
                                        const Molecule_Specific_Temporary_Arrays& msta);
   int _compute_environment2x(Molecule& m, int radius, int rmax, uint32_t* rc,
@@ -886,7 +916,9 @@ class SubstituentIdentification {
   int WriteBitMeaning(Molecule& m, atom_number_t zatom, int radius,
                        uint32_t bitnum,
                        Molecule_Specific_Temporary_Arrays& msta);
+
   int OpenBitMeaningsFile(const const_IWSubstring& fname);
+  int OpenBitSmartsDatabase(const const_IWSubstring& dbname);
 
  public:
   SubstituentIdentification();
@@ -984,6 +1016,8 @@ SubstituentIdentification::_default_values() {
 
   _write_bit_meanings = 0;
 
+  _atype = 0;
+
   return;
 }
 
@@ -1027,12 +1061,13 @@ substituents that have been found in the same context.
 Options used during addition/replacement
  -m <natoms>   min number of atoms in a substituent. Use -n for as many as 'n' fewer atoms than an existing sidechain.
  -M <natoms>   max number of atoms in a substituent. Use +n for as many as 'n' more atoms than an existing sidechain.
- -q <query>    during addition, query  describing anchor atoms needing new substituents
- -s <smarts>   during addition, smarts describing anchor atoms needing new substituents
- -k            during addition, break bond btw first two matched atoms, discard the fragment
+ -q <query>    during addition, query  describing anchor atoms needing new substituents.
+ -s <smarts>   during addition, smarts describing anchor atoms needing new substituents.
+ -k            during addition, break bond btw first two matched atoms, discard the fragment.
+ -D ...        during addition write a database with bitnum->smarts mappings. Enter '-D help' for info.
                containing the second atom, and then look for replacements.
                For example to replace an aniline try    -k -s 'c-[NH2]'
- -y            during addition, process all atoms with H's and all non ring single bonds (no -q or -s)
+ -y            during addition, process all atoms with H's and all non ring single bonds (no -q or -s).
  -L <natoms>   during addition, max atoms lost from parent with -k option
  -r <bonds>    during addition, min radius to be considered
  -a            during addition, only produce molecules at the largest radius found
@@ -1285,7 +1320,10 @@ SubstituentIdentification::StoreProto(
   }
 
   std::string serialized;
-  proto.SerializeToString(&serialized);
+  if (! proto.SerializeToString(&serialized)) {
+    cerr << "StoreProto:proto not serialized\n";
+    return 0;
+  }
 
   Dbt zkey{(void*)(&dbkey), sizeof(dbkey)};
   Dbt zdata(serialized.data(), serialized.size());
@@ -2017,7 +2055,10 @@ SubstituentIdentification::_look_for_new_substituents_db(
   if (_store_protos) {
     const absl::string_view sv(fromdb.data(), fromdb.length());
     substituent_identification::Replacements proto;
-    proto.ParseFromString(sv);
+    if (!proto.ParseFromString(sv)) {
+      cerr << "substituent_identification::_look_for_new_substituents_db:cannot parse proto\n";
+      return 0;
+    }
 
     return FormNewMolecules(m, zatom, fragment_lost, smiles_already_found,
                         rad_and_bit, proto, already_processed, output);
@@ -2923,6 +2964,7 @@ SubstituentIdentification::_enough_examples(const const_IWSubstring& fromdb) con
 // Returns true if this is a new bit.
 int
 SubstituentIdentification::_associate_substituent_with_bit(
+    Molecule& anchor,
     int r, uint32_t b, bond_type_t bt, Molecule& substituent,
     const Molecule_Specific_Temporary_Arrays& msta) {
 // #define DEBUG_ASSOCIATE_SUBSTITUENT_WITH_BIT
@@ -2989,6 +3031,28 @@ SubstituentIdentification::_associate_substituent_with_bit(
   return rc;
 }
 
+int
+SubstituentIdentification::StoreNewBit(Molecule& m, atom_number_t zatom,
+                        uint32_t bitnum, int radius,
+                        Molecule_Specific_Temporary_Arrays& msta) {
+  cerr << "Atom tpe " << _atom_typing_specification.user_specified_type() << '\n';
+  IWString smarts = lillymol::SmartsForAtomSubset(m, zatom, 
+                        _atom_typing_specification.user_specified_type(), msta.include_atom());
+
+  Dbt zkey((void*)&bitnum, sizeof(bitnum));
+  Dbt zdata((void*)smarts.data(), smarts.size());
+
+  if (int rc = _bit_database->put(NULL, &zkey, &zdata, 0); rc != 0) {
+    cerr << "SubstituentIdentification::_store_radius:Berkeley database Put "
+            "operation failed\n";
+    _bit_database->err(rc, "");
+
+    return 0;
+  } else {
+    return 1;
+  }
+}
+
 // Used during database builds.
 int
 SubstituentIdentification::_id_attch_pt_and_make_substituent_associations(
@@ -3008,7 +3072,8 @@ SubstituentIdentification::_id_attch_pt_and_make_substituent_associations(
 
   for (int i = 0; i <= max_radius_formed; ++i) {
     //  cerr << "Radius " << i << " bit " << b[i] << '\n';
-    if (_associate_substituent_with_bit(i, b[i], bt, substituent, msta) && _write_bit_meanings) {
+    if (_associate_substituent_with_bit(anchor, i, b[i], bt, substituent, msta) && (
+        _write_bit_meanings || _bit_database)) {
       WriteBitMeaning(anchor, a1, i, b[i], msta);
     }
   }
@@ -3028,17 +3093,35 @@ SubstituentIdentification::WriteBitMeaning(Molecule& m, atom_number_t zatom,
   m.ComputeDistanceMatrixIfNeeded();
 
   const int matoms = m.natoms();
+
+  if (_bit_database) {
+    int* include_atom = msta.include_atom();
+    std::fill_n(include_atom, matoms, 0);
+  }
+
   for (int i = 0; i < matoms; ++i) {
-    if (int d = m.bonds_between(zatom, i); d <= radius) {
-      m.set_isotope(i, d + 1);
+    const int d = m.bonds_between(zatom, i);
+    if (d > radius) {
+      continue;
+    }
+
+    m.set_isotope(i, d + 1);
+    if (_bit_database) {
+      msta.include_atom()[i] = 1;
     }
   }
 
   static constexpr char kSep = ' ';
-  _stream_for_bit_meanings << m.smiles() << kSep << m.name() <<
-                              kSep << radius << kSep << bitnum << '\n';
+  if (_stream_for_bit_meanings.is_open()) {
+    _stream_for_bit_meanings << m.smiles() << kSep << m.name() <<
+                                kSep << radius << kSep << bitnum << '\n';
 
-  _stream_for_bit_meanings.write_if_buffer_holds_more_than(32768);
+    _stream_for_bit_meanings.write_if_buffer_holds_more_than(32768);
+  }
+
+  if (_bit_database) {
+    StoreNewBit(m, zatom, bitnum, radius, msta);
+  }
 
   m.set_isotopes(msta.isosave());
 
@@ -3539,9 +3622,21 @@ SubstituentIdentification::OpenBitMeaningsFile(const const_IWSubstring& fname) {
 }
 
 int
+SubstituentIdentification::OpenBitSmartsDatabase(const const_IWSubstring& dbname) {
+  _bit_database = std::make_unique<Db>(nullptr, DB_CXX_NO_EXCEPTIONS);
+  IWString tmp(dbname);
+  if (! opendb_write(*_bit_database, tmp.null_terminated_chars())) {
+    cerr << "OpenBitSmartsDatabase:cannot open '" << dbname << "'\n";
+    return 0;
+  }
+
+  return 1;
+}
+
+
+int
 SubstituentIdentification::operator()(int argc, char** argv) {
-  Command_Line cl(argc, argv,
-                  "vA:E:i:g:ld:R:P:M:m:cs:q:ab:r:C:H:K:fw:pIBu:kY:L:ye:X:hV:");
+  Command_Line cl(argc, argv, "vA:E:i:g:ld:R:P:M:m:cs:q:ab:r:C:H:K:fw:pIBu:kY:L:ye:X:hV:D:");
 
   if (cl.unrecognised_options_encountered()) {
     cerr << "Unrecognised options encountered\n";
@@ -3953,6 +4048,15 @@ SubstituentIdentification::operator()(int argc, char** argv) {
           return 0;
         }
         _write_bit_meanings = 1;
+      } else if (y.starts_with("bitdb=")) {
+        y.remove_leading_chars(6);
+        if (! OpenBitSmartsDatabase(y)) {
+          cerr << "Cannot open bitnum->smarts database '" << y << "'\n";
+          return 0;
+        }
+        if (_verbose) {
+          cerr << "Will write mappings of bitnum->smarts to '" << y << "'\n";
+        }
       } else if (y == "help") {
         DisplayDashYOptions(cerr);
       } else {

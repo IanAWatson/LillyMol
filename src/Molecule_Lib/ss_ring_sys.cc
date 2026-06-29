@@ -636,7 +636,7 @@ Substructure_Ring_System_Specification::_matches(
     }
 #endif
     if (_environment_atom.number_elements()) {
-      if (!_environment_matches(target, atoms_in_system)) {
+      if (!_environment_matchesx(target, atoms_in_system, matched_by_global_specs)) {
         continue;
       }
     }

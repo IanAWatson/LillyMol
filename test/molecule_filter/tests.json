@@ -224,10 +224,59 @@
     },
 
     {
-      "name": "planarity",
+      "name": "utility_mode",
       "args": [
         "#{indir}/in.smi"
-      ]
+      ],
+      "difftool": "diff"
+    },
+
+    {
+      "name": "utility_weighted_sum",
+      "args": [
+        "#{indir}/in.smi"
+      ],
+      "difftool": "diff"
+    },
+
+    {
+      "name": "utility_product",
+      "args": [
+        "#{indir}/in.smi"
+      ],
+      "difftool": "diff"
+    },
+
+    {
+      "name": "utility_min",
+      "args": [
+        "#{indir}/in.smi"
+      ],
+      "difftool": "diff"
+    },
+
+    {
+      "name": "utility_max",
+      "args": [
+        "#{indir}/in.smi"
+      ],
+      "difftool": "diff"
+    },
+
+    {
+      "name": "utility_with_computed_filter",
+      "args": [
+        "#{indir}/in.smi"
+      ],
+      "difftool": "diff"
+    },
+
+    {
+      "name": "utility_smiles_output",
+      "args": [
+        "-u #{indir}/in.smi"
+      ],
+      "difftool": "diff"
     }
 
   ]

@@ -37,7 +37,7 @@ class IWMFingerprint : public IW_Bits_Base
 //  private functions
 
     void _default_values ();
-    int _construct_fingerprint (Molecule &, Atom_Typing_Specification & ats, const int * = nullptr, const int * = nullptr);
+    int _construct_fingerprint (Molecule &, Atom_Typing_Specification & ats, const uint32_t * = nullptr, const int * = nullptr);
 
 #ifdef COUNT_TIMES_ATOM_IN_PATH
     int _extra_bits_to_equalise_times_in_path_3(Molecule & m, MFingerprint & mfp, const int * include_these_atoms, const int niter);
@@ -59,8 +59,8 @@ class IWMFingerprint : public IW_Bits_Base
 
     int construct_fingerprint (Molecule &);
     int construct_fingerprint (Molecule &, Atom_Typing_Specification & ats, const int * inc);
-    int construct_fingerprint (Molecule &, const int * atype, const int * inc);
-    int construct_fingerprint (Molecule &, const int * atype);
+    int construct_fingerprint (Molecule &, const uint32_t * atype, const int * inc);
+    int construct_fingerprint (Molecule &, const uint32_t * atype);
 
 #ifdef COUNT_TIMES_ATOM_IN_PATH
     int construct_fingerprint_label_by_times_in_path (Molecule & m);

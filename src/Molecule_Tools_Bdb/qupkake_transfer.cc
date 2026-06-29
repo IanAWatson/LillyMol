@@ -508,7 +508,10 @@ Storage::StoreUsmi(Molecule& m, const MoleculeData& moldata) {
 int
 Store(const DBKey& dbkey, const qupkake_transfer::QupKakeData& proto, Db& db) {
   std::string serialized;
-  proto.SerializeToString(&serialized);
+  if (! proto.SerializeToString(&serialized)) {
+    cerr << "SerializeToString failed\n";
+    return 0;
+  }
 
   Dbt key;
   key.set_data((void*) &dbkey);
@@ -530,7 +533,10 @@ Store(const DBKey& dbkey, const qupkake_transfer::QupKakeData& proto, Db& db) {
 int
 Store(const IWString& usmi, const qupkake_transfer::QupKakeData& proto, Db& db) {
   std::string serialized;
-  proto.SerializeToString(&serialized);
+  if (! proto.SerializeToString(&serialized)) {
+    cerr << "SerializeToString failed\n";
+    return 0;
+  }
 
   Dbt key;
   key.set_data((void*)usmi.data());
@@ -706,7 +712,10 @@ Storage::Lookup(const IWString& usmi) {
 
   const absl::string_view sv((const char*) fromdb.get_data(), fromdb.get_size());
   qupkake_transfer::QupKakeData proto;
-  proto.ParseFromString(sv);
+  if (! proto.ParseFromString(sv)) {
+    cerr << "ParseFromString failed\n";
+    return std::nullopt;
+  }
 
   return std::move(proto);
 }

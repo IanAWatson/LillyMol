@@ -923,19 +923,6 @@ cc_test(
 )
 
 cc_test(
-    name = "planarity_test",
-    srcs = [
-        "planarity_test.cc",
-    ],
-    deps = [
-        ":iwmolecule",
-        ":moleculeio",
-        ":planarity",
-        "@googletest//:gtest_main",
-    ],
-)
-
-cc_test(
     name = "ring_bond_count_test",
     timeout = "short",
     srcs = [
@@ -1327,48 +1314,6 @@ cc_library(
     ],
     hdrs = [
         "iw_vdw.h",
-    ],
-    deps = [
-        ":iwmolecule",
-    ],
-)
-
-cc_library(
-    name = "planarity",
-    srcs = [
-        "planarity.cc",
-    ],
-    hdrs = [
-        "planarity.h",
-    ],
-    deps = [
-        ":iwmolecule",
-        "@third_party//:planarity_static",
-    ],
-)
-
-cc_library(
-    name = "planarity_shared",
-    srcs = [
-        "planarity.cc",
-    ],
-    hdrs = [
-        "planarity.h",
-    ],
-    visibility = ["//visibility:public"],
-    deps = [
-        ":iwmolecule",
-        "@third_party//:planarity_shared",
-    ],
-)
-
-cc_library(
-    name = "ring_data",
-    srcs = [
-        "ring_data.cc",
-    ],
-    hdrs = [
-        "ring_data.h",
     ],
     deps = [
         ":iwmolecule",

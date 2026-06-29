@@ -340,7 +340,7 @@ surviving molecules are scored with the two utility functions.
 The order of computation is chosen to avoid expensive work when cheaper checks
 can reject a molecule first. Atom counts, ring counts, fragment counts, isotope
 checks, and related simple properties are handled before more expensive
-calculations such as TPSA, ALOGP, XLOGP, and planarity.
+calculations such as TPSA, ALOGP, XLOGP, ...
 
 Utility values are computed only after hard filters pass. If utilities request a
 feature that was not part of the hard filters, that feature is computed lazily for

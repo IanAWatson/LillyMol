@@ -105,21 +105,24 @@ if [[ ${must_build} -eq 1 || ! -s 'libf2c/libf2c.a' ]] ; then
     (cd libf2c && make -f makefile.u)
 fi
 
-must_build=0
-if [[ ! -d 'edge-addition-planarity-suite' ]] ; then
-  git clone --branch Version_4.0.1.0 --depth 1 https://github.com/graph-algorithms/edge-addition-planarity-suite
-  # There is a bug in this version of planarity
-  # EAPS Version_4.0.1.0 contains a C/C++ incompatibility in
-  # graphExtensions.private.h. Patch before build.
-  python3 - <<'PY'
-from pathlib import Path
-p = Path("edge-addition-planarity-suite/c/graphLib/extensionSystem/graphExtensions.private.h")
-s = p.read_text()
-s = s.replace("typedef struct\n    {", "typedef struct graphExtension\n    {")
-p.write_text(s)
-PY
-  must_build=1
-fi
+# Proved problematic in many ways. Originally made part of iwdescr and molecule_filter
+# But this does not really perceive the kinds of things we think of as non-planar.
+# Not worth the complexity.
+# must_build=0
+# if [[ ! -d 'edge-addition-planarity-suite' ]] ; then
+#   git clone --branch Version_4.0.1.0 --depth 1 https://github.com/graph-algorithms/edge-addition-planarity-suite
+#   # There is a bug in this version of planarity
+#   # EAPS Version_4.0.1.0 contains a C/C++ incompatibility in
+#   # graphExtensions.private.h. Patch before build.
+#   python3 - <<'PY'
+# from pathlib import Path
+# p = Path("edge-addition-planarity-suite/c/graphLib/extensionSystem/graphExtensions.private.h")
+# s = p.read_text()
+# s = s.replace("typedef struct\n    {", "typedef struct graphExtension\n    {")
+# p.write_text(s)
+# PY
+#   must_build=1
+# fi
 
 if [[ ${must_build} == 1 ]] ; then
   (cd edge-addition-planarity-suite && autoreconf -fi)

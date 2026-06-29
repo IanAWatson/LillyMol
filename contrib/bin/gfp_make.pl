@@ -281,8 +281,7 @@ sub usage
   print STDERR " -TSUB ...      FP query/queries for tsubstructure, S:file for smarts\n" if ($expert);
   print STDERR " -tsubnc        generate tsubstructure fingerprints as counted\n" if ($expert);
   print STDERR " -ts ... -ts    options for tsubstructure\n" if ($expert);
-  print STDERR " -FPS ...       FP query/queries for fingerprint_substructure, S:file for smarts DNU\n" if ($expert);
-  print STDERR " -fpsopt ... -fpsopt extra options for -FPS (suggest -x 3)\n" if ($expert);
+  print STDERR " -FPS ... -FPS  FP query/queries for fingerprint_substructure, S:file for smarts DNU\n" if ($expert);
   print STDERR " -W <dname>     include fingerprint of descriptor <dname>\n";
   print STDERR " -R <rxn>       isostere reaction DNU\n" if ($expert);
   print STDERR " -R FRED        transform to isosteric form based on Fred's rules DNU\n" if ($expert);
@@ -1040,17 +1039,13 @@ OPTION: while ($argptr < @ARGV)
   }
   elsif ($opt eq "-FPS")
   {
-    $fingerprint_substructure_options = $ARGV[$argptr++];
     $fingerprints_specified++;
-  }
-  elsif ($opt eq "-fpsopt")
-  {
     my $gotclose;
     $gotclose = 0;
 
     GET_FPS: while (1)
     {
-      if ($ARGV[$argptr] eq "-fpsopt")
+      if ($ARGV[$argptr] eq "-FPS")
       {
         $gotclose = 1;
         $argptr++;
@@ -1064,7 +1059,7 @@ OPTION: while ($argptr < @ARGV)
       last GET_FPS if ($argptr >= @ARGV);
     }
 
-    die "The -fpsopt option grouping must be closed" unless ($gotclose);
+    die "The -FPS option grouping must be closed" unless ($gotclose);
 #   print STDERR "Options '${tsubstructure_fingerprint_options}'\n";
   }
   elsif ($opt =~ /^-NCTSUB(\d*)$/ || $opt =~ /^-TSUBNC(\d*)$/)
@@ -2686,9 +2681,9 @@ if (length($fingerprint_substructure_options))
     $input_file_specification = "$aromatic_smiles $input_qualifiers ";
   }
 
-  my $fingerprint_substructure_cmd_common = "$fingerprint_substructure -z i -A D -Y nbits=1024 -q $fingerprint_substructure_options";
+  my $fingerprint_substructure_cmd_common = "$fingerprint_substructure -z i -Y nbits=1024 $fingerprint_substructure_options";
 
-  $fingerprint_substructure_cmd_first = "$fingerprint_substructure_cmd_common $dash_g $input_file_specification FILE";
+  $fingerprint_substructure_cmd_first = "$fingerprint_substructure_cmd_common $dash_g ${input_qualifiers} $input_file_specification FILE";
   $fingerprint_substructure_cmd_pipe  = "$fingerprint_substructure_cmd_common $input_file_specification -f -";
 }
 

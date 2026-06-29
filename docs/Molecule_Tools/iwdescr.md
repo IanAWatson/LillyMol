@@ -145,7 +145,6 @@ Use `-O help` to display the available groups.
 | `lcc` | Long carbon-chain descriptors |
 | `ncon` | Atomic connectivity-count descriptors |
 | `pbond` | Polar-bond descriptors |
-| `planarity` | Molecular planarity descriptor |
 | `psa` | Novartis topological polar surface area |
 | `psymm` | Partial-symmetry descriptors |
 | `ramey` | Element-count and related descriptors |
@@ -511,7 +510,6 @@ as the distance from a starting atom is increased.
 | mh3b | Maximum number of heteroatoms within three bonds of any starting atom. | `dm` |
 | tg3 | Terminal groups separated by 3 bonds. | `dm` |
 | tm | Terminal methyl groups. | `dm` |
-| planarity | 0 if the molecule is planar; 1 if it is non-planar. | `planarity` |
 
 ### Symmetry
 

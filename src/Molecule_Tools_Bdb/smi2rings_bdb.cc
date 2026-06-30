@@ -1712,7 +1712,10 @@ WriteProto(Molecule& m, const PerMoleculeData& mdata,
   }
 
   std::string buffer;
-  printer.PrintToString(results, &buffer);
+  if (! printer.PrintToString(results, &buffer)) {
+    cerr << "PrintToString failed\n";
+    return 0;
+  }
 
   output << buffer << '\n';
 

@@ -265,7 +265,10 @@ ConformerDB::WriteConformers(MoleculeWithEnergy& m, const conformer_database::Co
   }
 
   std::string serialized;
-  conformers.SerializeToString(&serialized);
+  if (!conformers.SerializeToString(&serialized)) {
+    cerr << "SerializeToString failed\n";
+    return 0;
+  }
 
   zdata.set_data(serialized.data());
   zdata.set_size(serialized.size());
@@ -277,6 +280,8 @@ ConformerDB::WriteConformers(MoleculeWithEnergy& m, const conformer_database::Co
     _db->err(rc, "");
     return 0;
   }
+
+  return 1;
 }
 
 int

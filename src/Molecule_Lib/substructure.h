@@ -986,7 +986,12 @@ class Substructure_Atom : public Substructure_Atom_Specifier
     // for each atom. If requested, we can only match with an atom that has a given
     // global match id.
     // Note that in smarts, these are restricted to single digits.
-    int _global_match_id;
+    // Note that this is a signed value here. Negative values are interpreted as
+    // do NOT match an atom that has an given value.
+    // So if a ring specifies 'global_id: 3' a substructure atom
+    // might specify 'global_match_id: -3' which means do NOT match
+    // an atom which has a global id of 3.
+    int _global_id_match;
 
     resizable_array_p<Substructure_Atom> _children;
 
@@ -1201,7 +1206,7 @@ class Substructure_Atom : public Substructure_Atom_Specifier
     int  add_ncon_preference_object (int n, int p);
 
     int atom_map_number() const { return _atom_map_number;}
-    int global_match_id() const { return _global_match_id;}
+    int global_id_match() const { return _global_id_match;}
 
     int number_descendants () const;
 
@@ -1812,7 +1817,8 @@ class Substituent {
     int RunQueries(Molecule_to_Match& target, const int * storage, int flag,
                        int& got_required_match,
                        int& got_rejected_match);
-    int MatchesInner(Molecule_to_Match& target, const int * ring_atoms, int * storage);
+    int MatchesInner(Molecule_to_Match& target, const int * ring_atoms, int * storage,
+                     int* used_sidechain);
     void SetTargetGlobalIds(int * storage, int flag, Molecule_to_Match& target) const;
     void FillMatchedAtomsArray(std::unique_ptr<int[]>& matched_by_global_specs,
                         const int matoms,
@@ -1834,7 +1840,8 @@ class Substituent {
     // `storage` is an array of m.natoms() that each Substituent uses to
     // hold the identities of the atoms it is processing.
     int Matches(Molecule_to_Match& target, const int * ring_atoms, int * storage,
-                std::unique_ptr<int[]>& matched_by_global_specs);
+                std::unique_ptr<int[]>& matched_by_global_specs,
+                int* used_sidechain = nullptr);
 };
 
 // In processing inter-ring regions, there are a number of attributes
@@ -1989,6 +1996,10 @@ class Substructure_Ring_Base
     bool _ring_extends_to_carbonyl;
     // May 2026. Environment matches can also set the global id.
     bool _environment_sets_global_id;
+
+    // If true, repeated Substituent specifications greedily claim distinct
+    // sidechains in proto order.
+    bool _substituents_must_match_distinct_sidechains;
 
     // June 2022. Implement substituent idea.
     resizable_array_p<Substituent> _substituent;

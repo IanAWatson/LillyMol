@@ -23,7 +23,7 @@ Substructure_Atom::_default_values() {
 
   _atom_map_number = -1;
 
-  _global_match_id = -1;
+  _global_id_match = 0;
 
   _or_id = 0;
 
@@ -948,8 +948,8 @@ Substructure_Atom::_matches(Target_Atom& target, const int* already_matched) {
          << _match_as_match_or_rejection << '\n';
 #endif
 
-    if (m &&
-        0 == _match_as_match_or_rejection) {  // matches, but we are a rejection criterion
+    // matches, but we are a rejection criterion
+    if (m && 0 == _match_as_match_or_rejection) {
       return 0;
     }
 
@@ -1036,12 +1036,19 @@ Substructure_Atom::_matches(Target_Atom& target, const int* already_matched) {
 #ifdef DEBUG_ATOM_MATCHES
   cerr << "Query atom " << _unique_id << " trying to match " << target.atom_number()
        << " environment OK\n";
-  cerr << "_global_match_id " << _global_match_id << " cmp target " << target.global_id()
+  cerr << "_global_id_match " << _global_id_match << " cmp target " << target.global_id()
        << '\n';
 #endif
 
-  if (_global_match_id > 0 && _global_match_id != target.global_id()) {
-    return !_match_as_match_or_rejection;
+  if (_global_id_match == 0) [[ likely ]] {
+  } else if (_global_id_match > 0) {
+    if (_global_id_match != target.global_id()) {
+      return !_match_as_match_or_rejection;
+    }
+  } else if (_global_id_match < 0) {
+    if (target.global_id() == (- _global_id_match)) {
+      return !_match_as_match_or_rejection;
+    }
   }
 
   // sum any numeric preferences.

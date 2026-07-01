@@ -333,10 +333,91 @@ query {
 }
 )pb";
 
-const std::string substituent_sets_global_id = R"pg(
+const std::string substituent_sets_global_id = R"pb(
 query {
 ]
-)pg";
+)pb";
+
+const std::string smarts_no_match_global_id = R"pb(
+query {
+  ring_specifier {
+    base {
+      set_global_id: 1
+    }
+    aromatic: 1
+  }
+  smarts: "[/IWgid-1R]"
+}
+)pb";
+
+
+// By default repeated Substituent specifications must match distinct
+// sidechains. Phenol has only one sidechain, so the second specification
+// cannot reuse the phenolic oxygen matched by the first.
+const std::string multiple_substituents_match_one_sidechain = R"pb(
+query {
+  ring_specifier {
+    base {
+      set_global_id: 1
+      substituent {
+        length: 1
+        heteroatom_count: 1
+      }
+      substituent {
+        length: 1
+        required_smarts: "[OD1]"
+      }
+    }
+    aromatic: 1
+  }
+}
+)pb";
+
+// The legacy sidechain-sharing behaviour remains available as an explicit
+// opt-out.
+const std::string multiple_substituents_can_share_one_sidechain = R"pb(
+query {
+  ring_specifier {
+    base {
+      set_global_id: 1
+      substituents_must_match_distinct_sidechains: false
+      substituent {
+        length: 1
+        heteroatom_count: 1
+      }
+      substituent {
+        length: 1
+        required_smarts: "[OD1]"
+      }
+    }
+    aromatic: 1
+  }
+}
+)pb";
+
+// But now we insist that the two substituents match different sidechains
+// It should not match phenol, but should match catechol
+const std::string multiple_substituents_matched_separately = R"pb(
+query {
+  ring_specifier {
+    base {
+      set_global_id: 1
+      substituent {
+        length: 1
+        heteroatom_count: 1
+        set_global_id: 2
+      }
+      substituent {
+        length: 1
+        required_smarts: "[/IWgid-2OD1]"
+        set_global_id: 3
+      }
+    }
+    aromatic: 1
+  }
+  smarts: "[/IWgid1c].[/IWgid2R0].[/IWgid3R0]"
+}
+)pb";
 
 TEST_P(TestRingSys, TestOperators) {
   const auto params = GetParam();
@@ -448,7 +529,15 @@ INSTANTIATE_TEST_SUITE_P(TestRingSys, TestRingSys, testing::Values(
 
   Data{"Oc1ccccc1 phenol", environment_sets_global_id_single_atom, 1},
   Data{"COc1ccccc1 methoxy", environment_sets_global_id_two_atoms, 2},
-  Data{"OC1(C)CCC1 branched", environment_sets_global_id_branched, 2}
+  Data{"OC1(C)CCC1 branched", environment_sets_global_id_branched, 2},
+
+  Data{"c1ccccc1C1CC1", smarts_no_match_global_id, 3},
+
+  Data{"Oc1ccccc1", multiple_substituents_match_one_sidechain, 0},
+  Data{"Oc1ccccc1", multiple_substituents_can_share_one_sidechain, 1},
+
+  Data{"Oc1ccccc1", multiple_substituents_matched_separately, 0}
+
 ));
 
 const std::string ring_includes_carbonyl = R"pb(

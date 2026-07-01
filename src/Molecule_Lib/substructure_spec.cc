@@ -51,6 +51,7 @@ Substructure_Atom_Specifier::atomic_number(atomic_number_t& z) const {
 // regardless of configuration.
 static constexpr int kMustBeChiral = 3;
 static constexpr int kMustNotBeChiral = 4;
+static constexpr char kNvWithOpenBrace[] = "Nv{";
 
 void
 Substructure_Atom_Specifier::_default_values() {
@@ -772,7 +773,7 @@ Substructure_Atom_Specifier::_match_scaffold_bonds_attached_to_ring(
   any rejections
 */
 
-// #define DEBUG_ATOM_MATCHES
+//#define DEBUG_ATOM_MATCHES
 
 int
 Substructure_Atom_Specifier::_matches(Target_Atom& target) {
@@ -2111,6 +2112,7 @@ Substructure_Atom::construct_from_smarts_token(const const_IWSubstring& smarts) 
 
 int
 Substructure_Atom::ParseIWDirective(const_IWSubstring c) {  // note local copy
+  // cerr << "ParseIWDirective with '" << c << "'\n";
   if (c.starts_with("fragid")) {
     c.remove_leading_chars(6);
     if (! std::isdigit(c[0])) {  // opnly single digit fragid's are allowed in smarts.
@@ -2145,12 +2147,23 @@ Substructure_Atom::ParseIWDirective(const_IWSubstring c) {  // note local copy
     _ring_bond_count.set_min(2);
   } else if (c.starts_with("gid")) {
     c.remove_leading_chars(3);
+    int gsign;
+    if (c[0] == '-') {
+      gsign = -1;
+      ++c;
+    } else {
+      gsign = 1;
+    }
     if (!isdigit(c[0])) {  // only single digit global ids are allowed in smarts
       cerr << "Substructure_Atom::construct_from_smarts_token:invalid gid qualifier '"
            << c << "'\n";
       return 0;
     }
-    _global_match_id = c[0] - '0';
+    _global_id_match = c[0] - '0';
+    if (gsign < 0) {
+      _global_id_match = - _global_id_match;
+    }
+    // cerr << "Global id set to " << _global_id_match << '\n';
   } else if (c.starts_with("fss"))
     ;
   else if (c.starts_with("Vy"))
@@ -2179,7 +2192,7 @@ Substructure_Atom::ParseIWDirective(const_IWSubstring c) {  // note local copy
     ;
   else if (c.starts_with("cipR") || c.starts_with("cipS")) 
     ;
-  else if (c.starts_with("Nv{")) {
+  else if (c.starts_with(kNvWithOpenBrace)) {
     c.remove_leading_chars(3);
     if (!FetchNumericFromBraces(c, _numeric_value)) {
       cerr << "Substructure_Atom::construct_from_smarts_token:invalid Nv '" << c
@@ -2623,7 +2636,7 @@ Substructure_Atom_Specifier::AddNonOrganicElements() {
   }
 }
 
-// #define DEBUG_CONSTRUCT_FROM_SMARTS_TOKEN
+//#define DEBUG_CONSTRUCT_FROM_SMARTS_TOKEN
 
 /*
   An atomic smarts has been tokenised for us. Parse it.
@@ -3134,6 +3147,9 @@ Substructure_Atom_Specifier::construct_from_smarts_token(
         nchars = 3 + 4 + 1 - 1;  // will fail if more than two digits for fsid
       } else if (c.length() > 3 && c.starts_with("gid")) {
         nchars = 3 + 3 + 1 - 1;  // will fail if more than two digits for gid
+        if (c.contains('-')) {
+          ++nchars;
+        }
       } else if (c.length() > 3 && c.starts_with("fragid")) {
         nchars = 3 + 6 + 1 - 1;
       } else if (c.length() > 4 && (c.starts_with("spch") || c.starts_with("scaf"))) {
@@ -3653,7 +3669,7 @@ Substructure_Atom_Specifier::count_attributes_specified() {
     _chirality = 0;
   }
 
-// #define DEBUG_ATTRIBUTES_SPECIFIED
+//#define DEBUG_ATTRIBUTES_SPECIFIED
 #ifdef DEBUG_ATTRIBUTES_SPECIFIED
   cerr << "After counting everything " << rc << '\n';
 

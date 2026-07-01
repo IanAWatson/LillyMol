@@ -253,7 +253,7 @@ GlobalIdentifiersAlsoMatched(const Query_Atoms_Matched& qam,
                              const int* matched_by_global_specs)
 {
   for (const Substructure_Atom * a : qam) {
-    int gmid = a->global_match_id();
+    int gmid = a->global_id_match();
     if (gmid <= 0) {
       continue;
     }

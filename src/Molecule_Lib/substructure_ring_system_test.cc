@@ -1462,6 +1462,67 @@ query {
     every_group_matches_length_of_spinach: true
   }
 }
+)pb", 1},
+
+  SmilesProtoExpected{
+    "Oc1ccccc1",
+    R"pb(
+query {
+  ring_system_specifier {
+    rings_in_system: 1
+    base {
+      substituent {
+        length: 1
+        heteroatom_count: 1
+      }
+      substituent {
+        length: 1
+        required_smarts: "[OD1]"
+      }
+    }
+  }
+}
+)pb", 0},
+
+  SmilesProtoExpected{
+    "Oc1ccccc1",
+    R"pb(
+query {
+  ring_system_specifier {
+    rings_in_system: 1
+    base {
+      substituents_must_match_distinct_sidechains: false
+      substituent {
+        length: 1
+        heteroatom_count: 1
+      }
+      substituent {
+        length: 1
+        required_smarts: "[OD1]"
+      }
+    }
+  }
+}
+)pb", 1},
+
+  SmilesProtoExpected{
+    "Oc1cc(O)ccc1",
+    R"pb(
+query {
+  ring_system_specifier {
+    rings_in_system: 1
+    base {
+      substituent {
+        length: 1
+        heteroatom_count: 1
+      }
+      substituent {
+        length: 1
+        required_smarts: "[OD1]"
+      }
+    }
+  }
+}
 )pb", 1}
 
 ));

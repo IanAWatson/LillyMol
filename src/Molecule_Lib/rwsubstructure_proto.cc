@@ -963,8 +963,8 @@ Substructure_Atom::construct_from_proto(const SubstructureSearch::SubstructureAt
   if (proto.has_fragment_id() && ! AssignValue(proto.fragment_id(), _fragment_id, [](int f) { return f > 0;}, "fragment_id"))
     return 0;
 
-  if (proto.has_global_match_id()) {
-    _global_match_id = proto.global_match_id();
+  if (proto.has_global_id_match()) {
+    _global_id_match = proto.global_id_match();
   }
 
   if (proto.has_fused_system_id())
@@ -1517,7 +1517,7 @@ Substructure_Atom::BuildProto(SubstructureSearch::SubstructureAtom& proto) const
   SET_PROTO_IF_SET(proto, ring_id, 0);  // 9
   SET_PROTO_IF_SET(proto, fused_system_id, 0);  // 10
   SET_PROTO_IF_SET(proto, fragment_id, 0);  // 11
-  SetProtoIfSet(_global_match_id, 0, "global_match_id", proto);  // 34
+  SetProtoIfSet(_global_id_match, 0, "global_id_match", proto);  // 34
 
   double nv;
   if (_numeric_value.value(nv)) {  // 12
@@ -1593,6 +1593,10 @@ Substructure_Atom::BuildProto(SubstructureSearch::SubstructureAtom& proto) const
   }
 
   _environment.BuildProto(proto);
+
+  if (_global_id_match != 0) {
+    proto.set_global_id_match(_global_id_match);
+  }
 
   for (const Substructure_Atom* c : _children) {
     SubstructureSearch::SubstructureAtom* child = proto.add_children();
@@ -2997,6 +3001,11 @@ Substructure_Ring_Base::ConstructFromProto(const SubstructureSearch::Substructur
     _environment_sets_global_id = proto.environment_sets_global_id();
   }
 
+  if (proto.has_substituents_must_match_distinct_sidechains()) {
+    _substituents_must_match_distinct_sidechains =
+        proto.substituents_must_match_distinct_sidechains();
+  }
+
   if (!GETVALUES(proto, hits_needed, 0, no_limit))
     return 0;
 
@@ -3763,6 +3772,12 @@ Substructure_Ring_Base::BuildProto(SubstructureSearch::SubstructureRingBase& pro
   }
   if (_ring_extends_to_carbonyl) {
     proto.set_ring_extends_to_carbonyl(true);
+  }
+  if (_environment_sets_global_id) {
+    proto.set_environment_sets_global_id(true);
+  }
+  if (! _substituents_must_match_distinct_sidechains) {
+    proto.set_substituents_must_match_distinct_sidechains(false);
   }
 
   for (const Substituent* substituent : _substituent) {

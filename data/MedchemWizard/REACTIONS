@@ -260,3 +260,5 @@ Virtual_Ring.create_a_new_ring_with_O-CH2.rxn
 Virtual_Ring.create_a_new_ring_with_S-CH2.rxn
 PROTO:alcohol_to_CF2.rxn
 PROTO:CF2_to_alcohol.rxn
+PROTO:oxetane_to_gem_dimethyl.rxn
+PROTO:gem_dimethyl_to_oxetane.rxn

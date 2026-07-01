@@ -1202,13 +1202,20 @@ EmbeddingMatchesGlobalIds(const Set_of_Atoms& embedding,
 
   for (int i = 0; i < n; ++i) {
     const Substructure_Atom * a = qam[i];
-    int gmid = a->global_match_id();
-    if (gmid <= 0) {
+    int gmid = a->global_id_match();
+    if (gmid == 0) {
       continue;
     }
     const atom_number_t matched_atom = embedding[i];
-    if (matched_by_global_conditions[matched_atom] != gmid) {
-      return 0;
+    // Treat positive and negative matches differently
+    if (gmid > 0) {  // positive match
+      if (matched_by_global_conditions[matched_atom] != gmid) {
+        return 0;
+      }
+    } else {  // negative match.
+      if (matched_by_global_conditions[matched_atom] == gmid) {
+        return 0;
+      }
     }
   }
 

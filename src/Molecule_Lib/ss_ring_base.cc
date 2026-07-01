@@ -34,6 +34,8 @@ Substructure_Ring_Base::Substructure_Ring_Base()
 
   _environment_sets_global_id = false;
 
+  _substituents_must_match_distinct_sidechains = true;
+
   return;
 }
 
@@ -779,8 +781,9 @@ InvalidateOtherAtoms(const int* subset,
 int
 Substituent::Matches(Molecule_to_Match& target, const int * ring_atoms,
                      int * storage,
-                     std::unique_ptr<int[]>& matched_by_global_specs) {
-  int rc = MatchesInner(target, ring_atoms, storage);
+                     std::unique_ptr<int[]>& matched_by_global_specs,
+                     int* used_sidechain) {
+  int rc = MatchesInner(target, ring_atoms, storage, used_sidechain);
   if (_match_as_match_or_rejection == 0) {
     rc = ! rc;
   }
@@ -826,7 +829,7 @@ Substituent::Matches(Molecule_to_Match& target, const int * ring_atoms,
 // adjusted to 3.
 int
 Substituent::MatchesInner(Molecule_to_Match& target, const int * ring_atoms,
-                          int * storage) {
+                          int * storage, int* used_sidechain) {
   // A slightly risky cast, should be OK.
   Molecule& m = const_cast<Molecule&>(*target.molecule());
   const int matoms = m.natoms();
@@ -863,6 +866,9 @@ Substituent::MatchesInner(Molecule_to_Match& target, const int * ring_atoms,
     for (const Bond* b : a) {
       const atom_number_t o = b->other(i);
       if (storage[o]) {
+        continue;
+      }
+      if (used_sidechain != nullptr && used_sidechain[o]) {
         continue;
       }
       // Turn off atoms left by a previously failed attempt.
@@ -924,8 +930,19 @@ Substituent::MatchesInner(Molecule_to_Match& target, const int * ring_atoms,
       }
 
       TranslateNumbers(storage, matoms, 2, 3);  // Mark as having a successful substituent match.
+      if (used_sidechain != nullptr) {
+        used_sidechain[o] = 1;
+      }
       ++matches_found;
       ++matches_this_atom;
+
+      // In distinct-sidechain mode, a Substituent specification without an
+      // explicit hits_needed claims the first sidechain that satisfies it.
+      // If hits_needed is specified, preserve the existing behaviour of
+      // counting all matching sidechains for this Substituent.
+      if (used_sidechain != nullptr && ! _hits_needed.is_set()) {
+        return matches_found;
+      }
     }
 
     if (substituents_this_atom == 0) {

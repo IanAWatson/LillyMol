@@ -1,0 +1,10 @@
+(0 Query
+  (A C Comment "2-halogen_heterocycle")
+  (A I Version 2)
+  (A I min_nrings 1)
+  (0 Ring_Specifier
+    (A I ring_size 6)
+    (A I aromatic 1)
+  )
+  (A C smarts "[Cl,Br,I]-[/IWfss1c]:n")
+)

@@ -329,7 +329,10 @@ Mol2QryOutput::DoOutput(Substructure_Query& query, IWString& fname) {
   if (proto_destination) {
     SubstructureSearch::SubstructureQuery proto = query.BuildProto();
     std::string serialized;
-    proto.SerializeToString(&serialized);
+    if (!proto.SerializeToString(&serialized)) {
+      cerr << "SerializeToString failed\n";
+      return 0;
+    }
     return proto_destination->Write(serialized.data(), serialized.size());
   }
 

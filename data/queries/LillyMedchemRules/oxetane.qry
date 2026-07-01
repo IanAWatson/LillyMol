@@ -1,0 +1,10 @@
+(0 Query
+  (A C Comment "oxetane")
+  (A I Version 2)
+  (A I min_nrings 1)
+  (0 Ring_Specifier
+    (A I ring_size 4)
+    (A I heteroatom_count 1)
+  )
+  (A C smarts "[OD2r4]1-[$([CR1X4D2]);!$([D4R2])]-[CR1X4]-[$([CR1X4D2]);!$([CD4R2])]1")
+)

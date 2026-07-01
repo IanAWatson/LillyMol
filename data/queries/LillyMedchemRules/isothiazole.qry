@@ -1,0 +1,10 @@
+(0 Query
+  (A C Comment "isothiazole")
+  (A I Version 2)
+  (A D numeric_value 70)
+  (A C smarts "[n;r5x2]1:[sD2]:[cD2]:c:c1")
+  (1 Environment_no_Match
+    (A C smarts "O")
+    (A I single_bond 4)
+  )
+)

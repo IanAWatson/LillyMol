@@ -1,5 +1,7 @@
 #!/usr/bin/env python3
 
+from __future__ import annotations
+
 from rdkit import Chem
 from rdkit.Chem import Draw
 
@@ -53,10 +55,62 @@ def separator_from_args(args):
     return None   # whitespace split
 
 
-def read_smiles_file(fname, separator=None, has_header=False, max_molecules=None):
+def parse_smiles_columns(values) -> list[int]:
+    columns = []
+
+    def flattened(items):
+        for item in items or ["1"]:
+            if isinstance(item, (list, tuple)):
+                yield from flattened(item)
+            else:
+                yield item
+
+    for value in flattened(values):
+        for token in str(value).split(","):
+            token = token.strip()
+            if not token:
+                continue
+            try:
+                column = int(token)
+            except ValueError:
+                sys.exit(f"--smiles_column: invalid column '{token}'")
+            if column < 1:
+                sys.exit("--smiles_column values must be positive 1-based column numbers")
+            columns.append(column - 1)
+
+    if not columns:
+        sys.exit("--smiles_column must specify at least one column")
+
+    seen = set()
+    result = []
+    for column in columns:
+        if column not in seen:
+            seen.add(column)
+            result.append(column)
+
+    return result
+
+
+def split_smiles_and_extra(tokens: list[str], smiles_columns: list[int], record_number: int):
+    fields = [value.strip() for value in tokens]
+    smiles = []
+    for column in smiles_columns:
+        if column >= len(fields):
+            sys.exit(f"Input record {record_number} does not have SMILES column {column + 1}")
+        smiles.append(fields[column])
+
+    smiles_set = set(smiles_columns)
+    extra = [value for i, value in enumerate(fields) if i not in smiles_set]
+    return smiles, extra, fields
+
+
+def read_smiles_file(fname, separator=None, has_header=False, max_molecules=None, smiles_columns=None):
     rows = []
     max_extra = 0
     headers = None
+    display_headers = None
+    max_fields = 0
+    smiles_columns = smiles_columns or [0]
 
     with open(fname, newline="") as f:
         if separator == ",":
@@ -73,17 +127,17 @@ def read_smiles_file(fname, separator=None, has_header=False, max_molecules=None
                     continue
 
                 if has_header and headers is None:
-                    headers = [x.strip() for x in tokens[1:]]
+                    _, headers, display_headers = split_smiles_and_extra(tokens, smiles_columns, record_number)
                     continue
 
-                smiles = tokens[0].strip()
-                extra = [x.strip() for x in tokens[1:]]
+                smiles, extra, fields = split_smiles_and_extra(tokens, smiles_columns, record_number)
 
-                if not smiles:
+                if not any(smiles):
                     continue
 
-                rows.append((record_number, smiles, extra))
+                rows.append((record_number, smiles, extra, fields))
                 max_extra = max(max_extra, len(extra))
+                max_fields = max(max_fields, len(fields))
 
                 if max_molecules is not None and len(rows) >= max_molecules:
                     break
@@ -96,24 +150,40 @@ def read_smiles_file(fname, separator=None, has_header=False, max_molecules=None
                 tokens = line.split()
 
                 if has_header and headers is None:
-                    headers = tokens[1:]
+                    _, headers, display_headers = split_smiles_and_extra(tokens, smiles_columns, record_number)
                     continue
 
-                smiles = tokens[0]
-                extra = tokens[1:]
+                smiles, extra, fields = split_smiles_and_extra(tokens, smiles_columns, record_number)
 
-                rows.append((record_number, smiles, extra))
+                rows.append((record_number, smiles, extra, fields))
                 max_extra = max(max_extra, len(extra))
+                max_fields = max(max_fields, len(fields))
 
                 if max_molecules is not None and len(rows) >= max_molecules:
                     break
 
+    smiles_set = set(smiles_columns)
+    if display_headers is None:
+        display_headers = []
+        field_number = 1
+        structure_number = 1
+        for column in range(max_fields):
+            if column in smiles_set:
+                if len(smiles_columns) == 1:
+                    display_headers.append("Structure")
+                else:
+                    display_headers.append(f"Structure {structure_number}")
+                structure_number += 1
+            else:
+                display_headers.append(f"Field {field_number}")
+                field_number += 1
+
     if headers is None:
-        headers = [f"Field {i + 1}" for i in range(max_extra)]
+        headers = [display_headers[i] for i in range(len(display_headers)) if i not in smiles_set]
     elif len(headers) < max_extra:
         headers.extend(f"Field {i + 1}" for i in range(len(headers), max_extra))
 
-    return rows, headers
+    return rows, display_headers, headers
 
 
 def column_from_string(column: str, headers: list[str], option_name: str) -> int:
@@ -282,9 +352,8 @@ def row_style(extra: list[str], color_column: Optional[int], color_rules: list[C
 
 def normalised_rows_for_export(rows, headers):
     result = []
-    for row_number, smiles, extra in rows:
-        fields = [extra[i] if i < len(extra) else "" for i in range(len(headers))]
-        result.append({"row": row_number, "smiles": smiles, "fields": fields})
+    for row_number, smiles, extra, fields in rows:
+        result.append({"row": row_number, "fields": fields})
     return result
 
 
@@ -302,12 +371,14 @@ def write_export_controls(out, export_filename: Optional[str]):
 ''')
 
 
-def write_html(rows, headers, output, link_specs=None, color_column=None, color_rules=None,
+def write_html(rows, display_headers, headers, output, smiles_columns=None, link_specs=None, color_column=None, color_rules=None,
                page_length=50, image_columns=None, image_width=160,
                write_smiles_filename: Optional[str] = None):
     link_specs = link_specs or []
     color_rules = color_rules or []
     image_columns = image_columns or set()
+    smiles_columns = smiles_columns or [0]
+    smiles_set = set(smiles_columns)
 
     export_rows_json = json.dumps(normalised_rows_for_export(rows, headers))
     export_filename_json = json.dumps(write_smiles_filename or "selected.smi")
@@ -390,9 +461,7 @@ th:first-child {
         else:
             out.write("<th>#</th>\n")
 
-        out.write("<th>Structure</th>\n")
-
-        for header in headers:
+        for header in display_headers:
             out.write(f"<th>{html.escape(header)}</th>\n")
 
         out.write("""</tr>
@@ -400,7 +469,7 @@ th:first-child {
 <tbody>
 """)
 
-        for row_index, (row_number, smiles, extra) in enumerate(rows):
+        for row_index, (row_number, smiles, extra, fields) in enumerate(rows):
             out.write(f"<tr{row_style(extra, color_column, color_rules)}>\n")
             if write_smiles_filename:
                 out.write(
@@ -409,11 +478,15 @@ th:first-child {
                 )
             else:
                 out.write(f"<td>{row_number}</td>\n")
-            out.write(f"<td class='mol'>{mol_to_svg(smiles)}</td>\n")
 
-            for i in range(len(headers)):
-                value = extra[i] if i < len(extra) else ""
-                out.write(f"<td>{cell_value(value, i, link_specs, image_columns, image_width)}</td>\n")
+            extra_column = 0
+            for input_column in range(len(display_headers)):
+                value = fields[input_column] if input_column < len(fields) else ""
+                if input_column in smiles_set:
+                    out.write(f"<td class='mol'>{mol_to_svg(value)}</td>\n")
+                else:
+                    out.write(f"<td>{cell_value(value, extra_column, link_specs, image_columns, image_width)}</td>\n")
+                    extra_column += 1
 
             out.write("</tr>\n")
 
@@ -462,7 +535,8 @@ function updateSelectedCount() {
 }
 
 function smilesLine(row) {
-    const parts = [row.smiles].concat(row.fields || []);
+    const smiles = Array.isArray(row.smiles) ? row.smiles : [row.smiles];
+    const parts = smiles.concat(row.fields || []);
     return parts.join('\t').replace(/\s+$/g, '');
 }
 
@@ -545,14 +619,17 @@ $(document).ready(function () {
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("input", help="Input file. First field must be SMILES.")
+    parser.add_argument("input", help="Input file containing one or more SMILES columns.")
     parser.add_argument("-o", "--output", default="molecules.html")
     parser.add_argument("-n", type=int, default=None,
                         help="Maximum number of molecules to read")
     parser.add_argument("-s", "--separator", default=None,
                         help="Input separator. Use '\\t' for tab. Defaults to comma for .csv, otherwise whitespace.")
     parser.add_argument("--header", action="store_true",
-                        help="First record contains column titles. The first title is assumed to be the SMILES column.")
+                        help="First record contains column titles.")
+    parser.add_argument("--smiles_column", action="append", default=None, metavar="COLUMN[,COLUMN...]",
+                        help=("1-based input column(s) containing SMILES. Use a comma-separated list "
+                              "or repeat the option. Default is 1."))
     parser.add_argument("--link-column", action="append", default=[], metavar="COLUMN=URL_TEMPLATE",
                         help=("Make a data column a hyperlink. COLUMN is a 1-based field number "
                               "after the structure column, or a header name. The URL template "
@@ -587,11 +664,13 @@ def main():
         sys.exit("--image_width must be a positive integer")
 
     separator = separator_from_args(args)
-    rows, headers = read_smiles_file(
+    smiles_columns = parse_smiles_columns(args.smiles_column)
+    rows, display_headers, headers = read_smiles_file(
         args.input,
         separator=separator,
         has_header=args.header,
         max_molecules=args.n,
+        smiles_columns=smiles_columns,
     )
 
     link_specs = parse_link_columns(args.link_column, headers)
@@ -609,8 +688,10 @@ def main():
 
     write_html(
         rows,
+        display_headers,
         headers,
         args.output,
+        smiles_columns=smiles_columns,
         link_specs=link_specs,
         color_column=color_column,
         color_rules=color_rules,

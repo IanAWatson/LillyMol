@@ -1,6 +1,7 @@
 #include <assert.h>
 #include <ctype.h>
 
+#include <cstdint>
 #include <iostream>
 #include <memory>
 
@@ -1784,7 +1785,7 @@ Substructure_Atom::assign_unique_id_from_atom_number_if_set(
   } else  // find an unused number to assign
   {
     int next_to_assign = -1;
-    for (unsigned int i = 0; i < numbers_in_use.size(); ++i)  // find current max index
+    for (uint32_t i = 0; i < numbers_in_use.size(); ++i)  // find current max index
     {
       if (numbers_in_use[i] > 0) {  // number I is already in use
         continue;
@@ -1810,7 +1811,7 @@ Substructure_Atom::assign_unique_id_from_atom_number_if_set(
     e->assign_unique_id_from_atom_number_if_set(for_env);
   }
 
-  for (unsigned int i = 0; i < _children.size(); ++i) {
+  for (uint32_t i = 0; i < _children.size(); ++i) {
     _children[i]->assign_unique_id_from_atom_number_if_set(numbers_in_use);
   }
 

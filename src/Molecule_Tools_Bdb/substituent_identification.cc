@@ -3035,7 +3035,7 @@ int
 SubstituentIdentification::StoreNewBit(Molecule& m, atom_number_t zatom,
                         uint32_t bitnum, int radius,
                         Molecule_Specific_Temporary_Arrays& msta) {
-  cerr << "Atom tpe " << _atom_typing_specification.user_specified_type() << '\n';
+//cerr << "Atom tpe " << _atom_typing_specification.user_specified_type() << '\n';
   IWString smarts = lillymol::SmartsForAtomSubset(m, zatom, 
                         _atom_typing_specification.user_specified_type(), msta.include_atom());
 
@@ -3567,8 +3567,8 @@ SubstituentIdentification::_read_smiles_already_found(
 }
 
 static void
-DisplayDashYOptions(std::ostream& output) {
-  output << R"(
+DisplayDashYOptions(int rc) {
+  cerr << R"(
  -Y dbproto        during building store serialized protos, then needed during read.
  -Y textproto=<fname> during building also write database contents as textproto form to <fname>.
  -Y exph           make implicit Hydrogens explicit.
@@ -3582,9 +3582,10 @@ DisplayDashYOptions(std::ostream& output) {
  -Y smitextproto   write smiles + substituent_identification::Result textproto as output.
  -Y matchedpairs   during lookup, identify local matched pairs.
  -Y allHmatch      all -H queries must match. By default, a product is OK if any of the -H queries match.
+ -Y bit2smt=<dbname> write a database of bit->smarts, for each bit number, a smarts.
 )";
 
-  ::exit(0);
+  ::exit(rc);
 }
 
 int
@@ -4048,8 +4049,8 @@ SubstituentIdentification::operator()(int argc, char** argv) {
           return 0;
         }
         _write_bit_meanings = 1;
-      } else if (y.starts_with("bitdb=")) {
-        y.remove_leading_chars(6);
+      } else if (y.starts_with("bit2smt=")) {
+        y.remove_leading_chars(8);
         if (! OpenBitSmartsDatabase(y)) {
           cerr << "Cannot open bitnum->smarts database '" << y << "'\n";
           return 0;
@@ -4058,10 +4059,10 @@ SubstituentIdentification::operator()(int argc, char** argv) {
           cerr << "Will write mappings of bitnum->smarts to '" << y << "'\n";
         }
       } else if (y == "help") {
-        DisplayDashYOptions(cerr);
+        DisplayDashYOptions(0);
       } else {
         cerr << "Unrecognised -Y qualifier '" << y << "'\n";
-        DisplayDashYOptions(cerr);
+        DisplayDashYOptions(1);
       }
     }
   }

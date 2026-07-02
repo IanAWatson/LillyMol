@@ -315,7 +315,6 @@ usage(int rc)
   // clang-format off
   cerr << DB_VERSION_STRING << '\n';
   cerr << "Compute the Extended Connectivity fingerprints for molecules and store\n";
-  cerr << "Warning, does not do updates, use 'iwbdb_cat.sh -p' for updates\n";
   cerr << "  -r <len>       min shell width for writing a fingerprint\n";
   cerr << "  -R <length>    set the maximum step for the connected shell\n";
   cerr << "  -d <dbname>    database(s) to use\n";

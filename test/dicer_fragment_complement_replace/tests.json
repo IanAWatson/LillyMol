@@ -13,6 +13,20 @@
       "shellScript": {
         "scriptName": "benzene.sh"
       }
+    },
+
+    {
+      "name": "atom_types_ARZ",
+      "shellScript": {
+        "scriptName": "benzene.sh"
+      }
+    },
+
+    {
+      "name": "atom_types_degenerate",
+      "shellScript": {
+        "scriptName": "benzene.sh"
+      }
     }
 
   ]

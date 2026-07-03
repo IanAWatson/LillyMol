@@ -6,6 +6,7 @@
 #include <iostream>
 #include <memory>
 #include <optional>
+#include <vector>
 
 #include "google/protobuf/io/zero_copy_stream_impl_lite.h"
 #include "google/protobuf/text_format.h"
@@ -39,6 +40,20 @@
 namespace dicer_fragment_replace {
 
 using std::cerr;
+
+struct Attachment {
+  atom_number_t atom;
+  isotope_t isotope;
+};
+
+using AttachmentList = std::vector<Attachment>;
+
+struct AttachmentPair {
+  atom_number_t frag_atom;
+  atom_number_t comp_atom;
+};
+
+using AttachmentPairing = std::vector<AttachmentPair>;
 
 void
 Usage(int rc) {
@@ -285,8 +300,8 @@ class SetOfDatabases {
                 Molecule& initial_comp,
                 const Molecule& comp,
                 int count,
-                const Set_of_Atoms& frag_attachments,
-                const Set_of_Atoms comp_attachments,
+                const AttachmentList& frag_attachments,
+                const AttachmentList& comp_attachments,
                 IWString_and_File_Descriptor& output);
     int MaybeWriteProduct(PerMoleculeData& pmd, Molecule& m,
                         int count,
@@ -876,43 +891,102 @@ SetOfDatabases::OkProduct(Molecule& m) {
 }
 
 
-// return a list of all atoms with an isotope.
-Set_of_Atoms
-GetIsotopicAtoms(const Molecule& m) {
-  Set_of_Atoms result;
+int
+CompareAttachment(const Attachment& a1, const Attachment& a2) {
+  if (a1.isotope < a2.isotope) {
+    return -1;
+  }
+  if (a1.isotope > a2.isotope) {
+    return 1;
+  }
+  if (a1.atom < a2.atom) {
+    return -1;
+  }
+  if (a1.atom > a2.atom) {
+    return 1;
+  }
+  return 0;
+}
+
+bool
+AttachmentLess(const Attachment& a1, const Attachment& a2) {
+  return CompareAttachment(a1, a2) < 0;
+}
+
+AttachmentList
+GetAttachments(const Molecule& m) {
+  AttachmentList result;
 
   const int matoms = m.natoms();
+  result.reserve(matoms);
 
   for (int i = 0; i < matoms; ++i) {
-    if (m.isotope(i)) {
-      result << i;
+    const isotope_t iso = m.isotope(i);
+    if (iso) {
+      result.push_back(Attachment{static_cast<atom_number_t>(i), iso});
     }
+  }
+
+  std::sort(result.begin(), result.end(), AttachmentLess);
+
+  return result;
+}
+
+IWString
+AttachmentsToString(const AttachmentList& attachments) {
+  IWString result;
+
+  for (const Attachment& attachment : attachments) {
+    if (! result.empty()) {
+      result << ' ';
+    }
+    result << attachment.atom << ':' << attachment.isotope;
   }
 
   return result;
 }
 
-// return a list of all atoms with an isotope.
-// Once we have found `expected` we return.
-Set_of_Atoms
-GetIsotopicAtoms(const Molecule& m, int expected) {
-  Set_of_Atoms result;
-  result.reserve(expected);
+bool
+SameIsotopeMultiset(const AttachmentList& frag_attachments,
+                    const AttachmentList& comp_attachments) {
+  if (frag_attachments.size() != comp_attachments.size()) {
+    return false;
+  }
 
-  const int matoms = m.natoms();
-
-  for (int i = 0; i < matoms; ++i) {
-    if (m.isotope(i)) {
-      result << i;
-      if (result.number_elements() == expected) {
-        return result;
-      }
+  for (uint32_t i = 0; i < frag_attachments.size(); ++i) {
+    if (frag_attachments[i].isotope != comp_attachments[i].isotope) {
+      return false;
     }
   }
 
-  cerr << "GetIsotopicAtoms:supposed to find " << expected <<
-          " isotopic atoms, but got " << result.size() << '\n';
-  return result;
+  return true;
+}
+
+void
+GenerateAttachmentPairings(const AttachmentList& frag_attachments,
+                           const AttachmentList& comp_attachments,
+                           std::vector<AttachmentPairing>& pairings) {
+  pairings.clear();
+
+  AttachmentList comp_permutation = comp_attachments;
+  do {
+    AttachmentPairing pairing;
+    pairing.reserve(frag_attachments.size());
+
+    bool matched = true;
+    for (uint32_t i = 0; i < frag_attachments.size(); ++i) {
+      if (frag_attachments[i].isotope != comp_permutation[i].isotope) {
+        matched = false;
+        break;
+      }
+
+      pairing.push_back(AttachmentPair{frag_attachments[i].atom, comp_permutation[i].atom});
+    }
+
+    if (matched) {
+      pairings.push_back(std::move(pairing));
+    }
+  } while (std::next_permutation(comp_permutation.begin(), comp_permutation.end(), AttachmentLess));
 }
 
 // We have looked up complementary fragments from the database. These are in
@@ -933,8 +1007,8 @@ SetOfDatabases::AddFragments(
     initial_formula->Build(initial_comp);
   }
 
-  Set_of_Atoms frag_attachments = GetIsotopicAtoms(frag);
-  cerr << "AddFragments frag " << frag.smiles() << " attachments " << frag_attachments << '\n';
+  AttachmentList frag_attachments = GetAttachments(frag);
+  cerr << "AddFragments frag " << frag.smiles() << " attachments " << AttachmentsToString(frag_attachments) << '\n';
 
   const int initial_comp_number_fragments = initial_comp.number_fragments();
 
@@ -953,11 +1027,15 @@ SetOfDatabases::AddFragments(
       continue;
     }
 
-    const Set_of_Atoms comp_attachments = GetIsotopicAtoms(*new_comp);
-    cerr << new_comp->smiles() << " attachments " << comp_attachments << '\n';
+    AttachmentList comp_attachments = GetAttachments(*new_comp);
+    cerr << new_comp->smiles() << " attachments " << AttachmentsToString(comp_attachments) << '\n';
 
     if (frag_attachments.size() != comp_attachments.size()) {
       cerr << "Attachment size mismatch\n";
+      continue;
+    }
+    if (! SameIsotopeMultiset(frag_attachments, comp_attachments)) {
+      cerr << "Attachment isotope mismatch\n";
       continue;
     }
 
@@ -983,18 +1061,18 @@ SetOfDatabases::MakeMolecules(PerMoleculeData& pmd,
                 Molecule& initial_comp,
                 const Molecule& comp,
                 int count,
-                const Set_of_Atoms& frag_attachments,
-                const Set_of_Atoms comp_attachments,
+                const AttachmentList& frag_attachments,
+                const AttachmentList& comp_attachments,
                 IWString_and_File_Descriptor& output) {
-  if (frag_attachments.size() > 2) {
+  if (frag_attachments.empty()) {
+    return 0;
+  }
+
+  if (frag_attachments.size() > 3) {
     cerr << "SetOfDatabases::MakeMolecules: " << frag_attachments.size() <<
             " attachment points not implemented\n";
     return 0;
   }
-
-  Molecule product(frag);
-  product.add_molecule(&comp);
-  product << " %% " << comp.name() << ' ' << count;
 
 // #define DEBUG_MAKE_MOLECULES
 #ifdef DEBUG_MAKE_MOLECULES
@@ -1003,45 +1081,41 @@ SetOfDatabases::MakeMolecules(PerMoleculeData& pmd,
   cerr << initial_comp.smiles() << " STARTING COMPLEMENTARY\n";
   Molecule t2(comp);
   cerr << t2.aromatic_smiles() << " proposed replacement, count " << count << '\n';
-  cerr << product.aromatic_smiles() << " after adding\n";
-  cerr << "have " << frag_attachments.size() << " attachments\n";
+  cerr << "frag attachments " << AttachmentsToString(frag_attachments) << '\n';
+  cerr << "comp attachments " << AttachmentsToString(comp_attachments) << '\n';
 #endif
 
-  const int frag_natoms = frag.natoms();
-
-  if (frag_attachments.size() == 1) {
-    atom_number_t a2 = frag_natoms + comp_attachments[0];
-    product.add_bond(frag_attachments[0], a2, SINGLE_BOND);
-    UnfixImplicitHydrogens(product, frag_attachments[0], a2);
-    return MaybeWriteProduct(pmd, product, count, initial_comp, output);
+  std::vector<AttachmentPairing> pairings;
+  GenerateAttachmentPairings(frag_attachments, comp_attachments, pairings);
+  if (pairings.empty()) {
+    cerr << "SetOfDatabases::MakeMolecules:no isotope-compatible pairings\n";
+    return 0;
   }
 
   int rc = 0;
+  const int frag_natoms = frag.natoms();
 
-  if (frag_attachments.size() == 2) {
-    atom_number_t a21 = frag_natoms + comp_attachments[0];
-    atom_number_t a22 = frag_natoms + comp_attachments[1];
-    product.add_bond(frag_attachments[0], a21, SINGLE_BOND);
-    product.add_bond(frag_attachments[1], a22, SINGLE_BOND);
-    if (product.number_fragments() > 1) {
-      cerr << product.smiles() << ' ' << product.name() << " multiple attachment multiple fragments\n";
+  for (const AttachmentPairing& pairing : pairings) {
+    Molecule product(frag);
+    product.add_molecule(&comp);
+    product << " %% " << comp.name() << ' ' << count;
+
+#ifdef DEBUG_MAKE_MOLECULES
+    cerr << product.aromatic_smiles() << " after adding\n";
+    cerr << "have " << pairing.size() << " attachments\n";
+#endif
+
+    for (const AttachmentPair& pair : pairing) {
+      atom_number_t comp_atom = frag_natoms + pair.comp_atom;
+      product.add_bond(pair.frag_atom, comp_atom, SINGLE_BOND);
+      UnfixImplicitHydrogens(product, pair.frag_atom, comp_atom);
     }
-    UnfixImplicitHydrogens(product, frag_attachments[0], a21);
-    UnfixImplicitHydrogens(product, frag_attachments[1], a22);
-    rc += MaybeWriteProduct(pmd, product, count, initial_comp, output);
-    product.remove_bond_between_atoms(frag_attachments[0], a21);
-    product.remove_bond_between_atoms(frag_attachments[1], a22);
 
-    a21 = frag_natoms + comp_attachments[1];
-    a22 = frag_natoms + comp_attachments[0];
-
-    product.add_bond(frag_attachments[0], a22, SINGLE_BOND);
-    product.add_bond(frag_attachments[1], a21, SINGLE_BOND);
-    UnfixImplicitHydrogens(product, frag_attachments[0], a22);
-    UnfixImplicitHydrogens(product, frag_attachments[1], a21);
     if (product.number_fragments() > 1) {
-      cerr << product.smiles() << ' ' << product.name() << " multiple attachment multiple fragments\n";
+      cerr << product.smiles() << ' ' << product.name() <<
+              " multiple attachment multiple fragments\n";
     }
+
     rc += MaybeWriteProduct(pmd, product, count, initial_comp, output);
   }
 

@@ -191,11 +191,18 @@ static int increment_isotope_for_join_points = 0;
 // atoms used to be attached to this atom, we need this setting.
 static int always_increment_isotope = 0;
 
+// These atom types are computed on the starting molecule, before any
+// bonds are broken. Best to only use single atom properties since other
+// atomic properties might change during fragmentation.
 static int apply_atom_type_isotopic_labels = 0;
 
 static int isotopic_label_is_recursion_depth = 0;
 
 static int apply_isotopes_to_complementary_fragments = 0;
+
+// If atom types are computed after bonds are broken, then we can
+// have contexts -P UST:ARZ:3
+static int apply_atom_types_to_fragments = 0;
 
 #define ISO_CF_ATYPE -2
 
@@ -1021,8 +1028,6 @@ class Dicer_Arguments {
 
   uint32_t* _atom_type;
 
-  uint32_t* _isosave;  // for quickly saving and restoring isotopes. Not implemented.
-
   int _lower_atom_count_cutoff_current_molecule;
   int _upper_atom_count_cutoff_current_molecule;
   int _max_non_ring_atoms;
@@ -1195,10 +1200,9 @@ class Dicer_Arguments {
 
   int store_atom_types(Molecule& m, Atom_Typing_Specification& ats);
 
-  const uint32_t*
-  atom_types() const {
-    return _atom_type;
-  }
+  // Will allocate an empty array if not present. That is needed by the function
+  // that computes atom types on the fragments.
+  uint32_t* atom_types();
 
   int
   fragments_found() const {
@@ -1304,6 +1308,15 @@ Dicer_Arguments::set_array_size(int s) {
   _local_xref2 = new int[_atoms_in_molecule];
 
   return (nullptr != _xref && nullptr != _local_xref);
+}
+
+uint32_t*
+Dicer_Arguments::atom_types() {
+  if (_atom_type == nullptr) {
+    _atom_type = new uint32_t[_atoms_in_molecule];
+  }
+
+  return _atom_type;
 }
 
 int
@@ -2638,10 +2651,7 @@ Dicer_Arguments::produce_fingerprint(Molecule& m,
 int
 Dicer_Arguments::store_atom_types(Molecule& m, Atom_Typing_Specification& ats) {
   if (nullptr == _atom_type) {
-    const int matoms = m.natoms();
-
-    _atom_type = new uint32_t[matoms + matoms];
-    _isosave = _atom_type + matoms;
+    _atom_type = new uint32_t[m.natoms()];
   }
 
   return ats.assign_atom_types(m, _atom_type);
@@ -4024,13 +4034,30 @@ ApplyAtomTypeIsotopicLabel(Molecule& m, const atom_number_t j1, const atom_numbe
   m.set_isotope(j1, atype[j2]);
 }
 
+static int
+ApplyFragmentAtomTypeIsotopes(Molecule& m, atom_number_t a1, atom_number_t a2, 
+                Atom_Typing_Specification& atom_typing_specification,
+                Dicer_Arguments& dicer_args) {
+  uint32_t* atype = dicer_args.atom_types();
+
+  atom_typing_specification.assign_atom_types(m, atype);
+  m.set_isotope(a1, atype[a1]);
+  m.set_isotope(a2, atype[a2]);
+
+  return 1;
+}
+
 int
 set_isotopes_if_needed(Molecule& m, atom_number_t j1, atom_number_t j2,
-                       const Dicer_Arguments& dicer_args) {
+                       Dicer_Arguments& dicer_args) {
   if (isotope_for_join_points > 0 || increment_isotope_for_join_points) {
     do_apply_isotopic_labels(m, j1, j2);
 
     return 1;
+  }
+
+  if (apply_atom_types_to_fragments) {
+    return ApplyFragmentAtomTypeIsotopes(m, j1, j2, atom_typing_specification, dicer_args);
   }
 
   if (apply_environment_isotopic_labels) {
@@ -5483,10 +5510,9 @@ PairTransformation::_process(Molecule& mol, Dicer_Arguments& arg, Breakages& bre
 int
 Chain_Bond_Breakage::_process(Molecule& m0, Dicer_Arguments& dicer_args,
                               Breakages& breakages, Breakages_Iterator& bi) const {
-  if (0 !=
-      dicer_args.recursion_depth())  // can only do symmetry suppression at first level
-    ;
-  else if (this->symmetry_equivalent()) {
+  // can only do symmetry suppression at first level
+  if (0 != dicer_args.recursion_depth()) {
+  } else if (this->symmetry_equivalent()) {
     return 0;
   }
 
@@ -7285,7 +7311,7 @@ dicer(data_source_and_type<Molecule>& input, DicerFragmentOutput& output) {
     molecules_read++;
 
     if (report_progress()) {
-      cerr << "Processed " << lillymol::with_commas(molecules_read) << " molecules\n";
+      cerr << "Processed " << iwstring::with_commas(molecules_read) << " molecules\n";
     }
 
     std::unique_ptr<Molecule> free_m(m);
@@ -7518,6 +7544,8 @@ display_dash_i_options(std::ostream& os) {
  -I inc=<n>       increment existing isotopic label before labelling join points (only one increment)
  -I INC=<n>       increment all isotopic labels - isotope will be number of connections broken
  -I atype         the atom typing specified by the -P option '-P UST:AY -I atype'.
+                    note that the atom types are computed for the starting molecule.
+ -I fragatype     atom typing is computed on the fragments.
 )";
   // clang-format on
 
@@ -7745,6 +7773,11 @@ dicer(int argc, char** argv) {
         apply_atom_type_isotopic_labels = 1;
         if (verbose) {
           cerr << "Isotopic labels will be atom types\n";
+        }
+      } else if (i == "fragatype") {
+        apply_atom_types_to_fragments = 1;
+        if (verbose) {
+          cerr << "Atom types generated on fragments - enables context matching\n";
         }
       } else if ("help" == i) {
         display_dash_i_options(cerr);
@@ -8590,7 +8623,7 @@ dicer(int argc, char** argv) {
   }
 
   if (verbose) {
-    cerr << "Read " << molecules_read << " molecules\n";
+    cerr << "Read " << iwstring::with_commas(molecules_read) << " molecules\n";
 
     for (int i = 0; i < global_counter_bonds_to_be_broken.number_elements(); i++) {
       if (global_counter_bonds_to_be_broken[i]) {
@@ -8629,7 +8662,7 @@ dicer(int argc, char** argv) {
     cerr << "Computation took " << (tend - tstart) << " seconds\n";
   }
 
-  if (0 == molecules_containing.size())
+  if (molecules_containing.empty())
     ;
   else if (name_for_fragment_statistics_file.empty()) {
   } else if (write_fragstat_as_binary_proto) {

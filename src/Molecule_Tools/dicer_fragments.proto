@@ -87,6 +87,8 @@ message FragmentAndComplements {
 message ComplementaryFragment {
   optional string smi = 1;
   optional string id = 2;
+  // The number of instances.
+  optional uint32 n = 3;
 }
 
 message ComplementaryFragments {

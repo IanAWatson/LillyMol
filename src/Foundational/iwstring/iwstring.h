@@ -1046,7 +1046,7 @@ TokeniseWithQuotes(const const_IWSubstring& buffer,
                    resizable_array<int>& tstart,
                    resizable_array<int>& tstop);
 
-// Generates 1,000 from with_spaces(1000);
+// Generates 1,000 from with_commas(1000);
 template <typename Int> std::string with_commas(Int v);
 
 }  // namespace iwstring

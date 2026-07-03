@@ -1,0 +1,19 @@
+{
+  "executable": "dicer_fragment_complement_replace",
+  "test": [
+    {
+      "name": "benzene",
+      "shellScript": {
+        "scriptName": "benzene.sh"
+      }
+    },
+
+    {
+      "name": "disubstituted_benzene",
+      "shellScript": {
+        "scriptName": "benzene.sh"
+      }
+    }
+
+  ]
+}

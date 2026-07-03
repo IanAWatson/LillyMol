@@ -34,6 +34,14 @@ class Report_Progress_Template
 
     int active () const { return _report_every > 0;}
 
+    // In two phases of a programme, the first phase might read some molecules
+    // into a hash, and the progress reporter would be used then. In the
+    // second phase, the molecules in the hash get processed, and we want to
+    // keep track of progress there.
+    void reset() {
+      _times_called = 0;
+    }
+
     int set_report_every(T);
 
     int report (const char * leading, const char * trailing, std::ostream &);

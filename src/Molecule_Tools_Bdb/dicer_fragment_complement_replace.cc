@@ -208,11 +208,32 @@ PerMoleculeData::EstablishXref(const Set_of_Atoms& embedding) {
 }
 #endif // PMD_NOT_USED_HERE
 
+struct PerMoleculeData {
+  // If we are writing parent molecules, high up in the call tree
+  // this will be initialised with what should be written as the
+  // parent. When MaybeWriteProduct writes a product, it will check to see
+  // if this is non-empty. If non-empty, it will write it and resize it
+  // to empty.
+  // That way the parent molecule information gets written once - and only
+  // if products are generated.
+  IWString write_parent_molecule;
+
+  uint32_t products_generated = 0;
+
+  std::unique_ptr<uint32_t[]> atype;
+};
+
 class SetOfDatabases {
   private:
     int _verbose;
 
     dicer_replace_complement::Options _options;
+
+    // As dicer fragments are read from the input, we only process those fragments
+    // with at least this many atoms.
+    int _min_starting_fragment_natoms = 1;
+    uint32_t _fragments_too_small = 0;
+    uint32_t _duplicates_generated = 0;
 
     resizable_array_p<Substructure_Query> _fragment_must_contain;
     resizable_array_p<Substructure_Query> _fragment_must_not_contain;
@@ -227,6 +248,9 @@ class SetOfDatabases {
 
     uint64_t _fragments_found_in_db;
     uint64_t _fragments_not_found_in_db;;
+    uint64_t _ok_fragment_failed = 0;
+    uint64_t _ok_new_complement_failed = 0;
+    uint64_t _ok_complementary_failed = 0;
 
     uint64_t _molecules_processed;
 
@@ -236,39 +260,51 @@ class SetOfDatabases {
 
     int _remove_isotopes;
 
+    // THe -p <string> sets this value.
+    IWString _parent_molecule_string;
+
     char _write_initial_complementary_fragment;
 
-    extending_resizable_array<uint32_t> _variants_generated;
+    extending_resizable_array<uint32_t> _complements_retrieved;
 
     absl::flat_hash_set<IWString> _seen;
 
     // private functions
-    int Process(Molecule& parent,
+    int ProcessFragment(Molecule& parent,
+                        PerMoleculeData& pmd,
                         const dicer_data::DicerFragment& fragment,
                         IWString_and_File_Descriptor& output);
-    int Process(Molecule& parent,
+    int AddFragments(PerMoleculeData& pmd,
                 Molecule& frag,
                 Molecule& initial_comp,
                 const resizable_array_p<Molecule>& complements,
+                const std::vector<int>& counts,
                 IWString_and_File_Descriptor& output);
-    int MakeMolecules(const Molecule& frag,
+    int MakeMolecules(PerMoleculeData& pmd,
+                const Molecule& frag,
                 Molecule& initial_comp,
                 const Molecule& comp,
+                int count,
                 const Set_of_Atoms& frag_attachments,
                 const Set_of_Atoms comp_attachments,
                 IWString_and_File_Descriptor& output);
-    int MaybeWriteProduct(Molecule& m,
+    int MaybeWriteProduct(PerMoleculeData& pmd, Molecule& m,
+                        int count,
                         Molecule& initial_comp,
                         IWString_and_File_Descriptor& output);
+
+    bool Seen(Molecule& m);
 
     int OkComplementary(const Molecule& parent,
                         const Molecule& frag,
                         Molecule& comp);
     int OkFragment(const Molecule& parent, Molecule& fragment);
     int GetComplements(const IWString& usmi,
-                               resizable_array_p<Molecule>& complements);
+                       resizable_array_p<Molecule>& complements,
+                       std::vector<int>& counts);
     int GetComplementsInner(const const_IWSubstring& fromdb,
-               resizable_array_p<Molecule>& complements);
+               resizable_array_p<Molecule>& complements,
+               std::vector<int>& counts);
     int OkNewComplement(const Molecule& initial_comp,
                 std::unique_ptr<mformula::MFormula>& initial_formula,
                 Molecule& new_comp) const;
@@ -291,6 +327,8 @@ SetOfDatabases::SetOfDatabases() {
   _verbose = 0;
   _molecules_processed = 0;
   _input_has_atom_maps = 0;
+  _min_starting_fragment_natoms = 0;
+  _fragments_too_small = 0;
   _remove_isotopes = 0;
   _write_initial_complementary_fragment = '\0';
   _max_products_per_parent = std::numeric_limits<uint32_t>::max();
@@ -391,6 +429,16 @@ SetOfDatabases::Initialise(Command_Line& cl) {
     }
   }
 
+  if (cl.option_present('m')) {
+    if (! cl.value('m', _min_starting_fragment_natoms) || _min_starting_fragment_natoms < 1) {
+      cerr << "The minimum starting fragment size (-m) must be a whole +ve number\n";
+      return 1;
+    }
+    if (_verbose) {
+      cerr << "Will skip dicer fragments with fewer than " << _min_starting_fragment_natoms << " atoms\n";
+    }
+  }
+
   if (cl.option_present('x')) {
     if (! cl.value('x', _max_products_per_parent) || _max_products_per_parent < 1) {
       cerr << "SetOfDatabases::Initialise:the max products per parent (-x) option must be a whole +ve number\n";
@@ -412,6 +460,13 @@ SetOfDatabases::Initialise(Command_Line& cl) {
     _write_initial_complementary_fragment = c[0];
     if (_verbose) {
       cerr << "Will include the initial complementary fragment in the output\n";
+    }
+  }
+
+  if (cl.option_present('p')) {
+    _parent_molecule_string = cl.string_value('p');
+    if (_verbose) {
+      cerr << "Will write the parent molecule\n";
     }
   }
 
@@ -474,6 +529,20 @@ SetOfDatabases::Report(std::ostream& output) const {
   output << "SetOfDatabases processed " << _molecules_processed << '\n';
   output << "Found " << _fragments_found_in_db << " fragments, did not find " <<
             _fragments_not_found_in_db << '\n';
+  output << _ok_complementary_failed << " complements failed prerequisites\n";
+  output << _ok_new_complement_failed << " ok new complement failed\n";
+  output << _ok_fragment_failed << " ok fragment failed\n";
+
+  if (_min_starting_fragment_natoms > 0) {
+    output << _fragments_too_small << " fragments skipped for fewer than " <<
+              _min_starting_fragment_natoms << " atoms\n";
+  }
+
+  for (int i = 0; i < _complements_retrieved.number_elements(); ++i) {
+    if (_complements_retrieved[i]) {
+      cerr << _complements_retrieved[i] << " generated " << i << " variants\n";
+    }
+  }
   return output.good();
 }
 
@@ -490,23 +559,41 @@ SetOfDatabases::Process(const dicer_data::DicedMolecule& proto,
   }
 
   m.set_name(proto.name());
+  cerr << " read " << proto.name() << " with " << proto.fragment_size() << " fragmetns\n";
 
 //if (!_atom_typing.active()) {
 //  pmd.AssignAtomTypes(_atom_typing);
 //}
 
-  int rc = 0;
-  for (const dicer_data::DicerFragment& fragment : proto.fragment()) {
-    rc += Process(m, fragment, output);
+  PerMoleculeData pmd;
+
+  if (!_parent_molecule_string.empty()) {
+    pmd.write_parent_molecule << m.smiles() << ' ' << proto.name()
+                              << ' ' << _parent_molecule_string;
   }
 
+  if (_atom_typing.active()) {
+    pmd.atype = std::make_unique<uint32_t[]>(m.natoms());
+    _atom_typing.assign_atom_types(m, pmd.atype.get());
+  }
+
+  int rc = 0;
+  for (const dicer_data::DicerFragment& fragment : proto.fragment()) {
+    rc += ProcessFragment(m, pmd, fragment, output);
+  }
+
+  ++_complements_retrieved[rc];
 
   return 1;
 }
 
 
+// `fragment` is a fragment in `parent`. `fragment` and the
+// complement in `fragment` comprise `parent`.
+// Look for complements in the database.
 int
-SetOfDatabases::Process(Molecule& parent,
+SetOfDatabases::ProcessFragment(Molecule& parent,
+                        PerMoleculeData& pmd,
                         const dicer_data::DicerFragment& fragment,
                         IWString_and_File_Descriptor& output) {
   if (! fragment.has_comp()) {
@@ -520,9 +607,17 @@ SetOfDatabases::Process(Molecule& parent,
     return 0;
   }
 
+  if (frag.natoms() < _min_starting_fragment_natoms) {
+    cerr << "Too few atoms " << frag.natoms() << '\n';
+    ++_fragments_too_small;
+    return 1;
+  }
+
   cerr << parent.smiles() << " parent smiles\n";
   cerr << frag.smiles() << " fragment smiles\n";
   if (! OkFragment(parent, frag)) {
+    cerr << "OkFragment failed\n";
+    ++_ok_fragment_failed;
     return 0;
   }
 
@@ -533,23 +628,33 @@ SetOfDatabases::Process(Molecule& parent,
     return 0;
   }
 
+  // Sanity check.
+  if ((frag.natoms() + comp.natoms() != parent.natoms())) [[unlikely]] {
+    cerr << "Atom count mismatch " << frag.natoms() << '+' << comp.natoms() << " != "
+         << parent.natoms() << '\n';
+    return 0;
+  }
+
   cerr << comp.smiles() << " complementary smiles\n";
   if (! OkComplementary(parent, frag, comp)) {
     cerr << "OkComplementary failed\n";
+    ++_ok_complementary_failed;
     return 0;
   }
   cerr << "OkComplementary worked\n";
 
+  // Look up complements of this fragments in the database.
   resizable_array_p<Molecule> complements;
-  if (! GetComplements(frag.unique_smiles(), complements)) {
-    cerr << "GetComplements failed\n";
+  std::vector<int> counts;
+  if (! GetComplements(frag.unique_smiles(), complements, counts)) {
+    cerr << "GetComplements did not return complements\n";
     return 0;
   }
-  cerr << "GetComplements worked\n";
+  cerr << "GetComplements worked, have " << complements.size() << '\n';
 
   frag.set_name(parent.name());
 
-  return Process(parent, frag, comp, complements, output);
+  return AddFragments(pmd, frag, comp, complements, counts, output);
 }
 
 int
@@ -573,23 +678,31 @@ GetComplement(const const_IWSubstring& fromdb,
   return 1;
 }
 
-// `fromdb` looks like
-// 3043209:[9NH]1CC[9CH2]CC1,3067256:[9CH3]OC1CC[9NH]CC1
-// Parse into an array of molecules `complements`.
 int
 SetOfDatabases::GetComplementsInner(const const_IWSubstring& fromdb,
-               resizable_array_p<Molecule>& complements) {
-  const_IWSubstring token;
-  int i = 0;
+               resizable_array_p<Molecule>& complements,
+               std::vector<int>& counts) {
 
-  while (fromdb.nextword(token, i, ',')) {
-    if (! GetComplement(token, complements)) {
-      cerr << "GetComplements:invalid db entry '" << token << "'\n";
+  dicer_data::ComplementaryFragments proto;
+  if (! proto.ParseFromArray(fromdb.data(), fromdb.nchars())) {
+    cerr << "SetOfDatabases::GetComplementsInner:cannot decode proto\n";
+    return 0;
+  }
+
+  for (const auto& complement : proto.frag()) {
+    std::unique_ptr<Molecule> m = std::make_unique<Molecule>();
+    if (! m->build_from_smiles(complement.smi())) {
+      cerr << "SetOfDatabases::GetComplementsInner:invalid smiles '" << complement.smi() << "'\n";
       return 0;
     }
-
-    if (complements.size() >= _max_products_per_parent) {
-      return complements.size();
+    m->set_name(complement.id());
+    if (complement.n() == 0) {
+      cerr << "Read complement with zero count " << m->aromatic_smiles() << '\n';
+    }
+    complements << m.release();
+    counts.push_back(complement.n());
+    if (complements.size() > _max_products_per_parent) {
+      break;
     }
   }
 
@@ -598,7 +711,8 @@ SetOfDatabases::GetComplementsInner(const const_IWSubstring& fromdb,
 
 int
 SetOfDatabases::GetComplements(const IWString& usmi,
-                               resizable_array_p<Molecule>& complements) {
+                               resizable_array_p<Molecule>& complements,
+                               std::vector<int>& counts) {
   cerr << "Looking up " << usmi << "'\n";
   Dbt dbkey((void* ) (usmi.data()), usmi.length());
 
@@ -611,7 +725,7 @@ SetOfDatabases::GetComplements(const IWString& usmi,
     cerr << usmi << " found in db\n";
     ++_fragments_found_in_db;
     const_IWSubstring tmp(reinterpret_cast<const char*>(fromdb.get_data()), fromdb.get_size());
-    return GetComplementsInner(tmp, complements);
+    return GetComplementsInner(tmp, complements, counts);
   }
 
   ++_fragments_not_found_in_db;
@@ -627,6 +741,7 @@ int
 OkAtomDifferences(const dicer_replace_complement::Conditions& atom_conditions,
         uint32_t atoms_in_parent,
         uint32_t atoms_in_fragment) {
+  cerr << atoms_in_parent << " atoms_in_parent " << atoms_in_fragment << " atoms_in_fragment\n";
   if (! atom_conditions.has_min_atoms_in_fragment()) {
   } else if (atoms_in_fragment < atom_conditions.min_atoms_in_fragment()) {
     return 0;
@@ -650,9 +765,16 @@ OkAtomDifferences(const dicer_replace_complement::Conditions& atom_conditions,
   return 1;
 }
 
+// We have just read the diced form of `parent` and `fragment` is a fragment.
+// Is it OK to start looking for complementary fragments, given that `fragment`
+// will be the conserved part of `parent`.
 int
 SetOfDatabases::OkFragment(const Molecule& parent,
                            Molecule& fragment) {
+  return 1;
+
+
+
   if (! _options.has_fragment_conditions()) {
     return 1;
   }
@@ -663,6 +785,7 @@ SetOfDatabases::OkFragment(const Molecule& parent,
   const uint32_t atoms_in_fragment = fragment.natoms();
 
   if (! OkAtomDifferences(atom_conditions, atoms_in_parent, atoms_in_fragment)) {
+    cerr << "OkAtomDifferences failed\n";
     return 0;
   }
 
@@ -679,10 +802,17 @@ SetOfDatabases::OkFragment(const Molecule& parent,
   return 1;
 }
 
+// Given that `frag` is a fragment in `parent` is it OK to
+// begin searching for different complementary fragments.
+// This is the first test.
 int
 SetOfDatabases::OkComplementary(const Molecule& parent,
                         const Molecule& frag,
                         Molecule& comp) {
+  return 1;
+
+
+
   if (! _options.has_complement_conditions()) {
     return 1;
   }
@@ -709,10 +839,15 @@ SetOfDatabases::OkComplementary(const Molecule& parent,
   return 1;
 }
 
+// `initial_comp` is the complementary fragment that was found in the
+// starting molecule and we are proposing that it be switched with `new_comp`.
+// Check to see if that is an OK change.
 int
 SetOfDatabases::OkNewComplement(const Molecule& initial_comp,
                 std::unique_ptr<mformula::MFormula>& initial_formula,
                 Molecule& new_comp) const {
+  return 1;
+
   if (! _options.has_min_comp_formula_difference() &&
       ! _options.has_max_comp_formula_difference()) {
     return 1;
@@ -780,11 +915,16 @@ GetIsotopicAtoms(const Molecule& m, int expected) {
   return result;
 }
 
+// We have looked up complementary fragments from the database. These are in
+// `complements`. The parent molecule consists of two fragments, `frag` and
+// `initial_comp`.
 int
-SetOfDatabases::Process(Molecule& parent,
+SetOfDatabases::AddFragments(
+                PerMoleculeData& pmd,
                 Molecule& frag,
                 Molecule& initial_comp,
                 const resizable_array_p<Molecule>& complements,
+                const std::vector<int>& counts,
                 IWString_and_File_Descriptor& output) {
   std::unique_ptr<mformula::MFormula> initial_formula;
   if (_options.has_min_comp_formula_difference() ||
@@ -794,19 +934,34 @@ SetOfDatabases::Process(Molecule& parent,
   }
 
   Set_of_Atoms frag_attachments = GetIsotopicAtoms(frag);
-  cerr << "frag_attachments has " << frag_attachments.size() << " sites\n";
+  cerr << "AddFragments frag " << frag.smiles() << " attachments " << frag_attachments << '\n';
+
+  const int initial_comp_number_fragments = initial_comp.number_fragments();
 
   int rc = 0;
-  for (Molecule* new_comp : complements) {
-    if (! OkNewComplement(initial_comp, initial_formula, *new_comp)) {
-      cerr << "OkNewComplement failed\n";
+  for (int i = 0; i < complements.number_elements(); ++i) {
+    Molecule* new_comp = complements[i];
+    cerr << "new_comp " << new_comp->smiles() << " initial_comp_number_fragments " << initial_comp_number_fragments << '\n';
+    if (new_comp->number_fragments() != initial_comp_number_fragments) {
+      cerr << "Fragment count mismatch\n";
       continue;
     }
 
-    const Set_of_Atoms comp_attachments =
-                        GetIsotopicAtoms(*new_comp, frag_attachments.number_elements());
+    if (! OkNewComplement(initial_comp, initial_formula, *new_comp)) {
+      cerr << "OkNewComplement failed\n";
+      ++_ok_new_complement_failed;
+      continue;
+    }
 
-    rc += MakeMolecules(frag, initial_comp, *new_comp, frag_attachments, comp_attachments, output);
+    const Set_of_Atoms comp_attachments = GetIsotopicAtoms(*new_comp);
+    cerr << new_comp->smiles() << " attachments " << comp_attachments << '\n';
+
+    if (frag_attachments.size() != comp_attachments.size()) {
+      cerr << "Attachment size mismatch\n";
+      continue;
+    }
+
+    rc += MakeMolecules(pmd, frag, initial_comp, *new_comp, counts[i], frag_attachments, comp_attachments, output);
   }
 
   return rc;
@@ -820,10 +975,14 @@ UnfixImplicitHydrogens(Molecule& m,
   m.unset_all_implicit_hydrogen_information(a2);
 }
 
+// Fragments `frag` and `initial_comp` are the starting molecule.
+// We are going to add `comp` to `frag` to make new molecules.
 int
-SetOfDatabases::MakeMolecules(const Molecule& frag,
+SetOfDatabases::MakeMolecules(PerMoleculeData& pmd,
+                const Molecule& frag,
                 Molecule& initial_comp,
                 const Molecule& comp,
+                int count,
                 const Set_of_Atoms& frag_attachments,
                 const Set_of_Atoms comp_attachments,
                 IWString_and_File_Descriptor& output) {
@@ -835,7 +994,18 @@ SetOfDatabases::MakeMolecules(const Molecule& frag,
 
   Molecule product(frag);
   product.add_molecule(&comp);
-  product << " %% " << comp.name();
+  product << " %% " << comp.name() << ' ' << count;
+
+// #define DEBUG_MAKE_MOLECULES
+#ifdef DEBUG_MAKE_MOLECULES
+  Molecule t1(frag);
+  cerr << t1.smiles() << frag.name() << " FRAGMENT " << frag.natoms() << " starting atoms\n";
+  cerr << initial_comp.smiles() << " STARTING COMPLEMENTARY\n";
+  Molecule t2(comp);
+  cerr << t2.aromatic_smiles() << " proposed replacement, count " << count << '\n';
+  cerr << product.aromatic_smiles() << " after adding\n";
+  cerr << "have " << frag_attachments.size() << " attachments\n";
+#endif
 
   const int frag_natoms = frag.natoms();
 
@@ -843,7 +1013,7 @@ SetOfDatabases::MakeMolecules(const Molecule& frag,
     atom_number_t a2 = frag_natoms + comp_attachments[0];
     product.add_bond(frag_attachments[0], a2, SINGLE_BOND);
     UnfixImplicitHydrogens(product, frag_attachments[0], a2);
-    return MaybeWriteProduct(product, initial_comp, output);
+    return MaybeWriteProduct(pmd, product, count, initial_comp, output);
   }
 
   int rc = 0;
@@ -853,9 +1023,12 @@ SetOfDatabases::MakeMolecules(const Molecule& frag,
     atom_number_t a22 = frag_natoms + comp_attachments[1];
     product.add_bond(frag_attachments[0], a21, SINGLE_BOND);
     product.add_bond(frag_attachments[1], a22, SINGLE_BOND);
+    if (product.number_fragments() > 1) {
+      cerr << product.smiles() << ' ' << product.name() << " multiple attachment multiple fragments\n";
+    }
     UnfixImplicitHydrogens(product, frag_attachments[0], a21);
     UnfixImplicitHydrogens(product, frag_attachments[1], a22);
-    rc += MaybeWriteProduct(product, initial_comp, output);
+    rc += MaybeWriteProduct(pmd, product, count, initial_comp, output);
     product.remove_bond_between_atoms(frag_attachments[0], a21);
     product.remove_bond_between_atoms(frag_attachments[1], a22);
 
@@ -866,31 +1039,71 @@ SetOfDatabases::MakeMolecules(const Molecule& frag,
     product.add_bond(frag_attachments[1], a21, SINGLE_BOND);
     UnfixImplicitHydrogens(product, frag_attachments[0], a22);
     UnfixImplicitHydrogens(product, frag_attachments[1], a21);
-    rc += MaybeWriteProduct(product, initial_comp, output);
+    if (product.number_fragments() > 1) {
+      cerr << product.smiles() << ' ' << product.name() << " multiple attachment multiple fragments\n";
+    }
+    rc += MaybeWriteProduct(pmd, product, count, initial_comp, output);
   }
 
   return rc;
 }
 
+// Return true if m.unique_smiles() is part of the _seen hash.
+// Update the hash of not.
+bool
+SetOfDatabases::Seen(Molecule& m) {
+  if (_seen.contains(m.unique_smiles())) {
+    ++_duplicates_generated;
+    return 1;
+  }
+
+  _seen.insert(m.unique_smiles());
+
+  return 0;
+}
+
 int
-SetOfDatabases::MaybeWriteProduct(Molecule& m,
+SetOfDatabases::MaybeWriteProduct(PerMoleculeData& pmd,
+                        Molecule& m,
+                        int count,
                         Molecule& initial_comp,
                         IWString_and_File_Descriptor& output) {
+  if (m.number_fragments() > 1) {
+    cerr << m.smiles() << ' ' << m.name() << " multi fragment product\n";
+  }
+  // cerr << m.aromatic_smiles() << " MaybeWriteProduct\n";
+
   if (! OkProduct(m)) {
     return 0;
   }
 
   if (_remove_isotopes) {
     m.unset_isotopes();
+    if (Seen(m)) {
+      return 0;
+    }
+  } else {
+    Molecule mcopy(m);
+    mcopy.unset_isotopes();
+    if (Seen(mcopy)) {
+      return 0;
+    }
   }
 
-  if (_seen.contains(m.unique_smiles())) {
-    return 0;
+  if (! pmd.write_parent_molecule.empty()) {
+    output << pmd.write_parent_molecule << '\n';
+    pmd.write_parent_molecule.resize(0);
   }
 
-  _seen.insert(m.unique_smiles());
+  // Avoid writing unique smiles.
+  m.invalidate_smiles();
 
   output << m.smiles() << ' ' << m.name();
+
+  if (m.number_fragments() > 1) {
+    cerr << m.smiles() << ' ' << m.name() << " multi fragment product\n";
+  }
+
   if (_write_initial_complementary_fragment != '\0') {
     output << _write_initial_complementary_fragment << initial_comp.smiles();
   }
@@ -929,6 +1142,7 @@ DicerFragmentReplace(iwstring_data_source& input,
                      IWString_and_File_Descriptor& output) {
   const_IWSubstring buffer;
   while (input.next_record(buffer)) {
+    cerr << "processing " << buffer << '\n';
     if (! DicerFragmentReplaceLine(buffer, options, output)) {
       cerr << "DicerFragmentReplace:fatal error on line " << input.lines_read() << '\n';
       cerr << buffer << '\n';
@@ -955,7 +1169,7 @@ DicerFragmentReplace(const char* fname,
 
 int
 Main(int argc, char** argv) {
-  Command_Line cl(argc, argv, "vE:A:d:B:IC:x:c:");
+  Command_Line cl(argc, argv, "vE:A:d:B:IC:x:c:m:p:");
 
   if (cl.unrecognised_options_encountered()) {
     cerr << "unrecognised_options_encountered\n";

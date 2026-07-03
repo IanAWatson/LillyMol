@@ -7285,7 +7285,7 @@ dicer(data_source_and_type<Molecule>& input, DicerFragmentOutput& output) {
     molecules_read++;
 
     if (report_progress()) {
-      cerr << "Processed " << molecules_read << " molecules\n";
+      cerr << "Processed " << lillymol::with_commas(molecules_read) << " molecules\n";
     }
 
     std::unique_ptr<Molecule> free_m(m);

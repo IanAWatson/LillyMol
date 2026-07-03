@@ -2,6 +2,13 @@ syntax = "proto3";
 
 package lillymol_tests;
 
+message ShellScriptAndArgs {
+  // The shell_script attribute of a TestCase contains the name
+  // of a shell script, and any arguments beyond the defaults that are passed.
+  string script_name = 1;
+  repeated string args = 2;
+}
+
 message TestCase {
   // We assume that the directory layout looks like
   // lillymol/test
@@ -65,6 +72,19 @@ message TestCase {
 
   // This is also just used for passing around information in the driver.
   repeated string default_command_components = 15;
+
+  // Some tools involve orchestration of multiple commands and are not
+  // amenable to the simple command line and options scheme generally assumed
+  // by this framework. If shell_script is present, this script is executed
+  // instead of the default executable command line.
+  // The first argument will be the path to the executable being tested.
+  // Second argument will be the 'in' directory.
+  // Third argument will be the 'out' directory.
+  // Any arguments specified in the ShellScriptAndArgs message are then appended.
+  // If other executables are needed, the script can get the directory from the
+  // first argument to get bindir and find other executables in that location.
+  // This is different from `other_commands` which is less structured.
+  optional ShellScriptAndArgs shell_script = 16;
 }
 
 message TestCases {

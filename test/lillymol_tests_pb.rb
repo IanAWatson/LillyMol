@@ -5,6 +5,10 @@ require 'google/protobuf'
 
 Google::Protobuf::DescriptorPool.generated_pool.build do
   add_file("lillymol_tests.proto", :syntax => :proto3) do
+    add_message "lillymol_tests.ShellScriptAndArgs" do
+      optional :script_name, :string, 1
+      repeated :args, :string, 2
+    end
     add_message "lillymol_tests.TestCase" do
       proto3_optional :name, :string, 1
       repeated :preamble, :string, 2
@@ -18,6 +22,7 @@ Google::Protobuf::DescriptorPool.generated_pool.build do
       proto3_optional :broken_do_not_evaluate, :bool, 10
       proto3_optional :executable, :string, 14
       repeated :default_command_components, :string, 15
+      proto3_optional :shell_script, :message, 16, "lillymol_tests.ShellScriptAndArgs"
     end
     add_message "lillymol_tests.TestCases" do
       proto3_optional :executable, :string, 1
@@ -32,6 +37,7 @@ Google::Protobuf::DescriptorPool.generated_pool.build do
 end
 
 module LillymolTests
+  ShellScriptAndArgs = ::Google::Protobuf::DescriptorPool.generated_pool.lookup("lillymol_tests.ShellScriptAndArgs").msgclass
   TestCase = ::Google::Protobuf::DescriptorPool.generated_pool.lookup("lillymol_tests.TestCase").msgclass
   TestCases = ::Google::Protobuf::DescriptorPool.generated_pool.lookup("lillymol_tests.TestCases").msgclass
 end

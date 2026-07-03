@@ -1,10 +1,11 @@
-!#/usr/bin/env ruby
+#!/usr/bin/env ruby
 
 require 'digest'
 require 'etc'
 require 'fileutils'
 require 'pathname'
 require 'set'
+require 'shellwords'
 require 'socket'
 require 'tmpdir'
 
@@ -118,7 +119,7 @@ def to_single_line(lines)
 end
 
 class Options
-  attr_accessor :lillymol_home, :build_dir, :binary_dir, :default_binary_dir, :tmpdir, :ostype, :verbose, :copy_failures_dir, :only_process_r
+  attr_accessor :lillymol_home, :build_dir, :binary_dir, :default_binary_dir, :tmpdir, :ostype, :verbose, :copy_failures_dir, :only_process_rx
 
   def initialize(cl)
     @lillymol_home = ENV['LILLYMOL_HOME']
@@ -199,49 +200,6 @@ def get_directory_contents(dirname)
   return result
 end
 
-# When scanning a directory holding output file(s), two file names
-# are special, stdout and stderr.
-# This class scans a directory and records the list of files present,
-# while recording whether or not the two special files are present.
-class OutDirContents
-  attr_reader :has_stdout, :has_stderr, :files
-  def initialize(dirname)
-    @dir = dirname
-    @has_stdout = false
-    @has_stderr = false
-    @files = []
-
-    Dir.open(dirname).each do |fname|
-      next if fname[0] == '.'
-      if fname == 'stdout'
-        @has_stdout = true
-        next
-      end
-      if fname == 'stderr'
-        @has_stderr = true
-        next
-      end
-      @files << File.join(dirname, fname)
-    end
-  end
-  def get_stdout
-    return File.join(@dir, 'stdout')
-  end
-  def get_stderr
-    return File.join(@dir, 'stderr')
-  end
-end
-
-def get_out_directory_contents(dirname)
-  result = Set.new
-  Dir.open(dirname).each do |fname|
-    next if fname[0] == '.'
-    result.add(File.join(dirname, fname))
-  end
-
-  return result
-end
-
 def make_my_tmpdir(tmpdir, dir)
   # $stderr << "make_my_tmpdir #{tmpdir} dir '#{dir}'\n"
   path = File.join(tmpdir, dir)
@@ -251,51 +209,13 @@ def make_my_tmpdir(tmpdir, dir)
   end
 
   unless Dir.mkdir(path) == 0
-    $stderr << "Cound not create temporary directory #{path}\n"
+    $stderr << "Could not create temporary directory #{path}\n"
     return tmpdir
   end
 
   return path
 end
 
-# We have read the name of an input or output file from the proto.
-# We want to know the full path name.
-# Try various things.
-# `in_out` will be either `in` or `out` and if we can find the
-# file in that directory, we return it.
-def path_for_file(dirname, in_out, fname)
-  return fname if File.exist?(fname)
-  return fname if fname == "stdout"
-  return fname if fname == "stderr"
-
-  # First try top level directory.
-  maybe_in_dir = File.join(dirname, fname)
-  return maybe_in_dir if File.exist?(maybe_in_dir)
-
-  maybe_in_dir = File.join(dirname, in_out, fname)
-  return maybe_in_dir if File.exist?(maybe_in_dir)
-
-  $stderr << "Possibly missing input file: dir #{dirname} fname #{fname}\n"
-  return fname
-end
-
-# We have formed a command to execute. 
-# append stdout and stderr captures and return the new variant
-def maybe_append_stdout_stderr(options, cmd, output_file)
-
-  return "#{cmd} > stdout 2> stderr"
-  # remove the code below...
-
-  cmd = "#{cmd} > stdout" if output_file.include?('stdout')
-
-  return "#{cmd} 2> stderr" if output_file.include?('stderr')
-
-  # If verbose, allow stderr to pass through.
-  return cmd if options.verbose
-
-  # Not captured, send it to somewhere - could use /dev/null
-  return "#{cmd} 2> .stderr"
-end
 
 # If `exe` is the name of a LillyMol executable, return the full path.
 # This is designed for things like same_structures, jfilecompare...
@@ -341,15 +261,126 @@ def get_output_files(options, proto, dirname)
   return dc.select {|fname| ! proto.ignore_file.include?(File.basename(fname))}
 end
 
-def discard_ignored_files(proto, files)
-  return files if proto.ignore_file.empty?
+def output_directory_for_test(options, dirname)
+  outdir = File.join(dirname, 'out')
+  platform_specific = File.join(outdir, options.ostype)
+
+  return platform_specific if File.directory?(platform_specific)
+
+  outdir
 end
 
-# We have read an array of strings that are either input or output files
-# from the proto. Return an array with every member replaced by shell
-# expansion, or presence in either `in` or `out` directories.
-def maybe_expanded(lines, dirname, in_out) 
-  lines.map{ |line| path_for_file(dirname, in_out, expand_env(line)) }
+
+# Test JSON is trusted. This intentionally supports existing Ruby interpolation
+# forms like #{indir}, #{datadir}, #{ostype}, #{exe}, and #{outdir}.
+def interpolate_command_text(text, indir, datadir, ostype, exe, outdir)
+  eval("\"" + expand_env(text) + "\"")
+end
+
+# Build the command fragment for TestCase.shell_script. The script is found in the
+# specific test case directory. The caller is responsible for changing to the
+# temporary directory and capturing stdout/stderr.
+def command_from_shell_script(options, shell_script, test_case_dir, exe, indir, outdir, datadir, ostype)
+  if shell_script.script_name.empty?
+    $stderr << "Empty shell_script.script_name in #{test_case_dir}\n"
+    return nil
+  end
+
+  script = File.join(test_case_dir, shell_script.script_name)
+  unless File.file?(script)
+    $stderr << "Shell script #{script} missing\n"
+    return nil
+  end
+  unless File.executable?(script)
+    $stderr << "Shell script #{script} is not executable\n"
+    return nil
+  end
+
+  cmd = Shellwords.escape(script)
+  cmd << " #{Shellwords.escape(exe)}"
+  cmd << " #{Shellwords.escape(indir)}"
+  cmd << " #{Shellwords.escape(outdir)}"
+
+  shell_script.args.each do |arg|
+    value = interpolate_command_text(arg, indir, datadir, ostype, exe, outdir)
+    cmd << " #{value}"
+  end
+
+  cmd
+end
+
+def command_for_test_case(options, proto, exe, args, mytmp, indir, outdir, datadir, ostype, test_case_dir)
+  cmd = ""
+
+  # Preamble entries are shell fragments inserted before the test command.
+  # They run in the same shell as the test command so shell variables set here
+  # are visible to args/default_command_components.
+  if proto.preamble.size > 0
+    cmd << "cd #{Shellwords.escape(mytmp)} && "
+    cmd << interpolate_command_text(proto.preamble.join("\n") << "\n", indir, datadir, ostype, exe, outdir)
+  end
+
+  # Both normal and shell-script tests execute from the per-test temp directory,
+  # and both have stdout/stderr captured by the runner.
+  cmd << "cd #{Shellwords.escape(mytmp)} && "
+  if proto.has_shell_script?
+    shell_cmd = command_from_shell_script(options, proto.shell_script, test_case_dir, exe, indir, outdir, datadir, ostype)
+    return nil unless shell_cmd
+    cmd << shell_cmd
+  else
+    cmd << Shellwords.escape(exe)
+    if proto.default_command_components.size > 0
+      cmd << " " << interpolate_command_text(proto.default_command_components.join(' '), indir, datadir, ostype, exe, outdir)
+    end
+
+    cmd << " #{args}"
+  end
+
+  cmd << " > stdout 2> stderr"
+  expand_env(cmd)
+end
+
+def command_successful?(cmd, non_zero_rc_expected, verbose)
+  $stderr << "Executing #{cmd}\n" if verbose
+
+  return true if system(cmd)
+  return true if non_zero_rc_expected
+
+  $stderr << "Warning: #{cmd} failed rc #{$?}\n"
+  false
+end
+
+def output_files_match?(proto, output_file, mytmp, verbose)
+  all_files_same = true
+
+  system("/bin/ls -l #{mytmp}") if verbose
+
+  output_file.each do |correct|
+    in_tmp = File.join(mytmp, File.basename(correct))
+    $stderr << "Checking diffs #{correct} #{in_tmp}\n" if verbose
+    next if files_the_same(proto, correct, in_tmp)
+
+    $stderr << "Diffs btw #{correct}\n      and #{in_tmp}\n"
+    system("ls -l #{correct} #{in_tmp}")
+    all_files_same = false
+  end
+
+  all_files_same
+end
+
+def copy_failure_artifacts(options, proto, mytmp, cmd)
+  $stderr << "Got failed test where #{options.copy_failures_dir}\n"
+  return if options.copy_failures_dir.empty?
+
+  destination = File.join(options.copy_failures_dir, proto.executable, proto.name)
+  FileUtils.mkdir_p(destination)
+
+  get_directory_contents(mytmp).each do |fname|
+    f = File.basename(fname)
+    FileUtils.copy_file(fname, File.join(destination, f))
+  end
+
+  File.write(File.join(destination, 'cmd'), "#{cmd}\n")
 end
 
 def run_case_proto(options, proto, test_dir, test_name, parent_tmpdir)
@@ -388,76 +419,22 @@ def run_case_proto(options, proto, test_dir, test_name, parent_tmpdir)
   else
     datadir = ""
   end
-  uname = options.ostype
+  ostype = options.ostype
 
-  args = eval("\"" + args + "\"")
+  test_case_dir = File.join(test_dir, proto.name)
+  outdir = output_directory_for_test(options, test_case_dir)
 
-  if (proto.preamble.size > 0)
-    cmd = ""
-    proto.preamble.each do |p|
-      cmd << "cd #{mytmp} && " << eval("\"" + proto.preamble.join("\n") << "\n" + "\"")
-    end
-  else
-    cmd = ""
-  end
+  args = interpolate_command_text(args, indir, datadir, ostype, exe, outdir)
 
-  cmd << "cd #{mytmp} && #{exe} "
-  if proto.default_command_components.size > 0
-    cmd << eval("\"" + proto.default_command_components.join(' ') + "\"")
-  end
+  cmd = command_for_test_case(options, proto, exe, args, mytmp, indir, outdir, datadir, ostype, test_case_dir)
+  return false unless cmd
 
-  cmd << " #{args} > stdout 2> stderr"
-
-  cmd = expand_env(cmd)
-
-# if proto.preamble.size > 0
-#   cmd = proto.preamble.join("\n") << "\n" << cmd
-# end
-
-  $stderr << "Executing #{cmd}\n" if options.verbose
-
-  successful_execution = true
-  if system(cmd)
-  elsif proto.non_zero_rc_expected
-  else
-    successful_execution = false
-    $stderr << "Warning: #{cmd} failed rc #{$?}\n"
-  end
-
-  all_files_same = true
-
-  system("/bin/ls -l #{mytmp}") if options.verbose
-
-  # Check that the files match.
-  output_file.each do |correct|
-    in_tmp = File.join(mytmp, File.basename(correct))
-    $stderr << "Checking diffs #{correct} #{in_tmp}\n" if options.verbose
-    next if files_the_same(proto, correct, in_tmp)
-    $stderr << "Diffs btw #{correct}\n      and #{in_tmp}\n"
-    system("ls -l #{correct} #{in_tmp}")
-    all_files_same = false
-  end
+  successful_execution = command_successful?(cmd, proto.non_zero_rc_expected, options.verbose)
+  all_files_same = output_files_match?(proto, output_file, mytmp, options.verbose)
 
   return true if successful_execution && all_files_same
 
-  # Failed test, do we need to copy the temporary directory
-
-  $stderr << "Got failed test where #{options.copy_failures_dir}\n"
-  return false unless options.copy_failures_dir.length > 0
-
-  # Copy the contents of the result directory to the saved location.
-  destination = File.join(options.copy_failures_dir, proto.executable, proto.name)
-  # $stderr << "Making #{destination}\n"
-  FileUtils.mkdir_p(destination)
-
-  get_directory_contents(mytmp).each do |fname|
-    f = File.basename(fname)
-    # $stderr << "Copying #{fname} to #{destination}/#{f}\n"
-    FileUtils.copy_file(fname, File.join(destination, f))
-  end
-
-  File.write(File.join(destination, 'cmd'), "#{cmd}\n")
-
+  copy_failure_artifacts(options, proto, mytmp, cmd)
   return false
 end
 
@@ -515,12 +492,12 @@ def run_tests_in_dir(options, dirname, parent_tmpdir)
     end
     next unless options.perform_test?(test_case.name)
 
-    # Inherit difftool from parent - I think this is a good idea...
-    if (proto.has_difftool? && ! test_case.has_difftool?)
+    # Inherit difftool settings from the parent TestCases message.
+    if proto.has_difftool? && ! test_case.has_difftool?
       test_case.difftool = proto.difftool
-      if proto.has_difftool_options?
-        test_case.difftool = "#{test_case.difftool} #{proto.difftool_options}"
-      end
+    end
+    if proto.has_difftool_options? && ! test_case.has_difftool_options?
+      test_case.difftool_options = proto.difftool_options
     end
     # $stderr << test_case << "\n"
 
@@ -596,7 +573,7 @@ def selected_for_processing(pathname, argv)
   return argv.include?(fname)
 end
 
-# Return a sorted list of the subsirectories in `dirname`.
+# Return a sorted list of the subdirectories in `dirname`.
 def get_sorted_subdirectories(dirname)
   result = []
 

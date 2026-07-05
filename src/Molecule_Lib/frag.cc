@@ -1,6 +1,7 @@
 #include <algorithm>
 #include <iostream>
 #include <memory>
+#include <vector>
 
 #ifdef IW_USE_TBB_SCALABLE_ALLOCATOR
 #include "tbb/scalable_allocator.h"
@@ -803,8 +804,7 @@ Molecule::create_subset(Molecule& subset, const int* process_these, int id,
       continue;
     }
 
-    atom_number_t j =
-        xref[c->a()];  // atom number of the chiral centre in the subset molecule
+    atom_number_t j = xref[c->a()];  // atom number of the chiral centre in the subset molecule
 
     //  cerr << "in subset " << c->all_atoms_in_subset(process_these, id) << '\n';
     //  c->debug_print(cerr);
@@ -853,6 +853,111 @@ Molecule::create_subset(Molecule& subset, const int* process_these, int id) cons
   return create_subset(subset, process_these, id, tmp);
 }
 
+int
+Molecule::create_subsets(const int* subset_membership, Molecule& f0, Molecule& f1,
+                         int* xref) {
+
+  f0.resize_keep_storage(0);
+  f1.resize_keep_storage(0);
+
+  for (int i = 0; i < _number_elements; ++i) {
+    Atom* as = new Atom(_things[i]);
+
+    if (subset_membership[i] == 0) {
+      xref[i] = f0.natoms();
+      f0.Molecule::add(as);
+    } else {  // should check that the value is 1, but not enforcing that.
+      xref[i] = f1.natoms();
+      f1.Molecule::add(as);
+    }
+  }
+
+  for (const Bond* b : _bond_list) {
+    atom_number_t a1 = b->a1();
+    atom_number_t a2 = b->a2();
+    if (subset_membership[a1] != subset_membership[a2]) {
+      continue;
+    }
+    atom_number_t x1 = xref[a1];
+    atom_number_t x2 = xref[a2];
+
+    if (subset_membership[a1] == 0) {
+      f0.add_bond(x1, x2, b->btype());
+    } else {
+      f1.add_bond(x1, x2, b->btype());
+    }
+  }
+
+  for (const Chiral_Centre* c : _chiral_centres) {
+    if (f0.AddChiralCentre(*c, subset_membership, 0, xref)) {
+    } else if (f1.AddChiralCentre(*c, subset_membership, 1, xref)) {
+    }
+  }
+
+  return 1;
+}
+
+// `in_parent` is a chiral centre from a parent molecule of which we are a subset.
+// The subset specification is `subset_membership[i] == flag`. and `xref` is a mapping
+// from atoms in the parent to atoms in the subset.
+int
+Molecule::AddChiralCentre(const Chiral_Centre& in_parent, const int* subset_membership, int flag,
+                          const int* xref) {
+  if (subset_membership[in_parent.a()] != flag) {
+    return 0;
+  }
+
+  if (in_parent.all_atoms_in_subset(subset_membership, flag)) {
+    std::unique_ptr<Chiral_Centre> newc = std::make_unique<Chiral_Centre>(kInvalidAtomNumber);
+    if (newc->make_copy(in_parent, xref)) {
+      _chiral_centres << newc.release();
+      return 1;
+    }
+  }
+
+  // Not all atoms from `in_parent` are in our subset. Unless it has 4 explicit
+  // atoms, it cannot transfer to the subset.
+  if (in_parent.number_atoms_specified() != 4) {
+    return 0;
+  }
+
+  // If we are missing exactly one atom attached to the chiral centre, convert
+  // that atom to an implicit Hydrogen in the subset.
+  if (in_parent.atoms_in_subset(subset_membership, flag) != 3) {
+    return 0;
+  }
+
+  atom_number_t missing = kInvalidAtomNumber;
+  for (atom_number_t a : {in_parent.top_front(), in_parent.top_back(),
+                          in_parent.left_down(), in_parent.right_down()}) {
+    if (a >= 0 && subset_membership[a] != flag) {
+      missing = a;
+      break;
+    }
+  }
+
+  if (missing == kInvalidAtomNumber) {
+    return 0;
+  }
+
+  std::vector<int> xref_copy(xref, xref + _number_elements);
+  xref_copy[missing] = kChiralConnectionIsImplicitHydrogen;
+
+  std::unique_ptr<Chiral_Centre> newc = std::make_unique<Chiral_Centre>(kInvalidAtomNumber);
+  if (! newc->make_copy(in_parent, xref_copy.data())) {
+    return 0;
+  }
+
+  // Tell the centre atom that implicit Hydrogens are not known so it recomputes.
+  atom_number_t centre = xref[in_parent.a()];
+
+  _things[centre]->unset_all_implicit_hydrogen_information();
+
+  _chiral_centres << newc.release();
+
+  return 1;
+}
+
 Molecule
 Molecule::create_subset(const Set_of_Atoms& these_atoms) const {
   Molecule result;
@@ -863,6 +968,7 @@ Molecule::create_subset(const Set_of_Atoms& these_atoms) const {
     cerr << "Molecule::create_subset:failed\n";
     return result;
   }
+
   return result;
 }
 

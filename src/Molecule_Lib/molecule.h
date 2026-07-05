@@ -793,6 +793,9 @@ class __attribute__((visibility("default"))) Molecule : protected resizable_arra
 
   int _add_chiral_centre_checking_for_duplicate(Chiral_Centre* c);
 
+  int AddChiralCentre(const Chiral_Centre& in_parent, const int* subset_membership, int flag,
+                          const int* xref);
+
   int _check_chirality_after_loss_of_bond(const atom_number_t a1, const atom_number_t a2);
 
   int _write_molecule_tdt_pcn(std::ostream& os, const IWString&) const;
@@ -1728,11 +1731,28 @@ class __attribute__((visibility("default"))) Molecule : protected resizable_arra
   //  Different calls to create subset depending on whether the caller
   //  provides an array of length natoms() or not
 
-  int create_subset(Molecule&, const int*, int = 1) const;
-  int create_subset(Molecule&, const int*, int, int*) const;
+  // Create a subset where atoms are included if `process_these[i] == flag`.
+  int create_subset(Molecule& subset, const int* process_these, int flag = 1) const;
+
+  // Creat a subset of the parent molecule.
+  // Includes those atoms for which process_these[i] == flag.
+  // xref will contain a mapping from atom number in the starting molecule
+  // to an atom number in the subset.
+  // If an atom is not in the subset, xref[i] = -1.
+  int create_subset(Molecule& subset, const int* process_these, int flag, int* xref) const;
+
   Molecule create_subset(const Set_of_Atoms& these_atoms) const;
   int create_subset_by_bond(Molecule& subset, const int* these_bonds_only,
                             int flag) const;
+
+
+  // `subset_membership` must contain 0 and 1's only. Atoms for which
+  // `subset_membership[i]` == 0 are placed in `f0`...
+  // xref will be a cross reference from atom numbers in `this` to an atom
+  // in either `f0` or `f1`. Since subset_membership will be available,
+  // it is known the destination of each starting atom.
+  int create_subsets(const int* subset_membership, Molecule& f0, Molecule& f1,
+                     int* xref);
 
   int reduce_to_largest_fragment();
   int reduce_to_largest_organic_fragment();

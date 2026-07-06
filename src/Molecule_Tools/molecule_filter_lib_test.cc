@@ -9,6 +9,7 @@ using molecule_filter_lib::FeatureFromName;
 using molecule_filter_lib::FeatureValues;
 using molecule_filter_lib::FeatureName;
 using molecule_filter_lib::MoleculeFilter;
+using molecule_filter_lib::RejectionReason;
 using molecule_filter_lib::Utility;
 
 
@@ -347,6 +348,37 @@ TEST(MoleculeFilterTest, InvalidUtilityFailsBuildAndClearsUtilities) {
   EXPECT_FALSE(filter.Build(invalid_proto));
   EXPECT_FALSE(filter.active());
   EXPECT_EQ(filter.number_utilities(), 0);
+}
+
+TEST(MoleculeFilterTest, AppliesNewMinMaxComplementFields) {
+  Molecule m;
+  ASSERT_TRUE(m.build_from_smiles("CCO"));
+
+  molecule_filter_data::Requirements max_heteroatoms;
+  max_heteroatoms.set_max_heteroatom_count(0);
+  MoleculeFilter filter;
+  ASSERT_TRUE(filter.Build(max_heteroatoms));
+  RejectionReason rejection_reason;
+  EXPECT_FALSE(filter.Ok(m, rejection_reason));
+  EXPECT_EQ(rejection_reason, RejectionReason::kTooManyHeteroatoms);
+
+  molecule_filter_data::Requirements min_halogens;
+  min_halogens.set_min_halogen_count(1);
+  ASSERT_TRUE(filter.Build(min_halogens));
+  EXPECT_FALSE(filter.Ok(m, rejection_reason));
+  EXPECT_EQ(rejection_reason, RejectionReason::kTooFewHalogen);
+
+  molecule_filter_data::Requirements min_largest_ring;
+  min_largest_ring.set_min_largest_ring_size(3);
+  ASSERT_TRUE(filter.Build(min_largest_ring));
+  EXPECT_FALSE(filter.Ok(m, rejection_reason));
+  EXPECT_EQ(rejection_reason, RejectionReason::kRingTooSmall);
+
+  molecule_filter_data::Requirements min_aromatic_density;
+  min_aromatic_density.set_min_aromatic_density(0.1f);
+  ASSERT_TRUE(filter.Build(min_aromatic_density));
+  EXPECT_FALSE(filter.Ok(m, rejection_reason));
+  EXPECT_EQ(rejection_reason, RejectionReason::kAromaticDensityTooLow);
 }
 
 

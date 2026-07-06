@@ -827,12 +827,16 @@ MoleculeFilter::Ok(Molecule& m, const int matoms, const int nrings,
   }
 
   if (_requirements.has_min_heteroatom_count() ||
+      _requirements.has_max_heteroatom_count() ||
       _requirements.has_min_heteroatom_fraction() ||
       _requirements.has_max_heteroatom_fraction()) {
     const int hac = CountHeteroatoms(m);
 
     if (_requirements.has_min_heteroatom_count() && hac < _requirements.min_heteroatom_count()) {
       return Reject(rejection_reason, RejectionReason::kTooFewHeteroatoms);
+    }
+    if (_requirements.has_max_heteroatom_count() && hac > _requirements.max_heteroatom_count()) {
+      return Reject(rejection_reason, RejectionReason::kTooManyHeteroatoms);
     }
 
     if (_requirements.has_min_heteroatom_fraction() ||
@@ -855,15 +859,21 @@ MoleculeFilter::Ok(Molecule& m, const int matoms, const int nrings,
     return Reject(rejection_reason, RejectionReason::kIsotope);
   }
 
-  if (_requirements.has_max_chiral() &&
-      m.chiral_centres() > _requirements.max_chiral()) {
-    return Reject(rejection_reason, RejectionReason::kTooManyChiral);
+  if (_requirements.has_min_chiral() || _requirements.has_max_chiral()) {
+    const int chiral_centres = m.chiral_centres();
+    if (_requirements.has_min_chiral() && chiral_centres < _requirements.min_chiral()) {
+      return Reject(rejection_reason, RejectionReason::kTooFewChiral);
+    }
+    if (_requirements.has_max_chiral() && chiral_centres > _requirements.max_chiral()) {
+      return Reject(rejection_reason, RejectionReason::kTooManyChiral);
+    }
   }
 
   int arc = 0;
   int need_to_compute_aromatic_rings = 0;
   if (_requirements.has_min_aromatic_ring_count() ||
       _requirements.has_max_aromatic_ring_count() ||
+      _requirements.has_min_aromatic_rings_in_system() ||
       _requirements.has_max_aromatic_rings_in_system()) {
     need_to_compute_aromatic_rings = 1;
   }
@@ -915,24 +925,43 @@ MoleculeFilter::Ok(Molecule& m, const int matoms, const int nrings,
     }
   }
 
-  if (_requirements.has_min_sp3_carbon()) {
+  if (_requirements.has_min_sp3_carbon() || _requirements.has_max_sp3_carbon()) {
     const int csp3 = Sp3Carbon(m);
-    if (csp3 < _requirements.min_sp3_carbon()) {
+    if (_requirements.has_min_sp3_carbon() && csp3 < _requirements.min_sp3_carbon()) {
       return Reject(rejection_reason, RejectionReason::kTooFewSp3Carbon);
+    }
+    if (_requirements.has_max_sp3_carbon() && csp3 > _requirements.max_sp3_carbon()) {
+      return Reject(rejection_reason, RejectionReason::kTooManySp3Carbon);
     }
   }
 
-  if (_requirements.has_max_halogen_count()) {
+  if (_requirements.has_min_halogen_count() || _requirements.has_max_halogen_count()) {
     const int h = HalogenCount(m);
-    if (h > _requirements.max_halogen_count()) {
+    if (_requirements.has_min_halogen_count() && h < _requirements.min_halogen_count()) {
+      return Reject(rejection_reason, RejectionReason::kTooFewHalogen);
+    }
+    if (_requirements.has_max_halogen_count() && h > _requirements.max_halogen_count()) {
       return Reject(rejection_reason, RejectionReason::kTooManyHalogen);
     }
   }
 
-  if (_requirements.has_largest_ring_size() && nrings > 0) {
-    int rsze = m.ringi(nrings - 1)->number_elements();
-    if (rsze > _requirements.largest_ring_size()) {
-      return Reject(rejection_reason, RejectionReason::kRingTooLarge);
+  if (_requirements.has_min_largest_ring_size() ||
+      _requirements.has_max_largest_ring_size()) {
+    if (nrings == 0) {
+      if (_requirements.has_min_largest_ring_size() &&
+          _requirements.min_largest_ring_size() > 0) {
+        return Reject(rejection_reason, RejectionReason::kRingTooSmall);
+      }
+    } else {
+      int rsze = m.ringi(nrings - 1)->number_elements();
+      if (_requirements.has_min_largest_ring_size() &&
+          rsze < _requirements.min_largest_ring_size()) {
+        return Reject(rejection_reason, RejectionReason::kRingTooSmall);
+      }
+      if (_requirements.has_max_largest_ring_size() &&
+          rsze > _requirements.max_largest_ring_size()) {
+        return Reject(rejection_reason, RejectionReason::kRingTooLarge);
+      }
     }
   }
 
@@ -946,17 +975,28 @@ MoleculeFilter::Ok(Molecule& m, const int matoms, const int nrings,
     }
   }
 
-  if (_requirements.has_max_aromatic_density()) {
+  if (_requirements.has_min_aromatic_density() || _requirements.has_max_aromatic_density()) {
     const float aromdens = iwmisc::Fraction<float>(m.aromatic_atom_count(), matoms);
-    if (aromdens > _requirements.max_aromatic_density()) {
+    if (_requirements.has_min_aromatic_density() && aromdens < _requirements.min_aromatic_density()) {
+      return Reject(rejection_reason, RejectionReason::kAromaticDensityTooLow);
+    }
+    if (_requirements.has_max_aromatic_density() && aromdens > _requirements.max_aromatic_density()) {
       return Reject(rejection_reason, RejectionReason::kAromaticDensityTooHigh);
     }
   }
 
-  if (_requirements.has_max_distance() && matoms > _requirements.max_distance()) {
-    const int d = m.longest_path();
-    if (d > _requirements.max_distance()) {
-      return Reject(rejection_reason, RejectionReason::kTooLong);
+  if (_requirements.has_min_distance() || _requirements.has_max_distance()) {
+    if (! _requirements.has_min_distance() &&
+        _requirements.has_max_distance() && matoms <= _requirements.max_distance()) {
+      // No need to compute; longest path cannot exceed atom count.
+    } else {
+      const int d = m.longest_path();
+      if (_requirements.has_min_distance() && d < _requirements.min_distance()) {
+        return Reject(rejection_reason, RejectionReason::kTooShort);
+      }
+      if (_requirements.has_max_distance() && d > _requirements.max_distance()) {
+        return Reject(rejection_reason, RejectionReason::kTooLong);
+      }
     }
   }
 
@@ -973,15 +1013,37 @@ MoleculeFilter::Ok(Molecule& m, const int matoms, const int nrings,
   // A temporary array that some external functions might need.
   std::unique_ptr<int[]> tmp;
 
-  if (_requirements.has_max_ring_system_size() ||
+  if (_requirements.has_min_ring_system_size() ||
+      _requirements.has_max_ring_system_size() ||
+      _requirements.has_min_aromatic_rings_in_system() ||
       _requirements.has_max_aromatic_rings_in_system()) {
-    if (nrings < _requirements.max_ring_system_size() &&
-        nrings < _requirements.max_aromatic_rings_in_system()) {
-      // no need to compute.
-    }  else {
+    bool need_ring_system = true;
+    if (! _requirements.has_min_ring_system_size() &&
+        ! _requirements.has_min_aromatic_rings_in_system()) {
+      need_ring_system = false;
+      if (_requirements.has_max_ring_system_size() &&
+          nrings >= _requirements.max_ring_system_size()) {
+        need_ring_system = true;
+      }
+      if (_requirements.has_max_aromatic_rings_in_system() &&
+          nrings >= _requirements.max_aromatic_rings_in_system()) {
+        need_ring_system = true;
+      }
+    }
+
+    if (need_ring_system) {
       const auto [max_ring_system_size, max_aromatic_rings_in_system] = MaxRingSystemSize(m, tmp);
-      if (_requirements.has_max_ring_system_size() && max_ring_system_size > _requirements.max_ring_system_size()) {
+      if (_requirements.has_min_ring_system_size() &&
+          max_ring_system_size < _requirements.min_ring_system_size()) {
+        return Reject(rejection_reason, RejectionReason::kRingSystemTooSmall);
+      }
+      if (_requirements.has_max_ring_system_size() &&
+          max_ring_system_size > _requirements.max_ring_system_size()) {
         return Reject(rejection_reason, RejectionReason::kRingSystemTooLarge);
+      }
+      if (_requirements.has_min_aromatic_rings_in_system() &&
+          max_aromatic_rings_in_system < _requirements.min_aromatic_rings_in_system()) {
+        return Reject(rejection_reason, RejectionReason::kTooFewAromaticRingsInSystem);
       }
       if (_requirements.has_max_aromatic_rings_in_system() &&
           max_aromatic_rings_in_system > _requirements.max_aromatic_rings_in_system()) {

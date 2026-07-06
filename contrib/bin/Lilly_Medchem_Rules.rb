@@ -2,11 +2,10 @@
 
 # Implementation of Lilly Medchem rules using latest LillyMol executables.
 
-ianhome = File.dirname($0)      # location for supporting files
-
 ianhome = ENV['LILLYMOL_HOME']
 unless ianhome
-  ianhome = File.dirname(File.dirname(File.dirname __FILE__))
+  $stderr << "LILLYMOL_HOME must be set\n"
+  exit 1
 end
 
 require "#{ianhome}/contrib/bin/lib/iwcmdline.rb"
@@ -29,7 +28,7 @@ def usage (rc)
   $stderr.print " -S <fname>     write output to <fname> rather than stdout\n" if $expert
   $stderr.print " -B <stem>      output name stem for rejected molecules\n" if $expert
   $stderr.print " -log <stem>    name stem for log files\n" if $expert
-  $stderr.print " -tp...-tp      options passed directly to mc_first_pass\n" if $expert
+  $stderr.print " -tp...-tp      options passed directly to tp_first_pass\n" if $expert
   $stderr.print " -iwd...-iwd    options passed directly to iwdemerit\n" if $expert
   $stderr.print " -odm <name>    omit demerit with file name <name>\n" if $expert
   $stderr.print " -edm <fname>   extra demerits to be applied - query file format only\n" if $expert
@@ -72,7 +71,7 @@ if cl.option_present('i')
   input_type = '-i ' << cl.value('i')
 end
 
-# The ring bond ratio used by mc_first_pass
+# The ring bond ratio used by tp_first_pass
 
 ring_bond_ratio = -1
 if cl.option_present('b')
@@ -102,7 +101,7 @@ iwdemerit      = "#{ianhome}/bin/#{uname}/iwdemerit"
 mc_first_pass  = "#{ianhome}/bin/#{uname}/tp_first_pass"
 tsubstructure  = "#{ianhome}/bin/#{uname}/tsubstructure"
 
-query_dir = "#{ianhome}/data/LillyMedchemRules"
+query_dir = "#{ianhome}/data/queries/LillyMedchemRules"
 
 query_dir = cl.value('q') if cl.option_present('q')
 

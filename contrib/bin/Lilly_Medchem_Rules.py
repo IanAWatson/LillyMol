@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import argparse
 import os
+import platform
 import re
 import shlex
 import subprocess
@@ -74,6 +75,13 @@ def script_home() -> Path:
     return Path(__file__).resolve().parent
 
 
+def lillymol_home() -> Path:
+    value = os.environ.get("LILLYMOL_HOME")
+    if not value:
+        raise RuntimeError("LILLYMOL_HOME must be set")
+    return Path(value).resolve()
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         description="Run the Lilly medchem rejection/demerit rules."
@@ -94,7 +102,7 @@ def build_parser() -> argparse.ArgumentParser:
         action="append",
         default=[],
         metavar="OPTS",
-        help="Options passed directly to mc_first_pass. Quote multiple shell tokens.",
+        help="Options passed directly to tp_first_pass. Quote multiple shell tokens.",
     )
     parser.add_argument(
         "-iwd",
@@ -219,6 +227,7 @@ def build_odm_demerit_file(
 
 def build_command(args: argparse.Namespace) -> tuple[str, list[Path]]:
     home = script_home()
+    lm_home = lillymol_home()
 
     lower_atom_count_cutoff = DEFAULT_LOWER_ATOM_COUNT_CUTOFF
     soft_upper_atom_count_cutoff = DEFAULT_SOFT_UPPER_ATOM_COUNT_CUTOFF
@@ -248,19 +257,20 @@ def build_command(args: argparse.Namespace) -> tuple[str, list[Path]]:
 
     search_dirs = [home]
     search_dirs.extend(Path(d) for d in args.bindir)
+    system_name = platform.system()
     search_dirs.extend(
         [
-            home / "bin" / "Linux",
-            home / "bin",
+            lm_home / "bin" / system_name,
+            lm_home / "bin",
             home / "build",
         ]
     )
 
     iwdemerit = find_executable("iwdemerit", search_dirs)
-    mc_first_pass = find_executable("mc_first_pass", search_dirs)
+    mc_first_pass = find_executable("tp_first_pass", search_dirs)
     tsubstructure = find_executable("tsubstructure", search_dirs)
 
-    query_dir = Path(args.q) if args.q else home / "queries"
+    query_dir = Path(args.q) if args.q else lm_home / "data" / "queries" / "LillyMedchemRules"
     if not query_dir.is_dir():
         raise RuntimeError(f"Cannot continue, query dir '{query_dir}' invalid")
     validate_queries(query_dir)
@@ -300,7 +310,7 @@ def build_command(args: argparse.Namespace) -> tuple[str, list[Path]]:
     if args.symm is not None:
         extra_iwdemerit_options += f" -s {args.symm}"
 
-    charge_assigner = home / "charge_assigner" / "queries"
+    charge_assigner = lm_home / "data" / "queries" / "charges" / "queries"
     if not readable_nonempty_file(charge_assigner):
         print("Charge assigner not available, skipping", file=sys.stderr)
     else:

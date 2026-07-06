@@ -84,14 +84,18 @@ class Options {
     uint64_t _too_few_rings = 0;
     uint64_t _too_many_rings = 0;
     uint64_t _too_few_heteroatoms = 0;
+    uint64_t _too_many_heteroatoms = 0;
     uint64_t _min_heteroatom_fraction = 0;
     uint64_t _max_heteroatom_fraction = 0;
     uint64_t _too_few_aromatic_rings = 0;
     uint64_t _too_many_aromatic_rings = 0;
     uint64_t _too_few_aliphatic_rings = 0;
     uint64_t _too_many_aliphatic_rings = 0;
+    uint64_t _ring_system_too_small = 0;
     uint64_t _ring_system_too_large = 0;
+    uint64_t _too_few_aromatic_rings_in_system = 0;
     uint64_t _too_many_aromatic_rings_in_system = 0;
+    uint64_t _ring_too_small = 0;
     uint64_t _ring_too_large = 0;
     uint64_t _non_organic = 0;
     uint64_t _isotope = 0;
@@ -107,11 +111,17 @@ class Options {
     uint64_t _too_many_hba = 0;
     uint64_t _too_few_hbd = 0;
     uint64_t _too_many_hbd = 0;
+    uint64_t _too_few_halogens = 0;
     uint64_t _too_many_halogens = 0;
+    uint64_t _too_short = 0;
     uint64_t _too_long = 0;
     uint64_t _too_few_csp3 = 0;
+    uint64_t _too_many_csp3 = 0;
+    uint64_t _aromdens_too_low = 0;
     uint64_t _aromdens_too_high = 0;
+    uint64_t _too_few_chiral = 0;
     uint64_t _too_many_chiral = 0;
+    uint64_t _too_few_fragments = 0;
     uint64_t _too_many_fragments = 0;
 
     uint64_t _matches_exclusion_smarts = 0;
@@ -229,14 +239,16 @@ Options::Initialise(Command_Line& cl) {
     return 0;
   }
 
-  if (_remove_chirality && _requirements.has_max_chiral()) {
+  if (_remove_chirality &&
+      ((_requirements.has_min_chiral() && _requirements.min_chiral() > 0) ||
+       _requirements.has_max_chiral())) {
     cerr << "Options::Initialise:removing chirality has been specified (-c)\n";
-    cerr << "But the config file contains 'max_chiral'. Impossible\n";
+    cerr << "But the config file contains a chiral-centre filter. Impossible\n";
     return 0;
   }
 
-  if (_requirements.has_max_distance() && ! _reduce_to_largest_fragment) {
-    cerr << "Options::Initialise:max distance specified, but largest fragment not selected (-l)\n";
+  if ((_requirements.has_min_distance() || _requirements.has_max_distance()) && ! _reduce_to_largest_fragment) {
+    cerr << "Options::Initialise:distance specified, but largest fragment not selected (-l)\n";
     cerr << "Automatically enabling largest fragment selection\n";
     _reduce_to_largest_fragment = 1;
   }
@@ -310,6 +322,9 @@ Options::Report(std::ostream& output) const {
   if (_requirements.has_min_heteroatom_count()) {
     output << _too_few_heteroatoms << " too few heteroatoms " << _requirements.min_heteroatom_count() << '\n';
   }
+  if (_requirements.has_max_heteroatom_count()) {
+    output << _too_many_heteroatoms << " too many heteroatoms " << _requirements.max_heteroatom_count() << '\n';
+  }
   if (_requirements.has_min_heteroatom_fraction()) {
     output << _min_heteroatom_fraction << " min heteroatom fraction " << _requirements.min_heteroatom_fraction() << '\n';
   }
@@ -331,15 +346,24 @@ Options::Report(std::ostream& output) const {
     output << _too_many_aliphatic_rings << " too many aliphatic rings " << _requirements.max_aliphatic_ring_count() << '\n';
   }
 
+  if (_requirements.has_min_ring_system_size()) {
+    output << _ring_system_too_small << " ring systems too small " << _requirements.min_ring_system_size() << '\n';
+  }
   if (_requirements.has_max_ring_system_size()) {
     output << _ring_system_too_large << " ring systems too large " << _requirements.max_ring_system_size() << '\n';
+  }
+  if (_requirements.has_min_aromatic_rings_in_system()) {
+    output << _too_few_aromatic_rings_in_system << " too few aromatic rings in system " << _requirements.min_aromatic_rings_in_system() << '\n';
   }
   if (_requirements.has_max_aromatic_rings_in_system()) {
     output << _too_many_aromatic_rings_in_system << " too many aromatic rings in system " << _requirements.max_aromatic_rings_in_system() << '\n';
   }
 
-  if (_requirements.has_largest_ring_size()) {
-    output << _ring_too_large << " ring too large " << _requirements.largest_ring_size() << '\n';
+  if (_requirements.has_min_largest_ring_size()) {
+    output << _ring_too_small << " ring too small " << _requirements.min_largest_ring_size() << '\n';
+  }
+  if (_requirements.has_max_largest_ring_size()) {
+    output << _ring_too_large << " ring too large " << _requirements.max_largest_ring_size() << '\n';
   }
 
   if (_requirements.has_min_rotatable_bonds()) {
@@ -384,10 +408,16 @@ Options::Report(std::ostream& output) const {
     output << _too_many_hbd << " too many HBD " << _requirements.max_hbd() << '\n';
   }
 
+  if (_requirements.has_min_halogen_count()) {
+    output << _too_few_halogens << " too few halogens " << _requirements.min_halogen_count() << '\n';
+  }
   if (_requirements.has_max_halogen_count()) {
     output << _too_many_halogens << " too many halogens " << _requirements.max_halogen_count() << '\n';
   }
 
+  if (_requirements.has_min_distance()) {
+    output << _too_short << " molecules too short " << _requirements.min_distance() << '\n';
+  }
   if (_requirements.has_max_distance()) {
     output << _too_long << " molecules too long " << _requirements.max_distance() << '\n';
   }
@@ -395,15 +425,27 @@ Options::Report(std::ostream& output) const {
   if (_requirements.has_min_sp3_carbon()) {
     output << _too_few_csp3 << " too few CSP3 " << _requirements.min_sp3_carbon() << '\n';
   }
+  if (_requirements.has_max_sp3_carbon()) {
+    output << _too_many_csp3 << " too many CSP3 " << _requirements.max_sp3_carbon() << '\n';
+  }
 
+  if (_requirements.has_min_aromatic_density()) {
+    output << _aromdens_too_low << " aromatic density too low " << _requirements.min_aromatic_density() << '\n';
+  }
   if (_requirements.has_max_aromatic_density()) {
     output << _aromdens_too_high << " aromatic density too high " << _requirements.max_aromatic_density() << '\n';
   }
 
+  if (_requirements.has_min_chiral()) {
+    output << _too_few_chiral << " too few chiral centres " << _requirements.min_chiral() << '\n';
+  }
   if (_requirements.has_max_chiral()) {
     output << _too_many_chiral << " too many chiral centres " << _requirements.max_chiral() << '\n';
   }
 
+  if (_requirements.has_min_number_fragments()) {
+    output << _too_few_fragments << " too few fragments " << _requirements.min_number_fragments() << '\n';
+  }
   if (_requirements.has_max_number_fragments()) {
     output << _too_many_fragments << " too many fragments " << _requirements.max_number_fragments() << '\n';
   }
@@ -466,9 +508,14 @@ Options::Process(const const_IWSubstring& line,
 
   bool smiles_changed = false;
 
-  if (_requirements.has_max_number_fragments()) {
+  if (_requirements.has_min_number_fragments() || _requirements.has_max_number_fragments()) {
     const int nfrag = smiles.ccount('.') + 1;
-    if (nfrag > _requirements.max_number_fragments()) {
+    if (_requirements.has_min_number_fragments() && nfrag < _requirements.min_number_fragments()) {
+      ++_too_few_fragments;
+      MaybeWriteToRejectStream(line);
+      return 0;
+    }
+    if (_requirements.has_max_number_fragments() && nfrag > _requirements.max_number_fragments()) {
       ++_too_many_fragments;
       MaybeWriteToRejectStream(line);
       return 0;
@@ -526,10 +573,16 @@ Options::Process(const const_IWSubstring& line,
     return 0;
   }
 
-  if (_requirements.has_max_chiral() &&
-      m.chiral_centres() > _requirements.max_chiral()) {
-    ++_too_many_chiral;
-    return 0;
+  if (_requirements.has_min_chiral() || _requirements.has_max_chiral()) {
+    const int chiral_centres = m.chiral_centres();
+    if (_requirements.has_min_chiral() && chiral_centres < _requirements.min_chiral()) {
+      ++_too_few_chiral;
+      return 0;
+    }
+    if (_requirements.has_max_chiral() && chiral_centres > _requirements.max_chiral()) {
+      ++_too_many_chiral;
+      return 0;
+    }
   }
 
   if (_remove_chirality) {
@@ -636,6 +689,9 @@ Options::NoteRejection(molecule_filter_lib::RejectionReason rejection_reason) {
     case RejectionReason::kTooFewHeteroatoms:
       ++_too_few_heteroatoms;
       return;
+    case RejectionReason::kTooManyHeteroatoms:
+      ++_too_many_heteroatoms;
+      return;
     case RejectionReason::kMinHeteroatomFraction:
       ++_min_heteroatom_fraction;
       return;
@@ -678,8 +734,17 @@ Options::NoteRejection(molecule_filter_lib::RejectionReason rejection_reason) {
     case RejectionReason::kTooFewSp3Carbon:
       ++_too_few_csp3;
       return;
+    case RejectionReason::kTooManySp3Carbon:
+      ++_too_many_csp3;
+      return;
+    case RejectionReason::kTooFewHalogen:
+      ++_too_few_halogens;
+      return;
     case RejectionReason::kTooManyHalogen:
       ++_too_many_halogens;
+      return;
+    case RejectionReason::kRingTooSmall:
+      ++_ring_too_small;
       return;
     case RejectionReason::kRingTooLarge:
       ++_ring_too_large;
@@ -690,8 +755,14 @@ Options::NoteRejection(molecule_filter_lib::RejectionReason rejection_reason) {
     case RejectionReason::kTooManyRotatableBonds:
       ++_too_many_rotbond;
       return;
+    case RejectionReason::kAromaticDensityTooLow:
+      ++_aromdens_too_low;
+      return;
     case RejectionReason::kAromaticDensityTooHigh:
       ++_aromdens_too_high;
+      return;
+    case RejectionReason::kTooShort:
+      ++_too_short;
       return;
     case RejectionReason::kTooLong:
       ++_too_long;
@@ -702,8 +773,14 @@ Options::NoteRejection(molecule_filter_lib::RejectionReason rejection_reason) {
     case RejectionReason::kHighTpsa:
       ++_high_tpsa;
       return;
+    case RejectionReason::kRingSystemTooSmall:
+      ++_ring_system_too_small;
+      return;
     case RejectionReason::kRingSystemTooLarge:
       ++_ring_system_too_large;
+      return;
+    case RejectionReason::kTooFewAromaticRingsInSystem:
+      ++_too_few_aromatic_rings_in_system;
       return;
     case RejectionReason::kTooManyAromaticRingsInSystem:
       ++_too_many_aromatic_rings_in_system;
@@ -719,6 +796,15 @@ Options::NoteRejection(molecule_filter_lib::RejectionReason rejection_reason) {
       return;
     case RejectionReason::kHighXlogp:
       ++_high_xlogp;
+      return;
+    case RejectionReason::kTooFewChiral:
+      ++_too_few_chiral;
+      return;
+    case RejectionReason::kTooFewFragments:
+      ++_too_few_fragments;
+      return;
+    case RejectionReason::kTooManyFragments:
+      ++_too_many_fragments;
       return;
   }
 }

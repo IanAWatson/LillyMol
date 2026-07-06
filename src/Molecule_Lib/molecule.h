@@ -794,7 +794,7 @@ class __attribute__((visibility("default"))) Molecule : protected resizable_arra
   int _add_chiral_centre_checking_for_duplicate(Chiral_Centre* c);
 
   int AddChiralCentre(const Chiral_Centre& in_parent, const int* subset_membership, int flag,
-                          const int* xref);
+                          const int* xref, int parent_natoms);
 
   int _check_chirality_after_loss_of_bond(const atom_number_t a1, const atom_number_t a2);
 

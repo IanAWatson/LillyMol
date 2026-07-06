@@ -178,7 +178,8 @@ INSTANTIATE_TEST_SUITE_P(TestCreateSubsets, TestCreateSubsets, testing::Values(
    ForCreateSubsets{"F[C@](Cl)(Br)I", {0, 0, 0, 0, 0}, {"F[C@](Cl)(Br)I", "."}, 1, 0},
    ForCreateSubsets{"F[C@](Cl)(Br)I", {0, 0, 0, 0, 1}, {"F[C@H](Cl)Br", "I"}, 1, 0, 1, 0},
    ForCreateSubsets{"F[C@](Cl)(Br)I", {1, 1, 1, 1, 0}, {"I", "F[C@H](Cl)Br"}, 0, 1, 0, 1},
-   ForCreateSubsets{"F[C@](Cl)(Br)I", {0, 1, 1, 1, 1}, {"F", "Cl[C@H](Br)I"}, 0, 1, 0, 1}
+   ForCreateSubsets{"F[C@](Cl)(Br)I", {0, 1, 1, 1, 1}, {"F", "Cl[C@@H](Br)I"}, 0, 1, 0, 1},
+   ForCreateSubsets{"CCCC[C@](F)(Cl)Br", {1, 1, 1, 1, 0, 0, 0, 0}, {"F[C@@H](Cl)Br", "CCCC"}, 1, 0, 1, 0}
 ));
 
 }  // namespace

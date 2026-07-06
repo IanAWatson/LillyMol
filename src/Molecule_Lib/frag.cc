@@ -875,22 +875,31 @@ Molecule::create_subsets(const int* subset_membership, Molecule& f0, Molecule& f
   for (const Bond* b : _bond_list) {
     atom_number_t a1 = b->a1();
     atom_number_t a2 = b->a2();
-    if (subset_membership[a1] != subset_membership[a2]) {
-      continue;
-    }
+
     atom_number_t x1 = xref[a1];
     atom_number_t x2 = xref[a2];
 
-    if (subset_membership[a1] == 0) {
-      f0.add_bond(x1, x2, b->btype());
-    } else {
-      f1.add_bond(x1, x2, b->btype());
+    // Atoms are in the same fragment, make a bond
+    if (subset_membership[a1] == subset_membership[a2]) {
+      if (subset_membership[a1] == 0) {
+        f0.add_bond(x1, x2, b->btype());
+      } else {
+        f1.add_bond(x1, x2, b->btype());
+      }
+    } else {  // different fragments, unset cached Hydrogen atoms
+      if (subset_membership[a1] == 0) {
+        f0.unset_all_implicit_hydrogen_information(x1);
+        f1.unset_all_implicit_hydrogen_information(x2);
+      } else {
+        f0.unset_all_implicit_hydrogen_information(x2);
+        f1.unset_all_implicit_hydrogen_information(x1);
+      }
     }
   }
 
   for (const Chiral_Centre* c : _chiral_centres) {
-    if (f0.AddChiralCentre(*c, subset_membership, 0, xref)) {
-    } else if (f1.AddChiralCentre(*c, subset_membership, 1, xref)) {
+    if (f0.AddChiralCentre(*c, subset_membership, 0, xref, _number_elements)) {
+    } else if (f1.AddChiralCentre(*c, subset_membership, 1, xref, _number_elements)) {
     }
   }
 
@@ -902,7 +911,7 @@ Molecule::create_subsets(const int* subset_membership, Molecule& f0, Molecule& f
 // from atoms in the parent to atoms in the subset.
 int
 Molecule::AddChiralCentre(const Chiral_Centre& in_parent, const int* subset_membership, int flag,
-                          const int* xref) {
+                          const int* xref, int parent_natoms) {
   if (subset_membership[in_parent.a()] != flag) {
     return 0;
   }
@@ -940,7 +949,8 @@ Molecule::AddChiralCentre(const Chiral_Centre& in_parent, const int* subset_memb
     return 0;
   }
 
-  std::vector<int> xref_copy(xref, xref + _number_elements);
+  // might be OK to just use xref, TODO:ianwatson investigate.
+  std::vector<int> xref_copy(xref, xref + parent_natoms);
   xref_copy[missing] = kChiralConnectionIsImplicitHydrogen;
 
   std::unique_ptr<Chiral_Centre> newc = std::make_unique<Chiral_Centre>(kInvalidAtomNumber);

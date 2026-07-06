@@ -27,6 +27,20 @@
       "shellScript": {
         "scriptName": "benzene.sh"
       }
+    },
+
+    {
+      "name": "atype_fragmentradius0",
+      "shellScript": {
+        "scriptName": "benzene.sh"
+      }
+    },
+
+    {
+      "name": "atype_fragmentradius1",
+      "shellScript": {
+        "scriptName": "benzene.sh"
+      }
     }
 
   ]

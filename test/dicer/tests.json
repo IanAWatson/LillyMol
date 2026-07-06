@@ -48,6 +48,13 @@
         {
           "name": "always_increment_isotope",
           "args": [ "-I INC=1 -B bCCD3 -B brcb #{indir}/in.smi"]
+        },
+        {
+          "name": "fragatype_proto",
+          "args": [ "-B proto -k 2 -m 0 -M 10 -C fragatype -P UST:Z #{indir}/in.smi" ],
+          "difftool": "diff",
+          "difftool_options": "-w",
+          "comment": [ "fragment-local atom typing for complementary fragment proto output" ]
         }
     ]
 }

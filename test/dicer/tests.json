@@ -55,6 +55,34 @@
           "difftool": "diff",
           "difftool_options": "-w",
           "comment": [ "fragment-local atom typing for complementary fragment proto output" ]
+        },
+        {
+          "name": "fragatype_hydrogen_text",
+          "args": [ "-k 2 -m 0 -M 10 -C fragatype -P UST:Z #{indir}/in.smi" ],
+          "difftool": "diff",
+          "difftool_options": "-w",
+          "comment": [ "fragment-local atom typing for hydrogen complementary fragments" ]
+        },
+        {
+          "name": "conflicting_c_labelling_options",
+          "args": [ "-C auto -C fragatype -P UST:Z #{indir}/in.smi" ],
+          "difftool": "diff",
+          "difftool_options": "-w",
+          "non_zero_rc_expected": true,
+          "comment": [ "reject multiple complementary fragment labelling options" ]
+        },
+        {
+          "name": "conflicting_i_labelling_options",
+          "args": [ "-I z -I atype -P UST:Z #{indir}/in.smi" ],
+          "difftool": "diff",
+          "difftool_options": "-w",
+          "non_zero_rc_expected": true,
+          "comment": [ "reject multiple join point labelling options" ]
+        },
+        {
+          "name": "fragstat_textproto",
+          "args": [ "-i do=75 -B nbamide -I 1 -k 3 -B fragstat=fragstat.textproto -B fragstatproto -B brcb -c -B bCCD3 -B nooutput -M 12 -M maxnr=10 #{datadir}/rand.smi" ],
+          "comment": [ "fragstat file should be textproto" ]
         }
     ]
 }

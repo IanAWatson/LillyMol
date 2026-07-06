@@ -489,6 +489,10 @@ static int check_for_lost_chirality = 0;
 
 static Atom_Typing_Specification atom_typing_specification;
 
+// When -C fragatype writes hydrogen complementary fragments, this is the
+// synthetic hydrogen fragment token, for example [3001H].
+static IWString hydrogen_complement_atom_type_token;
+
 static Molecule_Output_Object stream_for_fully_broken_parents;
 
 // Feb 2022
@@ -651,6 +655,8 @@ reset_variables() {
   apply_atom_type_isotopic_labels = 0;
   isotopic_label_is_recursion_depth = 0;
   apply_isotopes_to_complementary_fragments = 0;
+  apply_atom_types_to_fragments = 0;
+  hydrogen_complement_atom_type_token.resize(0);
   number_by_initial_atom_number = 0;
   apply_environment_isotopic_labels = 0;
   add_environment_atoms = 0;
@@ -4467,16 +4473,16 @@ Dicer_Arguments::_write_fragment_and_hydrogen(
       continue;
     }
 
-    output << '[';
-
     Molecule s1;
     m.create_subset(s1, subset_specification, 1, _local_xref);
-    if (apply_isotopes_to_complementary_fragments > 0) {
+    if (apply_atom_types_to_fragments) {
+      output << hydrogen_complement_atom_type_token;
+    } else if (apply_isotopes_to_complementary_fragments > 0) {
       s1.set_isotope(_local_xref[i], apply_isotopes_to_complementary_fragments);
-      output << apply_isotopes_to_complementary_fragments << "H]";
+      output << '[' << apply_isotopes_to_complementary_fragments << "H]";
     } else if (apply_isotopes_to_complementary_fragments < 0) {
       s1.set_isotope(_local_xref[i], 1);
-      output << "1H]";
+      output << "[1H]";
     }
 
     output << ' ' << m.name();
@@ -7552,7 +7558,7 @@ display_dash_i_options(int rc) {
   exit(rc);
 }
 
-static int
+static void
 DisplayComplementaryFragmentOptions(int rc) {
   // clang-format off
   cerr << R"(The following options controlling complementary fragment creation are recognised.
@@ -7568,6 +7574,37 @@ DisplayComplementaryFragmentOptions(int rc) {
   ::exit(rc);
 }
 
+static void
+DisplayDashMOptions(int rc) {
+  cerr << R"(The -M option controls the size of dicer fragments generated.
+ -M <natoms>            the max size of a fragment.
+ -M naxnr=<n>           the largest number of non ring atoms allowed in a fragment.
+                         you might want to have a max of 15 atoms in a fragment, but you probably
+                         don't want to have a fragment with 15 non-ring atoms.
+)";
+
+  ::exit(rc);
+}
+
+// If applying atom typing to complementary fragments, and Hydrogen is a
+// complementary fragment, initialise the string atom type once.
+static int
+InitialiseHydrogenComplementAtomTypeToken() {
+  hydrogen_complement_atom_type_token.resize(0);  // File scope static variable.
+
+  Molecule hydrogen;
+  hydrogen.add(new Atom(1));
+
+  uint32_t atype[1];
+  if (!atom_typing_specification.assign_atom_types(hydrogen, atype)) {
+    cerr << "Cannot assign atom type to synthetic hydrogen atom\n";
+    return 0;
+  }
+
+  hydrogen_complement_atom_type_token << '[' << atype[0] << "H]";
+  return 1;
+}
+
 static int
 ParseComplementaryFragmentOptions(Command_Line& cl) {
   if (!cl.option_present('C')) {
@@ -7575,6 +7612,7 @@ ParseComplementaryFragmentOptions(Command_Line& cl) {
   }
 
   const_IWSubstring c;
+  int complementary_fragment_labelling_options = 0;
   for (int i = 0; cl.value('C', c, i); ++i) {
     if (c.starts_with("maxat=") || c.starts_with("maxat:")) {
       c.remove_leading_chars(6);
@@ -7590,16 +7628,19 @@ ParseComplementaryFragmentOptions(Command_Line& cl) {
       }
     } else if (c == "def") {
     } else if (c == "auto") {
+      ++complementary_fragment_labelling_options;
       apply_isotopes_to_complementary_fragments = -1;
       if (verbose) {
         cerr << "Same isotope will be set to the fragments and complementary fragments\n";
       }
     } else if (c == "atype") {
+      ++complementary_fragment_labelling_options;
       apply_isotopes_to_complementary_fragments = ISO_CF_ATYPE;
       if (verbose) {
         cerr << "Isotopes at complementary atoms will be initial molecule atom type\n";
       }
     } else if (c.starts_with("iso=") || c.starts_with("iso:")) {
+      ++complementary_fragment_labelling_options;
       c.remove_leading_chars(4);
 
       if (!c.numeric_value(apply_isotopes_to_complementary_fragments) ||
@@ -7612,6 +7653,7 @@ ParseComplementaryFragmentOptions(Command_Line& cl) {
              << " applied to join points of complementary fragments\n";
       }
     } else if (c == "fragatype") {
+      ++complementary_fragment_labelling_options;
       apply_atom_types_to_fragments = 1;
       if (verbose) {
         cerr << "Atom types generated on fragments - enables context matching\n";
@@ -7622,6 +7664,11 @@ ParseComplementaryFragmentOptions(Command_Line& cl) {
       cerr << "Unrecognised -C qualifier '" << c << "'\n";
       DisplayComplementaryFragmentOptions(1);
     }
+  }
+
+  if (complementary_fragment_labelling_options > 1) {
+    cerr << "Only one complementary fragment labelling option can be specified via -C\n";
+    return 0;
   }
 
   write_smiles_and_complementary_smiles = 1;
@@ -7726,31 +7773,38 @@ dicer(int argc, char** argv) {
 
   if (cl.option_present('I')) {
     const_IWSubstring i;
+    int join_point_labelling_options = 0;
 
     for (int j = 0; cl.value('I', i, j); ++j) {
       if ("env" == i) {
+        ++join_point_labelling_options;
         apply_environment_isotopic_labels = 1;
         if (verbose) {
           cerr << "Broken bonds marked with isotopes to indicate environment\n";
         }
       } else if ("ini" == i) {
+        ++join_point_labelling_options;
         number_by_initial_atom_number = 1;
         if (verbose) {
           cerr << "Will apply isotopic labels according to initial atom numbers\n";
         }
       } else if ('z' == i) {
+        ++join_point_labelling_options;
         apply_atomic_number_isotopic_labels = 1;
         if (verbose) {
           cerr << "Will label cut points by atomic number of removed atom\n";
         }
       } else if ("enva" == i) {
+        ++join_point_labelling_options;
         add_environment_atoms = 1;
       } else if ("depth" == i) {
+        ++join_point_labelling_options;
         isotopic_label_is_recursion_depth = 1;
         if (verbose) {
           cerr << "Isotopic labels will be according to bonds cut\n";
         }
       } else if (i.starts_with("inc=")) {
+        ++join_point_labelling_options;
         i.remove_leading_chars(4);
         if (!i.numeric_value(increment_isotope_for_join_points) ||
             increment_isotope_for_join_points < 1) {
@@ -7764,6 +7818,7 @@ dicer(int argc, char** argv) {
                << " to existing isotopic labels at join points - one time addition\n";
         }
       } else if (i.starts_with("INC=")) {
+        ++join_point_labelling_options;
         i.remove_leading_chars(4);
         if (!i.numeric_value(increment_isotope_for_join_points) ||
             increment_isotope_for_join_points < 1) {
@@ -7778,11 +7833,13 @@ dicer(int argc, char** argv) {
         }
         always_increment_isotope = 1;
       } else if ("atype" == i) {
+        ++join_point_labelling_options;
         apply_atom_type_isotopic_labels = 1;
         if (verbose) {
           cerr << "Isotopic labels will be atom types\n";
         }
       } else if (i == "fragatype") {
+        ++join_point_labelling_options;
         apply_atom_types_to_fragments = 1;
         if (verbose) {
           cerr << "Atom types generated on fragments - enables context matching\n";
@@ -7790,6 +7847,7 @@ dicer(int argc, char** argv) {
       } else if ("help" == i) {
         display_dash_i_options(0);
       } else {
+        ++join_point_labelling_options;
         if (!i.numeric_value(isotope_for_join_points) || isotope_for_join_points < 0) {
           cerr << "The isotope for join points value (-I) must be a whole +ve number '"
                << i << "' invalid\n";
@@ -7803,10 +7861,10 @@ dicer(int argc, char** argv) {
       }
     }
 
-    if (add_environment_atoms && apply_environment_isotopic_labels) {
-      cerr
-          << "Adding environment atoms and applying isotopic labels doesn't make sense\n";
-      usage(4);
+
+    if (join_point_labelling_options > 1) {
+      cerr << "Only one join point labelling option can be specified via -I\n";
+      return 4;
     }
 
     if (add_environment_atoms) {
@@ -7888,6 +7946,8 @@ dicer(int argc, char** argv) {
           cerr << "Invalid maxnr= qualifier '" << m << "'\n";
           return 1;
         }
+      } else if (m == "help") {
+        DisplayDashMOptions(0);
       } else if (!m.numeric_value(upper_atom_count_cutoff) ||
                  upper_atom_count_cutoff < 1 ||
                  upper_atom_count_cutoff < lower_atom_count_cutoff) {
@@ -8306,8 +8366,9 @@ dicer(int argc, char** argv) {
   }
 
   if (cl.option_present('C')) {
-    // will exit if it fails.
-    ParseComplementaryFragmentOptions(cl);
+    if (!ParseComplementaryFragmentOptions(cl)) {
+      return 1;
+    }
   }
 
   if (apply_atom_types_to_fragments && !atom_typing_specification.active()) {
@@ -8315,69 +8376,15 @@ dicer(int argc, char** argv) {
             "for example '-P UST:Z'\n";
     return 1;
   }
-
-#ifdef NOW_IN_FUNCTION
-  if (cl.option_present('C')) {
-    const_IWSubstring c;
-    for (int i = 0; cl.value('C', c, i); ++i) {
-      if (c.starts_with("maxat=") || c.starts_with("maxat:")) {
-        c.remove_leading_chars(6);
-        if (!c.numeric_value(upper_atom_count_cutoff_complementary_fragment) ||
-            upper_atom_count_cutoff_complementary_fragment < 1) {
-          cerr << "The upper atom count limit for complementary fragments must be a +ve "
-                  "whole number\n";
-          return 0;
-        }
-        if (verbose) {
-          cerr << "Will not write complementary fragmes with more than "
-               << upper_atom_count_cutoff_complementary_fragment << " atoms\n";
-        }
-      } else if (c == "def") {
-      } else if (c == "auto") {
-        apply_isotopes_to_complementary_fragments = -1;
-        if (verbose) {
-          cerr << "Same isotope will be set to the fragments and complementary "
-                  "fragments\n";
-        }
-      } else if (c == "atype") {
-        apply_isotopes_to_complementary_fragments = ISO_CF_ATYPE;
-        if (verbose) {
-          cerr << "Isotopes at complementary atoms will be initial molecule atom type\n";
-        }
-      } else if (c.starts_with("iso=") || c.starts_with("iso:")) {
-        c.remove_leading_chars(4);
-
-        if (!c.numeric_value(apply_isotopes_to_complementary_fragments) ||
-            apply_isotopes_to_complementary_fragments < 0) {
-          cerr << "Invalid complementary set isotope specification '" << c << "'\n";
-          return 0;
-        }
-        if (verbose) {
-          cerr << "Isotope " << apply_isotopes_to_complementary_fragments
-               << " applied to join points of complementary fragments\n";
-        }
-      } else if (c == "help") {
-        DisplayComplementaryFragmentOptions(cerr);
-      } else {
-        cerr << "Unrecognised -C qualifier '" << c << "'\n";
-        DisplayComplementaryFragmentOptions(cerr);
-      }
-    }
-
-    write_smiles_and_complementary_smiles = 1;
-    if (verbose) {
-      cerr << "Will write smiles and complementary smiles\n";
-    }
+  if (apply_atom_types_to_fragments && !InitialiseHydrogenComplementAtomTypeToken()) {
+    return 1;
   }
-#endif  // NOW_IN_FUNCTION
 
   if (cl.option_present('s')) {
-    int i = 0;
     const_IWSubstring smarts;
-    while (cl.value('s', smarts, i++)) {
-      Substructure_Hit_Statistics* q = new Substructure_Hit_Statistics;
+    for (int i = 0;cl.value('s', smarts, i); ++i) {
+      std::unique_ptr<Substructure_Hit_Statistics> q = std::make_unique<Substructure_Hit_Statistics>();
       if (!q->create_from_smarts(smarts)) {
-        delete q;
         return 60 + i;
       }
 
@@ -8385,7 +8392,7 @@ dicer(int argc, char** argv) {
         cerr << "Created query from smarts '" << smarts << "'\n";
       }
 
-      queries.add(q);
+      queries << q.release();
     }
   }
 

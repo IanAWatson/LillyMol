@@ -35,8 +35,8 @@ After 13 hours it had generated 170k fragments. After 5 days it has generated
 generated 690k fragments. After 21 days it had generated 715k fragments. After
 23 days it had generated 825k fragments.
 
-Enable this periodic reporting with `-B freport=10000` to have it report every 10k 
-fragments formed for any particular molecule.
+Enable this periodic reporting with `-B rpt=10000` to have it report every 10k
+molecules processed.
 
 The `-k` option, the number of bonds that can be simultaneously broken,
 can also be used to limit how much fragmentation an individual
@@ -111,10 +111,26 @@ Experience tells us that differentiating I, Cl, and Br is seldom useful in an SA
 Add `-T I=Cl -T Br=Cl` to translate all heavy halogens to `Cl`.
 
 ### Atom Typing
-Dicer fragmentation can be very useful in *de-novo* molecule construction and
-atom types can be assigned and saved with the fragments. See also the discussion
-of isotopes below, since atom types are most commonly instantiated as isotopic
-labels.
+
+Dicer uses atom typing to preserve attachment-point context. When a bond is
+broken, the fragment can be labelled with information about the atom that used
+to be attached across that bond. Downstream tools can then use those labels to
+assemble compatible fragments.
+
+There are two atom-typing interfaces in dicer.
+
+The modern and more general interface is `-P`. It accepts simple built-in atom
+typing names such as `sb`, and also user-specified atom typing expressions such
+as `UST:ARY`. In `UST:ARY`, `A` encodes aromaticity, `R` encodes ring bond
+count, and `Z` encodes atomic number. See
+[atom_typing](../Molecule_Lib/atom_typing.md) for more detail.
+
+The older `-B atype=<tag>` mechanism is used for fragment/complement output
+annotations such as `AT=[...]`. It is mostly relevant to legacy text output and
+workflows that consume those annotations.
+
+Options such as `-I atype`, `-I fragatype`, and `-C fragatype` use the `-P`
+atom typing specification to generate isotope labels.
 
 ### The `-B` option.
 
@@ -128,7 +144,10 @@ A more complete explanation of those sub-options follows.
 
 
 #### atype=\<tag\>
-Calculate atom type and dump it in frag/comp pairs
+Calculate atom types for fragment/complement text-output annotations such as
+`AT=[...]`. This is the older output-annotation mechanism; see the Atom Typing
+section above for the distinction between `-B atype=<tag>` and the more general
+`-P` atom typing option.
 #### term
 Perceive terminal groups. By default, single atom terminal groups are
 not produced.
@@ -146,6 +165,18 @@ very well, and always causes run-time problems. Best to not use.
 Suppress output of fragment smiles.
 #### noparent
 Suppress output of parent smiles.
+#### proto
+Write the main per-molecule output as `dicer_data::DicedMolecule` textproto to
+stdout. The name is historical; this is textproto output rather than binary
+serialized proto output.
+#### serialized_proto
+Write the main per-molecule output as serialized `dicer_data::DicedMolecule`
+protos in TFDataRecord form. This requires `-S <file>` to specify the output
+file.
+#### smiles_proto
+Write a smiles token followed by the textproto representation. This is a
+compatibility/convenience format and may be less useful now that LillyMol tools
+can read textproto directly.
 #### time
 Run timing.
 #### addq
@@ -172,12 +203,22 @@ That way, the fragments generated will retain those atom map numbers, thereby en
 a ready translation back to the starting molecule.
 #### nbamide
 Do NOT break amide and amide-like bonds.
+#### nbunsat
+Do not break bonds to unsaturated atoms.
 #### nbfts
 **This is currently not working properly, do not use.**
 Do NOT break bonds that would yield fragments too small. This is generally a good idea for
 performance - should be a default.
 #### appnatoms
 Append the atom count to each fragment produced
+#### nooutput
+Suppress normal diced-fragment output. This is useful when dicer is being run
+only to produce side outputs such as `fragstat=`.
+#### WRITEALL=\<fname\>
+Write all fragments encountered to `<fname>`. This file can be very large.
+#### WRITEALL:\<feature\>
+Select which fields are written to the `WRITEALL=` file. Valid features include
+`smiles`, `name`, `rdepth`, `psmiles`, `frag`, and `frag_id`.
 #### MAXAL=\<n\>
 Max atoms lost when creating any fragment
 #### MINFF=\<f\>
@@ -185,8 +226,16 @@ Discard fragments that comprise less than \<f\> fraction of atoms in parent
 #### MAXFF=\<f\>
 Discard fragments that comprise more than \<f\> fraction of atoms in parent
 #### fragstat=\<fname\>
-Write fragment statistics to \<fname\>. This is an important file that gives
-counts of how often each fragment occurs in the dataset.
+Write fragment statistics to \<fname\>. This is an important summary file that
+gives counts of how often each fragment occurs in the dataset. By default, this
+file is written in the historical text format.
+#### fragstatproto
+Write the `fragstat=` summary file as `dicer_data::DicerFragment` textproto.
+This affects the fragment summary file, not the main per-molecule output.
+#### fragstatbinproto
+Write the `fragstat=` summary file as serialized `dicer_data::DicerFragment`
+protos in TFDataRecord form. This affects the fragment summary file, not the
+main per-molecule output.
 #### fstsp=\<float\>
 Fractional support level for inclusion in fragstat= file. Fragments that occur
 only occasionally in the input are likely not of great interest, suppress them
@@ -222,8 +271,8 @@ with the `-c` option. With bonds being broken, chirality will almost certainly b
 destroyed.
 #### recap
 work like Recap - break all breakable bonds at once
-#### freport=\<n\>
-report fragment creation every \<n\> fragments for a molecule
+#### rpt=\<n\>
+Report progress every \<n\> molecules processed.
 
 # Output
 Frequently fragment output is most useful if there is a record of how the
@@ -292,9 +341,73 @@ dicer -B nbfts -B nbamide -B 'FMC:SMARTS:2[#7H0]' -B fragstat=fragstat.smi -B fs
 ```
 
 ### Complementary Fragments
-The `-C` option writes extra records to the output that are fragments and their complements. 
 
-TODO:ianwatson some examples of this.
+The `-C` option writes extra records containing a fragment and its complementary
+fragment. The complementary fragment is the part of the parent molecule that was
+removed in order to make the fragment. These records are useful for matched-pair
+and fragment-replacement workflows because they preserve the relationship between
+what was kept and what was removed.
+
+For a simple molecule such as
+
+```text
+CCO ethanol
+```
+
+an invocation like
+
+```shell
+dicer -c -k 2 -m 0 -M 10 -C fragatype -P UST:Z ethanol.smi
+```
+
+can produce records like
+
+```text
+[9001CH3]C ethanol [3001OH2] COMP ethanol
+[3001OH2] ethanol [9001CH3]C COMP ethanol
+[33014H] ethanol OCC COMP ethanol
+```
+
+The first token is the fragment, then the parent identifier, then the
+complementary fragment after the `COMP` marker. With `-m 0`, hydrogen
+complements may also be written. In the example above `[33014H]` is a synthetic
+hydrogen complementary fragment labelled by the atom typing scheme specified
+with `-P UST:Z`.
+
+If textproto output is requested with `-B proto`, complementary fragments are
+written in `dicer_data::DicerFragment` textproto form. In that output, the
+`smi` field holds the fragment smiles and the `comp` field holds the smiles of
+the complementary fragment.
+
+Complementary fragment generation is enabled with `-C`. Several qualifiers
+control how join points are labelled:
+
+- `-C def` writes fragment/complement pairs with default labelling.
+- `-C auto` labels corresponding join points in fragment and complement with
+  matching automatically assigned isotopes.
+- `-C iso=<n>` labels complementary-fragment join points with isotope `<n>`.
+- `-C atype` labels complementary-fragment join points with atom types computed
+  on the starting molecule.
+- `-C fragatype` computes atom types after fragmentation and labels each join
+  point with the atom type of the atom on the other side of the broken bond.
+
+Only one complementary-fragment labelling mode may be specified. For example,
+`-C auto -C fragatype` is rejected. This avoids ambiguous output where two
+labelling schemes would compete for the same atoms.
+
+The `maxat` qualifier is different: it is not a labelling mode. It limits the
+maximum size of complementary fragments that are written and may be combined
+with one labelling mode:
+
+```shell
+dicer -C maxat=12 -C fragatype -P UST:Z file.smi
+```
+
+`-C fragatype` requires an atom typing specification via `-P`. It is useful when
+the atom type should reflect the local environment after the molecule has been
+split, rather than the atom type in the intact parent molecule. This distinction
+can matter for atom types that include properties such as connection count,
+ring membership, or aromaticity.
 
 ## Isotopic Labels
 A variety of isotopic labels can be applied to the generated fragments. The
@@ -321,6 +434,7 @@ help message generated by `dicer -I help` is
  RingNitrogenAliphatic   14   Na
  -I atype         atoms labelled by atom type specified via the -P option.
                   Note that atom typing is performed on the starting molecule - before any bonds are broken.
+ -I fragatype     atom typing is computed on the fragments after bonds are broken.
  -I z             atoms labelled by atomic number of neighbour
  -I ini           atoms labelled by initial atom number (debugging uses)
  -I <number>      constant isotopic label applied to all join points
@@ -328,7 +442,12 @@ help message generated by `dicer -I help` is
  -I INC=<n>       increment existing isotopic label before labelling join points - every time
 ```
 
-The simplist form is to use a single number, which puts an isotopic label on
+Only one `-I` join-point labelling mode may be specified. For example,
+`-I z -I atype` and `-I env -I enva` are rejected. The lowercase and uppercase
+increment modes, `-I inc=<n>` and `-I INC=<n>`, are also labelling modes and
+cannot be combined with another `-I` labelling mode.
+
+The simplest form is to use a single number, which puts an isotopic label on
 each attachment, `-I 1` for example. This is the most common use.
 
 Other uses of isotopes can provide context on how the fragment was embedded in
@@ -378,7 +497,15 @@ group.
 The `-I env` option applies isotopes to the remaining atom. The `-I enva`
 directive results in an additional atom being added, with the elements
 used listed in the table above. This can be useful at atoms from
-which multiple bonds have been removed.
+which multiple bonds have been removed. These are alternative labelling modes
+and cannot be used together.
+
+`-I atype` and `-I fragatype` both require an atom typing specification via
+`-P`, but they compute the atom types at different times. With `-I atype`, atom
+types are computed on the starting molecule before any bonds are broken. With
+`-I fragatype`, atom types are computed after fragmentation, so the label can
+reflect the atom environment in the generated fragment rather than in the intact
+parent molecule.
 
 # Dicer Related Tools
 The output from dicer has many uses and several tools have been implemented

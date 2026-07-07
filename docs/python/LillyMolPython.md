@@ -621,10 +621,24 @@ Enable substructure searching via
 ```
 from lillymol_query import *
 ```
-Instantiate a new query for a para substituted methoxy group via
+Instantiate a new query for a para substituted methoxy group via the
+one-line helper
+```
+query = QueryFromSmarts('[CH3]-[OD2]-c:c:c:[cD3]')
+if query is None:
+  logging.error('Invalid smarts')
+```
+
+This will generally be the most convenient way to build a query from SMARTS.
+It returns a `SubstructureQuery` object on success and `None` if the SMARTS
+cannot be parsed.
+
+The equivalent two-step form is also available, which can be useful if you want
+to allocate the object first and configure it explicitly
 ```
 query = SubstructureQuery()
-query.build_from_smarts('[CH3]-[OD2]-c:c:c:[cD3]')
+if not query.build_from_smarts('[CH3]-[OD2]-c:c:c:[cD3]'):
+  logging.error('Invalid smarts')
 ```
 
 To read a query from a textproto query specification
@@ -643,6 +657,15 @@ query.substructure_search(m)
 The number of matches will be returned. In this case it will frequently be 2 since
 the query will match two times in a benzene like ring.
 
+For a simple boolean test, use Python's `in` operator with the query on the
+left and the molecule on the right
+```
+if query in m:
+  print('matched')
+```
+This is equivalent to asking whether `query.substructure_search(m)` finds at
+least one match, but it does not return the match count or matched atoms.
+
 To get the matched atoms, as a List of List's,
 ```
 matches = q.substructure_search_matches(m)
@@ -656,7 +679,7 @@ for match in query.substructure_search_matches(m):
   m.set_isotopes(match, 1)
   print(m)
 ```
-Omit the `remove_isotopes` call to add the new isotopes to whatever might have already been there.
+Omit the `remove_isotopes` call to overwrite the new isotopes onto whatever isotopes might have already been there.
 
 On the other hand if you need to know which matched atom is which, that might look like
 ```

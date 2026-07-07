@@ -1164,9 +1164,9 @@ IWDescr::IWDescrImpl::Initialise(Command_Line& cl) {
   // Note that these options may be set based on verbose, but may get 
   // reversed by the -B option.
   if (verbose) {
-    nvrtspsa::set_display_psa_unclassified_atom_mesages(1);
+    nvrtspsa::set_display_psa_unclassified_atom_messages(1);
   } else {
-    nvrtspsa::set_display_psa_unclassified_atom_mesages(0);
+    nvrtspsa::set_display_psa_unclassified_atom_messages(0);
   }
 
   if (verbose == 0) {
@@ -1177,7 +1177,7 @@ IWDescr::IWDescrImpl::Initialise(Command_Line& cl) {
     const_IWSubstring b;
     for (int i = 0; cl.value('B', b, i); ++i) {
       if (b == "quiet") {
-        nvrtspsa::set_display_psa_unclassified_atom_mesages(0);
+        nvrtspsa::set_display_psa_unclassified_atom_messages(0);
         alogp_engine.set_display_error_messages(0);
         xlogp_engine.SetIssueUnclassifiedAtomMessages(false);
         if (verbose) {
@@ -1233,7 +1233,7 @@ IWDescr::IWDescrImpl::InitialiseAll() {
     return 0;
   }
 
-  nvrtspsa::set_display_psa_unclassified_atom_mesages(0);
+  nvrtspsa::set_display_psa_unclassified_atom_messages(0);
   alogp_engine.set_display_error_messages(0);
   xlogp_engine.SetIssueUnclassifiedAtomMessages(false);
 

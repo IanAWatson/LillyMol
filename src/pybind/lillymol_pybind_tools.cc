@@ -23,6 +23,38 @@
 
 namespace py = pybind11;
 
+namespace {
+
+std::tuple<int, int>
+LipinskiHbaHbd(Molecule& m) {
+  const int matoms = m.natoms();
+
+  int hbd = 0;
+  int hba = 0;
+
+  for (int i = 0; i < matoms; ++i) {
+    const atomic_number_t z = m.atomic_number(i);
+    if (z == 7 || z == 8) {
+      ++hba;
+
+      const int h = m.hcount(i);
+      if (h == 0) {
+        continue;
+      }
+
+      if (z == 7 && h == 2) {
+        hbd += 2;
+      } else {
+        ++hbd;
+      }
+    }
+  }
+
+  return std::make_tuple(hba, hbd);
+}
+
+}  // namespace
+
 PYBIND11_MODULE(lillymol_tools, m) 
 {
   using unique_molecules::UniqueMolecules;
@@ -32,6 +64,61 @@ PYBIND11_MODULE(lillymol_tools, m)
   // faster than storing those same strings in the C++ map used in the current
   // implementation. TODO:ianwatson understand what is going on.
   // For now this is quite usable, just not efficient.
+  py::class_<nvrtspsa::NovartisPolarSurfaceArea>(m, "TPSA")
+    .def(py::init<>())
+    .def("compute",
+      [](nvrtspsa::NovartisPolarSurfaceArea& tpsa, Molecule& mol)->std::optional<double> {
+        return tpsa.PolarSurfaceArea(mol);
+      },
+      py::arg("mol"),
+      "Compute topological polar surface area for a molecule, returning None for empty molecules"
+    )
+    .def("set_display_psa_unclassified_atom_messages",
+      &nvrtspsa::NovartisPolarSurfaceArea::set_display_psa_unclassified_atom_messages,
+      py::arg("value"),
+      "Control warnings for unclassified atoms"
+    )
+    .def("set_return_zero_for_unclassified_atoms",
+      &nvrtspsa::NovartisPolarSurfaceArea::set_return_zero_for_unclassified_atoms,
+      py::arg("value"),
+      "Return zero for unclassified atoms"
+    )
+    .def("set_non_zero_contribution_for_SD2",
+      &nvrtspsa::NovartisPolarSurfaceArea::set_non_zero_contribution_for_SD2,
+      py::arg("value"),
+      "Control the SD2 sulphur contribution"
+    )
+    .def("set_zero_for_all_sulphur_atoms",
+      [](nvrtspsa::NovartisPolarSurfaceArea&, int value) {
+        nvrtspsa::set_zero_for_all_sulphur_atoms(value);
+      },
+      py::arg("value"),
+      "Set all sulphur atom TPSA contributions to zero"
+    )
+    .def("set_zero_for_all_phosphorus_atoms",
+      [](nvrtspsa::NovartisPolarSurfaceArea&, int value) {
+        nvrtspsa::set_zero_for_all_phosphorus_atoms(value);
+      },
+      py::arg("value"),
+      "Set all phosphorus atom TPSA contributions to zero"
+    )
+    .def("set_convert_to_charge_separated",
+      [](nvrtspsa::NovartisPolarSurfaceArea&, int value) {
+        nvrtspsa::set_convert_to_charge_separated(value);
+      },
+      py::arg("value"),
+      "Convert to charge-separated forms before computing TPSA"
+    )
+  ;
+
+  m.def("HbaHbd",
+    [](Molecule& mol) {
+      return LipinskiHbaHbd(mol);
+    },
+    py::arg("mol"),
+    "Return Lipinski-style hydrogen-bond acceptor and donor counts as (hba, hbd)"
+  );
+
   py::class_<unique_molecules::UniqueMolecules>(m, "UniqueMolecules")
     .def(py::init<>())
     .def("set_include_chiral_info", &UniqueMolecules::set_include_chiral_info, "Control whether chirality is considered")

@@ -558,7 +558,7 @@ MoleculeFilter::BuildUtilities() {
 void
 MoleculeFilter::InitialiseOptionalFeatures() {
   _rotbond.set_calculation_type(quick_rotbond::QuickRotatableBonds::RotBond::kExpensive);
-  nvrtspsa::set_display_psa_unclassified_atom_mesages(0);
+  nvrtspsa::set_display_psa_unclassified_atom_messages(0);
   _xlogp.SetIssueUnclassifiedAtomMessages(false);
 
   _alogp.set_use_alcohol_for_acid(1);

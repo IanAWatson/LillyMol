@@ -281,7 +281,7 @@ psafp(int argc, char** argv) {
   verbose = cl.option_count('v');
 
   if (!verbose) {
-    nvrtspsa::set_display_psa_unclassified_atom_mesages(0);
+    nvrtspsa::set_display_psa_unclassified_atom_messages(0);
   }
 
   if (cl.option_present('A')) {

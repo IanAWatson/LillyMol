@@ -243,5 +243,41 @@ class TestProcessListDataFrame(unittest.TestCase):
         self.assertNotIsInstance(result, pd.DataFrame)
 
 
+class TestSmallDescriptorHelpers(unittest.TestCase):
+
+    def test_tpsa_compute(self):
+        mol = _make_molecule("CCO", "ethanol")
+        tpsa = TPSA()
+        value = tpsa.compute(mol)
+        self.assertIsNotNone(value)
+        self.assertIsInstance(value, float)
+        self.assertGreater(value, 0.0)
+
+    def test_tpsa_empty_molecule_returns_none(self):
+        tpsa = TPSA()
+        self.assertIsNone(tpsa.compute(Molecule()))
+
+    def test_tpsa_setters_are_available(self):
+        tpsa = TPSA()
+        tpsa.set_display_psa_unclassified_atom_messages(0)
+        tpsa.set_return_zero_for_unclassified_atoms(0)
+        tpsa.set_non_zero_contribution_for_SD2(1)
+        tpsa.set_zero_for_all_sulphur_atoms(0)
+        tpsa.set_zero_for_all_phosphorus_atoms(0)
+        tpsa.set_convert_to_charge_separated(0)
+        mol = _make_molecule("CCO", "ethanol")
+        self.assertIsNotNone(tpsa.compute(mol))
+
+    def test_hba_hbd(self):
+        ethanol = _make_molecule("CCO", "ethanol")
+        self.assertEqual(HbaHbd(ethanol), (1, 1))
+
+        methylamine = _make_molecule("CN", "methylamine")
+        self.assertEqual(HbaHbd(methylamine), (1, 2))
+
+        acetic_acid = _make_molecule("CC(=O)O", "acetic_acid")
+        self.assertEqual(HbaHbd(acetic_acid), (2, 1))
+
+
 if __name__ == "__main__":
     unittest.main()

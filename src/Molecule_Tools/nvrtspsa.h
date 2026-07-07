@@ -16,19 +16,19 @@ extern double novartis_polar_surface_area (Molecule & m,
 
 namespace nvrtspsa {
 
-void   set_display_psa_unclassified_atom_mesages(int s);
+void   set_display_psa_unclassified_atom_messages(int s);
 void   set_return_zero_for_unclassified_atoms (int s);
 
 // The paper is uncertain on how certain S atoms are handled.
 // By default, we have a non zero contribution for [SD2] atoms.
-void set_non_zero_constribution_for_SD2(int s);
+void set_non_zero_contribution_for_SD2(int s);
 
 // Looks like the RDKit implementation assigns 0.0 to all Sulphur atoms.
 void set_zero_for_all_sulphur_atoms(int s);
 
 void set_zero_for_all_phosphorus_atoms(int s);
 
-// In order to get best condordance with RDKit, which is the reference
+// In order to get best concordance with RDKit, which is the reference
 // implementation, we need to reverse standardise molecules.
 // This is expensive, so it is optional.
 // Note that the molecule being passed is not altered, a copy of
@@ -44,25 +44,25 @@ int InitialiseOptions(const Command_Line& cl, char flag);
 // settings. Not ideal, the code needs to be restructured.
 class NovartisPolarSurfaceArea {
   private:
-    int _display_psa_unclassified_atom_mesages;
+    int _display_psa_unclassified_atom_messages;
     int _return_zero_for_unclassified_atoms;
     // default is 1
-    int _non_zero_constribution_for_SD2;
+    int _non_zero_contribution_for_SD2;
 
   public:
     NovartisPolarSurfaceArea();
 
-    void set_display_psa_unclassified_atom_mesages(int s) {
-      _display_psa_unclassified_atom_mesages = s;
-      nvrtspsa::set_display_psa_unclassified_atom_mesages(s);
+    void set_display_psa_unclassified_atom_messages(int s) {
+      _display_psa_unclassified_atom_messages = s;
+      nvrtspsa::set_display_psa_unclassified_atom_messages(s);
     }
     void set_return_zero_for_unclassified_atoms(int s) {
       _return_zero_for_unclassified_atoms = s;
       nvrtspsa::set_return_zero_for_unclassified_atoms(s);
     }
-    void set_non_zero_constribution_for_SD2(int s) {
-      _non_zero_constribution_for_SD2 = s;
-      nvrtspsa::set_non_zero_constribution_for_SD2(s);
+    void set_non_zero_contribution_for_SD2(int s) {
+      _non_zero_contribution_for_SD2 = s;
+      nvrtspsa::set_non_zero_contribution_for_SD2(s);
     }
 
     // Long term, this should return nullopt if there is an unclassified

@@ -76,7 +76,7 @@ Qed::Qed() {
 
   // For compatibility with RDKit.
   nvrtspsa::set_zero_for_all_sulphur_atoms(1);
-  nvrtspsa::set_display_psa_unclassified_atom_mesages(0);
+  nvrtspsa::set_display_psa_unclassified_atom_messages(0);
 }
 
 int

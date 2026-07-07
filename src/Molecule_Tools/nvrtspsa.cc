@@ -13,11 +13,11 @@ using std::cerr;
 
 namespace nvrtspsa {
 
-int display_psa_unclassified_atom_mesages = 1;
+int display_psa_unclassified_atom_messages = 1;
 
 void
-set_display_psa_unclassified_atom_mesages(int s) {
-  display_psa_unclassified_atom_mesages = s;
+set_display_psa_unclassified_atom_messages(int s) {
+  display_psa_unclassified_atom_messages = s;
 
   return;
 }
@@ -31,11 +31,11 @@ set_return_zero_for_unclassified_atoms(int s) {
   return;
 }
 
-int non_zero_constribution_for_SD2 = 1;
+int non_zero_contribution_for_SD2 = 1;
 
 void
-set_non_zero_constribution_for_SD2(int s) {
-  non_zero_constribution_for_SD2 = s;
+set_non_zero_contribution_for_SD2(int s) {
+  non_zero_contribution_for_SD2 = s;
 }
 
 int zero_for_all_sulphur_atoms = 0;
@@ -104,7 +104,7 @@ InitialiseOptions(const Command_Line& cl, char flag) {
 static void
 report_novartis_psa_unclassified_atom(Molecule &m, atom_number_t zatom, const Atom &a,
                                       int hcount, int is_aromatic) {
-  if (!nvrtspsa::display_psa_unclassified_atom_mesages) {
+  if (!nvrtspsa::display_psa_unclassified_atom_messages) {
     return;
   }
 
@@ -369,7 +369,7 @@ novartis_polar_surface_area_sulphur(Molecule &m, atom_number_t zatom, Atom &a,
 #endif
 
   if (is_aromatic) {
-    if (nvrtspsa::non_zero_constribution_for_SD2) {
+    if (nvrtspsa::non_zero_contribution_for_SD2) {
       if (0 == fc && 0 == hcount && 2 == ncon && 2 == aromatic_bonds) {  // [s](:*):*
         return 28.24;
       }
@@ -382,7 +382,7 @@ novartis_polar_surface_area_sulphur(Molecule &m, atom_number_t zatom, Atom &a,
   } else {
     if (0 == fc && 0 == hcount && 2 == ncon && 2 == single_bonds)  // [S](-*)-*
     {
-      if (nvrtspsa::non_zero_constribution_for_SD2) {
+      if (nvrtspsa::non_zero_contribution_for_SD2) {
         return 25.30;
       } else {
         return 0.0;
@@ -603,9 +603,9 @@ novartis_polar_surface_area(Molecule &m) {
 namespace nvrtspsa {
 
 NovartisPolarSurfaceArea::NovartisPolarSurfaceArea() {
-  _display_psa_unclassified_atom_mesages = 1;
+  _display_psa_unclassified_atom_messages = 1;
   _return_zero_for_unclassified_atoms = 0;
-  _non_zero_constribution_for_SD2 = 1;
+  _non_zero_contribution_for_SD2 = 1;
 }
 
 std::optional<double>

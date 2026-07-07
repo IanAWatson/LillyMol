@@ -9330,9 +9330,9 @@ iwdescr(int argc, char** argv) {
   }
 
   if (verbose) {
-    nvrtspsa::set_display_psa_unclassified_atom_mesages(1);
+    nvrtspsa::set_display_psa_unclassified_atom_messages(1);
   } else {
-    nvrtspsa::set_display_psa_unclassified_atom_mesages(0);
+    nvrtspsa::set_display_psa_unclassified_atom_messages(0);
   }
 
   if (verbose == 0) {
@@ -9376,7 +9376,7 @@ iwdescr(int argc, char** argv) {
           cerr << "Descriptors generated with prefix '" << descriptor_prefix << "'\n";
         }
       } else if (b == "quiet") {
-        nvrtspsa::set_display_psa_unclassified_atom_mesages(0);
+        nvrtspsa::set_display_psa_unclassified_atom_messages(0);
 
         if (verbose) {
           cerr << "Will not report unclassified atoms\n";

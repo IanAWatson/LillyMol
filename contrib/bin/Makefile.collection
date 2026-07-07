@@ -82,7 +82,6 @@ $(STEM).rings.bdb: $(STEM)gO.smi
 $(STEM).vs: $(STEM)gO_70.smi
 	w.sh -s . -O none -O psa -O xlogp $< | iwcut.sh -d smiles,w_amw,w_natoms,w_nvrtspsa,w_ro5_on,w_ro5_ohnh,w_rotbond,w_csp3,w_xlogp - > $@
 	sed -i '1s/.*/ID SMILES mw natoms tpsa hba hbd rotbond sp3 xlogp/' $@
-	python ${C3TK_HOME}/bin/py/pytk/csv2parquet.py -i $@	
 
 # Make sure this is kept consistent with dicer_fragment_lookup.v2.rb
 $(STEM).fragstat: $(STEM)gO.smi

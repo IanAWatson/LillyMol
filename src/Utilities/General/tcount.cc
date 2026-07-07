@@ -77,6 +77,9 @@ static int contains_backslashed_separators = 0;
 // We can optionally write large numbers with commas.
 static int human_readable_output = 0;
 
+// Accumulated across all files.
+statud uint64_t total_lines_read = 0;
+
 /*
   When writing different column counts to different files, we need a
   means of specifying that
@@ -448,6 +451,8 @@ tcount(iwstring_data_source &input) {
       continue;
     }
 
+    total_lines_read += token_counts[i];
+
     if (human_readable_output) {
       cerr << iwstring::with_commas(token_counts[i]);
     } else {
@@ -776,6 +781,11 @@ tcount(int argc, char **argv) {
 
   if (report_non_rectangular_files) {
     cerr << non_rectangular_files_found << " non rectangular files found\n";
+  }
+
+  if (verbose && cl.size() > 1) {
+    cerr << "Read " << iwstring::with_commas(total_lines_read) << " lines from "
+         << cl.size() << " files\n";
   }
 
   return 0;

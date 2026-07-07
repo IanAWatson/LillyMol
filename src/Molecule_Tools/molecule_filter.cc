@@ -117,6 +117,8 @@ class Options {
     uint64_t _too_long = 0;
     uint64_t _too_few_csp3 = 0;
     uint64_t _too_many_csp3 = 0;
+    uint64_t _fcsp3_too_low = 0;
+    uint64_t _fcsp3_too_high = 0;
     uint64_t _aromdens_too_low = 0;
     uint64_t _aromdens_too_high = 0;
     uint64_t _too_few_chiral = 0;
@@ -428,6 +430,12 @@ Options::Report(std::ostream& output) const {
   if (_requirements.has_max_sp3_carbon()) {
     output << _too_many_csp3 << " too many CSP3 " << _requirements.max_sp3_carbon() << '\n';
   }
+  if (_requirements.has_min_sp3_carbon_fraction()) {
+    output << _fcsp3_too_low << " fraction CSP3 too low " << _requirements.min_sp3_carbon_fraction() << '\n';
+  }
+  if (_requirements.has_max_sp3_carbon_fraction()) {
+    output << _fcsp3_too_high << " fraction CSP3 too high " << _requirements.max_sp3_carbon_fraction() << '\n';
+  }
 
   if (_requirements.has_min_aromatic_density()) {
     output << _aromdens_too_low << " aromatic density too low " << _requirements.min_aromatic_density() << '\n';
@@ -736,6 +744,12 @@ Options::NoteRejection(molecule_filter_lib::RejectionReason rejection_reason) {
       return;
     case RejectionReason::kTooManySp3Carbon:
       ++_too_many_csp3;
+      return;
+    case RejectionReason::kSp3CarbonFractionTooLow:
+      ++_fcsp3_too_low;
+      return;
+    case RejectionReason::kSp3CarbonFractionTooHigh:
+      ++_fcsp3_too_high;
       return;
     case RejectionReason::kTooFewHalogen:
       ++_too_few_halogens;

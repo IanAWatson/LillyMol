@@ -26,7 +26,7 @@ struct FeatureNameValue {
   Feature feature;
 };
 
-constexpr std::array<FeatureNameValue, 27> kFeatureNameValues = {{
+constexpr std::array<FeatureNameValue, 30> kFeatureNameValues = {{
   {"natoms", Feature::kNatoms},
   {"nrings", Feature::kNrings},
   {"heteroatom_count", Feature::kHeteroatomCount},
@@ -52,6 +52,9 @@ constexpr std::array<FeatureNameValue, 27> kFeatureNameValues = {{
   {"max_distance", Feature::kMaxDistance},
   {"longest_path", Feature::kMaxDistance},
   {"sp3_carbon", Feature::kSp3Carbon},
+  {"sp3_carbon_fraction", Feature::kSp3CarbonFraction},
+  {"fraction_csp3", Feature::kSp3CarbonFraction},
+  {"fcsp3", Feature::kSp3CarbonFraction},
   {"aromatic_density", Feature::kAromaticDensity},
   {"chiral", Feature::kChiral},
 }};
@@ -112,6 +115,8 @@ FeatureName(Feature feature) {
       return "max_distance";
     case Feature::kSp3Carbon:
       return "sp3_carbon";
+    case Feature::kSp3CarbonFraction:
+      return "sp3_carbon_fraction";
     case Feature::kAromaticDensity:
       return "aromatic_density";
     case Feature::kChiral:
@@ -322,12 +327,33 @@ FeatureValues::MaxDistance() {
   return *_max_distance;
 }
 
+void
+FeatureValues::ComputeSp3Carbon() {
+  if (_sp3_carbon && _sp3_carbon_fraction) {
+    return;
+  }
+
+  const int csp3 = molecule_filter_lib::Sp3Carbon(_m);
+  _sp3_carbon = csp3;
+
+  const int carbon = _m.natoms(6);
+  if (carbon == 0) {
+    _sp3_carbon_fraction = 0.0;
+  } else {
+    _sp3_carbon_fraction = iwmisc::Fraction<double>(csp3, carbon);
+  }
+}
+
 int
 FeatureValues::Sp3Carbon() {
-  if (! _sp3_carbon) {
-    _sp3_carbon = molecule_filter_lib::Sp3Carbon(_m);
-  }
+  ComputeSp3Carbon();
   return *_sp3_carbon;
+}
+
+double
+FeatureValues::Sp3CarbonFraction() {
+  ComputeSp3Carbon();
+  return *_sp3_carbon_fraction;
 }
 
 int
@@ -387,6 +413,8 @@ FeatureValues::Value(Feature feature) {
       return MaxDistance();
     case Feature::kSp3Carbon:
       return Sp3Carbon();
+    case Feature::kSp3CarbonFraction:
+      return Sp3CarbonFraction();
     case Feature::kAromaticDensity:
       return iwmisc::Fraction<double>(_m.aromatic_atom_count(), _matoms);
     case Feature::kChiral:
@@ -925,13 +953,29 @@ MoleculeFilter::Ok(Molecule& m, const int matoms, const int nrings,
     }
   }
 
-  if (_requirements.has_min_sp3_carbon() || _requirements.has_max_sp3_carbon()) {
+  if (_requirements.has_min_sp3_carbon() || _requirements.has_max_sp3_carbon() ||
+      _requirements.has_min_sp3_carbon_fraction() ||
+      _requirements.has_max_sp3_carbon_fraction()) {
     const int csp3 = Sp3Carbon(m);
     if (_requirements.has_min_sp3_carbon() && csp3 < _requirements.min_sp3_carbon()) {
       return Reject(rejection_reason, RejectionReason::kTooFewSp3Carbon);
     }
     if (_requirements.has_max_sp3_carbon() && csp3 > _requirements.max_sp3_carbon()) {
       return Reject(rejection_reason, RejectionReason::kTooManySp3Carbon);
+    }
+
+    if (_requirements.has_min_sp3_carbon_fraction() ||
+        _requirements.has_max_sp3_carbon_fraction()) {
+      const int carbon = m.natoms(6);
+      const float fcsp3 = carbon == 0 ? 0.0f : iwmisc::Fraction<float>(csp3, carbon);
+      if (_requirements.has_min_sp3_carbon_fraction() &&
+          fcsp3 < _requirements.min_sp3_carbon_fraction()) {
+        return Reject(rejection_reason, RejectionReason::kSp3CarbonFractionTooLow);
+      }
+      if (_requirements.has_max_sp3_carbon_fraction() &&
+          fcsp3 > _requirements.max_sp3_carbon_fraction()) {
+        return Reject(rejection_reason, RejectionReason::kSp3CarbonFractionTooHigh);
+      }
     }
   }
 

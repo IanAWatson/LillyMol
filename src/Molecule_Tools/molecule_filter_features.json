@@ -202,6 +202,17 @@
       "description": "Number of fully saturated carbon atoms."
     },
     {
+      "name": "sp3_carbon_fraction",
+      "label": "sp3 carbon fraction",
+      "category": "composition",
+      "type": "float",
+      "min_field": "min_sp3_carbon_fraction",
+      "max_field": "max_sp3_carbon_fraction",
+      "relative_cost": 5,
+      "utility": true,
+      "description": "Fraction of carbon atoms that are fully saturated sp3 carbons. The denominator is the number of carbon atoms."
+    },
+    {
       "name": "aromatic_density",
       "label": "Aromatic atom fraction",
       "category": "rings",

@@ -167,7 +167,7 @@ that.
 As a test of performance, load 70 queries from the Lilly Medchem Rules
 ```
 ts = TSubstructure()
-ts.read_queries("F:/home/you/path/to/LillyMol/data/queries/medchemrules/reject1")
+ts.read_queries("F:/home/you/path/to/LillyMol/data/queries/LillyMedchemRules/reject1")
 logging.info("Read %d queries", ts.number_queries())
 ```
 and then run these queries against 2000 random Chembl molecules

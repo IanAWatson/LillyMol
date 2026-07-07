@@ -156,6 +156,7 @@ A large example showing the available hard filters is:
 min_natoms: 10
 max_natoms: 40
 min_heteroatom_count: 1
+max_heteroatom_count: 20
 min_heteroatom_fraction: 0.05
 max_heteroatom_fraction: 0.90
 min_nrings: 1
@@ -166,7 +167,9 @@ min_aliphatic_ring_count: 0
 max_aliphatic_ring_count: 4
 min_rotatable_bonds: 2
 max_rotatable_bonds: 10
+min_ring_system_size: 0
 max_ring_system_size: 3
+min_aromatic_rings_in_system: 0
 max_aromatic_rings_in_system: 3
 min_tpsa: 20
 max_tpsa: 180
@@ -178,16 +181,17 @@ min_hba: 2
 max_hba: 10
 min_hbd: 0
 max_hbd: 5
-largest_ring_size: 7
+max_largest_ring_size: 7
 exclude_non_organic: true
 exclude_isotopes: true
+min_halogen_count: 0
 max_halogen_count: 7
 max_distance: 30
 min_sp3_carbon: 1
+min_sp3_carbon_fraction: 0.20
 max_aromatic_density: 0.8
 max_chiral: 2
 max_number_fragments: 2
-planar: true
 ```
 
 As written, this example is not intended as a recommended filter. It is an
@@ -263,6 +267,7 @@ largest_ring_size
 halogen_count
 max_distance
 sp3_carbon
+sp3_carbon_fraction
 aromatic_density
 chiral
 number_fragments
@@ -280,7 +285,13 @@ halogens
 longest_path
 nfrag
 fragments
+fraction_csp3
+fcsp3
 ```
+
+`sp3_carbon_fraction` is the fraction of carbon atoms that are fully saturated
+sp3 carbons. The denominator is the number of carbon atoms, not the total atom
+count. Molecules with no carbon atoms have `sp3_carbon_fraction` 0.0.
 
 Feature names are validated when the configuration is read. Unknown names cause
 initialisation to fail before any molecules are processed.

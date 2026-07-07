@@ -33,6 +33,7 @@ TEST(FeatureTest, RecognisesCanonicalFeatureNames) {
   EXPECT_EQ(FeatureFromName("halogen_count"), Feature::kHalogenCount);
   EXPECT_EQ(FeatureFromName("max_distance"), Feature::kMaxDistance);
   EXPECT_EQ(FeatureFromName("sp3_carbon"), Feature::kSp3Carbon);
+  EXPECT_EQ(FeatureFromName("sp3_carbon_fraction"), Feature::kSp3CarbonFraction);
   EXPECT_EQ(FeatureFromName("aromatic_density"), Feature::kAromaticDensity);
   EXPECT_EQ(FeatureFromName("chiral"), Feature::kChiral);
   EXPECT_EQ(FeatureFromName("number_fragments"), Feature::kNumberFragments);
@@ -46,6 +47,8 @@ TEST(FeatureTest, RecognisesLimitedAliases) {
   EXPECT_EQ(FeatureFromName("ring_system_size"), Feature::kMaxRingSystemSize);
   EXPECT_EQ(FeatureFromName("halogens"), Feature::kHalogenCount);
   EXPECT_EQ(FeatureFromName("longest_path"), Feature::kMaxDistance);
+  EXPECT_EQ(FeatureFromName("fraction_csp3"), Feature::kSp3CarbonFraction);
+  EXPECT_EQ(FeatureFromName("fcsp3"), Feature::kSp3CarbonFraction);
   EXPECT_EQ(FeatureFromName("nfrag"), Feature::kNumberFragments);
   EXPECT_EQ(FeatureFromName("fragments"), Feature::kNumberFragments);
 }
@@ -57,6 +60,7 @@ TEST(FeatureTest, RejectsUnknownFeatureName) {
 
 TEST(FeatureTest, ReturnsCanonicalFeatureName) {
   EXPECT_EQ(FeatureName(Feature::kRotatableBonds), "rotatable_bonds");
+  EXPECT_EQ(FeatureName(Feature::kSp3CarbonFraction), "sp3_carbon_fraction");
   EXPECT_EQ(FeatureName(Feature::kNumberFragments), "number_fragments");
 }
 
@@ -222,8 +226,30 @@ TEST(FeatureValuesTest, ComputesSimpleMolecularFeatures) {
   EXPECT_DOUBLE_EQ(*values.Value(Feature::kHalogenCount), 0.0);
   ASSERT_TRUE(values.Value(Feature::kSp3Carbon));
   EXPECT_DOUBLE_EQ(*values.Value(Feature::kSp3Carbon), 2.0);
+  ASSERT_TRUE(values.Value(Feature::kSp3CarbonFraction));
+  EXPECT_DOUBLE_EQ(*values.Value(Feature::kSp3CarbonFraction), 1.0);
   ASSERT_TRUE(values.Value(Feature::kNumberFragments));
   EXPECT_DOUBLE_EQ(*values.Value(Feature::kNumberFragments), 1.0);
+}
+
+TEST(FeatureValuesTest, Sp3CarbonFractionUsesCarbonAtomDenominator) {
+  Molecule ethene;
+  ASSERT_TRUE(ethene.build_from_smiles("C=C"));
+
+  quick_rotbond::QuickRotatableBonds rotbond;
+  rotbond.set_calculation_type(quick_rotbond::QuickRotatableBonds::RotBond::kExpensive);
+  alogp::ALogP alogp;
+  xlogp::XLogPCalc xlogp;
+
+  FeatureValues ethene_values(ethene, ethene.natoms(), ethene.nrings(), rotbond, alogp, xlogp);
+  ASSERT_TRUE(ethene_values.Value(Feature::kSp3CarbonFraction));
+  EXPECT_DOUBLE_EQ(*ethene_values.Value(Feature::kSp3CarbonFraction), 0.0);
+
+  Molecule nitrogen;
+  ASSERT_TRUE(nitrogen.build_from_smiles("N"));
+  FeatureValues nitrogen_values(nitrogen, nitrogen.natoms(), nitrogen.nrings(), rotbond, alogp, xlogp);
+  ASSERT_TRUE(nitrogen_values.Value(Feature::kSp3CarbonFraction));
+  EXPECT_DOUBLE_EQ(*nitrogen_values.Value(Feature::kSp3CarbonFraction), 0.0);
 }
 
 TEST(FeatureValuesTest, ComputesRingFeatures) {
@@ -373,6 +399,12 @@ TEST(MoleculeFilterTest, AppliesNewMinMaxComplementFields) {
   ASSERT_TRUE(filter.Build(min_largest_ring));
   EXPECT_FALSE(filter.Ok(m, rejection_reason));
   EXPECT_EQ(rejection_reason, RejectionReason::kRingTooSmall);
+
+  molecule_filter_data::Requirements min_sp3_carbon_fraction;
+  min_sp3_carbon_fraction.set_min_sp3_carbon_fraction(1.1f);
+  ASSERT_TRUE(filter.Build(min_sp3_carbon_fraction));
+  EXPECT_FALSE(filter.Ok(m, rejection_reason));
+  EXPECT_EQ(rejection_reason, RejectionReason::kSp3CarbonFractionTooLow);
 
   molecule_filter_data::Requirements min_aromatic_density;
   min_aromatic_density.set_min_aromatic_density(0.1f);

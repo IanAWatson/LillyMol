@@ -73,18 +73,21 @@ message Requirements {
   optional int32 min_sp3_carbon = 39;
   optional int32 max_sp3_carbon = 40;
 
-  optional float min_aromatic_density = 41;
-  optional float max_aromatic_density = 42;
+  optional float min_sp3_carbon_fraction = 41;
+  optional float max_sp3_carbon_fraction = 42;
 
-  optional int32 min_chiral = 43;
-  optional int32 max_chiral = 44;
+  optional float min_aromatic_density = 43;
+  optional float max_aromatic_density = 44;
 
-  optional int32 min_number_fragments = 45;
-  optional int32 max_number_fragments = 46;
+  optional int32 min_chiral = 45;
+  optional int32 max_chiral = 46;
+
+  optional int32 min_number_fragments = 47;
+  optional int32 max_number_fragments = 48;
 
   // Optional utility functions. Not used by the filtering mode.
-  repeated Utility utility = 47;
-  optional UtilityCombination utility_combination = 48;
+  repeated Utility utility = 49;
+  optional UtilityCombination utility_combination = 50;
 }
 
 message Point {

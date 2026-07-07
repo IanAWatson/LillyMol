@@ -47,6 +47,8 @@ enum class RejectionReason : int {
   kTooManyHbd,
   kTooFewSp3Carbon,
   kTooManySp3Carbon,
+  kSp3CarbonFractionTooLow,
+  kSp3CarbonFractionTooHigh,
   kTooFewHalogen,
   kTooManyHalogen,
   kRingTooSmall,
@@ -91,6 +93,7 @@ enum class Feature : int {
   kHalogenCount,
   kMaxDistance,
   kSp3Carbon,
+  kSp3CarbonFraction,
   kAromaticDensity,
   kChiral,
   kNumberFragments,
@@ -158,6 +161,7 @@ class FeatureValues {
     std::optional<int> _halogen_count;
     std::optional<int> _max_distance;
     std::optional<int> _sp3_carbon;
+    std::optional<double> _sp3_carbon_fraction;
     std::optional<int> _number_fragments;
 
     int HeteroatomCount();
@@ -169,7 +173,9 @@ class FeatureValues {
     void ComputeHbaHbd();
     int HalogenCount();
     int MaxDistance();
+    void ComputeSp3Carbon();
     int Sp3Carbon();
+    double Sp3CarbonFraction();
     int NumberFragments();
 
   public:

@@ -849,6 +849,35 @@ TEST_F(TestSubstructureRingSystem, TestNumberSpinachGroupsMatch)
   EXPECT_TRUE(_DoPermutationTests(kExpected));
 }
 
+TEST_F(TestSubstructureRingSystem, TestDoublyBondedNotPartOfSpinach) {
+  _string_proto = R"pb(
+    query {
+      ring_system_specifier {
+        base {
+          set_global_id: 1
+          ring_extends_to_carbonyl: true
+        }
+        number_spinach_groups: 2
+      }
+      smarts: "[/IWgid1]"
+    }
+  )pb";
+
+  ASSERT_TRUE(google::protobuf::TextFormat::ParseFromString(_string_proto, &_proto));
+
+  EXPECT_TRUE(_query.ConstructFromProto(_proto)) << "Cannot parse proto " << _proto.ShortDebugString();
+
+  _smiles = "COCC1=CC(=O)NC(=N1)C(C)(C)N CHEMBL4588481";
+
+  ASSERT_TRUE(_m.build_from_smiles(_smiles));
+
+  constexpr int kExpected = 7;
+
+  ASSERT_EQ(_query.substructure_search(_m, _sresults), kExpected);
+
+  EXPECT_TRUE(_DoPermutationTests(kExpected));
+}
+
 TEST_F(TestSubstructureRingSystem, TestNumberNonSpinachGroupsMatch)
 {
   _string_proto = R"(

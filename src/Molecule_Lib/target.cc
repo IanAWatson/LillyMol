@@ -1761,8 +1761,7 @@ Molecule_to_Match::_initialise_spinach_or_between_rings() {
 
   const int nr = _m->nrings();
 
-  if (0 == nr)  // no spinach, no between rings
-  {
+  if (0 == nr) { // no spinach, no between rings
     std::fill_n(_spinach_or_between_rings, _natoms, kSpinachNotDefined);
     return 1;
   }
@@ -1782,58 +1781,65 @@ Molecule_to_Match::_initialise_spinach_or_between_rings() {
   // ring atom
 
   for (int i = 0; i < _natoms; i++) {
-    if (TARGET_IS_RING !=
-        _spinach_or_between_rings[i]) {  // bonds between rings start with ring atoms
+    // bonds between rings start with ring atoms
+    if (TARGET_IS_RING != _spinach_or_between_rings[i]) {
       continue;
     }
 
     const Atom* a = _atom[i];
 
-    int acon = a->ncon();
-
-    if (2 == acon) {  // 2 connections, no branches off this atom
+    if (a->ncon() < 2) {  // 2 connections, no branches off this atom
       continue;
     }
 
-    for (int j = 0; j < acon; j++) {
-      atom_number_t k = a->other(i, j);
+    for (const Bond* b : *a) {
+      atom_number_t o = b->other(i);
 
-      if (TARGET_IS_RING == _spinach_or_between_rings[k]) {
+      if (TARGET_IS_RING == _spinach_or_between_rings[o]) {
         continue;
       }
 
-      _identify_between_rings(i, k);
+      _identify_between_rings(i, o);
     }
   }
 
+  // Now look for spinach atoms.
+  // Starting atoms are those marked as being in a ring or between rings.
   for (int i = 0; i < _natoms; i++) {
-    if (TARGET_IS_RING == _spinach_or_between_rings[i])  // spinach starts with ring atoms
+    // spinach starts with ring atoms
+    if (TARGET_IS_RING == _spinach_or_between_rings[i]) {
       ;
-    else if (TARGET_BETWEEN_RING ==
-             _spinach_or_between_rings[i])  // between ring atoms start on rings
-      ;
-    else {  // no spinach starting here
+    } else if (TARGET_BETWEEN_RING == _spinach_or_between_rings[i]) {
+      // already detected between ring atoms, good starting points for spinach.
+    } else {  // no spinach starting here
       continue;
     }
 
-    //  We have an atom that is between rings
+    const Atom* a = _atom[i];
 
-    const Atom* a = _m->atomi(i);
-
-    int acon = a->ncon();
-
-    if (2 == acon) {  // only > 2 connections can grow out spinach
+    // No spinach if only 2 connections.
+    if (a->ncon() < 2) {
       continue;
     }
 
-    for (int j = 0; j < acon; j++) {
-      atom_number_t k = a->other(i, j);
+    for (const Bond* b : *a) {
+      atom_number_t k = b->other(i);
 
       if (TARGET_IS_RING == _spinach_or_between_rings[k]) {
         continue;
       }
 
       if (TARGET_BETWEEN_RING == _spinach_or_between_rings[k]) {
+        continue;
+      }
+
+      // Mark any =[D1] atoms as part of the scaffold.
+      if (! b->is_single_bond() && _atom[k]->ncon() == 1) {
+        if (_spinach_or_between_rings[i] == TARGET_IS_RING) {
+          _spinach_or_between_rings[k] = TARGET_IS_RING;
+        } else {
+          _spinach_or_between_rings[k] = TARGET_BETWEEN_RING;
+        }
         continue;
       }
 
@@ -1892,17 +1898,15 @@ Molecule_to_Match::_identify_between_rings(const atom_number_t aprev,
                                            const atom_number_t zatom) {
   const Atom* a = _atom[zatom];
 
-  const int acon = a->ncon();
+  for (const Bond* b : *a) {
+    atom_number_t o = b->other(zatom);
 
-  for (int i = 0; i < acon; i++) {
-    atom_number_t j = a->other(zatom, i);
-
-    if (j == aprev) {  // forward only
+    if (o == aprev) {  // forward only
       continue;
     }
 
-    if (TARGET_IS_RING == _spinach_or_between_rings[j] ||
-        _identify_between_rings(zatom, j)) {
+    if (TARGET_IS_RING == _spinach_or_between_rings[o] ||
+        _identify_between_rings(zatom, o)) {
       _spinach_or_between_rings[zatom] = TARGET_BETWEEN_RING;
       return 1;
     }

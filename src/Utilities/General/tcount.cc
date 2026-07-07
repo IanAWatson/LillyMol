@@ -78,7 +78,7 @@ static int contains_backslashed_separators = 0;
 static int human_readable_output = 0;
 
 // Accumulated across all files.
-statud uint64_t total_lines_read = 0;
+static uint64_t total_lines_read = 0;
 
 /*
   When writing different column counts to different files, we need a

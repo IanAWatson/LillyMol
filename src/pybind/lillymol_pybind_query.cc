@@ -1,4 +1,5 @@
 #include <iostream>
+#include <memory>
 #include <string>
 
 #include "pybind11/pybind11.h"
@@ -103,13 +104,18 @@ PYBIND11_MODULE(lillymol_query, q)
       },
       "read MSI style query from 'fname'"
     )
-    // Maybe one day when we get move constructures for a query
-    /*.def("QueryFromSmarts",
-        [](const std::string& smarts){
-          return QueryFromSmarts(smarts);
-        },
-        "Query created from smarts - or None"
-    )*/
   ;
+
+  q.def("QueryFromSmarts",
+    [](const std::string& smarts)->std::unique_ptr<Substructure_Query> {
+      auto result = std::make_unique<Substructure_Query>();
+      if (! result->CreateFromSmarts(smarts)) {
+        return nullptr;
+      }
+      return result;
+    },
+    py::arg("smarts"),
+    "Return a SubstructureQuery built from `smarts`, or None if parsing fails."
+  );
 
 }

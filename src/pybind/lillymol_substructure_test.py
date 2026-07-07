@@ -23,6 +23,22 @@ class TestLillyMolSubstructure(absltest.TestCase):
     self.assertEqual(qry.substructure_search(mol), 1)
     self.assertIn(qry, mol)
 
+  def test_query_from_smarts(self):
+    mol = Molecule()
+    self.assertTrue(mol.build_from_smiles("CCO ethanol"))
+    qry = QueryFromSmarts("CO")
+    self.assertIsNotNone(qry)
+    self.assertIsInstance(qry, SubstructureQuery)
+    self.assertEqual(qry.substructure_search(mol), 1)
+
+  def test_query_from_smarts_single_step(self):
+    phenol_query = QueryFromSmarts("[OH]-c")
+    phenol = MolFromSmiles("Oc1ccccc1 phenol")
+    self.assertTrue(phenol_query in phenol)
+
+  def test_query_from_smarts_invalid(self):
+    self.assertIsNone(QueryFromSmarts("["))
+
   def test_ethane_c(self):
     mol = Molecule()
     self.assertTrue(mol.build_from_smiles("CC ethane"))

@@ -1161,6 +1161,7 @@ PYBIND11_MODULE(lillymol, m)
                 )
                 .def("__contains__",
                   [](Molecule& m, Substructure_Query& q)->bool{
+                    // It is an open question whether we should temporarily call set_max_matches_to_find.
                     return q.substructure_search(&m);
                   },
                   "Substructure search"

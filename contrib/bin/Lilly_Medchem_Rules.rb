@@ -44,7 +44,7 @@ def usage (rc)
   exit(rc)
 end
 
-cl = IWCmdline.new("-v-noapdm-i=s-expert-b=fraction-B=s-q=dir-log=s-tp=close-iwd=close-smarts=s-rej=s-c=ipos-Cs=ipos-Ch=ipos-okiso-odm=s-edm=sfile-relaxed-nodemerit-S=s-dcf=sfile-nobadfiles-symm=ipos")
+cl = IWCmdline.new("-v-noapdm-i=s-expert-b=fraction-B=s-q=dir-log=s-tp=close-iwd=close-smarts=s-rej=s-c=ipos-Cs=ipos-Ch=ipos-okiso-odm=s-edm=sfile-relaxed-nodemerit-S=s-dcf=sfile-nobadfiles-symm=ipos-nophosphorus-label-tabular")
 
 if cl.unrecognised_options_encountered()
   $stderr.print "Unrecognised options encountered\n"
@@ -81,6 +81,10 @@ end
 mc_first_pass_options = ""
 if cl.option_present('tp')
   mc_first_pass_options = cl.value('tp')
+end
+
+if cl.option_present('nophosphorus')
+  mc_first_pass_options << " -n P"
 end
 
 unless cl.option_present('okiso')
@@ -154,6 +158,10 @@ end
 if cl.option_present('nodemerit')
   extra_iwdemerit_options << " -r"
   $default_soft_upper_atom_count_cutoff = $default_hard_upper_atom_count_cutoff - 1
+end
+
+if cl.option_present('tabular')
+  extra_iwdemerit_options << " -W tabular"
 end
 
 if cl.option_present('iwd')
@@ -309,8 +317,15 @@ cmd << " -c #{lower_atom_count_cutoff} -C #{hard_upper_atom_count_cutoff} -E aut
 cmd << "-L #{bad_stem}0 -K TP1 " if bad_stem
 cmd << "-a -S - #{ARGV.join(' ')} 2> #{logfilestem}0.log "
 
+# Options passed to both tsubstructure invocations
+tsub_common_opts = '-A D -E autocreate -b -u -i smi -o smi'
+
+if cl.option_present('label')
+  tsub_common_opts << ' -j 1'
+end
+
 if stop_afer_completing_step >= 1
-  cmd << "| #{tsubstructure} -E autocreate -b -u -i smi -o smi -A D "
+  cmd << "| #{tsubstructure} #{tsub_common_opts} "
   cmd << "-m #{bad_stem}1 -m QDT " if bad_stem
   cmd << "-n - -q F:#{query_dir}/#{query_file[1]} "
 
@@ -319,7 +334,7 @@ if stop_afer_completing_step >= 1
   cmd << " - 2> #{logfilestem}1.log ";
 
   if stop_afer_completing_step >= 2
-    cmd << "| #{tsubstructure} -A D -E autocreate -b -u -i smi -o smi "
+    cmd << "| #{tsubstructure} #{tsub_common_opts} "
     cmd << "-m #{bad_stem}2 -m QDT " if bad_stem
     cmd << "-n - -q F:#{query_dir}/#{query_file[2]} - 2> #{logfilestem}2.log ";
     if stop_afer_completing_step >= 3

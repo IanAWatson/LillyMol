@@ -19,10 +19,12 @@ def get_model(mdir: str)->tuple:
     Return a model instantiated from mdir/xgboost.json and the
     name of the response
   """
+  failed = [None, None, None]
+
   fname = os.path.join(mdir, "model_metadata.txt")
   if not os.path.exists(fname):
     logging.error("%s not found", fname)
-    return None, None
+    return failed
 
   with open(fname, "r") as reader:
     text = reader.read()
@@ -30,27 +32,31 @@ def get_model(mdir: str)->tuple:
   proto = text_format.Parse(text, xgboost_model_pb2.XGBoostModel())
   if not proto:
     logging.error("Cannot interpret as proto %s", text)
-    return None, None
+    return failed
 
   if not proto.response:
     logging.error("No response in %s", fname)
-    return None, None
+    return failed
 
   model_file = os.path.join(mdir, "xgboost.json")
   if not os.path.exists(model_file):
     logging.error("%s not found", model_file)
-    return None
+    return failed
 
-  model = XGBRegressor()
+  if proto.classification:
+    model = XGBClassifier()
+  else:
+    model = XGBRegressor()
+
   model.load_model(model_file)
 
-  return model, proto.response
+  return proto, model, proto.response
 
 def read_class_label_translation(mdir:string)->bool:
   """Read the ClassLabelTransation proto in `mdir`.
   """
   fname = os.path.join(mdir, 'class_label_translation.dat')
-  with optn(fname, "rb") as input:
+  with open(fname, "rb") as input:
     serialised = input.read()
 
   proto = class_label_translation_pb2.ClassLabelTranslation()
@@ -58,7 +64,7 @@ def read_class_label_translation(mdir:string)->bool:
 
   return proto
 
-def to_class(labels:List[string], value)
+def to_class(labels:List[string], value):
   """Given a list of class labels and a model prediction, return the label for that score.
   """
   if value <= 0.5:
@@ -66,7 +72,7 @@ def to_class(labels:List[string], value)
   else:
     return labels[1]
  
-end
+
 
 def xgboost_evaluate(mdir: str, fname: str)->bool:
   """Read `fname` as descriptors for a model in `mdir`
@@ -75,26 +81,28 @@ def xgboost_evaluate(mdir: str, fname: str)->bool:
     logging.error("Model directory %s not found", mdir)
     return False
 
-  model, response = get_model(mdir)
+  proto, model, response = get_model(mdir)
   if not model:
     logging.error("Invalid mode in %s", mdir)
     return False
 
-  print(f"classification {model.classification}")
-  if model.classification:
+  print(f"classification {proto.classification}")
+  if proto.classification:
     xref = read_class_label_translation(mdir)
-    classes = [] * 2
-    for k, v in enumerate(xref):
-      classes[v] = k
+    classes = [False] * 2
+    print(f"xref {xref}")
+    for k, v in enumerate(xref.to_numeric):
+      print(f"k #{k} v #{v}")
+      classes[k] = v
 
   data = pd.read_csv(fname, sep=' ', header=0)
 
   logging.info("Evaluating %d rows", len(data))
   results = model.predict(data.iloc[:,1:])
   print(f"Id XGBD_{response}")
-  if model.classification:
+  if proto.classification:
     for i in range(len(results)):
-      printf(f"{data.iloc[i,0]} {to_class(classes, results[i]):.4f}")
+      print(f"{data.iloc[i,0]} {to_class(classes, results[i]):.4f}")
   else:
     for i in range(len(results)):
       print(f"{data.iloc[i,0]} {results[i]:.4f}")

@@ -128,3 +128,8 @@ aliphatic_nitro.qry
 
 isothiazole.qry
 multiple_amide.qry
+
+PROTO:strongly_fused_4_ring.qry
+multiple_spiro.qry
+di-alkyl_sulfoxide.qry
+activated_fluoro_methyl.qry

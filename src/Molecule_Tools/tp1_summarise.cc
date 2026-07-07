@@ -25,11 +25,11 @@ static IWString bad_file_stem ("bad");
 
 static IWString bad_file_stem_array ("BQTP");
 
-static int molecules_written = 0;
+static uint64_t molecules_written = 0;
 
-static int rejected_molecules = 0;
+static uint64_t rejected_molecules = 0;
 
-static int demerited_molecules = 0;
+static uint64_t demerited_molecules = 0;
 
 static int include_reason = 0;
 
@@ -65,6 +65,10 @@ static int suppress_normal_output = 0;
 
 static int process_rejection_files = 1;
 
+// If the Medchem rules have been run with the -tabular option
+// then demerit files will have a demerit as the last column and not a D(nn) value.
+static int input_from_tabular = 0;
+
 static void
 usage (int rc)
 {
@@ -91,6 +95,8 @@ usage (int rc)
   cerr << " -c             produce a demerit based scale factor file\n";
   cerr << " -f <n>         numeric demerit value for rejections (default 100)\n";
   cerr << " -k             only process the survivors file (do not process bad0, bad1...)\n";
+  cerr << " -w             the -tabular option was used when running the rules\n";
+  cerr << "                  there is no information about demerit query results\n";
   cerr << " -v             verbose output\n";
 
   exit (rc);
@@ -134,6 +140,44 @@ write_demerit_value(const const_IWSubstring & id,
   return output.good ();
 }
 
+
+// THe last token on the line is the demerit.
+// Note that we do not handle all possible output control options.
+// `must_have_demerit` is not processed, we just assume the last token
+// in `buffer` is a numeric demerit value.
+static int
+process_from_iwdemerit_tabular(const const_IWSubstring& buffer,
+                int must_have_demerit,
+                IWString_and_File_Descriptor& output) {
+
+  IWString id;
+
+  IWString last_token;
+  const_IWSubstring token;
+  int i = 0;
+  for (int col = 0; buffer.nextword(token, i); ++col) {
+    // skip the smiles.
+    if (col == 0) {
+      continue;
+    }
+
+    id.append_with_spacer(token);
+
+    last_token = token;
+  }
+
+  int demerits;
+  if (last_token.empty()) [[unlikely]] {
+    cerr << "process_from_iwdemerit_tabular::cannot retrieve last column, assuming zero demerits\n";
+    demerits = 0;
+  } else if (! last_token.numeric_value(demerits) || demerits < 0) {
+    cerr << "process_from_iwdemerit_tabular:invalid demerit value '" << last_token << "'\n";
+    return 0;
+  }
+
+  return write_demerit_value(id, demerits, output);
+}
+
 re2::RE2 d_parentheses("^D\\([0-9]+\\)$");
 //static IW_Regular_Expression d_parentheses ("^D\\([0-9]+\\)$");
 
@@ -142,6 +186,10 @@ process_from_iwdemerit(const const_IWSubstring & buffer,
                        int must_have_demerit,
                        IWString_and_File_Descriptor & output)
 {
+  if (input_from_tabular) {
+    return process_from_iwdemerit_tabular(buffer, must_have_demerit, output);
+  }
+
   int i = 0;
 
   const_IWSubstring token;
@@ -834,7 +882,7 @@ write_reasons (const IW_STL_Hash_Map_int & reason,
 static int
 tp1_summarise (int argc, char ** argv)
 {
-  Command_Line cl (argc, argv, "vB:S:rhzDs:tT:uj:f:XAP:cnkbm:");
+  Command_Line cl (argc, argv, "vB:S:rhzDs:tT:uj:f:XAP:cnkbm:w");
 
   if (cl.unrecognised_options_encountered ())
   {
@@ -946,6 +994,13 @@ tp1_summarise (int argc, char ** argv)
 
     if (verbose)
       cerr << "Will only process survivor files (not bad0, bad1...)\n";
+  }
+
+  if (cl.option_present('w')) {
+    input_from_tabular = 1;
+    if (verbose) {
+      cerr << "The -tabular option was used by the original invocation\n";
+    }
   }
 
 // Initial implementation used -j, but it should be -f to be compatible with

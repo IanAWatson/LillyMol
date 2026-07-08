@@ -28,6 +28,7 @@
 #include "Foundational/iwstring/iw_stl_hash_map.h"
 #include "Foundational/iwstring/iw_stl_hash_set.h"
 #include "Foundational/iwstring/iwstring.h"
+#include "Foundational/iwstring/string_with_commas.h"
 
 #include "Molecule_Lib/aromatic.h"
 #include "Molecule_Lib/istream_and_type.h"

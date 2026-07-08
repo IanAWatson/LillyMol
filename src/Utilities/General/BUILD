@@ -915,6 +915,7 @@ cc_binary(
         "//Foundational/data_source:iwstring_data_source",
         "//Foundational/iwmisc",
         "//Foundational/iwstring",
+        "//Foundational/iwstring:string_with_commas",
     ],
 )
 

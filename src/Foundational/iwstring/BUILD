@@ -31,7 +31,6 @@ cc_library(
         "string_change.cc",
         "string_relationals.cc",
         "string_to_float.cc",
-        "string_with_commas.cc",
         "tokenise_with_quotes.cc",
         "unhtml.cc",
     ],
@@ -54,6 +53,14 @@ cc_library(
         # "@third_party//:dragonbox",
         "@zlib",
     ],
+)
+
+cc_library(
+    name = "string_with_commas",
+    hdrs = [
+        "string_with_commas.h",
+    ],
+    visibility = ["//visibility:public"],
 )
 
 cc_binary(
@@ -101,7 +108,7 @@ cc_test(
         "string_with_commas_test.cc",
     ],
     deps = [
-        ":iwstring",
+        ":string_with_commas",
         "@googletest//:gtest",
         "@googletest//:gtest_main",
     ]

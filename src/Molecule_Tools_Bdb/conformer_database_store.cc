@@ -15,6 +15,7 @@
 #include "Foundational/cmdline/cmdline.h"
 #include "Foundational/iwmisc/report_progress.h"
 #include "Foundational/iwstring/iwstring.h"
+#include "Foundational/iwstring/string_with_commas.h"
 
 #include "Molecule_Lib/aromatic.h"
 #include "Molecule_Lib/element.h"

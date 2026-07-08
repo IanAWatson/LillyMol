@@ -36,6 +36,7 @@
 #include "Foundational/iwstring/iw_stl_hash_map.h"
 #include "Foundational/iwstring/iw_stl_hash_set.h"
 #include "Foundational/iwstring/iwstring.h"
+#include "Foundational/iwstring/string_with_commas.h"
 
 #include "Molecule_Lib/aromatic.h"
 #include "Molecule_Lib/atom_typing.h"
@@ -4258,7 +4259,7 @@ SubstituentIdentification::operator()(int argc, char** argv) {
   }
 
   if (_verbose) {
-    cerr << "Read " << istring::with_commas(_molecules_read) << " molecules\n";
+    cerr << "Read " << iwstring::with_commas(_molecules_read) << " molecules\n";
     if (_anchor_query.size() || _default_new_molecule_starting_points) {
       _do_create_molecules_report(cerr);
     } else {

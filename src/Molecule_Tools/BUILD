@@ -648,6 +648,7 @@ cc_binary(
         "//Foundational/iwaray",
         "//Foundational/iwmisc",
         "//Foundational/iwmisc:sparse_fp_creator",
+        "//Foundational/iwstring:string_with_commas",
         "//Molecule_Lib:iwmolecule",
         "//Molecule_Lib:moleculeio",
         "//Molecule_Lib:substructure_cc_proto",

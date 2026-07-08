@@ -22,6 +22,7 @@
 #include "Foundational/iwstring/absl_hash.h"
 #include "Foundational/iwstring/iw_stl_hash_set.h"
 #include "Foundational/iwstring/iwstring.h"
+#include "Foundational/iwstring/string_with_commas.h"
 
 #include "db_cxx.h"
 

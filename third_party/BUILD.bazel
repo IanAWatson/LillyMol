@@ -115,28 +115,30 @@ cc_library(
     visibility = ["//visibility:public"],
 )
 
-cc_library(
-    name = "planarity_static",
-    srcs = [
-        "lib/libplanarity.a",
-    ],
-    hdrs = glob(
-            ["include/planarity/**"],
-            allow_empty=False,
-        ),
-    strip_include_prefix = "include/planarity/",
-    visibility = ["//visibility:public"],
-)
-
-cc_library(
-    name = "planarity_shared",
-    srcs = [
-        "lib/libplanarity.so.2",
-    ],
-    hdrs = glob(
-            ["include/planarity/**"],
-            allow_empty=False,
-        ),
-    strip_include_prefix = "include/planarity/",
-    visibility = ["//visibility:public"],
-)
+#  cc_library(
+#      name = "planarity_static",
+#      srcs = [
+#          "lib/libplanarity.a",
+#      ],
+#      hdrs = glob(
+#              ["include/planarity/**"],
+#              allow_empty=False,
+#          ),
+#      strip_include_prefix = "include/planarity/",
+#      visibility = ["//visibility:public"],
+#  )
+#  
+#  cc_library(
+#      name = "planarity_shared",
+#      srcs = select({
+#          "@platforms//os:macos": ["lib/libplanarity.dylib"],
+#          "@platforms//os:linux": ["lib/libplanarity.so"],
+#          "//conditions:default": [],
+#      }),
+#      hdrs = glob(
+#              ["include/planarity/**"],
+#              allow_empty=False,
+#          ),
+#      strip_include_prefix = "include/planarity/",
+#      visibility = ["//visibility:public"],
+#  )

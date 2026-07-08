@@ -5,8 +5,7 @@
 
 #include "gtest/gtest.h"
 
-// Include the header where with_commas is declared.
-#include "iwstring.h"
+#include "string_with_commas.h"
 
 class WithCommasTest
     : public ::testing::TestWithParam<std::tuple<long long, std::string>> {};

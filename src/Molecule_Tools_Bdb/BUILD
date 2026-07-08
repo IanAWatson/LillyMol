@@ -82,6 +82,7 @@ cc_binary(
     ],
     tags = ["berkeleydb"],
     deps = [
+        "//Foundational/iwstring:string_with_commas",
         ":storage_conditions",
         "//Foundational/cmdline:iwcmdline",
         "//Molecule_Lib:iwmolecule",
@@ -112,6 +113,7 @@ cc_binary(
         "conformer_database_store.cc",
     ],
     deps = [
+        "//Foundational/iwstring:string_with_commas",
         "conformer_database_cc_proto",
         "//Foundational/cmdline:iwcmdline",
         "//Molecule_Lib:iwmolecule",
@@ -165,6 +167,7 @@ cc_binary(
     ],
     tags = ["berkeleydb"],
     deps = [
+        "//Foundational/iwstring:string_with_commas",
         "//Foundational/cmdline:iwcmdline",
         "//Foundational/data_source:iwtfdata_record",
         "//Molecule_Lib:iwmolecule",
@@ -230,6 +233,7 @@ cc_binary(
     ],
     tags = ["berkeleydb"],
     deps = [
+        "//Foundational/iwstring:string_with_commas",
         ":iwecfp_database",
         "//Foundational/cmdline:iwcmdline",
         "//Foundational/iwmisc",
@@ -246,6 +250,7 @@ cc_binary(
     ],
     tags = ["berkeleydb"],
     deps = [
+        "//Foundational/iwstring:string_with_commas",
         ":iwecfp_database",
         ":iwecfp_database_lookup_lib",
         "//Foundational/cmdline:iwcmdline",
@@ -281,6 +286,7 @@ cc_binary(
     ],
     tags = ["berkeleydb"],
     deps = [
+        "//Foundational/iwstring:string_with_commas",
         ":smi2rings_cc_proto",
         "//Foundational/cmdline:iwcmdline",
         "//Foundational/iwmisc",
@@ -330,6 +336,7 @@ cc_binary(
     ],
     tags = ["berkeleydb"],
     deps = [
+        "//Foundational/iwstring:string_with_commas",
         ":substituent_identification_cc_proto",
         "//Foundational/cmdline:iwcmdline",
         "//Foundational/iwmisc",

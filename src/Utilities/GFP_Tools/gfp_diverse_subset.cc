@@ -14,6 +14,7 @@
 #include "Foundational/iwmisc/report_progress.h"
 #include "Foundational/iwaray/iwaray.h"
 #include "Foundational/iwstring/iwstring.h"
+#include "Foundational/iwstring/string_with_commas.h"
 
 #include "Utilities/GFP_Tools/gfp.h"
 

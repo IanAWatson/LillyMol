@@ -22,6 +22,7 @@
 #include "Foundational/data_source/tfdatarecord.h"
 #include "Foundational/iwmisc/misc.h"
 #include "Foundational/iwmisc/report_progress.h"
+#include "Foundational/iwstring/string_with_commas.h"
 
 #include "Molecule_Lib/molecule.h"
 

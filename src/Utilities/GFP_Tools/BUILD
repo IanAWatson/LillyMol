@@ -259,6 +259,7 @@ cc_binary(
         "//conditions:default": ["-lgomp"]
     }),
     deps = [
+        "//Foundational/iwstring:string_with_commas",
         ":gfp",
         "//Foundational/cmdline:iwcmdline",
         "//Foundational/data_source:iwstring_data_source",

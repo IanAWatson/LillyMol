@@ -15,6 +15,7 @@ const char *prog_name = nullptr;
 #include "Foundational/cmdline/cmdline.h"
 #include "Foundational/data_source/iwstring_data_source.h"
 #include "Foundational/iwstring/iwstring.h"
+#include "Foundational/iwstring/string_with_commas.h"
 
 #include "tokens_in_quoted_string.h"
 

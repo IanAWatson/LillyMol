@@ -32,6 +32,7 @@
 #include "Foundational/iwqsort/iwqsort.h"
 #include "Foundational/iwstring/iw_stl_hash_map.h"
 #include "Foundational/iwstring/iw_stl_hash_set.h"
+#include "Foundational/iwstring/iwstring.h"
 
 #define ISTREAM_AND_TYPE_IMPLEMENTATION
 
@@ -58,7 +59,7 @@ static Chemical_Standardisation chemical_standardisation;
 
 static int verbose = 0;
 
-static int molecules_read = 0;
+static uint64_t molecules_read = 0;
 static int molecules_written = 0;
 
 static int iwecfp_atom_type = IWATTYPE_Z;
@@ -1574,7 +1575,7 @@ iwecfp(data_source_and_type<Molecule>& input, Set_of_Databases& sodb,
     std::unique_ptr<Molecule> free_m(m);
 
     if (report_progress()) {
-      cerr << "Processed " << molecules_read << " molecules\n";
+      cerr << "Processed " << iwstring::with_commas(molecules_read) << " molecules\n";
     }
 
     if (verbose > 1) {
@@ -1702,7 +1703,7 @@ iwecfp_chunked(data_source_and_type<Molecule>& input, Set_of_Databases& sodb,
     molecules_read += n;
 
     if (report_progress()) {
-      cerr << "Processed " << molecules_read << " molecules\n";
+      cerr << "Processed " << iwstring::with_commas(molecules_read) << " molecules\n";
     }
 
     for (int i = 0; i < n; ++i) {

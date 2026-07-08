@@ -72,6 +72,13 @@
       "args": [
         "-v -R #{indir}/6a.textproto -s '[r6c]' #{indir}/in.smi"
       ]
+    },
+
+    {
+      "name": "atype_simple",
+      "shellScript": {
+        "scriptName": "atype_simple.sh"
+      }
     }
 
 

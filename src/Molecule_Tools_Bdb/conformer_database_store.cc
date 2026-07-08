@@ -14,6 +14,7 @@
 #include "Foundational/iwaray/iwaray.h"
 #include "Foundational/cmdline/cmdline.h"
 #include "Foundational/iwmisc/report_progress.h"
+#include "Foundational/iwstring/iwstring.h"
 
 #include "Molecule_Lib/aromatic.h"
 #include "Molecule_Lib/element.h"
@@ -238,7 +239,8 @@ ConformerDB::WriteConformers(MoleculeWithEnergy& m, const conformer_database::Co
   }
 
   if (_report_progress()) {
-    cerr << "Stored conformers for " << _molecules_read << " molecules\n";
+    cerr << "Stored conformers for " << iwstring::with_commas(_molecules_read)
+         << " molecules\n";
   }
 
   _number_conformers[conformers.conformers_size()]++;

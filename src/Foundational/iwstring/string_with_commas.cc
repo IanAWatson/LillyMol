@@ -23,7 +23,9 @@ std::string with_commas(Int value) {
 template std::string with_commas<int>(int);
 template std::string with_commas<uint32_t>(uint32_t);
 template std::string with_commas<int64_t>(int64_t);
-template std::string with_commas<long long>(long long);
 template std::string with_commas<uint64_t>(uint64_t);
+#ifdef __APPLE__
+template std::string with_commas<unsigned long>(unsigned long);
+#endif  // __APPLE__
 
 }  // namespace iwstring

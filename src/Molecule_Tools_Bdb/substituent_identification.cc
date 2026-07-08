@@ -35,6 +35,7 @@
 #include "Foundational/iwqsort/iwqsort.h"
 #include "Foundational/iwstring/iw_stl_hash_map.h"
 #include "Foundational/iwstring/iw_stl_hash_set.h"
+#include "Foundational/iwstring/iwstring.h"
 
 #include "Molecule_Lib/aromatic.h"
 #include "Molecule_Lib/atom_typing.h"
@@ -3407,7 +3408,7 @@ SubstituentIdentification::_process_molecules(data_source_and_type<Molecule>& in
 
 void
 SubstituentIdentification::_do_build_database_report(std::ostream& os) const {
-  os << "Processed " << _molecules_read << " molecules,";
+  os << "Processed " << iwstring::with_commas(_molecules_read) << " molecules,";
   for (auto i = 0; i <= _shell_radius; ++i) {
     const auto& bi = _bit[i];
 
@@ -4257,7 +4258,7 @@ SubstituentIdentification::operator()(int argc, char** argv) {
   }
 
   if (_verbose) {
-    cerr << "Read " << _molecules_read << " molecules\n";
+    cerr << "Read " << istring::with_commas(_molecules_read) << " molecules\n";
     if (_anchor_query.size() || _default_new_molecule_starting_points) {
       _do_create_molecules_report(cerr);
     } else {

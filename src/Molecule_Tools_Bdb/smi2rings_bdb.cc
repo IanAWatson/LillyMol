@@ -21,6 +21,7 @@
 #include "Foundational/iwmisc/report_progress.h"
 #include "Foundational/iwstring/absl_hash.h"
 #include "Foundational/iwstring/iw_stl_hash_set.h"
+#include "Foundational/iwstring/iwstring.h"
 
 #include "db_cxx.h"
 
@@ -100,7 +101,7 @@ static int max_ring_size_to_consider = std::numeric_limits<int>::max();
 
 static int discard_molecules_where_ring_is_whole_molecule = 0;
 
-static int molecules_read = 0;
+static uint64_t molecules_read = 0;
 
 static resizable_array_p<Db> databases;
 
@@ -2159,11 +2160,11 @@ smi2rings(Molecule& m,
           IWString_and_File_Descriptor& output) {
   if (! report_progress()) {
   } else if (store_in_database) {
-    cerr << "Read " << molecules_read << " molecules, found " << new_ring_systems_stored
-         << " new ring systems\n";
+    cerr << "Read " << iwstring::with_commas(molecules_read) << " molecules, found "
+         << iwstring::with_commas(new_ring_systems_stored) << " new ring systems\n";
   } else {
-    cerr << "Read " << molecules_read << ", " << exemplar_count[0] << 
-            " unique ring systems found\n";
+    cerr << "Read " << iwstring::with_commas(molecules_read) << ", "
+         << iwstring::with_commas(exemplar_count[0]) << " unique ring systems found\n";
   }
 
   if (write_parent_structure || write_non_ring_atoms) {

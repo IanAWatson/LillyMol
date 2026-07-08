@@ -100,6 +100,10 @@ struct Exocyclic {
   bond_type_t btype;
 };
 
+// Each atom in the parent can be in one of these states with respect to
+// rings.
+//  kIsBase: the atom is part of a ring
+//  kIsExocyclic: the atom is doubly bonded to a ring atom.
 enum class ExocyclicStatus {
   kNotInvolved = 0,
   kIsBase = 1,
@@ -109,7 +113,10 @@ enum class ExocyclicStatus {
 struct PerMoleculeArrays {
   public:
     int* ring_sys;
+
+    // A mapping from atom number in parent to atom number in a ring.
     int* xref;
+
     int* include_atom;
     uint32_t* atype;
     ExocyclicStatus* exocyclic_status;
@@ -926,7 +933,7 @@ AnyMultiplyConnectedAtoms(Molecule& m,
 
 int
 ExtractRings::LabelAttachmentPoints(Molecule& parent,
-                              Molecule& r,
+                              Molecule& abstract_ring,
                               int sys_num,
                               const PerMoleculeArrays& data) const {
   const int matoms = parent.natoms();
@@ -974,7 +981,7 @@ ExtractRings::LabelAttachmentPoints(Molecule& parent,
         continue;
       }
 
-      r.set_isotope(data.xref[i], IsotopeForAtom(parent, i, sys_num, data));
+      abstract_ring.set_isotope(data.xref[i], IsotopeForAtom(parent, i, sys_num, data));
       ++rc;
       //cerr << "ring set isotope on atom " << xref[i] << " value " << _isotope << '\n';
     }
@@ -1297,6 +1304,7 @@ ExtractRings::GenerateSmarts(Molecule& parent,
     } else if (m.ncon(i) > 1) {
       smt << 'D' << m.ncon(i);
     }
+
     smt << kCloseSquareBracket;
     smiles_information.set_user_specified_atomic_smarts(i, smt);
   }

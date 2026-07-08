@@ -46,9 +46,9 @@ static int multi_fragment_molecules_stored = 0;
 
 static int store_chiral_and_non_chiral_forms = 0;
 
-static int molecules_read = 0;
+static uint64_t molecules_read = 0;
 
-static int molecules_stored = 0;
+static uint64_t molecules_stored = 0;
 
 static IWString name_separator(':');
 
@@ -596,7 +596,8 @@ buildsmidb(data_source_and_type<Molecule> &input, const Storage_Conditions &sc,
     molecules_read++;
 
     if (report_progress()) {
-      cerr << "read " << molecules_read << " molecules, stored " << molecules_stored << '\n';
+      cerr << "read " << iwstring::with_commas(molecules_read) << " molecules, stored "
+           << iwstring::with_commas(molecules_stored) << '\n';
     }
 
     preprocess(*m, sc);

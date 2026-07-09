@@ -477,6 +477,21 @@ write_molecules_to_be_written(const resizable_array_p<Molecule_to_be_Written>& m
 }
 
 int
+WouldOverwriteInputFile(const Command_Line& cl, const IWString& fname) {
+  if (fname == '-') {
+    return 0;
+  }
+
+  for (const char* input_fname : cl) {
+    if (fname == input_fname) {
+      return 1;
+    }
+  }
+
+  return 0;
+}
+
+int
 write_molecules_to_be_written(Command_Line& cl,
                               const resizable_array_p<Molecule_to_be_Written>& mtbw) {
   if (cl.option_present('S')) {
@@ -484,6 +499,11 @@ write_molecules_to_be_written(Command_Line& cl,
     if (fname == '-') {
     } else if (!fname.ends_with(".smi")) {
       fname << ".smi";
+    }
+
+    if (WouldOverwriteInputFile(cl, fname)) {
+      cerr << "Cannot overwrite input file '" << fname << "'\n";
+      return 0;
     }
 
     IWString_and_File_Descriptor output;
@@ -899,6 +919,10 @@ CommonNames(int argc, char** argv) {
       } else if (x.starts_with("proto=")) {
         x.remove_leading_chars(6);
         IWString proto_fname = x;
+        if (WouldOverwriteInputFile(cl, proto_fname)) {
+          cerr << "Cannot overwrite input file '" << proto_fname << "'\n";
+          return 1;
+        }
         if (!OpenStreamForProtos(proto_fname, stream_for_protos)) {
           cerr << "Cannot initialise stream for protos '" << proto_fname << "'\n";
           return 1;
@@ -1061,6 +1085,11 @@ CommonNames(int argc, char** argv) {
 
   if (cl.option_present('S')) {  // always
     const_IWSubstring s = cl.string_value('S');
+    if (output.would_overwrite_input_files(cl, s)) {
+      cerr << "Cannot overwrite input file(s) '" << s << "'\n";
+      return 1;
+    }
+
     if (!output.new_stem(s, 1)) {
       cerr << "Cannot open output stream '" << s << "'\n";
       return 1;

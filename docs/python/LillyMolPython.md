@@ -340,6 +340,7 @@ The most common methods for a Molecule currently implemented are
 | longest_path() | Longest through bond path |
 | atoms_on_shortest_path(a1, a2) | Set_of_Atoms holding atoms on shortest path between a1 and a2 |
 | down_the_bond(a1, a2) | Return all atoms found by looking down the a1->a2 bond. May return None |
+| atoms_by_radius(starting_atoms, max_radius) | List of Set_of_Atoms grouped by exact minimum bond distance |
 | atom_map_number(atom) | Atom map number on 'atom' |
 | set_atom_map_number(atom, nbr) | Set atom map number |
 | reset_atom_map_numbers() | Remove all atom map numbers |
@@ -666,11 +667,10 @@ if query in m:
 This is equivalent to asking whether `query.substructure_search(m)` finds at
 least one match, but it does not return the match count or matched atoms.
 
-To get the matched atoms, as a List of List's,
+To get the matched atoms directly as a list of `Set_of_Atoms` objects, use:
+```python
+matches = query.substructure_search_matches(m)
 ```
-matches = q.substructure_search_matches(m)
-```
-and then the matches object (type SubstructureResults) can be iterated.
 
 For example if you wanted to place an isotope on each set of matched atoms that might look like
 ```
@@ -703,6 +703,33 @@ are described in the `trxn` usage document. Here they are just listed
 * set_min_atoms_to_match
 * set_max_atoms_to_match
 * max_query_atoms_matched_in_search
+
+### Examining atoms around a substructure match
+
+A substructure search can populate an explicit `SubstructureResults` object. It
+contains one or more embeddings, each represented by a `Set_of_Atoms` containing
+the molecule atom numbers matched by the query. These embeddings can be passed
+directly to `atoms_by_radius`:
+
+```python
+m = MolFromSmiles("CCOC")
+query = QueryFromSmarts("[OD2]")
+sresults = SubstructureResults()
+
+if query.substructure_search(m, sresults):
+  for matched_atoms in sresults:
+    shells = m.atoms_by_radius(matched_atoms, 2)
+    print("matched", list(shells[0]))
+    print("one bond away", list(shells[1]))
+    print("two bonds away", list(shells[2]))
+```
+
+`atoms_by_radius` performs one graph traversal and returns a list indexed by exact
+minimum bond distance. Element zero is the starting set, element one contains
+atoms one bond away, and so on. Each atom occurs in only one shell, even when it
+is reachable from several matched atoms. Empty outer shells are retained. This
+operation can therefore be embedded in a larger loop over molecules and query
+embeddings without recomputing the inner shells for each radius.
 
 ## Reactions
 Enable reactions via

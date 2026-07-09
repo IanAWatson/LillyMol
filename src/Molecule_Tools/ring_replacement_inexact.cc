@@ -1554,7 +1554,7 @@ Options::Process(Molecule& m,
     return 0;
   }
 
-  cerr << "Rings in substituents " << substituents.nrings() << '\n';
+  // cerr << "Rings in substituents " << substituents.nrings() << '\n';
 
   if (substituents.nrings() == 1) {
     return ReplaceSingleRing(m, *substituents[0], replacement, output);
@@ -1573,7 +1573,7 @@ Options::ReplaceRingSystem(Molecule& m,
   m.add_molecule(&replacement.molecule());
 
   int rc;
-  cerr << "_preserve_ring_substitutions " << _preserve_ring_substitutions << '\n';
+  // cerr << "_preserve_ring_substitutions " << _preserve_ring_substitutions << '\n';
   if (_preserve_ring_substitutions && substituents.number_rids() > 1) {
     rc = ReplaceRingSystemPreserveRingSubstitution(m, initial_matoms, substituents, replacement, output);
   } else {

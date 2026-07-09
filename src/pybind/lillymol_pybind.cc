@@ -1,5 +1,6 @@
 #include <algorithm>
 #include <iostream>
+#include <queue>
 #include <sstream>
 #include <string>
 
@@ -166,6 +167,55 @@ ToScaffold(Molecule& m) {
   }
 
   return m.remove_atoms(spinach.get(), 1);
+}
+
+static std::vector<Set_of_Atoms>
+AtomsByRadius(const Molecule& m, const Set_of_Atoms& starting_atoms,
+              int max_radius) {
+  if (max_radius < 0) {
+    throw py::value_error("max_radius must be non-negative");
+  }
+
+  std::vector<Set_of_Atoms> result(max_radius + 1);
+  const int matoms = m.natoms();
+  std::vector<int> distance(matoms, -1);
+  std::queue<atom_number_t> to_process;
+
+  for (atom_number_t atom : starting_atoms) {
+    if (atom < 0 || atom >= matoms) {
+      throw py::value_error("starting atom is outside the molecule");
+    }
+    if (distance[atom] >= 0) {
+      continue;
+    }
+
+    distance[atom] = 0;
+    result[0].add(atom);
+    to_process.push(atom);
+  }
+
+  while (!to_process.empty()) {
+    const atom_number_t atom = to_process.front();
+    to_process.pop();
+
+    const int next_radius = distance[atom] + 1;
+    if (next_radius > max_radius) {
+      continue;
+    }
+
+    for (const Bond* bond : m[atom]) {
+      const atom_number_t other = bond->other(atom);
+      if (distance[other] >= 0) {
+        continue;
+      }
+
+      distance[other] = next_radius;
+      result[next_radius].add(other);
+      to_process.push(other);
+    }
+  }
+
+  return result;
 }
 
 // Ultimately we want kSingleBond to be used as the LillyMol name for
@@ -907,6 +957,11 @@ PYBIND11_MODULE(lillymol, m)
                     return result;
                   },
                   "Return all the atoms found looking down the bond from a1 to a2"
+                )
+
+                .def("atoms_by_radius", &AtomsByRadius,
+                  py::arg("starting_atoms"), py::arg("max_radius"),
+                  "Atoms grouped by minimum bond distance from starting_atoms"
                 )
 
                 .def("reset_atom_map_numbers", static_cast<void (Molecule::*)()>(&Molecule::reset_all_atom_map_numbers), "Reset atom map numbers")

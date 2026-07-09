@@ -2602,6 +2602,7 @@ cc_binary(
         "//Foundational/accumulator",
         "//Foundational/cmdline:iwcmdline",
         "//Foundational/iw_tdt",
+        "//Foundational/iwstring:string_with_commas",
         "//Foundational/iwaray",
         "//Foundational/iwmisc",
         "//Molecule_Lib:iwmolecule",

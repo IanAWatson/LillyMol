@@ -55,10 +55,13 @@ class TestRingReplacement(absltest.TestCase):
     rr.set_min_support_requirement(100)
     self.assertGreater(rr.read_replacement_rings("${LILLYMOL_HOME}/contrib/test/ring_replacement/6a.smi"), 0)
     products1 = rr.process(m)
-    self.assertLen(products1, 7)   # The parent is included in the output
+    self.assertLen(products1, 7)   # Seven generated products; the parent is not included
     products2 = rr.process(m)
-    # Contains only the starting molecule.
+    # All products were seen during the previous call.
     self.assertEmpty(products2)
+    rr.clear_unique_molecule_cache()
+    products3 = rr.process(m)
+    self.assertLen(products3, 7)
 
 if __name__ == '__main__':
   absltest.main()

@@ -41,6 +41,48 @@
       "args": [
            " -y -S output #{indir}/in.smi"
       ]
+    },
+
+    {
+      "name": "graph",
+      "args": [
+           " -a -S output #{indir}/in.smi"
+      ]
+    },
+
+    {
+      "name": "graph_hcount",
+      "args": [
+           " -a -a -S output #{indir}/in.smi"
+      ]
+    },
+
+    {
+      "name": "directional_bonds",
+      "args": [
+           " -x -S output #{indir}/in.smi"
+      ]
+    },
+
+    {
+      "name": "count_column",
+      "args": [
+           " -X num -S output #{indir}/in.smi"
+      ]
+    },
+
+    {
+      "name": "proto_output",
+      "args": [
+           " -X proto=groups.textproto #{indir}/in.smi"
+      ]
+    },
+
+    {
+      "name": "single_pass",
+      "args": [
+           " -f -S - #{indir}/in.smi"
+      ]
     }
 
 

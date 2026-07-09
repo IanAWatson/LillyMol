@@ -304,6 +304,10 @@ PYBIND11_MODULE(lillymol_tools, m)
     .def("set_unique_molecules_only", &ring_replacement::RingReplacement::set_unique_molecules_only,
          "only unique products will be generated"
     )
+    .def("clear_unique_molecule_cache",
+         &ring_replacement::RingReplacement::clear_unique_molecule_cache,
+         "Clear products retained for duplicate suppression"
+    )
     .def("set_min_support_requirement", &ring_replacement::RingReplacement::set_min_support_requirement,
          "min number of examples needed for a replacement ring to be used"
     )
@@ -316,7 +320,7 @@ PYBIND11_MODULE(lillymol_tools, m)
       [](ring_replacement::RingReplacement& rp, const std::string& fname)->uint32_t {
         return rp.ReadReplacementRings(fname);
       },
-      "Add a set of replacement rings, /path/to/lillymol/data/ring_replacement.6a.smi"
+      "Add a set of replacement rings, /path/to/lillymol/data/ring_replacement/rings_6a.smi"
     )
     .def("number_replacement_rings", &ring_replacement::RingReplacement::number_replacement_rings,
          "Return the number of replacement rings read by read_replacement_rings"

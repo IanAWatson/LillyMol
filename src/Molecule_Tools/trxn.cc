@@ -1582,6 +1582,17 @@ ReadReaction(IWString& fname, IWReaction& rxn,
   return 1;
 }
 
+static void
+DisplayDashzOptions(int rc) {
+  cerr << R"(The following -z qualifiers are recognised
+ -z i                   ignore scaffolds not reacting.
+ -z w                   write non reaction scaffolds to normal output.
+ -z write=<fname>       write non reacting scaffolds to <fname>.
+)";
+
+  ::exit(rc);
+}
+
 static int
 trxn(int argc, char** argv) {
   Command_Line cl(argc, argv, "r:i:vS:A:E:n:o:z:ZX:t:m:C:M:V:g:y:fIlLW:ukJ:D:P:dK:R:");
@@ -2433,9 +2444,11 @@ trxn(int argc, char** argv) {
         if (verbose) {
           cerr << "Scaffolds not reacting written to '" << z << "'\n";
         }
+      } else if (z == "help") {
+        DisplayDashzOptions(0);
       } else {
         cerr << "Unrecognised -z directive '" << z << "'\n";
-        usage(19);
+        DisplayDashzOptions(1);
       }
     }
   }

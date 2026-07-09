@@ -178,6 +178,7 @@ LocalOptions::Preprocess(Molecule& m) {
 
   if (_remove_chirality) {
     m.remove_all_chiral_centres();
+    m.revert_all_directional_bonds_to_non_directional();
   }
 
   if (_chemical_standardisation.active()) {
@@ -328,6 +329,8 @@ R1-R2-R3 the output will be {R1 R2 R3 R1-R2 R2-R3 R1-R2-R3}.
  -W <fname>             write dicer_data::DicerFragment data on all scaffolds.
  -p                     write the parent molecule.
  -y                     output as scaffolds::ScaffoldData textproto.
+ -c                     remove all chirality.
+ -l                     reduce to largest fragment.
  -v                     verbose output.
 )";
 

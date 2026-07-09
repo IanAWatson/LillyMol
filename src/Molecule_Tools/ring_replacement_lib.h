@@ -133,6 +133,9 @@ class RingReplacement {
     void set_unique_molecules_only(bool s) {
       _unique_molecules_only = s;
     }
+    void clear_unique_molecule_cache() {
+      _seen.clear();
+    }
     void set_min_support_requirement(uint32_t s);
     void set_max_formula_difference(uint32_t s); 
     // The python binding only supports one set of replacement rings.

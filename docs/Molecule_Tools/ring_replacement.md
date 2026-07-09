@@ -16,6 +16,7 @@
 - [Building replacement-ring collections](#building-replacement-ring-collections)
   - [Extracting rings](#extracting-rings-with-ring_extraction)
   - [Replacement-file naming](#replacement-file-naming)
+  - [Administrator wrapper](#administrator-wrapper)
   - [File format](#file-format)
   - [Spiro systems and exocyclic double bonds](#spiro-systems-and-exocyclic-double-bonds)
   - [Extracting several source collections](#extracting-several-source-collections)
@@ -616,6 +617,39 @@ With this convention, `Ar` means aromatic and `Al` means aliphatic:
 The distributed data directory includes `to_mac.sh` and `to_linux.sh` for
 converting an existing set of filenames. These scripts rename files; they do not
 change their contents.
+
+### Administrator wrapper
+
+`contrib/bin/ring_replacement.py` is a small front-end intended for administrators
+who maintain replacement-ring collections. It is not the primary user interface
+for ring replacement. The wrapper lets an administrator choose a collection and
+ring class by logical name and then constructs the corresponding `-R` arguments
+for `ring_replacement`.
+
+The `--ring` option uses canonical logical ring names regardless of the local
+filesystem naming convention. Names are one to three component descriptors, each
+consisting of a ring size followed by `a` for aromatic or `A` for aliphatic.
+Components must be sorted by increasing ring size; when sizes are equal, `a`
+precedes `A`. Examples include:
+
+| Input | Meaning | Status |
+| --- | --- | --- |
+| `6a` | six-membered aromatic ring | canonical |
+| `5a6a` | fused aromatic five- and six-membered rings | canonical |
+| `6a6A` | aromatic and aliphatic six-membered rings | canonical |
+| `6A6a` | same rings as `6a6A` | rejected; wrapper suggests `6a6A` |
+| `6a5a` | same rings as `5a6a` | rejected; wrapper suggests `5a6a` |
+
+On a case-sensitive filesystem, the wrapper looks for files such as
+`<collection>_6a.smi` and `<collection>_6a6A.smi`. On a macOS-style collection
+using `Ar`/`Al` filenames, the same user input is translated automatically; for
+example `--ring 6a6A` resolves to `<collection>_6Ar6Al.smi`. The wrapper probes
+for the common six-membered aromatic collection, `6a` or `6Ar`, to determine the
+preferred filename convention, with a fallback based on the files present.
+
+`--list-rings` reports canonical logical names, even if the underlying files use
+`Ar`/`Al` names. This keeps administrator commands the same on Linux and macOS
+collections.
 
 ### File format
 

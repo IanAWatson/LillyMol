@@ -29,6 +29,11 @@ This release includes first steps towards more extensive documentation of LillyM
 see the [docs](/docs) directory. More work is needed on this front. Most parts
 of LillyMol have been feature stable for a long time.
 
+## Notes for AI/code agents
+
+This repository includes [AGENTS.md](AGENTS.md), a short orientation file for
+AI/code agents and new contributors working on LillyMol source, tests, and docs.
+
 ## Python
 This release include a python interface to LillyMol via pybind11. This first release
 includes most Molecule related functionality, substructure searching and reaction

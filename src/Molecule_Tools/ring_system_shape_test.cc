@@ -1,0 +1,244 @@
+#include "Molecule_Tools/ring_system_shape.h"
+
+#include <memory>
+
+#include "gmock/gmock.h"
+#include "gtest/gtest.h"
+
+namespace {
+
+using ring_system_shape::AnalyseRingSystemShape;
+using ring_system_shape::RingSystemShape;
+using ring_system_shape::RingSystemShapeClass;
+
+RingSystemShape
+AnalyseFirstRingSystem(Molecule& m) {
+  std::unique_ptr<int[]> ring_system_membership = std::make_unique<int[]>(m.natoms());
+  const int number_ring_systems =
+      m.label_atoms_by_ring_system_including_spiro_fused(ring_system_membership.get());
+  EXPECT_GT(number_ring_systems, 0);
+
+  RingSystemShape result;
+  EXPECT_TRUE(AnalyseRingSystemShape(m, ring_system_membership.get(), 1, result));
+  return result;
+}
+
+const ring_system_shape::RingSystemSpan*
+FindRingSystemSpan(const RingSystemShape& shape, atom_number_t from) {
+  for (const ring_system_shape::RingSystemSpan& ring_system_span :
+       shape.ring_system_spans) {
+    if (ring_system_span.from == from) {
+      return &ring_system_span;
+    }
+  }
+
+  return nullptr;
+}
+
+TEST(RingSystemShape, TerminalBenzeneIsNotApplicable) {
+  Molecule m;
+  ASSERT_TRUE(m.build_from_smiles("Cc1ccccc1"));
+
+  const RingSystemShape shape = AnalyseFirstRingSystem(m);
+
+  EXPECT_EQ(shape.shape_class, RingSystemShapeClass::kNotApplicable);
+  EXPECT_EQ(shape.attachments.size(), 1u);
+  EXPECT_EQ(shape.ring_system_spans.size(), 1u);
+  EXPECT_EQ(shape.ring_system_spans[0].max_separation, 3);
+  EXPECT_EQ(shape.ring_system_spans[0].farthest_atoms.size(), 1u);
+}
+
+TEST(RingSystemShape, OrthoBenzeneIsNotRodLike) {
+  Molecule m;
+  ASSERT_TRUE(m.build_from_smiles("Cc1ccccc1C"));
+
+  const RingSystemShape shape = AnalyseFirstRingSystem(m);
+
+  EXPECT_EQ(shape.shape_class, RingSystemShapeClass::kNotRodLike);
+  EXPECT_EQ(shape.attachments.size(), 2u);
+  EXPECT_EQ(shape.ring_system_spans.size(), 2u);
+  EXPECT_EQ(shape.observed_separation, 1);
+  EXPECT_EQ(shape.rod_deficit, 2);
+  for (const ring_system_shape::RingSystemSpan& ring_system_span :
+       shape.ring_system_spans) {
+    EXPECT_EQ(ring_system_span.max_separation, 3);
+  }
+}
+
+TEST(RingSystemShape, MetaBenzeneIsNotRodLike) {
+  Molecule m;
+  ASSERT_TRUE(m.build_from_smiles("Cc1cccc(C)c1"));
+
+  const RingSystemShape shape = AnalyseFirstRingSystem(m);
+
+  EXPECT_EQ(shape.shape_class, RingSystemShapeClass::kNotRodLike);
+  EXPECT_EQ(shape.attachments.size(), 2u);
+  EXPECT_EQ(shape.ring_system_spans.size(), 2u);
+  EXPECT_EQ(shape.observed_separation, 2);
+  EXPECT_EQ(shape.rod_deficit, 1);
+}
+
+TEST(RingSystemShape, ParaBenzeneIsRodLike) {
+  Molecule m;
+  ASSERT_TRUE(m.build_from_smiles("Cc1ccc(C)cc1"));
+
+  const RingSystemShape shape = AnalyseFirstRingSystem(m);
+
+  EXPECT_EQ(shape.shape_class, RingSystemShapeClass::kRodLike);
+  EXPECT_EQ(shape.observed_separation, 3);
+  EXPECT_EQ(shape.rod_deficit, 0);
+  ASSERT_EQ(shape.attachments.size(), 2u);
+  ASSERT_EQ(shape.ring_system_spans.size(), 2u);
+
+  const atom_number_t a1 = shape.attachments[0].ring_atom;
+  const atom_number_t a2 = shape.attachments[1].ring_atom;
+
+  const ring_system_shape::RingSystemSpan* span1 = FindRingSystemSpan(shape, a1);
+  ASSERT_NE(span1, nullptr);
+  EXPECT_EQ(span1->max_separation, 3);
+  EXPECT_THAT(span1->farthest_atoms, testing::ElementsAre(a2));
+
+  const ring_system_shape::RingSystemSpan* span2 = FindRingSystemSpan(shape, a2);
+  ASSERT_NE(span2, nullptr);
+  EXPECT_EQ(span2->max_separation, 3);
+  EXPECT_THAT(span2->farthest_atoms, testing::ElementsAre(a1));
+}
+
+TEST(RingSystemShape, TrisubstitutedBenzeneIsMultiSubstituted) {
+  Molecule m;
+  ASSERT_TRUE(m.build_from_smiles("Cc1cc(C)cc(C)c1"));
+
+  const RingSystemShape shape = AnalyseFirstRingSystem(m);
+
+  EXPECT_EQ(shape.shape_class, RingSystemShapeClass::kMultiSubstituted);
+  EXPECT_EQ(shape.attachments.size(), 3u);
+  EXPECT_EQ(shape.ring_system_spans.size(), 3u);
+}
+
+TEST(RingSystemShape, MultipleSubstituentsOnOneRingAtomCountAsOneExitPoint) {
+  Molecule m;
+  ASSERT_TRUE(m.build_from_smiles("C1(C)(F)CCCCC1"));
+
+  const RingSystemShape shape = AnalyseFirstRingSystem(m);
+
+  EXPECT_EQ(shape.shape_class, RingSystemShapeClass::kNotApplicable);
+  EXPECT_EQ(shape.attachments.size(), 2u);
+  EXPECT_EQ(shape.ring_system_spans.size(), 1u);
+  EXPECT_EQ(shape.ring_system_spans[0].max_separation, 3);
+}
+
+TEST(RingSystemShape, TerminalCarbonylOxygenIsNotAnExitPoint) {
+  Molecule m;
+  ASSERT_TRUE(m.build_from_smiles("O=C1CCCCC1"));
+
+  const RingSystemShape shape = AnalyseFirstRingSystem(m);
+
+  EXPECT_EQ(shape.shape_class, RingSystemShapeClass::kNotApplicable);
+  EXPECT_EQ(shape.attachments.size(), 0u);
+  EXPECT_EQ(shape.ring_system_spans.size(), 0u);
+}
+
+TEST(RingSystemShape, TerminalCarbonylDoesNotDistortRodDeficit) {
+  Molecule m;
+  ASSERT_TRUE(m.build_from_smiles("CC1CCC(C)CC1=O"));
+
+  const RingSystemShape shape = AnalyseFirstRingSystem(m);
+
+  EXPECT_EQ(shape.shape_class, RingSystemShapeClass::kRodLike);
+  EXPECT_EQ(shape.attachments.size(), 2u);
+  EXPECT_EQ(shape.ring_system_spans.size(), 2u);
+  EXPECT_EQ(shape.observed_separation, 3);
+  EXPECT_EQ(shape.rod_deficit, 0);
+}
+
+TEST(RingSystemShape, BiphenylRingAttachmentIsExternal) {
+  Molecule m;
+  ASSERT_TRUE(m.build_from_smiles("c1ccccc1-c1ccccc1"));
+
+  std::unique_ptr<int[]> ring_system_membership = std::make_unique<int[]>(m.natoms());
+  const int number_ring_systems =
+      m.label_atoms_by_ring_system_including_spiro_fused(ring_system_membership.get());
+  ASSERT_EQ(number_ring_systems, 2);
+
+  RingSystemShape shape1;
+  ASSERT_TRUE(AnalyseRingSystemShape(m, ring_system_membership.get(), 1, shape1));
+  EXPECT_EQ(shape1.shape_class, RingSystemShapeClass::kNotApplicable);
+  EXPECT_EQ(shape1.attachments.size(), 1u);
+  EXPECT_EQ(shape1.ring_system_spans.size(), 1u);
+  EXPECT_EQ(ring_system_membership[shape1.attachments[0].outside_atom], 2);
+
+  RingSystemShape shape2;
+  ASSERT_TRUE(AnalyseRingSystemShape(m, ring_system_membership.get(), 2, shape2));
+  EXPECT_EQ(shape2.shape_class, RingSystemShapeClass::kNotApplicable);
+  EXPECT_EQ(shape2.attachments.size(), 1u);
+  EXPECT_EQ(shape2.ring_system_spans.size(), 1u);
+  EXPECT_EQ(ring_system_membership[shape2.attachments[0].outside_atom], 1);
+}
+
+TEST(RingSystemShape, InvalidRingSystemIdFails) {
+  Molecule m;
+  ASSERT_TRUE(m.build_from_smiles("Cc1ccccc1"));
+  std::unique_ptr<int[]> ring_system_membership = std::make_unique<int[]>(m.natoms());
+  m.label_atoms_by_ring_system_including_spiro_fused(ring_system_membership.get());
+
+  RingSystemShape shape;
+  EXPECT_FALSE(AnalyseRingSystemShape(m, ring_system_membership.get(), 2, shape));
+  EXPECT_EQ(shape.shape_class, RingSystemShapeClass::kInvalid);
+}
+
+TEST(RingSystemShape, Adamantane3) {
+  Molecule m;
+  ASSERT_TRUE(m.build_from_smiles("CC1C3CC2CC(C)(CC1C2)C3"));
+  std::unique_ptr<int[]> ring_system_membership = std::make_unique<int[]>(m.natoms());
+  int number_ring_systems =
+      m.label_atoms_by_ring_system_including_spiro_fused(ring_system_membership.get());
+  ASSERT_EQ(number_ring_systems, 1);
+
+  RingSystemShape shape1;
+  ASSERT_TRUE(AnalyseRingSystemShape(m, ring_system_membership.get(), 1, shape1));
+  EXPECT_EQ(shape1.shape_class, RingSystemShapeClass::kNotRodLike);
+  EXPECT_EQ(shape1.attachments.size(), 2u);
+  EXPECT_EQ(shape1.ring_system_spans.size(), 2u);
+  EXPECT_EQ(ring_system_membership[shape1.attachments[0].ring_atom], 1);
+  EXPECT_EQ(ring_system_membership[shape1.attachments[0].outside_atom], 0);
+  EXPECT_EQ(ring_system_membership[shape1.attachments[1].ring_atom], 1);
+  EXPECT_EQ(ring_system_membership[shape1.attachments[1].outside_atom], 0);
+  EXPECT_EQ(shape1.attachments[0].ring_atom, 1);
+  EXPECT_EQ(shape1.attachments[0].outside_atom, 0);
+  EXPECT_EQ(shape1.attachments[1].ring_atom, 6);
+  EXPECT_EQ(shape1.attachments[1].outside_atom, 7);
+
+  EXPECT_EQ(shape1.ring_system_spans.size(), 2u);
+  EXPECT_EQ(shape1.ring_system_spans[0].from, 1);
+  EXPECT_EQ(shape1.ring_system_spans[0].max_separation, 4);
+}
+
+TEST(RingSystemShape, Adamantane4) {
+  Molecule m;
+  ASSERT_TRUE(m.build_from_smiles("CC1C3CC2C(C)C(CC1C2)C3"));
+  std::unique_ptr<int[]> ring_system_membership = std::make_unique<int[]>(m.natoms());
+  int number_ring_systems =
+      m.label_atoms_by_ring_system_including_spiro_fused(ring_system_membership.get());
+  ASSERT_EQ(number_ring_systems, 1);
+
+  RingSystemShape shape1;
+  ASSERT_TRUE(AnalyseRingSystemShape(m, ring_system_membership.get(), 1, shape1));
+  EXPECT_EQ(shape1.shape_class, RingSystemShapeClass::kRodLike);
+  EXPECT_EQ(shape1.attachments.size(), 2u);
+  EXPECT_EQ(shape1.ring_system_spans.size(), 2u);
+  EXPECT_EQ(ring_system_membership[shape1.attachments[0].ring_atom], 1);
+  EXPECT_EQ(ring_system_membership[shape1.attachments[0].outside_atom], 0);
+  EXPECT_EQ(ring_system_membership[shape1.attachments[1].ring_atom], 1);
+  EXPECT_EQ(ring_system_membership[shape1.attachments[1].outside_atom], 0);
+
+  EXPECT_EQ(shape1.attachments[0].ring_atom, 1);
+  EXPECT_EQ(shape1.attachments[0].outside_atom, 0);
+  EXPECT_EQ(shape1.attachments[1].ring_atom, 5);
+  EXPECT_EQ(shape1.attachments[1].outside_atom, 6);
+
+  EXPECT_EQ(shape1.ring_system_spans.size(), 2u);
+  EXPECT_EQ(shape1.ring_system_spans[0].from, 1);
+  EXPECT_EQ(shape1.ring_system_spans[0].max_separation, 4);
+}
+
+}  // namespace

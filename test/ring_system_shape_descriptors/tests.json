@@ -1,0 +1,17 @@
+{
+  "executable": "ring_system_shape_descriptors",
+  "test": [
+    {
+      "name": "default",
+      "args": [
+        "#{indir}/input.smi"
+      ]
+    },
+    {
+      "name": "remove_single_atom_decorations",
+      "args": [
+        "-x #{indir}/input.smi"
+      ]
+    }
+  ]
+}

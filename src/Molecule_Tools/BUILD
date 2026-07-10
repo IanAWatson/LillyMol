@@ -2341,6 +2341,19 @@ cc_library(
 #)
 
 cc_binary(
+    name = "ring_system_shape_descriptors",
+    srcs = [
+        "ring_system_shape_descriptors.cc",
+    ],
+    deps = [
+        ":ring_system_shape",
+        "//Foundational/cmdline:iwcmdline",
+        "//Molecule_Lib:iwmolecule",
+        "//Molecule_Lib:moleculeio",
+    ],
+)
+
+cc_binary(
     name = "safe_generate",
     srcs = [
         "SAFE_generate.cc",
@@ -3286,6 +3299,19 @@ cc_library(
 )
 
 cc_library(
+    name = "ring_system_shape",
+    srcs = [
+        "ring_system_shape.cc",
+    ],
+    hdrs = [
+        "ring_system_shape.h",
+    ],
+    deps = [
+        "//Molecule_Lib:iwmolecule",
+    ],
+)
+
+cc_library(
     name = "linear_path_fingerprint",
     srcs = [
         "linear_path_fingerprint.cc",
@@ -3888,6 +3914,21 @@ cc_test(
         ":ring_ext_rep",
         "//Molecule_Lib:moleculeio",
         "@com_google_protobuf//:protobuf",
+        "@googletest//:gtest",
+        "@googletest//:gtest_main",
+    ],
+)
+
+cc_test(
+    name = "ring_system_shape_test",
+    timeout = "short",
+    srcs = [
+        "ring_system_shape_test.cc",
+    ],
+    deps = [
+        ":ring_system_shape",
+        "//Molecule_Lib:iwmolecule",
+        "//Molecule_Lib:moleculeio",
         "@googletest//:gtest",
         "@googletest//:gtest_main",
     ],

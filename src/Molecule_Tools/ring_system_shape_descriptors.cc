@@ -6,6 +6,8 @@
 #include <vector>
 
 #include "Foundational/cmdline/cmdline.h"
+#include "Foundational/iwmisc/misc.h"
+#include "Foundational/iwstring/iwstring.h"
 
 #include "Molecule_Lib/aromatic.h"
 #include "Molecule_Lib/istream_and_type.h"
@@ -20,6 +22,8 @@ using std::cerr;
 
 using molecule_processing::MoleculePreprocessing;
 using ring_system_shape::AnalyseRingSystemShape;
+using ring_system_shape::NonRingBranchPointCount;
+using ring_system_shape::RingAtomBranchPointCount;
 using ring_system_shape::RingSystemShape;
 using ring_system_shape::RingSystemShapeClass;
 
@@ -40,10 +44,12 @@ For each molecule, ring systems are labelled and each ring system is classified
 by the number and placement of meaningful exit points.
 
 Output columns are:
-  Name nringsys nringsys_terminal nringsys_applicable nringsys_rodlike nringsys_not_rodlike nringsys_multisub nringsys_invalid rodlike_molecule rod_deficit_min rod_deficit_max rod_deficit_ave
+  Name nringsys nringsys_terminal nringsys_applicable nringsys_rodlike nringsys_not_rodlike nringsys_multisub nringsys_invalid non_ring_branch_count ring_atom_branch_count rodlike_molecule rod_deficit_min rod_deficit_max rod_deficit_ave
 
 Options:
  -x           ignore terminal single-atom ring substituents when larger substituents exist
+ -R <fname>   write rod-like molecules as smiles and identifier
+ -N <fname>   write non-rod-like molecules as smiles and identifier
  -o <sep>     output separator, recognised names include tab and space
  -i <type>    input type
  -g ...       chemical standardisation
@@ -66,6 +72,8 @@ struct RingSystemShapeDescriptors {
   int not_rod_like = 0;
   int multi_substituted = 0;
   int invalid = 0;
+  int non_ring_branch_count = 0;
+  int ring_atom_branch_count = 0;
 
   int rod_deficit_count = 0;
   int rod_deficit_min = 0;
@@ -100,7 +108,7 @@ struct RingSystemShapeDescriptors {
       return 0.0f;
     }
 
-    return static_cast<float>(rod_deficit_sum) / static_cast<float>(rod_deficit_count);
+    return iwmisc::Fraction<float>(rod_deficit_sum, rod_deficit_count);
   }
 
   int
@@ -109,7 +117,8 @@ struct RingSystemShapeDescriptors {
       return 0;
     }
 
-    return not_rod_like == 0 && multi_substituted == 0 && invalid == 0;
+    return not_rod_like == 0 && multi_substituted == 0 && invalid == 0 &&
+           non_ring_branch_count == 0 && ring_atom_branch_count == 0;
   }
 };
 
@@ -123,8 +132,18 @@ class Options {
 
   int _remove_terminal_single_atom_substituents = 0;
 
+  IWString_and_File_Descriptor _stream_for_rodlike;
+  IWString_and_File_Descriptor _stream_for_non_rodlike;
+
   uint64_t _molecules_read = 0;
   uint64_t _atoms_removed = 0;
+  uint64_t _rodlike_molecules_written = 0;
+  uint64_t _non_rodlike_molecules_written = 0;
+
+  uint64_t _total_ring_systems = 0;
+  uint64_t _rodlike_molecules = 0;
+  uint64_t _molecules_with_non_ring_branching = 0;
+  uint64_t _molecules_with_ring_atom_branching = 0;
 
  public:
   Options();
@@ -140,9 +159,14 @@ class Options {
 
   int RemoveTerminalSingleAtomSubstituents(Molecule& m);
 
+  int WriteIfRequested(const Molecule& m, const IWString& smiles,
+                       const RingSystemShapeDescriptors& descriptors);
+
   int WriteHeader(IWString_and_File_Descriptor& output) const;
 
   int Process(Molecule& m, IWString_and_File_Descriptor& output);
+
+  void FlushOutputStreams();
 
   int Report(std::ostream& output) const;
 };
@@ -170,6 +194,34 @@ Options::Initialise(Command_Line& cl) {
 
   if (cl.option_present('x')) {
     _remove_terminal_single_atom_substituents = 1;
+    if (_verbose) {
+      cerr << "Terminal single atom substuents removed\n";
+    }
+  }
+
+  if (cl.option_present('R')) {
+    IWString fname = cl.string_value('R');
+    fname.EnsureEndsWith(".smi");
+    if (!_stream_for_rodlike.open(fname.null_terminated_chars())) {
+      cerr << "Options::Initialise:cannot open rod-like output '" << fname << "'\n";
+      return 0;
+    }
+
+    if (_verbose) {
+      cerr << "Rod-like molecules written to '" << fname << "'\n";
+    }
+  }
+
+  if (cl.option_present('N')) {
+    IWString fname = cl.string_value('N');
+    fname.EnsureEndsWith(".smi");
+    if (!_stream_for_non_rodlike.open(fname.null_terminated_chars())) {
+      cerr << "Options::Initialise:cannot open non-rod-like output '" << fname << "'\n";
+      return 0;
+    }
+    if (_verbose) {
+      cerr << "non-rod-like molecules written to '" << fname << "'\n";
+    }
   }
 
   return 1;
@@ -244,16 +296,47 @@ Options::Preprocess(Molecule& m) {
     _preprocessing.Process(m);
   }
 
-  if (_remove_terminal_single_atom_substituents) {
-    RemoveTerminalSingleAtomSubstituents(m);
-  }
-
   return 1;
+}
+
+void
+Options::FlushOutputStreams() {
+  if (_stream_for_rodlike.is_open()) {
+    _stream_for_rodlike.flush();
+  }
+  if (_stream_for_non_rodlike.is_open()) {
+    _stream_for_non_rodlike.flush();
+  }
 }
 
 int
 Options::Report(std::ostream& output) const {
   output << "Processed " << _molecules_read << " molecules\n";
+  if (_molecules_read == 0) {
+    return 1;
+  }
+
+  output << _total_ring_systems << " ring systems, "
+         << iwmisc::Fraction<float>(_total_ring_systems, _molecules_read)
+         << " per molecule\n";
+  output << _rodlike_molecules << " molecules classified as rod-like, fraction "
+         << iwmisc::Fraction<float>(_rodlike_molecules, _molecules_read) << '\n';
+  output << _molecules_with_non_ring_branching
+         << " molecules with non-ring branch points, fraction "
+         << iwmisc::Fraction<float>(_molecules_with_non_ring_branching, _molecules_read)
+         << '\n';
+  output << _molecules_with_ring_atom_branching
+         << " molecules with ring-atom branch points, fraction "
+         << iwmisc::Fraction<float>(_molecules_with_ring_atom_branching, _molecules_read)
+         << '\n';
+
+  if (_rodlike_molecules_written) {
+    output << "Wrote " << _rodlike_molecules_written << " rod-like molecules\n";
+  }
+  if (_non_rodlike_molecules_written) {
+    output << "Wrote " << _non_rodlike_molecules_written << " non-rod-like molecules\n";
+  }
+
   if (_remove_terminal_single_atom_substituents) {
     output << "Removed " << _atoms_removed << " terminal single atom substituents\n";
   }
@@ -261,8 +344,11 @@ Options::Report(std::ostream& output) const {
 }
 
 RingSystemShapeDescriptors
-ComputeRingSystemShapeDescriptors(Molecule& m) {
+ComputeRingSystemShapeDescriptors(Molecule& m, int non_ring_branch_count,
+                                  int ring_atom_branch_count) {
   RingSystemShapeDescriptors result;
+  result.non_ring_branch_count = non_ring_branch_count;
+  result.ring_atom_branch_count = ring_atom_branch_count;
 
   const int matoms = m.natoms();
   if (matoms == 0) {
@@ -313,15 +399,37 @@ ComputeRingSystemShapeDescriptors(Molecule& m) {
 }
 
 int
+Options::WriteIfRequested(const Molecule& m, const IWString& smiles,
+                          const RingSystemShapeDescriptors& descriptors) {
+  const int is_rodlike =
+      descriptors.RodLikeMolecule() && descriptors.non_ring_branch_count == 0;
+
+  if (is_rodlike && _stream_for_rodlike.is_open()) {
+    _stream_for_rodlike << smiles << ' ' << m.name() << '\n';
+    _stream_for_rodlike.write_if_buffer_holds_more_than(4096);
+    ++_rodlike_molecules_written;
+  }
+
+  if (!is_rodlike && _stream_for_non_rodlike.is_open()) {
+    _stream_for_non_rodlike << smiles << ' ' << m.name() << '\n';
+    _stream_for_non_rodlike.write_if_buffer_holds_more_than(4096);
+    ++_non_rodlike_molecules_written;
+  }
+
+  return 1;
+}
+
+int
 Options::WriteHeader(IWString_and_File_Descriptor& output) const {
   output << "Name" << _output_separator << "nringsys" << _output_separator
          << "nringsys_terminal" << _output_separator << "nringsys_applicable"
          << _output_separator << "nringsys_rodlike" << _output_separator
          << "nringsys_not_rodlike" << _output_separator << "nringsys_multisub"
          << _output_separator << "nringsys_invalid" << _output_separator
-         << "rodlike_molecule" << _output_separator << "rod_deficit_min"
-         << _output_separator << "rod_deficit_max" << _output_separator
-         << "rod_deficit_ave\n";
+         << "non_ring_branch_count" << _output_separator << "ring_atom_branch_count"
+         << _output_separator << "rodlike_molecule" << _output_separator
+         << "rod_deficit_min" << _output_separator << "rod_deficit_max"
+         << _output_separator << "rod_deficit_ave\n";
   return 1;
 }
 
@@ -329,14 +437,48 @@ int
 Options::Process(Molecule& m, IWString_and_File_Descriptor& output) {
   ++_molecules_read;
 
-  const RingSystemShapeDescriptors descriptors = ComputeRingSystemShapeDescriptors(m);
+  IWString smiles;
+  if (_stream_for_rodlike.is_open() || _stream_for_non_rodlike.is_open()) {
+    smiles = m.smiles();
+  }
+
+  const int matoms = m.natoms();
+  std::unique_ptr<int[]> ring_system_membership = std::make_unique<int[]>(matoms);
+  m.label_atoms_by_ring_system_including_spiro_fused(ring_system_membership.get());
+
+  const int non_ring_branch_count =
+      NonRingBranchPointCount(m, ring_system_membership.get());
+  const int ring_atom_branch_count =
+      RingAtomBranchPointCount(m, ring_system_membership.get());
+
+  if (_remove_terminal_single_atom_substituents) {
+    RemoveTerminalSingleAtomSubstituents(m);
+  }
+
+  const RingSystemShapeDescriptors descriptors =
+      ComputeRingSystemShapeDescriptors(m, non_ring_branch_count, ring_atom_branch_count);
+
+  _total_ring_systems += descriptors.number_ring_systems;
+  if (descriptors.RodLikeMolecule()) {
+    ++_rodlike_molecules;
+  }
+  if (descriptors.non_ring_branch_count > 0) {
+    ++_molecules_with_non_ring_branching;
+  }
+  if (descriptors.ring_atom_branch_count > 0) {
+    ++_molecules_with_ring_atom_branching;
+  }
+
+  WriteIfRequested(m, smiles, descriptors);
 
   output << m.name() << _output_separator << descriptors.number_ring_systems
          << _output_separator << descriptors.terminal << _output_separator
          << descriptors.applicable << _output_separator << descriptors.rod_like
          << _output_separator << descriptors.not_rod_like << _output_separator
          << descriptors.multi_substituted << _output_separator << descriptors.invalid
-         << _output_separator << descriptors.RodLikeMolecule() << _output_separator
+         << _output_separator << descriptors.non_ring_branch_count << _output_separator
+         << descriptors.ring_atom_branch_count << _output_separator
+         << descriptors.RodLikeMolecule() << _output_separator
          << descriptors.rod_deficit_min << _output_separator
          << descriptors.rod_deficit_max << _output_separator
          << descriptors.AverageRodDeficit() << '\n';
@@ -393,7 +535,7 @@ RingSystemShapeDescriptors(Options& options, const char* fname, FileType input_t
 
 int
 RingSystemShapeDescriptors(int argc, char** argv) {
-  Command_Line cl(argc, argv, "vE:A:lcg:i:o:x");
+  Command_Line cl(argc, argv, "vE:A:lcg:i:o:xR:N:");
 
   if (cl.unrecognised_options_encountered()) {
     cerr << "Unrecognised options encountered\n";
@@ -445,6 +587,7 @@ RingSystemShapeDescriptors(int argc, char** argv) {
   }
 
   output.flush();
+  options.FlushOutputStreams();
 
   if (verbose) {
     options.Report(cerr);

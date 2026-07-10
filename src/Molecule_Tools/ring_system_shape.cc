@@ -181,6 +181,12 @@ FindRingSystemSpan(const std::vector<RingSystemSpan>& ring_system_spans,
 }
 
 bool
+IsTerminalSingleAtomSubstituent(const Molecule& m, const Bond& bond,
+                                atom_number_t outside_atom) {
+  return bond.is_single_bond() && m.ncon(outside_atom) == 1;
+}
+
+bool
 ContainsAtom(const std::vector<atom_number_t>& atoms, atom_number_t needle) {
   return std::find(atoms.begin(), atoms.end(), needle) != atoms.end();
 }
@@ -243,6 +249,99 @@ Classify(const Set_of_Atoms& exit_points,
 }
 
 }  // namespace
+
+int
+NonRingBranchPointCount(const Molecule& m, const int* ring_system_membership) {
+  if (ring_system_membership == nullptr) {
+    return 0;
+  }
+
+  int result = 0;
+  const int matoms = m.natoms();
+  for (int i = 0; i < matoms; ++i) {
+    // This is the cheapest and most important exclusion. Ring-system shape is
+    // handled separately.
+    if (ring_system_membership[i] > 0) {
+      continue;
+    }
+
+    if (m.ncon(i) <= 2) {
+      continue;
+    }
+
+    int meaningful_neighbours = 0;
+    bool has_terminal_multiple_bond = false;
+    const Atom& atom = m[i];
+    for (const Bond* bond : atom) {
+      const atom_number_t other = bond->other(i);
+
+      if (IsTerminalExocyclicMultipleBond(m, *bond, other)) {
+        has_terminal_multiple_bond = true;
+        break;
+      }
+
+      if (IsTerminalSingleAtomSubstituent(m, *bond, other)) {
+        continue;
+      }
+
+      ++meaningful_neighbours;
+    }
+
+    if (has_terminal_multiple_bond) {
+      continue;
+    }
+
+    if (meaningful_neighbours > 2) {
+      ++result;
+    }
+  }
+
+  return result;
+}
+
+int
+RingAtomBranchPointCount(const Molecule& m, const int* ring_system_membership) {
+  if (ring_system_membership == nullptr) {
+    return 0;
+  }
+
+  int result = 0;
+  const int matoms = m.natoms();
+  for (int i = 0; i < matoms; ++i) {
+    if (ring_system_membership[i] <= 0) {
+      continue;
+    }
+
+    if (m.ncon(i) < 4) {
+      continue;
+    }
+
+    int substantial_outside_connections = 0;
+    const Atom& atom = m[i];
+    for (const Bond* bond : atom) {
+      const atom_number_t other = bond->other(i);
+      if (ring_system_membership[other] == ring_system_membership[i]) {
+        continue;
+      }
+
+      if (!bond->is_single_bond()) {
+        continue;
+      }
+
+      if (ring_system_membership[other] > 0) {
+        ++substantial_outside_connections;
+      } else if (m.ncon(other) > 1) {
+        ++substantial_outside_connections;
+      }
+    }
+
+    if (substantial_outside_connections >= 2) {
+      ++result;
+    }
+  }
+
+  return result;
+}
 
 bool
 AnalyseRingSystemShape(const Molecule& m, const int* ring_system_membership,

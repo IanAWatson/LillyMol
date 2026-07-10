@@ -50,6 +50,18 @@ struct RingSystemShape {
 bool AnalyseRingSystemShape(const Molecule& m, const int* ring_system_membership,
                             int ring_system_id, RingSystemShape& result);
 
+// Counts non-ring atoms that appear to be substantial branch points. Atoms in
+// any ring system are skipped first. Terminal single-atom decorations and
+// terminal multiply bonded atoms, like carbonyl oxygen, are not considered
+// evidence of branching.
+int NonRingBranchPointCount(const Molecule& m, const int* ring_system_membership);
+
+// Counts ring atoms from which two or more substantial non-ring substituents
+// emerge. This is not part of the ring-system geometric classification; it is
+// a higher-level shape descriptor useful for deciding whether a molecule is
+// globally rod-like.
+int RingAtomBranchPointCount(const Molecule& m, const int* ring_system_membership);
+
 }  // namespace ring_system_shape
 
 #endif  // MOLECULE_TOOLS_RING_SYSTEM_SHAPE_H_

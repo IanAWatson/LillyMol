@@ -8,6 +8,8 @@
 namespace {
 
 using ring_system_shape::AnalyseRingSystemShape;
+using ring_system_shape::NonRingBranchPointCount;
+using ring_system_shape::RingAtomBranchPointCount;
 using ring_system_shape::RingSystemShape;
 using ring_system_shape::RingSystemShapeClass;
 
@@ -21,6 +23,22 @@ AnalyseFirstRingSystem(Molecule& m) {
   RingSystemShape result;
   EXPECT_TRUE(AnalyseRingSystemShape(m, ring_system_membership.get(), 1, result));
   return result;
+}
+
+int
+NonRingBranchPointCount(Molecule& m) {
+  std::unique_ptr<int[]> ring_system_membership = std::make_unique<int[]>(m.natoms());
+  m.label_atoms_by_ring_system_including_spiro_fused(ring_system_membership.get());
+
+  return ring_system_shape::NonRingBranchPointCount(m, ring_system_membership.get());
+}
+
+int
+RingAtomBranchPointCount(Molecule& m) {
+  std::unique_ptr<int[]> ring_system_membership = std::make_unique<int[]>(m.natoms());
+  m.label_atoms_by_ring_system_including_spiro_fused(ring_system_membership.get());
+
+  return ring_system_shape::RingAtomBranchPointCount(m, ring_system_membership.get());
 }
 
 const ring_system_shape::RingSystemSpan*
@@ -239,6 +257,89 @@ TEST(RingSystemShape, Adamantane4) {
   EXPECT_EQ(shape1.ring_system_spans.size(), 2u);
   EXPECT_EQ(shape1.ring_system_spans[0].from, 1);
   EXPECT_EQ(shape1.ring_system_spans[0].max_separation, 4);
+}
+
+TEST(NonRingBranchPointCount, StraightAlkaneHasNoBranches) {
+  Molecule m;
+  ASSERT_TRUE(m.build_from_smiles("CCCCCC"));
+
+  EXPECT_EQ(NonRingBranchPointCount(m), 0);
+}
+
+TEST(NonRingBranchPointCount, TertButylIsNotSubstantialBranching) {
+  Molecule m;
+  ASSERT_TRUE(m.build_from_smiles("CC(C)(C)C"));
+
+  EXPECT_EQ(NonRingBranchPointCount(m), 0);
+}
+
+TEST(NonRingBranchPointCount, CarbonylCarbonIsNotSubstantialBranching) {
+  Molecule m;
+  ASSERT_TRUE(m.build_from_smiles("CC(=O)NC"));
+
+  EXPECT_EQ(NonRingBranchPointCount(m), 0);
+}
+
+TEST(NonRingBranchPointCount, SulfoneSulfurIsNotSubstantialBranching) {
+  Molecule m;
+  ASSERT_TRUE(m.build_from_smiles("CS(=O)(=O)C"));
+
+  EXPECT_EQ(NonRingBranchPointCount(m), 0);
+}
+
+TEST(NonRingBranchPointCount, TrifluoromethylIsNotSubstantialBranching) {
+  Molecule m;
+  ASSERT_TRUE(m.build_from_smiles("CC(F)(F)F"));
+
+  EXPECT_EQ(NonRingBranchPointCount(m), 0);
+}
+
+TEST(NonRingBranchPointCount, ThreeLargeSubstituentsCountAsBranching) {
+  Molecule m;
+  ASSERT_TRUE(m.build_from_smiles("CCC(CC)CC"));
+
+  EXPECT_EQ(NonRingBranchPointCount(m), 1);
+}
+
+TEST(NonRingBranchPointCount, RingAtomsAreSkipped) {
+  Molecule m;
+  ASSERT_TRUE(m.build_from_smiles("C1(C)(C)CCCCC1"));
+
+  EXPECT_EQ(NonRingBranchPointCount(m), 0);
+}
+
+TEST(RingAtomBranchPointCount, SingleSubstantialRingSubstituentIsNotBranching) {
+  Molecule m;
+  ASSERT_TRUE(m.build_from_smiles("CCC1CCCCC1"));
+
+  EXPECT_EQ(RingAtomBranchPointCount(m), 0);
+}
+
+TEST(RingAtomBranchPointCount, TwoTerminalSingleAtomSubstituentsAreNotBranching) {
+  Molecule m;
+  ASSERT_TRUE(m.build_from_smiles("C1(C)(F)CCCCC1"));
+
+  EXPECT_EQ(RingAtomBranchPointCount(m), 0);
+}
+
+TEST(RingAtomBranchPointCount, EthylAndPropylOnOneRingAtomIsBranching) {
+  Molecule m;
+  ASSERT_TRUE(m.build_from_smiles("C1(CC)(CCC)CCCCC1"));
+
+  EXPECT_EQ(RingAtomBranchPointCount(m), 1);
+
+  const RingSystemShape shape = AnalyseFirstRingSystem(m);
+  EXPECT_EQ(shape.shape_class, RingSystemShapeClass::kNotApplicable);
+}
+
+TEST(RingAtomBranchPointCount, BranchedRingAtomSuppressesRodLikeMoleculePolicy) {
+  Molecule m;
+  ASSERT_TRUE(m.build_from_smiles("C1(CC)(CCC)CCC(C)CC1"));
+
+  EXPECT_EQ(RingAtomBranchPointCount(m), 1);
+
+  const RingSystemShape shape = AnalyseFirstRingSystem(m);
+  EXPECT_EQ(shape.shape_class, RingSystemShapeClass::kRodLike);
 }
 
 }  // namespace

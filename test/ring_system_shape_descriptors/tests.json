@@ -12,6 +12,24 @@
       "args": [
         "-x #{indir}/input.smi"
       ]
+    },
+    {
+      "name": "non_ring_branching",
+      "args": [
+        "#{indir}/input.smi"
+      ]
+    },
+    {
+      "name": "ring_atom_branching",
+      "args": [
+        "#{indir}/input.smi"
+      ]
+    },
+    {
+      "name": "write_rodlike_and_nonrodlike",
+      "args": [
+        "-R rodlike.smi -N non_rodlike.smi #{indir}/input.smi"
+      ]
     }
   ]
 }

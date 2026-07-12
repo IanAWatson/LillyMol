@@ -1232,16 +1232,50 @@ cc_binary(
     ],
 )
 
+cc_library(
+    name = "jwcats_lib",
+    srcs = [
+        "jwcats_lib.cc",
+    ],
+    hdrs = [
+        "jwcats_lib.h",
+    ],
+    visibility = [
+        "//visibility:public",
+    ],
+    deps = [
+        "//Molecule_Lib:charge_assigner",
+        "//Molecule_Lib:donor_acceptor",
+        "//Molecule_Lib:iwmolecule",
+    ],
+)
+
 cc_binary(
     name = "jwcats",
     srcs = [
         "jwcats.cc",
     ],
     deps = [
+        ":jwcats_lib",
         "//Foundational/cmdline:iwcmdline",
         "//Foundational/iwmisc:sparse_fp_creator",
         "//Molecule_Lib:iwmolecule",
         "//Molecule_Lib:moleculeio",
+    ],
+)
+
+cc_test(
+    name = "jwcats_lib_test",
+    timeout = "short",
+    srcs = [
+        "jwcats_lib_test.cc",
+    ],
+    deps = [
+        ":jwcats_lib",
+        "//Molecule_Lib:iwmolecule",
+        "//Molecule_Lib:moleculeio",
+        "@googletest//:gtest",
+        "@googletest//:gtest_main",
     ],
 )
 

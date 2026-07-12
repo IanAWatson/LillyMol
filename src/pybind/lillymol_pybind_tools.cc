@@ -13,6 +13,7 @@
 
 #include "Molecule_Tools/dicer_api.h"
 #include "Molecule_Tools/iwdescr_lib.h"
+#include "Molecule_Tools/jwcats_lib.h"
 #include "Molecule_Tools/mformula.h"
 #include "Molecule_Tools/nvrtspsa.h"
 #include "Molecule_Tools/ring_replacement_lib.h"
@@ -51,6 +52,70 @@ LipinskiHbaHbd(Molecule& m) {
   }
 
   return std::make_tuple(hba, hbd);
+}
+
+
+std::unique_ptr<jwcats::JWCats>
+MakeJWCats(bool initialise_default_assigners) {
+  auto result = std::make_unique<jwcats::JWCats>();
+
+  if (initialise_default_assigners) {
+    if (! result->charge_assigner().BuildFromDefaultEnvs()) {
+      throw std::runtime_error(
+          "Cannot initialise JWCats charge assigner; ensure LILLYMOL_HOME is defined");
+    }
+    IWString default_dir("DEF");
+    if (! result->donor_acceptor_assigner().BuildFromDir(default_dir, 0)) {
+      throw std::runtime_error(
+          "Cannot initialise JWCats donor/acceptor assigner; ensure LILLYMOL_HOME is defined");
+    }
+  }
+
+  if (! result->Initialise()) {
+    throw std::runtime_error("Cannot initialise JWCats");
+  }
+
+  return result;
+}
+
+py::array_t<double>
+JWCatsResultToArray(const jwcats::JWCats& jwcats, const jwcats::Result& result) {
+  const std::vector<int>& write_array_value = jwcats.write_array_value();
+  int nfeatures = 0;
+  for (int value : write_array_value) {
+    if (value) {
+      ++nfeatures;
+    }
+  }
+
+  py::array_t<double> array(nfeatures);
+  double* ptr = array.mutable_data();
+
+  int ndx = 0;
+  for (int i = 0; i < static_cast<int>(write_array_value.size()); ++i) {
+    if (write_array_value[i]) {
+      ptr[ndx] = result.scaled_counts[i];
+      ++ndx;
+    }
+  }
+
+  return array;
+}
+
+void
+ThrowForJWCatsStatus(jwcats::ComputeStatus status) {
+  switch (status) {
+    case jwcats::ComputeStatus::kOk:
+      return;
+    case jwcats::ComputeStatus::kMissingChargeData:
+      throw std::runtime_error("JWCats calculation failed: missing charge data");
+    case jwcats::ComputeStatus::kNotInitialised:
+      throw std::runtime_error("JWCats calculation failed: object is not initialised");
+    case jwcats::ComputeStatus::kError:
+      throw std::runtime_error("JWCats calculation failed");
+  }
+
+  throw std::runtime_error("JWCats calculation failed: unknown status");
 }
 
 }  // namespace
@@ -333,6 +398,83 @@ PYBIND11_MODULE(lillymol_tools, m)
     )
   ;
 
+
+
+  py::class_<jwcats::JWCats>(m, "JWCats")
+    .def(py::init([](bool initialise_default_assigners) {
+        return MakeJWCats(initialise_default_assigners);
+      }),
+      py::arg("initialise_default_assigners") = true,
+      "Create a JWCats descriptor calculator. By default the standard charge and donor/acceptor assigners are initialised from LILLYMOL_HOME."
+    )
+    .def("initialise",
+      [](jwcats::JWCats& jwcats) {
+        return jwcats.Initialise();
+      },
+      "Initialise after changing settings"
+    )
+    .def("build_default_assigners",
+      [](jwcats::JWCats& jwcats) {
+        IWString default_dir("DEF");
+        return jwcats.charge_assigner().BuildFromDefaultEnvs() &&
+               jwcats.donor_acceptor_assigner().BuildFromDir(default_dir, 0);
+      },
+      "Initialise charge and donor/acceptor assigners from LILLYMOL_HOME"
+    )
+    .def("feature_names", &jwcats::JWCats::FeatureNames,
+      "Return descriptor names in the same order as process() values")
+    .def("process",
+      [](jwcats::JWCats& jwcats, Molecule& mol) {
+        jwcats::Result result;
+        const jwcats::ComputeStatus status = jwcats.Compute(mol, result);
+        ThrowForJWCatsStatus(status);
+        return JWCatsResultToArray(jwcats, result);
+      },
+      py::arg("mol"),
+      "Compute JWCats descriptors for one molecule as a float64 NumPy array. The molecule may be modified by descriptor calculation."
+    )
+    .def("process_list",
+      [](jwcats::JWCats& jwcats, std::vector<Molecule*>& mols) {
+        const std::vector<std::string> names = jwcats.FeatureNames();
+        const int nmols = static_cast<int>(mols.size());
+        const int nfeatures = static_cast<int>(names.size());
+
+        py::array_t<double> array({nmols, nfeatures});
+        double* ptr = array.mutable_data();
+
+        for (int i = 0; i < nmols; ++i) {
+          jwcats::Result result;
+          const jwcats::ComputeStatus status = jwcats.Compute(*mols[i], result);
+          ThrowForJWCatsStatus(status);
+
+          const std::vector<int>& write_array_value = jwcats.write_array_value();
+          int col = 0;
+          for (int j = 0; j < static_cast<int>(write_array_value.size()); ++j) {
+            if (write_array_value[j]) {
+              ptr[i * nfeatures + col] = result.scaled_counts[j];
+              ++col;
+            }
+          }
+        }
+
+        return array;
+      },
+      py::arg("mols"),
+      "Compute JWCats descriptors for a list of molecules as a float64 NumPy array"
+    )
+    .def("set_include_hydrophobic_pairs", &jwcats::JWCats::SetIncludeHydrophobicPairs,
+      py::arg("value"), "Control whether hydrophobe-hydrophobe pair columns are emitted")
+    .def("set_min_bond_separation", &jwcats::JWCats::SetMinBondSeparation,
+      py::arg("value"), "Set the minimum bond separation")
+    .def("set_max_bond_separation", &jwcats::JWCats::SetMaxBondSeparation,
+      py::arg("value"), "Set the maximum bond separation")
+    .def("set_scaling_type", &jwcats::JWCats::SetScalingType,
+      py::arg("value"), "Set scaling type: 0 none, 1 heavy atoms, 2 feature counts, 3 heavy atoms / feature counts")
+    .def("set_make_implicit_hydrogens_explicit", &jwcats::JWCats::SetMakeImplicitHydrogensExplicit,
+      py::arg("value"), "Make implicit hydrogens explicit during calculation")
+    .def("initialised", &jwcats::JWCats::initialised,
+      "Return whether the object has been initialised")
+  ;
 
   py::class_<IWDescr>(m, "IWDescr")
     .def(py::init([]() {

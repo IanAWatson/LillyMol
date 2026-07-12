@@ -243,6 +243,61 @@ class TestProcessListDataFrame(unittest.TestCase):
         self.assertNotIsInstance(result, pd.DataFrame)
 
 
+class TestJWCats(unittest.TestCase):
+
+    def setUp(self):
+        _skip_guards(self)
+
+    def test_jwcats_default(self):
+        import numpy as np
+        jwcats = JWCats()
+        names = jwcats.feature_names()
+        self.assertEqual(len(names), 150)
+        self.assertEqual(names[0], "jwc_B1PAA")
+        self.assertEqual(names[-1], "jwc_B10PHH")
+
+        mol = _make_molecule("CCO", "ethanol")
+        values = jwcats.process(mol)
+        self.assertIsInstance(values, np.ndarray)
+        self.assertEqual(values.dtype.name, "float64")
+        self.assertEqual(values.ndim, 1)
+        self.assertEqual(values.size, len(names))
+
+    def test_jwcats_without_hydrophobe_pairs(self):
+        jwcats = JWCats()
+        jwcats.set_include_hydrophobic_pairs(0)
+        self.assertFalse(jwcats.initialised())
+        self.assertTrue(jwcats.initialise())
+        names = jwcats.feature_names()
+        self.assertEqual(len(names), 140)
+        self.assertNotIn("jwc_B1PHH", names)
+        self.assertNotIn("jwc_B10PHH", names)
+
+        mol = _make_molecule("CC", "ethane")
+        values = jwcats.process(mol)
+        self.assertEqual(values.size, len(names))
+
+    def test_jwcats_process_list(self):
+        jwcats = JWCats()
+        mols = [
+            _make_molecule("CCO", "ethanol"),
+            _make_molecule("c1ccccc1", "benzene"),
+        ]
+        values = jwcats.process_list(mols)
+        self.assertEqual(values.shape, (2, len(jwcats.feature_names())))
+
+    def test_jwcats_can_be_built_without_default_assigners(self):
+        jwcats = JWCats(False)
+        self.assertTrue(jwcats.initialised())
+        names = jwcats.feature_names()
+        self.assertEqual(len(names), 150)
+
+        mol = _make_molecule("CC", "ethane")
+        values = jwcats.process(mol)
+        name_to_col = {name: i for i, name in enumerate(names)}
+        self.assertAlmostEqual(values[name_to_col["jwc_B1PHH"]], 0.5)
+
+
 class TestSmallDescriptorHelpers(unittest.TestCase):
 
     def test_tpsa_compute(self):

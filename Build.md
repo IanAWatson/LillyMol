@@ -7,6 +7,7 @@
 
   * [macOS](#macos)
   * [Python](#python)
+  * [Ruby](#ruby)
 * [Detailed Instructions](#detailed-instructions)
 
   * [Configuring for Bazel](#configuring-for-bazel)
@@ -92,6 +93,10 @@ LillyMol runs under [macOS](docs/macOS.md).
 ### Python
 If you build LillyMol with 'make all' or by setting shell variable BUILD_PYTHON,
 python bindings will be built. See [python](docs/python/Build.md).
+
+### Ruby
+Many scripts in the contrib directory are written in ruby. When protocol
+buffers are involved there may be extra complications. See [ruby](docs/ruby/Build.md).
 
 # Detailed Instructions
 

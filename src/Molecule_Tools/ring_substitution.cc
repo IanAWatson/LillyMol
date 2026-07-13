@@ -1,6 +1,7 @@
-#include <algorithm>
-
 #include "ring_substitution.h"
+
+#include <algorithm>
+#include <vector>
 
 #include "Foundational/iwmisc/misc.h"
 
@@ -10,11 +11,11 @@
 namespace ring_substitution {
 
 RingSubstitutionGenerator::RingSubstitutionGenerator() {
-  _positional_information_only = 1;
-  _simple_atom_types = 0;
-  _full_atom_types = 0;
+  _positional_information_only = true;
+  _simple_atom_types = false;
+  _full_atom_types = false;
   _max_path_length = 24;
-  _place_single_feature_bits = 0;
+  _place_single_feature_bits = false;
 }
 
 /*
@@ -22,33 +23,37 @@ RingSubstitutionGenerator::RingSubstitutionGenerator() {
   incrememt by 1 if the ring atom is aromatic
 */
 
-#define RSTYPE_DOUBLE_BOND_OUTSIDE_RING 1
-#define RSTYPE_SPIRO 2
-#define RSTYPE_RING_JOIN 3
-#define RSTYPE_TWO_SUBSTITUENTS 4
-#define RSTYPE_SUBSTITUTED 5
-#define RSTYPE_ANOTHER_RING 7
+namespace {
 
-#define RSTYPE_SATURATED_CARBON 9
-#define RSTYPE_UNSATURATED_CARBON 11
-#define RSTYPE_SATURATED_HETEROATOM 13
-#define RSTYPE_UNSATURATED_HETEROATOM 15
+static constexpr int kRsTypeDoubleBondOutsideRing = 1;
+static constexpr int kRsTypeSpiro = 2;
+static constexpr int kRsTypeRingJoin = 3;
+static constexpr int kRsTypeTwoSubstituents = 4;
+static constexpr int kRsTypeSubstituted = 5;
+static constexpr int kRsTypeAnotherRing = 7;
 
-#define RSTYPE_METHYL 17
-#define RSTYPE_TERMINAL_N 19
-#define RSTYPE_NITRO 21
-#define RSTYPE_SATURATED_NITROGEN 23
-#define RSTYPE_SP2_NITROGEN 25
-#define RSTYPE_HYDROXY 27
-#define RSTYPE_ETHER 29
-#define RSTYPE_SULPH 31
-#define RSTYPE_FLUORINE 33
-#define RSTYPE_HALOGEN 35
+static constexpr int kRsTypeSaturatedCarbon = 9;
+static constexpr int kRsTypeUnsaturatedCarbon = 11;
+static constexpr int kRsTypeSaturatedHeteroatom = 13;
+static constexpr int kRsTypeUnsaturatedHeteroatom = 15;
 
-int
+static constexpr int kRsTypeMethyl = 17;
+static constexpr int kRsTypeTerminalNitrogen = 19;
+static constexpr int kRsTypeNitro = 21;
+static constexpr int kRsTypeSaturatedNitrogen = 23;
+static constexpr int kRsTypeSp2Nitrogen = 25;
+static constexpr int kRsTypeHydroxy = 27;
+static constexpr int kRsTypeEther = 29;
+static constexpr int kRsTypeSulphur = 31;
+static constexpr int kRsTypeFluorine = 33;
+static constexpr int kRsTypeHalogen = 35;
+
+}  // namespace
+
+bool
 RingSubstitutionGenerator::Generate(const IWString& mname,
-                  const resizable_array<int>& abstract_path,
-                  int* tmp, Sparse_Fingerprint_Creator& sfpc) const {
+                                    const resizable_array<int>& abstract_path, int* tmp,
+                                    Sparse_Fingerprint_Creator& sfpc) const {
   int n = abstract_path.number_elements();
 
 // #define DEBUG_RING_SUBSTITUTION
@@ -95,13 +100,13 @@ RingSubstitutionGenerator::Generate(const IWString& mname,
     }
   }
 
-  return 1;
+  return true;
 }
 
-int
+bool
 RingSubstitutionGenerator::Generate(Molecule& m, const int* atype,
-                  const Set_of_Atoms& par, int* tmp,
-                  Sparse_Fingerprint_Creator& sfpc) const {
+                                    const Set_of_Atoms& par, int* tmp,
+                                    Sparse_Fingerprint_Creator& sfpc) const {
   resizable_array<int> abstract_path;
 
   const int n = par.number_elements();
@@ -133,7 +138,7 @@ RingSubstitutionGenerator::Generate(Molecule& m, const int* atype,
 
   if (1 == number_features) {
     sfpc.hit_bit(1383 * n + the_feature);
-    return 1;
+    return true;
   }
 
   assert(abstract_path.number_elements() == n);
@@ -141,18 +146,15 @@ RingSubstitutionGenerator::Generate(Molecule& m, const int* atype,
   return Generate(m.name(), abstract_path, tmp, sfpc);
 }
 
-int
+bool
 RingSubstitutionGenerator::Generate(Molecule& m, const int* atype,
-                           Sparse_Fingerprint_Creator& sfpc) const {
+                                    Sparse_Fingerprint_Creator& sfpc) const {
   const int nr = m.nrings();
 
   const int matoms = m.natoms();
 
-  int* ring_already_done = new_int(nr);
-  std::unique_ptr<int[]> free_ring_already_done(ring_already_done);
-
-  int* tmp = new int[matoms + matoms];
-  std::unique_ptr<int[]> free_tmp(tmp);
+  std::vector<int> ring_already_done(nr, 0);
+  std::vector<int> tmp(matoms + matoms, 0);
 
   m.compute_aromaticity_if_needed();
 
@@ -174,31 +176,30 @@ RingSubstitutionGenerator::Generate(Molecule& m, const int* atype,
       continue;
     }
 
-    Generate(m, atype, *ri, tmp, sfpc);
+    Generate(m, atype, *ri, tmp.data(), sfpc);
 
     ring_already_done[i] = 1;
     rings_processed++;
   }
 
   if (nr == rings_processed) {
-    return 1;
+    return true;
   }
 
   // Now any fused rings
 
-  int* in_ring_system = new_int(matoms);
-  std::unique_ptr<int[]> free_in_ring_system(in_ring_system);
+  std::vector<int> in_ring_system(matoms, 0);
 
   for (int i = 0; i < nr; i++) {
     if (ring_already_done[i]) {
       continue;
     }
 
-    std::fill_n(in_ring_system, matoms, 0);
+    std::fill(in_ring_system.begin(), in_ring_system.end(), 0);
 
     const Ring* ri = m.ringi(i);
 
-    ri->set_vector(in_ring_system, 1);
+    ri->set_vector(in_ring_system.data(), 1);
 
     rings_processed++;
 
@@ -213,33 +214,35 @@ RingSubstitutionGenerator::Generate(Molecule& m, const int* atype,
         continue;
       }
 
-      rj->set_vector(in_ring_system, 1);
+      rj->set_vector(in_ring_system.data(), 1);
       ring_already_done[j] = 1;
 
       rings_processed++;
     }
 
     Set_of_Atoms s;
-    if (!path_around_edge_of_ring_system(m, in_ring_system, 1, s))  // strongly fused
+    if (!path_around_edge_of_ring_system(m, in_ring_system.data(), 1,
+                                         s))  // strongly fused
     {
       sfpc.hit_bit(count_occurrences_of_item_in_array(
-          1, matoms, in_ring_system));  // unprocessed ring, hit bit according to size
+          1, matoms,
+          in_ring_system.data()));  // unprocessed ring, hit bit according to size
       continue;
     }
 
-    Generate(m, atype, s, tmp, sfpc);
+    Generate(m, atype, s, tmp.data(), sfpc);
 
     if (nr == rings_processed) {
       break;
     }
   }
 
-  return 1;
+  return true;
 }
 
 int
-RingSubstitutionGenerator::determine_substitution_type(Molecule& m,
-                        atom_number_t zatom, const Atom& a) const {
+RingSubstitutionGenerator::determine_substitution_type(Molecule& m, atom_number_t zatom,
+                                                       const Atom& a) const {
   int acon = a.ncon();
   // cerr << "determine_substitution_type for atom type " <<
   // m.smarts_equivalent_for_atom(zatom) << '\n';
@@ -249,11 +252,11 @@ RingSubstitutionGenerator::determine_substitution_type(Molecule& m,
   }
 
   if (m.nrings(zatom) > 1) {
-    return RSTYPE_RING_JOIN;
+    return kRsTypeRingJoin;
   }
 
   if (4 == acon) {
-    return RSTYPE_TWO_SUBSTITUENTS;
+    return kRsTypeTwoSubstituents;
   }
 
   for (int i = 0; i < acon; i++) {
@@ -264,17 +267,17 @@ RingSubstitutionGenerator::determine_substitution_type(Molecule& m,
     }
 
     if (b->is_double_bond()) {
-      return RSTYPE_DOUBLE_BOND_OUTSIDE_RING;
+      return kRsTypeDoubleBondOutsideRing;
     }
 
     if (_positional_information_only) {
-      return RSTYPE_SUBSTITUTED;
+      return kRsTypeSubstituted;
     }
 
     atom_number_t o = b->other(zatom);
 
     if (m.is_ring_atom(o)) {
-      return RSTYPE_ANOTHER_RING;
+      return kRsTypeAnotherRing;
     }
 
     atomic_number_t zo = m.atomic_number(o);
@@ -285,16 +288,16 @@ RingSubstitutionGenerator::determine_substitution_type(Molecule& m,
       int unsaturation = m.nbonds(o) - ocon;
       if (6 == zo) {
         if (0 == unsaturation) {
-          return RSTYPE_SATURATED_CARBON;
+          return kRsTypeSaturatedCarbon;
         } else {
-          return RSTYPE_UNSATURATED_CARBON;
+          return kRsTypeUnsaturatedCarbon;
         }
       } else if (1 == ocon && (9 == zo || 17 == zo || 35 == zo || 53 == zo)) {
-        return RSTYPE_HALOGEN;
+        return kRsTypeHalogen;
       } else if (0 == unsaturation) {
-        return RSTYPE_SATURATED_HETEROATOM;
+        return kRsTypeSaturatedHeteroatom;
       } else {
-        return RSTYPE_UNSATURATED_HETEROATOM;
+        return kRsTypeUnsaturatedHeteroatom;
       }
 
       continue;
@@ -304,50 +307,50 @@ RingSubstitutionGenerator::determine_substitution_type(Molecule& m,
 
     if (6 == zo) {
       if (1 == ocon) {
-        return RSTYPE_METHYL;
+        return kRsTypeMethyl;
       }
 
       int nbonds = m.nbonds(o);
       if (ocon == nbonds) {
-        return RSTYPE_SATURATED_CARBON;
+        return kRsTypeSaturatedCarbon;
       } else {
-        return RSTYPE_UNSATURATED_CARBON;
+        return kRsTypeUnsaturatedCarbon;
       }
     } else if (7 == zo) {
       if (1 == ocon) {
-        return RSTYPE_TERMINAL_N;
+        return kRsTypeTerminalNitrogen;
       }
 
       int nbonds = m.nbonds(o);
 
       if (3 == ocon && 5 == nbonds) {
-        return RSTYPE_NITRO;
+        return kRsTypeNitro;
       } else if (ocon == nbonds) {
-        return RSTYPE_SATURATED_NITROGEN;
+        return kRsTypeSaturatedNitrogen;
       } else {
-        return RSTYPE_SP2_NITROGEN;
+        return kRsTypeSp2Nitrogen;
       }
     } else if (8 == zo) {
       if (1 == ocon) {
-        return RSTYPE_HYDROXY;
+        return kRsTypeHydroxy;
       } else {
-        return RSTYPE_ETHER;
+        return kRsTypeEther;
       }
     } else if (16 == zo) {
       if (1 == ocon) {
-        return RSTYPE_HYDROXY;
+        return kRsTypeHydroxy;
       } else if (2 == ocon) {
-        return RSTYPE_ETHER;
+        return kRsTypeEther;
       } else {
-        return RSTYPE_SULPH;  // some other kind of state, who knows
+        return kRsTypeSulphur;  // some other kind of state, who knows
       }
     } else if (9 == zo) {
-      return RSTYPE_FLUORINE;
+      return kRsTypeFluorine;
     } else if (17 == zo || 35 == zo || 53 == zo) {
-      return RSTYPE_HALOGEN;
+      return kRsTypeHalogen;
     }
 
-    return RSTYPE_SUBSTITUTED;  // of not classified above
+    return kRsTypeSubstituted;  // of not classified above
   }
 
   assert(nullptr == "Could not classify non-ring bond???");
@@ -355,35 +358,37 @@ RingSubstitutionGenerator::determine_substitution_type(Molecule& m,
   return 0;
 }
 
-int
-is_spiro_fused(Molecule& m, atom_number_t zatom, const Atom& a) {
+namespace {
+
+bool
+IsSpiroFused(Molecule& m, atom_number_t zatom, const Atom& a) {
   int acon = a.ncon();
 
   if (4 != acon) {
-    return 0;
+    return false;
   }
 
   if (2 != m.nrings(zatom)) {  // too hard and rare otherwise
-    return 0;
+    return false;
   }
 
   for (int i = 0; i < acon; i++) {
     const Bond* b = a[i];
 
     if (0 == b->nrings()) {
-      return 0;
+      return false;
     }
   }
 
-  return 1;
+  return true;
 }
 
-int
-has_double_bond_outside_ring(Molecule& m, atom_number_t zatom, const Atom& a) {
+bool
+HasDoubleBondOutsideRing(Molecule& m, atom_number_t zatom, const Atom& a) {
   int acon = a.ncon();
 
   if (3 != acon) {
-    return 0;
+    return false;
   }
 
   for (int i = 0; i < acon; i++) {
@@ -396,14 +401,16 @@ has_double_bond_outside_ring(Molecule& m, atom_number_t zatom, const Atom& a) {
     }
 
     if (b->is_double_bond()) {
-      return 1;
+      return true;
     }
   }
 
-  return 0;
+  return false;
 }
 
-int
+}  // namespace
+
+bool
 RingSubstitutionGenerator::assign_atom_types(Molecule& m, int* atype) const {
   m.ring_membership();
 
@@ -418,16 +425,16 @@ RingSubstitutionGenerator::assign_atom_types(Molecule& m, int* atype) const {
 
     const Atom* a = m.atomi(i);
 
-    if (has_double_bond_outside_ring(m, i, *a)) {
-      atype[i] = RSTYPE_DOUBLE_BOND_OUTSIDE_RING;
+    if (HasDoubleBondOutsideRing(m, i, *a)) {
+      atype[i] = kRsTypeDoubleBondOutsideRing;
       if (m.is_aromatic(i)) {
         atype[i]++;
       }
       continue;
     }
 
-    if (is_spiro_fused(m, i, *a)) {
-      atype[i] = RSTYPE_SPIRO;
+    if (IsSpiroFused(m, i, *a)) {
+      atype[i] = kRsTypeSpiro;
       continue;
     }
 
@@ -440,20 +447,16 @@ RingSubstitutionGenerator::assign_atom_types(Molecule& m, int* atype) const {
     }
   }
 
-  return 1;
+  return true;
 }
 
+bool
+RingSubstitutionGenerator::Generate(Molecule& m, Sparse_Fingerprint_Creator& sfc) const {
+  std::vector<int> atype(m.natoms(), 0);
 
-int
-RingSubstitutionGenerator::Generate(Molecule& m,
-                 Sparse_Fingerprint_Creator& sfc) const {
+  assign_atom_types(m, atype.data());
 
-  int* atype = new_int(m.natoms());
-  std::unique_ptr<int[]> free_atype(atype);
-
-  assign_atom_types(m, atype);
-  
-  return Generate(m, atype, sfc);
+  return Generate(m, atype.data(), sfc);
 }
 
 }  // namespace ring_substitution

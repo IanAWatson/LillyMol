@@ -211,8 +211,20 @@ pybind_extension(
         "//Molecule_Tools_Bdb:iwecfp_database_lookup_lib_shared",
         "//Molecule_Tools_Bdb:selimsteg",
         "//Molecule_Tools_Bdb:structure_database_shared",
+        "//Utilities/GFP_Tools:gfp_context",
         "@third_party//:berkeley_shared",
 #       "@python",
+    ],
+)
+
+py_test(
+    name = "lillymol_tools_gfp_test",
+    srcs = ["lillymol_tools_gfp_test.py"],
+    data = [
+        "testdata/rand10.complex.gfp",
+    ],
+    deps = [
+        ":lillymol_tools",
     ],
 )
 

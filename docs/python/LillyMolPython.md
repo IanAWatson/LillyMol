@@ -731,6 +731,64 @@ is reachable from several matched atoms. Empty outer shells are retained. This
 operation can therefore be embedded in a larger loop over molecules and query
 embeddings without recomputing the inner shells for each radius.
 
+## GFP fingerprint files
+
+`lillymol_tools.GFPList` provides read/search access to existing LillyMol GFP
+fingerprint files. This is the Python interface to precomputed `.gfp`/TDT
+fingerprint data; it does not yet generate GFP fingerprints directly from
+`Molecule` objects.
+
+```python
+from lillymol_tools import GFPList
+
+gfp = GFPList.from_file("collection.gfp")
+
+print(len(gfp))
+print(gfp.tags())
+print(gfp.smiles(0), gfp.id(0))
+
+d = gfp.distance(0, 1)
+print(d)
+```
+
+The fingerprint schema is discovered from the tags in the first TDT in the file.
+All subsequent fingerprints are interpreted with that same schema. Common tags
+include `MPR<` for molecular properties, `FP...<` for fixed binary
+fingerprints, `NC...<` for sparse non-colliding fingerprints, and `FC...<` for
+fixed counted fingerprints.
+
+Nearest-neighbour searches return `GFPNearestNeighbour` objects. The `index` is
+the row number in the `GFPList`; use `smiles(index)` and `id(index)` to retrieve
+the original molecule metadata.
+
+```python
+hits = gfp.nearest_neighbours(0, 10)
+for hit in hits:
+  print(hit.index, hit.distance, gfp.id(hit.index))
+
+close = gfp.nearest_neighbours_within_distance(0, 0.25)
+for hit in close:
+  print(hit.index, hit.distance, gfp.smiles(hit.index), gfp.id(hit.index))
+```
+
+`nearest_neighbours(query, k)` returns up to `k` neighbours sorted by increasing
+distance. `nearest_neighbours_within_distance(query, max_distance)` returns all
+neighbours within the threshold, also sorted by increasing distance. The query
+fingerprint itself is not included in either result.
+
+Fingerprint components can be selected and weighted by tag name.
+
+```python
+gfp.use_only(["FPIW<", "FPMK<"])
+gfp.set_weight("FPMK<", 0.25)
+gfp.use_all()
+```
+
+Repeated calls to `distance(i, j)` perform repeated distance computations. For
+large all-against-all or repeated-nearest-neighbour workflows, prefer the
+nearest-neighbour methods. A cached nearest-neighbour interface is planned for a
+future version.
+
 ## Reactions
 Enable reactions via
 ```

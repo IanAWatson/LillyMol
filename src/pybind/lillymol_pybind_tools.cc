@@ -21,10 +21,16 @@
 #include "Molecule_Tools_Bdb/iwecfp_database_lookup_lib.h"
 #include "Molecule_Tools_Bdb/selimsteg.h"
 #include "Molecule_Tools_Bdb/structure_database.h"
+#include "Utilities/GFP_Tools/gfp_context.h"
 
 namespace py = pybind11;
 
 namespace {
+
+std::string
+IWStringToStdString(const IWString& s) {
+  return std::string(s.rawchars(), s.length());
+}
 
 std::tuple<int, int>
 LipinskiHbaHbd(Molecule& m) {
@@ -123,6 +129,78 @@ ThrowForJWCatsStatus(jwcats::ComputeStatus status) {
 PYBIND11_MODULE(lillymol_tools, m) 
 {
   using unique_molecules::UniqueMolecules;
+  using gfp_context::GFPList;
+  using gfp_context::NearestNeighbour;
+
+  py::class_<NearestNeighbour>(m, "GFPNearestNeighbour")
+    .def_readonly("index", &NearestNeighbour::index)
+    .def_readonly("distance", &NearestNeighbour::distance)
+    .def("__repr__", [](const NearestNeighbour& n) {
+      return "GFPNearestNeighbour(index=" + std::to_string(n.index) +
+             ", distance=" + std::to_string(n.distance) + ")";
+    })
+  ;
+
+  py::class_<GFPList>(m, "GFPList")
+    .def(py::init<>())
+    .def_static("from_file",
+      [](const std::string& fname, int size_hint) {
+        auto result = std::make_unique<GFPList>();
+        if (! result->ReadFile(fname.c_str(), size_hint)) {
+          throw std::runtime_error("Cannot read GFP file '" + fname + "'");
+        }
+        return result;
+      },
+      py::arg("fname"), py::arg("size_hint") = 0,
+      "Read a GFP/TDT fingerprint file")
+    .def("read_file",
+      [](GFPList& gfp, const std::string& fname, int size_hint) {
+        if (! gfp.ReadFile(fname.c_str(), size_hint)) {
+          throw std::runtime_error("Cannot read GFP file '" + fname + "'");
+        }
+      },
+      py::arg("fname"), py::arg("size_hint") = 0,
+      "Read a GFP/TDT fingerprint file into this object")
+    .def("__len__", &GFPList::size)
+    .def("size", &GFPList::size)
+    .def("tags", [](const GFPList& gfp) {
+      return gfp.context().Tags();
+    })
+    .def("smiles", [](const GFPList& gfp, int i) {
+      return IWStringToStdString(gfp.smiles(i));
+    }, py::arg("i"))
+    .def("id", [](const GFPList& gfp, int i) {
+      return IWStringToStdString(gfp.id(i));
+    }, py::arg("i"))
+    .def("distance", &GFPList::Distance, py::arg("i"), py::arg("j"))
+    .def("nearest_neighbours", &GFPList::NearestNeighbours,
+      py::arg("query"), py::arg("k"))
+    .def("nearest_neighbours_within_distance", &GFPList::NearestNeighboursWithinDistance,
+      py::arg("query"), py::arg("max_distance"))
+    .def("set_weight",
+      [](GFPList& gfp, const std::string& tag, float weight) {
+        IWString iwtag(tag);
+        if (! gfp.mutable_context().SetWeight(iwtag, weight)) {
+          throw std::runtime_error("Cannot set GFP weight for tag '" + tag + "'");
+        }
+      },
+      py::arg("tag"), py::arg("weight"))
+    .def("use_only",
+      [](GFPList& gfp, const std::vector<std::string>& tags) {
+        std::vector<IWString> iwtags;
+        iwtags.reserve(tags.size());
+        for (const std::string& tag : tags) {
+          iwtags.emplace_back(tag);
+        }
+        if (! gfp.mutable_context().UseOnly(iwtags)) {
+          throw std::runtime_error("Cannot restrict GFP components");
+        }
+      },
+      py::arg("tags"))
+    .def("use_all", [](GFPList& gfp) {
+      gfp.mutable_context().UseAll();
+    })
+  ;
 
   // This is a sub-optimal implementation. While functional, it is not efficient.
   // Much to my surprise I found that storing smiles in a python set() was much

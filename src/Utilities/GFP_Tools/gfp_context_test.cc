@@ -75,6 +75,35 @@ TempFileName() {
 }
 
 std::string
+CarbonTempFileName() {
+  const char* tmpdir = std::getenv("TEST_TMPDIR");
+  if (tmpdir == nullptr) {
+    tmpdir = "/tmp";
+  }
+
+  std::string result(tmpdir);
+  result.append("/gfp_context_carbon_test.gfp");
+  return result;
+}
+
+std::string
+WriteCarbonGfpFile() {
+  const std::string fname = CarbonTempFileName();
+
+  std::ofstream output(fname);
+  output << "$SMI<C>\n";
+  output << "PCN<Methane>\n";
+  output << "FCTS<.E..........2;1;1;1;1>\n";
+  output << "|\n";
+  output << "$SMI<CC>\n";
+  output << "PCN<Ethane>\n";
+  output << "FCTS<.U..........2;1;1;1;1>\n";
+  output << "|\n";
+
+  return fname;
+}
+
+std::string
 WriteTestGfpFile() {
   const std::string fname = TempFileName();
 
@@ -151,6 +180,19 @@ TEST(TestGFPContext, NearestNeighbours) {
   EXPECT_THAT(nbrs[0].distance, FloatNear(1.0f / 15.0f, 1.0e-6f));
   EXPECT_EQ(nbrs[1].index, 2);
   EXPECT_THAT(nbrs[1].distance, FloatNear(0.4f, 1.0e-6f));
+}
+
+TEST(TestGFPContext, FixedCountedCarbonDistance) {
+  const std::string fname = WriteCarbonGfpFile();
+
+  GFPList gfp;
+  ASSERT_TRUE(gfp.ReadFile(fname.c_str()));
+
+  EXPECT_EQ(gfp.size(), 2);
+  EXPECT_THAT(gfp.context().Tags(), ElementsAre("FCTS<"));
+  EXPECT_THAT(gfp.Distance(0, 0), FloatNear(0.0f, 1.0e-6f));
+  EXPECT_THAT(gfp.Distance(0, 1), FloatNear(0.5f, 1.0e-6f));
+  EXPECT_THAT(gfp.Distance(1, 0), FloatNear(0.5f, 1.0e-6f));
 }
 
 TEST(TestGFPContext, NearestNeighboursWithinDistance) {

@@ -69,6 +69,7 @@ my $formula = 0;
 my $formula_options = "";
 
 my $tsubstructure_fingerprints_non_colliding = 0;
+my $tsubstructure_fingerprints_counted = 0;
 my $tsubstructure_bitrep = 0;
 
 my $molecular_abstraction_options = "";
@@ -278,8 +279,8 @@ sub usage
   print STDERR " -SCF0          FP fingerprint of the molecular scaffold, -SCFI to differentiate substitution patterns\n";
   print STDERR " -SPINACH       spinach fingerprint\n" if ($expert);
   print STDERR " -MABS ... -MABS FP options for molecular abstractions\n" if ($expert);
-  print STDERR " -TSUB ...      FP query/queries for tsubstructure, S:file for smarts\n" if ($expert);
-  print STDERR " -tsubnc        generate tsubstructure fingerprints as counted\n" if ($expert);
+  print STDERR " -TSUB ...      FP query/queries for the -q option of tsubstructure: S:file.smt for file of smarts\n" if ($expert);
+  print STDERR " -tsubnc        generate tsubstructure fingerprints as counted, -tsubfixed for fixed width counted\n" if ($expert);
   print STDERR " -ts ... -ts    options for tsubstructure\n" if ($expert);
   print STDERR " -FPS ... -FPS  FP query/queries for fingerprint_substructure, S:file for smarts DNU\n" if ($expert);
   print STDERR " -W <dname>     include fingerprint of descriptor <dname>\n";
@@ -1104,6 +1105,10 @@ OPTION: while ($argptr < @ARGV)
   elsif ($opt eq "-bitrep")
   {
     $tsubstructure_bitrep = $ARGV[$argptr++];
+  }
+  elsif ($opt eq "-tsubfixed")
+  {
+    $tsubstructure_fingerprints_counted = 1;
   }
   elsif ($opt eq "-MABS")
   {
@@ -2785,6 +2790,10 @@ if (length($tsubstructure_fingerprint_options))
   if ($tsubstructure_fingerprints_non_colliding)
   {
     $tsubstructure_command .= "-J NCTS ";
+  }
+  elsif ($tsubstructure_fingerprints_counted)
+  {
+    $tsubstructure_command .= "-J FPTS ";
   }
   else
   {

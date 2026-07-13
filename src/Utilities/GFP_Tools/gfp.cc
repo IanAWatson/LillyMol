@@ -362,6 +362,8 @@ set_nfingerprints(int nfp, int sfp, int cfp,
 
     number_fixed_size_counted_fingerprints_in_file = cfp;
 
+    number_fixed_size_counted_fingerprints_to_allocate = cfp;
+
     number_fixed_size_counted_fingerprints_to_use_in_computations = cfp;  // for now
   }
 

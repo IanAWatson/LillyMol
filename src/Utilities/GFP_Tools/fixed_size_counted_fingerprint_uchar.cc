@@ -18,8 +18,6 @@ using std::endl;
 int
 Fixed_Size_Counted_Fingerprint_uchar::construct_from_tdt_record (const const_IWSubstring & buffer)
 {
-  assert (buffer.ends_with ('>'));
-
   int open_angle_bracket = buffer.index ('<');
 
   if (open_angle_bracket < 0)

@@ -1548,6 +1548,43 @@ cc_binary(
 #    ],
 #)
 
+cc_library(
+    name = "gfp_context",
+    srcs = ["gfp_context.cc"],
+    hdrs = ["gfp_context.h"],
+    visibility = ["//visibility:public"],
+    deps = [
+        ":gfp",
+        "//Foundational/data_source:iwstring_data_source",
+        "//Foundational/iw_tdt",
+        "//Foundational/iwbits",
+        "//Foundational/iwstring",
+    ],
+)
+
+cc_test(
+    name = "fixed_size_counted_fingerprint_test",
+    timeout = "short",
+    srcs = ["fixed_size_counted_fingerprint_test.cc"],
+    deps = [
+        ":gfp",
+        "@googletest//:gtest_main",
+    ],
+)
+
+cc_test(
+    name = "gfp_context_test",
+    timeout = "short",
+    srcs = ["gfp_context_test.cc"],
+    deps = [
+        ":gfp_context",
+        "//Foundational/iw_tdt",
+        "//Foundational/iwbits",
+        "//Foundational/iwmisc:sparse_fp_creator",
+        "@googletest//:gtest_main",
+    ],
+)
+
 cc_test(
     name = "sparsefp_test",
     timeout = "short",

@@ -1,0 +1,236 @@
+#ifndef UTILITIES_GFP_TOOLS_GFP_CONTEXT_H_
+#define UTILITIES_GFP_TOOLS_GFP_CONTEXT_H_
+
+#include <cstdint>
+#include <memory>
+#include <string>
+#include <vector>
+
+#include "Foundational/iwbits/iwbits.h"
+#include "Foundational/iwbits/fixed_bit_vector.h"
+#include "Foundational/iwstring/iwstring.h"
+
+#include "Utilities/GFP_Tools/fixed_size_counted_fingerprint.h"
+#include "Utilities/GFP_Tools/sparsefp.h"
+
+class IW_TDT;
+
+namespace gfp_context {
+
+enum class ComponentKind : uint8_t {
+  kMolecularProperties,
+  kFixedBinary,
+  kSparse,
+  kFixedCounted,
+};
+
+struct Component {
+  ComponentKind kind;
+  IWString tag;
+  int index = 0;
+  float weight = 1.0f;
+};
+
+struct ActiveComponent {
+  ComponentKind kind;
+  int index = 0;
+  float weight = 1.0f;
+};
+
+struct NearestNeighbour {
+  int index = -1;
+  float distance = 0.0f;
+};
+
+class MolecularProperties {
+ private:
+  int _nproperties = 0;
+  int* _property = nullptr;
+
+ public:
+  MolecularProperties() = default;
+  ~MolecularProperties();
+
+  MolecularProperties(const MolecularProperties& rhs);
+  MolecularProperties& operator=(const MolecularProperties& rhs);
+
+  MolecularProperties(MolecularProperties&& rhs) noexcept;
+  MolecularProperties& operator=(MolecularProperties&& rhs) noexcept;
+
+  int Build(const const_IWSubstring& buffer);
+
+  int nproperties() const {
+    return _nproperties;
+  }
+  const int* properties() const {
+    return _property;
+  }
+
+  float Similarity(const MolecularProperties& rhs) const;
+};
+
+class FixedBitVector {
+ private:
+  fixed_bit_vector::FixedBitVector _bits;
+  int _nset = 0;
+
+ public:
+  int Build(const const_IWSubstring& buffer);
+
+  int nbits() const {
+    return _bits.nbits();
+  }
+  int nset() const {
+    return _nset;
+  }
+  const fixed_bit_vector::FixedBitVector& bits() const {
+    return _bits;
+  }
+
+  float Tanimoto(const FixedBitVector& rhs) const;
+};
+
+class GFPContext;
+
+// A compact standalone/query fingerprint. GFPList stores large collections in
+// packed component arrays.
+class GFPFingerprint {
+ private:
+  uint64_t _context_hash = 0;
+
+  MolecularProperties _molecular_properties;
+  FixedBitVector* _fixed_binary = nullptr;
+  Sparse_Fingerprint* _sparse = nullptr;
+  Fixed_Size_Counted_Fingerprint_uchar* _fixed_counted = nullptr;
+
+  void FreeArrays();
+
+ public:
+  GFPFingerprint() = default;
+  ~GFPFingerprint();
+
+  GFPFingerprint(const GFPFingerprint&) = delete;
+  GFPFingerprint& operator=(const GFPFingerprint&) = delete;
+
+  GFPFingerprint(GFPFingerprint&& rhs) noexcept;
+  GFPFingerprint& operator=(GFPFingerprint&& rhs) noexcept;
+
+  int Allocate(const GFPContext& context);
+  int Build(const IW_TDT& tdt, const GFPContext& context);
+
+  uint64_t context_hash() const {
+    return _context_hash;
+  }
+
+  const MolecularProperties& molecular_properties() const {
+    return _molecular_properties;
+  }
+  const FixedBitVector& fixed_binary(int i) const {
+    return _fixed_binary[i];
+  }
+  const Sparse_Fingerprint& sparse(int i) const {
+    return _sparse[i];
+  }
+  const Fixed_Size_Counted_Fingerprint_uchar& fixed_counted(int i) const {
+    return _fixed_counted[i];
+  }
+};
+
+class GFPContext {
+ private:
+  std::vector<Component> _components;
+  std::vector<ActiveComponent> _active;
+
+  int _nfixed_binary = 0;
+  int _nsparse = 0;
+  int _nfixed_counted = 0;
+  bool _has_molecular_properties = false;
+
+  uint64_t _context_hash = 0;
+
+  void ComputeHash();
+  void BuildDefaultActiveList();
+
+ public:
+  int BuildFromTdt(const IW_TDT& tdt);
+
+  uint64_t context_hash() const {
+    return _context_hash;
+  }
+  int nfixed_binary() const {
+    return _nfixed_binary;
+  }
+  int nsparse() const {
+    return _nsparse;
+  }
+  int nfixed_counted() const {
+    return _nfixed_counted;
+  }
+  bool has_molecular_properties() const {
+    return _has_molecular_properties;
+  }
+
+  const std::vector<Component>& components() const {
+    return _components;
+  }
+  const std::vector<ActiveComponent>& active_components() const {
+    return _active;
+  }
+  std::vector<std::string> Tags() const;
+
+  int SetWeight(const const_IWSubstring& tag, float weight);
+  int UseOnly(const std::vector<IWString>& tags);
+  void UseAll();
+
+  float Distance(const GFPFingerprint& lhs, const GFPFingerprint& rhs) const;
+};
+
+class GFPList {
+ private:
+  std::shared_ptr<GFPContext> _context;
+
+  std::vector<MolecularProperties> _molecular_properties;
+  std::vector<FixedBitVector> _fixed_binary;
+  std::vector<Sparse_Fingerprint> _sparse;
+  std::vector<Fixed_Size_Counted_Fingerprint_uchar> _fixed_counted;
+
+  std::vector<IWString> _smiles;
+  std::vector<IWString> _ids;
+
+  int BuildContextIfNeeded(const IW_TDT& tdt);
+  int Add(const IW_TDT& tdt);
+
+ public:
+  GFPList();
+  explicit GFPList(std::shared_ptr<GFPContext> context);
+
+  int ReadFile(const char* fname, int size_hint = 0);
+  int Reserve(int size_hint);
+
+  int size() const {
+    return _ids.size();
+  }
+
+  const GFPContext& context() const {
+    return *_context;
+  }
+  GFPContext& mutable_context() {
+    return *_context;
+  }
+
+  const IWString& smiles(int i) const {
+    return _smiles[i];
+  }
+  const IWString& id(int i) const {
+    return _ids[i];
+  }
+
+  float Distance(int i, int j) const;
+  std::vector<NearestNeighbour> NearestNeighbours(int query, int k) const;
+  std::vector<NearestNeighbour> NearestNeighboursWithinDistance(int query,
+                                                                float max_distance) const;
+};
+
+}  // namespace gfp_context
+
+#endif  // UTILITIES_GFP_TOOLS_GFP_CONTEXT_H_

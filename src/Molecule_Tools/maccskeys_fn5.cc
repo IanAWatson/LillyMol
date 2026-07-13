@@ -66,7 +66,7 @@ MACCSKeys::set_nbits (int s)
   return 1;
 }
 
-static int level2_threshold [] = {
+static constexpr int level2_threshold [] = {
   2,     // key 0   2.32637
   1,     // key 1   1.29712
   1,     // key 2   1.282324

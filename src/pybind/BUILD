@@ -29,6 +29,26 @@ pybind_extension(
 )
 
 pybind_extension(
+    name = "lillymol_atom",
+    srcs = [
+        "lillymol_pybind_atom.cc",
+    ],
+    deps = [
+        ":lillymol",
+    ],
+)
+
+pybind_extension(
+    name = "lillymol_bond",
+    srcs = [
+        "lillymol_pybind_bond.cc",
+    ],
+    deps = [
+        ":lillymol",
+    ],
+)
+
+pybind_extension(
     name = "lillymol_fingerprint",
     srcs = [
         "lillymol_pybind_fingerprint.cc",

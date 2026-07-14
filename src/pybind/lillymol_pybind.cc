@@ -1250,6 +1250,7 @@ PYBIND11_MODULE(lillymol, m)
     .def("fully_saturated", &Atom::fully_saturated, "True if fully saturated")
     .def("unsaturation", &Atom::unsaturation, "nbonds() - ncon()")
     .def("other", static_cast<atom_number_t (Atom::*)(atom_number_t, int)const>(&Atom::other), "Other connection")
+    .def("is_organic", &Atom::is_organic, "True if the element is organic")
     .def("x", [](const Atom* a)->float {
         return a->x();
       },
@@ -1506,6 +1507,13 @@ PYBIND11_MODULE(lillymol, m)
     .def("first_atom_in_common", &Set_of_Atoms::members_in_common, "Atom number of first atom in common")
     .def("atoms_in_common", &Set_of_Atoms::members_in_common, "Number of atoms shared")
     .def("size", &Set_of_Atoms::size, "size")
+    .def("set_vector",
+      [](const Set_of_Atoms& s, std::vector<int>& v, int value) {
+        for (auto a : s) {
+          v[a] = value;
+        }
+      }
+    )
 #ifdef LILLYMOL_VECTOR_OPAQUE
     .def("scatter",
       [](const Set_of_Atoms& s, std::vector<int>& v, int value) {

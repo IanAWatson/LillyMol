@@ -27,7 +27,7 @@ Unfortunately there do appear to be many instances of needless copies happening
 between C++ and Python. Perhaps these could be lessened via careful inspection,
 but for now, there is no claim that this is as fast as things could be.
 
-## Building
+## Building and installation
 Your python environment *must* include pybind11. Normally
 ```
 pip install pybind11
@@ -38,21 +38,86 @@ Normally the python bindings are built as part of the default build,
 the script [build_linux.sh](/src/build_linux.sh), but if
 you wish to compile separately that can be done via
 ```
-bazelisk --output_user_root=/local/disk/ian build --cxxopt=-DTODAY=\"$(date +%Y-%b-%d)\" --cxxopt=-DGIT_HASH=\"$(git rev-parse --short --verify HEAD)\" --local_cpu_resources=10 -c opt pybind:all
+bazelisk --output_user_root=/local/disk/ian build --cxxopt=-DTODAY="$(date +%Y-%b-%d)" --cxxopt=-DGIT_HASH="$(git rev-parse --short --verify HEAD)" --local_cpu_resources=10 -c opt pybind:all
 ```
-This generates several `*.so` files in bazel-bin/pybind. In addition, LillyMol
-now has several run-time dependencies, and these also need to be made available.
-For now, the script `copy_shared_libraries.sh` in the `src` directory will copy
-the needed files out of bazel-bin and into lib.
+This generates several `*.so` files in `bazel-bin/pybind`. In addition,
+LillyMol now has several run-time dependencies, and these also need to be made
+available.
 
-See `WORKSPACE` for how we configured the local python and pybind11 installs.
-This was quite difficult to get right. Normally these will be auto
-configured for you by the build script,
-which in turn calls [update_python_in_workspace](/src/update_python_in_workspace.py)
-which interrogates the python installation. 
+### Local development with `run_python.sh`
 
-Once the shared libraries are copied to `LillyMol/lib`, a script, `run_python.sh` in
-the top level directory can be used to invoke python with those libraries avaialble.
+For local development, the script `copy_shared_libraries.sh` in the `src`
+directory copies the pybind extension modules and their LillyMol shared-library
+dependencies out of `bazel-bin` and into `${LILLYMOL_HOME}/lib`.
+
+```
+cd ${LILLYMOL_HOME}/src
+bazel build //pybind:all
+./copy_shared_libraries.sh ../lib
+```
+
+Once the shared libraries are copied to `${LILLYMOL_HOME}/lib`, the top-level
+`run_python.sh` script can be used to invoke Python with `PYTHONPATH` and
+`LD_LIBRARY_PATH` set appropriately.
+
+```
+${LILLYMOL_HOME}/run_python.sh my_script.py
+```
+
+This is the simplest workflow while developing LillyMol itself.
+
+### Building a wheel
+
+A wheel can be built from the same Bazel-generated pybind modules. This does not
+compile C++ via setuptools; Bazel still does the C++ build. The wheel machinery
+just packages the prebuilt extension modules and their private LillyMol shared
+libraries.
+
+```
+cd ${LILLYMOL_HOME}/src
+bazel build //pybind:all
+./copy_shared_libraries.sh ../lib
+
+cd ${LILLYMOL_HOME}/python
+./scripts/stage_wheel_files.sh
+python -m pip install build wheel setuptools
+python -m build --wheel
+```
+
+The wheel is written to `${LILLYMOL_HOME}/python/dist`. The staging script
+creates `${LILLYMOL_HOME}/python/prebuilt`, which is generated data and should
+not be committed.
+
+The wheel includes the pybind extension modules, selected generated protobuf
+Python modules, and private LillyMol shared libraries. On Linux the staged shared
+objects are patched with an `$ORIGIN` runpath so installed extension modules can
+find the private shared libraries shipped beside them, without requiring
+`LD_LIBRARY_PATH`.
+
+The wheel can be smoke-tested in a clean target directory with something like
+
+```
+rm -rf /tmp/lillymol_wheel_test
+python -m pip install --no-deps --target /tmp/lillymol_wheel_test \
+  ${LILLYMOL_HOME}/python/dist/lillymol-*.whl
+
+env -u LD_LIBRARY_PATH PYTHONPATH=/tmp/lillymol_wheel_test python - <<'PYTHON_SMOKE_TEST'
+import lillymol
+import lillymol_query
+import lillymol_tools
+m = lillymol.MolFromSmiles("CCO ethanol")
+q = lillymol_query.QueryFromSmarts("[OD1,OD2]")
+assert q in m
+ctx = lillymol_tools.GFPContext.standard()
+fp = ctx.fingerprint(m)
+assert abs(ctx.distance(fp, fp)) < 1.0e-6
+print("LillyMol wheel smoke test ok")
+PYTHON_SMOKE_TEST
+```
+
+See `${LILLYMOL_HOME}/python/README.md` for the wheel staging details.
+
+See `MODULE.bazel` for how we configured the local python and pybind11 installs.
 
 ## Philosophy
 LillyMol has no concept of changeable and unchangeable molecules. Any molecule
@@ -731,12 +796,14 @@ is reachable from several matched atoms. Empty outer shells are retained. This
 operation can therefore be embedded in a larger loop over molecules and query
 embeddings without recomputing the inner shells for each radius.
 
-## GFP fingerprint files
+## GFP fingerprint files and similarity search
 
-`lillymol_tools.GFPList` provides read/search access to existing LillyMol GFP
-fingerprint files. This is the Python interface to precomputed `.gfp`/TDT
-fingerprint data; it does not yet generate GFP fingerprints directly from
+`lillymol_tools.GFPList` provides read/search access to LillyMol GFP
+fingerprints. It can read precomputed `.gfp`/TDT fingerprint files, and it can
+also generate the standard LillyMol GFP fingerprint directly from Python
 `Molecule` objects.
+
+### Reading an existing GFP file
 
 ```python
 from lillymol_tools import GFPList
@@ -747,15 +814,89 @@ print(len(gfp))
 print(gfp.tags())
 print(gfp.smiles(0), gfp.id(0))
 
-d = gfp.distance(0, 1)
-print(d)
+print(gfp.distance(0, 1))
 ```
 
 The fingerprint schema is discovered from the tags in the first TDT in the file.
-All subsequent fingerprints are interpreted with that same schema. Common tags
-include `MPR<` for molecular properties, `FP...<` for fixed binary
-fingerprints, `NC...<` for sparse non-colliding fingerprints, and `FC...<` for
-fixed counted fingerprints.
+All subsequent fingerprints are interpreted with that same schema. Tag order in
+the TDT is not significant, but all fingerprints in a `GFPList` must contain the
+same components. Common tags include `MPR<` for molecular properties, `FP...<`
+for fixed binary fingerprints, `NC...<` for sparse non-colliding fingerprints,
+and `FC...<` for fixed counted fingerprints.
+
+### Generating standard GFP fingerprints
+
+The standard LillyMol GFP fingerprint can be generated directly from molecules.
+This currently creates the long-standing standard GFP components:
+
+- `FPIW<` path fingerprint
+- `FPMK<` MACCS keys
+- `FPMK2<` level-2 MACCS keys
+- `MPR<` molecular properties
+
+Use a `GFPContext` when you want standalone query fingerprints:
+
+```python
+from lillymol import Molecule
+from lillymol_tools import GFPContext
+
+ctx = GFPContext.standard()
+
+mol = Molecule()
+mol.build_from_smiles("CCO ethanol")
+fp = ctx.fingerprint(mol)
+
+print(ctx.distance(fp, fp))
+```
+
+Use `GFPList.standard()` when you want to build a searchable collection from
+Python molecules:
+
+```python
+from lillymol import Molecule
+from lillymol_tools import GFPContext, GFPList
+
+gfp = GFPList.standard()
+
+for smiles in ["CC ethane", "CCC propane", "CCCC butane"]:
+  mol = Molecule()
+  mol.build_from_smiles(smiles)
+  gfp.add(mol)
+
+query = Molecule()
+query.build_from_smiles("CCC query")
+query_fp = GFPContext.standard().fingerprint(query)
+
+hits = gfp.nearest_neighbours(query_fp, 3)
+for hit in hits:
+  print(hit.index, hit.distance, gfp.id(hit.index))
+```
+
+Fingerprint generation follows the standard GFP preprocessing used by the
+existing C++ GFP server path. The input Python molecule is copied before that
+preprocessing, so calling `fingerprint()` or `GFPList.add()` does not alter the
+Python `Molecule` object. If molecules have already been standardised and
+preprocessed, this step can be skipped:
+
+```python
+ctx = GFPContext.standard(preprocess=False)
+gfp = GFPList.standard(preprocess=False)
+```
+
+### Context compatibility
+
+A `GFPFingerprint` is only meaningful with the `GFPContext` that generated it,
+or with another context that has the same fingerprint schema. The Python binding
+checks this compatibility before list/query distance calculations. Combining a
+fingerprint generated by one context with a list using a different schema raises
+`ValueError`.
+
+This means a query fingerprint used against a `GFPList.standard()` collection
+should be generated with `GFPContext.standard()` using the same settings. A
+fingerprint generated with the standard context is not compatible with a list
+read from a file that contains a different set of fingerprint tags.
+
+### Nearest neighbours
 
 Nearest-neighbour searches return `GFPNearestNeighbour` objects. The `index` is
 the row number in the `GFPList`; use `smiles(index)` and `id(index)` to retrieve
@@ -773,8 +914,12 @@ for hit in close:
 
 `nearest_neighbours(query, k)` returns up to `k` neighbours sorted by increasing
 distance. `nearest_neighbours_within_distance(query, max_distance)` returns all
-neighbours within the threshold, also sorted by increasing distance. The query
-fingerprint itself is not included in either result.
+neighbours within the threshold, also sorted by increasing distance. When
+`query` is a row number, the query fingerprint itself is not included in either
+result. When `query` is a standalone `GFPFingerprint`, all list entries are
+eligible neighbours.
+
+### Component selection and weights
 
 Fingerprint components can be selected and weighted by tag name.
 
@@ -783,6 +928,22 @@ gfp.use_only(["FPIW<", "FPMK<"])
 gfp.set_weight("FPMK<", 0.25)
 gfp.use_all()
 ```
+
+Weights affect subsequent distance and nearest-neighbour calculations. Changing
+weights does not change the context compatibility hash, since the underlying
+fingerprint schema is unchanged.
+
+### Error handling
+
+The Python API is designed to fail loudly in notebooks:
+
+- unreadable GFP files raise `RuntimeError`
+- trying to generate a fingerprint from a context that cannot generate
+  fingerprints raises `RuntimeError`
+- invalid row indices raise `IndexError`
+- incompatible fingerprint contexts raise `ValueError`
+- negative distance thresholds raise `ValueError`
+- unknown component tags in `use_only` or `set_weight` raise `RuntimeError`
 
 Repeated calls to `distance(i, j)` perform repeated distance computations. For
 large all-against-all or repeated-nearest-neighbour workflows, prefer the

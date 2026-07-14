@@ -339,4 +339,43 @@ TEST(TestGFPContext, StandardListAddAndQueryFingerprint) {
   EXPECT_THAT(hits[0].distance, FloatNear(0.0f, 1.0e-6f));
 }
 
+TEST(TestGFPContext, StandardListAddMoleculesWithoutMetadata) {
+  auto gfp = GFPList::Standard();
+  ASSERT_NE(gfp, nullptr);
+
+  Molecule ethane;
+  ASSERT_TRUE(ethane.build_from_smiles("CC ethane"));
+  Molecule propane;
+  ASSERT_TRUE(propane.build_from_smiles("CCC propane"));
+  Molecule butane;
+  ASSERT_TRUE(butane.build_from_smiles("CCCC butane"));
+
+  std::vector<Molecule*> molecules = {&ethane, &propane, &butane};
+  ASSERT_TRUE(gfp->AddMolecules(molecules));
+
+  EXPECT_EQ(gfp->size(), 3);
+  EXPECT_FALSE(gfp->metadata_stored());
+  EXPECT_THAT(gfp->Distance(1, 1), FloatNear(0.0f, 1.0e-6f));
+
+  Molecule pentane;
+  ASSERT_TRUE(pentane.build_from_smiles("CCCCC pentane"));
+  EXPECT_FALSE(gfp->Add(pentane));
+}
+
+TEST(TestGFPContext, StandardListFromMoleculesCanStoreMetadata) {
+  Molecule ethane;
+  ASSERT_TRUE(ethane.build_from_smiles("CC ethane"));
+  Molecule propane;
+  ASSERT_TRUE(propane.build_from_smiles("CCC propane"));
+
+  std::vector<Molecule*> molecules = {&ethane, &propane};
+  auto gfp = GFPList::StandardFromMolecules(molecules, true, true);
+  ASSERT_NE(gfp, nullptr);
+
+  EXPECT_EQ(gfp->size(), 2);
+  EXPECT_TRUE(gfp->metadata_stored());
+  EXPECT_EQ(gfp->id(0), "ethane");
+  EXPECT_EQ(gfp->smiles(1), "CCC");
+}
+
 }  // namespace

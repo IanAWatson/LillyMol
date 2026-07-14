@@ -37,6 +37,12 @@ def _testdata_file(fname):
             return candidate
     raise FileNotFoundError(fname)
 
+def _mol(smiles):
+    mol = Molecule()
+    if not mol.build_from_smiles(smiles):
+        raise ValueError(smiles)
+    return mol
+
 
 CARBON_GFP = """
 $SMI<C>
@@ -177,20 +183,45 @@ class TestGFPList(unittest.TestCase):
 
     def test_programmatic_standard_list_matches_stored_file_distances(self):
         stored = GFPList.from_file(_testdata_file('rand10.standard.gfp'))
-        generated = GFPList.standard()
-
-        for i in range(len(stored)):
-            mol = Molecule()
-            self.assertTrue(mol.build_from_smiles(stored.smiles(i)))
-            generated.add(mol)
+        molecules = [_mol(stored.smiles(i)) for i in range(len(stored))]
+        generated = GFPList.standard_from_molecules(molecules)
 
         self.assertEqual(len(generated), len(stored))
+        self.assertFalse(generated.metadata_stored())
+        with self.assertRaises(RuntimeError):
+            generated.id(0)
+        with self.assertRaises(RuntimeError):
+            generated.smiles(0)
+
         for i in range(len(stored)):
             for j in range(len(stored)):
                 self.assertAlmostEqual(generated.distance(i, j),
                                        stored.distance(i, j),
                                        places=6,
                                        msg=f'{i},{j}')
+
+    def test_standard_from_molecules_can_store_metadata(self):
+        molecules = [_mol('CC ethane'), _mol('CCC propane'), _mol('CCCC butane')]
+        gfp = GFPList.standard_from_molecules(molecules, store_metadata=True)
+
+        self.assertEqual(len(gfp), 3)
+        self.assertTrue(gfp.metadata_stored())
+        self.assertEqual(gfp.id(0), 'ethane')
+        self.assertEqual(gfp.smiles(1), 'CCC')
+        self.assertAlmostEqual(gfp.distance(1, 1), 0.0, places=6)
+
+    def test_add_molecules_defaults_to_no_metadata(self):
+        molecules = [_mol('CC ethane'), _mol('CCC propane')]
+        gfp = GFPList.standard()
+        gfp.add_molecules(molecules)
+
+        self.assertEqual(len(gfp), 2)
+        self.assertFalse(gfp.metadata_stored())
+        self.assertAlmostEqual(gfp.distance(0, 0), 0.0, places=6)
+        with self.assertRaises(RuntimeError):
+            gfp.id(0)
+        with self.assertRaises(RuntimeError):
+            gfp.add(_mol('CCCC butane'))
 
     def test_gfp_failures_raise_exceptions(self):
         mol = Molecule()

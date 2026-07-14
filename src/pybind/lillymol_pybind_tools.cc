@@ -40,10 +40,18 @@ CheckGFPListIndex(const gfp_context::GFPList& gfp, int i, const char* argname) {
 }
 
 void
+CheckGFPListMetadata(const gfp_context::GFPList& gfp) {
+  if (!gfp.metadata_stored()) {
+    throw std::runtime_error("GFPList does not store smiles/id metadata");
+  }
+}
+
+void
 CheckCompatibleFingerprint(const gfp_context::GFPList& gfp,
                            const gfp_context::GFPFingerprint& fp) {
   if (fp.context_hash() != gfp.context().context_hash()) {
-    throw std::invalid_argument("GFPFingerprint was generated with an incompatible GFPContext");
+    throw std::invalid_argument(
+        "GFPFingerprint was generated with an incompatible GFPContext");
   }
 }
 
@@ -224,6 +232,20 @@ PYBIND11_MODULE(lillymol_tools, m) {
           py::arg("preprocess") = true,
           "Create an empty GFPList that generates standard LillyMol GFP fingerprints")
       .def_static(
+          "standard_from_molecules",
+          [](const std::vector<Molecule*>& molecules, bool preprocess,
+             bool store_metadata) {
+            auto result =
+                GFPList::StandardFromMolecules(molecules, preprocess, store_metadata);
+            if (result == nullptr) {
+              throw std::runtime_error("Cannot build standard GFP list from molecules");
+            }
+            return result;
+          },
+          py::arg("molecules"), py::arg("preprocess") = true,
+          py::arg("store_metadata") = false,
+          "Build a standard GFPList from a Python sequence of Molecule objects")
+      .def_static(
           "from_file",
           [](const std::string& fname, int size_hint) {
             auto result = std::make_shared<GFPList>();
@@ -244,11 +266,13 @@ PYBIND11_MODULE(lillymol_tools, m) {
           "Read a GFP/TDT fingerprint file into this object")
       .def("__len__", &GFPList::size)
       .def("size", &GFPList::size)
+      .def("metadata_stored", &GFPList::metadata_stored)
       .def("tags", [](const GFPList& gfp) { return gfp.context().Tags(); })
       .def(
           "smiles",
           [](const GFPList& gfp, int i) {
             CheckGFPListIndex(gfp, i, "i");
+            CheckGFPListMetadata(gfp);
             return IWStringToStdString(gfp.smiles(i));
           },
           py::arg("i"))
@@ -256,6 +280,7 @@ PYBIND11_MODULE(lillymol_tools, m) {
           "id",
           [](const GFPList& gfp, int i) {
             CheckGFPListIndex(gfp, i, "i");
+            CheckGFPListMetadata(gfp);
             return IWStringToStdString(gfp.id(i));
           },
           py::arg("i"))
@@ -267,6 +292,14 @@ PYBIND11_MODULE(lillymol_tools, m) {
             }
           },
           py::arg("mol"))
+      .def(
+          "add_molecules",
+          [](GFPList& gfp, const std::vector<Molecule*>& molecules, bool store_metadata) {
+            if (!gfp.AddMolecules(molecules, store_metadata)) {
+              throw std::runtime_error("Cannot add molecules to GFPList");
+            }
+          },
+          py::arg("molecules"), py::arg("store_metadata") = false)
       .def(
           "distance",
           [](const GFPList& gfp, int i, int j) {

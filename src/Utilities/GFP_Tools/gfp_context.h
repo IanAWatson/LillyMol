@@ -244,6 +244,9 @@ class GFPContext {
 class GFPList {
  private:
   std::shared_ptr<GFPContext> _context;
+  int _size = 0;
+  // -1 unknown/empty, 0 no metadata stored, 1 metadata stored for every entry.
+  int _store_metadata = -1;
 
   std::vector<MolecularProperties> _molecular_properties;
   std::vector<FixedBitVector> _fixed_binary;
@@ -255,21 +258,34 @@ class GFPList {
 
   int BuildContextIfNeeded(const IW_TDT& tdt);
   int Add(const IW_TDT& tdt);
+  int AddFingerprintComponents(const GFPFingerprint& fp);
+  int Add(const GFPFingerprint& fp);
   int Add(const GFPFingerprint& fp, const IWString& smiles, const IWString& id);
+  int SetStoreMetadata(int store_metadata);
 
  public:
   GFPList();
   explicit GFPList(std::shared_ptr<GFPContext> context);
 
   static std::shared_ptr<GFPList> Standard(bool preprocess = true);
+  static std::shared_ptr<GFPList> StandardFromMolecules(
+      const std::vector<Molecule*>& molecules, bool preprocess = true,
+      bool store_metadata = false);
 
   int ReadFile(const char* fname, int size_hint = 0);
   int Reserve(int size_hint);
   int Add(Molecule& m);
+  int Add(Molecule& m, bool store_metadata);
+  int AddMolecules(const std::vector<Molecule*>& molecules, bool store_metadata = false);
 
   int
   size() const {
-    return _ids.size();
+    return _size;
+  }
+
+  bool
+  metadata_stored() const {
+    return _store_metadata == 1;
   }
 
   const GFPContext&

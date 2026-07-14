@@ -16,6 +16,8 @@ fi
 
 declare -a libs=(
 bazel-bin/pybind/lillymol.so
+bazel-bin/pybind/lillymol_atom.so
+bazel-bin/pybind/lillymol_bond.so
 bazel-bin/pybind/lillymol_io.so
 bazel-bin/pybind/lillymol_fingerprint.so
 bazel-bin/pybind/lillymol_gfp_server.so

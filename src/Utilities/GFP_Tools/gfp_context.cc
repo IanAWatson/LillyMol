@@ -6,6 +6,7 @@
 #include <iostream>
 #include <limits>
 #include <memory>
+#include <queue>
 
 #include "Foundational/data_source/iwstring_data_source.h"
 #include "Foundational/iw_tdt/iw_tdt.h"
@@ -52,16 +53,6 @@ TagFromDataitem(const const_IWSubstring& item, IWString& tag) {
   return true;
 }
 
-bool
-TagStartsWith(const IWString& tag, const char* prefix) {
-  const int n = static_cast<int>(strlen(prefix));
-  if (tag.length() < n) {
-    return false;
-  }
-
-  return strncmp(tag.rawchars(), prefix, n) == 0;
-}
-
 int
 CountTdts(iwstring_data_source& input, const char* fname) {
   const uint64_t result = input.count_records_starting_with("|");
@@ -90,6 +81,54 @@ CompareTagsCanonical(const IWString& lhs, const IWString& rhs) {
     return 1;
   }
   return 0;
+}
+
+bool
+NearestNeighbourBetter(const NearestNeighbour& lhs, const NearestNeighbour& rhs) {
+  if (lhs.distance != rhs.distance) {
+    return lhs.distance < rhs.distance;
+  }
+  return lhs.index < rhs.index;
+}
+
+struct NearestNeighbourMaxHeapCompare {
+  bool
+  operator()(const NearestNeighbour& lhs, const NearestNeighbour& rhs) const {
+    // priority_queue places the highest priority item at the top. Return true
+    // when `lhs` is better than `rhs`, so the worst retained neighbour is top.
+    return NearestNeighbourBetter(lhs, rhs);
+  }
+};
+
+using NearestNeighbourMaxHeap =
+    std::priority_queue<NearestNeighbour, std::vector<NearestNeighbour>,
+                        NearestNeighbourMaxHeapCompare>;
+
+void
+MaybeAddNearestNeighbour(NearestNeighbourMaxHeap& heap, int k,
+                         NearestNeighbour candidate) {
+  if (static_cast<int>(heap.size()) < k) {
+    heap.push(candidate);
+    return;
+  }
+
+  if (NearestNeighbourBetter(candidate, heap.top())) {
+    heap.pop();
+    heap.push(candidate);
+  }
+}
+
+std::vector<NearestNeighbour>
+SortedNearestNeighbours(NearestNeighbourMaxHeap& heap) {
+  std::vector<NearestNeighbour> result;
+  result.reserve(heap.size());
+  while (!heap.empty()) {
+    result.push_back(heap.top());
+    heap.pop();
+  }
+  std::sort(result.begin(), result.end(), NearestNeighbourBetter);
+
+  return result;
 }
 
 float
@@ -512,14 +551,14 @@ GFPContext::BuildFromTdt(const IW_TDT& tdt) {
     if (tag == kMolecularPropertiesTag) {
       _has_molecular_properties = true;
       _components.push_back(Component{ComponentKind::kMolecularProperties, tag, 0, 1.0f});
-    } else if (TagStartsWith(tag, "FP")) {
+    } else if (tag.starts_with("FP")) {
       _components.push_back(
           Component{ComponentKind::kFixedBinary, tag, _nfixed_binary, 1.0f});
       ++_nfixed_binary;
-    } else if (TagStartsWith(tag, "NC")) {
+    } else if (tag.starts_with("NC")) {
       _components.push_back(Component{ComponentKind::kSparse, tag, _nsparse, 1.0f});
       ++_nsparse;
-    } else if (TagStartsWith(tag, "FC")) {
+    } else if (tag.starts_with("FC")) {
       _components.push_back(
           Component{ComponentKind::kFixedCounted, tag, _nfixed_counted, 1.0f});
       ++_nfixed_counted;
@@ -748,6 +787,37 @@ GFPList::Standard(bool preprocess) {
   return std::make_shared<GFPList>(context);
 }
 
+std::shared_ptr<GFPList>
+GFPList::StandardFromMolecules(const std::vector<Molecule*>& molecules, bool preprocess,
+                               bool store_metadata) {
+  auto result = GFPList::Standard(preprocess);
+  if (result == nullptr) {
+    return nullptr;
+  }
+
+  if (!result->AddMolecules(molecules, store_metadata)) {
+    return nullptr;
+  }
+
+  return result;
+}
+
+int
+GFPList::SetStoreMetadata(int store_metadata) {
+  const int value = store_metadata ? 1 : 0;
+  if (_store_metadata < 0) {
+    _store_metadata = value;
+    return 1;
+  }
+
+  if (_store_metadata == value) {
+    return 1;
+  }
+
+  std::cerr << "GFPList::SetStoreMetadata:cannot mix metadata and no-metadata entries\n";
+  return 0;
+}
+
 int
 GFPList::Reserve(int size_hint) {
   if (size_hint <= 0) {
@@ -758,8 +828,10 @@ GFPList::Reserve(int size_hint) {
   _fixed_binary.reserve(size_hint * _context->nfixed_binary());
   _sparse.reserve(size_hint * _context->nsparse());
   _fixed_counted.reserve(size_hint * _context->nfixed_counted());
-  _smiles.reserve(size_hint);
-  _ids.reserve(size_hint);
+  if (_store_metadata != 0) {
+    _smiles.reserve(size_hint);
+    _ids.reserve(size_hint);
+  }
 
   return 1;
 }
@@ -776,6 +848,9 @@ GFPList::BuildContextIfNeeded(const IW_TDT& tdt) {
 int
 GFPList::Add(const IW_TDT& tdt) {
   if (!BuildContextIfNeeded(tdt)) {
+    return 0;
+  }
+  if (!SetStoreMetadata(1)) {
     return 0;
   }
 
@@ -837,12 +912,13 @@ GFPList::Add(const IW_TDT& tdt) {
 
   _smiles.push_back(smiles);
   _ids.push_back(id);
+  ++_size;
 
   return 1;
 }
 
 int
-GFPList::Add(const GFPFingerprint& fp, const IWString& smiles, const IWString& id) {
+GFPList::AddFingerprintComponents(const GFPFingerprint& fp) {
   if (fp.context_hash() != _context->context_hash()) {
     std::cerr << "GFPList::Add:incompatible fingerprint context\n";
     return 0;
@@ -865,6 +941,29 @@ GFPList::Add(const GFPFingerprint& fp, const IWString& smiles, const IWString& i
     }
   }
 
+  ++_size;
+  return 1;
+}
+
+int
+GFPList::Add(const GFPFingerprint& fp) {
+  if (!SetStoreMetadata(0)) {
+    return 0;
+  }
+
+  return AddFingerprintComponents(fp);
+}
+
+int
+GFPList::Add(const GFPFingerprint& fp, const IWString& smiles, const IWString& id) {
+  if (!SetStoreMetadata(1)) {
+    return 0;
+  }
+
+  if (!AddFingerprintComponents(fp)) {
+    return 0;
+  }
+
   _smiles.push_back(smiles);
   _ids.push_back(id);
 
@@ -873,13 +972,42 @@ GFPList::Add(const GFPFingerprint& fp, const IWString& smiles, const IWString& i
 
 int
 GFPList::Add(Molecule& m) {
+  return Add(m, true);
+}
+
+int
+GFPList::Add(Molecule& m, bool store_metadata) {
   GFPFingerprint fp;
   if (!_context->Fingerprint(m, fp)) {
     return 0;
   }
 
+  if (!store_metadata) {
+    return Add(fp);
+  }
+
   IWString smiles(m.smiles());
   return Add(fp, smiles, m.name());
+}
+
+int
+GFPList::AddMolecules(const std::vector<Molecule*>& molecules, bool store_metadata) {
+  if (!SetStoreMetadata(store_metadata)) {
+    return 0;
+  }
+  Reserve(molecules.size());
+
+  for (Molecule* molecule : molecules) {
+    if (molecule == nullptr) {
+      std::cerr << "GFPList::AddMolecules:null molecule pointer\n";
+      return 0;
+    }
+    if (!Add(*molecule, store_metadata)) {
+      return 0;
+    }
+  }
+
+  return 1;
 }
 
 int
@@ -1005,64 +1133,34 @@ GFPList::Distance(const GFPFingerprint& fp, int j) const {
 
 std::vector<NearestNeighbour>
 GFPList::NearestNeighbours(int query, int k) const {
-  std::vector<NearestNeighbour> result;
   if (k <= 0 || query < 0 || query >= size()) {
-    return result;
+    return {};
   }
 
-  result.reserve(size() > 1 ? std::min(k, size() - 1) : 0);
+  NearestNeighbourMaxHeap heap;
   for (int i = 0; i < size(); ++i) {
     if (i == query) {
       continue;
     }
 
-    result.push_back(NearestNeighbour{i, Distance(query, i)});
+    MaybeAddNearestNeighbour(heap, k, NearestNeighbour{i, Distance(query, i)});
   }
 
-  auto compare = [](const NearestNeighbour& lhs, const NearestNeighbour& rhs) {
-    if (lhs.distance != rhs.distance) {
-      return lhs.distance < rhs.distance;
-    }
-    return lhs.index < rhs.index;
-  };
-
-  if (static_cast<int>(result.size()) > k) {
-    std::nth_element(result.begin(), result.begin() + k, result.end(), compare);
-    result.resize(k);
-  }
-
-  std::sort(result.begin(), result.end(), compare);
-
-  return result;
+  return SortedNearestNeighbours(heap);
 }
 
 std::vector<NearestNeighbour>
 GFPList::NearestNeighbours(const GFPFingerprint& query, int k) const {
-  std::vector<NearestNeighbour> result;
   if (k <= 0 || query.context_hash() != _context->context_hash()) {
-    return result;
+    return {};
   }
 
-  result.reserve(std::min(k, size()));
+  NearestNeighbourMaxHeap heap;
   for (int i = 0; i < size(); ++i) {
-    result.push_back(NearestNeighbour{i, Distance(query, i)});
+    MaybeAddNearestNeighbour(heap, k, NearestNeighbour{i, Distance(query, i)});
   }
 
-  auto compare = [](const NearestNeighbour& lhs, const NearestNeighbour& rhs) {
-    if (lhs.distance != rhs.distance) {
-      return lhs.distance < rhs.distance;
-    }
-    return lhs.index < rhs.index;
-  };
-
-  if (static_cast<int>(result.size()) > k) {
-    std::nth_element(result.begin(), result.begin() + k, result.end(), compare);
-    result.resize(k);
-  }
-
-  std::sort(result.begin(), result.end(), compare);
-
-  return result;
+  return SortedNearestNeighbours(heap);
 }
 
 std::vector<NearestNeighbour>

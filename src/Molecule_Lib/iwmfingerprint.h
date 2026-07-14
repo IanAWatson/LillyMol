@@ -13,6 +13,31 @@ class MFingerprint;
 
 //#define COUNT_TIMES_ATOM_IN_PATH
 
+
+struct IWMFingerprintOptions {
+  int bits_per_fingerprint = 2048;
+  int form_bit_vector_during_fingerprint_creation = 1;
+  int min_path_length = 0;
+  int max_path_length = 7;
+  int omit_ch2 = 0;
+  int only_bits_preserving_substructure_perception = 0;
+  int formal_charge_bits = -1;
+  int formally_charged_atoms_lose_identity = 0;
+  int do_atom_pair_bits = 0;
+  int isotopic_paths = 0;
+  int unsaturated_includes_aromatic = 0;
+  int maximal_daylight_compatibility = 0;
+  int bits_for_hydrogen_attachments = -1;
+  int max_path_length_isotopic_bits = -1;
+  int place_bits_for_rings = 0;
+  int bits_for_atoms_in_multiple_rings = 0;
+  int include_unsaturation_in_atom_type = 0;
+  int terminal_path_bits = -1;
+  int differentiate_ring_and_chain_bonds = 0;
+};
+
+IWMFingerprintOptions& DefaultIWMFingerprintOptions();
+
 class IWMFingerprint : public IW_Bits_Base
 {
   friend
@@ -29,6 +54,8 @@ class IWMFingerprint : public IW_Bits_Base
     int _min_heteroatoms_at_path_ends;
 
     Atom_Typing_Specification _atom_typing_specification;
+
+    IWMFingerprintOptions _options;
 
 #ifdef COUNT_TIMES_ATOM_IN_PATH
     int _cycles_adjust_times_used;
@@ -50,10 +77,15 @@ class IWMFingerprint : public IW_Bits_Base
 
   public:
     IWMFingerprint ();
+    explicit IWMFingerprint (const IWMFingerprintOptions& options);
     IWMFingerprint (int);
+    IWMFingerprint (int, const IWMFingerprintOptions& options);
     ~IWMFingerprint ();
 
     int nset () const;
+
+    const IWMFingerprintOptions& options() const { return _options;}
+    IWMFingerprintOptions& options() { return _options;}
 
     int initialise_atom_typing_specification (const const_IWSubstring &);
 

@@ -180,7 +180,6 @@ FixedBitVector::FixedBitVector(FixedBitVector&& rhs) {
   _nbits = rhs._nbits;
   _bits = rhs._bits;
 
-  delete [] rhs._bits;
   rhs._bits = nullptr;
   rhs._nwords = 0;
   rhs._nbits = 0;
@@ -824,5 +823,25 @@ FixedBitVector::ConstructFromArray(const T * bits, int nbits) {
 }
 
 template int FixedBitVector::ConstructFromArray(const int * bits, int nbits);
+
+template <typename T>
+int
+FixedBitVector::ConstructFromArrayIWBitsOrder(const T * bits, int nbits) {
+  if (_nwords) {
+    resize(0);
+  }
+  _allocate_bits(nbits);
+
+  unsigned char* destination = reinterpret_cast<unsigned char*>(_bits);
+  for (int i = 0; i < nbits; ++i) {
+    if (bits[i]) {
+      destination[i / IW_BITS_PER_BYTE] |= one_bit_8[i % IW_BITS_PER_BYTE];
+    }
+  }
+
+  return nbits;
+}
+
+template int FixedBitVector::ConstructFromArrayIWBitsOrder(const int * bits, int nbits);
 
 }  // namespace fixed_bit_vector

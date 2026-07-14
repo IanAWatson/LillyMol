@@ -123,6 +123,12 @@ class FixedBitVector {
     // Items in `bits` that are non zero, set the corresponding bit.
     template <typename T> int ConstructFromArray(const T * bits, int nbits);
 
+    // Items in `bits` that are non zero, set the corresponding bit using
+    // the historical IW_Bits_Base byte ordering. This is needed when building
+    // a FixedBitVector from legacy fingerprint generators whose arrays are
+    // normally encoded via IW_Bits_Base/Daylight ASCII.
+    template <typename T> int ConstructFromArrayIWBitsOrder(const T * bits, int nbits);
+
     // Copy our contents to `destination`.
     // Return a pointer just past the end of what was written.
     void* CopyToContiguousStorage(void * destination) const;

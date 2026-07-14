@@ -7,6 +7,8 @@ load("@com_google_protobuf//bazel:cc_proto_library.bzl", "cc_proto_library")
 
 package(default_visibility = ["//visibility:public"])
 
+exports_files(["testdata/rand10.standard.gfp"])
+
 pybind_extension(
     name = "lillymol",
     srcs = [
@@ -85,30 +87,6 @@ pybind_extension(
     name = "lillymol_ring",
     srcs = [
         "lillymol_pybind_ring.cc",
-    ],
-    deps = [
-        "//Molecule_Lib:iwmolecule",
-        "//Molecule_Lib:moleculeio",
-#       "@python",
-    ],
-)
-
-pybind_extension(
-    name = "lillymol_atom",
-    srcs = [
-        "lillymol_pybind_atom.cc",
-    ],
-    deps = [
-        "//Molecule_Lib:iwmolecule",
-        "//Molecule_Lib:moleculeio",
-#       "@python",
-    ],
-)
-
-pybind_extension(
-    name = "lillymol_bond",
-    srcs = [
-        "lillymol_pybind_bond.cc",
     ],
     deps = [
         "//Molecule_Lib:iwmolecule",
@@ -222,8 +200,10 @@ py_test(
     srcs = ["lillymol_tools_gfp_test.py"],
     data = [
         "testdata/rand10.complex.gfp",
+        "testdata/rand10.standard.gfp",
     ],
     deps = [
+        ":lillymol",
         ":lillymol_tools",
     ],
 )

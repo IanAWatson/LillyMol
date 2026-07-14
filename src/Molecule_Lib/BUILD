@@ -1307,6 +1307,19 @@ cc_library(
     ],
 )
 
+
+cc_test(
+    name = "iwmfingerprint_test",
+    timeout = "short",
+    srcs = ["iwmfingerprint_test.cc"],
+    deps = [
+        ":iwmfingerprint",
+        ":iwmolecule",
+        ":moleculeio",
+        "@googletest//:gtest_main",
+    ],
+)
+
 cc_library(
     name = "iw_vdw",
     srcs = [

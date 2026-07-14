@@ -5,7 +5,8 @@ import unittest
 
 sys.path.insert(0, os.path.dirname(__file__))
 
-from lillymol_tools import GFPList
+from lillymol import Molecule
+from lillymol_tools import GFPContext, GFPList
 
 
 def _write_file(contents):
@@ -85,6 +86,18 @@ class TestGFPList(unittest.TestCase):
         finally:
             os.remove(fname)
 
+    def test_standard_gfp_golden_distances(self):
+        gfp = GFPList.from_file(_testdata_file('rand10.standard.gfp'))
+        self.assertGreater(len(gfp), 3)
+        self.assertEqual(gfp.id(0), 'CHEMBL3460651')
+        self.assertEqual(gfp.id(1), 'CHEMBL3460651.a')
+        self.assertEqual(gfp.id(3), 'CHEMBL1417367')
+
+        self.assertAlmostEqual(gfp.distance(0, 1), 0.0421, delta=0.0001)
+        self.assertAlmostEqual(gfp.distance(1, 0), 0.0421, delta=0.0001)
+        self.assertAlmostEqual(gfp.distance(3, 0), 0.499, delta=0.001)
+        self.assertAlmostEqual(gfp.distance(0, 3), 0.499, delta=0.001)
+
     def test_complex_gfp_file(self):
         gfp = GFPList.from_file(_testdata_file('rand10.complex.gfp'))
         self.assertEqual(len(gfp), 10)
@@ -119,6 +132,128 @@ class TestGFPList(unittest.TestCase):
             self.assertAlmostEqual(gfp.distance(0, 1), 0.5, places=6)
         finally:
             os.remove(fname)
+
+
+    def test_standard_context_generates_fingerprints(self):
+        ctx = GFPContext.standard()
+        self.assertEqual(ctx.tags(), ['FPIW<', 'FPMK<', 'FPMK2<', 'MPR<'])
+        self.assertTrue(ctx.can_generate_fingerprints())
+
+        ethane = Molecule()
+        self.assertTrue(ethane.build_from_smiles('CC ethane'))
+        propane = Molecule()
+        self.assertTrue(propane.build_from_smiles('CCC propane'))
+
+        fp1 = ctx.fingerprint(ethane)
+        fp2 = ctx.fingerprint(propane)
+        self.assertAlmostEqual(ctx.distance(fp1, fp1), 0.0, places=6)
+        d12 = ctx.distance(fp1, fp2)
+        self.assertGreaterEqual(d12, 0.0)
+        self.assertLessEqual(d12, 1.0)
+        self.assertAlmostEqual(ctx.distance(fp2, fp1), d12, places=6)
+
+    def test_standard_list_add_and_query_fingerprint(self):
+        gfp = GFPList.standard()
+        self.assertEqual(gfp.tags(), ['FPIW<', 'FPMK<', 'FPMK2<', 'MPR<'])
+
+        for smiles in ['CC ethane', 'CCC propane', 'CCCC butane']:
+            mol = Molecule()
+            self.assertTrue(mol.build_from_smiles(smiles))
+            gfp.add(mol)
+
+        self.assertEqual(len(gfp), 3)
+        self.assertEqual(gfp.id(0), 'ethane')
+        self.assertAlmostEqual(gfp.distance(0, 0), 0.0, places=6)
+
+        query = Molecule()
+        self.assertTrue(query.build_from_smiles('CCC query'))
+        fp = GFPContext.standard().fingerprint(query)
+        self.assertAlmostEqual(gfp.distance(fp, 1), 0.0, places=6)
+
+        hits = gfp.nearest_neighbours(fp, 2)
+        self.assertEqual(hits[0].index, 1)
+        self.assertAlmostEqual(hits[0].distance, 0.0, places=6)
+
+
+    def test_programmatic_standard_list_matches_stored_file_distances(self):
+        stored = GFPList.from_file(_testdata_file('rand10.standard.gfp'))
+        generated = GFPList.standard()
+
+        for i in range(len(stored)):
+            mol = Molecule()
+            self.assertTrue(mol.build_from_smiles(stored.smiles(i)))
+            generated.add(mol)
+
+        self.assertEqual(len(generated), len(stored))
+        for i in range(len(stored)):
+            for j in range(len(stored)):
+                self.assertAlmostEqual(generated.distance(i, j),
+                                       stored.distance(i, j),
+                                       places=6,
+                                       msg=f'{i},{j}')
+
+    def test_gfp_failures_raise_exceptions(self):
+        mol = Molecule()
+        self.assertTrue(mol.build_from_smiles('CC ethane'))
+
+        with self.assertRaises(RuntimeError):
+            GFPContext().fingerprint(mol)
+
+        with self.assertRaises(RuntimeError):
+            GFPList().add(mol)
+
+        with self.assertRaises(RuntimeError):
+            GFPList.from_file('/no/such/gfp/file.gfp')
+
+        gfp = GFPList.standard()
+        gfp.add(mol)
+        with self.assertRaises(IndexError):
+            gfp.distance(0, 1)
+        with self.assertRaises(IndexError):
+            gfp.smiles(1)
+        with self.assertRaises(IndexError):
+            gfp.nearest_neighbours(1, 1)
+        with self.assertRaises(ValueError):
+            gfp.nearest_neighbours_within_distance(0, -1.0)
+        with self.assertRaises(RuntimeError):
+            gfp.use_only(['NO_SUCH_TAG<'])
+
+        carbon_fname = _write_file(CARBON_GFP)
+        try:
+            carbon = GFPList.from_file(carbon_fname)
+            fp = GFPContext.standard().fingerprint(mol)
+            with self.assertRaises(ValueError):
+                carbon.distance(fp, 0)
+            with self.assertRaises(ValueError):
+                carbon.nearest_neighbours(fp, 1)
+        finally:
+            os.remove(carbon_fname)
+
+
+    def test_generated_standard_fingerprints_match_stored_file(self):
+        stored = GFPList.from_file(_testdata_file('rand10.standard.gfp'))
+        self.assertEqual(stored.tags(), ['FPIW<', 'FPMK<', 'FPMK2<', 'MPR<'])
+
+        ctx = GFPContext.standard()
+        for i in range(len(stored)):
+            mol = Molecule()
+            self.assertTrue(mol.build_from_smiles(stored.smiles(i)))
+            fp = ctx.fingerprint(mol)
+            self.assertAlmostEqual(stored.distance(fp, i), 0.0, places=6,
+                                   msg=stored.id(i))
+
+    def test_standard_generation_can_skip_preprocessing(self):
+        ctx = GFPContext.standard(preprocess=False)
+        self.assertTrue(ctx.can_generate_fingerprints())
+        mol = Molecule()
+        self.assertTrue(mol.build_from_smiles('CCO ethanol'))
+        fp = ctx.fingerprint(mol)
+        self.assertAlmostEqual(ctx.distance(fp, fp), 0.0, places=6)
+
+        gfp = GFPList.standard(preprocess=False)
+        gfp.add(mol)
+        self.assertEqual(len(gfp), 1)
+        self.assertAlmostEqual(gfp.distance(0, 0), 0.0, places=6)
 
 
 if __name__ == '__main__':

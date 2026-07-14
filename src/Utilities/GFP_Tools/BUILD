@@ -1559,6 +1559,11 @@ cc_library(
         "//Foundational/iw_tdt",
         "//Foundational/iwbits",
         "//Foundational/iwstring",
+        "//Molecule_Lib:iwmfingerprint",
+        "//Molecule_Lib:iwmolecule",
+        "//Molecule_Lib:moleculeio",
+        "//Molecule_Tools:maccskeys_fn5_lib",
+        "//Molecule_Tools:mpr",
     ],
 )
 
@@ -1576,6 +1581,9 @@ cc_test(
     name = "gfp_context_test",
     timeout = "short",
     srcs = ["gfp_context_test.cc"],
+    data = [
+        "//pybind:testdata/rand10.standard.gfp",
+    ],
     deps = [
         ":gfp_context",
         "//Foundational/iw_tdt",

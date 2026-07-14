@@ -6,16 +6,19 @@
 #include <string>
 #include <vector>
 
-#include "Foundational/iwbits/iwbits.h"
 #include "Foundational/iwbits/fixed_bit_vector.h"
+#include "Foundational/iwbits/iwbits.h"
 #include "Foundational/iwstring/iwstring.h"
 
 #include "Utilities/GFP_Tools/fixed_size_counted_fingerprint.h"
 #include "Utilities/GFP_Tools/sparsefp.h"
 
 class IW_TDT;
+class Molecule;
 
 namespace gfp_context {
+
+class StandardFingerprintGenerator;
 
 enum class ComponentKind : uint8_t {
   kMolecularProperties,
@@ -58,11 +61,15 @@ class MolecularProperties {
   MolecularProperties& operator=(MolecularProperties&& rhs) noexcept;
 
   int Build(const const_IWSubstring& buffer);
+  int BuildFromArray(const int* properties, int nproperties);
 
-  int nproperties() const {
+  int
+  nproperties() const {
     return _nproperties;
   }
-  const int* properties() const {
+
+  const int*
+  properties() const {
     return _property;
   }
 
@@ -76,14 +83,20 @@ class FixedBitVector {
 
  public:
   int Build(const const_IWSubstring& buffer);
+  int BuildFromArray(const int* bits, int nbits);
 
-  int nbits() const {
+  int
+  nbits() const {
     return _bits.nbits();
   }
-  int nset() const {
+
+  int
+  nset() const {
     return _nset;
   }
-  const fixed_bit_vector::FixedBitVector& bits() const {
+
+  const fixed_bit_vector::FixedBitVector&
+  bits() const {
     return _bits;
   }
 
@@ -118,20 +131,38 @@ class GFPFingerprint {
   int Allocate(const GFPContext& context);
   int Build(const IW_TDT& tdt, const GFPContext& context);
 
-  uint64_t context_hash() const {
+  uint64_t
+  context_hash() const {
     return _context_hash;
   }
 
-  const MolecularProperties& molecular_properties() const {
+  const MolecularProperties&
+  molecular_properties() const {
     return _molecular_properties;
   }
-  const FixedBitVector& fixed_binary(int i) const {
+
+  MolecularProperties&
+  mutable_molecular_properties() {
+    return _molecular_properties;
+  }
+
+  const FixedBitVector&
+  fixed_binary(int i) const {
     return _fixed_binary[i];
   }
-  const Sparse_Fingerprint& sparse(int i) const {
+
+  FixedBitVector&
+  mutable_fixed_binary(int i) {
+    return _fixed_binary[i];
+  }
+
+  const Sparse_Fingerprint&
+  sparse(int i) const {
     return _sparse[i];
   }
-  const Fixed_Size_Counted_Fingerprint_uchar& fixed_counted(int i) const {
+
+  const Fixed_Size_Counted_Fingerprint_uchar&
+  fixed_counted(int i) const {
     return _fixed_counted[i];
   }
 };
@@ -140,6 +171,7 @@ class GFPContext {
  private:
   std::vector<Component> _components;
   std::vector<ActiveComponent> _active;
+  std::unique_ptr<StandardFingerprintGenerator> _standard_generator;
 
   int _nfixed_binary = 0;
   int _nsparse = 0;
@@ -149,39 +181,63 @@ class GFPContext {
   uint64_t _context_hash = 0;
 
   void ComputeHash();
+  void CanonicalizeComponents();
   void BuildDefaultActiveList();
 
  public:
-  int BuildFromTdt(const IW_TDT& tdt);
+  GFPContext();
+  ~GFPContext();
 
-  uint64_t context_hash() const {
+  int BuildFromTdt(const IW_TDT& tdt);
+  int BuildStandard(bool preprocess = true);
+
+  bool
+  can_generate_fingerprints() const {
+    return _standard_generator != nullptr;
+  }
+
+  uint64_t
+  context_hash() const {
     return _context_hash;
   }
-  int nfixed_binary() const {
+
+  int
+  nfixed_binary() const {
     return _nfixed_binary;
   }
-  int nsparse() const {
+
+  int
+  nsparse() const {
     return _nsparse;
   }
-  int nfixed_counted() const {
+
+  int
+  nfixed_counted() const {
     return _nfixed_counted;
   }
-  bool has_molecular_properties() const {
+
+  bool
+  has_molecular_properties() const {
     return _has_molecular_properties;
   }
 
-  const std::vector<Component>& components() const {
+  const std::vector<Component>&
+  components() const {
     return _components;
   }
-  const std::vector<ActiveComponent>& active_components() const {
+
+  const std::vector<ActiveComponent>&
+  active_components() const {
     return _active;
   }
+
   std::vector<std::string> Tags() const;
 
   int SetWeight(const const_IWSubstring& tag, float weight);
   int UseOnly(const std::vector<IWString>& tags);
   void UseAll();
 
+  int Fingerprint(Molecule& m, GFPFingerprint& result);
   float Distance(const GFPFingerprint& lhs, const GFPFingerprint& rhs) const;
 };
 
@@ -199,36 +255,52 @@ class GFPList {
 
   int BuildContextIfNeeded(const IW_TDT& tdt);
   int Add(const IW_TDT& tdt);
+  int Add(const GFPFingerprint& fp, const IWString& smiles, const IWString& id);
 
  public:
   GFPList();
   explicit GFPList(std::shared_ptr<GFPContext> context);
 
+  static std::shared_ptr<GFPList> Standard(bool preprocess = true);
+
   int ReadFile(const char* fname, int size_hint = 0);
   int Reserve(int size_hint);
+  int Add(Molecule& m);
 
-  int size() const {
+  int
+  size() const {
     return _ids.size();
   }
 
-  const GFPContext& context() const {
-    return *_context;
-  }
-  GFPContext& mutable_context() {
+  const GFPContext&
+  context() const {
     return *_context;
   }
 
-  const IWString& smiles(int i) const {
+  GFPContext&
+  mutable_context() {
+    return *_context;
+  }
+
+  const IWString&
+  smiles(int i) const {
     return _smiles[i];
   }
-  const IWString& id(int i) const {
+
+  const IWString&
+  id(int i) const {
     return _ids[i];
   }
 
   float Distance(int i, int j) const;
+  float Distance(const GFPFingerprint& fp, int j) const;
   std::vector<NearestNeighbour> NearestNeighbours(int query, int k) const;
+  std::vector<NearestNeighbour> NearestNeighbours(const GFPFingerprint& query,
+                                                  int k) const;
   std::vector<NearestNeighbour> NearestNeighboursWithinDistance(int query,
                                                                 float max_distance) const;
+  std::vector<NearestNeighbour> NearestNeighboursWithinDistance(
+      const GFPFingerprint& query, float max_distance) const;
 };
 
 }  // namespace gfp_context

@@ -5,10 +5,17 @@
 #include <cstring>
 #include <iostream>
 #include <limits>
+#include <memory>
 
 #include "Foundational/data_source/iwstring_data_source.h"
 #include "Foundational/iw_tdt/iw_tdt.h"
 
+#include "Molecule_Lib/iwmfingerprint.h"
+#include "Molecule_Lib/molecule.h"
+#include "Molecule_Lib/standardise.h"
+
+#include "Molecule_Tools/maccskeys_fn5.h"
+#include "Molecule_Tools/mpr.h"
 #include "Utilities/GFP_Tools/dyfp.h"
 
 namespace gfp_context {
@@ -33,7 +40,6 @@ uint64_t
 Fnv1a(uint64_t hash, const IWString& s) {
   return Fnv1a(hash, s.rawchars(), s.length());
 }
-
 
 bool
 TagFromDataitem(const const_IWSubstring& item, IWString& tag) {
@@ -67,6 +73,25 @@ CountTdts(iwstring_data_source& input, const char* fname) {
   return static_cast<int>(result);
 }
 
+int
+CompareTagsCanonical(const IWString& lhs, const IWString& rhs) {
+  const int n1 = lhs.ends_with('<') ? lhs.length() - 1 : lhs.length();
+  const int n2 = rhs.ends_with('<') ? rhs.length() - 1 : rhs.length();
+  const int n = std::min(n1, n2);
+
+  const int cmp = strncmp(lhs.rawchars(), rhs.rawchars(), n);
+  if (cmp != 0) {
+    return cmp;
+  }
+  if (n1 < n2) {
+    return -1;
+  }
+  if (n1 > n2) {
+    return 1;
+  }
+  return 0;
+}
+
 float
 FixedBinaryTanimoto(const FixedBitVector& lhs, const FixedBitVector& rhs) {
   const int bic = lhs.bits().BitsInCommon(rhs.bits());
@@ -80,8 +105,75 @@ FixedBinaryTanimoto(const FixedBitVector& lhs, const FixedBitVector& rhs) {
 
 }  // namespace
 
+class StandardFingerprintGenerator {
+ private:
+  Molecular_Properties_Generator _mpr;
+  MACCSKeys _mk;
+  IWMFingerprintOptions _iw_options;
+  Chemical_Standardisation _chemical_standardisation;
+  int _preprocess = 1;
+  int _tmp[2048];
+
+  void Preprocess(Molecule& m);
+
+ public:
+  explicit StandardFingerprintGenerator(bool preprocess);
+
+  int Generate(Molecule& m, GFPFingerprint& destination);
+};
+
+StandardFingerprintGenerator::StandardFingerprintGenerator(bool preprocess)
+    : _preprocess(preprocess) {
+  _chemical_standardisation.activate_all();
+}
+
+void
+StandardFingerprintGenerator::Preprocess(Molecule& m) {
+  m.reduce_to_largest_fragment_carefully();
+  m.remove_all_chiral_centres();
+  m.revert_all_directional_bonds_to_non_directional();
+  _chemical_standardisation.process(m);
+}
+
+int
+StandardFingerprintGenerator::Generate(Molecule& input, GFPFingerprint& destination) {
+  std::unique_ptr<Molecule> copy;
+  Molecule* m = &input;
+  if (_preprocess) {
+    copy = std::make_unique<Molecule>(input);
+    Preprocess(*copy);
+    m = copy.get();
+  }
+
+  int properties[8];
+  _mpr(*m, properties);
+  if (!destination.mutable_molecular_properties().BuildFromArray(properties, 8)) {
+    return 0;
+  }
+
+  IWMFingerprint iwfp(_iw_options);
+  iwfp.construct_fingerprint(*m);
+  if (!destination.mutable_fixed_binary(0).BuildFromArray(
+          iwfp.vector(), _iw_options.bits_per_fingerprint)) {
+    return 0;
+  }
+
+  std::fill_n(_tmp, 2048, 0);
+  _mk(*m, _tmp);
+  if (!destination.mutable_fixed_binary(1).BuildFromArray(_tmp, _mk.nbits())) {
+    return 0;
+  }
+
+  _mk.set_level_2_fingerprint(_tmp);
+  if (!destination.mutable_fixed_binary(2).BuildFromArray(_tmp, _mk.nbits())) {
+    return 0;
+  }
+
+  return 1;
+}
+
 MolecularProperties::~MolecularProperties() {
-  delete [] _property;
+  delete[] _property;
 }
 
 MolecularProperties::MolecularProperties(const MolecularProperties& rhs) {
@@ -94,7 +186,7 @@ MolecularProperties::operator=(const MolecularProperties& rhs) {
     return *this;
   }
 
-  delete [] _property;
+  delete[] _property;
   _nproperties = rhs._nproperties;
   if (_nproperties == 0) {
     _property = nullptr;
@@ -117,7 +209,7 @@ MolecularProperties::operator=(MolecularProperties&& rhs) noexcept {
     return *this;
   }
 
-  delete [] _property;
+  delete[] _property;
 
   _nproperties = rhs._nproperties;
   _property = rhs._property;
@@ -143,7 +235,7 @@ MolecularProperties::Build(const const_IWSubstring& buffer) {
   }
 
   if (_nproperties != nproperties) {
-    delete [] _property;
+    delete[] _property;
     _nproperties = nproperties;
     _property = new int[_nproperties];
   }
@@ -153,6 +245,22 @@ MolecularProperties::Build(const const_IWSubstring& buffer) {
     _property[i] = bits[i];
   }
 
+  return 1;
+}
+
+int
+MolecularProperties::BuildFromArray(const int* properties, int nproperties) {
+  if (nproperties <= 0) {
+    return 0;
+  }
+
+  if (_nproperties != nproperties) {
+    delete[] _property;
+    _nproperties = nproperties;
+    _property = new int[_nproperties];
+  }
+
+  std::copy(properties, properties + _nproperties, _property);
   return 1;
 }
 
@@ -190,6 +298,20 @@ FixedBitVector::Build(const const_IWSubstring& buffer) {
   return 1;
 }
 
+int
+FixedBitVector::BuildFromArray(const int* bits, int nbits) {
+  if (nbits <= 0) {
+    return 0;
+  }
+
+  if (!_bits.ConstructFromArrayIWBitsOrder(bits, nbits)) {
+    return 0;
+  }
+  _nset = _bits.nset();
+
+  return 1;
+}
+
 float
 FixedBitVector::Tanimoto(const FixedBitVector& rhs) const {
   return FixedBinaryTanimoto(*this, rhs);
@@ -197,9 +319,9 @@ FixedBitVector::Tanimoto(const FixedBitVector& rhs) const {
 
 void
 GFPFingerprint::FreeArrays() {
-  delete [] _fixed_binary;
-  delete [] _sparse;
-  delete [] _fixed_counted;
+  delete[] _fixed_binary;
+  delete[] _sparse;
+  delete[] _fixed_counted;
 
   _fixed_binary = nullptr;
   _sparse = nullptr;
@@ -285,7 +407,8 @@ GFPFingerprint::Build(const IW_TDT& tdt, const GFPContext& context) {
         break;
       case ComponentKind::kSparse:
         if (!_sparse[component.index].construct_from_tdt_record(dataitem)) {
-          std::cerr << "GFPFingerprint::Build:cannot parse sparse '" << component.tag << "'\n";
+          std::cerr << "GFPFingerprint::Build:cannot parse sparse '" << component.tag
+                    << "'\n";
           return 0;
         }
         break;
@@ -316,6 +439,40 @@ GFPContext::ComputeHash() {
 }
 
 void
+GFPContext::CanonicalizeComponents() {
+  std::sort(_components.begin(), _components.end(),
+            [](const Component& lhs, const Component& rhs) {
+              return CompareTagsCanonical(lhs.tag, rhs.tag) < 0;
+            });
+
+  _nfixed_binary = 0;
+  _nsparse = 0;
+  _nfixed_counted = 0;
+  _has_molecular_properties = false;
+
+  for (Component& component : _components) {
+    switch (component.kind) {
+      case ComponentKind::kMolecularProperties:
+        component.index = 0;
+        _has_molecular_properties = true;
+        break;
+      case ComponentKind::kFixedBinary:
+        component.index = _nfixed_binary;
+        ++_nfixed_binary;
+        break;
+      case ComponentKind::kSparse:
+        component.index = _nsparse;
+        ++_nsparse;
+        break;
+      case ComponentKind::kFixedCounted:
+        component.index = _nfixed_counted;
+        ++_nfixed_counted;
+        break;
+    }
+  }
+}
+
+void
 GFPContext::BuildDefaultActiveList() {
   _active.clear();
   if (_components.empty()) {
@@ -329,6 +486,10 @@ GFPContext::BuildDefaultActiveList() {
   }
 }
 
+GFPContext::GFPContext() = default;
+
+GFPContext::~GFPContext() = default;
+
 int
 GFPContext::BuildFromTdt(const IW_TDT& tdt) {
   _components.clear();
@@ -338,6 +499,7 @@ GFPContext::BuildFromTdt(const IW_TDT& tdt) {
   _nfixed_counted = 0;
   _has_molecular_properties = false;
   _context_hash = 0;
+  _standard_generator.reset();
 
   int i = 0;
   const_IWSubstring item;
@@ -351,13 +513,15 @@ GFPContext::BuildFromTdt(const IW_TDT& tdt) {
       _has_molecular_properties = true;
       _components.push_back(Component{ComponentKind::kMolecularProperties, tag, 0, 1.0f});
     } else if (TagStartsWith(tag, "FP")) {
-      _components.push_back(Component{ComponentKind::kFixedBinary, tag, _nfixed_binary, 1.0f});
+      _components.push_back(
+          Component{ComponentKind::kFixedBinary, tag, _nfixed_binary, 1.0f});
       ++_nfixed_binary;
     } else if (TagStartsWith(tag, "NC")) {
       _components.push_back(Component{ComponentKind::kSparse, tag, _nsparse, 1.0f});
       ++_nsparse;
     } else if (TagStartsWith(tag, "FC")) {
-      _components.push_back(Component{ComponentKind::kFixedCounted, tag, _nfixed_counted, 1.0f});
+      _components.push_back(
+          Component{ComponentKind::kFixedCounted, tag, _nfixed_counted, 1.0f});
       ++_nfixed_counted;
     }
   }
@@ -367,6 +531,35 @@ GFPContext::BuildFromTdt(const IW_TDT& tdt) {
     return 0;
   }
 
+  CanonicalizeComponents();
+  ComputeHash();
+  BuildDefaultActiveList();
+
+  return 1;
+}
+
+int
+GFPContext::BuildStandard(bool preprocess) {
+  _components.clear();
+  _active.clear();
+  _nfixed_binary = 0;
+  _nsparse = 0;
+  _nfixed_counted = 0;
+  _has_molecular_properties = true;
+  _context_hash = 0;
+
+  _components.push_back(
+      Component{ComponentKind::kFixedBinary, IWString("FPIW<"), 0, 1.0f});
+  _components.push_back(
+      Component{ComponentKind::kFixedBinary, IWString("FPMK<"), 1, 1.0f});
+  _components.push_back(
+      Component{ComponentKind::kFixedBinary, IWString("FPMK2<"), 2, 1.0f});
+  _components.push_back(
+      Component{ComponentKind::kMolecularProperties, IWString("MPR<"), 0, 1.0f});
+  _nfixed_binary = 3;
+
+  CanonicalizeComponents();
+  _standard_generator = std::make_unique<StandardFingerprintGenerator>(preprocess);
   ComputeHash();
   BuildDefaultActiveList();
 
@@ -436,7 +629,8 @@ GFPContext::UseOnly(const std::vector<IWString>& tags) {
       if (component.tag != tag) {
         continue;
       }
-      _active.push_back(ActiveComponent{component.kind, component.index, component.weight});
+      _active.push_back(
+          ActiveComponent{component.kind, component.index, component.weight});
       found = true;
       break;
     }
@@ -487,6 +681,20 @@ GFPContext::UseAll() {
   }
 }
 
+int
+GFPContext::Fingerprint(Molecule& m, GFPFingerprint& result) {
+  if (_standard_generator == nullptr) {
+    std::cerr << "GFPContext::Fingerprint:context cannot generate fingerprints\n";
+    return 0;
+  }
+
+  if (result.context_hash() != _context_hash && !result.Allocate(*this)) {
+    return 0;
+  }
+
+  return _standard_generator->Generate(m, result);
+}
+
 float
 GFPContext::Distance(const GFPFingerprint& lhs, const GFPFingerprint& rhs) const {
   if (lhs.context_hash() != _context_hash || rhs.context_hash() != _context_hash) {
@@ -497,16 +705,22 @@ GFPContext::Distance(const GFPFingerprint& lhs, const GFPFingerprint& rhs) const
   for (const ActiveComponent& active : _active) {
     switch (active.kind) {
       case ComponentKind::kMolecularProperties:
-        similarity += active.weight * lhs.molecular_properties().Similarity(rhs.molecular_properties());
+        similarity += active.weight *
+                      lhs.molecular_properties().Similarity(rhs.molecular_properties());
         break;
       case ComponentKind::kFixedBinary:
-        similarity += active.weight * lhs.fixed_binary(active.index).Tanimoto(rhs.fixed_binary(active.index));
+        similarity +=
+            active.weight *
+            lhs.fixed_binary(active.index).Tanimoto(rhs.fixed_binary(active.index));
         break;
       case ComponentKind::kSparse:
-        similarity += active.weight * lhs.sparse(active.index).tanimoto(rhs.sparse(active.index));
+        similarity +=
+            active.weight * lhs.sparse(active.index).tanimoto(rhs.sparse(active.index));
         break;
       case ComponentKind::kFixedCounted:
-        similarity += active.weight * lhs.fixed_counted(active.index).tanimoto(rhs.fixed_counted(active.index));
+        similarity +=
+            active.weight *
+            lhs.fixed_counted(active.index).tanimoto(rhs.fixed_counted(active.index));
         break;
     }
   }
@@ -522,6 +736,16 @@ GFPList::GFPList() : _context(std::make_shared<GFPContext>()) {
 }
 
 GFPList::GFPList(std::shared_ptr<GFPContext> context) : _context(std::move(context)) {
+}
+
+std::shared_ptr<GFPList>
+GFPList::Standard(bool preprocess) {
+  auto context = std::make_shared<GFPContext>();
+  if (!context->BuildStandard(preprocess)) {
+    return nullptr;
+  }
+
+  return std::make_shared<GFPList>(context);
 }
 
 int
@@ -566,7 +790,6 @@ GFPList::Add(const IW_TDT& tdt) {
     return 0;
   }
 
-
   for (const Component& component : _context->components()) {
     const_IWSubstring dataitem;
     if (!tdt.dataitem(component.tag, dataitem)) {
@@ -603,7 +826,8 @@ GFPList::Add(const IW_TDT& tdt) {
       case ComponentKind::kFixedCounted: {
         _fixed_counted.emplace_back();
         if (!_fixed_counted.back().construct_from_tdt_record(dataitem)) {
-          std::cerr << "GFPList::Add:cannot parse fixed counted '" << component.tag << "'\n";
+          std::cerr << "GFPList::Add:cannot parse fixed counted '" << component.tag
+                    << "'\n";
           return 0;
         }
         break;
@@ -615,6 +839,47 @@ GFPList::Add(const IW_TDT& tdt) {
   _ids.push_back(id);
 
   return 1;
+}
+
+int
+GFPList::Add(const GFPFingerprint& fp, const IWString& smiles, const IWString& id) {
+  if (fp.context_hash() != _context->context_hash()) {
+    std::cerr << "GFPList::Add:incompatible fingerprint context\n";
+    return 0;
+  }
+
+  for (const Component& component : _context->components()) {
+    switch (component.kind) {
+      case ComponentKind::kMolecularProperties:
+        _molecular_properties.push_back(fp.molecular_properties());
+        break;
+      case ComponentKind::kFixedBinary:
+        _fixed_binary.push_back(fp.fixed_binary(component.index));
+        break;
+      case ComponentKind::kSparse:
+        _sparse.push_back(fp.sparse(component.index));
+        break;
+      case ComponentKind::kFixedCounted:
+        _fixed_counted.push_back(fp.fixed_counted(component.index));
+        break;
+    }
+  }
+
+  _smiles.push_back(smiles);
+  _ids.push_back(id);
+
+  return 1;
+}
+
+int
+GFPList::Add(Molecule& m) {
+  GFPFingerprint fp;
+  if (!_context->Fingerprint(m, fp)) {
+    return 0;
+  }
+
+  IWString smiles(m.smiles());
+  return Add(fp, smiles, m.name());
 }
 
 int
@@ -663,24 +928,69 @@ GFPList::Distance(int i, int j) const {
   for (const ActiveComponent& active : _context->active_components()) {
     switch (active.kind) {
       case ComponentKind::kMolecularProperties:
-        similarity += active.weight * _molecular_properties[i].Similarity(_molecular_properties[j]);
+        similarity +=
+            active.weight * _molecular_properties[i].Similarity(_molecular_properties[j]);
         break;
       case ComponentKind::kFixedBinary: {
         const int nfixed = _context->nfixed_binary();
-        similarity += active.weight *
-            _fixed_binary[i * nfixed + active.index].Tanimoto(_fixed_binary[j * nfixed + active.index]);
+        similarity += active.weight * _fixed_binary[i * nfixed + active.index].Tanimoto(
+                                          _fixed_binary[j * nfixed + active.index]);
         break;
       }
       case ComponentKind::kSparse: {
         const int nsparse = _context->nsparse();
-        similarity += active.weight *
-            _sparse[i * nsparse + active.index].tanimoto(_sparse[j * nsparse + active.index]);
+        similarity += active.weight * _sparse[i * nsparse + active.index].tanimoto(
+                                          _sparse[j * nsparse + active.index]);
         break;
       }
       case ComponentKind::kFixedCounted: {
         const int nfc = _context->nfixed_counted();
+        similarity += active.weight * _fixed_counted[i * nfc + active.index].tanimoto(
+                                          _fixed_counted[j * nfc + active.index]);
+        break;
+      }
+    }
+  }
+
+  if (similarity > 1.0f && similarity < 1.0001f) {
+    similarity = 1.0f;
+  }
+
+  return 1.0f - similarity;
+}
+
+float
+GFPList::Distance(const GFPFingerprint& fp, int j) const {
+  if (fp.context_hash() != _context->context_hash()) {
+    return std::numeric_limits<float>::quiet_NaN();
+  }
+
+  float similarity = 0.0f;
+  for (const ActiveComponent& active : _context->active_components()) {
+    switch (active.kind) {
+      case ComponentKind::kMolecularProperties:
         similarity += active.weight *
-            _fixed_counted[i * nfc + active.index].tanimoto(_fixed_counted[j * nfc + active.index]);
+                      fp.molecular_properties().Similarity(_molecular_properties[j]);
+        break;
+      case ComponentKind::kFixedBinary: {
+        const int nfixed = _context->nfixed_binary();
+        similarity +=
+            active.weight * fp.fixed_binary(active.index)
+                                .Tanimoto(_fixed_binary[j * nfixed + active.index]);
+        break;
+      }
+      case ComponentKind::kSparse: {
+        const int nsparse = _context->nsparse();
+        similarity +=
+            active.weight *
+            fp.sparse(active.index).tanimoto(_sparse[j * nsparse + active.index]);
+        break;
+      }
+      case ComponentKind::kFixedCounted: {
+        const int nfc = _context->nfixed_counted();
+        similarity +=
+            active.weight * fp.fixed_counted(active.index)
+                                .tanimoto(_fixed_counted[j * nfc + active.index]);
         break;
       }
     }
@@ -727,6 +1037,35 @@ GFPList::NearestNeighbours(int query, int k) const {
 }
 
 std::vector<NearestNeighbour>
+GFPList::NearestNeighbours(const GFPFingerprint& query, int k) const {
+  std::vector<NearestNeighbour> result;
+  if (k <= 0 || query.context_hash() != _context->context_hash()) {
+    return result;
+  }
+
+  result.reserve(std::min(k, size()));
+  for (int i = 0; i < size(); ++i) {
+    result.push_back(NearestNeighbour{i, Distance(query, i)});
+  }
+
+  auto compare = [](const NearestNeighbour& lhs, const NearestNeighbour& rhs) {
+    if (lhs.distance != rhs.distance) {
+      return lhs.distance < rhs.distance;
+    }
+    return lhs.index < rhs.index;
+  };
+
+  if (static_cast<int>(result.size()) > k) {
+    std::nth_element(result.begin(), result.begin() + k, result.end(), compare);
+    result.resize(k);
+  }
+
+  std::sort(result.begin(), result.end(), compare);
+
+  return result;
+}
+
+std::vector<NearestNeighbour>
 GFPList::NearestNeighboursWithinDistance(int query, float max_distance) const {
   std::vector<NearestNeighbour> result;
   if (query < 0 || query >= size() || max_distance < 0.0f) {
@@ -745,12 +1084,38 @@ GFPList::NearestNeighboursWithinDistance(int query, float max_distance) const {
   }
 
   std::sort(result.begin(), result.end(),
-      [](const NearestNeighbour& lhs, const NearestNeighbour& rhs) {
-        if (lhs.distance != rhs.distance) {
-          return lhs.distance < rhs.distance;
-        }
-        return lhs.index < rhs.index;
-      });
+            [](const NearestNeighbour& lhs, const NearestNeighbour& rhs) {
+              if (lhs.distance != rhs.distance) {
+                return lhs.distance < rhs.distance;
+              }
+              return lhs.index < rhs.index;
+            });
+
+  return result;
+}
+
+std::vector<NearestNeighbour>
+GFPList::NearestNeighboursWithinDistance(const GFPFingerprint& query,
+                                         float max_distance) const {
+  std::vector<NearestNeighbour> result;
+  if (query.context_hash() != _context->context_hash() || max_distance < 0.0f) {
+    return result;
+  }
+
+  for (int i = 0; i < size(); ++i) {
+    const float distance = Distance(query, i);
+    if (distance <= max_distance) {
+      result.push_back(NearestNeighbour{i, distance});
+    }
+  }
+
+  std::sort(result.begin(), result.end(),
+            [](const NearestNeighbour& lhs, const NearestNeighbour& rhs) {
+              if (lhs.distance != rhs.distance) {
+                return lhs.distance < rhs.distance;
+              }
+              return lhs.index < rhs.index;
+            });
 
   return result;
 }

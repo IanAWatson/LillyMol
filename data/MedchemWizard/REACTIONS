@@ -101,6 +101,7 @@ PROTO:Ester-amide_isosteres._T_oxetane_ether.textproto
 # ugly PROTO:Ester-amide_isosteres._T_oxetane.textproto
 PROTO:Ester-amide_isosteres._T_sulfonamide.textproto
 Metabolism.acetylene_T_ether.rxn
+Metabolism.ether_T_acetylene.rxn
 Metabolism.alkene_T_alkane.rxn
 Metabolism.alkene_T_cyclopropyl.rxn
 Metabolism.alkene_T_ether.rxn

@@ -14,6 +14,7 @@
 #include "Foundational/iw_tdt/iw_tdt.h"
 #include "Foundational/iwmisc/sparse_fp_creator.h"
 
+#include "Molecule_Lib/atom_pair_fingerprint.h"
 #include "Molecule_Lib/atom_typing.h"
 #include "Molecule_Lib/iwmfingerprint.h"
 #include "Molecule_Lib/molecule.h"
@@ -249,6 +250,22 @@ AppendSanitisedAtomType(const IWString& atom_type, IWString& destination) {
 }
 
 IWString
+AtomPairTag(int min_separation, int max_separation, const IWString& atom_type,
+            bool include_out_of_range) {
+  IWString result;
+  result << "NCAP";
+  if (include_out_of_range) {
+    result << 'T';
+  }
+  result << min_separation << 'M' << max_separation;
+  if (AppendSanitisedAtomType(atom_type, result) == 0) {
+    return IWString();
+  }
+  result << '<';
+  return result;
+}
+
+IWString
 ECTag(int radius, const IWString& atom_type) {
   IWString atom_type_component;
   if (radius < 0 || !AppendSanitisedAtomType(atom_type, atom_type_component)) {
@@ -276,6 +293,16 @@ GFPGeneratorSpec::GFPGeneratorSpec(GeneratorKind kind, int max_path_length,
     : _kind(kind),
       _max_path_length(max_path_length),
       _include_hydrophobic_pairs(include_hydrophobic_pairs) {
+}
+
+GFPGeneratorSpec::GFPGeneratorSpec(GeneratorKind kind, int min_separation,
+                                   int max_separation, const IWString& atom_type,
+                                   bool include_out_of_range)
+    : _kind(kind),
+      _min_separation(min_separation),
+      _max_separation(max_separation),
+      _include_out_of_range(include_out_of_range),
+      _atom_type(atom_type) {
 }
 
 GFPGeneratorSpec
@@ -320,6 +347,13 @@ GFPGeneratorSpec::CATS(int max_path_length, bool include_hydrophobic_pairs) {
 }
 
 GFPGeneratorSpec
+GFPGeneratorSpec::AtomPair(int min_separation, int max_separation,
+                           const IWString& atom_type, bool include_out_of_range) {
+  return GFPGeneratorSpec(GeneratorKind::kAtomPair, min_separation, max_separation,
+                          atom_type, include_out_of_range);
+}
+
+GFPGeneratorSpec
 GFPGeneratorSpec::ECFingerprint(int radius, const IWString& atom_type) {
   return GFPGeneratorSpec(GeneratorKind::kECFingerprint, radius, atom_type);
 }
@@ -357,6 +391,11 @@ GFPGeneratorSpec::Components() const {
     case GeneratorKind::kCATS:
       return {Component{ComponentKind::kSparse,
                         CATSTag(_max_path_length, _include_hydrophobic_pairs), 0, 1.0f}};
+    case GeneratorKind::kAtomPair:
+      return {Component{ComponentKind::kSparse,
+                        AtomPairTag(_min_separation, _max_separation, _atom_type,
+                                    _include_out_of_range),
+                        0, 1.0f}};
     case GeneratorKind::kECFingerprint:
       return {Component{ComponentKind::kSparse, ECTag(_radius, _atom_type), 0, 1.0f}};
     case GeneratorKind::kRingSubstitution:
@@ -387,6 +426,12 @@ GFPGeneratorSpec::Repr() const {
       return "GFP.cats(max_path_length=" + std::to_string(_max_path_length) +
              ", include_hydrophobic_pairs=" +
              (_include_hydrophobic_pairs ? "True" : "False") + ")";
+    case GeneratorKind::kAtomPair:
+      return "GFP.atom_pair(min_separation=" + std::to_string(_min_separation) +
+             ", max_separation=" + std::to_string(_max_separation) + ", atom_type='" +
+             _atom_type.AsString() +
+             "', include_out_of_range=" + (_include_out_of_range ? "True" : "False") +
+             ")";
     case GeneratorKind::kECFingerprint:
       return "GFP.ec(radius=" + std::to_string(_radius) + ", atom_type='" +
              _atom_type.AsString() + "')";
@@ -781,6 +826,85 @@ CATSFingerprintGenerator::Generate(Molecule& m,
     if (count > 0) {
       sfc.hit_bit(i, count);
     }
+  }
+
+  return destination.mutable_sparse(slots[0].index)
+      .build_from_sparse_fingerprint_creator(sfc);
+}
+
+class AtomPairFingerprintGenerator : public FingerprintGeneratorImplementation {
+ private:
+  int _min_separation = 1;
+  int _max_separation = 10;
+  IWString _atom_type_string;
+  bool _include_out_of_range = false;
+  Atom_Typing_Specification _atom_typing;
+  atom_pair_fingerprint::AtomPairFingerprint _atom_pair_fingerprint;
+
+ public:
+  AtomPairFingerprintGenerator(int min_separation, int max_separation,
+                               const IWString& atom_type, bool include_out_of_range)
+      : _min_separation(min_separation),
+        _max_separation(max_separation),
+        _atom_type_string(atom_type),
+        _include_out_of_range(include_out_of_range) {
+  }
+
+  int Initialise();
+  std::vector<Component> Components() const override;
+  int Generate(Molecule& m, const std::vector<GeneratorComponentAssignment>& slots,
+               GFPFingerprint& destination) override;
+};
+
+int
+AtomPairFingerprintGenerator::Initialise() {
+  if (_min_separation < 0 || _max_separation < _min_separation) {
+    return 0;
+  }
+  if (_atom_type_string.empty() || AtomPairTag(_min_separation, _max_separation,
+                                               _atom_type_string, _include_out_of_range)
+                                       .empty()) {
+    return 0;
+  }
+
+  const_IWSubstring tmp(_atom_type_string);
+  if (!_atom_typing.build(tmp)) {
+    return 0;
+  }
+
+  _atom_pair_fingerprint.set_min_separation(_min_separation);
+  _atom_pair_fingerprint.set_max_separation(_max_separation);
+  _atom_pair_fingerprint.set_include_out_of_range_separations(_include_out_of_range);
+
+  return 1;
+}
+
+std::vector<Component>
+AtomPairFingerprintGenerator::Components() const {
+  return {Component{ComponentKind::kSparse,
+                    AtomPairTag(_min_separation, _max_separation, _atom_type_string,
+                                _include_out_of_range),
+                    0, 1.0f}};
+}
+
+int
+AtomPairFingerprintGenerator::Generate(
+    Molecule& m, const std::vector<GeneratorComponentAssignment>& slots,
+    GFPFingerprint& destination) {
+  if (slots.size() != 1 || slots[0].kind != ComponentKind::kSparse) {
+    std::cerr << "AtomPairFingerprintGenerator::Generate:invalid slots\n";
+    return 0;
+  }
+
+  std::vector<atom_pair_fingerprint::atom_type_t> atom_type(m.natoms());
+  if (!_atom_typing.assign_atom_types(m, atom_type.data())) {
+    std::cerr << "AtomPairFingerprintGenerator::Generate:cannot assign atom types\n";
+    return 0;
+  }
+
+  Sparse_Fingerprint_Creator sfc;
+  if (!_atom_pair_fingerprint.Fingerprint(m, nullptr, atom_type.data(), sfc)) {
+    return 0;
   }
 
   return destination.mutable_sparse(slots[0].index)
@@ -1296,6 +1420,10 @@ MakeGenerator(const GFPGeneratorSpec& spec) {
     case GeneratorKind::kCATS:
       return std::make_unique<CATSFingerprintGenerator>(spec.max_path_length(),
                                                         spec.include_hydrophobic_pairs());
+    case GeneratorKind::kAtomPair:
+      return std::make_unique<AtomPairFingerprintGenerator>(
+          spec.min_separation(), spec.max_separation(), spec.atom_type(),
+          spec.include_out_of_range());
     case GeneratorKind::kECFingerprint:
       return std::make_unique<ECFingerprintGenerator>(spec.radius(), spec.atom_type());
     case GeneratorKind::kRingSubstitution:
@@ -1409,6 +1537,17 @@ GFPContext::BuildFromSpecs(const std::vector<GFPGeneratorSpec>& specs, bool prep
                 << spec.max_path_length() << '\n';
       return 0;
     }
+    if (spec.kind() == GeneratorKind::kAtomPair) {
+      if (spec.min_separation() < 0 || spec.max_separation() < spec.min_separation() ||
+          spec.atom_type().empty() ||
+          AtomPairTag(spec.min_separation(), spec.max_separation(), spec.atom_type(),
+                      spec.include_out_of_range())
+              .empty()) {
+        std::cerr << "GFPContext::BuildFromSpecs:invalid atom pair spec " << spec.Repr()
+                  << '\n';
+        return 0;
+      }
+    }
     if (spec.kind() == GeneratorKind::kECFingerprint) {
       if (spec.radius() < 0 || spec.atom_type().empty() ||
           ECTag(spec.radius(), spec.atom_type()).empty()) {
@@ -1426,6 +1565,15 @@ GFPContext::BuildFromSpecs(const std::vector<GFPGeneratorSpec>& specs, bool prep
       CATSFingerprintGenerator* cats =
           dynamic_cast<CATSFingerprintGenerator*>(generator.get());
       if (cats == nullptr || !cats->Initialise()) {
+        std::cerr << "GFPContext::BuildFromSpecs:cannot initialise " << spec.Repr()
+                  << '\n';
+        return 0;
+      }
+    }
+    if (spec.kind() == GeneratorKind::kAtomPair) {
+      AtomPairFingerprintGenerator* atom_pair =
+          dynamic_cast<AtomPairFingerprintGenerator*>(generator.get());
+      if (atom_pair == nullptr || !atom_pair->Initialise()) {
         std::cerr << "GFPContext::BuildFromSpecs:cannot initialise " << spec.Repr()
                   << '\n';
         return 0;

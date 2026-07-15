@@ -260,6 +260,35 @@ class TestGFPList(unittest.TestCase):
         with self.assertRaises(ValueError):
             GFP.cats(max_path_length=0)
 
+    def test_atom_pair_generator_spec(self):
+        spec = GFP.atom_pair(min_separation=1, max_separation=3, atom_type='UST:Y')
+        self.assertEqual(spec.components(), ['NCAP1M3USTY<'])
+        self.assertEqual(
+            repr(spec),
+            "GFP.atom_pair(min_separation=1, max_separation=3, "
+            "atom_type='UST:Y', include_out_of_range=False)")
+
+        ctx = GFPContext.from_specs([spec])
+        self.assertEqual(ctx.tags(), ['NCAP1M3USTY<'])
+        mol = _mol('CCO ethanol')
+        fp = ctx.fingerprint(mol)
+        self.assertAlmostEqual(ctx.distance(fp, fp), 0.0, places=6)
+
+    def test_atom_pair_out_of_range_tag(self):
+        spec = GFP.atom_pair(
+            min_separation=0, max_separation=2, include_out_of_range=True)
+        self.assertEqual(spec.components(), ['NCAPT0M2USTY<'])
+
+    def test_atom_pair_rejects_invalid_specs(self):
+        with self.assertRaises(ValueError):
+            GFP.atom_pair(min_separation=-1)
+        with self.assertRaises(ValueError):
+            GFP.atom_pair(min_separation=4, max_separation=3)
+        with self.assertRaises(ValueError):
+            GFP.atom_pair(atom_type='')
+        with self.assertRaises(RuntimeError):
+            GFPContext.from_specs([GFP.atom_pair(atom_type='UST:Y-')])
+
     def test_ring_substitution_generator_spec(self):
         spec = GFP.ring_substitution()
         self.assertEqual(spec.components(), ['NCRS<'])

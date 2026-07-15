@@ -1559,6 +1559,7 @@ cc_library(
         "//Foundational/iw_tdt",
         "//Foundational/iwbits",
         "//Foundational/iwstring",
+        "//Molecule_Lib:atom_pair_fingerprint",
         "//Molecule_Lib:iwmfingerprint",
         "//Molecule_Lib:iwmolecule",
         "//Molecule_Lib:moleculeio",

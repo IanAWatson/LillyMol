@@ -902,6 +902,13 @@ where the `jwcats -p` option suppresses hydrophobic-hydrophobic pairs. CATS
 initialization requires `LILLYMOL_HOME` so the default charge and
 donor/acceptor assigners can be loaded.
 
+`GFP.atom_pair(min_separation=1, max_separation=10, atom_type="UST:Y",
+include_out_of_range=False)` adds the newer sparse counted atom-pair
+fingerprint. The default atom type matches the command-line tool. Setting
+`min_separation=0` includes the single-atom atom-type bits. When
+`include_out_of_range=True`, atom pairs beyond `max_separation` are collected in
+the truncated out-of-range bucket, matching the command-line `-t` behavior.
+
 `GFP.ec(radius=3, atom_type="UST:Z")` adds a sparse counted extended
 connectivity fingerprint. The default atom type is atomic number (`UST:Z`). The
 radius and atom-type specification are encoded in the tag, for example

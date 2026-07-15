@@ -215,6 +215,24 @@ PYBIND11_MODULE(lillymol_tools, m) {
           },
           py::arg("replicates") = 9)
       .def_static(
+          "atom_pair",
+          [](int min_separation, int max_separation, const std::string& atom_type,
+             bool include_out_of_range) {
+            if (min_separation < 0) {
+              throw std::invalid_argument("min_separation must be non-negative");
+            }
+            if (max_separation < min_separation) {
+              throw std::invalid_argument("max_separation must be >= min_separation");
+            }
+            if (atom_type.empty()) {
+              throw std::invalid_argument("atom_type must be non-empty");
+            }
+            return GFPGeneratorSpec::AtomPair(min_separation, max_separation,
+                                              IWString(atom_type), include_out_of_range);
+          },
+          py::arg("min_separation") = 1, py::arg("max_separation") = 10,
+          py::arg("atom_type") = "UST:Y", py::arg("include_out_of_range") = false)
+      .def_static(
           "ec",
           [](int radius, const std::string& atom_type) {
             if (radius < 0) {

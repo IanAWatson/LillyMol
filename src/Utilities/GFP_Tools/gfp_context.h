@@ -36,6 +36,7 @@ enum class GeneratorKind : uint8_t {
   kTPSA,
   kFormula,
   kCATS,
+  kAtomPair,
   kECFingerprint,
   kRingSubstitution,
 };
@@ -53,8 +54,11 @@ class GFPGeneratorSpec {
   bool _maccs_level2 = true;
   int _replicates = 0;
   int _radius = 0;
+  int _min_separation = 0;
+  int _max_separation = 0;
   int _max_path_length = 0;
   bool _include_hydrophobic_pairs = true;
+  bool _include_out_of_range = false;
   IWString _atom_type;
 
  public:
@@ -63,6 +67,8 @@ class GFPGeneratorSpec {
   GFPGeneratorSpec(GeneratorKind kind, int radius, const IWString& atom_type);
   GFPGeneratorSpec(GeneratorKind kind, int max_path_length,
                    bool include_hydrophobic_pairs);
+  GFPGeneratorSpec(GeneratorKind kind, int min_separation, int max_separation,
+                   const IWString& atom_type, bool include_out_of_range);
 
   static GFPGeneratorSpec MolecularProperties();
   static GFPGeneratorSpec IWMFingerprint();
@@ -73,6 +79,9 @@ class GFPGeneratorSpec {
   static GFPGeneratorSpec FormulaFingerprint();
   static GFPGeneratorSpec CATS(int max_path_length = 10,
                                bool include_hydrophobic_pairs = true);
+  static GFPGeneratorSpec AtomPair(int min_separation = 1, int max_separation = 10,
+                                   const IWString& atom_type = IWString("UST:Y"),
+                                   bool include_out_of_range = false);
   static GFPGeneratorSpec ECFingerprint(int radius = 3,
                                         const IWString& atom_type = IWString("UST:Z"));
   static GFPGeneratorSpec RingSubstitution();
@@ -107,9 +116,24 @@ class GFPGeneratorSpec {
     return _max_path_length;
   }
 
+  int
+  min_separation() const {
+    return _min_separation;
+  }
+
+  int
+  max_separation() const {
+    return _max_separation;
+  }
+
   bool
   include_hydrophobic_pairs() const {
     return _include_hydrophobic_pairs;
+  }
+
+  bool
+  include_out_of_range() const {
+    return _include_out_of_range;
   }
 
   std::vector<Component> Components() const;

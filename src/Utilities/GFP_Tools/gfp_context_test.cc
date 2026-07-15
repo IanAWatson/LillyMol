@@ -457,6 +457,44 @@ TEST(TestGFPContext, CATSRejectsInvalidMaxPathLength) {
   EXPECT_FALSE(context.BuildFromSpecs(specs));
 }
 
+TEST(TestGFPContext, AtomPairFingerprint) {
+  std::vector<gfp_context::GFPGeneratorSpec> specs = {
+      gfp_context::GFPGeneratorSpec::AtomPair(1, 3, IWString("UST:Y"), false)};
+  gfp_context::GFPContext context;
+  ASSERT_TRUE(context.BuildFromSpecs(specs));
+  EXPECT_THAT(context.Tags(), ElementsAre("NCAP1M3USTY<"));
+
+  Molecule mol;
+  ASSERT_TRUE(mol.build_from_smiles("CCO ethanol"));
+  gfp_context::GFPFingerprint fp;
+  ASSERT_TRUE(context.Fingerprint(mol, fp));
+  EXPECT_GT(fp.sparse(0).nbits(), 0);
+  EXPECT_THAT(context.Distance(fp, fp), FloatNear(0.0f, 1.0e-6f));
+}
+
+TEST(TestGFPContext, AtomPairOutOfRangeTag) {
+  std::vector<gfp_context::GFPGeneratorSpec> specs = {
+      gfp_context::GFPGeneratorSpec::AtomPair(0, 2, IWString("UST:Y"), true)};
+  gfp_context::GFPContext context;
+  ASSERT_TRUE(context.BuildFromSpecs(specs));
+  EXPECT_THAT(context.Tags(), ElementsAre("NCAPT0M2USTY<"));
+}
+
+TEST(TestGFPContext, AtomPairRejectsInvalidSpecs) {
+  gfp_context::GFPContext context;
+  std::vector<gfp_context::GFPGeneratorSpec> negative_min = {
+      gfp_context::GFPGeneratorSpec::AtomPair(-1, 3, IWString("UST:Y"), false)};
+  EXPECT_FALSE(context.BuildFromSpecs(negative_min));
+
+  std::vector<gfp_context::GFPGeneratorSpec> max_less_than_min = {
+      gfp_context::GFPGeneratorSpec::AtomPair(4, 3, IWString("UST:Y"), false)};
+  EXPECT_FALSE(context.BuildFromSpecs(max_less_than_min));
+
+  std::vector<gfp_context::GFPGeneratorSpec> bad_atom_type = {
+      gfp_context::GFPGeneratorSpec::AtomPair(1, 3, IWString("UST:Y-"), false)};
+  EXPECT_FALSE(context.BuildFromSpecs(bad_atom_type));
+}
+
 TEST(TestGFPContext, RingSubstitutionFingerprint) {
   std::vector<gfp_context::GFPGeneratorSpec> specs = {
       gfp_context::GFPGeneratorSpec::RingSubstitution()};

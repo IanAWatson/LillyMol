@@ -3496,6 +3496,10 @@ my $formula_cmd_pipe;
 if ($formula)
 {
   my $formula_exe = "formula_fingerprint.sh";
+  if ($formula_options eq "")
+  {
+    $formula_options = "-L 200,41";
+  }
   my $formula_cmd = "${formula_exe} ${formula_options}";
 
   if ($work_as_filter)

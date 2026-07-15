@@ -398,6 +398,28 @@ TEST(TestGFPContext, TPSARejectsInvalidReplicates) {
   EXPECT_FALSE(context.BuildFromSpecs(specs));
 }
 
+TEST(TestGFPContext, FormulaFingerprint) {
+  std::vector<gfp_context::GFPGeneratorSpec> specs = {
+      gfp_context::GFPGeneratorSpec::FormulaFingerprint()};
+  gfp_context::GFPContext context;
+  ASSERT_TRUE(context.BuildFromSpecs(specs));
+  EXPECT_THAT(context.Tags(), ElementsAre("FCFML<"));
+
+  Molecule ethane;
+  ASSERT_TRUE(ethane.build_from_smiles("CC ethane"));
+  gfp_context::GFPFingerprint fp1;
+  ASSERT_TRUE(context.Fingerprint(ethane, fp1));
+
+  Molecule propane;
+  ASSERT_TRUE(propane.build_from_smiles("CCC propane"));
+  gfp_context::GFPFingerprint fp2;
+  ASSERT_TRUE(context.Fingerprint(propane, fp2));
+
+  EXPECT_THAT(context.Distance(fp1, fp1), FloatNear(0.0f, 1.0e-6f));
+  EXPECT_GT(context.Distance(fp1, fp2), 0.0f);
+  EXPECT_LT(context.Distance(fp1, fp2), 1.0f);
+}
+
 TEST(TestGFPContext, RingSubstitutionFingerprint) {
   std::vector<gfp_context::GFPGeneratorSpec> specs = {
       gfp_context::GFPGeneratorSpec::RingSubstitution()};

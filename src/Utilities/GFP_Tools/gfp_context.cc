@@ -22,6 +22,7 @@
 #include "Molecule_Tools/alogp.h"
 #include "Molecule_Tools/iwecfp_lib.h"
 #include "Molecule_Tools/maccskeys_fn5.h"
+#include "Molecule_Tools/mformula.h"
 #include "Molecule_Tools/mpr.h"
 #include "Molecule_Tools/nvrtspsa.h"
 #include "Molecule_Tools/ring_substitution.h"
@@ -36,6 +37,9 @@ constexpr char kIdentifierTag[] = "PCN<";
 constexpr char kMolecularPropertiesTag[] = "MPR<";
 constexpr int kMaccskeysNbits = 3 * 64;
 constexpr int kDefaultSparseReplicates = 9;
+constexpr float kDefaultFormulaLogS = 200.0f;
+constexpr float kDefaultFormulaLogD = 41.0f;
+constexpr int kFormulaFingerprintNbits = mformula::kMFOther + 1;
 
 uint64_t
 Fnv1a(uint64_t hash, const void* v, int n) {
@@ -208,6 +212,11 @@ TPSATag(int replicates) {
   return result;
 }
 
+IWString
+FormulaTag() {
+  return IWString("FCFML<");
+}
+
 int
 AppendSanitisedAtomType(const IWString& atom_type, IWString& destination) {
   int appended = 0;
@@ -280,6 +289,11 @@ GFPGeneratorSpec::TPSA(int replicates) {
 }
 
 GFPGeneratorSpec
+GFPGeneratorSpec::FormulaFingerprint() {
+  return GFPGeneratorSpec(GeneratorKind::kFormula);
+}
+
+GFPGeneratorSpec
 GFPGeneratorSpec::ECFingerprint(int radius, const IWString& atom_type) {
   return GFPGeneratorSpec(GeneratorKind::kECFingerprint, radius, atom_type);
 }
@@ -312,6 +326,8 @@ GFPGeneratorSpec::Components() const {
       return {Component{ComponentKind::kSparse, XLogPTag(_replicates), 0, 1.0f}};
     case GeneratorKind::kTPSA:
       return {Component{ComponentKind::kSparse, TPSATag(_replicates), 0, 1.0f}};
+    case GeneratorKind::kFormula:
+      return {Component{ComponentKind::kFixedCounted, FormulaTag(), 0, 1.0f}};
     case GeneratorKind::kECFingerprint:
       return {Component{ComponentKind::kSparse, ECTag(_radius, _atom_type), 0, 1.0f}};
     case GeneratorKind::kRingSubstitution:
@@ -336,6 +352,8 @@ GFPGeneratorSpec::Repr() const {
       return "GFP.xlogp(replicates=" + std::to_string(_replicates) + ")";
     case GeneratorKind::kTPSA:
       return "GFP.tpsa(replicates=" + std::to_string(_replicates) + ")";
+    case GeneratorKind::kFormula:
+      return "GFP.formula()";
     case GeneratorKind::kECFingerprint:
       return "GFP.ec(radius=" + std::to_string(_radius) + ", atom_type='" +
              _atom_type.AsString() + "')";
@@ -609,6 +627,43 @@ TPSAFingerprintGenerator::Count(Molecule& m) {
   }
 
   return TPSAToPositiveInt(*tpsa);
+}
+
+class FormulaFingerprintGenerator : public FingerprintGeneratorImplementation {
+ private:
+  int _count[kFormulaFingerprintNbits];
+
+ public:
+  std::vector<Component> Components() const override;
+  int Generate(Molecule& m, const std::vector<GeneratorComponentAssignment>& slots,
+               GFPFingerprint& destination) override;
+};
+
+std::vector<Component>
+FormulaFingerprintGenerator::Components() const {
+  return {Component{ComponentKind::kFixedCounted, FormulaTag(), 0, 1.0f}};
+}
+
+int
+FormulaFingerprintGenerator::Generate(
+    Molecule& m, const std::vector<GeneratorComponentAssignment>& slots,
+    GFPFingerprint& destination) {
+  if (slots.size() != 1 || slots[0].kind != ComponentKind::kFixedCounted) {
+    std::cerr << "FormulaFingerprintGenerator::Generate:invalid slots\n";
+    return 0;
+  }
+
+  mformula::MFormula formula;
+  formula.set_log_scaling_factors(kDefaultFormulaLogS, kDefaultFormulaLogD);
+  if (!formula.Build(m)) {
+    return 0;
+  }
+  if (!formula.ToFixedCountedFingerprint(_count, kFormulaFingerprintNbits)) {
+    return 0;
+  }
+
+  return destination.mutable_fixed_counted(slots[0].index)
+      .construct_from_array_of_ints(_count, kFormulaFingerprintNbits);
 }
 
 class ECFingerprintGenerator : public FingerprintGeneratorImplementation {
@@ -1115,6 +1170,8 @@ MakeGenerator(const GFPGeneratorSpec& spec) {
       return std::make_unique<XLogPFingerprintGenerator>(spec.replicates());
     case GeneratorKind::kTPSA:
       return std::make_unique<TPSAFingerprintGenerator>(spec.replicates());
+    case GeneratorKind::kFormula:
+      return std::make_unique<FormulaFingerprintGenerator>();
     case GeneratorKind::kECFingerprint:
       return std::make_unique<ECFingerprintGenerator>(spec.radius(), spec.atom_type());
     case GeneratorKind::kRingSubstitution:

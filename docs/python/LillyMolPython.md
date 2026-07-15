@@ -886,6 +886,14 @@ component with tags such as `NCTPSA9<`. It preserves the command-line `psafp`
 convention: TPSA is divided by 10, rounded to an integer bucket, and stored as
 the count on each replicated bit, with a minimum count of 1.
 
+`GFP.formula()` adds a fixed-size counted molecular formula fingerprint with
+tag `FCFML<`. It uses the formula fingerprint log scaling defaults
+recommended by the command-line tool, preserving the nonlinear count
+scaling that emphasizes low element-count differences and compresses
+differences among more abundant elements. The change going from one Oxygen
+atom to two Oxygen atoms is much more important than going from 15 to 16
+Carbon atoms.
+
 `GFP.ec(radius=3, atom_type="UST:Z")` adds a sparse counted extended
 connectivity fingerprint. The default atom type is atomic number (`UST:Z`). The
 radius and atom-type specification are encoded in the tag, for example

@@ -111,7 +111,10 @@ class MFormula {
     bool IsElementCountSubset(const MFormula& rhs) const;
 
     int ToSparseFingerprint(IWString& destination) const;
-    int ToFixedCountedFingerprint(IWString& destination) const;
+
+    // Fill `destination` with the fixed counted fingerprint representation.
+    // `n` must be at least kMFOther + 1. Counts are clamped to [0, 255].
+    int ToFixedCountedFingerprint(int* destination, int n) const;
 
     // These are mostly used by tests.
     // Note that they do not consider aromatic variants.

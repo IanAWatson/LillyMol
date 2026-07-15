@@ -34,6 +34,7 @@ enum class GeneratorKind : uint8_t {
   kALogP,
   kXLogP,
   kTPSA,
+  kFormula,
   kECFingerprint,
   kRingSubstitution,
 };
@@ -64,6 +65,7 @@ class GFPGeneratorSpec {
   static GFPGeneratorSpec ALogP(int replicates = 9);
   static GFPGeneratorSpec XLogP(int replicates = 9);
   static GFPGeneratorSpec TPSA(int replicates = 9);
+  static GFPGeneratorSpec FormulaFingerprint();
   static GFPGeneratorSpec ECFingerprint(int radius = 3,
                                         const IWString& atom_type = IWString("UST:Z"));
   static GFPGeneratorSpec RingSubstitution();
@@ -231,6 +233,11 @@ class GFPFingerprint {
 
   const Fixed_Size_Counted_Fingerprint_uchar&
   fixed_counted(int i) const {
+    return _fixed_counted[i];
+  }
+
+  Fixed_Size_Counted_Fingerprint_uchar&
+  mutable_fixed_counted(int i) {
     return _fixed_counted[i];
   }
 };

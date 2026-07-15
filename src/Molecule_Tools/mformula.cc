@@ -188,6 +188,35 @@ MFormula::ToSparseFingerprint(IWString& destination) const {
   return sfc.daylight_ascii_form_with_counts_encoded(destination);
 }
 
+int
+MFormula::ToFixedCountedFingerprint(int* destination, int n) const {
+  if (destination == nullptr || n < kMFOther + 1) {
+    return 0;
+  }
+
+  std::fill_n(destination, n, 0);
+
+  if (_log_s > 0.0f) {
+    const float denom = std::log(_log_d);
+    for (int i = 0; i <= kMFOther; ++i) {
+      if (_count[i] == 0) {
+        continue;
+      }
+      int c = static_cast<int>(_log_s * std::log(_count[i] + 1) / denom);
+      if (c > std::numeric_limits<uint8_t>::max()) {
+        c = std::numeric_limits<uint8_t>::max();
+      }
+      destination[i] = c;
+    }
+  } else {
+    for (int i = 0; i <= kMFOther; ++i) {
+      destination[i] = std::min(_count[i], static_cast<int>(std::numeric_limits<uint8_t>::max()));
+    }
+  }
+
+  return 1;
+}
+
 constexpr char kOpenSquareBracket = '[';
 constexpr char kCloseSquareBracket = ']';
 

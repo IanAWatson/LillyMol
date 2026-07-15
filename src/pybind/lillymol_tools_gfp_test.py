@@ -212,6 +212,21 @@ class TestGFPList(unittest.TestCase):
         with self.assertRaises(ValueError):
             GFP.tpsa(replicates=0)
 
+    def test_formula_generator_spec(self):
+        spec = GFP.formula()
+        self.assertEqual(spec.components(), ['FCFML<'])
+        self.assertEqual(repr(spec), 'GFP.formula()')
+
+        ctx = GFPContext.from_specs([spec])
+        self.assertEqual(ctx.tags(), ['FCFML<'])
+        ethane = _mol('CC ethane')
+        propane = _mol('CCC propane')
+        fp1 = ctx.fingerprint(ethane)
+        fp2 = ctx.fingerprint(propane)
+        self.assertAlmostEqual(ctx.distance(fp1, fp1), 0.0, places=6)
+        self.assertGreater(ctx.distance(fp1, fp2), 0.0)
+        self.assertLess(ctx.distance(fp1, fp2), 1.0)
+
     def test_ring_substitution_generator_spec(self):
         spec = GFP.ring_substitution()
         self.assertEqual(spec.components(), ['NCRS<'])

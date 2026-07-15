@@ -1565,6 +1565,7 @@ cc_library(
         "//Molecule_Tools:alogp_lib",
         "//Molecule_Tools:iwecfp_lib",
         "//Molecule_Tools:maccskeys_fn5_lib",
+        "//Molecule_Tools:mformula",
         "//Molecule_Tools:mpr",
         "//Molecule_Tools:nvrtspsa",
         "//Molecule_Tools:ring_substitution_lib",

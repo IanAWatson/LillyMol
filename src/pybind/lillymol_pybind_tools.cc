@@ -177,6 +177,7 @@ PYBIND11_MODULE(lillymol_tools, m) {
       .def_static("mpr", &GFPGeneratorSpec::MolecularProperties)
       .def_static("iw", &GFPGeneratorSpec::IWMFingerprint)
       .def_static("maccs", &GFPGeneratorSpec::MACCSKeys, py::arg("level2") = true)
+      .def_static("formula", &GFPGeneratorSpec::FormulaFingerprint)
       .def_static(
           "alogp",
           [](int replicates) {

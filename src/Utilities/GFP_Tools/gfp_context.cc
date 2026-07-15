@@ -23,6 +23,7 @@
 #include "Molecule_Tools/iwecfp_lib.h"
 #include "Molecule_Tools/maccskeys_fn5.h"
 #include "Molecule_Tools/mpr.h"
+#include "Molecule_Tools/nvrtspsa.h"
 #include "Molecule_Tools/ring_substitution.h"
 #include "Molecule_Tools/xlogp.h"
 #include "Utilities/GFP_Tools/dyfp.h"
@@ -34,7 +35,7 @@ constexpr char kSmilesTag[] = "$SMI<";
 constexpr char kIdentifierTag[] = "PCN<";
 constexpr char kMolecularPropertiesTag[] = "MPR<";
 constexpr int kMaccskeysNbits = 3 * 64;
-constexpr int kDefaultALogPReplicates = 9;
+constexpr int kDefaultSparseReplicates = 9;
 
 uint64_t
 Fnv1a(uint64_t hash, const void* v, int n) {
@@ -191,6 +192,23 @@ XLogPTag(int replicates) {
 }
 
 int
+TPSAToPositiveInt(double value) {
+  int result = static_cast<int>(value / 10.0 + 0.49999);
+  if (result <= 0) {
+    result = 1;
+  }
+
+  return result;
+}
+
+IWString
+TPSATag(int replicates) {
+  IWString result;
+  result << "NCTPSA" << replicates << '<';
+  return result;
+}
+
+int
 AppendSanitisedAtomType(const IWString& atom_type, IWString& destination) {
   int appended = 0;
   for (int i = 0; i < atom_type.length(); ++i) {
@@ -257,6 +275,11 @@ GFPGeneratorSpec::XLogP(int replicates) {
 }
 
 GFPGeneratorSpec
+GFPGeneratorSpec::TPSA(int replicates) {
+  return GFPGeneratorSpec(GeneratorKind::kTPSA, true, replicates);
+}
+
+GFPGeneratorSpec
 GFPGeneratorSpec::ECFingerprint(int radius, const IWString& atom_type) {
   return GFPGeneratorSpec(GeneratorKind::kECFingerprint, radius, atom_type);
 }
@@ -287,6 +310,8 @@ GFPGeneratorSpec::Components() const {
       return {Component{ComponentKind::kSparse, ALogPTag(_replicates), 0, 1.0f}};
     case GeneratorKind::kXLogP:
       return {Component{ComponentKind::kSparse, XLogPTag(_replicates), 0, 1.0f}};
+    case GeneratorKind::kTPSA:
+      return {Component{ComponentKind::kSparse, TPSATag(_replicates), 0, 1.0f}};
     case GeneratorKind::kECFingerprint:
       return {Component{ComponentKind::kSparse, ECTag(_radius, _atom_type), 0, 1.0f}};
     case GeneratorKind::kRingSubstitution:
@@ -309,6 +334,8 @@ GFPGeneratorSpec::Repr() const {
       return "GFP.alogp(replicates=" + std::to_string(_replicates) + ")";
     case GeneratorKind::kXLogP:
       return "GFP.xlogp(replicates=" + std::to_string(_replicates) + ")";
+    case GeneratorKind::kTPSA:
+      return "GFP.tpsa(replicates=" + std::to_string(_replicates) + ")";
     case GeneratorKind::kECFingerprint:
       return "GFP.ec(radius=" + std::to_string(_radius) + ", atom_type='" +
              _atom_type.AsString() + "')";
@@ -454,7 +481,7 @@ MACCSFingerprintGenerator::Generate(
 class ALogPFingerprintGenerator : public FingerprintGeneratorImplementation {
  private:
   alogp::ALogP _alogp;
-  int _replicates = kDefaultALogPReplicates;
+  int _replicates = kDefaultSparseReplicates;
 
  public:
   explicit ALogPFingerprintGenerator(int replicates) : _replicates(replicates) {
@@ -498,7 +525,7 @@ ALogPFingerprintGenerator::Generate(
 class XLogPFingerprintGenerator : public FingerprintGeneratorImplementation {
  private:
   xlogp::XLogPCalc _xlogp;
-  int _replicates = kDefaultALogPReplicates;
+  int _replicates = kDefaultSparseReplicates;
 
  public:
   explicit XLogPFingerprintGenerator(int replicates) : _replicates(replicates) {
@@ -535,6 +562,50 @@ XLogPFingerprintGenerator::Generate(
   }
 
   const int count = XLogPToPositiveInt(*logp);
+  return destination.mutable_sparse(slots[0].index)
+      .build_from_replicates(_replicates, count);
+}
+
+class TPSAFingerprintGenerator : public FingerprintGeneratorImplementation {
+ private:
+  nvrtspsa::NovartisPolarSurfaceArea _tpsa;
+  int _replicates = kDefaultSparseReplicates;
+
+ public:
+  explicit TPSAFingerprintGenerator(int replicates) : _replicates(replicates) {
+    _tpsa.set_display_psa_unclassified_atom_messages(0);
+  }
+
+  std::vector<Component> Components() const override;
+  int Generate(Molecule& m, const std::vector<GeneratorComponentAssignment>& slots,
+               GFPFingerprint& destination) override;
+};
+
+std::vector<Component>
+TPSAFingerprintGenerator::Components() const {
+  return {Component{ComponentKind::kSparse, TPSATag(_replicates), 0, 1.0f}};
+}
+
+int
+TPSAFingerprintGenerator::Generate(Molecule& m,
+                                   const std::vector<GeneratorComponentAssignment>& slots,
+                                   GFPFingerprint& destination) {
+  if (slots.size() != 1 || slots[0].kind != ComponentKind::kSparse) {
+    std::cerr << "TPSAFingerprintGenerator::Generate:invalid slots\n";
+    return 0;
+  }
+  if (_replicates <= 0) {
+    std::cerr << "TPSAFingerprintGenerator::Generate:invalid replicates " << _replicates
+              << '\n';
+    return 0;
+  }
+
+  std::optional<double> tpsa = _tpsa.PolarSurfaceArea(m);
+  if (!tpsa) {
+    return 0;
+  }
+
+  const int count = TPSAToPositiveInt(*tpsa);
   return destination.mutable_sparse(slots[0].index)
       .build_from_replicates(_replicates, count);
 }
@@ -1041,6 +1112,8 @@ MakeGenerator(const GFPGeneratorSpec& spec) {
       return std::make_unique<ALogPFingerprintGenerator>(spec.replicates());
     case GeneratorKind::kXLogP:
       return std::make_unique<XLogPFingerprintGenerator>(spec.replicates());
+    case GeneratorKind::kTPSA:
+      return std::make_unique<TPSAFingerprintGenerator>(spec.replicates());
     case GeneratorKind::kECFingerprint:
       return std::make_unique<ECFingerprintGenerator>(spec.radius(), spec.atom_type());
     case GeneratorKind::kRingSubstitution:
@@ -1141,10 +1214,12 @@ GFPContext::BuildFromSpecs(const std::vector<GFPGeneratorSpec>& specs, bool prep
   generator_components.reserve(specs.size());
 
   for (const GFPGeneratorSpec& spec : specs) {
-    if ((spec.kind() == GeneratorKind::kALogP || spec.kind() == GeneratorKind::kXLogP) &&
+    if ((spec.kind() == GeneratorKind::kALogP || spec.kind() == GeneratorKind::kXLogP ||
+         spec.kind() == GeneratorKind::kTPSA) &&
         spec.replicates() <= 0) {
-      std::cerr << "GFPContext::BuildFromSpecs:invalid logp replicates "
-                << spec.replicates() << '\n';
+      std::cerr
+          << "GFPContext::BuildFromSpecs:invalid sparse fingerprint replicate count "
+          << spec.replicates() << '\n';
       return 0;
     }
     if (spec.kind() == GeneratorKind::kECFingerprint) {

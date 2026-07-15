@@ -881,6 +881,11 @@ fingerprint convention.
 with tags such as `NCXLOGP9<`. It uses the xlogp command-line fingerprint
 bucketization convention.
 
+`GFP.tpsa(replicates=9)` adds a sparse counted topological polar surface area
+component with tags such as `NCTPSA9<`. It preserves the command-line `psafp`
+convention: TPSA is divided by 10, rounded to an integer bucket, and stored as
+the count on each replicated bit, with a minimum count of 1.
+
 `GFP.ec(radius=3, atom_type="UST:Z")` adds a sparse counted extended
 connectivity fingerprint. The default atom type is atomic number (`UST:Z`). The
 radius and atom-type specification are encoded in the tag, for example

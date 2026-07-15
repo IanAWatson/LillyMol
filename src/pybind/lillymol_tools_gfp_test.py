@@ -197,6 +197,21 @@ class TestGFPList(unittest.TestCase):
         with self.assertRaises(ValueError):
             GFP.xlogp(replicates=0)
 
+    def test_tpsa_generator_spec(self):
+        spec = GFP.tpsa(replicates=4)
+        self.assertEqual(spec.components(), ['NCTPSA4<'])
+        self.assertEqual(repr(spec), 'GFP.tpsa(replicates=4)')
+
+        ctx = GFPContext.from_specs([spec])
+        self.assertEqual(ctx.tags(), ['NCTPSA4<'])
+        mol = _mol('CCO ethanol')
+        fp = ctx.fingerprint(mol)
+        self.assertAlmostEqual(ctx.distance(fp, fp), 0.0, places=6)
+
+    def test_tpsa_rejects_invalid_replicates(self):
+        with self.assertRaises(ValueError):
+            GFP.tpsa(replicates=0)
+
     def test_ring_substitution_generator_spec(self):
         spec = GFP.ring_substitution()
         self.assertEqual(spec.components(), ['NCRS<'])

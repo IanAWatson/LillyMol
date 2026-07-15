@@ -196,6 +196,15 @@ PYBIND11_MODULE(lillymol_tools, m) {
           },
           py::arg("replicates") = 9)
       .def_static(
+          "tpsa",
+          [](int replicates) {
+            if (replicates <= 0) {
+              throw std::invalid_argument("replicates must be positive");
+            }
+            return GFPGeneratorSpec::TPSA(replicates);
+          },
+          py::arg("replicates") = 9)
+      .def_static(
           "ec",
           [](int radius, const std::string& atom_type) {
             if (radius < 0) {

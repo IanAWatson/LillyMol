@@ -16,6 +16,7 @@
 #include "Molecule_Lib/molecule.h"
 #include "Molecule_Lib/standardise.h"
 
+#include "Molecule_Tools/alogp.h"
 #include "Molecule_Tools/maccskeys_fn5.h"
 #include "Molecule_Tools/mpr.h"
 #include "Utilities/GFP_Tools/dyfp.h"
@@ -27,6 +28,7 @@ constexpr char kSmilesTag[] = "$SMI<";
 constexpr char kIdentifierTag[] = "PCN<";
 constexpr char kMolecularPropertiesTag[] = "MPR<";
 constexpr int kMaccskeysNbits = 3 * 64;
+constexpr int kDefaultALogPReplicates = 9;
 
 uint64_t
 Fnv1a(uint64_t hash, const void* v, int n) {
@@ -144,10 +146,31 @@ FixedBinaryTanimoto(const FixedBitVector& lhs, const FixedBitVector& rhs) {
   return static_cast<float>(bic) / static_cast<float>(denom);
 }
 
+int
+ALogPToPositiveInt(float value) {
+  if (value <= -5.0f) {
+    return 1;
+  }
+
+  if (value >= 10.0f) {
+    return 20;
+  }
+
+  value += 5.0f;
+  return static_cast<int>(value + value + 0.4999f);
+}
+
+IWString
+ALogPTag(int replicates) {
+  IWString result;
+  result << "NCALOGP" << replicates << '<';
+  return result;
+}
+
 }  // namespace
 
-GFPGeneratorSpec::GFPGeneratorSpec(GeneratorKind kind, bool maccs_level2)
-    : _kind(kind), _maccs_level2(maccs_level2) {
+GFPGeneratorSpec::GFPGeneratorSpec(GeneratorKind kind, bool maccs_level2, int replicates)
+    : _kind(kind), _maccs_level2(maccs_level2), _replicates(replicates) {
 }
 
 GFPGeneratorSpec
@@ -163,6 +186,11 @@ GFPGeneratorSpec::IWMFingerprint() {
 GFPGeneratorSpec
 GFPGeneratorSpec::MACCSKeys(bool level2) {
   return GFPGeneratorSpec(GeneratorKind::kMACCSKeys, level2);
+}
+
+GFPGeneratorSpec
+GFPGeneratorSpec::ALogP(int replicates) {
+  return GFPGeneratorSpec(GeneratorKind::kALogP, true, replicates);
 }
 
 std::vector<Component>
@@ -182,6 +210,8 @@ GFPGeneratorSpec::Components() const {
       }
       return result;
     }
+    case GeneratorKind::kALogP:
+      return {Component{ComponentKind::kSparse, ALogPTag(_replicates), 0, 1.0f}};
   }
 
   return {};
@@ -196,6 +226,8 @@ GFPGeneratorSpec::Repr() const {
       return "GFP.iw()";
     case GeneratorKind::kMACCSKeys:
       return _maccs_level2 ? "GFP.maccs(level2=True)" : "GFP.maccs(level2=False)";
+    case GeneratorKind::kALogP:
+      return "GFP.alogp(replicates=" + std::to_string(_replicates) + ")";
   }
 
   return "GFP.unknown()";
@@ -331,6 +363,50 @@ MACCSFingerprintGenerator::Generate(
   _mk.set_level_2_fingerprint(_tmp);
   return destination.mutable_fixed_binary(slots[1].index)
       .BuildFromArray(_tmp, _mk.nbits());
+}
+
+class ALogPFingerprintGenerator : public FingerprintGeneratorImplementation {
+ private:
+  alogp::ALogP _alogp;
+  int _replicates = kDefaultALogPReplicates;
+
+ public:
+  explicit ALogPFingerprintGenerator(int replicates) : _replicates(replicates) {
+    _alogp.set_display_error_messages(0);
+  }
+
+  std::vector<Component> Components() const override;
+  int Generate(Molecule& m, const std::vector<GeneratorComponentAssignment>& slots,
+               GFPFingerprint& destination) override;
+};
+
+std::vector<Component>
+ALogPFingerprintGenerator::Components() const {
+  return {Component{ComponentKind::kSparse, ALogPTag(_replicates), 0, 1.0f}};
+}
+
+int
+ALogPFingerprintGenerator::Generate(
+    Molecule& m, const std::vector<GeneratorComponentAssignment>& slots,
+    GFPFingerprint& destination) {
+  if (slots.size() != 1 || slots[0].kind != ComponentKind::kSparse) {
+    std::cerr << "ALogPFingerprintGenerator::Generate:invalid slots\n";
+    return 0;
+  }
+  if (_replicates <= 0) {
+    std::cerr << "ALogPFingerprintGenerator::Generate:invalid replicates " << _replicates
+              << '\n';
+    return 0;
+  }
+
+  std::optional<float> logp = _alogp.LogP(m);
+  if (!logp) {
+    return 0;
+  }
+
+  const int count = ALogPToPositiveInt(*logp);
+  return destination.mutable_sparse(slots[0].index)
+      .build_from_replicates(_replicates, count);
 }
 
 class StandardFingerprintGenerator {
@@ -724,6 +800,8 @@ MakeGenerator(const GFPGeneratorSpec& spec) {
       return std::make_unique<IWMFingerprintGenerator>();
     case GeneratorKind::kMACCSKeys:
       return std::make_unique<MACCSFingerprintGenerator>(spec.maccs_level2());
+    case GeneratorKind::kALogP:
+      return std::make_unique<ALogPFingerprintGenerator>(spec.replicates());
   }
 
   return nullptr;
@@ -820,6 +898,12 @@ GFPContext::BuildFromSpecs(const std::vector<GFPGeneratorSpec>& specs, bool prep
   generator_components.reserve(specs.size());
 
   for (const GFPGeneratorSpec& spec : specs) {
+    if (spec.kind() == GeneratorKind::kALogP && spec.replicates() <= 0) {
+      std::cerr << "GFPContext::BuildFromSpecs:invalid alogp replicates "
+                << spec.replicates() << '\n';
+      return 0;
+    }
+
     std::unique_ptr<FingerprintGeneratorImplementation> generator = MakeGenerator(spec);
     if (generator == nullptr) {
       std::cerr << "GFPContext::BuildFromSpecs:cannot build " << spec.Repr() << '\n';

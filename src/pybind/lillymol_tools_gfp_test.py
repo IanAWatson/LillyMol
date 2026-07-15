@@ -178,6 +178,22 @@ class TestGFPList(unittest.TestCase):
         fp = ctx.fingerprint(mol)
         self.assertAlmostEqual(ctx.distance(fp, fp), 0.0, places=6)
 
+
+    def test_alogp_generator_spec(self):
+        spec = GFP.alogp(replicates=4)
+        self.assertEqual(spec.components(), ['NCALOGP4<'])
+        self.assertEqual(repr(spec), 'GFP.alogp(replicates=4)')
+
+        ctx = GFPContext.from_specs([spec])
+        self.assertEqual(ctx.tags(), ['NCALOGP4<'])
+        mol = _mol('CCO ethanol')
+        fp = ctx.fingerprint(mol)
+        self.assertAlmostEqual(ctx.distance(fp, fp), 0.0, places=6)
+
+    def test_alogp_rejects_invalid_replicates(self):
+        with self.assertRaises(ValueError):
+            GFP.alogp(replicates=0)
+
     def test_standard_context_generates_fingerprints(self):
         ctx = GFPContext.standard()
         self.assertEqual(ctx.tags(), ['FPIW<', 'FPMK<', 'FPMK2<', 'MPR<'])

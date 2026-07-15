@@ -173,6 +173,25 @@ Sparse_Fingerprint::resize(int n) {
   return 1;
 }
 
+int
+Sparse_Fingerprint::build_from_replicates(int replicates, int count) {
+  if (replicates < 0 || count < 0) {
+    return 0;
+  }
+
+  if (! resize(replicates)) {
+    return 0;
+  }
+
+  for (int i = 0; i < replicates; ++i) {
+    _bit[i] = static_cast<unsigned int>(i);
+    _count[i] = count;
+  }
+  _recompute_sums();
+
+  return 1;
+}
+
 Sparse_Fingerprint &
 Sparse_Fingerprint::operator=(const Sparse_Fingerprint &rhs) {
   if (0 == rhs._nbits) {

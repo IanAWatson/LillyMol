@@ -31,6 +31,7 @@ enum class GeneratorKind : uint8_t {
   kMolecularProperties,
   kIWMFingerprint,
   kMACCSKeys,
+  kALogP,
 };
 
 struct Component {
@@ -44,14 +45,16 @@ class GFPGeneratorSpec {
  private:
   GeneratorKind _kind = GeneratorKind::kMolecularProperties;
   bool _maccs_level2 = true;
+  int _replicates = 0;
 
  public:
   GFPGeneratorSpec() = default;
-  GFPGeneratorSpec(GeneratorKind kind, bool maccs_level2 = true);
+  GFPGeneratorSpec(GeneratorKind kind, bool maccs_level2 = true, int replicates = 0);
 
   static GFPGeneratorSpec MolecularProperties();
   static GFPGeneratorSpec IWMFingerprint();
   static GFPGeneratorSpec MACCSKeys(bool level2 = true);
+  static GFPGeneratorSpec ALogP(int replicates = 9);
 
   GeneratorKind
   kind() const {
@@ -61,6 +64,11 @@ class GFPGeneratorSpec {
   bool
   maccs_level2() const {
     return _maccs_level2;
+  }
+
+  int
+  replicates() const {
+    return _replicates;
   }
 
   std::vector<Component> Components() const;
@@ -191,6 +199,11 @@ class GFPFingerprint {
 
   const Sparse_Fingerprint&
   sparse(int i) const {
+    return _sparse[i];
+  }
+
+  Sparse_Fingerprint&
+  mutable_sparse(int i) {
     return _sparse[i];
   }
 

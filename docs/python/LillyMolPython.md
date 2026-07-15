@@ -871,6 +871,12 @@ are canonicalized before the context hash is computed.
 `GFP.maccs(level2=False)` generates only `FPMK<`; the default generates both
 `FPMK<` and `FPMK2<`.
 
+`GFP.alogp(replicates=9)` adds a sparse counted alogp component. The tag
+contains the replicate count, for example `NCALOGP9<`, so contexts built with
+different replicate counts are not compatible. The replicated bits all carry the
+same bucketized alogp value as their count, matching the command-line alogp
+fingerprint convention.
+
 Use `GFPList.standard()` when you want to build a searchable collection from
 Python molecules:
 

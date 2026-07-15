@@ -176,7 +176,16 @@ PYBIND11_MODULE(lillymol_tools, m) {
   py::class_<GFPFactory>(m, "GFP")
       .def_static("mpr", &GFPGeneratorSpec::MolecularProperties)
       .def_static("iw", &GFPGeneratorSpec::IWMFingerprint)
-      .def_static("maccs", &GFPGeneratorSpec::MACCSKeys, py::arg("level2") = true);
+      .def_static("maccs", &GFPGeneratorSpec::MACCSKeys, py::arg("level2") = true)
+      .def_static(
+          "alogp",
+          [](int replicates) {
+            if (replicates <= 0) {
+              throw std::invalid_argument("replicates must be positive");
+            }
+            return GFPGeneratorSpec::ALogP(replicates);
+          },
+          py::arg("replicates") = 9);
 
   py::class_<GFPContext, std::shared_ptr<GFPContext>>(m, "GFPContext")
       .def(py::init<>())

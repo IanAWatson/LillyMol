@@ -478,136 +478,137 @@ MACCSFingerprintGenerator::Generate(
       .BuildFromArray(_tmp, _mk.nbits());
 }
 
-class ALogPFingerprintGenerator : public FingerprintGeneratorImplementation {
+class ReplicatedCountFingerprintGenerator : public FingerprintGeneratorImplementation {
+ private:
+  IWString _tag;
+  int _replicates = kDefaultSparseReplicates;
+
+ protected:
+  virtual std::optional<int> Count(Molecule& m) = 0;
+  virtual const char* Name() const = 0;
+
+ public:
+  ReplicatedCountFingerprintGenerator(const IWString& tag, int replicates)
+      : _tag(tag), _replicates(replicates) {
+  }
+
+  std::vector<Component> Components() const override;
+  int Generate(Molecule& m, const std::vector<GeneratorComponentAssignment>& slots,
+               GFPFingerprint& destination) override;
+};
+
+std::vector<Component>
+ReplicatedCountFingerprintGenerator::Components() const {
+  return {Component{ComponentKind::kSparse, _tag, 0, 1.0f}};
+}
+
+int
+ReplicatedCountFingerprintGenerator::Generate(
+    Molecule& m, const std::vector<GeneratorComponentAssignment>& slots,
+    GFPFingerprint& destination) {
+  if (slots.size() != 1 || slots[0].kind != ComponentKind::kSparse) {
+    std::cerr << Name() << "::Generate:invalid slots\n";
+    return 0;
+  }
+  if (_replicates <= 0) {
+    std::cerr << Name() << "::Generate:invalid replicates " << _replicates << '\n';
+    return 0;
+  }
+
+  std::optional<int> count = Count(m);
+  if (!count) {
+    return 0;
+  }
+
+  return destination.mutable_sparse(slots[0].index)
+      .build_from_replicates(_replicates, *count);
+}
+
+class ALogPFingerprintGenerator : public ReplicatedCountFingerprintGenerator {
  private:
   alogp::ALogP _alogp;
-  int _replicates = kDefaultSparseReplicates;
+
+ protected:
+  std::optional<int> Count(Molecule& m) override;
+
+  const char*
+  Name() const override {
+    return "ALogPFingerprintGenerator";
+  }
 
  public:
-  explicit ALogPFingerprintGenerator(int replicates) : _replicates(replicates) {
+  explicit ALogPFingerprintGenerator(int replicates)
+      : ReplicatedCountFingerprintGenerator(ALogPTag(replicates), replicates) {
     _alogp.set_display_error_messages(0);
   }
-
-  std::vector<Component> Components() const override;
-  int Generate(Molecule& m, const std::vector<GeneratorComponentAssignment>& slots,
-               GFPFingerprint& destination) override;
 };
 
-std::vector<Component>
-ALogPFingerprintGenerator::Components() const {
-  return {Component{ComponentKind::kSparse, ALogPTag(_replicates), 0, 1.0f}};
-}
-
-int
-ALogPFingerprintGenerator::Generate(
-    Molecule& m, const std::vector<GeneratorComponentAssignment>& slots,
-    GFPFingerprint& destination) {
-  if (slots.size() != 1 || slots[0].kind != ComponentKind::kSparse) {
-    std::cerr << "ALogPFingerprintGenerator::Generate:invalid slots\n";
-    return 0;
-  }
-  if (_replicates <= 0) {
-    std::cerr << "ALogPFingerprintGenerator::Generate:invalid replicates " << _replicates
-              << '\n';
-    return 0;
-  }
-
+std::optional<int>
+ALogPFingerprintGenerator::Count(Molecule& m) {
   std::optional<float> logp = _alogp.LogP(m);
   if (!logp) {
-    return 0;
+    return std::nullopt;
   }
 
-  const int count = ALogPToPositiveInt(*logp);
-  return destination.mutable_sparse(slots[0].index)
-      .build_from_replicates(_replicates, count);
+  return ALogPToPositiveInt(*logp);
 }
 
-class XLogPFingerprintGenerator : public FingerprintGeneratorImplementation {
+class XLogPFingerprintGenerator : public ReplicatedCountFingerprintGenerator {
  private:
   xlogp::XLogPCalc _xlogp;
-  int _replicates = kDefaultSparseReplicates;
+
+ protected:
+  std::optional<int> Count(Molecule& m) override;
+
+  const char*
+  Name() const override {
+    return "XLogPFingerprintGenerator";
+  }
 
  public:
-  explicit XLogPFingerprintGenerator(int replicates) : _replicates(replicates) {
+  explicit XLogPFingerprintGenerator(int replicates)
+      : ReplicatedCountFingerprintGenerator(XLogPTag(replicates), replicates) {
     _xlogp.SetIssueUnclassifiedAtomMessages(false);
   }
-
-  std::vector<Component> Components() const override;
-  int Generate(Molecule& m, const std::vector<GeneratorComponentAssignment>& slots,
-               GFPFingerprint& destination) override;
 };
 
-std::vector<Component>
-XLogPFingerprintGenerator::Components() const {
-  return {Component{ComponentKind::kSparse, XLogPTag(_replicates), 0, 1.0f}};
-}
-
-int
-XLogPFingerprintGenerator::Generate(
-    Molecule& m, const std::vector<GeneratorComponentAssignment>& slots,
-    GFPFingerprint& destination) {
-  if (slots.size() != 1 || slots[0].kind != ComponentKind::kSparse) {
-    std::cerr << "XLogPFingerprintGenerator::Generate:invalid slots\n";
-    return 0;
-  }
-  if (_replicates <= 0) {
-    std::cerr << "XLogPFingerprintGenerator::Generate:invalid replicates " << _replicates
-              << '\n';
-    return 0;
-  }
-
+std::optional<int>
+XLogPFingerprintGenerator::Count(Molecule& m) {
   std::optional<double> logp = _xlogp.LogP(m);
   if (!logp) {
-    return 0;
+    return std::nullopt;
   }
 
-  const int count = XLogPToPositiveInt(*logp);
-  return destination.mutable_sparse(slots[0].index)
-      .build_from_replicates(_replicates, count);
+  return XLogPToPositiveInt(*logp);
 }
 
-class TPSAFingerprintGenerator : public FingerprintGeneratorImplementation {
+class TPSAFingerprintGenerator : public ReplicatedCountFingerprintGenerator {
  private:
   nvrtspsa::NovartisPolarSurfaceArea _tpsa;
-  int _replicates = kDefaultSparseReplicates;
+
+ protected:
+  std::optional<int> Count(Molecule& m) override;
+
+  const char*
+  Name() const override {
+    return "TPSAFingerprintGenerator";
+  }
 
  public:
-  explicit TPSAFingerprintGenerator(int replicates) : _replicates(replicates) {
+  explicit TPSAFingerprintGenerator(int replicates)
+      : ReplicatedCountFingerprintGenerator(TPSATag(replicates), replicates) {
     _tpsa.set_display_psa_unclassified_atom_messages(0);
   }
-
-  std::vector<Component> Components() const override;
-  int Generate(Molecule& m, const std::vector<GeneratorComponentAssignment>& slots,
-               GFPFingerprint& destination) override;
 };
 
-std::vector<Component>
-TPSAFingerprintGenerator::Components() const {
-  return {Component{ComponentKind::kSparse, TPSATag(_replicates), 0, 1.0f}};
-}
-
-int
-TPSAFingerprintGenerator::Generate(Molecule& m,
-                                   const std::vector<GeneratorComponentAssignment>& slots,
-                                   GFPFingerprint& destination) {
-  if (slots.size() != 1 || slots[0].kind != ComponentKind::kSparse) {
-    std::cerr << "TPSAFingerprintGenerator::Generate:invalid slots\n";
-    return 0;
-  }
-  if (_replicates <= 0) {
-    std::cerr << "TPSAFingerprintGenerator::Generate:invalid replicates " << _replicates
-              << '\n';
-    return 0;
-  }
-
+std::optional<int>
+TPSAFingerprintGenerator::Count(Molecule& m) {
   std::optional<double> tpsa = _tpsa.PolarSurfaceArea(m);
   if (!tpsa) {
-    return 0;
+    return std::nullopt;
   }
 
-  const int count = TPSAToPositiveInt(*tpsa);
-  return destination.mutable_sparse(slots[0].index)
-      .build_from_replicates(_replicates, count);
+  return TPSAToPositiveInt(*tpsa);
 }
 
 class ECFingerprintGenerator : public FingerprintGeneratorImplementation {

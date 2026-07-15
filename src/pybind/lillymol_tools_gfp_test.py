@@ -180,6 +180,18 @@ class TestGFPList(unittest.TestCase):
 
 
 
+
+    def test_ring_substitution_generator_spec(self):
+        spec = GFP.ring_substitution()
+        self.assertEqual(spec.components(), ['NCRS<'])
+        self.assertEqual(repr(spec), 'GFP.ring_substitution()')
+
+        ctx = GFPContext.from_specs([spec])
+        self.assertEqual(ctx.tags(), ['NCRS<'])
+        mol = _mol('c1ccccc1C toluene')
+        fp = ctx.fingerprint(mol)
+        self.assertAlmostEqual(ctx.distance(fp, fp), 0.0, places=6)
+
     def test_ec_generator_spec(self):
         spec = GFP.ec(radius=3, atom_type='UST:AY')
         self.assertEqual(spec.components(), ['NCEC3USTAY<'])

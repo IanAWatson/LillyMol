@@ -197,7 +197,8 @@ PYBIND11_MODULE(lillymol_tools, m) {
             }
             return GFPGeneratorSpec::ECFingerprint(radius, IWString(atom_type));
           },
-          py::arg("radius") = 3, py::arg("atom_type") = "UST:Z");
+          py::arg("radius") = 3, py::arg("atom_type") = "UST:Z")
+      .def_static("ring_substitution", &GFPGeneratorSpec::RingSubstitution);
 
   py::class_<GFPContext, std::shared_ptr<GFPContext>>(m, "GFPContext")
       .def(py::init<>())

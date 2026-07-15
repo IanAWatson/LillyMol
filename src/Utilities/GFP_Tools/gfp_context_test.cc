@@ -338,6 +338,21 @@ TEST(TestGFPContext, BuildFromSpecsRejectsDuplicateTags) {
   EXPECT_FALSE(context.BuildFromSpecs(specs));
 }
 
+TEST(TestGFPContext, RingSubstitutionFingerprint) {
+  std::vector<gfp_context::GFPGeneratorSpec> specs = {
+      gfp_context::GFPGeneratorSpec::RingSubstitution()};
+  gfp_context::GFPContext context;
+  ASSERT_TRUE(context.BuildFromSpecs(specs));
+  EXPECT_THAT(context.Tags(), ElementsAre("NCRS<"));
+
+  Molecule mol;
+  ASSERT_TRUE(mol.build_from_smiles("c1ccccc1C toluene"));
+  gfp_context::GFPFingerprint fp;
+  ASSERT_TRUE(context.Fingerprint(mol, fp));
+  EXPECT_GT(fp.sparse(0).nbits(), 0);
+  EXPECT_THAT(context.Distance(fp, fp), FloatNear(0.0f, 1.0e-6f));
+}
+
 TEST(TestGFPContext, ECFingerprintDefaultAtomType) {
   std::vector<gfp_context::GFPGeneratorSpec> specs = {
       gfp_context::GFPGeneratorSpec::ECFingerprint(3, IWString("UST:Z"))};

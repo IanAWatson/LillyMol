@@ -884,6 +884,10 @@ radius and atom-type specification are encoded in the tag, for example
 from tags; other non-alphanumeric characters are rejected. Multiple EC
 fingerprints with different atom types can be combined in one context.
 
+`GFP.ring_substitution()` adds the ring-substitution fingerprint with tag
+`NCRS<`. It uses the defaults used by `gfp_make.pl`: full substituent atom
+typing and single-feature bits.
+
 Use `GFPList.standard()` when you want to build a searchable collection from
 Python molecules:
 

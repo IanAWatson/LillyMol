@@ -23,6 +23,7 @@
 #include "Molecule_Tools/iwecfp_lib.h"
 #include "Molecule_Tools/maccskeys_fn5.h"
 #include "Molecule_Tools/mpr.h"
+#include "Molecule_Tools/ring_substitution.h"
 #include "Utilities/GFP_Tools/dyfp.h"
 
 namespace gfp_context {
@@ -237,6 +238,11 @@ GFPGeneratorSpec::ECFingerprint(int radius, const IWString& atom_type) {
   return GFPGeneratorSpec(GeneratorKind::kECFingerprint, radius, atom_type);
 }
 
+GFPGeneratorSpec
+GFPGeneratorSpec::RingSubstitution() {
+  return GFPGeneratorSpec(GeneratorKind::kRingSubstitution);
+}
+
 std::vector<Component>
 GFPGeneratorSpec::Components() const {
   switch (_kind) {
@@ -258,6 +264,8 @@ GFPGeneratorSpec::Components() const {
       return {Component{ComponentKind::kSparse, ALogPTag(_replicates), 0, 1.0f}};
     case GeneratorKind::kECFingerprint:
       return {Component{ComponentKind::kSparse, ECTag(_radius, _atom_type), 0, 1.0f}};
+    case GeneratorKind::kRingSubstitution:
+      return {Component{ComponentKind::kSparse, IWString("NCRS<"), 0, 1.0f}};
   }
 
   return {};
@@ -277,6 +285,8 @@ GFPGeneratorSpec::Repr() const {
     case GeneratorKind::kECFingerprint:
       return "GFP.ec(radius=" + std::to_string(_radius) + ", atom_type='" +
              _atom_type.AsString() + "')";
+    case GeneratorKind::kRingSubstitution:
+      return "GFP.ring_substitution()";
   }
 
   return "GFP.unknown()";
@@ -517,6 +527,47 @@ ECFingerprintGenerator::Generate(Molecule& m,
   const iwecfp::FingerprintResult result = _iwecfp.Fingerprint(m, atom_type.get(), &sfc);
   if (result != iwecfp::FingerprintResult::kOk) {
     std::cerr << "ECFingerprintGenerator::Generate:fingerprint generation failed\n";
+    return 0;
+  }
+
+  return destination.mutable_sparse(slots[0].index)
+      .build_from_sparse_fingerprint_creator(sfc);
+}
+
+class RingSubstitutionFingerprintGenerator : public FingerprintGeneratorImplementation {
+ private:
+  ring_substitution::RingSubstitutionGenerator _generator;
+
+ public:
+  RingSubstitutionFingerprintGenerator() {
+    _generator.set_positional_information_only(false);
+    _generator.set_full_atom_types(true);
+    _generator.set_place_single_feature_bits(true);
+  }
+
+  std::vector<Component> Components() const override;
+  int Generate(Molecule& m, const std::vector<GeneratorComponentAssignment>& slots,
+               GFPFingerprint& destination) override;
+};
+
+std::vector<Component>
+RingSubstitutionFingerprintGenerator::Components() const {
+  return {Component{ComponentKind::kSparse, IWString("NCRS<"), 0, 1.0f}};
+}
+
+int
+RingSubstitutionFingerprintGenerator::Generate(
+    Molecule& m, const std::vector<GeneratorComponentAssignment>& slots,
+    GFPFingerprint& destination) {
+  if (slots.size() != 1 || slots[0].kind != ComponentKind::kSparse) {
+    std::cerr << "RingSubstitutionFingerprintGenerator::Generate:invalid slots\n";
+    return 0;
+  }
+
+  Sparse_Fingerprint_Creator sfc;
+  if (m.nrings() > 0 && !_generator.Generate(m, sfc)) {
+    std::cerr << "RingSubstitutionFingerprintGenerator::Generate:fingerprint generation "
+                 "failed\n";
     return 0;
   }
 
@@ -919,6 +970,8 @@ MakeGenerator(const GFPGeneratorSpec& spec) {
       return std::make_unique<ALogPFingerprintGenerator>(spec.replicates());
     case GeneratorKind::kECFingerprint:
       return std::make_unique<ECFingerprintGenerator>(spec.radius(), spec.atom_type());
+    case GeneratorKind::kRingSubstitution:
+      return std::make_unique<RingSubstitutionFingerprintGenerator>();
   }
 
   return nullptr;

@@ -33,6 +33,7 @@ enum class GeneratorKind : uint8_t {
   kMACCSKeys,
   kALogP,
   kECFingerprint,
+  kRingSubstitution,
 };
 
 struct Component {
@@ -61,6 +62,7 @@ class GFPGeneratorSpec {
   static GFPGeneratorSpec ALogP(int replicates = 9);
   static GFPGeneratorSpec ECFingerprint(int radius = 3,
                                         const IWString& atom_type = IWString("UST:Z"));
+  static GFPGeneratorSpec RingSubstitution();
 
   GeneratorKind
   kind() const {

@@ -338,6 +338,36 @@ TEST(TestGFPContext, BuildFromSpecsRejectsDuplicateTags) {
   EXPECT_FALSE(context.BuildFromSpecs(specs));
 }
 
+TEST(TestGFPContext, XLogPReplicates) {
+  std::vector<gfp_context::GFPGeneratorSpec> specs = {
+      gfp_context::GFPGeneratorSpec::XLogP(4)};
+  gfp_context::GFPContext context;
+  ASSERT_TRUE(context.BuildFromSpecs(specs));
+  EXPECT_THAT(context.Tags(), ElementsAre("NCXLOGP4<"));
+
+  Molecule mol;
+  ASSERT_TRUE(mol.build_from_smiles("CCO ethanol"));
+  gfp_context::GFPFingerprint fp;
+  ASSERT_TRUE(context.Fingerprint(mol, fp));
+
+  const Sparse_Fingerprint& sparse = fp.sparse(0);
+  ASSERT_EQ(sparse.nbits(), 4);
+  const int count = sparse.count_for_bit(0);
+  EXPECT_GT(count, 0);
+  EXPECT_EQ(sparse.count_for_bit(1), count);
+  EXPECT_EQ(sparse.count_for_bit(2), count);
+  EXPECT_EQ(sparse.count_for_bit(3), count);
+  EXPECT_EQ(sparse.count_for_bit(4), 0);
+  EXPECT_THAT(context.Distance(fp, fp), FloatNear(0.0f, 1.0e-6f));
+}
+
+TEST(TestGFPContext, XLogPRejectsInvalidReplicates) {
+  std::vector<gfp_context::GFPGeneratorSpec> specs = {
+      gfp_context::GFPGeneratorSpec::XLogP(0)};
+  gfp_context::GFPContext context;
+  EXPECT_FALSE(context.BuildFromSpecs(specs));
+}
+
 TEST(TestGFPContext, RingSubstitutionFingerprint) {
   std::vector<gfp_context::GFPGeneratorSpec> specs = {
       gfp_context::GFPGeneratorSpec::RingSubstitution()};

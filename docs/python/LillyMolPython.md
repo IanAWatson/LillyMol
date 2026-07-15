@@ -877,6 +877,10 @@ different replicate counts are not compatible. The replicated bits all carry the
 same bucketized alogp value as their count, matching the command-line alogp
 fingerprint convention.
 
+`GFP.xlogp(replicates=9)` adds the analogous sparse counted xlogp component
+with tags such as `NCXLOGP9<`. It uses the xlogp command-line fingerprint
+bucketization convention.
+
 `GFP.ec(radius=3, atom_type="UST:Z")` adds a sparse counted extended
 connectivity fingerprint. The default atom type is atomic number (`UST:Z`). The
 radius and atom-type specification are encoded in the tag, for example

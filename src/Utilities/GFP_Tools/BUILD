@@ -1567,6 +1567,7 @@ cc_library(
         "//Molecule_Tools:maccskeys_fn5_lib",
         "//Molecule_Tools:mpr",
         "//Molecule_Tools:ring_substitution_lib",
+        "//Molecule_Tools:xlogp_lib",
     ],
 )
 

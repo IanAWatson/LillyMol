@@ -24,6 +24,7 @@
 #include "Molecule_Tools/maccskeys_fn5.h"
 #include "Molecule_Tools/mpr.h"
 #include "Molecule_Tools/ring_substitution.h"
+#include "Molecule_Tools/xlogp.h"
 #include "Utilities/GFP_Tools/dyfp.h"
 
 namespace gfp_context {
@@ -173,6 +174,23 @@ ALogPTag(int replicates) {
 }
 
 int
+XLogPToPositiveInt(double value) {
+  const int result = static_cast<int>(value + 5.4999);
+  if (result <= 0) {
+    return 1;
+  }
+
+  return result;
+}
+
+IWString
+XLogPTag(int replicates) {
+  IWString result;
+  result << "NCXLOGP" << replicates << '<';
+  return result;
+}
+
+int
 AppendSanitisedAtomType(const IWString& atom_type, IWString& destination) {
   int appended = 0;
   for (int i = 0; i < atom_type.length(); ++i) {
@@ -234,6 +252,11 @@ GFPGeneratorSpec::ALogP(int replicates) {
 }
 
 GFPGeneratorSpec
+GFPGeneratorSpec::XLogP(int replicates) {
+  return GFPGeneratorSpec(GeneratorKind::kXLogP, true, replicates);
+}
+
+GFPGeneratorSpec
 GFPGeneratorSpec::ECFingerprint(int radius, const IWString& atom_type) {
   return GFPGeneratorSpec(GeneratorKind::kECFingerprint, radius, atom_type);
 }
@@ -262,6 +285,8 @@ GFPGeneratorSpec::Components() const {
     }
     case GeneratorKind::kALogP:
       return {Component{ComponentKind::kSparse, ALogPTag(_replicates), 0, 1.0f}};
+    case GeneratorKind::kXLogP:
+      return {Component{ComponentKind::kSparse, XLogPTag(_replicates), 0, 1.0f}};
     case GeneratorKind::kECFingerprint:
       return {Component{ComponentKind::kSparse, ECTag(_radius, _atom_type), 0, 1.0f}};
     case GeneratorKind::kRingSubstitution:
@@ -282,6 +307,8 @@ GFPGeneratorSpec::Repr() const {
       return _maccs_level2 ? "GFP.maccs(level2=True)" : "GFP.maccs(level2=False)";
     case GeneratorKind::kALogP:
       return "GFP.alogp(replicates=" + std::to_string(_replicates) + ")";
+    case GeneratorKind::kXLogP:
+      return "GFP.xlogp(replicates=" + std::to_string(_replicates) + ")";
     case GeneratorKind::kECFingerprint:
       return "GFP.ec(radius=" + std::to_string(_radius) + ", atom_type='" +
              _atom_type.AsString() + "')";
@@ -464,6 +491,50 @@ ALogPFingerprintGenerator::Generate(
   }
 
   const int count = ALogPToPositiveInt(*logp);
+  return destination.mutable_sparse(slots[0].index)
+      .build_from_replicates(_replicates, count);
+}
+
+class XLogPFingerprintGenerator : public FingerprintGeneratorImplementation {
+ private:
+  xlogp::XLogPCalc _xlogp;
+  int _replicates = kDefaultALogPReplicates;
+
+ public:
+  explicit XLogPFingerprintGenerator(int replicates) : _replicates(replicates) {
+    _xlogp.SetIssueUnclassifiedAtomMessages(false);
+  }
+
+  std::vector<Component> Components() const override;
+  int Generate(Molecule& m, const std::vector<GeneratorComponentAssignment>& slots,
+               GFPFingerprint& destination) override;
+};
+
+std::vector<Component>
+XLogPFingerprintGenerator::Components() const {
+  return {Component{ComponentKind::kSparse, XLogPTag(_replicates), 0, 1.0f}};
+}
+
+int
+XLogPFingerprintGenerator::Generate(
+    Molecule& m, const std::vector<GeneratorComponentAssignment>& slots,
+    GFPFingerprint& destination) {
+  if (slots.size() != 1 || slots[0].kind != ComponentKind::kSparse) {
+    std::cerr << "XLogPFingerprintGenerator::Generate:invalid slots\n";
+    return 0;
+  }
+  if (_replicates <= 0) {
+    std::cerr << "XLogPFingerprintGenerator::Generate:invalid replicates " << _replicates
+              << '\n';
+    return 0;
+  }
+
+  std::optional<double> logp = _xlogp.LogP(m);
+  if (!logp) {
+    return 0;
+  }
+
+  const int count = XLogPToPositiveInt(*logp);
   return destination.mutable_sparse(slots[0].index)
       .build_from_replicates(_replicates, count);
 }
@@ -968,6 +1039,8 @@ MakeGenerator(const GFPGeneratorSpec& spec) {
       return std::make_unique<MACCSFingerprintGenerator>(spec.maccs_level2());
     case GeneratorKind::kALogP:
       return std::make_unique<ALogPFingerprintGenerator>(spec.replicates());
+    case GeneratorKind::kXLogP:
+      return std::make_unique<XLogPFingerprintGenerator>(spec.replicates());
     case GeneratorKind::kECFingerprint:
       return std::make_unique<ECFingerprintGenerator>(spec.radius(), spec.atom_type());
     case GeneratorKind::kRingSubstitution:
@@ -1068,8 +1141,9 @@ GFPContext::BuildFromSpecs(const std::vector<GFPGeneratorSpec>& specs, bool prep
   generator_components.reserve(specs.size());
 
   for (const GFPGeneratorSpec& spec : specs) {
-    if (spec.kind() == GeneratorKind::kALogP && spec.replicates() <= 0) {
-      std::cerr << "GFPContext::BuildFromSpecs:invalid alogp replicates "
+    if ((spec.kind() == GeneratorKind::kALogP || spec.kind() == GeneratorKind::kXLogP) &&
+        spec.replicates() <= 0) {
+      std::cerr << "GFPContext::BuildFromSpecs:invalid logp replicates "
                 << spec.replicates() << '\n';
       return 0;
     }

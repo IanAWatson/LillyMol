@@ -35,6 +35,7 @@ enum class GeneratorKind : uint8_t {
   kXLogP,
   kTPSA,
   kFormula,
+  kCATS,
   kECFingerprint,
   kRingSubstitution,
 };
@@ -52,12 +53,16 @@ class GFPGeneratorSpec {
   bool _maccs_level2 = true;
   int _replicates = 0;
   int _radius = 0;
+  int _max_path_length = 0;
+  bool _include_hydrophobic_pairs = true;
   IWString _atom_type;
 
  public:
   GFPGeneratorSpec() = default;
   GFPGeneratorSpec(GeneratorKind kind, bool maccs_level2 = true, int replicates = 0);
   GFPGeneratorSpec(GeneratorKind kind, int radius, const IWString& atom_type);
+  GFPGeneratorSpec(GeneratorKind kind, int max_path_length,
+                   bool include_hydrophobic_pairs);
 
   static GFPGeneratorSpec MolecularProperties();
   static GFPGeneratorSpec IWMFingerprint();
@@ -66,6 +71,8 @@ class GFPGeneratorSpec {
   static GFPGeneratorSpec XLogP(int replicates = 9);
   static GFPGeneratorSpec TPSA(int replicates = 9);
   static GFPGeneratorSpec FormulaFingerprint();
+  static GFPGeneratorSpec CATS(int max_path_length = 10,
+                               bool include_hydrophobic_pairs = true);
   static GFPGeneratorSpec ECFingerprint(int radius = 3,
                                         const IWString& atom_type = IWString("UST:Z"));
   static GFPGeneratorSpec RingSubstitution();
@@ -93,6 +100,16 @@ class GFPGeneratorSpec {
   const IWString&
   atom_type() const {
     return _atom_type;
+  }
+
+  int
+  max_path_length() const {
+    return _max_path_length;
+  }
+
+  bool
+  include_hydrophobic_pairs() const {
+    return _include_hydrophobic_pairs;
   }
 
   std::vector<Component> Components() const;

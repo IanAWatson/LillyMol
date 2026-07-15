@@ -179,6 +179,15 @@ PYBIND11_MODULE(lillymol_tools, m) {
       .def_static("maccs", &GFPGeneratorSpec::MACCSKeys, py::arg("level2") = true)
       .def_static("formula", &GFPGeneratorSpec::FormulaFingerprint)
       .def_static(
+          "cats",
+          [](int max_path_length, bool include_hydrophobic_pairs) {
+            if (max_path_length < 1) {
+              throw std::invalid_argument("max_path_length must be positive");
+            }
+            return GFPGeneratorSpec::CATS(max_path_length, include_hydrophobic_pairs);
+          },
+          py::arg("max_path_length") = 10, py::arg("include_hydrophobic_pairs") = true)
+      .def_static(
           "alogp",
           [](int replicates) {
             if (replicates <= 0) {

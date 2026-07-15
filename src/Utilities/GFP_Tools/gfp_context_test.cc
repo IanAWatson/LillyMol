@@ -420,6 +420,43 @@ TEST(TestGFPContext, FormulaFingerprint) {
   EXPECT_LT(context.Distance(fp1, fp2), 1.0f);
 }
 
+TEST(TestGFPContext, CATSFingerprint) {
+  if (std::getenv("LILLYMOL_HOME") == nullptr) {
+    GTEST_SKIP() << "LILLYMOL_HOME not set";
+  }
+
+  std::vector<gfp_context::GFPGeneratorSpec> specs = {
+      gfp_context::GFPGeneratorSpec::CATS(4, true)};
+  gfp_context::GFPContext context;
+  ASSERT_TRUE(context.BuildFromSpecs(specs));
+  EXPECT_THAT(context.Tags(), ElementsAre("NCCATS4<"));
+
+  Molecule mol;
+  ASSERT_TRUE(mol.build_from_smiles("CCO ethanol"));
+  gfp_context::GFPFingerprint fp;
+  ASSERT_TRUE(context.Fingerprint(mol, fp));
+  EXPECT_THAT(context.Distance(fp, fp), FloatNear(0.0f, 1.0e-6f));
+}
+
+TEST(TestGFPContext, CATSSuppressedHydrophobicPairsTag) {
+  if (std::getenv("LILLYMOL_HOME") == nullptr) {
+    GTEST_SKIP() << "LILLYMOL_HOME not set";
+  }
+
+  std::vector<gfp_context::GFPGeneratorSpec> specs = {
+      gfp_context::GFPGeneratorSpec::CATS(4, false)};
+  gfp_context::GFPContext context;
+  ASSERT_TRUE(context.BuildFromSpecs(specs));
+  EXPECT_THAT(context.Tags(), ElementsAre("NCCATSP4<"));
+}
+
+TEST(TestGFPContext, CATSRejectsInvalidMaxPathLength) {
+  std::vector<gfp_context::GFPGeneratorSpec> specs = {
+      gfp_context::GFPGeneratorSpec::CATS(0, true)};
+  gfp_context::GFPContext context;
+  EXPECT_FALSE(context.BuildFromSpecs(specs));
+}
+
 TEST(TestGFPContext, RingSubstitutionFingerprint) {
   std::vector<gfp_context::GFPGeneratorSpec> specs = {
       gfp_context::GFPGeneratorSpec::RingSubstitution()};

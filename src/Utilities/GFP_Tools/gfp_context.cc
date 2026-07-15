@@ -21,6 +21,7 @@
 
 #include "Molecule_Tools/alogp.h"
 #include "Molecule_Tools/iwecfp_lib.h"
+#include "Molecule_Tools/jwcats_lib.h"
 #include "Molecule_Tools/maccskeys_fn5.h"
 #include "Molecule_Tools/mformula.h"
 #include "Molecule_Tools/mpr.h"
@@ -217,6 +218,18 @@ FormulaTag() {
   return IWString("FCFML<");
 }
 
+IWString
+CATSTag(int max_path_length, bool include_hydrophobic_pairs) {
+  IWString result;
+  if (include_hydrophobic_pairs) {
+    result << "NCCATS";
+  } else {
+    result << "NCCATSP";
+  }
+  result << max_path_length << '<';
+  return result;
+}
+
 int
 AppendSanitisedAtomType(const IWString& atom_type, IWString& destination) {
   int appended = 0;
@@ -258,6 +271,13 @@ GFPGeneratorSpec::GFPGeneratorSpec(GeneratorKind kind, int radius,
     : _kind(kind), _radius(radius), _atom_type(atom_type) {
 }
 
+GFPGeneratorSpec::GFPGeneratorSpec(GeneratorKind kind, int max_path_length,
+                                   bool include_hydrophobic_pairs)
+    : _kind(kind),
+      _max_path_length(max_path_length),
+      _include_hydrophobic_pairs(include_hydrophobic_pairs) {
+}
+
 GFPGeneratorSpec
 GFPGeneratorSpec::MolecularProperties() {
   return GFPGeneratorSpec(GeneratorKind::kMolecularProperties);
@@ -291,6 +311,12 @@ GFPGeneratorSpec::TPSA(int replicates) {
 GFPGeneratorSpec
 GFPGeneratorSpec::FormulaFingerprint() {
   return GFPGeneratorSpec(GeneratorKind::kFormula);
+}
+
+GFPGeneratorSpec
+GFPGeneratorSpec::CATS(int max_path_length, bool include_hydrophobic_pairs) {
+  return GFPGeneratorSpec(GeneratorKind::kCATS, max_path_length,
+                          include_hydrophobic_pairs);
 }
 
 GFPGeneratorSpec
@@ -328,6 +354,9 @@ GFPGeneratorSpec::Components() const {
       return {Component{ComponentKind::kSparse, TPSATag(_replicates), 0, 1.0f}};
     case GeneratorKind::kFormula:
       return {Component{ComponentKind::kFixedCounted, FormulaTag(), 0, 1.0f}};
+    case GeneratorKind::kCATS:
+      return {Component{ComponentKind::kSparse,
+                        CATSTag(_max_path_length, _include_hydrophobic_pairs), 0, 1.0f}};
     case GeneratorKind::kECFingerprint:
       return {Component{ComponentKind::kSparse, ECTag(_radius, _atom_type), 0, 1.0f}};
     case GeneratorKind::kRingSubstitution:
@@ -354,6 +383,10 @@ GFPGeneratorSpec::Repr() const {
       return "GFP.tpsa(replicates=" + std::to_string(_replicates) + ")";
     case GeneratorKind::kFormula:
       return "GFP.formula()";
+    case GeneratorKind::kCATS:
+      return "GFP.cats(max_path_length=" + std::to_string(_max_path_length) +
+             ", include_hydrophobic_pairs=" +
+             (_include_hydrophobic_pairs ? "True" : "False") + ")";
     case GeneratorKind::kECFingerprint:
       return "GFP.ec(radius=" + std::to_string(_radius) + ", atom_type='" +
              _atom_type.AsString() + "')";
@@ -664,6 +697,94 @@ FormulaFingerprintGenerator::Generate(
 
   return destination.mutable_fixed_counted(slots[0].index)
       .construct_from_array_of_ints(_count, kFormulaFingerprintNbits);
+}
+
+class CATSFingerprintGenerator : public FingerprintGeneratorImplementation {
+ private:
+  int _max_path_length = 10;
+  bool _include_hydrophobic_pairs = true;
+  jwcats::JWCats _jwcats;
+
+ public:
+  CATSFingerprintGenerator(int max_path_length, bool include_hydrophobic_pairs)
+      : _max_path_length(max_path_length),
+        _include_hydrophobic_pairs(include_hydrophobic_pairs) {
+  }
+
+  int Initialise();
+  std::vector<Component> Components() const override;
+  int Generate(Molecule& m, const std::vector<GeneratorComponentAssignment>& slots,
+               GFPFingerprint& destination) override;
+};
+
+int
+CATSFingerprintGenerator::Initialise() {
+  if (_max_path_length < 1) {
+    std::cerr << "CATSFingerprintGenerator::Initialise:invalid max path length "
+              << _max_path_length << '\n';
+    return 0;
+  }
+
+  _jwcats.SetMaxBondSeparation(_max_path_length);
+  _jwcats.SetIncludeHydrophobicPairs(_include_hydrophobic_pairs);
+  _jwcats.SetScalingType(0);
+
+  if (!_jwcats.charge_assigner().BuildFromDefaultEnvs()) {
+    std::cerr << "CATSFingerprintGenerator::Initialise:cannot initialise charge "
+                 "assigner; ensure LILLYMOL_HOME is defined\n";
+    return 0;
+  }
+
+  constexpr int kQuiet = 0;
+  if (!_jwcats.donor_acceptor_assigner().BuildFromDefaultEnv(kQuiet)) {
+    std::cerr << "CATSFingerprintGenerator::Initialise:cannot initialise donor/acceptor "
+                 "assigner; ensure LILLYMOL_HOME is defined\n";
+    return 0;
+  }
+
+  return _jwcats.Initialise();
+}
+
+std::vector<Component>
+CATSFingerprintGenerator::Components() const {
+  return {Component{ComponentKind::kSparse,
+                    CATSTag(_max_path_length, _include_hydrophobic_pairs), 0, 1.0f}};
+}
+
+int
+CATSFingerprintGenerator::Generate(Molecule& m,
+                                   const std::vector<GeneratorComponentAssignment>& slots,
+                                   GFPFingerprint& destination) {
+  if (slots.size() != 1 || slots[0].kind != ComponentKind::kSparse) {
+    std::cerr << "CATSFingerprintGenerator::Generate:invalid slots\n";
+    return 0;
+  }
+
+  jwcats::Result result;
+  const jwcats::ComputeStatus status = _jwcats.Compute(m, result);
+  if (status != jwcats::ComputeStatus::kOk) {
+    std::cerr << "CATSFingerprintGenerator::Generate:cannot compute CATS fingerprint\n";
+    return 0;
+  }
+
+  Sparse_Fingerprint_Creator sfc;
+  const std::vector<int>& write_array_value = _jwcats.write_array_value();
+  const int array_size = _jwcats.array_size();
+  for (int i = 0; i < array_size; ++i) {
+    if (!write_array_value[i]) {
+      continue;
+    }
+    if (result.scaled_counts[i] == 0.0) {
+      continue;
+    }
+    const int count = static_cast<int>(result.scaled_counts[i] + 0.01);
+    if (count > 0) {
+      sfc.hit_bit(i, count);
+    }
+  }
+
+  return destination.mutable_sparse(slots[0].index)
+      .build_from_sparse_fingerprint_creator(sfc);
 }
 
 class ECFingerprintGenerator : public FingerprintGeneratorImplementation {
@@ -1172,6 +1293,9 @@ MakeGenerator(const GFPGeneratorSpec& spec) {
       return std::make_unique<TPSAFingerprintGenerator>(spec.replicates());
     case GeneratorKind::kFormula:
       return std::make_unique<FormulaFingerprintGenerator>();
+    case GeneratorKind::kCATS:
+      return std::make_unique<CATSFingerprintGenerator>(spec.max_path_length(),
+                                                        spec.include_hydrophobic_pairs());
     case GeneratorKind::kECFingerprint:
       return std::make_unique<ECFingerprintGenerator>(spec.radius(), spec.atom_type());
     case GeneratorKind::kRingSubstitution:
@@ -1280,6 +1404,11 @@ GFPContext::BuildFromSpecs(const std::vector<GFPGeneratorSpec>& specs, bool prep
           << spec.replicates() << '\n';
       return 0;
     }
+    if (spec.kind() == GeneratorKind::kCATS && spec.max_path_length() < 1) {
+      std::cerr << "GFPContext::BuildFromSpecs:invalid CATS max path length "
+                << spec.max_path_length() << '\n';
+      return 0;
+    }
     if (spec.kind() == GeneratorKind::kECFingerprint) {
       if (spec.radius() < 0 || spec.atom_type().empty() ||
           ECTag(spec.radius(), spec.atom_type()).empty()) {
@@ -1289,6 +1418,19 @@ GFPContext::BuildFromSpecs(const std::vector<GFPGeneratorSpec>& specs, bool prep
     }
 
     std::unique_ptr<FingerprintGeneratorImplementation> generator = MakeGenerator(spec);
+    if (generator == nullptr) {
+      std::cerr << "GFPContext::BuildFromSpecs:cannot build " << spec.Repr() << '\n';
+      return 0;
+    }
+    if (spec.kind() == GeneratorKind::kCATS) {
+      CATSFingerprintGenerator* cats =
+          dynamic_cast<CATSFingerprintGenerator*>(generator.get());
+      if (cats == nullptr || !cats->Initialise()) {
+        std::cerr << "GFPContext::BuildFromSpecs:cannot initialise " << spec.Repr()
+                  << '\n';
+        return 0;
+      }
+    }
     if (spec.kind() == GeneratorKind::kECFingerprint) {
       ECFingerprintGenerator* ec = dynamic_cast<ECFingerprintGenerator*>(generator.get());
       if (ec == nullptr || !ec->Initialise()) {
@@ -1296,10 +1438,6 @@ GFPContext::BuildFromSpecs(const std::vector<GFPGeneratorSpec>& specs, bool prep
                   << '\n';
         return 0;
       }
-    }
-    if (generator == nullptr) {
-      std::cerr << "GFPContext::BuildFromSpecs:cannot build " << spec.Repr() << '\n';
-      return 0;
     }
 
     std::vector<Component> components = generator->Components();

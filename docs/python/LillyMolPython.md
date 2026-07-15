@@ -894,6 +894,14 @@ differences among more abundant elements. The change going from one Oxygen
 atom to two Oxygen atoms is much more important than going from 15 to 16
 Carbon atoms.
 
+`GFP.cats(max_path_length=10, include_hydrophobic_pairs=True)` adds the sparse
+counted CATS pharmacophore-pair fingerprint. The tag is `NCCATS10<` when
+hydrophobic-hydrophobic pairs are included and `NCCATSP10<` when they are
+suppressed. The `P` suffix preserves the long-standing command-line convention
+where the `jwcats -p` option suppresses hydrophobic-hydrophobic pairs. CATS
+initialization requires `LILLYMOL_HOME` so the default charge and
+donor/acceptor assigners can be loaded.
+
 `GFP.ec(radius=3, atom_type="UST:Z")` adds a sparse counted extended
 connectivity fingerprint. The default atom type is atomic number (`UST:Z`). The
 radius and atom-type specification are encoded in the tag, for example

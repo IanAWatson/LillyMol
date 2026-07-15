@@ -45,7 +45,6 @@ class Donor_Acceptor_Assigner
 //  private functions
 
     int BuildFromDirValue(const IWString & dir, int verbose);
-    int BuildFromDefaultEnv(int verbose);
 
     int  _assign_acceptors(Molecule_to_Match & target, int * isotope);
     int  _assign_donors(Molecule_to_Match & target, int * isotope);
@@ -82,6 +81,9 @@ class Donor_Acceptor_Assigner
 
     // Usually LILLYMOL_HOME/data/queries/hbonds
     int BuildFromDir(const IWString& dir, int verbose);
+
+    // Use LILLYMOL_HOME to locate the default donor/acceptor queries.
+    int BuildFromDefaultEnv(int verbose);
 
     // Construct from proto files.
     int BuildFromProto(const IWString& fname);

@@ -227,6 +227,39 @@ class TestGFPList(unittest.TestCase):
         self.assertGreater(ctx.distance(fp1, fp2), 0.0)
         self.assertLess(ctx.distance(fp1, fp2), 1.0)
 
+    def test_cats_generator_spec(self):
+        spec = GFP.cats(max_path_length=4)
+        self.assertEqual(spec.components(), ['NCCATS4<'])
+        self.assertEqual(
+            repr(spec),
+            'GFP.cats(max_path_length=4, include_hydrophobic_pairs=True)')
+
+        if not os.environ.get('LILLYMOL_HOME'):
+            self.skipTest('LILLYMOL_HOME not set')
+
+        ctx = GFPContext.from_specs([spec])
+        self.assertEqual(ctx.tags(), ['NCCATS4<'])
+        mol = _mol('CCO ethanol')
+        fp = ctx.fingerprint(mol)
+        self.assertAlmostEqual(ctx.distance(fp, fp), 0.0, places=6)
+
+    def test_catsp_generator_spec(self):
+        spec = GFP.cats(max_path_length=4, include_hydrophobic_pairs=False)
+        self.assertEqual(spec.components(), ['NCCATSP4<'])
+        self.assertEqual(
+            repr(spec),
+            'GFP.cats(max_path_length=4, include_hydrophobic_pairs=False)')
+
+        if not os.environ.get('LILLYMOL_HOME'):
+            self.skipTest('LILLYMOL_HOME not set')
+
+        ctx = GFPContext.from_specs([spec])
+        self.assertEqual(ctx.tags(), ['NCCATSP4<'])
+
+    def test_cats_rejects_invalid_max_path_length(self):
+        with self.assertRaises(ValueError):
+            GFP.cats(max_path_length=0)
+
     def test_ring_substitution_generator_spec(self):
         spec = GFP.ring_substitution()
         self.assertEqual(spec.components(), ['NCRS<'])

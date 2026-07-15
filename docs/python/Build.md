@@ -30,3 +30,23 @@ Things seem to work seamlessly in virtualenv and `uv`.
 Note that with the default build (below) Python bindings are not built,
 but 'make all' will build python related targets.
 
+## Wheel packaging
+After building the pybind modules, LillyMol can stage those Bazel-built shared
+objects into a Python wheel. The wheel infrastructure lives in
+`${LILLYMOL_HOME}/python`.
+
+```
+cd ${LILLYMOL_HOME}/src
+bazel build //pybind:all
+./copy_shared_libraries.sh ../lib
+
+cd ${LILLYMOL_HOME}/python
+./scripts/stage_wheel_files.sh
+python -m pip install build wheel setuptools
+python -m build --wheel
+```
+
+The generated `python/prebuilt`, `python/build`, and `python/dist` directories
+are build artifacts. Commit only the wheel-building infrastructure, not the
+staged binaries or generated wheel.
+

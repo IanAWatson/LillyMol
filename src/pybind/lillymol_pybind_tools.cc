@@ -27,6 +27,8 @@ namespace py = pybind11;
 
 namespace {
 
+struct GFPFactory {};
+
 std::string
 IWStringToStdString(const IWString& s) {
   return std::string(s.rawchars(), s.length());
@@ -152,12 +154,29 @@ ThrowForJWCatsStatus(jwcats::ComputeStatus status) {
 PYBIND11_MODULE(lillymol_tools, m) {
   using gfp_context::GFPContext;
   using gfp_context::GFPFingerprint;
+  using gfp_context::GFPGeneratorSpec;
   using gfp_context::GFPList;
   using gfp_context::NearestNeighbour;
   using unique_molecules::UniqueMolecules;
 
   py::class_<GFPFingerprint>(m, "GFPFingerprint")
       .def("context_hash", &GFPFingerprint::context_hash);
+
+  py::class_<GFPGeneratorSpec>(m, "GFPGeneratorSpec")
+      .def("components",
+           [](const GFPGeneratorSpec& spec) {
+             std::vector<std::string> result;
+             for (const gfp_context::Component& component : spec.Components()) {
+               result.emplace_back(component.tag.rawchars(), component.tag.length());
+             }
+             return result;
+           })
+      .def("__repr__", &GFPGeneratorSpec::Repr);
+
+  py::class_<GFPFactory>(m, "GFP")
+      .def_static("mpr", &GFPGeneratorSpec::MolecularProperties)
+      .def_static("iw", &GFPGeneratorSpec::IWMFingerprint)
+      .def_static("maccs", &GFPGeneratorSpec::MACCSKeys, py::arg("level2") = true);
 
   py::class_<GFPContext, std::shared_ptr<GFPContext>>(m, "GFPContext")
       .def(py::init<>())
@@ -172,6 +191,17 @@ PYBIND11_MODULE(lillymol_tools, m) {
           },
           py::arg("preprocess") = true,
           "Create a context that generates the standard LillyMol GFP fingerprint")
+      .def_static(
+          "from_specs",
+          [](const std::vector<GFPGeneratorSpec>& specs, bool preprocess) {
+            auto result = std::make_shared<GFPContext>();
+            if (!result->BuildFromSpecs(specs, preprocess)) {
+              throw std::runtime_error("Cannot initialise GFP context from specs");
+            }
+            return result;
+          },
+          py::arg("specs"), py::arg("preprocess") = true,
+          "Create a context from GFP generator specifications")
       .def("tags", &GFPContext::Tags)
       .def("can_generate_fingerprints", &GFPContext::can_generate_fingerprints)
       .def(

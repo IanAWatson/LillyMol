@@ -6,7 +6,7 @@ import unittest
 sys.path.insert(0, os.path.dirname(__file__))
 
 from lillymol import Molecule
-from lillymol_tools import GFPContext, GFPList
+from lillymol_tools import GFP, GFPContext, GFPList
 
 
 def _write_file(contents):
@@ -139,6 +139,44 @@ class TestGFPList(unittest.TestCase):
         finally:
             os.remove(fname)
 
+    def test_generator_specs_match_standard_context(self):
+        standard = GFPContext.standard()
+        from_specs = GFPContext.from_specs([GFP.iw(), GFP.maccs(), GFP.mpr()])
+
+        self.assertEqual(from_specs.tags(), standard.tags())
+
+        mol = _mol('CCO ethanol')
+        fp_standard = standard.fingerprint(mol)
+        fp_from_specs = from_specs.fingerprint(mol)
+        self.assertAlmostEqual(standard.distance(fp_standard, fp_from_specs),
+                               0.0, places=6)
+
+    def test_generator_specs_are_order_independent(self):
+        ctx1 = GFPContext.from_specs([GFP.iw(), GFP.maccs(), GFP.mpr()])
+        ctx2 = GFPContext.from_specs([GFP.mpr(), GFP.maccs(), GFP.iw()])
+
+        self.assertEqual(ctx1.tags(), ['FPIW<', 'FPMK<', 'FPMK2<', 'MPR<'])
+        self.assertEqual(ctx1.tags(), ctx2.tags())
+
+        mol = _mol('CCC propane')
+        fp1 = ctx1.fingerprint(mol)
+        fp2 = ctx2.fingerprint(mol)
+        self.assertAlmostEqual(ctx1.distance(fp1, fp2), 0.0, places=6)
+
+    def test_generator_specs_reject_duplicates(self):
+        with self.assertRaises(RuntimeError):
+            GFPContext.from_specs([GFP.iw(), GFP.iw()])
+
+    def test_maccs_level2_false(self):
+        spec = GFP.maccs(level2=False)
+        self.assertEqual(spec.components(), ['FPMK<'])
+        self.assertEqual(repr(spec), 'GFP.maccs(level2=False)')
+
+        ctx = GFPContext.from_specs([spec])
+        self.assertEqual(ctx.tags(), ['FPMK<'])
+        mol = _mol('CCO ethanol')
+        fp = ctx.fingerprint(mol)
+        self.assertAlmostEqual(ctx.distance(fp, fp), 0.0, places=6)
 
     def test_standard_context_generates_fingerprints(self):
         ctx = GFPContext.standard()

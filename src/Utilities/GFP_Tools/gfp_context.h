@@ -27,11 +27,44 @@ enum class ComponentKind : uint8_t {
   kFixedCounted,
 };
 
+enum class GeneratorKind : uint8_t {
+  kMolecularProperties,
+  kIWMFingerprint,
+  kMACCSKeys,
+};
+
 struct Component {
   ComponentKind kind;
   IWString tag;
   int index = 0;
   float weight = 1.0f;
+};
+
+class GFPGeneratorSpec {
+ private:
+  GeneratorKind _kind = GeneratorKind::kMolecularProperties;
+  bool _maccs_level2 = true;
+
+ public:
+  GFPGeneratorSpec() = default;
+  GFPGeneratorSpec(GeneratorKind kind, bool maccs_level2 = true);
+
+  static GFPGeneratorSpec MolecularProperties();
+  static GFPGeneratorSpec IWMFingerprint();
+  static GFPGeneratorSpec MACCSKeys(bool level2 = true);
+
+  GeneratorKind
+  kind() const {
+    return _kind;
+  }
+
+  bool
+  maccs_level2() const {
+    return _maccs_level2;
+  }
+
+  std::vector<Component> Components() const;
+  std::string Repr() const;
 };
 
 struct ActiveComponent {
@@ -189,6 +222,7 @@ class GFPContext {
   ~GFPContext();
 
   int BuildFromTdt(const IW_TDT& tdt);
+  int BuildFromSpecs(const std::vector<GFPGeneratorSpec>& specs, bool preprocess = true);
   int BuildStandard(bool preprocess = true);
 
   bool

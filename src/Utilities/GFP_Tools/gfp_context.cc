@@ -1,6 +1,7 @@
 #include "Utilities/GFP_Tools/gfp_context.h"
 
 #include <algorithm>
+#include <cassert>
 #include <cmath>
 #include <cstring>
 #include <iostream>
@@ -25,6 +26,7 @@ namespace {
 constexpr char kSmilesTag[] = "$SMI<";
 constexpr char kIdentifierTag[] = "PCN<";
 constexpr char kMolecularPropertiesTag[] = "MPR<";
+constexpr int kMaccskeysNbits = 3 * 64;
 
 uint64_t
 Fnv1a(uint64_t hash, const void* v, int n) {
@@ -144,20 +146,207 @@ FixedBinaryTanimoto(const FixedBitVector& lhs, const FixedBitVector& rhs) {
 
 }  // namespace
 
-class StandardFingerprintGenerator {
+GFPGeneratorSpec::GFPGeneratorSpec(GeneratorKind kind, bool maccs_level2)
+    : _kind(kind), _maccs_level2(maccs_level2) {
+}
+
+GFPGeneratorSpec
+GFPGeneratorSpec::MolecularProperties() {
+  return GFPGeneratorSpec(GeneratorKind::kMolecularProperties);
+}
+
+GFPGeneratorSpec
+GFPGeneratorSpec::IWMFingerprint() {
+  return GFPGeneratorSpec(GeneratorKind::kIWMFingerprint);
+}
+
+GFPGeneratorSpec
+GFPGeneratorSpec::MACCSKeys(bool level2) {
+  return GFPGeneratorSpec(GeneratorKind::kMACCSKeys, level2);
+}
+
+std::vector<Component>
+GFPGeneratorSpec::Components() const {
+  switch (_kind) {
+    case GeneratorKind::kMolecularProperties:
+      return {Component{ComponentKind::kMolecularProperties, IWString("MPR<"), 0, 1.0f}};
+    case GeneratorKind::kIWMFingerprint:
+      return {Component{ComponentKind::kFixedBinary, IWString("FPIW<"), 0, 1.0f}};
+    case GeneratorKind::kMACCSKeys: {
+      std::vector<Component> result;
+      result.push_back(
+          Component{ComponentKind::kFixedBinary, IWString("FPMK<"), 0, 1.0f});
+      if (_maccs_level2) {
+        result.push_back(
+            Component{ComponentKind::kFixedBinary, IWString("FPMK2<"), 0, 1.0f});
+      }
+      return result;
+    }
+  }
+
+  return {};
+}
+
+std::string
+GFPGeneratorSpec::Repr() const {
+  switch (_kind) {
+    case GeneratorKind::kMolecularProperties:
+      return "GFP.mpr()";
+    case GeneratorKind::kIWMFingerprint:
+      return "GFP.iw()";
+    case GeneratorKind::kMACCSKeys:
+      return _maccs_level2 ? "GFP.maccs(level2=True)" : "GFP.maccs(level2=False)";
+  }
+
+  return "GFP.unknown()";
+}
+
+struct GeneratorComponentAssignment {
+  ComponentKind kind;
+  int index = 0;
+};
+
+class FingerprintGeneratorImplementation {
+ public:
+  virtual ~FingerprintGeneratorImplementation() = default;
+
+  virtual std::vector<Component> Components() const = 0;
+  virtual int Generate(Molecule& m,
+                       const std::vector<GeneratorComponentAssignment>& slots,
+                       GFPFingerprint& destination) = 0;
+};
+
+class MolecularPropertiesFingerprintGenerator
+    : public FingerprintGeneratorImplementation {
  private:
   Molecular_Properties_Generator _mpr;
-  MACCSKeys _mk;
+
+ public:
+  std::vector<Component> Components() const override;
+  int Generate(Molecule& m, const std::vector<GeneratorComponentAssignment>& slots,
+               GFPFingerprint& destination) override;
+};
+
+std::vector<Component>
+MolecularPropertiesFingerprintGenerator::Components() const {
+  return {Component{ComponentKind::kMolecularProperties, IWString("MPR<"), 0, 1.0f}};
+}
+
+int
+MolecularPropertiesFingerprintGenerator::Generate(
+    Molecule& m, const std::vector<GeneratorComponentAssignment>& slots,
+    GFPFingerprint& destination) {
+  if (slots.size() != 1 || slots[0].kind != ComponentKind::kMolecularProperties) {
+    std::cerr << "MolecularPropertiesFingerprintGenerator::Generate:invalid slots\n";
+    return 0;
+  }
+
+  int properties[8];
+  _mpr(m, properties);
+  return destination.mutable_molecular_properties().BuildFromArray(properties, 8);
+}
+
+class IWMFingerprintGenerator : public FingerprintGeneratorImplementation {
+ private:
   IWMFingerprintOptions _iw_options;
+
+ public:
+  std::vector<Component> Components() const override;
+  int Generate(Molecule& m, const std::vector<GeneratorComponentAssignment>& slots,
+               GFPFingerprint& destination) override;
+};
+
+std::vector<Component>
+IWMFingerprintGenerator::Components() const {
+  return {Component{ComponentKind::kFixedBinary, IWString("FPIW<"), 0, 1.0f}};
+}
+
+int
+IWMFingerprintGenerator::Generate(Molecule& m,
+                                  const std::vector<GeneratorComponentAssignment>& slots,
+                                  GFPFingerprint& destination) {
+  if (slots.size() != 1 || slots[0].kind != ComponentKind::kFixedBinary) {
+    std::cerr << "IWMFingerprintGenerator::Generate:invalid slots\n";
+    return 0;
+  }
+
+  IWMFingerprint iwfp(_iw_options);
+  iwfp.construct_fingerprint(m);
+  return destination.mutable_fixed_binary(slots[0].index)
+      .BuildFromArray(iwfp.vector(), _iw_options.bits_per_fingerprint);
+}
+
+class MACCSFingerprintGenerator : public FingerprintGeneratorImplementation {
+ private:
+  MACCSKeys _mk;
+  bool _level2 = true;
+  int _tmp[kMaccskeysNbits];
+
+ public:
+  explicit MACCSFingerprintGenerator(bool level2) : _level2(level2) {
+  }
+
+  std::vector<Component> Components() const override;
+  int Generate(Molecule& m, const std::vector<GeneratorComponentAssignment>& slots,
+               GFPFingerprint& destination) override;
+};
+
+std::vector<Component>
+MACCSFingerprintGenerator::Components() const {
+  std::vector<Component> result;
+  result.push_back(Component{ComponentKind::kFixedBinary, IWString("FPMK<"), 0, 1.0f});
+  if (_level2) {
+    result.push_back(Component{ComponentKind::kFixedBinary, IWString("FPMK2<"), 0, 1.0f});
+  }
+  return result;
+}
+
+int
+MACCSFingerprintGenerator::Generate(
+    Molecule& m, const std::vector<GeneratorComponentAssignment>& slots,
+    GFPFingerprint& destination) {
+  if (slots.empty() || slots.size() > 2) {
+    std::cerr << "MACCSFingerprintGenerator::Generate:invalid slots\n";
+    return 0;
+  }
+  for (const GeneratorComponentAssignment& slot : slots) {
+    if (slot.kind != ComponentKind::kFixedBinary) {
+      std::cerr << "MACCSFingerprintGenerator::Generate:invalid slot kind\n";
+      return 0;
+    }
+  }
+
+  std::fill_n(_tmp, kMaccskeysNbits, 0);
+  _mk(m, _tmp);
+  assert(_mk.nbits() == kMaccskeysNbits);
+  if (!destination.mutable_fixed_binary(slots[0].index)
+           .BuildFromArray(_tmp, _mk.nbits())) {
+    return 0;
+  }
+
+  if (slots.size() == 1) {
+    return 1;
+  }
+
+  _mk.set_level_2_fingerprint(_tmp);
+  return destination.mutable_fixed_binary(slots[1].index)
+      .BuildFromArray(_tmp, _mk.nbits());
+}
+
+class StandardFingerprintGenerator {
+ private:
   Chemical_Standardisation _chemical_standardisation;
-  int _preprocess = 1;
-  int _tmp[2048];
+  bool _preprocess = true;
+  std::vector<std::unique_ptr<FingerprintGeneratorImplementation>> _generators;
+  std::vector<std::vector<GeneratorComponentAssignment>> _assignments;
 
   void Preprocess(Molecule& m);
 
  public:
   explicit StandardFingerprintGenerator(bool preprocess);
 
+  int AddGenerator(std::unique_ptr<FingerprintGeneratorImplementation> generator,
+                   const std::vector<GeneratorComponentAssignment>& assignments);
   int Generate(Molecule& m, GFPFingerprint& destination);
 };
 
@@ -175,6 +364,19 @@ StandardFingerprintGenerator::Preprocess(Molecule& m) {
 }
 
 int
+StandardFingerprintGenerator::AddGenerator(
+    std::unique_ptr<FingerprintGeneratorImplementation> generator,
+    const std::vector<GeneratorComponentAssignment>& assignments) {
+  if (generator == nullptr || assignments.empty()) {
+    return 0;
+  }
+
+  _generators.push_back(std::move(generator));
+  _assignments.push_back(assignments);
+  return 1;
+}
+
+int
 StandardFingerprintGenerator::Generate(Molecule& input, GFPFingerprint& destination) {
   std::unique_ptr<Molecule> copy;
   Molecule* m = &input;
@@ -184,28 +386,10 @@ StandardFingerprintGenerator::Generate(Molecule& input, GFPFingerprint& destinat
     m = copy.get();
   }
 
-  int properties[8];
-  _mpr(*m, properties);
-  if (!destination.mutable_molecular_properties().BuildFromArray(properties, 8)) {
-    return 0;
-  }
-
-  IWMFingerprint iwfp(_iw_options);
-  iwfp.construct_fingerprint(*m);
-  if (!destination.mutable_fixed_binary(0).BuildFromArray(
-          iwfp.vector(), _iw_options.bits_per_fingerprint)) {
-    return 0;
-  }
-
-  std::fill_n(_tmp, 2048, 0);
-  _mk(*m, _tmp);
-  if (!destination.mutable_fixed_binary(1).BuildFromArray(_tmp, _mk.nbits())) {
-    return 0;
-  }
-
-  _mk.set_level_2_fingerprint(_tmp);
-  if (!destination.mutable_fixed_binary(2).BuildFromArray(_tmp, _mk.nbits())) {
-    return 0;
+  for (int i = 0; i < static_cast<int>(_generators.size()); ++i) {
+    if (!_generators[i]->Generate(*m, _assignments[i], destination)) {
+      return 0;
+    }
   }
 
   return 1;
@@ -529,6 +713,43 @@ GFPContext::GFPContext() = default;
 
 GFPContext::~GFPContext() = default;
 
+namespace {
+
+std::unique_ptr<FingerprintGeneratorImplementation>
+MakeGenerator(const GFPGeneratorSpec& spec) {
+  switch (spec.kind()) {
+    case GeneratorKind::kMolecularProperties:
+      return std::make_unique<MolecularPropertiesFingerprintGenerator>();
+    case GeneratorKind::kIWMFingerprint:
+      return std::make_unique<IWMFingerprintGenerator>();
+    case GeneratorKind::kMACCSKeys:
+      return std::make_unique<MACCSFingerprintGenerator>(spec.maccs_level2());
+  }
+
+  return nullptr;
+}
+
+bool
+SameTag(const IWString& lhs, const IWString& rhs) {
+  return lhs == rhs;
+}
+
+int
+FindAssignedComponent(const std::vector<Component>& components, const Component& desired,
+                      GeneratorComponentAssignment& assignment) {
+  for (const Component& component : components) {
+    if (component.kind == desired.kind && SameTag(component.tag, desired.tag)) {
+      assignment.kind = component.kind;
+      assignment.index = component.index;
+      return 1;
+    }
+  }
+
+  return 0;
+}
+
+}  // namespace
+
 int
 GFPContext::BuildFromTdt(const IW_TDT& tdt) {
   _components.clear();
@@ -578,31 +799,91 @@ GFPContext::BuildFromTdt(const IW_TDT& tdt) {
 }
 
 int
-GFPContext::BuildStandard(bool preprocess) {
+GFPContext::BuildFromSpecs(const std::vector<GFPGeneratorSpec>& specs, bool preprocess) {
   _components.clear();
   _active.clear();
   _nfixed_binary = 0;
   _nsparse = 0;
   _nfixed_counted = 0;
-  _has_molecular_properties = true;
+  _has_molecular_properties = false;
   _context_hash = 0;
+  _standard_generator.reset();
 
-  _components.push_back(
-      Component{ComponentKind::kFixedBinary, IWString("FPIW<"), 0, 1.0f});
-  _components.push_back(
-      Component{ComponentKind::kFixedBinary, IWString("FPMK<"), 1, 1.0f});
-  _components.push_back(
-      Component{ComponentKind::kFixedBinary, IWString("FPMK2<"), 2, 1.0f});
-  _components.push_back(
-      Component{ComponentKind::kMolecularProperties, IWString("MPR<"), 0, 1.0f});
-  _nfixed_binary = 3;
+  if (specs.empty()) {
+    std::cerr << "GFPContext::BuildFromSpecs:no generator specs\n";
+    return 0;
+  }
+
+  std::vector<std::unique_ptr<FingerprintGeneratorImplementation>> generators;
+  std::vector<std::vector<Component>> generator_components;
+  generators.reserve(specs.size());
+  generator_components.reserve(specs.size());
+
+  for (const GFPGeneratorSpec& spec : specs) {
+    std::unique_ptr<FingerprintGeneratorImplementation> generator = MakeGenerator(spec);
+    if (generator == nullptr) {
+      std::cerr << "GFPContext::BuildFromSpecs:cannot build " << spec.Repr() << '\n';
+      return 0;
+    }
+
+    std::vector<Component> components = generator->Components();
+    if (components.empty()) {
+      std::cerr << "GFPContext::BuildFromSpecs:no components from " << spec.Repr()
+                << '\n';
+      return 0;
+    }
+
+    for (const Component& component : components) {
+      for (const Component& existing : _components) {
+        if (existing.tag == component.tag) {
+          std::cerr << "GFPContext::BuildFromSpecs:duplicate fingerprint tag '"
+                    << component.tag << "'\n";
+          return 0;
+        }
+      }
+      _components.push_back(component);
+    }
+
+    generators.push_back(std::move(generator));
+    generator_components.push_back(std::move(components));
+  }
 
   CanonicalizeComponents();
-  _standard_generator = std::make_unique<StandardFingerprintGenerator>(preprocess);
   ComputeHash();
   BuildDefaultActiveList();
 
+  auto standard_generator = std::make_unique<StandardFingerprintGenerator>(preprocess);
+  for (int i = 0; i < static_cast<int>(generators.size()); ++i) {
+    std::vector<GeneratorComponentAssignment> assignments;
+    assignments.reserve(generator_components[i].size());
+    for (const Component& component : generator_components[i]) {
+      GeneratorComponentAssignment assignment;
+      if (!FindAssignedComponent(_components, component, assignment)) {
+        std::cerr << "GFPContext::BuildFromSpecs:cannot assign component '"
+                  << component.tag << "'\n";
+        return 0;
+      }
+      assignments.push_back(assignment);
+    }
+
+    if (!standard_generator->AddGenerator(std::move(generators[i]), assignments)) {
+      return 0;
+    }
+  }
+
+  _standard_generator = std::move(standard_generator);
   return 1;
+}
+
+int
+GFPContext::BuildStandard(bool preprocess) {
+  std::vector<GFPGeneratorSpec> specs;
+  specs.reserve(3);
+  specs.push_back(GFPGeneratorSpec::IWMFingerprint());
+  specs.push_back(GFPGeneratorSpec::MACCSKeys(true));
+  specs.push_back(GFPGeneratorSpec::MolecularProperties());
+
+  return BuildFromSpecs(specs, preprocess);
 }
 
 std::vector<std::string>

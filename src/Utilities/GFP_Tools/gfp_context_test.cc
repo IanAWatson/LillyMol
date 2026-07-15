@@ -1,6 +1,7 @@
 #include "Utilities/GFP_Tools/gfp_context.h"
 
 #include <cstdlib>
+#include <filesystem>
 #include <fstream>
 #include <sstream>
 #include <string>
@@ -94,8 +95,7 @@ TestDataFile(const char* fname) {
       std::string candidate(test_srcdir);
       candidate.append(path);
       candidate.append(fname);
-      std::ifstream input(candidate);
-      if (input.good()) {
+      if (std::filesystem::exists(candidate)) {
         return candidate;
       }
     }
@@ -285,6 +285,71 @@ TEST(TestGFPContext, StandardContextCanonicalOrderMatchesShuffledFile) {
   EXPECT_EQ(from_file.context().context_hash(), standard->context_hash());
   EXPECT_THAT(from_file.context().Tags(),
               ElementsAre("FPIW<", "FPMK<", "FPMK2<", "MPR<"));
+}
+
+TEST(TestGFPContext, BuildFromSpecsMatchesStandard) {
+  gfp_context::GFPContext standard;
+  ASSERT_TRUE(standard.BuildStandard());
+
+  std::vector<gfp_context::GFPGeneratorSpec> specs = {
+      gfp_context::GFPGeneratorSpec::IWMFingerprint(),
+      gfp_context::GFPGeneratorSpec::MACCSKeys(true),
+      gfp_context::GFPGeneratorSpec::MolecularProperties()};
+  gfp_context::GFPContext from_specs;
+  ASSERT_TRUE(from_specs.BuildFromSpecs(specs));
+
+  EXPECT_EQ(from_specs.context_hash(), standard.context_hash());
+  EXPECT_THAT(from_specs.Tags(), ElementsAre("FPIW<", "FPMK<", "FPMK2<", "MPR<"));
+
+  Molecule mol;
+  ASSERT_TRUE(mol.build_from_smiles("CCO ethanol"));
+  gfp_context::GFPFingerprint fp1;
+  ASSERT_TRUE(standard.Fingerprint(mol, fp1));
+  gfp_context::GFPFingerprint fp2;
+  ASSERT_TRUE(from_specs.Fingerprint(mol, fp2));
+  EXPECT_THAT(standard.Distance(fp1, fp2), FloatNear(0.0f, 1.0e-6f));
+}
+
+TEST(TestGFPContext, BuildFromSpecsIsOrderIndependent) {
+  std::vector<gfp_context::GFPGeneratorSpec> specs1 = {
+      gfp_context::GFPGeneratorSpec::IWMFingerprint(),
+      gfp_context::GFPGeneratorSpec::MACCSKeys(true),
+      gfp_context::GFPGeneratorSpec::MolecularProperties()};
+  std::vector<gfp_context::GFPGeneratorSpec> specs2 = {
+      gfp_context::GFPGeneratorSpec::MolecularProperties(),
+      gfp_context::GFPGeneratorSpec::MACCSKeys(true),
+      gfp_context::GFPGeneratorSpec::IWMFingerprint()};
+
+  gfp_context::GFPContext context1;
+  ASSERT_TRUE(context1.BuildFromSpecs(specs1));
+  gfp_context::GFPContext context2;
+  ASSERT_TRUE(context2.BuildFromSpecs(specs2));
+
+  EXPECT_EQ(context1.context_hash(), context2.context_hash());
+  EXPECT_THAT(context1.Tags(), ElementsAre("FPIW<", "FPMK<", "FPMK2<", "MPR<"));
+  EXPECT_THAT(context2.Tags(), ElementsAre("FPIW<", "FPMK<", "FPMK2<", "MPR<"));
+}
+
+TEST(TestGFPContext, BuildFromSpecsRejectsDuplicateTags) {
+  std::vector<gfp_context::GFPGeneratorSpec> specs = {
+      gfp_context::GFPGeneratorSpec::IWMFingerprint(),
+      gfp_context::GFPGeneratorSpec::IWMFingerprint()};
+  gfp_context::GFPContext context;
+  EXPECT_FALSE(context.BuildFromSpecs(specs));
+}
+
+TEST(TestGFPContext, MaccsCanOmitLevel2) {
+  std::vector<gfp_context::GFPGeneratorSpec> specs = {
+      gfp_context::GFPGeneratorSpec::MACCSKeys(false)};
+  gfp_context::GFPContext context;
+  ASSERT_TRUE(context.BuildFromSpecs(specs));
+
+  EXPECT_THAT(context.Tags(), ElementsAre("FPMK<"));
+  Molecule mol;
+  ASSERT_TRUE(mol.build_from_smiles("CCO ethanol"));
+  gfp_context::GFPFingerprint fp;
+  ASSERT_TRUE(context.Fingerprint(mol, fp));
+  EXPECT_THAT(context.Distance(fp, fp), FloatNear(0.0f, 1.0e-6f));
 }
 
 TEST(TestGFPContext, StandardFingerprintGeneration) {

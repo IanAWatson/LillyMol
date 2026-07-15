@@ -179,6 +179,26 @@ class TestGFPList(unittest.TestCase):
         self.assertAlmostEqual(ctx.distance(fp, fp), 0.0, places=6)
 
 
+
+    def test_ec_generator_spec(self):
+        spec = GFP.ec(radius=3, atom_type='UST:AY')
+        self.assertEqual(spec.components(), ['NCEC3USTAY<'])
+        self.assertEqual(repr(spec), "GFP.ec(radius=3, atom_type='UST:AY')")
+
+        ctx = GFPContext.from_specs([GFP.ec(), spec])
+        self.assertEqual(ctx.tags(), ['NCEC3USTAY<', 'NCEC3USTZ<'])
+        mol = _mol('CCO ethanol')
+        fp = ctx.fingerprint(mol)
+        self.assertAlmostEqual(ctx.distance(fp, fp), 0.0, places=6)
+
+    def test_ec_rejects_invalid_specs(self):
+        with self.assertRaises(ValueError):
+            GFP.ec(radius=-1)
+        with self.assertRaises(ValueError):
+            GFP.ec(atom_type='')
+        with self.assertRaises(RuntimeError):
+            GFPContext.from_specs([GFP.ec(radius=3, atom_type='UST:A-Y')])
+
     def test_alogp_generator_spec(self):
         spec = GFP.alogp(replicates=4)
         self.assertEqual(spec.components(), ['NCALOGP4<'])

@@ -185,7 +185,19 @@ PYBIND11_MODULE(lillymol_tools, m) {
             }
             return GFPGeneratorSpec::ALogP(replicates);
           },
-          py::arg("replicates") = 9);
+          py::arg("replicates") = 9)
+      .def_static(
+          "ec",
+          [](int radius, const std::string& atom_type) {
+            if (radius < 0) {
+              throw std::invalid_argument("radius must be non-negative");
+            }
+            if (atom_type.empty()) {
+              throw std::invalid_argument("atom_type must be non-empty");
+            }
+            return GFPGeneratorSpec::ECFingerprint(radius, IWString(atom_type));
+          },
+          py::arg("radius") = 3, py::arg("atom_type") = "UST:Z");
 
   py::class_<GFPContext, std::shared_ptr<GFPContext>>(m, "GFPContext")
       .def(py::init<>())

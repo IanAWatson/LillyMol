@@ -32,6 +32,7 @@ enum class GeneratorKind : uint8_t {
   kIWMFingerprint,
   kMACCSKeys,
   kALogP,
+  kECFingerprint,
 };
 
 struct Component {
@@ -46,15 +47,20 @@ class GFPGeneratorSpec {
   GeneratorKind _kind = GeneratorKind::kMolecularProperties;
   bool _maccs_level2 = true;
   int _replicates = 0;
+  int _radius = 0;
+  IWString _atom_type;
 
  public:
   GFPGeneratorSpec() = default;
   GFPGeneratorSpec(GeneratorKind kind, bool maccs_level2 = true, int replicates = 0);
+  GFPGeneratorSpec(GeneratorKind kind, int radius, const IWString& atom_type);
 
   static GFPGeneratorSpec MolecularProperties();
   static GFPGeneratorSpec IWMFingerprint();
   static GFPGeneratorSpec MACCSKeys(bool level2 = true);
   static GFPGeneratorSpec ALogP(int replicates = 9);
+  static GFPGeneratorSpec ECFingerprint(int radius = 3,
+                                        const IWString& atom_type = IWString("UST:Z"));
 
   GeneratorKind
   kind() const {
@@ -69,6 +75,16 @@ class GFPGeneratorSpec {
   int
   replicates() const {
     return _replicates;
+  }
+
+  int
+  radius() const {
+    return _radius;
+  }
+
+  const IWString&
+  atom_type() const {
+    return _atom_type;
   }
 
   std::vector<Component> Components() const;

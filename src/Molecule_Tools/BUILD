@@ -3325,6 +3325,7 @@ cc_library(
     hdrs = [
         "iwecfp_lib.h",
     ],
+    visibility = ["//visibility:public"],
     deps = [
         "//Foundational/iwmisc:sparse_fp_creator",
         "//Molecule_Lib:iwmolecule",

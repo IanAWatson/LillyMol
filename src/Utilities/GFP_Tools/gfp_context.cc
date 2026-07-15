@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <cassert>
+#include <cctype>
 #include <cmath>
 #include <cstring>
 #include <iostream>
@@ -11,12 +12,15 @@
 
 #include "Foundational/data_source/iwstring_data_source.h"
 #include "Foundational/iw_tdt/iw_tdt.h"
+#include "Foundational/iwmisc/sparse_fp_creator.h"
 
+#include "Molecule_Lib/atom_typing.h"
 #include "Molecule_Lib/iwmfingerprint.h"
 #include "Molecule_Lib/molecule.h"
 #include "Molecule_Lib/standardise.h"
 
 #include "Molecule_Tools/alogp.h"
+#include "Molecule_Tools/iwecfp_lib.h"
 #include "Molecule_Tools/maccskeys_fn5.h"
 #include "Molecule_Tools/mpr.h"
 #include "Utilities/GFP_Tools/dyfp.h"
@@ -167,10 +171,45 @@ ALogPTag(int replicates) {
   return result;
 }
 
+int
+AppendSanitisedAtomType(const IWString& atom_type, IWString& destination) {
+  int appended = 0;
+  for (int i = 0; i < atom_type.length(); ++i) {
+    const char c = atom_type[i];
+    if (c == ':') {
+      continue;
+    }
+    if (!std::isalnum(static_cast<unsigned char>(c))) {
+      return 0;
+    }
+    destination << c;
+    ++appended;
+  }
+
+  return appended;
+}
+
+IWString
+ECTag(int radius, const IWString& atom_type) {
+  IWString atom_type_component;
+  if (radius < 0 || !AppendSanitisedAtomType(atom_type, atom_type_component)) {
+    return IWString();
+  }
+
+  IWString result;
+  result << "NCEC" << radius << atom_type_component << '<';
+  return result;
+}
+
 }  // namespace
 
 GFPGeneratorSpec::GFPGeneratorSpec(GeneratorKind kind, bool maccs_level2, int replicates)
     : _kind(kind), _maccs_level2(maccs_level2), _replicates(replicates) {
+}
+
+GFPGeneratorSpec::GFPGeneratorSpec(GeneratorKind kind, int radius,
+                                   const IWString& atom_type)
+    : _kind(kind), _radius(radius), _atom_type(atom_type) {
 }
 
 GFPGeneratorSpec
@@ -193,6 +232,11 @@ GFPGeneratorSpec::ALogP(int replicates) {
   return GFPGeneratorSpec(GeneratorKind::kALogP, true, replicates);
 }
 
+GFPGeneratorSpec
+GFPGeneratorSpec::ECFingerprint(int radius, const IWString& atom_type) {
+  return GFPGeneratorSpec(GeneratorKind::kECFingerprint, radius, atom_type);
+}
+
 std::vector<Component>
 GFPGeneratorSpec::Components() const {
   switch (_kind) {
@@ -212,6 +256,8 @@ GFPGeneratorSpec::Components() const {
     }
     case GeneratorKind::kALogP:
       return {Component{ComponentKind::kSparse, ALogPTag(_replicates), 0, 1.0f}};
+    case GeneratorKind::kECFingerprint:
+      return {Component{ComponentKind::kSparse, ECTag(_radius, _atom_type), 0, 1.0f}};
   }
 
   return {};
@@ -228,6 +274,9 @@ GFPGeneratorSpec::Repr() const {
       return _maccs_level2 ? "GFP.maccs(level2=True)" : "GFP.maccs(level2=False)";
     case GeneratorKind::kALogP:
       return "GFP.alogp(replicates=" + std::to_string(_replicates) + ")";
+    case GeneratorKind::kECFingerprint:
+      return "GFP.ec(radius=" + std::to_string(_radius) + ", atom_type='" +
+             _atom_type.AsString() + "')";
   }
 
   return "GFP.unknown()";
@@ -407,6 +456,72 @@ ALogPFingerprintGenerator::Generate(
   const int count = ALogPToPositiveInt(*logp);
   return destination.mutable_sparse(slots[0].index)
       .build_from_replicates(_replicates, count);
+}
+
+class ECFingerprintGenerator : public FingerprintGeneratorImplementation {
+ private:
+  int _radius = 3;
+  IWString _atom_type_string;
+  Atom_Typing_Specification _atom_typing;
+  iwecfp::Iwecfp _iwecfp;
+
+ public:
+  ECFingerprintGenerator(int radius, const IWString& atom_type)
+      : _radius(radius), _atom_type_string(atom_type) {
+    _iwecfp.set_max_radius(radius);
+  }
+
+  int Initialise();
+  std::vector<Component> Components() const override;
+  int Generate(Molecule& m, const std::vector<GeneratorComponentAssignment>& slots,
+               GFPFingerprint& destination) override;
+};
+
+int
+ECFingerprintGenerator::Initialise() {
+  if (_radius < 0 || _atom_type_string.empty()) {
+    return 0;
+  }
+
+  const_IWSubstring tmp(_atom_type_string);
+  return _atom_typing.build(tmp);
+}
+
+std::vector<Component>
+ECFingerprintGenerator::Components() const {
+  return {Component{ComponentKind::kSparse, ECTag(_radius, _atom_type_string), 0, 1.0f}};
+}
+
+int
+ECFingerprintGenerator::Generate(Molecule& m,
+                                 const std::vector<GeneratorComponentAssignment>& slots,
+                                 GFPFingerprint& destination) {
+  if (slots.size() != 1 || slots[0].kind != ComponentKind::kSparse) {
+    std::cerr << "ECFingerprintGenerator::Generate:invalid slots\n";
+    return 0;
+  }
+
+  const int matoms = m.natoms();
+  if (matoms == 0) {
+    return 0;
+  }
+
+  std::unique_ptr<iwecfp::atype_t[]> atom_type =
+      std::make_unique<iwecfp::atype_t[]>(matoms);
+  if (!_atom_typing.assign_atom_types(m, atom_type.get())) {
+    std::cerr << "ECFingerprintGenerator::Generate:cannot assign atom types\n";
+    return 0;
+  }
+
+  Sparse_Fingerprint_Creator sfc;
+  const iwecfp::FingerprintResult result = _iwecfp.Fingerprint(m, atom_type.get(), &sfc);
+  if (result != iwecfp::FingerprintResult::kOk) {
+    std::cerr << "ECFingerprintGenerator::Generate:fingerprint generation failed\n";
+    return 0;
+  }
+
+  return destination.mutable_sparse(slots[0].index)
+      .build_from_sparse_fingerprint_creator(sfc);
 }
 
 class StandardFingerprintGenerator {
@@ -802,6 +917,8 @@ MakeGenerator(const GFPGeneratorSpec& spec) {
       return std::make_unique<MACCSFingerprintGenerator>(spec.maccs_level2());
     case GeneratorKind::kALogP:
       return std::make_unique<ALogPFingerprintGenerator>(spec.replicates());
+    case GeneratorKind::kECFingerprint:
+      return std::make_unique<ECFingerprintGenerator>(spec.radius(), spec.atom_type());
   }
 
   return nullptr;
@@ -903,8 +1020,23 @@ GFPContext::BuildFromSpecs(const std::vector<GFPGeneratorSpec>& specs, bool prep
                 << spec.replicates() << '\n';
       return 0;
     }
+    if (spec.kind() == GeneratorKind::kECFingerprint) {
+      if (spec.radius() < 0 || spec.atom_type().empty() ||
+          ECTag(spec.radius(), spec.atom_type()).empty()) {
+        std::cerr << "GFPContext::BuildFromSpecs:invalid EC spec " << spec.Repr() << '\n';
+        return 0;
+      }
+    }
 
     std::unique_ptr<FingerprintGeneratorImplementation> generator = MakeGenerator(spec);
+    if (spec.kind() == GeneratorKind::kECFingerprint) {
+      ECFingerprintGenerator* ec = dynamic_cast<ECFingerprintGenerator*>(generator.get());
+      if (ec == nullptr || !ec->Initialise()) {
+        std::cerr << "GFPContext::BuildFromSpecs:cannot initialise " << spec.Repr()
+                  << '\n';
+        return 0;
+      }
+    }
     if (generator == nullptr) {
       std::cerr << "GFPContext::BuildFromSpecs:cannot build " << spec.Repr() << '\n';
       return 0;

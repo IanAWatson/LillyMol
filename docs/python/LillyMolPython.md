@@ -877,6 +877,13 @@ different replicate counts are not compatible. The replicated bits all carry the
 same bucketized alogp value as their count, matching the command-line alogp
 fingerprint convention.
 
+`GFP.ec(radius=3, atom_type="UST:Z")` adds a sparse counted extended
+connectivity fingerprint. The default atom type is atomic number (`UST:Z`). The
+radius and atom-type specification are encoded in the tag, for example
+`NCEC3USTZ<` or `NCEC3USTAY<`. Colons in atom-type specifications are omitted
+from tags; other non-alphanumeric characters are rejected. Multiple EC
+fingerprints with different atom types can be combined in one context.
+
 Use `GFPList.standard()` when you want to build a searchable collection from
 Python molecules:
 

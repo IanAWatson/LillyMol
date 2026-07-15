@@ -338,6 +338,48 @@ TEST(TestGFPContext, BuildFromSpecsRejectsDuplicateTags) {
   EXPECT_FALSE(context.BuildFromSpecs(specs));
 }
 
+TEST(TestGFPContext, ECFingerprintDefaultAtomType) {
+  std::vector<gfp_context::GFPGeneratorSpec> specs = {
+      gfp_context::GFPGeneratorSpec::ECFingerprint(3, IWString("UST:Z"))};
+  gfp_context::GFPContext context;
+  ASSERT_TRUE(context.BuildFromSpecs(specs));
+  EXPECT_THAT(context.Tags(), ElementsAre("NCEC3USTZ<"));
+
+  Molecule mol;
+  ASSERT_TRUE(mol.build_from_smiles("CCO ethanol"));
+  gfp_context::GFPFingerprint fp;
+  ASSERT_TRUE(context.Fingerprint(mol, fp));
+  EXPECT_GT(fp.sparse(0).nbits(), 0);
+  EXPECT_THAT(context.Distance(fp, fp), FloatNear(0.0f, 1.0e-6f));
+}
+
+TEST(TestGFPContext, ECFingerprintAllowsDifferentAtomTypes) {
+  std::vector<gfp_context::GFPGeneratorSpec> specs = {
+      gfp_context::GFPGeneratorSpec::ECFingerprint(3, IWString("UST:AY")),
+      gfp_context::GFPGeneratorSpec::ECFingerprint(3, IWString("C"))};
+  gfp_context::GFPContext context;
+  ASSERT_TRUE(context.BuildFromSpecs(specs));
+  EXPECT_THAT(context.Tags(), ElementsAre("NCEC3C<", "NCEC3USTAY<"));
+
+  Molecule mol;
+  ASSERT_TRUE(mol.build_from_smiles("c1ccccc1 benzene"));
+  gfp_context::GFPFingerprint fp;
+  ASSERT_TRUE(context.Fingerprint(mol, fp));
+  EXPECT_GT(fp.sparse(0).nbits(), 0);
+  EXPECT_GT(fp.sparse(1).nbits(), 0);
+}
+
+TEST(TestGFPContext, ECFingerprintRejectsInvalidSpecs) {
+  gfp_context::GFPContext context;
+  std::vector<gfp_context::GFPGeneratorSpec> negative_radius = {
+      gfp_context::GFPGeneratorSpec::ECFingerprint(-1, IWString("UST:Z"))};
+  EXPECT_FALSE(context.BuildFromSpecs(negative_radius));
+
+  std::vector<gfp_context::GFPGeneratorSpec> bad_atom_type_chars = {
+      gfp_context::GFPGeneratorSpec::ECFingerprint(3, IWString("UST:A-Y"))};
+  EXPECT_FALSE(context.BuildFromSpecs(bad_atom_type_chars));
+}
+
 TEST(TestGFPContext, ALogPReplicates) {
   std::vector<gfp_context::GFPGeneratorSpec> specs = {
       gfp_context::GFPGeneratorSpec::ALogP(4)};

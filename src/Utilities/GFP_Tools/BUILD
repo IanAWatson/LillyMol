@@ -1563,6 +1563,7 @@ cc_library(
         "//Molecule_Lib:iwmolecule",
         "//Molecule_Lib:moleculeio",
         "//Molecule_Tools:alogp_lib",
+        "//Molecule_Tools:iwecfp_lib",
         "//Molecule_Tools:maccskeys_fn5_lib",
         "//Molecule_Tools:mpr",
     ],

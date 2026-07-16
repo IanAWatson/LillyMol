@@ -67,6 +67,10 @@ FeatureFromName(std::string_view name) {
     return Feature::kNumberFragments;
   }
 
+  if (name == "qed") {
+    return Feature::kQed;
+  }
+
   for (const FeatureNameValue& value : kFeatureNameValues) {
     if (name == value.name) {
       return value.feature;
@@ -123,6 +127,8 @@ FeatureName(Feature feature) {
       return "chiral";
     case Feature::kNumberFragments:
       return "number_fragments";
+    case Feature::kQed:
+      return "qed";
   }
 
   return "unknown";
@@ -224,13 +230,15 @@ Utility::Value(double value) const {
 FeatureValues::FeatureValues(Molecule& m, const int matoms, const int nrings,
                              quick_rotbond::QuickRotatableBonds& rotbond,
                              alogp::ALogP& alogp,
-                             xlogp::XLogPCalc& xlogp) :
+                             xlogp::XLogPCalc& xlogp,
+                             qed::Qed* qed) :
     _m(m),
     _matoms(matoms),
     _nrings(nrings),
     _rotbond(rotbond),
     _alogp(alogp),
-    _xlogp(xlogp) {
+    _xlogp(xlogp),
+    _qed_calculator(qed) {
 }
 
 int
@@ -365,6 +373,24 @@ FeatureValues::NumberFragments() {
 }
 
 std::optional<double>
+FeatureValues::Qed() {
+  if (_qed) {
+    return _qed;
+  }
+  if (_qed_calculator == nullptr) {
+    return std::nullopt;
+  }
+
+  Molecule mcopy(_m);
+  std::optional<float> value = _qed_calculator->qed(mcopy);
+  if (! value) {
+    return std::nullopt;
+  }
+  _qed = *value;
+  return _qed;
+}
+
+std::optional<double>
 FeatureValues::Value(Feature feature) {
   switch (feature) {
     case Feature::kNatoms:
@@ -421,6 +447,8 @@ FeatureValues::Value(Feature feature) {
       return _m.chiral_centres();
     case Feature::kNumberFragments:
       return NumberFragments();
+    case Feature::kQed:
+      return Qed();
   }
 
   return std::nullopt;
@@ -428,6 +456,7 @@ FeatureValues::Value(Feature feature) {
 
 MoleculeFilter::MoleculeFilter() {
   _active = false;
+  _qed_initialised = false;
 }
 
 int
@@ -457,6 +486,10 @@ MoleculeFilter::Build(const molecule_filter_data::Requirements& proto) {
     return 0;
   }
 
+  if (! InitialiseQEDIfNeeded()) {
+    return 0;
+  }
+
   _active = true;
 
   return 1;
@@ -473,7 +506,7 @@ MoleculeFilter::EvaluateUtilities(Molecule& m, const int matoms, const int nring
     return 1;
   }
 
-  FeatureValues feature_values(m, matoms, nrings, _rotbond, _alogp, _xlogp);
+  FeatureValues feature_values(m, matoms, nrings, _rotbond, _alogp, _xlogp, &_qed);
   per_feature_utility.reserve(_utilities.size());
 
   double weighted_sum = 0.0;
@@ -533,6 +566,36 @@ MoleculeFilter::EvaluateUtilities(Molecule& m, const int matoms, const int nring
               static_cast<int>(combination) << "\n";
       return 0;
   }
+}
+
+bool
+MoleculeFilter::UsesFeature(Feature feature) const {
+  for (const Utility& utility : _utilities) {
+    if (utility.feature() == feature) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
+int
+MoleculeFilter::InitialiseQEDIfNeeded() {
+  if (! UsesFeature(Feature::kQed)) {
+    return 1;
+  }
+  if (_qed_initialised) {
+    return 1;
+  }
+
+  if (! _qed.InitialiseFromEnvironment()) {
+    cerr << "MoleculeFilter::InitialiseQEDIfNeeded:cannot initialise QED\n";
+    _utilities.clear();
+    return 0;
+  }
+
+  _qed_initialised = true;
+  return 1;
 }
 
 int
@@ -711,8 +774,8 @@ RuleOfFive(Molecule & m, int& acceptor, int& donor) {
       continue;
     }
 
-    if (7 == z && h > 1) {
-      donor += 2;
+    if (7 == z) {
+      donor += 1;
     } else {
       donor += 1;
     }

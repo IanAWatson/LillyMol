@@ -820,6 +820,10 @@ Options::NoteRejection(molecule_filter_lib::RejectionReason rejection_reason) {
     case RejectionReason::kTooManyFragments:
       ++_too_many_fragments;
       return;
+    case RejectionReason::kLowQed:
+      return;
+    case RejectionReason::kHighQed:
+      return;
   }
 }
 

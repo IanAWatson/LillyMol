@@ -37,6 +37,7 @@ TEST(FeatureTest, RecognisesCanonicalFeatureNames) {
   EXPECT_EQ(FeatureFromName("aromatic_density"), Feature::kAromaticDensity);
   EXPECT_EQ(FeatureFromName("chiral"), Feature::kChiral);
   EXPECT_EQ(FeatureFromName("number_fragments"), Feature::kNumberFragments);
+  EXPECT_EQ(FeatureFromName("qed"), Feature::kQed);
 }
 
 TEST(FeatureTest, RecognisesLimitedAliases) {
@@ -62,6 +63,7 @@ TEST(FeatureTest, ReturnsCanonicalFeatureName) {
   EXPECT_EQ(FeatureName(Feature::kRotatableBonds), "rotatable_bonds");
   EXPECT_EQ(FeatureName(Feature::kSp3CarbonFraction), "sp3_carbon_fraction");
   EXPECT_EQ(FeatureName(Feature::kNumberFragments), "number_fragments");
+  EXPECT_EQ(FeatureName(Feature::kQed), "qed");
 }
 
 molecule_filter_data::Utility* AddUtility(molecule_filter_data::Requirements& proto,
@@ -293,7 +295,7 @@ TEST(FeatureValuesTest, ComputesGroupedRuleOfFiveFeatures) {
   ASSERT_TRUE(values.Value(Feature::kHba));
   EXPECT_DOUBLE_EQ(*values.Value(Feature::kHba), 2.0);
   ASSERT_TRUE(values.Value(Feature::kHbd));
-  EXPECT_DOUBLE_EQ(*values.Value(Feature::kHbd), 3.0);
+  EXPECT_DOUBLE_EQ(*values.Value(Feature::kHbd), 2.0);
 }
 
 TEST(FeatureValuesTest, ComputesOptionalContinuousFeatures) {

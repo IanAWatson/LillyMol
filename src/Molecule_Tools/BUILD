@@ -2335,6 +2335,7 @@ cc_library(
     deps = [
         ":alogp_lib",
         ":molecule_filter_cc_proto",
+        ":qed_lib",
         ":xlogp_lib",
         "//Foundational/cmdline:iwcmdline",
         "//Molecule_Lib:iwmolecule",

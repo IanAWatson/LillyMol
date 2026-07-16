@@ -1,4 +1,5 @@
 #include <array>
+#include <cstdlib>
 #include <iostream>
 #include <optional>
 
@@ -80,7 +81,100 @@ Qed::Qed() {
 }
 
 int
+Qed::ReadQueryFile(const IWString& fname,
+                   resizable_array_p<Substructure_Query>& destination,
+                   const char* description) {
+  IWString token;
+  token << "S:" << fname;
+
+  static constexpr int kVerbose = 0;
+  if (! process_cmdline_token('Q', token, destination, kVerbose)) {
+    cerr << "Qed::ReadQueryFile:cannot read " << description << " queries '" << fname << "'\n";
+    return 0;
+  }
+
+  return 1;
+}
+
+int
+Qed::FinishInitialisation() {
+  if (_queries.empty()) {
+    cerr << "Qed::FinishInitialisation:no queries specified\n";
+    return 0;
+  }
+
+  for (Substructure_Query* q : _queries) {
+    q->set_max_matches_to_find(1);
+    q->set_save_matched_atoms(0);
+  }
+
+  for (Substructure_Query* q : _rdkit_rotb_queries) {
+    q->set_find_unique_embeddings_only(1);
+  }
+
+  return 1;
+}
+
+int
+Qed::InitialiseFromDirectory(const IWString& qed_dir) {
+  _queries.resize(0);
+  _acceptor_queries.resize(0);
+  _donor_queries.resize(0);
+  _rdkit_rotb_queries.resize(0);
+
+  IWString dirname(qed_dir);
+  if (! dirname.ends_with('/')) {
+    dirname << '/';
+  }
+
+  IWString fname;
+  fname << dirname << "unwanted-groups.smt";
+  if (! ReadQueryFile(fname, _queries, "alert")) {
+    return 0;
+  }
+
+  fname = dirname;
+  fname << "acceptor.smt";
+  if (! ReadQueryFile(fname, _acceptor_queries, "acceptor")) {
+    return 0;
+  }
+
+  fname = dirname;
+  fname << "donor.smt";
+  if (! ReadQueryFile(fname, _donor_queries, "donor")) {
+    return 0;
+  }
+
+  fname = dirname;
+  fname << "rotb.smt";
+  if (! ReadQueryFile(fname, _rdkit_rotb_queries, "rotatable bond")) {
+    return 0;
+  }
+
+  return FinishInitialisation();
+}
+
+int
+Qed::InitialiseFromEnvironment() {
+  const char* lillymol_home = getenv("LILLYMOL_HOME");
+  if (lillymol_home == nullptr || *lillymol_home == '\0') {
+    cerr << "Qed::InitialiseFromEnvironment:LILLYMOL_HOME not set\n";
+    return 0;
+  }
+
+  IWString qed_dir(lillymol_home);
+  qed_dir << "/data/queries/QED";
+
+  return InitialiseFromDirectory(qed_dir);
+}
+
+int
 Qed::Initialise(Command_Line& cl, char flag) {
+  _queries.resize(0);
+  _acceptor_queries.resize(0);
+  _donor_queries.resize(0);
+  _rdkit_rotb_queries.resize(0);
+
   IWString s;
   for (int i = 0; cl.value(flag, s, i); ++i) {
     if (s.starts_with("QUERY=")) {
@@ -121,21 +215,7 @@ Qed::Initialise(Command_Line& cl, char flag) {
     }
   }
 
-  if (_queries.empty()) {
-    cerr << "Qed::Initialise:no queries specified\n";
-    return 0;
-  }
-
-  for (Substructure_Query* q : _queries) {
-    q->set_max_matches_to_find(1);
-    q->set_save_matched_atoms(0);
-  }
-
-  for (Substructure_Query* q : _rdkit_rotb_queries) {
-    q->set_find_unique_embeddings_only(1);
-  }
-
-  return 1;
+  return FinishInitialisation();
 }
 
 int

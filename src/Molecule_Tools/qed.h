@@ -65,11 +65,17 @@ class Qed {
     // Used for externally supplied donor and/or acceptor queries
     int ExternalQueryCount(Molecule& m,
                 resizable_array_p<Substructure_Query>& queries);
+    int ReadQueryFile(const IWString& fname,
+                resizable_array_p<Substructure_Query>& destination,
+                const char* description);
+    int FinishInitialisation();
 
   public:
     Qed();
 
     int Initialise(Command_Line& cl, char flag);
+    int InitialiseFromDirectory(const IWString& qed_dir);
+    int InitialiseFromEnvironment();
 
     bool CalculateProperties(Molecule& m, QEDProperties& result);
 

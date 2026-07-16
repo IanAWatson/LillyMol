@@ -13,6 +13,7 @@
 
 #include "Molecule_Tools/alogp.h"
 #include "Molecule_Tools/nvrtspsa.h"
+#include "Molecule_Tools/qed.h"
 #include "Molecule_Tools/xlogp.h"
 
 #ifdef BUILD_BAZEL
@@ -72,6 +73,8 @@ enum class RejectionReason : int {
   kTooFewChiral,
   kTooFewFragments,
   kTooManyFragments,
+  kLowQed,
+  kHighQed,
 };
 
 enum class Feature : int {
@@ -97,6 +100,7 @@ enum class Feature : int {
   kAromaticDensity,
   kChiral,
   kNumberFragments,
+  kQed,
 };
 
 std::optional<Feature> FeatureFromName(std::string_view name);
@@ -145,6 +149,7 @@ class FeatureValues {
     quick_rotbond::QuickRotatableBonds& _rotbond;
     alogp::ALogP& _alogp;
     xlogp::XLogPCalc& _xlogp;
+    qed::Qed* _qed_calculator;
 
     std::unique_ptr<int[]> _tmp;
 
@@ -163,6 +168,7 @@ class FeatureValues {
     std::optional<int> _sp3_carbon;
     std::optional<double> _sp3_carbon_fraction;
     std::optional<int> _number_fragments;
+    std::optional<double> _qed;
 
     int HeteroatomCount();
     int AromaticRingCount();
@@ -177,12 +183,14 @@ class FeatureValues {
     int Sp3Carbon();
     double Sp3CarbonFraction();
     int NumberFragments();
+    std::optional<double> Qed();
 
   public:
     FeatureValues(Molecule& m, int matoms, int nrings,
                   quick_rotbond::QuickRotatableBonds& rotbond,
                   alogp::ALogP& alogp,
-                  xlogp::XLogPCalc& xlogp);
+                  xlogp::XLogPCalc& xlogp,
+                  qed::Qed* qed = nullptr);
 
     std::optional<double> Value(Feature feature);
 };
@@ -195,6 +203,9 @@ class MoleculeFilter {
 
     xlogp::XLogPCalc _xlogp;
 
+    qed::Qed _qed;
+    bool _qed_initialised;
+
     molecule_filter_data::Requirements _requirements;
 
     std::vector<Utility> _utilities;
@@ -204,6 +215,8 @@ class MoleculeFilter {
   // private functions
     void InitialiseOptionalFeatures();
     int BuildUtilities();
+    bool UsesFeature(Feature feature) const;
+    int InitialiseQEDIfNeeded();
 
   public:
     MoleculeFilter();

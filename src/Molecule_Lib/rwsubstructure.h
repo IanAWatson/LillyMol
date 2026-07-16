@@ -579,10 +579,52 @@ file_record_is_smarts(resizable_array_p<T>& queries, IWString& buffer, int verbo
   return 1;
 }
 
+static bool
+LooksLikeTextproto(iwstring_data_source& input) {
+  // Cannot seek on standard input.
+  if (input.fd() == 1) {
+    return false;
+  }
+
+  const off_t start_pos = input.tellg();
+
+  const_IWSubstring line;
+  // Empty file, who knows
+  if (! input.next_record(line)) {
+    return false;
+  }
+
+  input.seekg(start_pos);
+
+  if (line.starts_with("(0 Query")) {
+    return false;
+  }
+  if (line.starts_with("name:")) {
+    return true;
+  }
+  if (line.starts_with("query {") || line.starts_with("query{")) {
+    return true;
+  }
+
+  return false;
+}
+
+// Forward declaration.
+template <typename T>
+int ReadProtoQuery(const IWString& fname, const IWString& directory_path,
+                   resizable_array_p<T>& queries, int verbose);
+
 template <typename T>
 int
 read_one_or_more_queries_from_file(resizable_array_p<T>& queries,
                                    iwstring_data_source& input, int verbose) {
+  if (LooksLikeTextproto(input)) {
+    IWString proto_fname;
+    proto_fname << "PROTO:" << input.fname();
+    IWString directory_path;  // empty.
+    return ReadProtoQuery(proto_fname, directory_path, queries, verbose);
+  }
+
   off_t file_size = input.file_size();
 
   msi_object msi;

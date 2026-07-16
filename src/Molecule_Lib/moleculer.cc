@@ -1961,6 +1961,33 @@ Molecule::_identify_spinach(int* spinach, Set_of_Atoms& stack) const {
 }
 
 int
+Molecule::IdentifySpinachLabel(int* spinach, isotope_t iso) {
+  identify_spinach(spinach);
+
+  for (const Bond* b : _bond_list) {
+    atom_number_t a1 = b->a1();
+    atom_number_t a2 = b->a2();
+    if (spinach[a1] == spinach[a2]) {
+      continue;
+    }
+
+    if (! b->is_double_bond()) {
+    } else if (_things[a1]->ncon() == 1) {
+      spinach[a1] = 0;
+    } else if (_things[a2]->ncon() == 1) {
+      spinach[a2] = 0;
+    }
+
+    if (iso > 0 && spinach[a1] != spinach[a2]) {
+      _things[a1]->set_isotope(iso);
+      _things[a2]->set_isotope(iso);
+    }
+  }
+
+  return 1;
+}
+
+int
 Molecule::rings_with_strongly_fused_ring_neighbours() {
   int nr = nrings();
 

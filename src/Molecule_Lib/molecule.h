@@ -1704,6 +1704,12 @@ class __attribute__((visibility("default"))) Molecule : protected resizable_arra
   // same, but anything already set in SPINACH will also be included
   int identify_spinach_preset(int* spinach) const;
 
+  // Atoms that are in the spinach will be set in `spinach`.
+  // =O, and =[D1] atoms will NOT be part of the spinach.
+  // If `iso` is non zero, that isotope will be applied to both
+  // atoms of a bond that joins spinach to scaffold.
+  int IdentifySpinachLabel(int* spinach, isotope_t iso);
+
   int atoms_in_fragment(Set_of_Atoms&, int);  // Set_of_Atoms must start empty
   int add_atoms_in_fragment(Set_of_Atoms&,
                             int);  // Set_of_Atoms may initially contain atoms

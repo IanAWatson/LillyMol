@@ -1,5 +1,8 @@
 // Tests for Molecule
 
+#include <memory>
+#include <span>
+#include <vector>
 #include <unordered_map>
 
 #include "gmock/gmock.h"
@@ -515,5 +518,36 @@ TEST(TestAtomOrderInSmiles, Test1) {
   EXPECT_EQ(aoit2[0], 1);
   EXPECT_EQ(aoit2[1], 0);
 }
+
+struct SmilesAndSpinach {
+  IWString smiles;
+  isotope_t isotope;
+  std::vector<int> expected_spinach;
+  // If `isotope` is specified.
+  IWString expected_smiles;
+};
+
+class TestSpinach : public testing::TestWithParam<SmilesAndSpinach> {
+  protected:
+    Molecule _m;
+};
+TEST_P(TestSpinach, TestSpinach) {
+  const auto params = GetParam();
+  ASSERT_TRUE(_m.build_from_smiles(params.smiles));
+
+  const int matoms = _m.natoms();
+
+  std::unique_ptr<int[]> spinach = std::make_unique<int[]>(matoms);
+  _m.IdentifySpinachLabel(spinach.get(), params.isotope);
+  const std::span<int> gotspan(spinach.get(), spinach.get() + matoms);
+  EXPECT_THAT(gotspan, testing::ElementsAreArray(params.expected_spinach));
+  EXPECT_EQ(_m.smiles(), params.expected_smiles) << " got " << _m.smiles();
+}
+INSTANTIATE_TEST_SUITE_P(TestSpinach, TestSpinach, testing::Values(
+  SmilesAndSpinach{"CC", 1, {1, 1}, "CC"},
+  SmilesAndSpinach{"C1CC1", 1, {0, 0, 0}, "C1CC1"},
+  SmilesAndSpinach{"C1CC1=O", 1, {0, 0, 0, 0}, "C1CC1=O"},
+  SmilesAndSpinach{"CC1CC1=O", 1, {1, 0, 0, 0, 0}, "[1CH3][1CH]1CC1=O"} 
+));
 
 }  // namespace

@@ -5982,17 +5982,14 @@ IWDescr::IWDescrImpl::ComputeRuleOfFiveDescriptors(Molecule& m, PerMoleculeData&
   int on = 0;
 
   for (int i = 0; i < matoms; ++i) {
+    if (z[i] == 6) {
+      continue;
+    }
+
     if (z[i] == 7 || z[i] == 8) {
       ++on;
 
-      const int h = m.hcount(i);
-      if (h == 0) {  // acceptor
-        continue;
-      }
-
-      if (z[i] == 7 && h == 2) {
-        ohnh += 2;
-      } else {
+      if (m.hcount(i) > 0) {
         ++ohnh;
       }
     }

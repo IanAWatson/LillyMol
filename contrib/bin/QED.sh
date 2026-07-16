@@ -2,9 +2,9 @@
 here=$(dirname $0)
 
 if [[ -v LILLYMOL_HOME ]] ; then
-  qed_dir="${LILLYMOL_HOME}/data/QED"
+  qed_dir="${LILLYMOL_HOME}/data/queries/QED"
 else
-  qed_dir="${here}/../../data/QED"
+  qed_dir="${here}/../../data/queries/QED"
 fi
 
 if [[ ! -d ${qed_dir} ]] ; then

@@ -14,3 +14,11 @@ include
 ./LillyMolPrivate.code-workspace
 *ruby-version
 lib64
+
+# Wheel staging/build artifacts.
+# Also ignored in `python`
+python/prebuilt/
+python/build/
+python/dist/
+python/*.egg-info/
+

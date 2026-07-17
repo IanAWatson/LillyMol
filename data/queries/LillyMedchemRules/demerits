@@ -46,7 +46,7 @@ crown_2_3_acyclic.qry
 n_o_acyclic.qry
 acyl_hydrazone_cyclic.qry
 aromatic_iodide.qry
-reverse_michael_demerit.qry
+reverse_michael.qry
 
 oxime.qry
 thiol.qry
@@ -127,7 +127,7 @@ hemiaminal.qry
 menthol.qry
 aliphatic_nitro.qry
 
-isothiazole.qry
+isothiazole_3h_newd.qry
 multiple_amide.qry
 
 strongly_fused_4_ring.qry

@@ -66,7 +66,7 @@ ncn.qry
 aminal_acyclic.qry
 #latent_cho.qry
 
-reverse_michael.qry
+reverse_michael_rejected.qry
 reverse_michael_quat.qry
 five_connected_n_or_p.qry
 n_hydroxy.qry
@@ -188,7 +188,7 @@ vinyl_halide_2_halogens.qry
 
 half_sulfur_peroxide.qry
 
-beta_lactam.qry
-isothiazole_halogenated.qry
+beta-lactam.qry
+isothiazole_3h_ewd.qry
 catechol.qry
 thiourea_unsubstituted.qry

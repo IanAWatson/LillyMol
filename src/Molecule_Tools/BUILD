@@ -2726,9 +2726,11 @@ cc_binary(
         "//Foundational/iwaray",
         "//Foundational/iwmisc",
         "//Foundational/iwmisc:sparse_fp_creator",
+        "//Foundational/iwstring:absl_hash",
         "//Molecule_Lib:iwmolecule",
         "//Molecule_Lib:moleculeio",
         "//Molecule_Lib:substructure_cc_proto",
+        "@com_google_absl//absl/container:flat_hash_set",
         "@com_google_protobuf//:protobuf",
     ],
 )

@@ -314,6 +314,18 @@ cc_test(
 )
 
 cc_test(
+    name = "display_dash_help_test",
+    srcs = [
+        "display_dash_help_test.cc",
+    ],
+    deps = [
+        ":iwmisc",
+        "//Foundational/cmdline:iwcmdline",
+        "@googletest//:gtest_main",
+    ],
+)
+
+cc_test(
     name = "logical_expression_test",
     srcs = [
         "logical_expression_test.cc",

@@ -9,12 +9,15 @@
 #include <google/protobuf/message.h>
 #include <google/protobuf/text_format.h>
 
+#include "absl/container/flat_hash_set.h"
+
 #include "Foundational/cmdline/cmdline.h"
 #include "Foundational/iw_tdt/iw_tdt.h"
 #include "Foundational/iwbits/iwbits.h"
 #include "Foundational/iwmisc/iwre2.h"
 #include "Foundational/iwmisc/misc.h"
 #include "Foundational/iwmisc/report_progress.h"
+#include "Foundational/iwstring/absl_hash.h"
 
 #include "Molecule_Lib/aromatic.h"
 #include "Molecule_Lib/atom_typing.h"
@@ -124,8 +127,7 @@ usage(int rc) {
   // clang-format off
 //cerr << "  -m REPOrt      report (to the screen) matches\n";
   cerr << "  -m <fname>     write matches to <fname>\n";
-  cerr << "  -m ...         more options for specifying matches file, enter\n";
-  cerr << "      tsubstructure -s c -m help x.smi      for info - must specify query and input file\n";
+  cerr << "  -m ...         more options for specifying matches file, enter '-m help' for info\n";
   cerr << "  -n <fname>      write non matches to <fname>\n";
   cerr << '\n';
   cerr << "  -q <query>     specify query file\n";
@@ -250,8 +252,8 @@ display_dash_j_options() {
 }
 
 static void
-DisplayDashmOptions(std::ostream& output) {
-  output << R"(The -m option specifies where molecules that match one or more queries are written
+DisplayDashmOptions(int rc) {
+  cerr << R"(The -m option specifies where molecules that match one or more queries are written
  -m <fname>     the file name(s) that will be created
  -m QDT         to each molecule append Query DeTails of the query(s) that matched.
                 output might look like: S=C(N)NN=C(C)C1=CC=CN1 CHEMBL1990108 (4 matches to 'c')
@@ -280,18 +282,7 @@ DisplayDashmOptions(std::ostream& output) {
                      Use molecule_subset for this functionality.
 )";
 
-  ::exit(0);
-}
-
-// If '-m help' is in `cl`, invode DisplayDashmOptions.
-void
-MaybeDisplayMHelp(Command_Line& cl) {
-  const_IWSubstring m;
-  for (int i = 0; cl.value('m', m, i); ++i) {
-    if (m == "help") {
-      DisplayDashmOptions(cerr);
-    }
-  }
+  ::exit(rc);
 }
 
 int verbose = 0;
@@ -2084,7 +2075,7 @@ parse_set_of_options(Command_Line& cl, char flag,
       proto_flag_set = true;
       need_to_open_file = 1;
     } else if (tmp == "help") {
-      DisplayDashmOptions(cerr);
+      DisplayDashmOptions(0);
     } else if (fname.empty()) {  // not yet set
       fname = tmp;
       if (verbose) {
@@ -2141,6 +2132,34 @@ assign_name_if_needed(Substructure_Hit_Statistics& q, int query_number) {
   return 1;
 }
 
+// Return true if there are no duplicate names in `queries`.
+static bool
+QueryNamesUnique(const resizable_array_p<Substructure_Hit_Statistics>& queries) {
+  absl::flat_hash_set<IWString> seen;
+
+  bool rc = true;
+  for (const Substructure_Hit_Statistics* q : queries) {
+    const auto iter = seen.find(q->comment());
+    if (iter != seen.end()) {
+      cerr << "Duplicate query name '" << q->comment() << "'\n";
+      rc = false;
+    } else {
+      seen.insert(q->comment());
+    }
+  }
+
+  return rc;
+}
+
+static void
+DisplayDashROptions(int rc) {
+  cerr << R"( -R idfirst            write the report as 'name_of_query hits'.
+ -R <fname>            the file to create.
+)";
+
+  std::exit(rc);
+}
+
 static int
 tsubstructure(int argc, char** argv) {
   Command_Line cl(argc, argv,
@@ -2149,6 +2168,9 @@ tsubstructure(int argc, char** argv) {
   if (cl.unrecognised_options_encountered()) {
     usage(1);
   }
+
+  DisplayDashHelpIfRequested(cl, 'm', DisplayDashmOptions);
+  DisplayDashHelpIfRequested(cl, 'R', DisplayDashROptions);
 
   verbose = cl.option_count('v');
 
@@ -2182,10 +2204,6 @@ tsubstructure(int argc, char** argv) {
       usage(5);
     }
   }
-
-  // As a usability aid, quickly check if '-m help' is entered. If so,
-  // call DisplayDashmOptions, which exits.
-  MaybeDisplayMHelp(cl);
 
   int match_first = 0;
   if (cl.option_present('f')) {
@@ -2906,9 +2924,7 @@ tsubstructure(int argc, char** argv) {
           cerr << "In the report file the query name will be written first\n";
         }
       } else if (r == "help") {
-        cerr << " -R idfirst            write the report as 'name_of_query hits'\n";
-        cerr << " -R <fname>            the file to create\n";
-        return 0;
+        DisplayDashROptions(0);
       } else {
         fname = r;
       }
@@ -2918,6 +2934,12 @@ tsubstructure(int argc, char** argv) {
       cerr << "With the -R option, must specify a file name to use\n";
       return 1;
     }
+
+    if (! QueryNamesUnique(queries)) {
+      cerr << "Non unique query names encountered, cannot create report\n";
+      return 1;
+    }
+
     stream_for_report.open(fname.null_terminated_chars(), std::ios::out);
     if (!stream_for_report.good()) {
       cerr << "Cannot open report file '" << fname << "'\n";

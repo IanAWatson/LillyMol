@@ -4862,7 +4862,7 @@ Single_Substructure_Query::_construct_from_msi_object(const msi_object &msi,
   assert(ok());
   assert(_root_atoms.empty());
 
-  int version_attribute_found = 0;
+//int version_attribute_found = 0;
 
   _numeric_value.resize(0);
 
@@ -4884,7 +4884,7 @@ Single_Substructure_Query::_construct_from_msi_object(const msi_object &msi,
                 "version 2 queries\n";
         return 0;
       }
-      version_attribute_found = 1;
+//    version_attribute_found = 1;
       attribute_recognised[i] = 1;
     } else if (NAME_OF_DEFINE_HETEROATOMS_ATTRIBUTE == att->name()) {
       if (!fetch_heteroatom_definitions(att, _heteroatoms)) {
@@ -5195,12 +5195,15 @@ Single_Substructure_Query::_construct_from_msi_object(const msi_object &msi,
     return 0;
   }
 
+#ifdef WARN_NO_QUERY_VERSION_ATTRIBUTE
+  turned off, this format is legacy only
   // For now, this is just a warning. Perhaps it should be fatal
 
   if (0 == version_attribute_found) {
     cerr << "Single_Substructure_Query::_construct_from_msi_object: no version "
             "attribute\n";
   }
+#endif
 
   int nat = 0;
   if (!really_gruesome(_attached_heteroatom_count, msi,

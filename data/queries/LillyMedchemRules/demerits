@@ -65,7 +65,8 @@ adamantane.qry
 adamantane_sub.qry
 sulfonic_acid.qry
 phosphoric_acid.qry
-ester.qry
+ester_aliphatic.qry
+ester_aromatic.qry
 sulfonyl_urea.qry
 acyl_sulfonamide.qry
 thione.qry
@@ -138,3 +139,5 @@ CF2CF3.qry
 enyne.qry
 thioether.qry
 thioanisole.qry
+catechol_1-4.qry
+thiourea_diaryl.qry

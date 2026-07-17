@@ -3,7 +3,7 @@
 
 # Fred Bruns Dec 2003
 (0 Query
-  (A C Comment "ester")
+  (A C Comment "ester_aliphatic")
   (A I Version 2)
   (A D numeric_value 35)
   (A C smarts "[OD1]=[CD3R0T2]-[OD2]")

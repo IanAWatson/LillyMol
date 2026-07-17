@@ -245,7 +245,11 @@ PYBIND11_MODULE(lillymol_tools, m) {
             return GFPGeneratorSpec::ECFingerprint(radius, IWString(atom_type));
           },
           py::arg("radius") = 3, py::arg("atom_type") = "UST:Z")
-      .def_static("ring_substitution", &GFPGeneratorSpec::RingSubstitution);
+      .def_static("ring_substitution", &GFPGeneratorSpec::RingSubstitution)
+      .def_static("spinach", &GFPGeneratorSpec::SpinachFingerprint,
+                  py::arg("label_join_points") = false)
+      .def_static("scaffold", &GFPGeneratorSpec::ScaffoldFingerprint,
+                  py::arg("label_join_points") = false);
 
   py::class_<GFPContext, std::shared_ptr<GFPContext>>(m, "GFPContext")
       .def(py::init<>())

@@ -277,6 +277,16 @@ ECTag(int radius, const IWString& atom_type) {
   return result;
 }
 
+IWString
+SpinachTag(bool label_join_points) {
+  return label_join_points ? IWString("FPSPINI<") : IWString("FPSPIN<");
+}
+
+IWString
+ScaffoldTag(bool label_join_points) {
+  return label_join_points ? IWString("FPSCAFI<") : IWString("FPSCAF<");
+}
+
 }  // namespace
 
 GFPGeneratorSpec::GFPGeneratorSpec(GeneratorKind kind, bool maccs_level2, int replicates)
@@ -363,6 +373,20 @@ GFPGeneratorSpec::RingSubstitution() {
   return GFPGeneratorSpec(GeneratorKind::kRingSubstitution);
 }
 
+GFPGeneratorSpec
+GFPGeneratorSpec::SpinachFingerprint(bool label_join_points) {
+  GFPGeneratorSpec result(GeneratorKind::kSpinachFingerprint);
+  result._label_join_points = label_join_points;
+  return result;
+}
+
+GFPGeneratorSpec
+GFPGeneratorSpec::ScaffoldFingerprint(bool label_join_points) {
+  GFPGeneratorSpec result(GeneratorKind::kScaffoldFingerprint);
+  result._label_join_points = label_join_points;
+  return result;
+}
+
 std::vector<Component>
 GFPGeneratorSpec::Components() const {
   switch (_kind) {
@@ -400,6 +424,12 @@ GFPGeneratorSpec::Components() const {
       return {Component{ComponentKind::kSparse, ECTag(_radius, _atom_type), 0, 1.0f}};
     case GeneratorKind::kRingSubstitution:
       return {Component{ComponentKind::kSparse, IWString("NCRS<"), 0, 1.0f}};
+    case GeneratorKind::kSpinachFingerprint:
+      return {Component{ComponentKind::kFixedBinary, SpinachTag(_label_join_points), 0,
+                        1.0f}};
+    case GeneratorKind::kScaffoldFingerprint:
+      return {Component{ComponentKind::kFixedBinary, ScaffoldTag(_label_join_points), 0,
+                        1.0f}};
   }
 
   return {};
@@ -437,6 +467,12 @@ GFPGeneratorSpec::Repr() const {
              _atom_type.AsString() + "')";
     case GeneratorKind::kRingSubstitution:
       return "GFP.ring_substitution()";
+    case GeneratorKind::kSpinachFingerprint:
+      return std::string("GFP.spinach(label_join_points=") +
+             (_label_join_points ? "True" : "False") + ")";
+    case GeneratorKind::kScaffoldFingerprint:
+      return std::string("GFP.scaffold(label_join_points=") +
+             (_label_join_points ? "True" : "False") + ")";
   }
 
   return "GFP.unknown()";
@@ -1018,6 +1054,88 @@ RingSubstitutionFingerprintGenerator::Generate(
       .build_from_sparse_fingerprint_creator(sfc);
 }
 
+enum class FingerprintSubset : uint8_t {
+  kSpinach,
+  kScaffold,
+};
+
+class ScaffoldSpinachFingerprintGenerator : public FingerprintGeneratorImplementation {
+ private:
+  FingerprintSubset _subset = FingerprintSubset::kSpinach;
+  bool _label_join_points = false;
+  IWString _tag;
+  IWString _atom_type_string;
+  Atom_Typing_Specification _atom_typing;
+  IWMFingerprintOptions _iw_options;
+
+ public:
+  ScaffoldSpinachFingerprintGenerator(FingerprintSubset subset, bool label_join_points)
+      : _subset(subset), _label_join_points(label_join_points) {
+    _tag = (_subset == FingerprintSubset::kSpinach)
+               ? SpinachTag(_label_join_points)
+               : ScaffoldTag(_label_join_points);
+    _atom_type_string = _label_join_points ? IWString("UST:AIRZ")
+                                           : IWString("UST:ARZ");
+  }
+
+  int Initialise();
+  std::vector<Component> Components() const override;
+  int Generate(Molecule& m, const std::vector<GeneratorComponentAssignment>& slots,
+               GFPFingerprint& destination) override;
+};
+
+int
+ScaffoldSpinachFingerprintGenerator::Initialise() {
+  const_IWSubstring tmp(_atom_type_string);
+  return _atom_typing.build(tmp);
+}
+
+std::vector<Component>
+ScaffoldSpinachFingerprintGenerator::Components() const {
+  return {Component{ComponentKind::kFixedBinary, _tag, 0, 1.0f}};
+}
+
+int
+ScaffoldSpinachFingerprintGenerator::Generate(
+    Molecule& m, const std::vector<GeneratorComponentAssignment>& slots,
+    GFPFingerprint& destination) {
+  if (slots.size() != 1 || slots[0].kind != ComponentKind::kFixedBinary) {
+    std::cerr << "ScaffoldSpinachFingerprintGenerator::Generate:invalid slots\n";
+    return 0;
+  }
+
+  Molecule copy(m);
+  const int matoms = copy.natoms();
+  std::vector<int> include_atom(matoms, 0);
+  if (!copy.IdentifySpinachLabel(include_atom.data(), _label_join_points ? 1 : 0)) {
+    std::cerr << "ScaffoldSpinachFingerprintGenerator::Generate:cannot identify spinach\n";
+    return 0;
+  }
+
+  if (_subset == FingerprintSubset::kScaffold) {
+    for (int& include : include_atom) {
+      include = include ? 0 : 1;
+    }
+  }
+
+  std::vector<uint32_t> atom_type(matoms);
+  if (!_atom_typing.assign_atom_types(copy, atom_type.data())) {
+    std::cerr << "ScaffoldSpinachFingerprintGenerator::Generate:cannot assign atom "
+                 "types\n";
+    return 0;
+  }
+
+  IWMFingerprint fp(_iw_options);
+  if (!fp.construct_fingerprint(copy, atom_type.data(), include_atom.data())) {
+    std::cerr << "ScaffoldSpinachFingerprintGenerator::Generate:fingerprint generation "
+                 "failed\n";
+    return 0;
+  }
+
+  return destination.mutable_fixed_binary(slots[0].index)
+      .BuildFromArray(fp.vector(), _iw_options.bits_per_fingerprint);
+}
+
 class StandardFingerprintGenerator {
  private:
   Chemical_Standardisation _chemical_standardisation;
@@ -1428,6 +1546,12 @@ MakeGenerator(const GFPGeneratorSpec& spec) {
       return std::make_unique<ECFingerprintGenerator>(spec.radius(), spec.atom_type());
     case GeneratorKind::kRingSubstitution:
       return std::make_unique<RingSubstitutionFingerprintGenerator>();
+    case GeneratorKind::kSpinachFingerprint:
+      return std::make_unique<ScaffoldSpinachFingerprintGenerator>(
+          FingerprintSubset::kSpinach, spec.label_join_points());
+    case GeneratorKind::kScaffoldFingerprint:
+      return std::make_unique<ScaffoldSpinachFingerprintGenerator>(
+          FingerprintSubset::kScaffold, spec.label_join_points());
   }
 
   return nullptr;
@@ -1582,6 +1706,16 @@ GFPContext::BuildFromSpecs(const std::vector<GFPGeneratorSpec>& specs, bool prep
     if (spec.kind() == GeneratorKind::kECFingerprint) {
       ECFingerprintGenerator* ec = dynamic_cast<ECFingerprintGenerator*>(generator.get());
       if (ec == nullptr || !ec->Initialise()) {
+        std::cerr << "GFPContext::BuildFromSpecs:cannot initialise " << spec.Repr()
+                  << '\n';
+        return 0;
+      }
+    }
+    if (spec.kind() == GeneratorKind::kSpinachFingerprint ||
+        spec.kind() == GeneratorKind::kScaffoldFingerprint) {
+      ScaffoldSpinachFingerprintGenerator* scaffold_spinach =
+          dynamic_cast<ScaffoldSpinachFingerprintGenerator*>(generator.get());
+      if (scaffold_spinach == nullptr || !scaffold_spinach->Initialise()) {
         std::cerr << "GFPContext::BuildFromSpecs:cannot initialise " << spec.Repr()
                   << '\n';
         return 0;

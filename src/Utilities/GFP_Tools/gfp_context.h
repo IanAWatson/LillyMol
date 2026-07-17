@@ -39,6 +39,8 @@ enum class GeneratorKind : uint8_t {
   kAtomPair,
   kECFingerprint,
   kRingSubstitution,
+  kSpinachFingerprint,
+  kScaffoldFingerprint,
 };
 
 struct Component {
@@ -59,6 +61,7 @@ class GFPGeneratorSpec {
   int _max_path_length = 0;
   bool _include_hydrophobic_pairs = true;
   bool _include_out_of_range = false;
+  bool _label_join_points = false;
   IWString _atom_type;
 
  public:
@@ -85,6 +88,8 @@ class GFPGeneratorSpec {
   static GFPGeneratorSpec ECFingerprint(int radius = 3,
                                         const IWString& atom_type = IWString("UST:Z"));
   static GFPGeneratorSpec RingSubstitution();
+  static GFPGeneratorSpec SpinachFingerprint(bool label_join_points = false);
+  static GFPGeneratorSpec ScaffoldFingerprint(bool label_join_points = false);
 
   GeneratorKind
   kind() const {
@@ -134,6 +139,11 @@ class GFPGeneratorSpec {
   bool
   include_out_of_range() const {
     return _include_out_of_range;
+  }
+
+  bool
+  label_join_points() const {
+    return _label_join_points;
   }
 
   std::vector<Component> Components() const;

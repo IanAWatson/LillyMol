@@ -920,6 +920,29 @@ fingerprints with different atom types can be combined in one context.
 `NCRS<`. It uses the defaults used by `gfp_make.pl`: full substituent atom
 typing and single-feature bits.
 
+`GFP.spinach(label_join_points=False)` adds a fixed-width binary path
+fingerprint over the molecular spinach, the atoms outside the scaffold. The tag
+is `FPSPIN<`. When `label_join_points=True`, atoms at the scaffold/spinach join
+are isotope-labelled before atom typing and the tag is `FPSPINI<`.
+
+`GFP.scaffold(label_join_points=False)` adds the corresponding fixed-width
+binary path fingerprint over the scaffold atoms. The tag is `FPSCAF<`, or
+`FPSCAFI<` when join points are labelled. Both scaffold and spinach
+fingerprints use the same `IdentifySpinachLabel` perception and the
+`IWMFingerprint` atom include mask, so they can be combined in one context
+without changing the input molecule.
+
+For example:
+
+```python
+from lillymol_tools import GFP, GFPContext
+
+ctx = GFPContext.from_specs([
+    GFP.spinach(label_join_points=True),
+    GFP.scaffold(label_join_points=True),
+])
+```
+
 Use `GFPList.standard()` when you want to build a searchable collection from
 Python molecules:
 

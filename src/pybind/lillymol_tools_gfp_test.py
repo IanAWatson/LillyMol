@@ -300,6 +300,48 @@ class TestGFPList(unittest.TestCase):
         fp = ctx.fingerprint(mol)
         self.assertAlmostEqual(ctx.distance(fp, fp), 0.0, places=6)
 
+    def test_spinach_generator_spec(self):
+        spec = GFP.spinach()
+        self.assertEqual(spec.components(), ['FPSPIN<'])
+        self.assertEqual(repr(spec), 'GFP.spinach(label_join_points=False)')
+
+        labelled = GFP.spinach(label_join_points=True)
+        self.assertEqual(labelled.components(), ['FPSPINI<'])
+        self.assertEqual(repr(labelled), 'GFP.spinach(label_join_points=True)')
+
+        ctx = GFPContext.from_specs([spec, labelled])
+        self.assertEqual(ctx.tags(), ['FPSPIN<', 'FPSPINI<'])
+        mol = _mol('c1ccccc1C toluene')
+        fp = ctx.fingerprint(mol)
+        self.assertAlmostEqual(ctx.distance(fp, fp), 0.0, places=6)
+
+    def test_scaffold_generator_spec(self):
+        spec = GFP.scaffold()
+        self.assertEqual(spec.components(), ['FPSCAF<'])
+        self.assertEqual(repr(spec), 'GFP.scaffold(label_join_points=False)')
+
+        labelled = GFP.scaffold(label_join_points=True)
+        self.assertEqual(labelled.components(), ['FPSCAFI<'])
+        self.assertEqual(repr(labelled), 'GFP.scaffold(label_join_points=True)')
+
+        ctx = GFPContext.from_specs([spec, labelled])
+        self.assertEqual(ctx.tags(), ['FPSCAF<', 'FPSCAFI<'])
+        mol = _mol('c1ccccc1C toluene')
+        fp = ctx.fingerprint(mol)
+        self.assertAlmostEqual(ctx.distance(fp, fp), 0.0, places=6)
+
+    def test_scaffold_and_spinach_together(self):
+        ctx = GFPContext.from_specs([
+            GFP.spinach(),
+            GFP.spinach(label_join_points=True),
+            GFP.scaffold(),
+            GFP.scaffold(label_join_points=True),
+        ])
+        self.assertEqual(ctx.tags(), ['FPSCAF<', 'FPSCAFI<', 'FPSPIN<', 'FPSPINI<'])
+        mol = _mol('c1ccccc1C toluene')
+        fp = ctx.fingerprint(mol)
+        self.assertAlmostEqual(ctx.distance(fp, fp), 0.0, places=6)
+
     def test_ec_generator_spec(self):
         spec = GFP.ec(radius=3, atom_type='UST:AY')
         self.assertEqual(spec.components(), ['NCEC3USTAY<'])

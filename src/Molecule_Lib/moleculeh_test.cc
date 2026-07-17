@@ -130,12 +130,13 @@ TEST_P(TestHydrogensLastChirality, WithChirality) {
   EXPECT_EQ(_m.unique_smiles(), initial_usmi);
   const int matoms = _m.natoms();
   bool first_hydrogen_encountered = false;
-  int previous_isotope = -1;
+  isotope_t previous_isotope = 0;
   for (int i = 0; i < matoms; ++i) {
     if (_m.atomic_number(i) != 1) {
       EXPECT_FALSE(first_hydrogen_encountered) << "Heavy atom after H";
       continue;
     }
+
     first_hydrogen_encountered = true;
     EXPECT_GT(_m.isotope(i), previous_isotope);
     previous_isotope = _m.isotope(i);
@@ -157,6 +158,32 @@ TEST(TestImplicitHSatisfiesAltValence, Test1) {
   const IWString smiles("C=[SH]-C");
   Molecule m;
   ASSERT_TRUE(m.build_from_smiles(smiles));
-  EXPECT_FALSE(m.ok_valence());
+  EXPECT_FALSE(m.valence_ok());
 }
+
+struct SmilesHbaHbd {
+  IWString smiles;
+  int hba;
+  int hbd;
+};
+
+class TestHbaHbd : public testing::TestWithParam<SmilesHbaHbd> {
+  protected:
+    Molecule _m;
+};
+
+TEST_P(TestHbaHbd, Default) {
+  const auto params = GetParam();
+  ASSERT_TRUE(_m.build_from_smiles(params.smiles));
+
+  int hba = _m.LipinskiNumHAcceptors();
+  int hbd = _m.LipinskiNumHDonors();
+  EXPECT_EQ(params.hba, hba);
+  EXPECT_EQ(params.hbd, hbd);
+}
+INSTANTIATE_TEST_SUITE_P(TestHbaHbd, TestHbaHbd, testing::Values(
+  SmilesHbaHbd{"C", 0, 0},
+  SmilesHbaHbd{"CN", 1, 1},
+  SmilesHbaHbd{"COC", 1, 0}
+));
 }  // namespace

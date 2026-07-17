@@ -1518,3 +1518,47 @@ Molecule::implicit_hydrogens_known(const atom_number_t zatom) const
 {
   return _things[zatom]->implicit_hydrogens_known();
 }
+
+// The Lipinski formula, names mimic RDKit.
+int
+Molecule::LipinskiNumHDonors() {
+  int rc = 0;
+  for (int i = 0; i < _number_elements; ++i) {
+    const atomic_number_t z = _things[i]->atomic_number();
+    if (z == 6) {
+      continue;
+    }
+
+    if (z == 7) {
+    } else if (z == 8) {
+    } else {
+      continue;
+    }
+
+    if (hcount(i) == 0) {
+      continue;
+    }
+
+    ++rc;
+  }
+
+  return rc;
+}
+
+int
+Molecule::LipinskiNumHAcceptors() const {
+  int rc = 0;
+  for (int i = 0; i < _number_elements; ++i) {
+    const atomic_number_t z = _things[i]->atomic_number();
+
+    if (z == 6) {
+      continue;
+    }
+
+    if (z == 7 || z == 8) {
+      ++rc;
+    }
+  }
+
+  return rc;
+}

@@ -36,11 +36,11 @@ cannot be loaded.
 ## Basic Usage
 
 ```python
-from lillymol import Molecule
+from lillymol import MolFromSmiles
 from lillymol_tools import IWDescr
 
-mol = Molecule()
-if not mol.build_from_smiles("CCO ethanol"):
+mol = MolFromSmiles("CCO ethanol")
+if mol is None:
     raise ValueError("Invalid SMILES")
 
 iwdescr = IWDescr()
@@ -196,7 +196,7 @@ name.
 A batch example using `process_list`:
 
 ```python
-from lillymol import Molecule
+from lillymol import MolFromSmiles
 from lillymol_tools import IWDescr
 
 smiles_list = [
@@ -206,11 +206,10 @@ smiles_list = [
     ("c1ccccc1O",     "phenol"),
 ]
 
-molecules = []
-for smi, name in smiles_list:
-    mol = Molecule()
-    mol.build_from_smiles(f"{smi} {name}")
-    molecules.append(mol)
+molecules = [
+    MolFromSmiles(f"{smi} {name}")
+    for smi, name in smiles_list
+]
 
 or
 

@@ -1819,6 +1819,11 @@ class __attribute__((visibility("default"))) Molecule : protected resizable_arra
   // Returns 1 if any number of H atoms are moved.
   int MoveToEndOfConnectionTable(atomic_number_t z);
 
+  // The Lipinski formula, names mimic RDKit.
+  // the donors call is not const because it needs to determine implicit hydrogens.
+  int LipinskiNumHDonors(); 
+  int LipinskiNumHAcceptors() const;
+
   //  It is often handy to be able to place atoms around another atom. Both A1 and A2 must
   //  be singly connected atoms that are bonded to a common anchor. This is used by
   //  the make_implicit_hydrogens_explicit() functions

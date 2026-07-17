@@ -10,6 +10,81 @@ by `iwdescr.sh` and returns them as a NumPy array. See
 [Molecular Descriptors](descriptors.md) for usage, requirements, descriptor
 ordering, and performance information.
 
+## QED
+
+The `QED` class computes the LillyMol implementation of the quantitative
+estimate of drug-likeness score. It is exposed from the `lillymol_tools` module
+and uses the same query files as the command-line `QED.sh` wrapper.
+
+By default, construction initialises from
+`${LILLYMOL_HOME}/data/queries/QED`. Make sure `LILLYMOL_HOME` points to a
+LillyMol installation or source tree before constructing the object.
+
+```python
+from lillymol import MolFromSmiles
+from lillymol_tools import QED
+
+mol = MolFromSmiles("CC(=O)Oc1ccccc1C(=O)O aspirin")
+if mol is None:
+    raise ValueError("Invalid SMILES")
+
+qed = QED()
+score = qed.qed(mol)
+if score is None:
+    raise ValueError("QED calculation failed")
+
+print(score)
+```
+
+`qed.qed(mol)` returns a floating point value between 0 and 1, or `None` if the
+calculation fails. The Python binding computes on an internal copy of the
+molecule, so the supplied `Molecule` is not modified.
+
+For tests, non-standard installations, or packaged data, construct without
+automatic environment initialisation and load the query directory explicitly:
+
+```python
+qed = QED(initialise_from_environment=False)
+if not qed.initialise_from_directory("/path/to/LillyMol/data/queries/QED"):
+    raise ValueError("Cannot initialise QED")
+
+score = qed.qed(mol)
+```
+
+The object also provides `initialise_from_environment()`, which reloads the
+standard `${LILLYMOL_HOME}/data/queries/QED` configuration.
+
+See also the command-line [QED documentation](/docs/Molecule_Tools/QED.md).
+
+## Lipinski Hydrogen Bond Counts
+
+The `lillymol` module provides RDKit-compatible function names for simple
+Lipinski hydrogen-bond acceptor and donor counts:
+
+```python
+from lillymol import MolFromSmiles, NumHAcceptors, NumHDonors
+
+mol = MolFromSmiles("CN methylamine")
+if mol is None:
+    raise ValueError("Invalid SMILES")
+
+hba = NumHAcceptors(mol)
+hbd = NumHDonors(mol)
+```
+
+These names mirror `rdkit.Chem.Lipinski.NumHAcceptors` and
+`rdkit.Chem.Lipinski.NumHDonors`. The same calculations are also available as
+methods on `Molecule` when the more explicit LillyMol naming is useful:
+
+```python
+hba = mol.lipinski_num_h_acceptors()
+hbd = mol.lipinski_num_h_donors()
+```
+
+The acceptor count follows the simple Lipinski definition: nitrogen and oxygen
+atoms are counted as acceptors. The donor count is the number of nitrogen or
+oxygen atoms with at least one hydrogen.
+
 ## Selimsteg
 Selimsteg is an anadrome of getsmiles. At Lilly a variety of selimsteg
 tools are used to fetch the smiles for an identifier, from BerkeleyDB

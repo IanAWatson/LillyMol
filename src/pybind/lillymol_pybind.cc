@@ -666,6 +666,8 @@ PYBIND11_MODULE(lillymol, m)
                 .def("implicit_hydrogens", static_cast<int (Molecule::*)(atom_number_t)>(&Molecule::implicit_hydrogens), "Implicit Hydrogens on atom")
                 .def("explicit_hydrogens", static_cast<int (Molecule::*)(atom_number_t)const>(&Molecule::explicit_hydrogens), "Explicit Hydrogens on atom")
                 .def("hcount", static_cast<int (Molecule::*)(atom_number_t)>(&Molecule::hcount), "Explicit and implicit Hydrogens on atom")
+                .def("lipinski_num_h_donors", &Molecule::LipinskiNumHDonors, "Lipinski hydrogen bond donor count")
+                .def("lipinski_num_h_acceptors", &Molecule::LipinskiNumHAcceptors, "Lipinski hydrogen bond acceptor count")
                 .def("saturated",
                   [](Molecule& m, atom_number_t zatom)->bool{
                     return m.saturated(zatom);
@@ -1758,6 +1760,8 @@ PYBIND11_MODULE(lillymol, m)
   ;
 
   m.def("set_copy_name_in_molecule_copy_constructor", &set_copy_name_in_molecule_copy_constructor, "Copy name in constructor");
+  m.def("NumHAcceptors", [](const Molecule& mol) { return mol.LipinskiNumHAcceptors(); }, "Lipinski hydrogen bond acceptor count");
+  m.def("NumHDonors", [](Molecule& mol) { return mol.LipinskiNumHDonors(); }, "Lipinski hydrogen bond donor count");
   m.def("LillyMolFromSmiles", &MolFromSmiles, "Molecule from smiles");
   m.def("MolFromSmiles",
     [](const std::string& smiles)->std::optional<Molecule> {

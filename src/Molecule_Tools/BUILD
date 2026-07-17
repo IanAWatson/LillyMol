@@ -3468,6 +3468,9 @@ cc_library(
     hdrs = [
         "qed.h",
     ],
+    visibility = [
+        "//visibility:public",
+    ],
     deps = [
         ":alogp_lib",
         ":nvrtspsa",

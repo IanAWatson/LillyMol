@@ -204,6 +204,7 @@ pybind_extension(
         "//Molecule_Tools:iwdescr_lib_shared",
         "//Molecule_Tools:jwcats_lib",
         "//Molecule_Tools:nvrtspsa",
+        "//Molecule_Tools:qed_lib",
         "//Molecule_Tools:ring_replacement_lib",
         "//Molecule_Tools:unique_molecules_api",
         "//Molecule_Tools_Bdb:iwecfp_database_lookup_lib_shared",
@@ -231,6 +232,15 @@ py_test(
 py_test(
     name = "lillymol_tools_iwdescr_test",
     srcs = ["lillymol_tools_iwdescr_test.py"],
+    deps = [
+        ":lillymol",
+        ":lillymol_tools",
+    ],
+)
+
+py_test(
+    name = "lillymol_tools_qed_test",
+    srcs = ["lillymol_tools_qed_test.py"],
     deps = [
         ":lillymol",
         ":lillymol_tools",

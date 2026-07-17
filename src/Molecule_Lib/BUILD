@@ -911,6 +911,18 @@ cc_test(
 )
 
 cc_test(
+    name = "moleculeh_test",
+    srcs = [
+        "moleculeh_test.cc",
+    ],
+    deps = [
+        ":iwmolecule",
+        ":moleculeio",
+        "@googletest//:gtest_main",
+    ],
+)
+
+cc_test(
     name = "moleculer_test",
     srcs = [
         "moleculer_test.cc",

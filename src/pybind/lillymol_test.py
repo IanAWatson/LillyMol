@@ -1007,6 +1007,20 @@ class TestLillyMol(absltest.TestCase):
       donor_acceotor.process(mol)
       self.assertEqual(mol.unique_smiles(), result)
 
+  def test_lipinski_hba_hbd(self):
+    cases = [
+      ("C", 0, 0),
+      ("CN", 1, 1),
+      ("COC", 1, 0),
+    ]
+
+    for smiles, hba, hbd in cases:
+      mol = MolFromSmiles(smiles)
+      self.assertEqual(NumHAcceptors(mol), hba)
+      self.assertEqual(NumHDonors(mol), hbd)
+      self.assertEqual(mol.lipinski_num_h_acceptors(), hba)
+      self.assertEqual(mol.lipinski_num_h_donors(), hbd)
+
   def test_xlogp(self):
     m = Molecule()
     self.assertTrue(m.build_from_smiles("CC(=O)OC1=CC=CC=C1C(=O)O aspirin"))

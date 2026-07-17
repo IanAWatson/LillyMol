@@ -15,6 +15,7 @@
 #include "Molecule_Tools/jwcats_lib.h"
 #include "Molecule_Tools/mformula.h"
 #include "Molecule_Tools/nvrtspsa.h"
+#include "Molecule_Tools/qed.h"
 #include "Molecule_Tools/ring_replacement_lib.h"
 #include "Molecule_Tools/unique_molecules_api.h"
 #include "Molecule_Tools_Bdb/iwecfp_database_lookup_lib.h"
@@ -522,6 +523,36 @@ PYBIND11_MODULE(lillymol_tools, m) {
   m.def(
       "HbaHbd", [](Molecule& mol) { return LipinskiHbaHbd(mol); }, py::arg("mol"),
       "Return Lipinski-style hydrogen-bond acceptor and donor counts as (hba, hbd)");
+
+  py::class_<qed::Qed>(m, "QED")
+      .def(py::init([](bool initialise_from_environment) {
+             auto result = std::make_unique<qed::Qed>();
+             if (initialise_from_environment && ! result->InitialiseFromEnvironment()) {
+               throw std::runtime_error(
+                   "Cannot initialise QED; ensure LILLYMOL_HOME points to a LillyMol tree");
+             }
+             return result;
+           }),
+           py::arg("initialise_from_environment") = true)
+      .def(
+          "initialise_from_environment",
+          [](qed::Qed& qed) { return qed.InitialiseFromEnvironment(); },
+          "Initialise QED from LILLYMOL_HOME/data/queries/QED")
+      .def(
+          "initialise_from_directory",
+          [](qed::Qed& qed, const std::string& dirname) {
+            IWString d(dirname);
+            return qed.InitialiseFromDirectory(d);
+          },
+          py::arg("dirname"),
+          "Initialise QED from a directory containing the QED smarts files")
+      .def(
+          "qed",
+          [](qed::Qed& qed, const Molecule& mol) -> std::optional<float> {
+            Molecule mcopy(mol);
+            return qed.qed(mcopy);
+          },
+          py::arg("mol"), "Compute QED, returning None if the calculation fails");
 
   py::class_<unique_molecules::UniqueMolecules>(m, "UniqueMolecules")
       .def(py::init<>())

@@ -6,14 +6,12 @@
 (0 Query
   (A C Comment "boc")
   (A I Version 2)
-  (A D numeric_value 30)
-  (A I min_hits_needed 2)
-  (A I unique_embeddings_only 1)
+  (A D numeric_value 60)
+  (A I one_embedding_per_start_atom 1)
 
   (0 Query_Atom
     (A I atomic_number 7)
-    (A I nrings 0)
-    (A I hcount 1)
+    (A I aromatic 0)
   )
   (1 Query_Atom
     (A I atomic_number 6)

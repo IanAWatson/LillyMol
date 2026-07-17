@@ -29,7 +29,9 @@
 #include "Molecule_Lib/path.h"
 #include "Molecule_Lib/qry_wstats.h"
 #include "Molecule_Lib/rmele.h"
+#include "Molecule_Lib/rwsubstructure.h"
 #include "Molecule_Lib/smiles.h"
+#include "Molecule_Lib/substructure.h"
 #include "Molecule_Lib/standardise.h"
 #include "Molecule_Lib/target.h"
 

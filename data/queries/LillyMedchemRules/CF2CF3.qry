@@ -5,4 +5,8 @@
   # for excessive fluorine atoms
   (A D numeric_value 40)
   (A C smarts "F-[CD4](-F)-[CD4](-F)(-F)-F")
+  (0 Environment_no_match
+    (A I single_bond 1)
+    (A C smarts "[CD4](-F)-F")
+  )
 )

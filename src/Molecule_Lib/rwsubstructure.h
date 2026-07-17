@@ -579,36 +579,6 @@ file_record_is_smarts(resizable_array_p<T>& queries, IWString& buffer, int verbo
   return 1;
 }
 
-static bool
-LooksLikeTextproto(iwstring_data_source& input) {
-  // Cannot seek on standard input.
-  if (input.fd() == 1) {
-    return false;
-  }
-
-  const off_t start_pos = input.tellg();
-
-  const_IWSubstring line;
-  // Empty file, who knows
-  if (! input.next_record(line)) {
-    return false;
-  }
-
-  input.seekg(start_pos);
-
-  if (line.starts_with("(0 Query")) {
-    return false;
-  }
-  if (line.starts_with("name:")) {
-    return true;
-  }
-  if (line.starts_with("query {") || line.starts_with("query{")) {
-    return true;
-  }
-
-  return false;
-}
-
 // Forward declaration.
 template <typename T>
 int ReadProtoQuery(const IWString& fname, const IWString& directory_path,
@@ -618,7 +588,7 @@ template <typename T>
 int
 read_one_or_more_queries_from_file(resizable_array_p<T>& queries,
                                    iwstring_data_source& input, int verbose) {
-  if (LooksLikeTextproto(input)) {
+  if (lillymol::LooksLikeTextproto(input)) {
     IWString proto_fname;
     proto_fname << "PROTO:" << input.fname();
     IWString directory_path;  // empty.
@@ -710,6 +680,25 @@ ReadProtoQuery(const IWString& fname, const IWString& directory_path,
   return 1;
 }
 
+template <typename T>
+int
+ReadQueryTextproto(const IWString& fname, resizable_array_p<T>& queries, int verbose) {
+  std::unique_ptr<T> maybeproto = std::make_unique<T>();
+
+  if (! maybeproto->ReadProto(fname)) {
+    std:: cerr << "ReadQueryTextproto:cannot read '" << fname << "'\n";
+    return 0;
+  }
+
+  queries << maybeproto.release();
+
+  if (verbose) {
+    std::cerr << "Created query '" << queries.back()->comment() << "' from '" << fname << "'\n";
+  }
+
+  return 1;
+}
+
 // Read a single record from a file containing queries.
 template <typename T>
 int
@@ -732,6 +721,10 @@ file_record_is_file(resizable_array_p<T>& queries, const IWString& directory_pat
     pathname = directory_path + fname;
   } else {
     pathname = fname;
+  }
+
+  if (lillymol::LooksLikeTextproto(pathname)) {
+    return ReadQueryTextproto(pathname, queries, verbose);
   }
 
   T* tmp = new T;

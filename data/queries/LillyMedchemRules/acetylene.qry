@@ -14,4 +14,9 @@
     (A I nrings 0)
     (A I triple_bond 0)
   )
+  # enyne types get an extra demerit, so exclude here
+  (1 Environment_no_Match
+    (A I single_bond (0 1))
+    (A C smarts "C=C")
+  )
 )

@@ -4015,6 +4015,11 @@ int AllQueriesMatch(Molecule_to_Match& m, resizable_array_p<Substructure_Query> 
 int AnyQueryMatches(Molecule& m, resizable_array_p<Substructure_Query> & queries);
 int AnyQueryMatches(Molecule_to_Match& m, resizable_array_p<Substructure_Query> & queries);
 
+// Peeks at the first line of a file and returns true if that looks like a textproto query.
+// `fname` is not const only because it calls null_terminated_chars.
+bool LooksLikeTextproto(IWString& fname);
+bool LooksLikeTextproto(iwstring_data_source& input);
+
 }  // namespace lillymol
 
 namespace substructure_spec {

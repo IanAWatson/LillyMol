@@ -7156,4 +7156,45 @@ Substructure_Query::CreateFromSmarts(const std::string& smt) {
 
 namespace lillymol {
 
+bool
+LooksLikeTextproto(iwstring_data_source& input) {
+  // Cannot seek on standard input.
+  if (input.fd() == 1) {
+    return false;
+  }
+
+  const off_t start_pos = input.tellg();
+
+  const_IWSubstring line;
+  // Empty file, who knows
+  if (! input.next_record(line)) {
+    return false;
+  }
+
+  input.seekg(start_pos);
+
+  if (line.starts_with("(0 Query")) {
+    return false;
+  }
+  if (line.starts_with("name:")) {
+    return true;
+  }
+  if (line.starts_with("query {") || line.starts_with("query{")) {
+    return true;
+  }
+
+  return false;
+}
+
+bool
+LooksLikeTextproto(IWString& fname) {
+  iwstring_data_source input;
+  if (! input.open(fname)) {
+    cerr << "LooksLikeTextproto:cannot open '" << fname << "'\n";
+    return false;
+  }
+
+  return LooksLikeTextproto(input);
+}
+
 }  // namespace lillymol

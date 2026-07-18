@@ -95,6 +95,11 @@ class SSpread_Item : public GFP_Standard {
   float distance() const {
     return _distance;
   }
+  // This is only called when previously selected fingerprints are in effect.
+  // Note that it does not set _nearest_previously_selected.
+  void set_distance(float d) {
+    _distance = d;
+  }
 
   int nearest_previously_selected() const {
     return _nearest_previously_selected;
@@ -600,7 +605,7 @@ WriteSelected(T* pool, int selected, IWString_and_File_Descriptor& output) {
   } else {
     output << smiles_tag << "*>\n";
     output << identifier_tag << "*>\n";
-    output << distance_tag << "1>\n";
+    output << distance_tag << sel.distance() << ">\n";
   }
 
   output << "|\n";
@@ -608,6 +613,22 @@ WriteSelected(T* pool, int selected, IWString_and_File_Descriptor& output) {
   output.write_if_buffer_holds_more_than(4096);
 
   return 1;
+}
+
+// Return the index of the member of `pool` with the longest distance.
+int
+MaxInitialDistance(const SSpread_Item* pool, int pool_size) {
+  float max_dist = -1.0f;
+  int rc = -1;
+
+  for (int i = 0; i < pool_size; ++i) {
+    if (pool[i].distance() > max_dist) {
+      max_dist = pool[i].distance();
+      rc = i;
+    }
+  }
+
+  return rc;
 }
 
 template <typename F>
@@ -618,10 +639,7 @@ spread4(F* pool, int& pool_size, IWString_and_File_Descriptor& output) {
   if (choose_first_point_randomly) {
     s = RandomPoolMember(pool_size);
   } else if (previously_selected_file_specified) {
-    s = std::max_element(
-            pool, pool + pool_size,
-            [](const F& fp1, const F& fp2) { return fp1.distance() > fp2.distance(); }) -
-        pool;
+    s = MaxInitialDistance(pool, pool_size);
   } else {
     s = 0;
   }
@@ -1126,12 +1144,13 @@ do_previously_selected(const IW_General_Fingerprint& gfp) {
   sgfp.build_mk(gfp[1]);
   sgfp.build_mk2(gfp[2]);
 
-#pragma omp parallel for schedule(dynamic, 256)
+// #pragma omp parallel for schedule(static)
   for (int i = 0; i < pool_size; i++) {
     float d = sgfp.tanimoto_distance(fingerprints[i]);
 
     assert(d >= 0.0f);
 
+//  cerr << " cmp " << d << " distances[i] " << distances[i] << " i = " << i << '\n';
     if (d < distances[i]) {
       distances[i] = d;
     }
@@ -1146,6 +1165,11 @@ static int
 do_previously_selected(iwstring_data_source& input) {
   IW_TDT tdt;
 
+  Report_Progress my_report_progress;
+  if (report_progress.active()) {
+    my_report_progress.set_report_every(report_progress.report_every());
+  }
+
   while (tdt.next(input)) {
     IW_General_Fingerprint gfp;
 
@@ -1156,6 +1180,10 @@ do_previously_selected(iwstring_data_source& input) {
     }
 
     do_previously_selected(gfp);
+
+    if (my_report_progress()) {
+      cerr << "Processed " << my_report_progress.times_called() << " previously selected fingerprints\n";
+    }
   }
 
   return 1;
@@ -1508,6 +1536,10 @@ gfp_spread_standard(int argc, char** argv) {
     }
 
     previously_selected_file_specified = 1;
+
+    for (int i = 0; i < pool_size; ++i) {
+      fingerprints[i].set_distance(distances[i]);
+    }
   }
 
   if (cl.option_present('S')) {

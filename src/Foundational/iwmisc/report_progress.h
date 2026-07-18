@@ -34,6 +34,10 @@ class Report_Progress_Template
 
     int active () const { return _report_every > 0;}
 
+    T report_every() const {
+      return _report_every;
+    }
+
     // In two phases of a programme, the first phase might read some molecules
     // into a hash, and the progress reporter would be used then. In the
     // second phase, the molecules in the hash get processed, and we want to

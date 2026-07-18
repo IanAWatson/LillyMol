@@ -12432,7 +12432,10 @@ FindNitrogenAcrossRingFusion(Molecule& m,
   const resizable_array_p<Set_of_Atoms>& rings = current_molecule_data.rings();
 
   const atom_number_t nh0 = indole.n1;
-  assert(ring_membership[nh0] == 1);
+  // Deal with complex fused systems.
+  if (ring_membership[nh0] != 1) {
+    return 0;
+  }
   indole.n2 = kInvalidAtomNumber;
 
   // cerr << "Adjacent nitrogen for " << nh0 << " in " << m.name() << '\n';

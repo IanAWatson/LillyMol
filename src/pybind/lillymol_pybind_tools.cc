@@ -249,7 +249,33 @@ PYBIND11_MODULE(lillymol_tools, m) {
       .def_static("spinach", &GFPGeneratorSpec::SpinachFingerprint,
                   py::arg("label_join_points") = false)
       .def_static("scaffold", &GFPGeneratorSpec::ScaffoldFingerprint,
-                  py::arg("label_join_points") = false);
+                  py::arg("label_join_points") = false)
+      .def_static(
+          "substructure",
+          [](const std::string& smarts, int radius, const std::string& atom_type,
+             const std::string& no_match) {
+            if (smarts.empty()) {
+              throw std::invalid_argument("smarts must be non-empty");
+            }
+            if (radius < 0) {
+              throw std::invalid_argument("radius must be non-negative");
+            }
+            if (atom_type.empty()) {
+              throw std::invalid_argument("atom_type must be non-empty");
+            }
+            bool no_match_is_empty;
+            if (no_match == "empty") {
+              no_match_is_empty = true;
+            } else if (no_match == "error") {
+              no_match_is_empty = false;
+            } else {
+              throw std::invalid_argument("no_match must be 'empty' or 'error'");
+            }
+            return GFPGeneratorSpec::SubstructureFingerprint(
+                IWString(smarts), radius, IWString(atom_type), no_match_is_empty);
+          },
+          py::arg("smarts"), py::arg("radius") = 0,
+          py::arg("atom_type") = "UST:ARY", py::arg("no_match") = "empty");
 
   py::class_<GFPContext, std::shared_ptr<GFPContext>>(m, "GFPContext")
       .def(py::init<>())

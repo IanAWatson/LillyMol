@@ -916,6 +916,20 @@ radius and atom-type specification are encoded in the tag, for example
 from tags; other non-alphanumeric characters are rejected. Multiple EC
 fingerprints with different atom types can be combined in one context.
 
+`GFP.substructure(smarts, radius=0, atom_type="UST:ARY", no_match="empty")`
+adds a fixed-width binary path fingerprint over the atoms matched by one SMARTS
+query, optionally expanded by `radius` bonds around all matched atoms. The tag
+starts with `FPSUB` and includes the radius, atom type, and a stable hash of the
+query specification. When `no_match="empty"`, molecules that do not match the
+query receive an empty fingerprint component. When `no_match="error"`,
+fingerprint generation fails for non-matching molecules.
+
+```python
+ctx = GFPContext.from_specs([
+    GFP.substructure("n1cncc1", radius=4),
+])
+```
+
 `GFP.ring_substitution()` adds the ring-substitution fingerprint with tag
 `NCRS<`. It uses the defaults used by `gfp_make.pl`: full substituent atom
 typing and single-feature bits.

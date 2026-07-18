@@ -342,6 +342,56 @@ class TestGFPList(unittest.TestCase):
         fp = ctx.fingerprint(mol)
         self.assertAlmostEqual(ctx.distance(fp, fp), 0.0, places=6)
 
+    def test_substructure_generator_spec(self):
+        spec = GFP.substructure('c1ccccc1', radius=1)
+        components = spec.components()
+        self.assertEqual(len(components), 1)
+        self.assertTrue(components[0].startswith('FPSUB1USTARY'))
+        self.assertTrue(components[0].endswith('<'))
+        self.assertEqual(
+            repr(spec),
+            "GFP.substructure(smarts='c1ccccc1', radius=1, "
+            "atom_type='UST:ARY', no_match='empty')")
+
+        ctx = GFPContext.from_specs([spec])
+        self.assertEqual(ctx.tags(), components)
+        benzene = _mol('c1ccccc1 benzene')
+        fp = ctx.fingerprint(benzene)
+        self.assertAlmostEqual(ctx.distance(fp, fp), 0.0, places=6)
+
+    def test_substructure_radius_changes_tag(self):
+        radius0 = GFP.substructure('c1ccccc1', radius=0)
+        radius2 = GFP.substructure('c1ccccc1', radius=2)
+        self.assertNotEqual(radius0.components(), radius2.components())
+        ctx = GFPContext.from_specs([radius0, radius2])
+        self.assertEqual(len(ctx.tags()), 2)
+
+    def test_substructure_no_match_empty(self):
+        ctx = GFPContext.from_specs([GFP.substructure('N', no_match='empty')])
+        methane = _mol('C methane')
+        fp = ctx.fingerprint(methane)
+        self.assertAlmostEqual(ctx.distance(fp, fp), 0.0, places=6)
+
+    def test_substructure_no_match_error(self):
+        ctx = GFPContext.from_specs([GFP.substructure('N', no_match='error')])
+        methane = _mol('C methane')
+        with self.assertRaises(RuntimeError):
+            ctx.fingerprint(methane)
+
+    def test_substructure_rejects_invalid_specs(self):
+        with self.assertRaises(ValueError):
+            GFP.substructure('')
+        with self.assertRaises(ValueError):
+            GFP.substructure('C', radius=-1)
+        with self.assertRaises(ValueError):
+            GFP.substructure('C', atom_type='')
+        with self.assertRaises(ValueError):
+            GFP.substructure('C', no_match='skip')
+        with self.assertRaises(RuntimeError):
+            GFPContext.from_specs([GFP.substructure('[')])
+        with self.assertRaises(RuntimeError):
+            GFPContext.from_specs([GFP.substructure('C', atom_type='UST:A-Y')])
+
     def test_ec_generator_spec(self):
         spec = GFP.ec(radius=3, atom_type='UST:AY')
         self.assertEqual(spec.components(), ['NCEC3USTAY<'])

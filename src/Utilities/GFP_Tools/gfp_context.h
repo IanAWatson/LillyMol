@@ -41,6 +41,7 @@ enum class GeneratorKind : uint8_t {
   kRingSubstitution,
   kSpinachFingerprint,
   kScaffoldFingerprint,
+  kSubstructureFingerprint,
 };
 
 struct Component {
@@ -62,7 +63,9 @@ class GFPGeneratorSpec {
   bool _include_hydrophobic_pairs = true;
   bool _include_out_of_range = false;
   bool _label_join_points = false;
+  bool _no_match_is_empty = true;
   IWString _atom_type;
+  IWString _smarts;
 
  public:
   GFPGeneratorSpec() = default;
@@ -72,6 +75,8 @@ class GFPGeneratorSpec {
                    bool include_hydrophobic_pairs);
   GFPGeneratorSpec(GeneratorKind kind, int min_separation, int max_separation,
                    const IWString& atom_type, bool include_out_of_range);
+  GFPGeneratorSpec(GeneratorKind kind, const IWString& smarts, int radius,
+                   const IWString& atom_type, bool no_match_is_empty);
 
   static GFPGeneratorSpec MolecularProperties();
   static GFPGeneratorSpec IWMFingerprint();
@@ -90,6 +95,10 @@ class GFPGeneratorSpec {
   static GFPGeneratorSpec RingSubstitution();
   static GFPGeneratorSpec SpinachFingerprint(bool label_join_points = false);
   static GFPGeneratorSpec ScaffoldFingerprint(bool label_join_points = false);
+  static GFPGeneratorSpec SubstructureFingerprint(
+      const IWString& smarts, int radius = 0,
+      const IWString& atom_type = IWString("UST:ARY"),
+      bool no_match_is_empty = true);
 
   GeneratorKind
   kind() const {
@@ -144,6 +153,16 @@ class GFPGeneratorSpec {
   bool
   label_join_points() const {
     return _label_join_points;
+  }
+
+  bool
+  no_match_is_empty() const {
+    return _no_match_is_empty;
+  }
+
+  const IWString&
+  smarts() const {
+    return _smarts;
   }
 
   std::vector<Component> Components() const;

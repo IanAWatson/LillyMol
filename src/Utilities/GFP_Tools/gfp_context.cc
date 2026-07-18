@@ -18,7 +18,9 @@
 #include "Molecule_Lib/atom_typing.h"
 #include "Molecule_Lib/iwmfingerprint.h"
 #include "Molecule_Lib/molecule.h"
+#include "Molecule_Lib/qry_wstats.h"
 #include "Molecule_Lib/standardise.h"
+#include "Molecule_Lib/target.h"
 
 #include "Molecule_Tools/alogp.h"
 #include "Molecule_Tools/iwecfp_lib.h"
@@ -287,6 +289,34 @@ ScaffoldTag(bool label_join_points) {
   return label_join_points ? IWString("FPSCAFI<") : IWString("FPSCAF<");
 }
 
+IWString
+HexHash(uint64_t hash) {
+  static constexpr char kHex[] = "0123456789ABCDEF";
+  IWString result;
+  for (int shift = 60; shift >= 0; shift -= 4) {
+    result << kHex[(hash >> shift) & 0x0f];
+  }
+  return result;
+}
+
+IWString
+SubstructureTag(const IWString& smarts, int radius, const IWString& atom_type) {
+  IWString atom_type_component;
+  if (smarts.empty() || radius < 0 ||
+      !AppendSanitisedAtomType(atom_type, atom_type_component)) {
+    return IWString();
+  }
+
+  uint64_t hash = 14695981039346656037ULL;
+  hash = Fnv1a(hash, smarts);
+  hash = Fnv1a(hash, atom_type);
+  hash = Fnv1a(hash, &radius, sizeof(radius));
+
+  IWString result;
+  result << "FPSUB" << radius << atom_type_component << HexHash(hash) << '<';
+  return result;
+}
+
 }  // namespace
 
 GFPGeneratorSpec::GFPGeneratorSpec(GeneratorKind kind, bool maccs_level2, int replicates)
@@ -313,6 +343,16 @@ GFPGeneratorSpec::GFPGeneratorSpec(GeneratorKind kind, int min_separation,
       _max_separation(max_separation),
       _include_out_of_range(include_out_of_range),
       _atom_type(atom_type) {
+}
+
+GFPGeneratorSpec::GFPGeneratorSpec(GeneratorKind kind, const IWString& smarts,
+                                   int radius, const IWString& atom_type,
+                                   bool no_match_is_empty)
+    : _kind(kind),
+      _radius(radius),
+      _no_match_is_empty(no_match_is_empty),
+      _atom_type(atom_type),
+      _smarts(smarts) {
 }
 
 GFPGeneratorSpec
@@ -387,6 +427,14 @@ GFPGeneratorSpec::ScaffoldFingerprint(bool label_join_points) {
   return result;
 }
 
+GFPGeneratorSpec
+GFPGeneratorSpec::SubstructureFingerprint(const IWString& smarts, int radius,
+                                          const IWString& atom_type,
+                                          bool no_match_is_empty) {
+  return GFPGeneratorSpec(GeneratorKind::kSubstructureFingerprint, smarts, radius,
+                          atom_type, no_match_is_empty);
+}
+
 std::vector<Component>
 GFPGeneratorSpec::Components() const {
   switch (_kind) {
@@ -430,6 +478,9 @@ GFPGeneratorSpec::Components() const {
     case GeneratorKind::kScaffoldFingerprint:
       return {Component{ComponentKind::kFixedBinary, ScaffoldTag(_label_join_points), 0,
                         1.0f}};
+    case GeneratorKind::kSubstructureFingerprint:
+      return {Component{ComponentKind::kFixedBinary,
+                        SubstructureTag(_smarts, _radius, _atom_type), 0, 1.0f}};
   }
 
   return {};
@@ -473,6 +524,11 @@ GFPGeneratorSpec::Repr() const {
     case GeneratorKind::kScaffoldFingerprint:
       return std::string("GFP.scaffold(label_join_points=") +
              (_label_join_points ? "True" : "False") + ")";
+    case GeneratorKind::kSubstructureFingerprint:
+      return std::string("GFP.substructure(smarts='") + _smarts.AsString() +
+             "', radius=" + std::to_string(_radius) + ", atom_type='" +
+             _atom_type.AsString() + "', no_match='" +
+             (_no_match_is_empty ? "empty" : "error") + "')";
   }
 
   return "GFP.unknown()";
@@ -1136,6 +1192,125 @@ ScaffoldSpinachFingerprintGenerator::Generate(
       .BuildFromArray(fp.vector(), _iw_options.bits_per_fingerprint);
 }
 
+class SubstructureFingerprintGenerator : public FingerprintGeneratorImplementation {
+ private:
+  IWString _smarts;
+  int _radius = 0;
+  IWString _atom_type_string;
+  bool _no_match_is_empty = true;
+  IWString _tag;
+  Substructure_Hit_Statistics _query;
+  Atom_Typing_Specification _atom_typing;
+  IWMFingerprintOptions _iw_options;
+
+ public:
+  SubstructureFingerprintGenerator(const IWString& smarts, int radius,
+                                   const IWString& atom_type,
+                                   bool no_match_is_empty)
+      : _smarts(smarts),
+        _radius(radius),
+        _atom_type_string(atom_type),
+        _no_match_is_empty(no_match_is_empty),
+        _tag(SubstructureTag(smarts, radius, atom_type)) {
+  }
+
+  int Initialise();
+  std::vector<Component> Components() const override;
+  int Generate(Molecule& m, const std::vector<GeneratorComponentAssignment>& slots,
+               GFPFingerprint& destination) override;
+};
+
+int
+SubstructureFingerprintGenerator::Initialise() {
+  if (_smarts.empty() || _radius < 0 || _atom_type_string.empty() || _tag.empty()) {
+    return 0;
+  }
+
+  if (!_query.create_from_smarts(_smarts)) {
+    std::cerr << "SubstructureFingerprintGenerator::Initialise:invalid smarts '"
+              << _smarts << "'\n";
+    return 0;
+  }
+  _query.set_find_unique_embeddings_only(1);
+
+  const_IWSubstring atom_type(_atom_type_string);
+  if (!_atom_typing.build(atom_type)) {
+    std::cerr << "SubstructureFingerprintGenerator::Initialise:invalid atom type '"
+              << _atom_type_string << "'\n";
+    return 0;
+  }
+
+  return 1;
+}
+
+std::vector<Component>
+SubstructureFingerprintGenerator::Components() const {
+  return {Component{ComponentKind::kFixedBinary, _tag, 0, 1.0f}};
+}
+
+int
+SubstructureFingerprintGenerator::Generate(
+    Molecule& m, const std::vector<GeneratorComponentAssignment>& slots,
+    GFPFingerprint& destination) {
+  if (slots.size() != 1 || slots[0].kind != ComponentKind::kFixedBinary) {
+    std::cerr << "SubstructureFingerprintGenerator::Generate:invalid slots\n";
+    return 0;
+  }
+
+  const int matoms = m.natoms();
+  std::vector<int> include_atom(matoms, 0);
+
+  Molecule_to_Match target(&m);
+  Substructure_Results results;
+  const int nhits = _query.substructure_search(target, results);
+  if (nhits == 0) {
+    if (!_no_match_is_empty) {
+      std::cerr << "SubstructureFingerprintGenerator::Generate:no query match for "
+                << m.name() << "\n";
+      return 0;
+    }
+  } else {
+    for (int i = 0; i < nhits; ++i) {
+      const Set_of_Atoms* embedding = results.embedding(i);
+      embedding->set_vector(include_atom.data(), 1);
+    }
+
+    if (_radius > 0) {
+      m.recompute_distance_matrix();
+      std::vector<int> matched(include_atom);
+      for (int i = 0; i < matoms; ++i) {
+        if (!matched[i]) {
+          continue;
+        }
+        for (int j = 0; j < matoms; ++j) {
+          if (include_atom[j]) {
+            continue;
+          }
+          if (m.bonds_between(i, j) <= _radius) {
+            include_atom[j] = 1;
+          }
+        }
+      }
+    }
+  }
+
+  std::vector<uint32_t> atom_type(matoms);
+  if (!_atom_typing.assign_atom_types(m, atom_type.data())) {
+    std::cerr << "SubstructureFingerprintGenerator::Generate:cannot assign atom types\n";
+    return 0;
+  }
+
+  IWMFingerprint fp(_iw_options);
+  if (!fp.construct_fingerprint(m, atom_type.data(), include_atom.data())) {
+    std::cerr << "SubstructureFingerprintGenerator::Generate:fingerprint generation "
+                 "failed\n";
+    return 0;
+  }
+
+  return destination.mutable_fixed_binary(slots[0].index)
+      .BuildFromArray(fp.vector(), _iw_options.bits_per_fingerprint);
+}
+
 class StandardFingerprintGenerator {
  private:
   Chemical_Standardisation _chemical_standardisation;
@@ -1552,6 +1727,9 @@ MakeGenerator(const GFPGeneratorSpec& spec) {
     case GeneratorKind::kScaffoldFingerprint:
       return std::make_unique<ScaffoldSpinachFingerprintGenerator>(
           FingerprintSubset::kScaffold, spec.label_join_points());
+    case GeneratorKind::kSubstructureFingerprint:
+      return std::make_unique<SubstructureFingerprintGenerator>(
+          spec.smarts(), spec.radius(), spec.atom_type(), spec.no_match_is_empty());
   }
 
   return nullptr;
@@ -1679,6 +1857,14 @@ GFPContext::BuildFromSpecs(const std::vector<GFPGeneratorSpec>& specs, bool prep
         return 0;
       }
     }
+    if (spec.kind() == GeneratorKind::kSubstructureFingerprint) {
+      if (spec.smarts().empty() || spec.radius() < 0 || spec.atom_type().empty() ||
+          SubstructureTag(spec.smarts(), spec.radius(), spec.atom_type()).empty()) {
+        std::cerr << "GFPContext::BuildFromSpecs:invalid substructure spec "
+                  << spec.Repr() << '\n';
+        return 0;
+      }
+    }
 
     std::unique_ptr<FingerprintGeneratorImplementation> generator = MakeGenerator(spec);
     if (generator == nullptr) {
@@ -1716,6 +1902,15 @@ GFPContext::BuildFromSpecs(const std::vector<GFPGeneratorSpec>& specs, bool prep
       ScaffoldSpinachFingerprintGenerator* scaffold_spinach =
           dynamic_cast<ScaffoldSpinachFingerprintGenerator*>(generator.get());
       if (scaffold_spinach == nullptr || !scaffold_spinach->Initialise()) {
+        std::cerr << "GFPContext::BuildFromSpecs:cannot initialise " << spec.Repr()
+                  << '\n';
+        return 0;
+      }
+    }
+    if (spec.kind() == GeneratorKind::kSubstructureFingerprint) {
+      SubstructureFingerprintGenerator* substructure =
+          dynamic_cast<SubstructureFingerprintGenerator*>(generator.get());
+      if (substructure == nullptr || !substructure->Initialise()) {
         std::cerr << "GFPContext::BuildFromSpecs:cannot initialise " << spec.Repr()
                   << '\n';
         return 0;

@@ -3145,6 +3145,30 @@ TEST(TestDaylightH, Test1) {
   EXPECT_EQ(qry2.substructure_search(&nitrogen), 1);
   EXPECT_EQ(qry2.substructure_search(&fluorine), 1);
   set_h_means_exactly_one_hydrogen(1);  // reset to default.
+
+  Molecule with_explicit_h;
+  ASSERT_TRUE(with_explicit_h.build_from_smiles("HC"));
+  EXPECT_EQ(with_explicit_h.natoms(), 2);
+  Substructure_Query qry3;
+  ASSERT_TRUE(qry3.create_from_smarts("[H]"));
+  EXPECT_EQ(qry3.substructure_search(&with_explicit_h), 1);
+  EXPECT_GT(with_explicit_h.make_implicit_hydrogens_explicit(), 0);
+  EXPECT_EQ(with_explicit_h.natoms(), 5);
+  EXPECT_EQ(qry3.substructure_search(&with_explicit_h), 4);
+
+  with_explicit_h.set_isotope(0, 5);
+  Substructure_Query qry4;
+  ASSERT_TRUE(qry4.create_from_smarts("[>4H]"));
+  EXPECT_EQ(qry4.substructure_search(&with_explicit_h), 1);
+
+  Substructure_Query qry5;
+  ASSERT_TRUE(qry5.create_from_smarts("[5H]"));
+  EXPECT_EQ(qry5.substructure_search(&with_explicit_h), 1);
+
+  Substructure_Query qry6;
+  ASSERT_TRUE(qry6.create_from_smarts("[<6H]"));
+  EXPECT_EQ(qry6.substructure_search(&with_explicit_h), 4);
+
 }
 
 const std::string inter_ring_region1 = R"pb(

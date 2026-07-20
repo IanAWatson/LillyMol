@@ -454,8 +454,8 @@ Sparse_Fingerprint::is_set(unsigned int b) const {
 #ifdef SLOWER_VERSION_AA
 similarity_type_t
 Sparse_Fingerprint::_tanimoto_with_counts(const Sparse_Fingerprint &rhs) const {
-  if (0 == _nbits || 0 == rhs._nbits) {
-    if (0 == _nbits && 0 == rhs._nbits) {
+  if (0 == _nset || 0 == rhs._nset) {
+    if (0 == _nset && 0 == rhs._nset) {
       return static_cast<similarity_type_t>(1.0);
     }
 
@@ -534,8 +534,8 @@ Sparse_Fingerprint::_tanimoto_with_counts(const Sparse_Fingerprint &rhs) const {
 
 similarity_type_t
 Sparse_Fingerprint::_tanimoto_with_counts(const Sparse_Fingerprint &rhs) const {
-  if (0 == _nbits || 0 == rhs._nbits) {
-    if (0 == _nbits && 0 == rhs._nbits) {
+  if (0 == _nset || 0 == rhs._nset) {
+    if (0 == _nset && 0 == rhs._nset) {
       return static_cast<similarity_type_t>(1.0);
     }
 
@@ -1573,12 +1573,11 @@ Sparse_Fingerprint::bits_in_common(const Sparse_Fingerprint &rhs) const {
 
 int
 Sparse_Fingerprint::bits_in_common(const Sparse_Fingerprint &rhs) const {
-  if (0 == _nbits || 0 == rhs._nbits) {
+  if (0 == _nset || 0 == rhs._nset) {
     return 0;
   }
 
   assert(nullptr != _count);
-  assert(_nset > 0 && rhs._nset > 0);
 
   const unsigned int *b1;
   const int *c1;

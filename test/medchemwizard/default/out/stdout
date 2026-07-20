@@ -3929,8 +3929,6 @@ C(#CC(=O)OCC1=CC=CC=C1)C CHEMBL4073377 Aryl_group_addition.add_benzyl
 C(#CC(O)=O)CCC1=CC=CC=C1 CHEMBL4073377 Aryl_group_addition.add_benzyl
 C(#CC(=O)OC1=CC=CC=C1)C CHEMBL4073377 Aryl_group_addition.add_phenyl
 C(#CC(O)=O)CC1=CC=CC=C1 CHEMBL4073377 Aryl_group_addition.add_phenyl
-C(C)OC(O)=O CHEMBL4073377 Metabolism.acetylene_T_ether
-O(C)CC(O)=O CHEMBL4073377 Metabolism.acetylene_T_ether
 C(C)CC(O)=O CHEMBL4073377 Metabolism.alkene_T_alkane
 C(C)CC(O)=O CHEMBL4073377 Metabolism.alkene_T_alkane
 C(#CC(O)=O)CO CHEMBL4073377 Metabolism.methyl_T_hydroxymethyl
@@ -3980,8 +3978,8 @@ C(C#CCCN)C1=CC=CC=C1 CHEMBL3982678 Aryl_group_addition.add_phenyl
 CC#CC(CN)C1=CC=CC=C1 CHEMBL3982678 Aryl_group_addition.add_phenyl
 CC#CCC(N)C1=CC=CC=C1 CHEMBL3982678 Aryl_group_addition.add_phenyl
 CC#CCCNC1=CC=CC=C1 CHEMBL3982678 Aryl_group_addition.add_phenyl
-COCCCN CHEMBL3982678 Metabolism.acetylene_T_ether
-CCOCCN CHEMBL3982678 Metabolism.acetylene_T_ether
+COCCN CHEMBL3982678 Metabolism.acetylene_T_ether
+COCCN CHEMBL3982678 Metabolism.acetylene_T_ether
 CCCCCN CHEMBL3982678 Metabolism.alkene_T_alkane
 CCCCCN CHEMBL3982678 Metabolism.alkene_T_alkane
 C(O)C#CCCN CHEMBL3982678 Metabolism.methyl_T_hydroxymethyl
@@ -4067,8 +4065,6 @@ N(CC#CC#N)CC1=CC=CC=C1 CHEMBL3947059 Aryl_group_addition.add_benzyl
 NC(C#CC#N)CC1=CC=CC=C1 CHEMBL3947059 Aryl_group_addition.add_benzyl
 N(CC#CC#N)C1=CC=CC=C1 CHEMBL3947059 Aryl_group_addition.add_phenyl
 NC(C#CC#N)C1=CC=CC=C1 CHEMBL3947059 Aryl_group_addition.add_phenyl
-NCOCC#N CHEMBL3947059 Metabolism.acetylene_T_ether
-NCCOC#N CHEMBL3947059 Metabolism.acetylene_T_ether
 NCCCC#N CHEMBL3947059 Metabolism.alkene_T_alkane
 NCCCC#N CHEMBL3947059 Metabolism.alkene_T_alkane
 NC(C#CC#N)[CH2:1]CC(C)(C)O CHEMBL3947059 Simple_H_Replacement.add_2,2-dimethylethanol
@@ -4119,8 +4115,6 @@ N(CC#CCN)C1=CC=CC=C1 CHEMBL3890199 Aryl_group_addition.add_phenyl
 NC(C#CCN)C1=CC=CC=C1 CHEMBL3890199 Aryl_group_addition.add_phenyl
 NCC#CC(N)C1=CC=CC=C1 CHEMBL3890199 Aryl_group_addition.add_phenyl
 NCC#CCNC1=CC=CC=C1 CHEMBL3890199 Aryl_group_addition.add_phenyl
-NCOCCN CHEMBL3890199 Metabolism.acetylene_T_ether
-NCCOCN CHEMBL3890199 Metabolism.acetylene_T_ether
 NCCCCN CHEMBL3890199 Metabolism.alkene_T_alkane
 NCCCCN CHEMBL3890199 Metabolism.alkene_T_alkane
 NC(C#CCN)[CH2:1]CC(C)(C)O CHEMBL3890199 Simple_H_Replacement.add_2,2-dimethylethanol
@@ -4199,8 +4193,6 @@ O(CC#CCO)C1=CC=CC=C1 CHEMBL3187551 Aryl_group_addition.add_phenyl
 OC(C#CCO)C1=CC=CC=C1 CHEMBL3187551 Aryl_group_addition.add_phenyl
 OCC#CC(O)C1=CC=CC=C1 CHEMBL3187551 Aryl_group_addition.add_phenyl
 OCC#CCOC1=CC=CC=C1 CHEMBL3187551 Aryl_group_addition.add_phenyl
-OCOCCO CHEMBL3187551 Metabolism.acetylene_T_ether
-OCCOCO CHEMBL3187551 Metabolism.acetylene_T_ether
 OCCCCO CHEMBL3187551 Metabolism.alkene_T_alkane
 OCCCCO CHEMBL3187551 Metabolism.alkene_T_alkane
 C(C#CCO)C(F)(F)F CHEMBL3187551 Metabolism.OH_T_OCF3
@@ -4272,8 +4264,6 @@ C(#CC(C)=O)C=CCC1=CC=CC=C1 CHEMBL4081971 Aryl_group_addition.add_benzyl
 C(#CC(=O)CC1=CC=CC=C1)C=C CHEMBL4081971 Aryl_group_addition.add_phenyl
 C(#CC(C)=O)C(=C)C1=CC=CC=C1 CHEMBL4081971 Aryl_group_addition.add_phenyl
 C(#CC(C)=O)C=CC1=CC=CC=C1 CHEMBL4081971 Aryl_group_addition.add_phenyl
-C(OC(C)=O)C=C CHEMBL4081971 Metabolism.acetylene_T_ether
-O(CC(C)=O)C=C CHEMBL4081971 Metabolism.acetylene_T_ether
 C(CC(C)=O)C=C CHEMBL4081971 Metabolism.alkene_T_alkane
 C(CC(C)=O)C=C CHEMBL4081971 Metabolism.alkene_T_alkane
 C(#CC(=O)CO)C=C CHEMBL4081971 Metabolism.methyl_T_hydroxymethyl
@@ -4368,8 +4358,6 @@ CC(O)(C#CCO)C1=CC=CC=C1 CHEMBL3798796 Aryl_group_addition.add_phenyl
 CC(OC1=CC=CC=C1)C#CCO CHEMBL3798796 Aryl_group_addition.add_phenyl
 CC(O)C#CC(O)C1=CC=CC=C1 CHEMBL3798796 Aryl_group_addition.add_phenyl
 CC(O)C#CCOC1=CC=CC=C1 CHEMBL3798796 Aryl_group_addition.add_phenyl
-CC(O)OCCO CHEMBL3798796 Metabolism.acetylene_T_ether
-CC(O)COCO CHEMBL3798796 Metabolism.acetylene_T_ether
 CC(O)CCCO CHEMBL3798796 Metabolism.alkene_T_alkane
 CC(O)CCCO CHEMBL3798796 Metabolism.alkene_T_alkane
 C(O)C(O)C#CCO CHEMBL3798796 Metabolism.methyl_T_hydroxymethyl
@@ -4511,8 +4499,6 @@ O=C(O)C#CCOCC1=CC=CC=C1 CHEMBL1994370 Aryl_group_addition.add_benzyl
 O=C(OC1=CC=CC=C1)C#CCO CHEMBL1994370 Aryl_group_addition.add_phenyl
 O=C(O)C#CC(O)C1=CC=CC=C1 CHEMBL1994370 Aryl_group_addition.add_phenyl
 O=C(O)C#CCOC1=CC=CC=C1 CHEMBL1994370 Aryl_group_addition.add_phenyl
-O=C(O)OCCO CHEMBL1994370 Metabolism.acetylene_T_ether
-O=C(O)COCO CHEMBL1994370 Metabolism.acetylene_T_ether
 O=C(O)CCCO CHEMBL1994370 Metabolism.alkene_T_alkane
 O=C(O)CCCO CHEMBL1994370 Metabolism.alkene_T_alkane
 O=C(C#CCO)C(F)(F)F CHEMBL1994370 Metabolism.OH_T_OCF3
@@ -11660,6 +11646,7 @@ C(COCC)C1=CC=CC=C1 CHEMBL16264 Aryl_group_addition.add_phenyl
 CC(OCC)C1=CC=CC=C1 CHEMBL16264 Aryl_group_addition.add_phenyl
 CCOC(C)C1=CC=CC=C1 CHEMBL16264 Aryl_group_addition.add_phenyl
 CCOCCC1=CC=CC=C1 CHEMBL16264 Aryl_group_addition.add_phenyl
+CC#CCC CHEMBL16264 Metabolism.ether_T_acetylene
 C(O)COCC CHEMBL16264 Metabolism.methyl_T_hydroxymethyl
 CCOCCO CHEMBL16264 Metabolism.methyl_T_hydroxymethyl
 C(F)(F)(F)COCC CHEMBL16264 Metabolism.OEt_T_OCH2CF3
@@ -12504,6 +12491,7 @@ ClC(OCCl)CC1=CC=CC=C1 CHEMBL3185875 Aryl_group_addition.add_benzyl
 ClCOC(Cl)CC1=CC=CC=C1 CHEMBL3185875 Aryl_group_addition.add_benzyl
 ClC(OCCl)C1=CC=CC=C1 CHEMBL3185875 Aryl_group_addition.add_phenyl
 ClCOC(Cl)C1=CC=CC=C1 CHEMBL3185875 Aryl_group_addition.add_phenyl
+ClC#CCCl CHEMBL3185875 Metabolism.ether_T_acetylene
 ClC(OCCl)CC CHEMBL3185875 Metabolism.OMe_T_OPr
 ClCOC(Cl)CC CHEMBL3185875 Metabolism.OMe_T_OPr
 ClC(OCCl)[CH2:1]CC(C)(C)O CHEMBL3185875 Simple_H_Replacement.add_2,2-dimethylethanol

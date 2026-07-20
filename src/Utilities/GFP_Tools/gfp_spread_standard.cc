@@ -1144,7 +1144,7 @@ do_previously_selected(const IW_General_Fingerprint& gfp) {
   sgfp.build_mk(gfp[1]);
   sgfp.build_mk2(gfp[2]);
 
-// #pragma omp parallel for schedule(static)
+#pragma omp parallel for schedule(static)
   for (int i = 0; i < pool_size; i++) {
     float d = sgfp.tanimoto_distance(fingerprints[i]);
 

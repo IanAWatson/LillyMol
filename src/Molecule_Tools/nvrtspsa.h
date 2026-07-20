@@ -7,68 +7,75 @@
 
 class Command_Line;
 
-extern double novartis_polar_surface_area (Molecule & m);
-
-extern double novartis_polar_surface_area (Molecule & m, 
-                             const atomic_number_t * z,
-                             const Atom ** atom,
-                             const int * is_aromatic);
-
 namespace nvrtspsa {
 
-void   set_display_psa_unclassified_atom_messages(int s);
-void   set_return_zero_for_unclassified_atoms (int s);
-
-// The paper is uncertain on how certain S atoms are handled.
-// By default, we have a non zero contribution for [SD2] atoms.
-void set_non_zero_contribution_for_SD2(int s);
-
-// Looks like the RDKit implementation assigns 0.0 to all Sulphur atoms.
-void set_zero_for_all_sulphur_atoms(int s);
-
-void set_zero_for_all_phosphorus_atoms(int s);
-
-// In order to get best concordance with RDKit, which is the reference
-// implementation, we need to reverse standardise molecules.
-// This is expensive, so it is optional.
-// Note that the molecule being passed is not altered, a copy of
-// that input molecule is made, and the copy is altered.
-void set_convert_to_charge_separated(int s);
-
-// A function that can process a command line option specifying...
-int InitialiseOptions(const Command_Line& cl, char flag);
-
 // Class for performing Novartis Polar Surface Area calculations.
-// Note, currently this code just calls the standalone functions above.
-// Calling any of the set_ methods also updates the file scope static
-// settings. Not ideal, the code needs to be restructured.
 class NovartisPolarSurfaceArea {
   private:
-    int _display_psa_unclassified_atom_messages;
-    int _return_zero_for_unclassified_atoms;
-    // default is 1
-    int _non_zero_contribution_for_SD2;
+    int _display_psa_unclassified_atom_messages = 1;
+    int _return_zero_for_unclassified_atoms = 0;
+    // The paper is uncertain on how certain S atoms are handled. By default,
+    // LillyMol keeps the historical non-zero contribution for [SD2] atoms.
+    int _non_zero_contribution_for_SD2 = 1;
+    // RDKit compatibility options.
+    int _zero_for_all_sulphur_atoms = 0;
+    int _zero_for_all_phosphorus_atoms = 0;
+    int _convert_to_charge_separated = 0;
+
+    double PolarSurfaceAreaInner(Molecule& m, const atomic_number_t* z,
+                                 const Atom** atom, const int* is_aromatic) const;
 
   public:
-    NovartisPolarSurfaceArea();
+    NovartisPolarSurfaceArea() = default;
 
     void set_display_psa_unclassified_atom_messages(int s) {
       _display_psa_unclassified_atom_messages = s;
-      nvrtspsa::set_display_psa_unclassified_atom_messages(s);
     }
     void set_return_zero_for_unclassified_atoms(int s) {
       _return_zero_for_unclassified_atoms = s;
-      nvrtspsa::set_return_zero_for_unclassified_atoms(s);
     }
     void set_non_zero_contribution_for_SD2(int s) {
       _non_zero_contribution_for_SD2 = s;
-      nvrtspsa::set_non_zero_contribution_for_SD2(s);
+    }
+    void set_zero_for_all_sulphur_atoms(int s) {
+      _zero_for_all_sulphur_atoms = s;
+    }
+    void set_zero_for_all_phosphorus_atoms(int s) {
+      _zero_for_all_phosphorus_atoms = s;
+    }
+    void set_convert_to_charge_separated(int s) {
+      _convert_to_charge_separated = s;
     }
 
-    // Long term, this should return nullopt if there is an unclassified
-    // atom. But currently there is no clean way to do that, the entire
-    // code base in the corresponding .cc file would need restructuring.
-    std::optional<double> PolarSurfaceArea(Molecule& m);
+    int display_psa_unclassified_atom_messages() const {
+      return _display_psa_unclassified_atom_messages;
+    }
+    int return_zero_for_unclassified_atoms() const {
+      return _return_zero_for_unclassified_atoms;
+    }
+    int non_zero_contribution_for_SD2() const {
+      return _non_zero_contribution_for_SD2;
+    }
+    int zero_for_all_sulphur_atoms() const {
+      return _zero_for_all_sulphur_atoms;
+    }
+    int zero_for_all_phosphorus_atoms() const {
+      return _zero_for_all_phosphorus_atoms;
+    }
+    int convert_to_charge_separated() const {
+      return _convert_to_charge_separated;
+    }
+
+    void SetRDKitCompatibility();
+
+    // A function that can process a command line option specifying TPSA
+    // calculation options.
+    int InitialiseOptions(const Command_Line& cl, char flag);
+
+    std::optional<double> PolarSurfaceArea(Molecule& m) const;
+    std::optional<double> PolarSurfaceArea(Molecule& m, const atomic_number_t* z,
+                                           const Atom** atom,
+                                           const int* is_aromatic) const;
 };
 
 }  // namespace nvrtspsa

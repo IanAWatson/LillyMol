@@ -140,16 +140,22 @@ class Utility {
     double Value(double value) const;
 };
 
+// The calculator objects.
+struct FeatureCalculators {
+  quick_rotbond::QuickRotatableBonds& rotbond;
+  alogp::ALogP& alogp;
+  xlogp::XLogPCalc& xlogp;
+  nvrtspsa::NovartisPolarSurfaceArea& tpsa;
+  qed::Qed& qed;
+};
+
 class FeatureValues {
   private:
     Molecule& _m;
     int _matoms;
     int _nrings;
 
-    quick_rotbond::QuickRotatableBonds& _rotbond;
-    alogp::ALogP& _alogp;
-    xlogp::XLogPCalc& _xlogp;
-    qed::Qed* _qed_calculator;
+    FeatureCalculators& _calculators;
 
     std::unique_ptr<int[]> _tmp;
 
@@ -186,11 +192,7 @@ class FeatureValues {
     std::optional<double> Qed();
 
   public:
-    FeatureValues(Molecule& m, int matoms, int nrings,
-                  quick_rotbond::QuickRotatableBonds& rotbond,
-                  alogp::ALogP& alogp,
-                  xlogp::XLogPCalc& xlogp,
-                  qed::Qed* qed = nullptr);
+    FeatureValues(Molecule& m, int matoms, int nrings, FeatureCalculators& calculators);
 
     std::optional<double> Value(Feature feature);
 };
@@ -202,6 +204,8 @@ class MoleculeFilter {
     alogp::ALogP _alogp;
 
     xlogp::XLogPCalc _xlogp;
+
+    nvrtspsa::NovartisPolarSurfaceArea _tpsa;
 
     qed::Qed _qed;
     bool _qed_initialised;

@@ -84,6 +84,7 @@ static int flush_after_each_molecule = 0;
 
 static alogp::ALogP alogp_engine;
 static xlogp::XLogPCalc xlogp_engine;
+static nvrtspsa::NovartisPolarSurfaceArea tpsa_calculator;
 
 // Normally we read a smiles file and produce a descriptor file.
 // Optionally we can read a descriptor file with a smiles as the first
@@ -551,11 +552,6 @@ static int ignore_molecules_with_no_atoms = 0;
 // Internal Hydrogen bonding extremeties.
 static int shortest_internal_hydrogen_bond_separation = 3;
 static int longest_internal_hydrogen_bond_separation = 6;
-
-// For maximum concordance with RDKit, we need to transform
-// charge neutralised forms back to charge separated.
-static int perform_psa_on_charge_separated_forms = 0;
-static Chemical_Standardisation rvnitro;
 
 // Many of the features are int forms.
 static IWDigits iwdigits;
@@ -8608,8 +8604,8 @@ iwdescriptors(Molecule& m, IWString_and_File_Descriptor& output, const atomic_nu
 
   // It looks as if the Novartis PSA descriptor should be done before charges are assigned
 
-  descriptor[iwdescr_nvrtspsa].set(
-      static_cast<float>(novartis_polar_surface_area(m, z, atom, is_aromatic)));
+  std::optional<double> psa = tpsa_calculator.PolarSurfaceArea(m, z, atom, is_aromatic);
+  descriptor[iwdescr_nvrtspsa].set(static_cast<float>(psa.value_or(0.0)));
 
 #ifdef MCGOWAN
   if (descriptors_to_compute.mcgowan) {
@@ -9330,9 +9326,9 @@ iwdescr(int argc, char** argv) {
   }
 
   if (verbose) {
-    nvrtspsa::set_display_psa_unclassified_atom_messages(1);
+    tpsa_calculator.set_display_psa_unclassified_atom_messages(1);
   } else {
-    nvrtspsa::set_display_psa_unclassified_atom_messages(0);
+    tpsa_calculator.set_display_psa_unclassified_atom_messages(0);
   }
 
   if (verbose == 0) {
@@ -9340,9 +9336,7 @@ iwdescr(int argc, char** argv) {
   }
 
   if (cl.option_present('S')) {
-    nvrtspsa::set_zero_for_all_sulphur_atoms(1);
-    nvrtspsa::set_zero_for_all_phosphorus_atoms(1);
-    nvrtspsa::set_convert_to_charge_separated(1);
+    tpsa_calculator.SetRDKitCompatibility();
     if (verbose) {
       cerr << "TPSA computation done with maximum RDKit compatability\n";
     }
@@ -9376,7 +9370,7 @@ iwdescr(int argc, char** argv) {
           cerr << "Descriptors generated with prefix '" << descriptor_prefix << "'\n";
         }
       } else if (b == "quiet") {
-        nvrtspsa::set_display_psa_unclassified_atom_messages(0);
+        tpsa_calculator.set_display_psa_unclassified_atom_messages(0);
 
         if (verbose) {
           cerr << "Will not report unclassified atoms\n";

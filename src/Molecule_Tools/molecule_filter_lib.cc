@@ -228,17 +228,11 @@ Utility::Value(double value) const {
 }
 
 FeatureValues::FeatureValues(Molecule& m, const int matoms, const int nrings,
-                             quick_rotbond::QuickRotatableBonds& rotbond,
-                             alogp::ALogP& alogp,
-                             xlogp::XLogPCalc& xlogp,
-                             qed::Qed* qed) :
+                             FeatureCalculators& calculators) :
     _m(m),
     _matoms(matoms),
     _nrings(nrings),
-    _rotbond(rotbond),
-    _alogp(alogp),
-    _xlogp(xlogp),
-    _qed_calculator(qed) {
+    _calculators(calculators) {
 }
 
 int
@@ -260,7 +254,7 @@ FeatureValues::AromaticRingCount() {
 int
 FeatureValues::RotatableBonds() {
   if (! _rotatable_bonds) {
-    _rotatable_bonds = _rotbond.Process(_m);
+    _rotatable_bonds = _calculators.rotbond.Process(_m);
   }
   return *_rotatable_bonds;
 }
@@ -279,7 +273,7 @@ FeatureValues::ComputeRingSystem() {
 std::optional<double>
 FeatureValues::ALogP() {
   if (! _alogp_value) {
-    std::optional<double> value = _alogp.LogP(_m);
+    std::optional<double> value = _calculators.alogp.LogP(_m);
     if (! value) {
       return std::nullopt;
     }
@@ -296,7 +290,7 @@ FeatureValues::XLogP() {
       _tmp = std::make_unique<int[]>(_matoms);
     }
     std::fill_n(_tmp.get(), _matoms, 0);
-    std::optional<double> value = _xlogp.LogP(_m, _tmp.get());
+    std::optional<double> value = _calculators.xlogp.LogP(_m, _tmp.get());
     if (! value) {
       return std::nullopt;
     }
@@ -377,12 +371,8 @@ FeatureValues::Qed() {
   if (_qed) {
     return _qed;
   }
-  if (_qed_calculator == nullptr) {
-    return std::nullopt;
-  }
-
   Molecule mcopy(_m);
-  std::optional<float> value = _qed_calculator->qed(mcopy);
+  std::optional<float> value = _calculators.qed.qed(mcopy);
   if (! value) {
     return std::nullopt;
   }
@@ -415,9 +405,9 @@ FeatureValues::Value(Feature feature) {
       return *_aromatic_rings_in_system;
     case Feature::kTpsa:
       if (! _tpsa) {
-        _tpsa = novartis_polar_surface_area(_m);
+        _tpsa = _calculators.tpsa.PolarSurfaceArea(_m);
       }
-      return *_tpsa;
+      return _tpsa;
     case Feature::kAlogp:
       return ALogP();
     case Feature::kXlogp:
@@ -506,7 +496,8 @@ MoleculeFilter::EvaluateUtilities(Molecule& m, const int matoms, const int nring
     return 1;
   }
 
-  FeatureValues feature_values(m, matoms, nrings, _rotbond, _alogp, _xlogp, &_qed);
+  FeatureCalculators calculators{_rotbond, _alogp, _xlogp, _tpsa, _qed};
+  FeatureValues feature_values(m, matoms, nrings, calculators);
   per_feature_utility.reserve(_utilities.size());
 
   double weighted_sum = 0.0;
@@ -621,7 +612,7 @@ MoleculeFilter::BuildUtilities() {
 void
 MoleculeFilter::InitialiseOptionalFeatures() {
   _rotbond.set_calculation_type(quick_rotbond::QuickRotatableBonds::RotBond::kExpensive);
-  nvrtspsa::set_display_psa_unclassified_atom_messages(0);
+  _tpsa.set_display_psa_unclassified_atom_messages(0);
   _xlogp.SetIssueUnclassifiedAtomMessages(false);
 
   _alogp.set_use_alcohol_for_acid(1);
@@ -1108,11 +1099,14 @@ MoleculeFilter::Ok(Molecule& m, const int matoms, const int nrings,
   }
 
   if (_requirements.has_min_tpsa() || _requirements.has_max_tpsa()) {
-    float tpsa = novartis_polar_surface_area(m);
-    if (_requirements.has_min_tpsa() && tpsa < _requirements.min_tpsa()) {
+    std::optional<double> tpsa = _tpsa.PolarSurfaceArea(m);
+    if (! tpsa) {
       return Reject(rejection_reason, RejectionReason::kLowTpsa);
     }
-    if (_requirements.has_max_tpsa() && tpsa > _requirements.max_tpsa()) {
+    if (_requirements.has_min_tpsa() && *tpsa < _requirements.min_tpsa()) {
+      return Reject(rejection_reason, RejectionReason::kLowTpsa);
+    }
+    if (_requirements.has_max_tpsa() && *tpsa > _requirements.max_tpsa()) {
       return Reject(rejection_reason, RejectionReason::kHighTpsa);
     }
   }

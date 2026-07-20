@@ -13,49 +13,6 @@ using std::cerr;
 
 namespace nvrtspsa {
 
-int display_psa_unclassified_atom_messages = 1;
-
-void
-set_display_psa_unclassified_atom_messages(int s) {
-  display_psa_unclassified_atom_messages = s;
-
-  return;
-}
-
-int return_zero_for_unclassified_atoms = 0;
-
-void
-set_return_zero_for_unclassified_atoms(int s) {
-  return_zero_for_unclassified_atoms = s;
-
-  return;
-}
-
-int non_zero_contribution_for_SD2 = 1;
-
-void
-set_non_zero_contribution_for_SD2(int s) {
-  non_zero_contribution_for_SD2 = s;
-}
-
-int zero_for_all_sulphur_atoms = 0;
-
-void
-set_zero_for_all_sulphur_atoms(int s) {
-  zero_for_all_sulphur_atoms = s;
-}
-
-int zero_for_all_phosphorus_atoms = 0;
-
-void set_zero_for_all_phosphorus_atoms(int s) {
-  zero_for_all_phosphorus_atoms = s;
-}
-
-int convert_to_charge_separated = 0;
-void set_convert_to_charge_separated(int s) {
-  convert_to_charge_separated = s;
-}
-
 void
 DisplayOptions(char flag) {
   cerr << " -" << flag << " rvstd        convert to charge separated forms - best compat with RDKit\n";
@@ -63,48 +20,15 @@ DisplayOptions(char flag) {
   cerr << " -" << flag << " zeroS        Sulphur atoms make zero contribution\n";
   cerr << " -" << flag << " zeroU        all unclassified atoms make zero contribution\n";
   cerr << " -" << flag << " RDKit        as close as possible to the RDKit implementation\n";
-
-}
-
-int
-InitialiseOptions(const Command_Line& cl, char flag) {
-  if (! cl.option_present(flag)) {
-    return 1;
-  }
-
-  IWString s;
-  for (int i = 0; cl.value(flag, s, i); ++i) {
-    if (s == "rvstd") {
-      convert_to_charge_separated = 1;
-    } else if (s == "zeroP") {
-      zero_for_all_phosphorus_atoms = 1;
-    } else if (s == "zeroU") {
-      return_zero_for_unclassified_atoms = 1;
-    } else if (s == "zeroS") {
-      zero_for_all_sulphur_atoms = 1;
-    } else if (s == "RDKit") {
-      convert_to_charge_separated = 1;
-      zero_for_all_phosphorus_atoms = 1;
-      zero_for_all_sulphur_atoms = 1;
-    } else if (s == "help") {
-      DisplayOptions(flag);
-      return 1;
-    } else {
-      cerr << "Unrecognised nvrtspsa -" << flag << " qualifier '" << s << "'\n";
-      DisplayOptions(flag);
-      return 0;
-    }
-  }
-
-  return 1;
 }
 
 }  // namespace nvrtspsa
 
 static void
-report_novartis_psa_unclassified_atom(Molecule &m, atom_number_t zatom, const Atom &a,
+report_novartis_psa_unclassified_atom(const nvrtspsa::NovartisPolarSurfaceArea& options,
+                                      Molecule &m, atom_number_t zatom, const Atom &a,
                                       int hcount, int is_aromatic) {
-  if (!nvrtspsa::display_psa_unclassified_atom_messages) {
+  if (!options.display_psa_unclassified_atom_messages()) {
     return;
   }
 
@@ -131,7 +55,8 @@ report_novartis_psa_unclassified_atom(Molecule &m, atom_number_t zatom, const At
 }
 
 static double
-novartis_polar_surface_area_nitrogen(Molecule &m, atom_number_t zatom, Atom &a,
+novartis_polar_surface_area_nitrogen(const nvrtspsa::NovartisPolarSurfaceArea& options,
+                                     Molecule &m, atom_number_t zatom, Atom &a,
                                      int is_aromatic) {
   // cerr << m.smiles() << " nitrogen atom " << m.smarts_equivalent_for_atom(zatom) << " atom " << zatom << '\n';
 
@@ -257,9 +182,9 @@ novartis_polar_surface_area_nitrogen(Molecule &m, atom_number_t zatom, Atom &a,
   }
 
   // cerr << "unclassified nitrogen\n";
-  report_novartis_psa_unclassified_atom(m, zatom, a, hcount, is_aromatic);
+  report_novartis_psa_unclassified_atom(options, m, zatom, a, hcount, is_aromatic);
 
-  if (nvrtspsa::return_zero_for_unclassified_atoms) {
+  if (options.return_zero_for_unclassified_atoms()) {
     return 0.0;
   } else {
     return 30.5 - ncon * 8.2 + hcount * 1.5;
@@ -267,7 +192,8 @@ novartis_polar_surface_area_nitrogen(Molecule &m, atom_number_t zatom, Atom &a,
 }
 
 static double
-novartis_polar_surface_area_oxygen(Molecule &m, atom_number_t zatom, Atom &a,
+novartis_polar_surface_area_oxygen(const nvrtspsa::NovartisPolarSurfaceArea& options,
+                                   Molecule &m, atom_number_t zatom, Atom &a,
                                    int is_aromatic) {
   int ncon = a.ncon();
 
@@ -318,9 +244,9 @@ novartis_polar_surface_area_oxygen(Molecule &m, atom_number_t zatom, Atom &a,
     }
   }
 
-  report_novartis_psa_unclassified_atom(m, zatom, a, hcount, is_aromatic);
+  report_novartis_psa_unclassified_atom(options, m, zatom, a, hcount, is_aromatic);
 
-  if (nvrtspsa::return_zero_for_unclassified_atoms) {
+  if (options.return_zero_for_unclassified_atoms()) {
     return 0.0;
   } else {
     return 10.0;  // just a guess
@@ -328,9 +254,10 @@ novartis_polar_surface_area_oxygen(Molecule &m, atom_number_t zatom, Atom &a,
 }
 
 static double
-novartis_polar_surface_area_sulphur(Molecule &m, atom_number_t zatom, Atom &a,
+novartis_polar_surface_area_sulphur(const nvrtspsa::NovartisPolarSurfaceArea& options,
+                                    Molecule &m, atom_number_t zatom, Atom &a,
                                     int is_aromatic) {
-  if (nvrtspsa::zero_for_all_sulphur_atoms) {
+  if (options.zero_for_all_sulphur_atoms()) {
     return 0.0;
   }
 
@@ -369,7 +296,7 @@ novartis_polar_surface_area_sulphur(Molecule &m, atom_number_t zatom, Atom &a,
 #endif
 
   if (is_aromatic) {
-    if (nvrtspsa::non_zero_contribution_for_SD2) {
+    if (options.non_zero_contribution_for_SD2()) {
       if (0 == fc && 0 == hcount && 2 == ncon && 2 == aromatic_bonds) {  // [s](:*):*
         return 28.24;
       }
@@ -382,7 +309,7 @@ novartis_polar_surface_area_sulphur(Molecule &m, atom_number_t zatom, Atom &a,
   } else {
     if (0 == fc && 0 == hcount && 2 == ncon && 2 == single_bonds)  // [S](-*)-*
     {
-      if (nvrtspsa::non_zero_contribution_for_SD2) {
+      if (options.non_zero_contribution_for_SD2()) {
         return 25.30;
       } else {
         return 0.0;
@@ -404,9 +331,9 @@ novartis_polar_surface_area_sulphur(Molecule &m, atom_number_t zatom, Atom &a,
     }
   }
 
-  report_novartis_psa_unclassified_atom(m, zatom, a, hcount, is_aromatic);
+  report_novartis_psa_unclassified_atom(options, m, zatom, a, hcount, is_aromatic);
 
-  if (nvrtspsa::return_zero_for_unclassified_atoms) {
+  if (options.return_zero_for_unclassified_atoms()) {
     return 0.0;
   } else {
     return 20.0;  // just a guess
@@ -414,9 +341,10 @@ novartis_polar_surface_area_sulphur(Molecule &m, atom_number_t zatom, Atom &a,
 }
 
 static double
-novartis_polar_surface_area_phosphorus(Molecule &m, atom_number_t zatom, Atom &a,
+novartis_polar_surface_area_phosphorus(const nvrtspsa::NovartisPolarSurfaceArea& options,
+                                       Molecule &m, atom_number_t zatom, Atom &a,
                                        int is_aromatic) {
-  if (nvrtspsa::zero_for_all_phosphorus_atoms) {
+  if (options.zero_for_all_phosphorus_atoms()) {
     return 0.0;
   }
 
@@ -461,9 +389,9 @@ novartis_polar_surface_area_phosphorus(Molecule &m, atom_number_t zatom, Atom &a
     return 23.47;
   }
 
-  report_novartis_psa_unclassified_atom(m, zatom, a, hcount, is_aromatic);
+  report_novartis_psa_unclassified_atom(options, m, zatom, a, hcount, is_aromatic);
 
-  if (nvrtspsa::return_zero_for_unclassified_atoms) {
+  if (options.return_zero_for_unclassified_atoms()) {
     return 0.0;
   } else {
     return 10.0;  // just a guess
@@ -478,8 +406,8 @@ novartis_polar_surface_area_phosphorus(Molecule &m, atom_number_t zatom, Atom &a
 */
 
 double
-novartis_polar_surface_area_inner(Molecule &m, const atomic_number_t *z, const Atom **atom,
-                            const int *is_aromatic) {
+nvrtspsa::NovartisPolarSurfaceArea::PolarSurfaceAreaInner(Molecule &m, const atomic_number_t *z,
+                            const Atom **atom, const int *is_aromatic) const {
   double result = 0.0;
 
   const int matoms = m.natoms();
@@ -499,13 +427,13 @@ novartis_polar_surface_area_inner(Molecule &m, const atomic_number_t *z, const A
     double delta;
 
     if (7 == z[i]) {
-      delta = novartis_polar_surface_area_nitrogen(m, i, ai, is_aromatic[i]);
+      delta = novartis_polar_surface_area_nitrogen(*this, m, i, ai, is_aromatic[i]);
     } else if (8 == z[i]) {
-      delta = novartis_polar_surface_area_oxygen(m, i, ai, is_aromatic[i]);
+      delta = novartis_polar_surface_area_oxygen(*this, m, i, ai, is_aromatic[i]);
     } else if (16 == z[i]) {
-      delta = novartis_polar_surface_area_sulphur(m, i, ai, is_aromatic[i]);
+      delta = novartis_polar_surface_area_sulphur(*this, m, i, ai, is_aromatic[i]);
     } else if (15 == z[i]) {
-      delta = novartis_polar_surface_area_phosphorus(m, i, ai, is_aromatic[i]);
+      delta = novartis_polar_surface_area_phosphorus(*this, m, i, ai, is_aromatic[i]);
     } else {
       delta = 0.0;
     }
@@ -528,18 +456,21 @@ novartis_polar_surface_area_inner(Molecule &m, const atomic_number_t *z, const A
 }
 
 
-double
-novartis_polar_surface_area(Molecule &m, const atomic_number_t *z, const Atom **atom,
-                            const int *is_aromatic) {
+
+std::optional<double>
+nvrtspsa::NovartisPolarSurfaceArea::PolarSurfaceArea(Molecule &m, const atomic_number_t *z,
+                            const Atom **atom, const int *is_aromatic) const {
   // This is a public API entry point, so make sure aromaticity is OK.
   // Because of what we are doing in iwdescr to reverse standardisations.
   m.compute_aromaticity_if_needed();
 
   const int matoms = m.natoms();
+  if (matoms == 0) {
+    return std::nullopt;
+  }
 
-  // cerr << "convert_to_charge_separated " << nvrtspsa::convert_to_charge_separated << '\n';
-  if (! nvrtspsa::convert_to_charge_separated) {
-    return novartis_polar_surface_area_inner(m, z, atom, is_aromatic);
+  if (! convert_to_charge_separated()) {
+    return PolarSurfaceAreaInner(m, z, atom, is_aromatic);
   }
 
   Molecule mcopy(m);
@@ -557,20 +488,17 @@ novartis_polar_surface_area(Molecule &m, const atomic_number_t *z, const Atom **
   const Atom **my_atom = new const Atom *[matoms];
   std::unique_ptr<const Atom *[]> free_atom(my_atom);
   mcopy.atoms(my_atom);
-  // cerr << mcopy.smiles() << " transformed to charge separated\n";
-  return novartis_polar_surface_area_inner(mcopy, z, my_atom, is_aromatic);
+  return PolarSurfaceAreaInner(mcopy, z, my_atom, is_aromatic);
 }
 
-double
-novartis_polar_surface_area(Molecule &m) {
+std::optional<double>
+nvrtspsa::NovartisPolarSurfaceArea::PolarSurfaceArea(Molecule &m) const {
   const int matoms = m.natoms();
 
   if (0 == matoms) {
     cerr << "Cannot compute polar surface area of molecule w/ no atoms\n";
-    return 0.0;
+    return std::nullopt;
   }
-
-  // cerr << m.smiles() << " beginnig novartis_polar_surface_area\n";
 
   int aromsave = global_aromaticity_type();
 
@@ -593,7 +521,7 @@ novartis_polar_surface_area(Molecule &m) {
   std::unique_ptr<const Atom *[]> free_atom(atom);
   m.atoms(atom);
 
-  double rc = novartis_polar_surface_area(m, z, atom, is_aromatic);
+  std::optional<double> rc = PolarSurfaceArea(m, z, atom, is_aromatic);
 
   set_global_aromaticity_type(aromsave);
 
@@ -602,19 +530,45 @@ novartis_polar_surface_area(Molecule &m) {
 
 namespace nvrtspsa {
 
-NovartisPolarSurfaceArea::NovartisPolarSurfaceArea() {
-  _display_psa_unclassified_atom_messages = 1;
-  _return_zero_for_unclassified_atoms = 0;
-  _non_zero_contribution_for_SD2 = 1;
+void
+NovartisPolarSurfaceArea::SetRDKitCompatibility() {
+  _convert_to_charge_separated = 1;
+  _zero_for_all_phosphorus_atoms = 1;
+  _zero_for_all_sulphur_atoms = 1;
 }
 
-std::optional<double>
-NovartisPolarSurfaceArea::PolarSurfaceArea(Molecule& m) {
-  if (m.empty()) {
-    return std::nullopt;
+int
+NovartisPolarSurfaceArea::InitialiseOptions(const Command_Line& cl, char flag) {
+  const int nw = cl.option_count(flag);
+  for (int i = 0; i < nw; ++i) {
+    const_IWSubstring w = cl.string_value(flag, i);
+    if (w == "help") {
+      DisplayOptions(flag);
+      return 1;
+    }
+
+    if (w == "quiet") {
+      set_display_psa_unclassified_atom_messages(0);
+    } else if (w == "verbose") {
+      set_display_psa_unclassified_atom_messages(1);
+    } else if (w == "zeroU") {
+      set_return_zero_for_unclassified_atoms(1);
+    } else if (w == "zeroS") {
+      set_zero_for_all_sulphur_atoms(1);
+    } else if (w == "zeroP") {
+      set_zero_for_all_phosphorus_atoms(1);
+    } else if (w == "rvstd") {
+      set_convert_to_charge_separated(1);
+    } else if (w == "RDKit") {
+      SetRDKitCompatibility();
+    } else {
+      cerr << "NovartisPolarSurfaceArea::InitialiseOptions:unrecognised option '" << w << "'\n";
+      DisplayOptions(flag);
+      return 0;
+    }
   }
 
-  return novartis_polar_surface_area(m);
+  return 1;
 }
 
 }  // namespace nvrtspsa

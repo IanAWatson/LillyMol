@@ -531,23 +531,15 @@ PYBIND11_MODULE(lillymol_tools, m) {
       .def("set_non_zero_contribution_for_SD2",
            &nvrtspsa::NovartisPolarSurfaceArea::set_non_zero_contribution_for_SD2,
            py::arg("value"), "Control the SD2 sulphur contribution")
-      .def(
-          "set_zero_for_all_sulphur_atoms",
-          [](nvrtspsa::NovartisPolarSurfaceArea&, int value) {
-            nvrtspsa::set_zero_for_all_sulphur_atoms(value);
-          },
-          py::arg("value"), "Set all sulphur atom TPSA contributions to zero")
-      .def(
-          "set_zero_for_all_phosphorus_atoms",
-          [](nvrtspsa::NovartisPolarSurfaceArea&, int value) {
-            nvrtspsa::set_zero_for_all_phosphorus_atoms(value);
-          },
-          py::arg("value"), "Set all phosphorus atom TPSA contributions to zero")
+      .def("set_zero_for_all_sulphur_atoms",
+           &nvrtspsa::NovartisPolarSurfaceArea::set_zero_for_all_sulphur_atoms,
+           py::arg("value"), "Set all sulphur atom TPSA contributions to zero")
+      .def("set_zero_for_all_phosphorus_atoms",
+           &nvrtspsa::NovartisPolarSurfaceArea::set_zero_for_all_phosphorus_atoms,
+           py::arg("value"), "Set all phosphorus atom TPSA contributions to zero")
       .def(
           "set_convert_to_charge_separated",
-          [](nvrtspsa::NovartisPolarSurfaceArea&, int value) {
-            nvrtspsa::set_convert_to_charge_separated(value);
-          },
+          &nvrtspsa::NovartisPolarSurfaceArea::set_convert_to_charge_separated,
           py::arg("value"), "Convert to charge-separated forms before computing TPSA");
 
   m.def(

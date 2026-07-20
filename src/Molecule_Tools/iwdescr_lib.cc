@@ -905,6 +905,7 @@ class IWDescr::IWDescrImpl {
   Donor_Acceptor_Assigner donor_acceptor_assigner;
   alogp::ALogP alogp_engine;
   xlogp::XLogPCalc xlogp_engine;
+  nvrtspsa::NovartisPolarSurfaceArea tpsa_calculator;
 
   DescriptorsToCompute descriptors_to_compute;
 
@@ -931,9 +932,6 @@ class IWDescr::IWDescrImpl {
 
   int shortest_internal_hydrogen_bond_separation = 3;
   int longest_internal_hydrogen_bond_separation = 6;
-
-  int perform_psa_on_charge_separated_forms = 0;
-  Chemical_Standardisation rvnitro;
 
   // Descriptor calculation diagnostics/statistics that are coupled to the
   // descriptor engine rather than output formatting. These can later be exposed
@@ -1153,9 +1151,7 @@ IWDescr::IWDescrImpl::Initialise(Command_Line& cl) {
   }
 
   if (cl.option_present('S')) {
-    nvrtspsa::set_zero_for_all_sulphur_atoms(1);
-    nvrtspsa::set_zero_for_all_phosphorus_atoms(1);
-    nvrtspsa::set_convert_to_charge_separated(1);
+    tpsa_calculator.SetRDKitCompatibility();
     if (cl.option_present('v')) {
       cerr << "TPSA computation done with maximum RDKit compatability\n";
     }
@@ -1164,9 +1160,9 @@ IWDescr::IWDescrImpl::Initialise(Command_Line& cl) {
   // Note that these options may be set based on verbose, but may get 
   // reversed by the -B option.
   if (verbose) {
-    nvrtspsa::set_display_psa_unclassified_atom_messages(1);
+    tpsa_calculator.set_display_psa_unclassified_atom_messages(1);
   } else {
-    nvrtspsa::set_display_psa_unclassified_atom_messages(0);
+    tpsa_calculator.set_display_psa_unclassified_atom_messages(0);
   }
 
   if (verbose == 0) {
@@ -1177,7 +1173,7 @@ IWDescr::IWDescrImpl::Initialise(Command_Line& cl) {
     const_IWSubstring b;
     for (int i = 0; cl.value('B', b, i); ++i) {
       if (b == "quiet") {
-        nvrtspsa::set_display_psa_unclassified_atom_messages(0);
+        tpsa_calculator.set_display_psa_unclassified_atom_messages(0);
         alogp_engine.set_display_error_messages(0);
         xlogp_engine.SetIssueUnclassifiedAtomMessages(false);
         if (verbose) {
@@ -1233,7 +1229,7 @@ IWDescr::IWDescrImpl::InitialiseAll() {
     return 0;
   }
 
-  nvrtspsa::set_display_psa_unclassified_atom_messages(0);
+  tpsa_calculator.set_display_psa_unclassified_atom_messages(0);
   alogp_engine.set_display_error_messages(0);
   xlogp_engine.SetIssueUnclassifiedAtomMessages(false);
 
@@ -1279,7 +1275,7 @@ IWDescr::IWDescrImpl::InitialiseCalculationOptions(Command_Line& cl) {
   //   * alogp_engine and xlogp setup
   //   * min/max hbond separation
   //   * ring fusion/spiro settings
-  //   * PSA charge-separated form handling and rvnitro setup
+  //   * TPSA calculator compatibility setup
   //   * molecular weight control
   //   * ignore_molecules_with_no_atoms, if it controls calculation handling
   // Mixed options should be split: calculation pieces here, output/filter/test
@@ -5574,9 +5570,9 @@ IWDescr::IWDescrImpl::ComputeNovartisPsaDescriptor(Molecule& m, PerMoleculeData&
     return 1;
   }
 
-  descriptor[iwdescr_nvrtspsa].set(static_cast<float>(
-      novartis_polar_surface_area(m, data.atomic_numbers(), data.atoms(),
-                                  data.aromaticity())));
+  std::optional<double> psa = tpsa_calculator.PolarSurfaceArea(
+      m, data.atomic_numbers(), data.atoms(), data.aromaticity());
+  descriptor[iwdescr_nvrtspsa].set(static_cast<float>(psa.value_or(0.0)));
 
   return 1;
 }

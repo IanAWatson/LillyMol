@@ -1,6 +1,8 @@
 // Tests for nvrtspsa
 
 
+#include <optional>
+
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
@@ -22,11 +24,14 @@ class NvrtsPSATest : public testing::TestWithParam<Data> {
 TEST_P(NvrtsPSATest, Tests) {
   const auto& params = GetParam();
   ASSERT_TRUE(_m.build_from_smiles(params.smiles));
-  nvrtspsa::set_convert_to_charge_separated(1);
-  nvrtspsa::set_zero_for_all_phosphorus_atoms(1);
-  nvrtspsa::set_zero_for_all_sulphur_atoms(1);
+  nvrtspsa::NovartisPolarSurfaceArea tpsa;
+  tpsa.set_convert_to_charge_separated(1);
+  tpsa.set_zero_for_all_phosphorus_atoms(1);
+  tpsa.set_zero_for_all_sulphur_atoms(1);
 
-  EXPECT_NEAR(novartis_polar_surface_area(_m), params.expected, 0.001) << _m.smiles();
+  std::optional<double> result = tpsa.PolarSurfaceArea(_m);
+  ASSERT_TRUE(result) << _m.smiles();
+  EXPECT_NEAR(*result, params.expected, 0.001) << _m.smiles();
 }
 INSTANTIATE_TEST_SUITE_P(NvrtsPSATest, NvrtsPSATest, testing::Values(
   // This value is quite different from RdKit due to aromaticity.

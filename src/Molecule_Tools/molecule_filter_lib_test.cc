@@ -5,6 +5,7 @@
 namespace {
 
 using molecule_filter_lib::Feature;
+using molecule_filter_lib::FeatureCalculators;
 using molecule_filter_lib::FeatureFromName;
 using molecule_filter_lib::FeatureValues;
 using molecule_filter_lib::FeatureName;
@@ -211,8 +212,11 @@ TEST(FeatureValuesTest, ComputesSimpleMolecularFeatures) {
   rotbond.set_calculation_type(quick_rotbond::QuickRotatableBonds::RotBond::kExpensive);
   alogp::ALogP alogp;
   xlogp::XLogPCalc xlogp;
+  nvrtspsa::NovartisPolarSurfaceArea tpsa;
+  qed::Qed qed;
+  FeatureCalculators calculators{rotbond, alogp, xlogp, tpsa, qed};
 
-  FeatureValues values(m, m.natoms(), m.nrings(), rotbond, alogp, xlogp);
+  FeatureValues values(m, m.natoms(), m.nrings(), calculators);
 
   ASSERT_TRUE(values.Value(Feature::kNatoms));
   EXPECT_DOUBLE_EQ(*values.Value(Feature::kNatoms), 3.0);
@@ -242,14 +246,17 @@ TEST(FeatureValuesTest, Sp3CarbonFractionUsesCarbonAtomDenominator) {
   rotbond.set_calculation_type(quick_rotbond::QuickRotatableBonds::RotBond::kExpensive);
   alogp::ALogP alogp;
   xlogp::XLogPCalc xlogp;
+  nvrtspsa::NovartisPolarSurfaceArea tpsa;
+  qed::Qed qed;
+  FeatureCalculators calculators{rotbond, alogp, xlogp, tpsa, qed};
 
-  FeatureValues ethene_values(ethene, ethene.natoms(), ethene.nrings(), rotbond, alogp, xlogp);
+  FeatureValues ethene_values(ethene, ethene.natoms(), ethene.nrings(), calculators);
   ASSERT_TRUE(ethene_values.Value(Feature::kSp3CarbonFraction));
   EXPECT_DOUBLE_EQ(*ethene_values.Value(Feature::kSp3CarbonFraction), 0.0);
 
   Molecule nitrogen;
   ASSERT_TRUE(nitrogen.build_from_smiles("N"));
-  FeatureValues nitrogen_values(nitrogen, nitrogen.natoms(), nitrogen.nrings(), rotbond, alogp, xlogp);
+  FeatureValues nitrogen_values(nitrogen, nitrogen.natoms(), nitrogen.nrings(), calculators);
   ASSERT_TRUE(nitrogen_values.Value(Feature::kSp3CarbonFraction));
   EXPECT_DOUBLE_EQ(*nitrogen_values.Value(Feature::kSp3CarbonFraction), 0.0);
 }
@@ -262,8 +269,11 @@ TEST(FeatureValuesTest, ComputesRingFeatures) {
   rotbond.set_calculation_type(quick_rotbond::QuickRotatableBonds::RotBond::kExpensive);
   alogp::ALogP alogp;
   xlogp::XLogPCalc xlogp;
+  nvrtspsa::NovartisPolarSurfaceArea tpsa;
+  qed::Qed qed;
+  FeatureCalculators calculators{rotbond, alogp, xlogp, tpsa, qed};
 
-  FeatureValues values(m, m.natoms(), m.nrings(), rotbond, alogp, xlogp);
+  FeatureValues values(m, m.natoms(), m.nrings(), calculators);
 
   ASSERT_TRUE(values.Value(Feature::kNrings));
   EXPECT_DOUBLE_EQ(*values.Value(Feature::kNrings), 2.0);
@@ -289,8 +299,11 @@ TEST(FeatureValuesTest, ComputesGroupedRuleOfFiveFeatures) {
   rotbond.set_calculation_type(quick_rotbond::QuickRotatableBonds::RotBond::kExpensive);
   alogp::ALogP alogp;
   xlogp::XLogPCalc xlogp;
+  nvrtspsa::NovartisPolarSurfaceArea tpsa;
+  qed::Qed qed;
+  FeatureCalculators calculators{rotbond, alogp, xlogp, tpsa, qed};
 
-  FeatureValues values(m, m.natoms(), m.nrings(), rotbond, alogp, xlogp);
+  FeatureValues values(m, m.natoms(), m.nrings(), calculators);
 
   ASSERT_TRUE(values.Value(Feature::kHba));
   EXPECT_DOUBLE_EQ(*values.Value(Feature::kHba), 2.0);
@@ -309,8 +322,11 @@ TEST(FeatureValuesTest, ComputesOptionalContinuousFeatures) {
   alogp.set_apply_zwitterion_correction(1);
   xlogp::XLogPCalc xlogp;
   xlogp.SetIssueUnclassifiedAtomMessages(false);
+  nvrtspsa::NovartisPolarSurfaceArea tpsa;
+  qed::Qed qed;
+  FeatureCalculators calculators{rotbond, alogp, xlogp, tpsa, qed};
 
-  FeatureValues values(m, m.natoms(), m.nrings(), rotbond, alogp, xlogp);
+  FeatureValues values(m, m.natoms(), m.nrings(), calculators);
 
   EXPECT_TRUE(values.Value(Feature::kRotatableBonds));
   EXPECT_TRUE(values.Value(Feature::kTpsa));

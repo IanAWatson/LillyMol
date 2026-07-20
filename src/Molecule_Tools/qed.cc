@@ -76,8 +76,8 @@ Qed::Qed() {
   _rotbond.set_calculation_type(quick_rotbond::QuickRotatableBonds::RotBond::kExpensive);
 
   // For compatibility with RDKit.
-  nvrtspsa::set_zero_for_all_sulphur_atoms(1);
-  nvrtspsa::set_display_psa_unclassified_atom_messages(0);
+  _nvrtspsa.set_zero_for_all_sulphur_atoms(1);
+  _nvrtspsa.set_display_psa_unclassified_atom_messages(0);
 }
 
 int

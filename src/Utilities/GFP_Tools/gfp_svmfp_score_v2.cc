@@ -48,6 +48,40 @@ namespace gfp_svmfp_evaluate {
 using std::cerr;
 namespace fs = std::filesystem;
 
+class Options {
+  private:
+    int _verbose = 0;
+
+    int _write_all_name_tokens = 0;
+
+  // private functions.
+
+  public:
+    Options();
+
+    int Initialise(Command_Line_v2& cl);
+
+    int write_all_name_tokens() const {
+      return _write_all_name_tokens;
+    }
+};
+
+Options::Options() {
+}
+
+int
+Options::Initialise(Command_Line_v2& cl) {
+  _verbose = cl.option_present('v');
+  if (cl.option_present("writeall")) {
+    _write_all_name_tokens = 1;
+    if (_verbose) {
+      cerr << "Will write all tokens in the name\n";
+    }
+  }
+
+  return 1;
+}
+
 int verbose = 0;
 
 // This tag is hard coded, should be command line settable.
@@ -609,11 +643,16 @@ CopyXref(const google::protobuf::Map<long unsigned int, long unsigned int>& from
 }
          
 int
-GfpSvmfpEvaluate(IW_General_Fingerprint& fp,
+GfpSvmfpEvaluate(const Options& options,
+                 IW_General_Fingerprint& fp,
                  SvmModel* models,
                  int nmodels,
                  IWString_and_File_Descriptor& output) { 
-  append_first_token_of_name(fp.id(), output);
+  if (options.write_all_name_tokens()) {
+    output << fp.id();
+  } else {
+    append_first_token_of_name(fp.id(), output);
+  }
 
   for (int i = 0; i < nmodels; ++i) {
     const auto score = models[i].Score(fp);
@@ -636,7 +675,8 @@ GfpSvmfpEvaluate(IW_General_Fingerprint& fp,
 }
 
 int
-GfpSvmfpEvaluate(IW_TDT& tdt,
+GfpSvmfpEvaluate(const Options& options,
+                 IW_TDT& tdt,
                  SvmModel* models,
                  int nmodels,
                  IWString_and_File_Descriptor& output) { 
@@ -647,17 +687,17 @@ GfpSvmfpEvaluate(IW_TDT& tdt,
     return 0;
   }
 
-  return GfpSvmfpEvaluate(fp, models, nmodels, output);
+  return GfpSvmfpEvaluate(options, fp, models, nmodels, output);
 }
 
 int
-GfpSvmfpEvaluate(iwstring_data_source& input,
+GfpSvmfpEvaluate(const Options& options, iwstring_data_source& input,
                  SvmModel* models,
                  int nmodels,
                  IWString_and_File_Descriptor& output) { 
   IW_TDT tdt;
   while (tdt.next(input)) {
-    if (! GfpSvmfpEvaluate(tdt, models, nmodels, output)) {
+    if (! GfpSvmfpEvaluate(options, tdt, models, nmodels, output)) {
       cerr << "Error processing " << tdt << '\n';
       return 0;
     }
@@ -667,7 +707,7 @@ GfpSvmfpEvaluate(iwstring_data_source& input,
 }
 
 int
-GfpSvmfpEvaluate(const char * fname,
+GfpSvmfpEvaluate(const Options& options, const char * fname,
                  SvmModel* models,
                  int nmodels,
                  IWString_and_File_Descriptor& output) {
@@ -677,12 +717,12 @@ GfpSvmfpEvaluate(const char * fname,
     return 0;
   }
 
-  return GfpSvmfpEvaluate(input, models, nmodels, output);
+  return GfpSvmfpEvaluate(options, input, models, nmodels, output);
 }
 
 int
 GfpSvmfpEvaluate(int argc, char** argv) {
-  Command_Line_v2 cl(argc, argv, "-v-M=sfile-cwrite=s-sas=ipos-o=s");
+  Command_Line_v2 cl(argc, argv, "-v-M=sfile-cwrite=s-sas=ipos-o=s-writeall");
   if (cl.unrecognised_options_encountered()) {
     cerr << "unrecognised_options_encountered\n";
     Usage(1);
@@ -756,6 +796,12 @@ GfpSvmfpEvaluate(int argc, char** argv) {
     output_separator = o[0];
   }
 
+  Options options;
+  if (! options.Initialise(cl)) {
+    cerr << "Cannot initialise local options\n";
+    return 1;
+  }
+
   if (cl.empty()) {
     cerr << "Insufficient arguments\n";
     Usage(1);
@@ -775,7 +821,7 @@ GfpSvmfpEvaluate(int argc, char** argv) {
   }
   output << '\n';
   for (const char * fname : cl) {
-    if (! GfpSvmfpEvaluate(fname, models.get(), nmodels, output)) {
+    if (! GfpSvmfpEvaluate(options, fname, models.get(), nmodels, output)) {
       cerr << "GfpSvmfpEvaluate:cannot process '" << fname << "'\n";
       return 1;
     }

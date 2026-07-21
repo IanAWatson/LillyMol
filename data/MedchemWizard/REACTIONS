@@ -237,6 +237,7 @@ Simple_H_Replacement.amine_to_urea.rxn
 Simple_H_Replacement.nitrogen_to_oxygen.rxn
 Switches.reverse_amide.rxn
 Switches.reverse_sulfonamide.rxn
+Switches.reverse_ester.rxn
 Virtual_Ring.break_open_a_5-ring_to_form_pseudoring.rxn
 PROTO:Virtual_Ring.break_open_a_6-ring_to_form_pseudoring.textproto
 Virtual_Ring.break_open_a_cycloheptyl_1.rxn
@@ -269,3 +270,6 @@ PROTO:phenol_to_benzofuran.rxn
 PROTO:aniline_to_indole_b.rxn
 PROTO:thiophenol_to_benzothiophene.rxn
 PROTO:aniline_to_indole_a.rxn
+PROTO:Switches.reverse_ester.rxn
+PROTO:ketone_to_amide.rxn
+PROTO:ketone_to_ether.rxn

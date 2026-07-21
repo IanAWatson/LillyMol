@@ -4,7 +4,7 @@
     (A C smarts "[CH>0]")
   )
   (1 Sidechain
-    (A C smiles "[C:1]F SHR.add_F")
+    (A C smiles "CF SHR.add_F")
     (A C smarts "C")
     (A I join (0 0))
   )

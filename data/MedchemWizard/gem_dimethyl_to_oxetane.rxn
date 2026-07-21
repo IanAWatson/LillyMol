@@ -1,4 +1,4 @@
-name: "gem-dimethyl to oxteane"
+name: "gem-dimethyl_to_oxteane"
 scaffold {
   id: 0
   smarts: "[CD4](-[CH3])-[CH3]"

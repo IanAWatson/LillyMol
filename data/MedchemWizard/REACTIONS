@@ -263,3 +263,10 @@ PROTO:alcohol_to_CF2.rxn
 PROTO:CF2_to_alcohol.rxn
 PROTO:oxetane_to_gem_dimethyl.rxn
 PROTO:gem_dimethyl_to_oxetane.rxn
+PROTO:anisole_to_benzofuran_b.rxn
+PROTO:anisole_to_benzofuran_a.rxn
+PROTO:anisole_to_benzofuran.rxn
+PROTO:phenol_to_benzofuran.rxn
+PROTO:aniline_to_indole_b.rxn
+PROTO:thiophenol_to_benzothiophene.rxn
+PROTO:aniline_to_indole_a.rxn

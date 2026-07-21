@@ -500,6 +500,7 @@ ScaffoldFinder::ScaffoldFinder() {
 int
 ScaffoldFinder::AddBackFirstNonRingAtom(Molecule& m, int* in_system, int flag) {
   const int matoms = m.natoms();
+  cerr << m.smiles() << ' ' << m.name() << " AddBackFirstNonRingAtom\n";
 
   Set_of_Atoms added_here;
 
@@ -707,6 +708,12 @@ ScaffoldFinder::Initialise(Command_Line& cl, char flag) {
 int 
 ScaffoldFinder::Initialise(const scaffolds::ScaffoldsOptions& proto) {
   _config = proto;
+
+  // Recognise both forms of keep_first_nonring_atom
+  if (_config.keep_first_non_ring_atom()) {
+    _config.set_keep_first_nonring_atom(true);
+  }
+
   // cerr << _config.ShortDebugString() << '\n';
 
   return 1;

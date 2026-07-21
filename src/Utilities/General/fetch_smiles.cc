@@ -41,8 +41,20 @@ int missing_identifier = 0;
 
 void
 Usage(int rc) {
-  cerr << " -c <col>       identifier column in identifier file\n";
-  cerr << " -C <col>       identifier column in smiles file\n";
+  cerr << R"(Fetches records from one file based on the identifiers in another.
+The key to this tool is that the records fetched from the donor file will be in the same order that
+they appear in the identifier file. It works by reading the whole file, determining where each identifier
+is, and then reading the file of identifiers to be written one at a time. It then writes the requested
+identifier line.
+This is fundamentally different from fetch_smiles_quick which ingests the identifiers, and then as
+records are read, a record is written if it has been requested. That is fundamentally more efficient
+and should be used unless there is a specific reason to preserve the ordering.
+ -c <col>       identifier column in identifier file.
+ -C <col>       identifier column in smiles file.
+ -x             ignore missing identifiers.
+ -v             verbose output.
+)";
+
   exit(rc);
 }
 
@@ -167,7 +179,7 @@ ReadData(const char * fname,
 
 int
 FetchSmiles(int argc, char** argv) {
-  Command_Line cl(argc, argv, "vc:C:");
+  Command_Line cl(argc, argv, "vc:C:x");
   if (cl.unrecognised_options_encountered()) {
     cerr << "unrecognised_options_encountered\n";
     Usage(1);
@@ -200,7 +212,14 @@ FetchSmiles(int argc, char** argv) {
     params.data_file_column--;
   }
 
-  if (cl.number_elements() < 2) {
+  if (cl.option_present('x')) {
+    params.ignore_missing_identifiers = 1;
+    if (verbose) {
+      cerr << "Missing identifiers will be ignored\n";
+    }
+  }
+
+  if (cl.size() < 2) {
     cerr << "Must specify at least 2 files\n";
     Usage(1);
   }

@@ -245,8 +245,8 @@ Virtual_Ring.break_open_a_cycloheptyl_2.rxn
 Virtual_Ring.break_open_a_cycloheptyl_3.rxn
 Virtual_Ring.break_open_a_cycloheptyl_4.rxn
 Virtual_Ring.break_open_a_cycloheptyl.rxn
-Virtual_Ring.break_open_a_cyclohexyl_1.rxn
-Virtual_Ring.break_open_a_cyclohexyl_2.rxn
+PROTO:Virtual_Ring.break_open_a_cyclohexyl_1.rxn
+PROTO:Virtual_Ring.break_open_a_cyclohexyl_2.rxn
 Virtual_Ring.break_open_a_cyclohexyl_3.rxn
 Virtual_Ring.break_open_a_cyclopentyl_1.rxn
 Virtual_Ring.break_open_a_cyclopentyl_2.rxn
@@ -254,11 +254,11 @@ Virtual_Ring.create_a_new_ring_with_CH2-CH2-O.rxn
 Virtual_Ring.create_a_new_ring_with_CH2-CH2.rxn
 Virtual_Ring.create_a_new_ring_with_CH2-N-CH2.rxn
 Virtual_Ring.create_a_new_ring_with_CH2-O-CH2.rxn
-Virtual_Ring.create_a_new_ring_with_CH2-O.rxn
+PROTO:Virtual_Ring.create_a_new_ring_with_CH2-O.rxn
 Virtual_Ring.create_a_new_ring_with_CH2-S-CH2.rxn
 Virtual_Ring.create_a_new_ring_with_CH2-S.rxn
-Virtual_Ring.create_a_new_ring_with_-O-CH2-CH2.rxn
-Virtual_Ring.create_a_new_ring_with_O-CH2.rxn
+PROTO:Virtual_Ring.create_a_new_ring_with_-O-CH2-CH2.rxn
+PROTO:Virtual_Ring.create_a_new_ring_with_O-CH2.rxn
 Virtual_Ring.create_a_new_ring_with_S-CH2.rxn
 PROTO:alcohol_to_CF2.rxn
 PROTO:CF2_to_alcohol.rxn
@@ -270,6 +270,5 @@ PROTO:phenol_to_benzofuran.rxn
 PROTO:aniline_to_indole_b.rxn
 PROTO:thiophenol_to_benzothiophene.rxn
 PROTO:aniline_to_indole_a.rxn
-PROTO:Switches.reverse_ester.rxn
 PROTO:ketone_to_amide.rxn
 PROTO:ketone_to_ether.rxn

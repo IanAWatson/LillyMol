@@ -1,7 +1,7 @@
 (0 Reaction
   (A C Comment "Simple_H_Replacement.add_N,N-dimethylpropanolamine")
   (0 Scaffold
-    (A C smarts "[CH>0]")
+    (A C smarts "[CH>0D<3]")
   )
   (1 Sidechain
     (A C smiles "COCCCN(C)C SHR.add_N,N-dimethylpropanolamine")

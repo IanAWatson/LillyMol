@@ -2005,6 +2005,7 @@ cc_binary(
         "//Foundational/cmdline_v2",
         "//Foundational/iwaray",
         "//Foundational/iwmisc",
+        "//Utilities/General:proto_collator",
         "@com_google_absl//absl/container:flat_hash_map",
         "@com_google_protobuf//:protobuf",
     ],

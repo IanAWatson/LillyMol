@@ -244,6 +244,23 @@ cc_library(
     ],
 )
 
+
+cc_library(
+    name = "proto_collator",
+    hdrs = [
+        "proto_collator.h",
+    ],
+    visibility = [
+        "//visibility:public",
+    ],
+    deps = [
+        "//Foundational/data_source:iwstring_data_source",
+        "//Foundational/iwstring",
+        "@com_google_protobuf//:protobuf",
+        "@com_google_absl//absl/container:flat_hash_map",
+    ],
+)
+
 cc_library(
     name = "ttitem",
     srcs = [
@@ -1017,6 +1034,19 @@ cc_binary(
         "//Foundational/data_source:iwstring_data_source",
         "//Foundational/iwmisc",
         "//Foundational/iwstring",
+    ],
+)
+
+
+cc_test(
+    name = "proto_collator_test",
+    srcs = [
+        "proto_collator_test.cc",
+    ],
+    deps = [
+        ":proto_collator",
+        "@googletest//:gtest",
+        "@googletest//:gtest_main",
     ],
 )
 

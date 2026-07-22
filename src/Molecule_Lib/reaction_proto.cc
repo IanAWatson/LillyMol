@@ -1860,10 +1860,12 @@ IWReaction::BuildProto(ReactionProto::Reaction& proto) const {
   if (! _append_to_name.empty()) {
     proto.set_append_to_name(_append_to_name.data(), _append_to_name.size());
   }
-  if (_query_files_in_current_directory) {
-    proto.set_query_files_in_current_directory(true);
+  if (! _query_files_in_current_directory) {
+    proto.set_query_files_in_current_directory(false);
   }
-  if (! _reaction_directory.empty()) {
+  if (_reaction_directory.empty()) {
+  } else if (_reaction_directory == "./") {
+  } else {
     proto.set_reaction_directory(_reaction_directory.data(), _reaction_directory.size());
   }
   if (_find_kekule_forms_for_bad_valence) {

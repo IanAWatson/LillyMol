@@ -42,8 +42,13 @@ bazel build //pybind:all
 
 cd ${LILLYMOL_HOME}/python
 ./scripts/stage_wheel_files.sh
+
 python -m pip install build wheel setuptools
 python -m build --wheel
+ OR
+uv install build wheel setuptools
+uv build --wheel
+
 ```
 
 The generated `python/prebuilt`, `python/build`, and `python/dist` directories

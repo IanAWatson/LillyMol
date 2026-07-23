@@ -357,6 +357,23 @@ cc_proto_library(
 )
 
 proto_library(
+    name = "transformation_profile_proto",
+    srcs = [
+        "transformation_profile.proto",
+    ],
+)
+
+cc_proto_library(
+    name = "transformation_profile_cc_proto",
+    visibility = [
+        "//visibility:public",
+    ],
+    deps = [
+        ":transformation_profile_proto",
+    ],
+)
+
+proto_library(
     name = "safe_generate_proto",
     srcs = [
         "safe_generate.proto",

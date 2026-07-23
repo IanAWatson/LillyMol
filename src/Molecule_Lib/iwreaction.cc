@@ -3476,10 +3476,38 @@ IWReaction::write_msi(std::ostream & os)
   return os.good();
 }
 
+// Peek at `input` and if it looks like this is a textproto reaction, return true
+static bool
+LooksLikeTextproto(iwstring_data_source& input) {
+  const off_t start_pos = input.tellg();
+
+  const_IWSubstring buffer;
+  if (! input.next_record(buffer)) {  // empty file?
+    return false;
+  }
+
+  input.seekg(start_pos);
+
+  if (buffer.starts_with("name:")) {
+    return true;
+  }
+
+  if (buffer.starts_with("(0 Reaction")) {
+    return false;
+  }
+
+  return false;
+}
+
 int
 IWReaction::do_read (iwstring_data_source & input,
                      const Sidechain_Match_Conditions & sidechain_match_conditions)
 {
+  if (LooksLikeTextproto(input)) {
+    // Note that `input` remains open.
+    return Read(input.fname());
+  }
+
   msi_object msi;
 
   input.set_ignore_pattern("^#");    // these are comments

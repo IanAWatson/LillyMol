@@ -30,8 +30,8 @@ class ColorRule:
     regex: Optional[re.Pattern] = None
 
 
-def mol_to_svg(smiles: str, width=250, height=180) -> str:
-    mol = Chem.MolFromSmiles(smiles)
+def mol_to_svg(smiles: str, sanitize=False, width=250, height=180) -> str:
+    mol = Chem.MolFromSmiles(smiles, sanitize=sanitize)
     if mol is None:
         return f"<span class='bad'>{html.escape(smiles)} bad</span>"
 
@@ -373,6 +373,7 @@ def write_export_controls(out, export_filename: Optional[str]):
 
 def write_html(rows, display_headers, headers, output, smiles_columns=None, link_specs=None, color_column=None, color_rules=None,
                page_length=50, image_columns=None, image_width=160,
+               sanitize=False,
                write_smiles_filename: Optional[str] = None):
     link_specs = link_specs or []
     color_rules = color_rules or []
@@ -483,7 +484,7 @@ th:first-child {
             for input_column in range(len(display_headers)):
                 value = fields[input_column] if input_column < len(fields) else ""
                 if input_column in smiles_set:
-                    out.write(f"<td class='mol'>{mol_to_svg(value)}</td>\n")
+                    out.write(f"<td class='mol'>{mol_to_svg(value, sanitize)}</td>\n")
                 else:
                     out.write(f"<td>{cell_value(value, extra_column, link_specs, image_columns, image_width)}</td>\n")
                     extra_column += 1
@@ -654,6 +655,8 @@ def main():
     parser.add_argument("--image_width", type=int, default=160,
                         help="Maximum width in pixels for --image_column thumbnails")
 
+    parser.add_argument("--sanitize", action=argparse.BooleanOptionalAction, default=False,
+                        help="Sanitize molecules upon read.")
     args = parser.parse_args()
 
     if args.n is not None and args.n < 1:
@@ -698,6 +701,7 @@ def main():
         page_length=args.page_length,
         image_columns=image_columns,
         image_width=args.image_width,
+        sanitize=args.sanitize,
         write_smiles_filename=args.write_smiles,
     )
 

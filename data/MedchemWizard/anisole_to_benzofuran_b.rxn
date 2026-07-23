@@ -1,4 +1,4 @@
-name: "anisole_to_benzofuran"
+name: "anisole_to_benzofuran_b"
 scaffold {
   smarts: "[/IWfss1cD3](!@[OD2]-[CD1])(:[$([cD2]:[cD2])]):[$([cD2]:[cD2])]"
   smarts: "[/IWfss1cD3](!@[OD2]-[CD1])(:[cD2]):[cD2]"

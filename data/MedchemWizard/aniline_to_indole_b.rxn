@@ -1,4 +1,4 @@
-name: "aniline_to_indole"
+name: "aniline_to_indole_b"
 scaffold {
   id: 0
   smarts: "[/IWfss1cD3](!@[ND1H2])(:[$([cD2]:[cD2])]):[$([cD2]:[cD2])]"

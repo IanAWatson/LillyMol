@@ -1,4 +1,4 @@
-name: "oxetane_to_gem-dimethyl"
+name: "oxetane_to_gem_dimethyl"
 scaffold {
   smarts: "[OD2r4]1@[C;x2X4]@[C;x2X4]@[C;x2X4]1"
   remove_atom: 0

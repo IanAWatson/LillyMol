@@ -3,6 +3,7 @@
 require 'csv'
 require 'English'
 require 'fileutils'
+require 'json'
 require 'open3'
 require 'optparse'
 require 'shellwords'
@@ -135,7 +136,7 @@ def read_space_activity(fname)
   activity
 end
 
-def read_activity(fname, ids)
+def read_activity(fname, ids = nil)
   activity = if File.extname(fname).casecmp?('.csv')
                read_csv_activity(fname)
              else
@@ -144,11 +145,61 @@ def read_activity(fname, ids)
 
   die "#{fname}: no activity values read" if activity.empty?
 
-  ids.each_key do |id|
-    die "#{fname}: missing activity for smiles id '#{id}'" unless activity.key?(id)
+  if ids
+    ids.each_key do |id|
+      die "#{fname}: missing activity for smiles id '#{id}'" unless activity.key?(id)
+    end
   end
 
   activity
+end
+
+
+def extract_reaction_name(fname)
+  contents = File.read(fname)
+
+  if (match = contents.match(/^\s*name:\s*"([^"]+)"/))
+    return match[1]
+  end
+
+  if (match = contents.match(/\(A\s+C\s+Comment\s+"([^"]+)"\)/))
+    return match[1]
+  end
+
+  nil
+end
+
+def default_reactions_file
+  return nil unless ENV['LILLYMOL_HOME']
+
+  fname = File.join(ENV.fetch('LILLYMOL_HOME'), 'data', 'MedchemWizard', 'REACTIONS')
+  File.file?(fname) ? fname : nil
+end
+
+def read_reaction_file_map(fname)
+  mapping = {}
+  root = File.dirname(fname)
+
+  each_non_blank_line(fname) do |line, line_number|
+    next if line.start_with?('#')
+
+    reaction_file = line.start_with?('PROTO:') ? line.sub(/\APROTO:/, '') : line
+    path = File.join(root, reaction_file)
+    die "#{fname}:#{line_number}: missing reaction file '#{reaction_file}'" unless File.file?(path)
+
+    name = extract_reaction_name(path)
+    die "#{fname}:#{line_number}: cannot determine reaction name in '#{reaction_file}'" unless name
+
+    if mapping.key?(name)
+      die "#{fname}:#{line_number}: duplicate transformation name '#{name}' in '#{reaction_file}' and '#{mapping[name]}'"
+    end
+
+    # Store the original REACTIONS token. For textproto reactions this preserves
+    # the PROTO: prefix needed when writing a medchem_wizard reaction list.
+    mapping[name] = line
+  end
+
+  mapping
 end
 
 def accumulate_found(fname, activity, observed)
@@ -164,15 +215,21 @@ def accumulate_found(fname, activity, observed)
   end
 end
 
-# Optional predicted-value input. This deliberately mirrors the not-found stream
-# with one extra value appended by whatever model/prediction wrapper is used:
-#   smiles starting_id transformation predicted_activity
+# Optional predicted-value input. The first non-blank line is a header.
+# Subsequent records contain:
+#   starting_id transformation predicted_activity
 def accumulate_predictions(fname, activity, predicted)
+  skip_header = true
   each_non_blank_line(fname) do |line, line_number|
-    tokens = line.split
-    die "#{fname}:#{line_number}: expected 4 tokens, got #{tokens.size}" unless tokens.size == 4
+    if skip_header
+      skip_header = false
+      next
+    end
 
-    _smiles, starting_id, transformation, value = tokens
+    tokens = line.split
+    die "#{fname}:#{line_number}: expected 3 tokens, got #{tokens.size}" unless tokens.size == 3
+
+    starting_id, transformation, value = tokens
     die "#{fname}:#{line_number}: unknown starting id '#{starting_id}'" unless activity.key?(starting_id)
 
     predicted[transformation].add(Float(value) - activity[starting_id])
@@ -238,9 +295,58 @@ def write_table(output, observed, predicted)
   end
 end
 
-def usage(parser)
+
+def summary_json(stats)
+  result = { 'n' => stats.n }
+  result['min'] = stats.min unless stats.min.nil?
+  result['max'] = stats.max unless stats.max.nil?
+  result['mean'] = stats.mean unless stats.mean.nil?
+  result['median'] = stats.median unless stats.median.nil?
+  result
+end
+
+def activity_effect(property, source, stats)
+  {
+    'property' => property,
+    'source' => source,
+    'delta' => summary_json(stats)
+  }
+end
+
+def transformation_profiles(observed, predicted, reaction_files)
+  transformations = (observed.keys + predicted.keys).uniq.sort
+  transformations.map do |transformation|
+    reaction_file = reaction_files[transformation]
+    die "No reaction file for transformation '#{transformation}'" unless reaction_file
+
+    {
+      'transformation' => transformation,
+      'reactionFile' => reaction_file,
+      'effect' => [
+        activity_effect('activity', 'OBSERVED_ACTIVITY', observed[transformation].stats),
+        activity_effect('activity', 'PREDICTED_ACTIVITY', predicted[transformation].stats)
+      ]
+    }
+  end
+end
+
+def write_profile_json(output, observed, predicted, reaction_files)
+  output.puts JSON.pretty_generate({ 'profile' => transformation_profiles(observed, predicted, reaction_files) })
+end
+
+def usage(parser, mode = nil)
+  command = mode ? " #{mode}" : ' [run|generate|analyse]'
   warn <<~USAGE
     Accumulate activity changes by medchem_wizard transformation.
+
+    Usage: #{File.basename($PROGRAM_NAME)}#{command} [options] input.smi
+
+    Modes:
+      run       Generate transformed molecules, optionally score not-found molecules, and analyse.
+      generate  Generate transformed molecules and split them into found/notfound files.
+      analyse   Analyse existing found and prediction files.
+
+    If no mode is specified, run mode is used for backward compatibility.
 
     #{parser}
 
@@ -256,27 +362,35 @@ def usage(parser)
   exit 1
 end
 
-options = {
-  buildsmidb: 'buildsmidb_bdb',
-  in_database: 'in_database_bdb',
-  medchem_wizard: 'medchem_wizard.sh',
-  output: '-',
-  verbose: false,
-  keep: false
-}
+def default_options
+  {
+    buildsmidb: 'buildsmidb_bdb',
+    in_database: 'in_database_bdb',
+    medchem_wizard: 'medchem_wizard.sh',
+    output: '-',
+    profile_json: nil,
+    reactions: nil,
+    verbose: false,
+    keep: false
+  }
+end
 
-parser = OptionParser.new do |opts|
-  opts.banner = "Usage: #{File.basename($PROGRAM_NAME)} -A activity -d dbname [options] input.smi"
-
+def add_common_options(opts, options)
   opts.on('-A', '--activity FILE', 'Activity file') { |value| options[:activity] = value }
   opts.on('-d', '--database NAME', 'BerkeleyDB database name') { |value| options[:database] = value }
   opts.on('-o', '--output FILE', 'Output table, default stdout') { |value| options[:output] = value }
+  opts.on('--profile-json FILE', 'Write TransformationProfileCollection JSON') do |value|
+    options[:profile_json] = value
+  end
+  opts.on('--reactions FILE', 'REACTIONS file used to map transformation names to reaction files') do |value|
+    options[:reactions] = value
+  end
   opts.on('--found FILE', 'Found structures file') { |value| options[:found] = value }
   opts.on('--notfound FILE', 'Not-found structures file') { |value| options[:notfound] = value }
-  opts.on('--predictions FILE', 'Existing predictions: smiles starting_id transformation predicted_activity') do |value|
+  opts.on('--predictions FILE', 'Existing predictions: id transformation predicted_activity') do |value|
     options[:predictions] = value
   end
-  opts.on('--model-command COMMAND', 'Command that converts notfound.smi to predictions') do |value|
+  opts.on('--model-command COMMAND', 'Command that converts notfound.smi to id/transform predictions') do |value|
     options[:model_command] = value
   end
   opts.on('--buildsmidb EXE', 'buildsmidb executable, default buildsmidb_bdb') do |value|
@@ -292,29 +406,29 @@ parser = OptionParser.new do |opts|
   opts.on('-v', '--verbose', 'Verbose execution') { options[:verbose] = true }
 end
 
-begin
-  parser.parse!
-rescue OptionParser::ParseError => e
-  die e.message
+def parse_command_line(argv)
+  mode = if %w[run generate analyse].include?(argv.first)
+           argv.shift
+         else
+           'run'
+         end
+
+  options = default_options
+  parser = OptionParser.new do |opts|
+    opts.banner = "Usage: #{File.basename($PROGRAM_NAME)} #{mode} [options] input.smi"
+    add_common_options(opts, options)
+  end
+
+  begin
+    parser.parse!(argv)
+  rescue OptionParser::ParseError => e
+    die e.message
+  end
+
+  [mode, options, parser, argv]
 end
 
-usage(parser) unless ARGV.size == 1
-usage(parser) unless options[:activity] && options[:database]
-die 'Specify only one of --predictions and --model-command' if options[:predictions] && options[:model_command]
-
-smiles = ARGV.fetch(0)
-ids = read_smiles_ids(smiles)
-activity = read_activity(options.fetch(:activity), ids)
-
-tmpdir = nil
-unless options[:found] && options[:notfound] && (options[:predictions] || !options[:model_command])
-  tmpdir = Dir.mktmpdir('medchem_transform_activity')
-  options[:found] ||= File.join(tmpdir, 'found.smi')
-  options[:notfound] ||= File.join(tmpdir, 'notfound.smi')
-  options[:predictions] ||= File.join(tmpdir, 'predictions.txt') if options[:model_command]
-end
-
-begin
+def generate_transformed_molecules(smiles, options)
   run_command(
     [options.fetch(:buildsmidb), '-d', options.fetch(:database), '-g', 'all', '-l', '-c', smiles],
     verbose: options.fetch(:verbose)
@@ -326,16 +440,15 @@ begin
     '-F', options.fetch(:found), '-U', options.fetch(:notfound), '-i', 'smi', '-'
   ]
   run_pipeline([medchem, lookup], verbose: options.fetch(:verbose))
+end
+
+def analyse_transformations(options, activity_ids = nil)
+  activity = read_activity(options.fetch(:activity), activity_ids)
 
   observed = Hash.new { |hash, key| hash[key] = Values.new }
   predicted = Hash.new { |hash, key| hash[key] = Values.new }
 
   accumulate_found(options.fetch(:found), activity, observed)
-  if options[:model_command]
-    model = command_from_template(options.fetch(:model_command), options.fetch(:notfound),
-                                  options.fetch(:predictions))
-    run_command(model, verbose: options.fetch(:verbose))
-  end
   accumulate_predictions(options.fetch(:predictions), activity, predicted) if options[:predictions]
 
   if options.fetch(:output) == '-'
@@ -343,6 +456,74 @@ begin
   else
     File.open(options.fetch(:output), 'w') { |file| write_table(file, observed, predicted) }
   end
-ensure
-  FileUtils.remove_entry(tmpdir) if tmpdir && !options.fetch(:keep)
+
+  return unless options[:profile_json]
+
+  reactions = options[:reactions] || default_reactions_file
+  die 'Must specify --reactions or set LILLYMOL_HOME for --profile-json' unless reactions
+
+  reaction_files = read_reaction_file_map(reactions)
+  File.open(options.fetch(:profile_json), 'w') do |file|
+    write_profile_json(file, observed, predicted, reaction_files)
+  end
+end
+
+def run_mode(options, argv, parser)
+  usage(parser, 'run') unless argv.size == 1
+  usage(parser, 'run') unless options[:activity] && options[:database]
+  die 'Specify only one of --predictions and --model-command' if options[:predictions] && options[:model_command]
+
+  smiles = argv.fetch(0)
+  ids = read_smiles_ids(smiles)
+
+  tmpdir = nil
+  unless options[:found] && options[:notfound] && (options[:predictions] || !options[:model_command])
+    tmpdir = Dir.mktmpdir('medchem_transform_activity')
+    options[:found] ||= File.join(tmpdir, 'found.smi')
+    options[:notfound] ||= File.join(tmpdir, 'notfound.smi')
+    options[:predictions] ||= File.join(tmpdir, 'predictions.txt') if options[:model_command]
+  end
+
+  begin
+    generate_transformed_molecules(smiles, options)
+
+    if options[:model_command]
+      model = command_from_template(options.fetch(:model_command), options.fetch(:notfound),
+                                    options.fetch(:predictions))
+      run_command(model, verbose: options.fetch(:verbose))
+    end
+
+    analyse_transformations(options, ids)
+  ensure
+    FileUtils.remove_entry(tmpdir) if tmpdir && !options.fetch(:keep)
+  end
+end
+
+def generate_mode(options, argv, parser)
+  usage(parser, 'generate') unless argv.size == 1
+  usage(parser, 'generate') unless options[:database]
+
+  options[:found] ||= 'found.smi'
+  options[:notfound] ||= 'notfound.smi'
+
+  generate_transformed_molecules(argv.fetch(0), options)
+end
+
+def analyse_mode(options, argv, parser)
+  usage(parser, 'analyse') unless argv.empty?
+  usage(parser, 'analyse') unless options[:activity] && options[:found]
+  analyse_transformations(options)
+end
+
+mode, options, parser, remaining_args = parse_command_line(ARGV)
+
+case mode
+when 'run'
+  run_mode(options, remaining_args, parser)
+when 'generate'
+  generate_mode(options, remaining_args, parser)
+when 'analyse'
+  analyse_mode(options, remaining_args, parser)
+else
+  die "Unrecognised mode '#{mode}'"
 end

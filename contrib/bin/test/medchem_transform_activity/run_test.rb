@@ -1,44 +1,107 @@
 #!/usr/bin/env ruby
 
 require 'fileutils'
+require 'json'
 require 'tmpdir'
 
 root = File.expand_path('../../../..', __dir__)
 script = File.join(root, 'contrib/bin/medchem_transform_activity.rb')
 fixture = __dir__
 
+def run_or_die(cmd)
+  return if system(*cmd)
+
+  warn "Command failed: #{cmd.join(' ')}"
+  exit 1
+end
+
+def compare_text(fname, expected_fname, label)
+  expected = File.read(expected_fname)
+  got = File.read(fname)
+  return if got == expected
+
+  warn "#{label} mismatch"
+  warn 'Expected:'
+  warn expected
+  warn 'Got:'
+  warn got
+  exit 1
+end
+
+def compare_json(fname, expected_fname, label)
+  expected = JSON.parse(File.read(expected_fname))
+  got = JSON.parse(File.read(fname))
+  return if got == expected
+
+  warn "#{label} mismatch"
+  warn 'Expected:'
+  warn JSON.pretty_generate(expected)
+  warn 'Got:'
+  warn JSON.pretty_generate(got)
+  exit 1
+end
+
 Dir.mktmpdir('medchem_transform_activity_test') do |tmpdir|
   output = File.join(tmpdir, 'output.txt')
+  profile_json = File.join(tmpdir, 'profile.json')
   dbname = File.join(tmpdir, 'structures.bdb')
 
-  cmd = [
+  run_or_die([
     RbConfig.ruby,
     script,
     '-A', File.join(fixture, 'activity.txt'),
     '-d', dbname,
     '-o', output,
+    '--profile-json', profile_json,
+    '--reactions', File.join(fixture, 'REACTIONS'),
     '--buildsmidb', File.join(fixture, 'fake_buildsmidb.rb'),
     '--medchem-wizard', File.join(fixture, 'fake_medchem_wizard.rb'),
     '--in-database', File.join(fixture, 'fake_in_database.rb'),
     '--model-command', File.join(fixture, 'fake_model.rb'),
     File.join(fixture, 'input.smi')
-  ]
+  ])
 
-  unless system(*cmd)
-    warn "Command failed: #{cmd.join(' ')}"
-    exit 1
-  end
+  compare_text(output, File.join(fixture, 'expected.txt'), 'Unified output')
+  compare_json(profile_json, File.join(fixture, 'expected_profile.json'), 'Unified profile JSON')
+end
 
-  expected = File.read(File.join(fixture, 'expected.txt'))
-  got = File.read(output)
-  if got != expected
-    warn 'Output mismatch'
-    warn 'Expected:'
-    warn expected
-    warn 'Got:'
-    warn got
-    exit 1
-  end
+Dir.mktmpdir('medchem_transform_activity_split_test') do |tmpdir|
+  found = File.join(tmpdir, 'found.smi')
+  notfound = File.join(tmpdir, 'notfound.smi')
+  predictions = File.join(tmpdir, 'predictions.txt')
+  output = File.join(tmpdir, 'output.txt')
+  profile_json = File.join(tmpdir, 'profile.json')
+  dbname = File.join(tmpdir, 'structures.bdb')
+
+  run_or_die([
+    RbConfig.ruby,
+    script,
+    'generate',
+    '-d', dbname,
+    '--found', found,
+    '--notfound', notfound,
+    '--buildsmidb', File.join(fixture, 'fake_buildsmidb.rb'),
+    '--medchem-wizard', File.join(fixture, 'fake_medchem_wizard.rb'),
+    '--in-database', File.join(fixture, 'fake_in_database.rb'),
+    File.join(fixture, 'input.smi')
+  ])
+
+  run_or_die([RbConfig.ruby, File.join(fixture, 'fake_model.rb'), notfound, predictions])
+
+  run_or_die([
+    RbConfig.ruby,
+    script,
+    'analyse',
+    '-A', File.join(fixture, 'activity.txt'),
+    '--found', found,
+    '--predictions', predictions,
+    '-o', output,
+    '--profile-json', profile_json,
+    '--reactions', File.join(fixture, 'REACTIONS')
+  ])
+
+  compare_text(output, File.join(fixture, 'expected.txt'), 'Split output')
+  compare_json(profile_json, File.join(fixture, 'expected_profile.json'), 'Split profile JSON')
 end
 
 puts 'medchem_transform_activity test passed'

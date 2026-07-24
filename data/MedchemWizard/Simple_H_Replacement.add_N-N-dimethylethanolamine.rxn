@@ -1,5 +1,5 @@
 (0 Reaction
-  (A C Comment "Simple_H_Replacement.add_N,N-dimethylethanolamine")
+  (A C Comment "Simple_H_Replacement.add_N-N-dimethylethanolamine")
   (0 Scaffold
     (A C smarts "[CH>0]")
   )

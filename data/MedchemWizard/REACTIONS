@@ -223,8 +223,8 @@ Simple_H_Replacement.add_hydroxy.rxn
 Simple_H_Replacement.add_methyl.rxn
 Simple_H_Replacement.add_morpholinyl.rxn
 Simple_H_Replacement.add_N-Me_piperazine.rxn
-Simple_H_Replacement.add_N,N-dimethylethanolamine.rxn
-Simple_H_Replacement.add_N,N-dimethylpropanolamine.rxn
+Simple_H_Replacement.add_N-N-dimethylethanolamine.rxn
+Simple_H_Replacement.add_N-N-dimethylpropanolamine.rxn
 Simple_H_Replacement.add_O-CH2-CH2-pyrrolidine.rxn
 Simple_H_Replacement.add_sulfonamide.rxn
 Simple_H_Replacement.add_sulfone.rxn

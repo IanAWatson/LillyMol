@@ -29,8 +29,7 @@ class TestLillyMol(absltest.TestCase):
     reagents.append(MolFromSmiles("O-C(=O)c1ccc(Cl)cc1 scaffold"))
     reagents.append(MolFromSmiles("Nc1ccc(S)cc1 R1"))
     reagents.append(MolFromSmiles("C R2"))
-    rxn_textproto = """
-scaffold {
+    rxn_textproto = """scaffold {
   id: 0
   smarts: "[OD1]-C=O.[Cl:3]"
   remove_atom: 0

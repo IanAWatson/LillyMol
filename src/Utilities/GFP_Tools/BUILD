@@ -1213,7 +1213,11 @@ cc_binary(
         "//Foundational/iwmisc:iw_tabular_data",
         "//Foundational/iwstring:absl_hash",
         "@com_google_absl//absl/container:flat_hash_map",
-    ],
+    ] +
+      select( {
+      "darwin": [ "@homebrew_openmp"],
+      "//conditions:default": []
+    }),
 )
 
 cc_binary(

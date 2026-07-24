@@ -3505,7 +3505,8 @@ IWReaction::do_read (iwstring_data_source & input,
 {
   if (LooksLikeTextproto(input)) {
     // Note that `input` remains open.
-    return Read(input.fname());
+    IWString tmp(input.fname());
+    return Read(tmp);
   }
 
   msi_object msi;

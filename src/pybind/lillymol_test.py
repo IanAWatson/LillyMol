@@ -604,12 +604,12 @@ class TestLillyMol(absltest.TestCase):
     self.assertFalse(m.is_ring_atom(0))
     self.assertTrue(m.is_ring_atom(1))
 
-    self.assertFalse(m.in_ring_of_given_size(0, 3))
-    self.assertTrue(m.in_ring_of_given_size(1, 3))
-    self.assertFalse(m.in_ring_of_given_size(1, 4))
-    self.assertTrue(m.in_ring_of_given_size(2, 3))
-    self.assertTrue(m.in_ring_of_given_size(3, 3))
-    self.assertTrue(m.in_ring_of_given_size(5, 3))
+    self.assertFalse(m.in_ring_of_size(0, 3))
+    self.assertTrue(m.in_ring_of_size(1, 3))
+    self.assertFalse(m.in_ring_of_size(1, 4))
+    self.assertTrue(m.in_ring_of_size(2, 3))
+    self.assertTrue(m.in_ring_of_size(3, 3))
+    self.assertTrue(m.in_ring_of_size(5, 3))
 
     self.assertTrue(m.in_same_ring(1, 2))
     self.assertTrue(m.in_same_ring(1, 5))
@@ -787,10 +787,17 @@ class TestLillyMol(absltest.TestCase):
   def test_scaffold(self):
     m = Molecule()
     self.assertTrue(m.build_from_smiles("C"))
+    s = m.scaffold()
+    self.assertEqual(s.smiles(), "C")
+    self.assertEqual(m.smiles(), "C")
     m.to_scaffold()
     self.assertEqual(m.smiles(), "C")
 
     self.assertTrue(m.build_from_smiles("O1N=C(C(=O)N2CCCC2)C=C1COC1=CC=C2N=CC=CC2=C1 CHEMBL1589003"))
+    original = m.smiles()
+    s = m.scaffold()
+    self.assertEqual(s.smiles(), "O1N=C(C(=O)N2CCCC2)C=C1COC1=CC=C2N=CC=CC2=C1")
+    self.assertEqual(m.smiles(), original)
     m.to_scaffold()
     self.assertEqual(m.smiles(), "O1N=C(C(=O)N2CCCC2)C=C1COC1=CC=C2N=CC=CC2=C1")
 

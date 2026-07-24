@@ -169,6 +169,13 @@ ToScaffold(Molecule& m) {
   return m.remove_atoms(spinach.get(), 1);
 }
 
+static Molecule
+Scaffold(const Molecule& m) {
+  Molecule result(m);
+  ToScaffold(result);
+  return result;
+}
+
 static std::vector<Set_of_Atoms>
 AtomsByRadius(const Molecule& m, const Set_of_Atoms& starting_atoms,
               int max_radius) {
@@ -366,7 +373,7 @@ PYBIND11_MODULE(lillymol, m)
                   },
                   "True if atom in ring"
                 )
-                .def("in_ring_of_given_size", &Molecule::in_ring_of_given_size, "True if atom in ring of give size")
+                .def("in_ring_of_size", &Molecule::in_ring_of_given_size, "True if atom in ring of give size")
                 .def("IsAtomInRingOfSize",
                   [](Molecule& m, atom_number_t zatom, int rsize)->bool{
                     return m.in_ring_of_given_size(zatom, rsize);
@@ -694,7 +701,13 @@ PYBIND11_MODULE(lillymol, m)
                   [](Molecule& m) {
                     return ToScaffold(m);
                   },
-                  "Convert to scaffold"
+                  "Convert to scaffold in place"
+                )
+                .def("scaffold",
+                  [](const Molecule& m) {
+                    return Scaffold(m);
+                  },
+                  "Return a new Molecule containing the scaffold"
                 )
                 .def("change_to_graph_form",
                   [](Molecule& m) {

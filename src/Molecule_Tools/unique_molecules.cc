@@ -524,7 +524,7 @@ Molecules may be transformed by various options - the first options below.
  -S <name>      specify output file name stem - the unique molecules.
  -D <name>      write duplicate structures to <name>.
  -T             discard molecular changes after comparison - writes initial molecule.
- -U <fname>     write molecules and counts to <fname>, add '-U csv' for csv.
+ -U <fname>     write molecules and counts to <fname>. for csv '-U csv' for dicer fragments '-U textproto'.
  -U csv         write the -U file a csv form.
  -U textproto   write the -U file as dicer_data::DicerFragment textproto
  -U smiles      if writing textprotos, write smiles + textproto
@@ -945,7 +945,7 @@ unique_molecule(int argc, char** argv) {
       if (u == "textproto") {
         write_dicer_textproto = 1;
         if (verbose) {
-          cerr << "Will write dicer_data::DicerFragment textprotos to the -Y file\n";
+          cerr << "Will write dicer_data::DicerFragment textprotos to the -U file\n";
         }
       } else if (u == "smiles") {
         write_dicer_textproto = 1;

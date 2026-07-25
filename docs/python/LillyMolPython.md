@@ -290,6 +290,7 @@ The most common methods for a Molecule currently implemented are
 | empty() | True if there are no atoms in the molecule |
 | GetNumAtoms() | Number of atoms (explicit atoms only) |
 | resize(n) | keep only the first n atoms |
+| add_atom(z) | add an atom with atomic number z. Returns the atom number |
 | nedges() | Number of bonds |
 | bonds() | Iterable collection of Bonds |
 | nrings() | Number of SSSR rings |
@@ -366,7 +367,8 @@ The most common methods for a Molecule currently implemented are
 | reduce_to_largest_fragment_carefully() | Contains heuristics to do a better selection |
 | get_fragment_membership() | Return a list of fragment memberships |
 | create_components() | Return a list of Molecules from a multi fragment molecule |
-| to_scaffold() | Remove all non-scaffold atoms |
+| to_scaffold() | Remove all non-scaffold atoms in place |
+| scaffold() | Return a new molecule containing the scaffold |
 | canonical_rank(atom) | Canonical rank for 'atom' |
 | canonical_ranks() | Canonical rank of each atom |
 | symmetry_class(atom) | Symmetry class for 'atom' |

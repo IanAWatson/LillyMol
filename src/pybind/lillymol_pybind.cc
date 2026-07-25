@@ -353,13 +353,14 @@ PYBIND11_MODULE(lillymol, m)
                 .def("resize", &Molecule::resize, "Change number of atoms - dangerous")
                 .def("nedges", static_cast<int (Molecule::*)()const>(&Molecule::nedges), "Number edges in molecule")
                 .def("add_atom",
-                  [](Molecule& m, int atnum)->bool {
+                  [](Molecule& m, int atnum)->atom_number_t {
                     const Element* e = get_element_from_atomic_number(atnum);
                     if (e == nullptr) {
                       std::cerr << "Invalid atomic number " << atnum << '\n';
                       return false;
                     }
-                    return m.add(e);
+                    m.add(e);
+                    return m.natoms() - 1;
                   },
                   "Add an atom with atomic number"
                 )

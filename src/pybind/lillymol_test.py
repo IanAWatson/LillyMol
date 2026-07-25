@@ -76,6 +76,12 @@ class TestLillyMol(absltest.TestCase):
     self.assertEqual(m1.smiles(), "C.C")
     self.assertEqual(m2.smiles(), "C")
 
+  def test_add_atom(self):
+    m = MolFromSmiles("C methane")
+    c = m.add_atom(6)
+    m.add_bond(0, c, SINGLE_BOND)
+    self.assertEqual(m.number_fragments(), 1)
+
   def test_copy_constructor_with_name(self):
     m = Molecule()
     set_copy_name_in_molecule_copy_constructor(True)

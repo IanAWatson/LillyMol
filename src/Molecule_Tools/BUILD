@@ -3367,6 +3367,36 @@ cc_library(
     ],
 )
 
+cc_binary(
+    name = "chemotypes",
+    srcs = [
+        "chemotypes_main.cc",
+    ],
+    deps = [
+        ":chemotypes_lib",
+        ":dicer_fragments_cc_proto",
+        "//Foundational/cmdline:iwcmdline",
+        "//Foundational/iwstring:absl_hash",
+        "//Molecule_Lib:iwmolecule",
+        "//Molecule_Lib:moleculeio",
+        "@com_google_absl//absl/container:flat_hash_map",
+        "@com_google_protobuf//:protobuf",
+    ],
+)
+
+cc_library(
+    name = "chemotypes_lib",
+    srcs = [
+        "chemotypes.cc",
+    ],
+    hdrs = [
+        "chemotypes.h",
+    ],
+    deps = [
+        "//Molecule_Lib:iwmolecule",
+    ],
+)
+
 cc_library(
     name = "linear_path_fingerprint",
     srcs = [
@@ -3986,6 +4016,21 @@ cc_test(
     ],
     deps = [
         ":ring_system_shape",
+        "//Molecule_Lib:iwmolecule",
+        "//Molecule_Lib:moleculeio",
+        "@googletest//:gtest",
+        "@googletest//:gtest_main",
+    ],
+)
+
+cc_test(
+    name = "chemotypes_test",
+    timeout = "short",
+    srcs = [
+        "chemotypes_test.cc",
+    ],
+    deps = [
+        ":chemotypes_lib",
         "//Molecule_Lib:iwmolecule",
         "//Molecule_Lib:moleculeio",
         "@googletest//:gtest",

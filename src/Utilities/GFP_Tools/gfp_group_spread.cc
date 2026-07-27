@@ -14,6 +14,7 @@
 #include "Foundational/cmdline/cmdline.h"
 #define RESIZABLE_ARRAY_IMPLEMENTATION 1
 #include "Foundational/iwaray/iwaray.h"
+#include "Foundational/iwmisc/iwdigits.h"
 #include "Foundational/iwmisc/misc.h"
 #define RESIZABLE_ARRAY_IWQSORT_IMPLEMENTATION 1
 #include "Foundational/iwqsort/iwqsort.h"
@@ -26,6 +27,8 @@
 namespace gfp_group_spread {
 
 using std::cerr;
+
+static Fraction_as_String fraction_as_string;
 
 // clang-format off
 static void
@@ -364,7 +367,10 @@ Group::GroupHasBeenSelected(const Group* sel) {
 
 int
 Group::Write(IWString_and_File_Descriptor& output) const {
-  output << _group_name << _output_separator << AverageDistance() << _output_separator << AverageDesirability();
+  output << _group_name;
+  fraction_as_string.append_number(output, AverageDistance());
+  fraction_as_string.append_number(output, AverageDesirability());
+
   for (const Fingerprint* f : _fp) {
     output << _output_separator << f->name();
   }
@@ -696,6 +702,12 @@ Options::Initialise(const Command_Line& cl) {
         DisplayDashwOptions(1);
       }
     }
+  }
+
+  fraction_as_string.set_leading_string(' ');
+  if (! fraction_as_string.initialise(0.0f, 1.0f, 4)) {
+    cerr << "Cannot initialise fractional output cache\n";
+    return 0;
   }
 
   return 1;

@@ -719,8 +719,12 @@ Options::WriteStatistics(IWString_and_File_Descriptor& stream_for_statistics) co
       stream_for_statistics << ',';
     }
 
-    stream_for_statistics << "     // key " << i << "   "
-                          << static_cast<float>(_accumulators[i].average()) << "\n";
+    stream_for_statistics << "     // key " << i << "   ";
+    if (_accumulators[i].n() == 0) {
+      stream_for_statistics << ".\n";
+    } else {
+       stream_for_statistics << static_cast<float>(_accumulators[i].average()) << "\n";
+    }
   }
 
   stream_for_statistics << "};\n";

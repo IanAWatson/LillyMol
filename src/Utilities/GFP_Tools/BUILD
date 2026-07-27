@@ -778,6 +778,7 @@ cc_binary(
         "//Foundational/accumulator",
         "//Foundational/cmdline:iwcmdline",
         "//Foundational/iwstring:absl_hash",
+        "//Foundational/iwmisc",
         "//Foundational/data_source:iwstring_data_source",
         "//Foundational/iw_tdt",
         "@com_google_absl//absl/container:flat_hash_map",

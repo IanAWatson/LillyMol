@@ -870,7 +870,7 @@ class IWDescr::IWDescrImpl {
 
   int ComputeCrowdingDescriptors(Molecule& m, PerMoleculeData& data);
   int ComputeSpinachDescriptors(Molecule& m, PerMoleculeData& data);
-  int ComputeRingChainDescriptors(Molecule& m, PerMoleculeData& data);
+//int ComputeRingChainDescriptors(Molecule& m, PerMoleculeData& data);
   int ComputeComplexityDescriptors(Molecule& m, PerMoleculeData& data);
   int ComputeNovartisPsaDescriptor(Molecule& m, PerMoleculeData& data);
   int ComputeMolarRefractivityDescriptors(Molecule& m, PerMoleculeData& data);
@@ -1409,6 +1409,7 @@ IWDescr::IWDescrImpl::AllocateDescriptors() {
     SetDescriptorName(iwdescr_rchj, "rchj");
     SetDescriptorName(iwdescr_amrcj, "amrcj");
     SetDescriptorName(iwdescr_alrcj, "alrcj");
+    SetDescriptorName(iwdescr_biphenyl, "biphenyl");
   }
 
   if (descriptors_to_compute.polar_bond_descriptors) {
@@ -1835,9 +1836,9 @@ IWDescr::IWDescrImpl::ComputeDescriptorValues(Molecule& m, PerMoleculeData& data
       ComputeSpinachDescriptors(m, data);
   }
 
-  if (descriptors_to_compute.ring_chain_descriptors) {
-      ComputeRingChainDescriptors(m, data);
-  }
+//if (descriptors_to_compute.ring_chain_descriptors) {
+//    ComputeRingChainDescriptors(m, data);
+//}
 
   if (descriptors_to_compute.complexity_descriptors) {
       ComputeComplexityDescriptors(m, data);
@@ -4136,6 +4137,7 @@ IWDescr::IWDescrImpl::ComputeRingDescriptors(Molecule& m, PerMoleculeData& data)
   const atomic_number_t* z = data.atomic_numbers();
   const int* ncon = data.connections();
   const int* ring_membership = data.ring_membership_data();
+  const int* is_aromatic_atom = data.aromaticity();
 
   descriptor[iwdescr_trmnlrng].set(0.0f);
   descriptor[iwdescr_intrnlrng].set(0.0f);
@@ -4273,37 +4275,72 @@ IWDescr::IWDescrImpl::ComputeRingDescriptors(Molecule& m, PerMoleculeData& data)
   int singly_connected_heteroatoms = 0;
   int singly_connected_donors = 0;
 
+  int biphenyl = 0;  // arom_single_arom
+  int arom_single_aliph = 0;
+  int aliph_single_aliph = 0;
+
+  int ring_chain_heteroatom_join_count = 0;
+  int aromatic_ring_chain_join_count = 0;
+  int aliphatic_ring_chain_join_count = 0;
+
+
   // Originally I had a function that traversed each ring looking for singly
   // connected attachments, but that is unstable when different SSSR ring
   // determinations are done, so just look for singly connected atoms that are
   // attached to a ring.
   // THis is probably more efficient than looking at all bonds attached to
   // all ring atoms.
-  const int matoms = m.natoms();
-  for (int i = 0; i < matoms; ++i) {
-    if (ncon[i] != 1) {
+  for (const Bond* b : m.bond_list()) {
+    if (b->nrings()) {
       continue;
     }
-    for (const Bond* b : m[i]) {
-      atom_number_t o = b->other(i);
-      if (ring_membership[o] == 0) {
-        continue;
-      }
 
-      // singly connected atom `i` is bonded to ring atom `o`.
-      ++exocyclic_bonds;
-      if (b->is_double_bond()) {
-        ++double_bond_attachments;
-      }
+    const atom_number_t a1 = b->a1();
+    const atom_number_t a2 = b->a2();
+    if (ring_membership[a1] == 0 && ring_membership[a2] == 0) {
+      continue;
+    }
 
-      if (z[o] != 6) {
+    // non ring bond bonded to at least one ring.
+    ++exocyclic_bonds;
+
+    if (b->is_double_bond()) {
+      ++double_bond_attachments;
+      continue;
+    }
+
+    if (is_aromatic_atom[a1] && is_aromatic_atom[a2]) {
+      ++biphenyl;
+      continue;
+    } 
+    
+    if (is_aromatic_atom[a1] || is_aromatic_atom[a2]) {
+      ++arom_single_aliph;
+    } else {
+      ++aliph_single_aliph;
+    }
+
+    if (ncon[a1] == 1 || ncon[a2] == 1) {
+      ++singly_connected_attachments;
+      if (z[a1] != 6 || z[a2] != 6) {  // ignore heteroatom-heteratom case.
         ++singly_connected_heteroatoms;
-        if (m.hcount(o) > 0) {
+        if ((z[a1] != 6 && m.hcount(a1)) || 
+            (z[a2] != 6 && m.hcount(a2))) {
           ++singly_connected_donors;
         }
       }
+    } else if (z[a1] != 6 || z[a2] != 6) {
+      ++ring_chain_heteroatom_join_count;
+    }
+
+    if (is_aromatic_atom[a1] || is_aromatic_atom[a2]) {
+      ++ aromatic_ring_chain_join_count;
+    } else if (! is_aromatic_atom[a1] && ! is_aromatic_atom[a2]) {
+      ++aliphatic_ring_chain_join_count;
     }
   }
+
+  const int ring_chain_join_count = arom_single_aliph + aliph_single_aliph;
 
   int more_than_7_atoms = 0;
 
@@ -4444,6 +4481,10 @@ IWDescr::IWDescrImpl::ComputeRingDescriptors(Molecule& m, PerMoleculeData& data)
     descriptor[offset].set(static_cast<float>(nrings[i]));
   }
 
+  descriptor[iwdescr_rcj].set(static_cast<float>(ring_chain_join_count));
+  descriptor[iwdescr_rchj].set(static_cast<float>(ring_chain_heteroatom_join_count));
+  descriptor[iwdescr_amrcj].set(static_cast<float>(aromatic_ring_chain_join_count));
+  descriptor[iwdescr_alrcj].set(static_cast<float>(aliphatic_ring_chain_join_count));
   return 1;
 }
 
@@ -5211,6 +5252,7 @@ IWDescr::IWDescrImpl::ComputeSpinachDescriptors(Molecule& m, PerMoleculeData& da
   return 1;
 }
 
+#ifdef NOW_HANDLED_ELSEWHERE
 int
 IWDescr::IWDescrImpl::ComputeRingChainDescriptors(Molecule& m, PerMoleculeData& data) {
   // Migrated from legacy compute_ring_chain_descriptors(m, z, ncon, atom,
@@ -5269,6 +5311,7 @@ IWDescr::IWDescrImpl::ComputeRingChainDescriptors(Molecule& m, PerMoleculeData& 
 
   return 1;
 }
+#endif
 
 
 // `r1` and `r2` are fused. Determine whether or not they are strongly fused.

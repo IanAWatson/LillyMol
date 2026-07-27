@@ -1128,34 +1128,10 @@ cc_binary(
     name = "iwdescr",
     srcs = [
         "iwdescr.cc",
-        "qry_wcharge.cc",
-        "qry_wcharge.h",
-    ],
-    deps = [
-        ":alogp_lib",
-        ":iwdescr_cc_proto",
-        ":nvrtspsa",
-        ":partial_symmetry",
-        ":xlogp_lib",
-        "//Foundational/accumulator",
-        "//Foundational/cmdline_v2",
-        "//Foundational/iwaray",
-        "//Foundational/iwmisc",
-        "//Foundational/iwmisc:sparse_fp_creator",
-        "//Molecule_Lib:iwmolecule",
-        "//Molecule_Lib:moleculeio",
-        "//Molecule_Lib:substructure_cc_proto",
-        "@com_google_protobuf//:protobuf",
-    ],
-)
-
-cc_binary(
-    name = "iwdescr_new",
-    srcs = [
-        "iwdescr_main_target.cc",
     ],
     deps = [
         ":iwdescr_lib",
+        "//Foundational/iwmisc",
         "//Foundational/iwstring:iwstring",
     ],
 )

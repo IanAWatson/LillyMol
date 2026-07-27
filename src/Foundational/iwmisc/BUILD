@@ -129,6 +129,7 @@ cc_library(
         "//Foundational/data_source:iwstring_data_source",
         "//Foundational/iwqsort",
         "@com_google_protobuf//:protobuf",
+        "@fmt//:fmt",
     ],
 )
 

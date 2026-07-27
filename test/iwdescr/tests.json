@@ -1,5 +1,5 @@
 {
-  "executable": "iwdescr_new",
+  "executable": "iwdescr",
   "default_command_components": [
     "-g all -E autocreate -B quiet"
   ],

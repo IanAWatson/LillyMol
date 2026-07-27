@@ -24,7 +24,7 @@ bazel_dep(name = "gazelle", version = "0.48.0")
 
 # Not being used.
 #bazel_dep(name = "fast_float", version = "6.1.6")
-#bazel_dep(name = "fmt", version = "12.1.0")
+bazel_dep(name = "fmt", version = "12.1.0")
 
 bazel_dep(name = "google_benchmark", version = "1.9.5", repo_name="benchmark")
 bazel_dep(name = "googletest", version = "1.17.0.bcr.2")

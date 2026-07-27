@@ -101,6 +101,7 @@ enum IWDescr_Enum {
   iwdescr_rchj,
   iwdescr_amrcj,
   iwdescr_alrcj,
+  iwdescr_biphenyl,
   iwdescr_pbcount,
   iwdescr_frpbond,
   iwdescr_nonpbond,

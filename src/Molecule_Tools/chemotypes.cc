@@ -288,7 +288,7 @@ AddLinkerComponents(Molecule& m, const std::vector<int>& ring_system,
     }
 
     for (atom_number_t a : scratch.component) {
-      mask[a] = 1;
+      mask[a] = kChemotypeCoreAtom;
     }
   }
 }
@@ -310,7 +310,7 @@ AddExocyclicDoubleBondedAtoms(Molecule& m, const std::vector<int>& ring_system,
 
     const atom_number_t other = bond->other(atom);
     if (mask[other]) {
-      mask[atom] = 1;
+      mask[atom] = kChemotypeCoreAtom;
     }
   }
 }
@@ -340,20 +340,9 @@ AddAttachedAtoms(Molecule& m, const std::vector<int>& ring_system,
         continue;
       }
 
-      mask[other] = 1;
+      mask[other] = kChemotypeAttachedAtom;
     }
   }
-}
-
-
-bool
-IsTerminalDoubleBondedCNO(Molecule& m, atom_number_t atom) {
-  if (m.ncon(atom) != 1) {
-    return false;
-  }
-
-  const Atom& a = m[atom];
-  return IsTerminalExocyclicDoubleBondedAtom(m, *a[0], atom);
 }
 
 
@@ -396,16 +385,32 @@ ApplyAtomTypeIsotopes(Molecule& m, Atom_Typing_Specification& atom_typing) {
   return 1;
 }
 
+// Atom type labelling is via attached atoms. Core chemotype atoms lose
+// their isotopes, while one-hop attachment atoms retain atom-type isotopes.
 void
-CleanupChemotypeIsotopes(Molecule& m, const std::vector<int>& keep) {
+UnsetIsotopesAddAdjacent(Molecule& m, std::vector<int>& keep) {
   const int matoms = m.natoms();
   for (atom_number_t atom = 0; atom < matoms; ++atom) {
-    if (! keep[atom] || m.ncon(atom) != 1 || IsTerminalDoubleBondedCNO(m, atom)) {
+    // Singly connected atoms never have isotopic labels.
+    if (m.ncon(atom) == 1) {
       m.set_isotope(atom, 0);
+      continue;
+    }
+
+    if (keep[atom] != kChemotypeCoreAtom) {
+      continue;
+    }
+
+    m.set_isotope(atom, 0);
+
+    for (const Bond* b : m[atom]) {
+      const atom_number_t other = b->other(atom);
+      if (keep[other] == kChemotypeNotKept) {
+        keep[other] = kChemotypeAttachedAtom;
+      }
     }
   }
 }
-
 
 }  // namespace
 
@@ -435,9 +440,33 @@ ChemotypeScratch::PrepareForNewLinkerComponent(int ring_system_count) {
   }
 }
 
+int
+SetMatchFromEmbedding(int query_index, int hits, const Set_of_Atoms& embedding,
+                      const std::vector<int>& ring_system, int required_ring_system,
+                      ChemotypeQueryMatch& result) {
+  for (atom_number_t atom : embedding) {
+    if (ring_system[atom] == 0) {
+      continue;
+    }
+    if (required_ring_system > 0 && ring_system[atom] != required_ring_system) {
+      continue;
+    }
+
+    result.query_index = query_index;
+    result.hits = hits;
+    result.embedding = embedding;
+    result.ring_system = ring_system;
+    result.seed_atom = atom;
+    result.seed_ring_system = ring_system[atom];
+    return 1;
+  }
+
+  return 0;
+}
+
 ChemotypeQueryMatchStatus
 FirstChemotypeQueryMatch(Molecule& m, resizable_array_p<Substructure_Query>& queries,
-                         ChemotypeQueryMatch& result) {
+                         ChemotypeQueryMatch& result, bool choose_first_embedding) {
   result = ChemotypeQueryMatch();
 
   for (int i = 0; i < queries.number_elements(); ++i) {
@@ -452,21 +481,47 @@ FirstChemotypeQueryMatch(Molecule& m, resizable_array_p<Substructure_Query>& que
       continue;
     }
 
+    std::vector<int> ring_system(m.natoms(), 0);
+    m.label_atoms_by_ring_system_including_spiro_fused(ring_system.data());
+
     result.query_index = i;
     result.hits = hits;
     result.embedding = *sresults.embedding(0);
+    result.ring_system = ring_system;
 
-    result.ring_system.resize(m.natoms(), 0);
-    m.label_atoms_by_ring_system_including_spiro_fused(result.ring_system.data());
-
-    for (atom_number_t atom : result.embedding) {
-      if (result.ring_system[atom] == 0) {
-        continue;
+    if (choose_first_embedding) {
+      if (SetMatchFromEmbedding(i, hits, *sresults.embedding(0), ring_system, 0, result)) {
+        return ChemotypeQueryMatchStatus::kMatched;
       }
+      return ChemotypeQueryMatchStatus::kMatchedQueryNoRingAtom;
+    }
 
-      result.seed_atom = atom;
-      result.seed_ring_system = result.ring_system[atom];
-      return ChemotypeQueryMatchStatus::kMatched;
+    std::vector<int> ring_system_seen(m.natoms() + 1, 0);
+    int unique_ring_systems = 0;
+    int only_ring_system = 0;
+    for (const Set_of_Atoms* embedding : sresults.embeddings()) {
+      for (atom_number_t atom : *embedding) {
+        const int rs = ring_system[atom];
+        if (rs == 0 || ring_system_seen[rs]) {
+          continue;
+        }
+        ring_system_seen[rs] = 1;
+        only_ring_system = rs;
+        ++unique_ring_systems;
+        if (unique_ring_systems > 1) {
+          return ChemotypeQueryMatchStatus::kAmbiguousQueryMatches;
+        }
+      }
+    }
+
+    if (unique_ring_systems == 0) {
+      return ChemotypeQueryMatchStatus::kMatchedQueryNoRingAtom;
+    }
+
+    for (const Set_of_Atoms* embedding : sresults.embeddings()) {
+      if (SetMatchFromEmbedding(i, hits, *embedding, ring_system, only_ring_system, result)) {
+        return ChemotypeQueryMatchStatus::kMatched;
+      }
     }
 
     return ChemotypeQueryMatchStatus::kMatchedQueryNoRingAtom;
@@ -501,7 +556,7 @@ std::vector<int>
 ChemotypeAtomMask(Molecule& m, const ChemotypeQueryMatch& match,
                   const ChemotypeOptions& options, ChemotypeScratch& scratch) {
   const int matoms = m.natoms();
-  std::vector<int> result(matoms, 0);
+  std::vector<int> result(matoms, kChemotypeNotKept);
 
   if (match.seed_ring_system <= 0 ||
       match.ring_system.size() != static_cast<size_t>(matoms)) {
@@ -538,7 +593,7 @@ ChemotypeAtomMask(Molecule& m, const ChemotypeQueryMatch& match,
     const int r = match.ring_system[atom];
     if (r > 0 && r < static_cast<int>(selected_ring_system.size()) &&
         selected_ring_system[r]) {
-      result[atom] = 1;
+      result[atom] = kChemotypeCoreAtom;
     }
   }
 
@@ -584,14 +639,15 @@ ReduceToChemotype(Molecule& m, resizable_array_p<Substructure_Query>& queries,
     return ChemotypeQueryMatchStatus::kAtomTypingFailed;
   }
 
-  if (const ChemotypeQueryMatchStatus status = FirstChemotypeQueryMatch(m, queries, match);
+  if (const ChemotypeQueryMatchStatus status = FirstChemotypeQueryMatch(
+          m, queries, match, options.choose_first_embedding);
       status != ChemotypeQueryMatchStatus::kMatched) {
     return status;
   }
 
   std::vector<int> keep = ChemotypeAtomMask(m, match, options, scratch);
   if (atom_typing != nullptr) {
-    CleanupChemotypeIsotopes(m, keep);
+    UnsetIsotopesAddAdjacent(m, keep);
   } else if (options.isotope_for_exit_points != 0) {
     ApplyExitPointIsotopes(m, keep, match.ring_system, options.isotope_for_exit_points);
   }

@@ -48,7 +48,7 @@ MatchWithSeedAtom(Molecule& m, atom_number_t seed_atom) {
 
 int
 CountMaskedAtoms(const std::vector<int>& mask) {
-  return std::count(mask.begin(), mask.end(), 1);
+  return std::count_if(mask.begin(), mask.end(), [](int value) { return value != 0; });
 }
 
 
@@ -117,6 +117,49 @@ TEST(Chemotypes, FirstChemotypeQueryMatchUsesFirstEmbedding) {
   EXPECT_EQ(result.seed_atom, expected.embedding(0)->item(0));
 }
 
+TEST(Chemotypes, FirstChemotypeQueryMatchAllowsMultipleEmbeddingsInOneRingSystem) {
+  Molecule m;
+  ASSERT_TRUE(m.build_from_smiles("c1ccccc1"));
+
+  resizable_array_p<Substructure_Query> queries;
+  AddSmarts(queries, "[c]");
+
+  chemotypes::ChemotypeQueryMatch result;
+  ASSERT_EQ(chemotypes::FirstChemotypeQueryMatch(m, queries, result),
+            chemotypes::ChemotypeQueryMatchStatus::kMatched);
+  EXPECT_EQ(result.seed_ring_system, 1);
+}
+
+TEST(Chemotypes, FirstChemotypeQueryMatchRejectsMultipleRingSystems) {
+  Molecule m;
+  ASSERT_TRUE(m.build_from_smiles("c1ccccc1-c1ccccc1"));
+
+  resizable_array_p<Substructure_Query> queries;
+  AddSmarts(queries, "[c]");
+
+  chemotypes::ChemotypeQueryMatch result;
+  EXPECT_EQ(chemotypes::FirstChemotypeQueryMatch(m, queries, result),
+            chemotypes::ChemotypeQueryMatchStatus::kAmbiguousQueryMatches);
+}
+
+TEST(Chemotypes, FirstChemotypeQueryMatchCanUseFirstEmbeddingAcrossRingSystems) {
+  Molecule m;
+  ASSERT_TRUE(m.build_from_smiles("c1ccccc1-c1ccccc1"));
+
+  resizable_array_p<Substructure_Query> queries;
+  Substructure_Query* query = AddSmarts(queries, "[c]");
+
+  Substructure_Results expected;
+  ASSERT_GT(query->substructure_search(m, expected), 0u);
+
+  chemotypes::ChemotypeQueryMatch result;
+  constexpr bool kChooseFirstEmbedding = true;
+  ASSERT_EQ(chemotypes::FirstChemotypeQueryMatch(m, queries, result,
+                                                kChooseFirstEmbedding),
+            chemotypes::ChemotypeQueryMatchStatus::kMatched);
+  ExpectSameEmbedding(result.embedding, *expected.embedding(0));
+}
+
 
 TEST(Chemotypes, ChemotypeAtomMaskSeedRingOnly) {
   Molecule m;
@@ -127,7 +170,9 @@ TEST(Chemotypes, ChemotypeAtomMaskSeedRingOnly) {
 
   EXPECT_EQ(CountMaskedAtoms(mask), 6);
   for (atom_number_t atom = 0; atom < m.natoms(); ++atom) {
-    EXPECT_EQ(mask[atom], match.ring_system[atom] == match.seed_ring_system ? 1 : 0);
+    EXPECT_EQ(mask[atom], match.ring_system[atom] == match.seed_ring_system ?
+                              chemotypes::kChemotypeCoreAtom :
+                              chemotypes::kChemotypeNotKept);
   }
 }
 
@@ -139,7 +184,7 @@ TEST(Chemotypes, ChemotypeAtomMaskIncludesRequestedAdjacentRingSystem) {
   const std::vector<int> mask = chemotypes::ChemotypeAtomMask(m, match, 1);
 
   EXPECT_EQ(CountMaskedAtoms(mask), 12);
-  EXPECT_THAT(mask, testing::Each(1));
+  EXPECT_THAT(mask, testing::Each(chemotypes::kChemotypeCoreAtom));
 }
 
 TEST(Chemotypes, ChemotypeAtomMaskDoesNotIncludeRingBeyondInterveningRing) {
@@ -234,7 +279,7 @@ TEST(Chemotypes, ChemotypeAtomMaskIncludesExocyclicDoubleBondedAtoms) {
   const std::vector<int> mask = chemotypes::ChemotypeAtomMask(m, match, 0);
 
   EXPECT_EQ(CountMaskedAtoms(mask), 7);
-  EXPECT_EQ(mask[0], 1);
+  EXPECT_EQ(mask[0], chemotypes::kChemotypeCoreAtom);
 }
 
 
@@ -246,7 +291,7 @@ TEST(Chemotypes, ChemotypeAtomMaskIncludesTerminalDoubleBondOnLinkerAtom) {
   const std::vector<int> mask = chemotypes::ChemotypeAtomMask(m, match, 1);
 
   EXPECT_EQ(CountMaskedAtoms(mask), 14);
-  EXPECT_EQ(mask[7], 1);
+  EXPECT_EQ(mask[7], chemotypes::kChemotypeCoreAtom);
 }
 
 TEST(Chemotypes, ChemotypeAtomMaskCanSuppressExocyclicDoubleBondedAtoms) {
@@ -274,7 +319,7 @@ TEST(Chemotypes, ChemotypeAtomMaskIncludesOptionalAttachedAtoms) {
   const std::vector<int> mask = chemotypes::ChemotypeAtomMask(m, match, options);
 
   EXPECT_EQ(CountMaskedAtoms(mask), 7);
-  EXPECT_EQ(mask[0], 1);
+  EXPECT_EQ(mask[0], chemotypes::kChemotypeAttachedAtom);
 }
 
 TEST(Chemotypes, ChemotypeAtomMaskCanIgnoreSinglyConnectedAttachedAtoms) {
@@ -321,6 +366,7 @@ TEST(Chemotypes, ReduceToChemotypeRemovesAtomsNotInMask) {
 
   chemotypes::ChemotypeOptions options;
   options.adjacent_ring_systems_to_include = 1;
+  options.choose_first_embedding = true;
   chemotypes::ChemotypeScratch scratch;
   chemotypes::ChemotypeQueryMatch match;
 
@@ -353,8 +399,9 @@ TEST(Chemotypes, ReduceToChemotypeLabelsRingExitPointWithFixedIsotope) {
   resizable_array_p<Substructure_Query> queries;
   AddSmarts(queries, "[N]");
 
+  constexpr isotope_t kExitPointIsotope = 99;
   chemotypes::ChemotypeOptions options;
-  options.isotope_for_exit_points = 99;
+  options.isotope_for_exit_points = kExitPointIsotope;
   chemotypes::ChemotypeScratch scratch;
   chemotypes::ChemotypeQueryMatch match;
 
@@ -364,7 +411,7 @@ TEST(Chemotypes, ReduceToChemotypeLabelsRingExitPointWithFixedIsotope) {
   ASSERT_EQ(m.natoms(), 6);
   int labelled_atoms = 0;
   for (atom_number_t atom = 0; atom < m.natoms(); ++atom) {
-    if (m.isotope(atom) == static_cast<isotope_t>(99)) {
+    if (m.isotope(atom) == kExitPointIsotope) {
       ++labelled_atoms;
       EXPECT_EQ(m.atomic_number(atom), static_cast<atomic_number_t>(7));
     } else {
@@ -374,15 +421,14 @@ TEST(Chemotypes, ReduceToChemotypeLabelsRingExitPointWithFixedIsotope) {
   EXPECT_EQ(labelled_atoms, 1);
 }
 
-TEST(Chemotypes, ReduceToChemotypeLabelsTerminalAttachmentAtomsByAtomType) {
+TEST(Chemotypes, ReduceToChemotypeLabelsNonTerminalAttachmentAtomsByAtomType) {
   Molecule m;
-  ASSERT_TRUE(m.build_from_smiles("CN1CCCCC1"));
+  ASSERT_TRUE(m.build_from_smiles("CCN1CCCCC1"));
 
   resizable_array_p<Substructure_Query> queries;
   AddSmarts(queries, "[N]");
 
   chemotypes::ChemotypeOptions options;
-  options.include_attached_atoms = 1;
   chemotypes::ChemotypeScratch scratch;
   chemotypes::ChemotypeQueryMatch match;
   Atom_Typing_Specification atom_typing;
@@ -397,12 +443,37 @@ TEST(Chemotypes, ReduceToChemotypeLabelsTerminalAttachmentAtomsByAtomType) {
   for (atom_number_t atom = 0; atom < m.natoms(); ++atom) {
     if (m.isotope(atom)) {
       ++labelled_atoms;
+      // The labelled atom was non-terminal in the parent molecule, but becomes
+      // terminal after the rest of the ethyl group is removed.
       EXPECT_EQ(m.ncon(atom), 1);
       EXPECT_EQ(m.atomic_number(atom), static_cast<atomic_number_t>(6));
       EXPECT_EQ(m.isotope(atom), static_cast<isotope_t>(6));
     }
   }
   EXPECT_EQ(labelled_atoms, 1);
+}
+
+TEST(Chemotypes, ReduceToChemotypeDoesNotLabelSinglyConnectedAttachmentAtoms) {
+  Molecule m;
+  ASSERT_TRUE(m.build_from_smiles("CN1CCCCC1"));
+
+  resizable_array_p<Substructure_Query> queries;
+  AddSmarts(queries, "[N]");
+
+  chemotypes::ChemotypeOptions options;
+  chemotypes::ChemotypeScratch scratch;
+  chemotypes::ChemotypeQueryMatch match;
+  Atom_Typing_Specification atom_typing;
+  atom_typing.set_atom_type(IWATTYPE_Z);
+
+  ASSERT_EQ(chemotypes::ReduceToChemotype(m, queries, options, scratch, match,
+                                          &atom_typing),
+            chemotypes::ChemotypeQueryMatchStatus::kMatched);
+
+  ASSERT_EQ(m.natoms(), 7);
+  for (atom_number_t atom = 0; atom < m.natoms(); ++atom) {
+    EXPECT_EQ(m.isotope(atom), static_cast<isotope_t>(0)) << " atom " << atom;
+  }
 }
 
 TEST(Chemotypes, ReduceToChemotypeDoesNotLabelTerminalDoubleBondedAtoms) {

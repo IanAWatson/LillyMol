@@ -13,10 +13,17 @@ class Substructure_Query;
 
 namespace chemotypes {
 
+// Values in the atom mask returned by ChemotypeAtomMask. Nonzero values are
+// retained by Molecule::remove_atoms(mask.data(), 0).
+static constexpr int kChemotypeNotKept = 0;
+static constexpr int kChemotypeCoreAtom = 1;
+static constexpr int kChemotypeAttachedAtom = 2;
+
 enum class ChemotypeQueryMatchStatus {
   kMatched,
   kNoQueryMatch,
   kMatchedQueryNoRingAtom,
+  kAmbiguousQueryMatches,
   kAtomTypingFailed,
 };
 
@@ -28,6 +35,7 @@ struct ChemotypeOptions {
   int include_attached_atoms = 0;
   int ignore_singly_connected_attached_atoms = 0;
   int include_tied_adjacent_ring_systems = 0;
+  bool choose_first_embedding = false;
   isotope_t isotope_for_exit_points = 0;
 };
 
@@ -52,12 +60,13 @@ struct ChemotypeQueryMatch {
   std::vector<int> ring_system;
 };
 
-// Scan queries in order and return the first embedding of the first query that
-// matches. The seed ring system is defined by the first matched atom, in
-// embedding order, that belongs to a ring system.
+// Scan queries in order and return a chemotype-defining match. By default, the
+// first query that matches must identify exactly one ring system across all its
+// embeddings. With choose_first_embedding, the first embedding of the first
+// matching query is used even if the query matches multiple ring systems.
 ChemotypeQueryMatchStatus FirstChemotypeQueryMatch(
     Molecule& m, resizable_array_p<Substructure_Query>& queries,
-    ChemotypeQueryMatch& result);
+    ChemotypeQueryMatch& result, bool choose_first_embedding = false);
 
 struct AdjacentRingSystem {
   int ring_system = 0;

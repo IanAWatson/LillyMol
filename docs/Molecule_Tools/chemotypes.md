@@ -34,8 +34,8 @@ the command writes:
 N1CCCCC1 mol1
 ```
 
-By default, a molecule that does not match any query is an error. Use `-z i` to
-ignore nonmatching molecules.
+By default, a molecule that does not match any query is an error. Use `-z i`
+or `-z ignore` to ignore nonmatching molecules.
 
 ## Query Matching
 
@@ -46,9 +46,19 @@ chemotypes -q seed.qry input.smi > chemotypes.smi
 chemotypes -s '[nH]1cccc1' input.smi > chemotypes.smi
 ```
 
-Queries are examined in command-line order. The first matching query is used,
-and the first embedding from that query is used. Within that embedding, the
-first matched atom that belongs to a ring system defines the seed ring system.
+Queries are examined in command-line order. The first matching query is used.
+By default, that query must identify exactly one ring system across all of its
+embeddings. This means a broad query such as `c` is acceptable for a molecule
+with one aromatic ring system, but ambiguous for biphenyl because the embeddings
+touch two different ring systems.
+
+Within the accepted query, the first embedding that touches the identified ring
+system is used. The first matched atom in that embedding that belongs to the
+ring system defines the seed atom.
+
+Use `-z f` or `-z first` to keep the historical behaviour of using the first
+embedding of the first matching query, even if the query touches multiple ring
+systems.
 
 The query should normally include ring constraints where appropriate. If the
 first matching query has no matched atom in a ring system, processing stops for
@@ -108,30 +118,43 @@ chemotypes -s '[N]' -I 99 -i smi input.smi > labelled.smi
 This labels the ring atom exit point with the fixed isotope value. `-I` cannot
 be used with atom typing.
 
-Use `-u` to retain one-hop atoms attached to retained ring atoms:
+Use `-u` to retain one-hop atoms attached to retained ring atoms without
+applying atom-type labels:
 
 ```shell
-chemotypes -s '[N]' -u -P UST:ARY -i smi input.smi > typed.smi
+chemotypes -s '[N]' -u -i smi input.smi > attached.smi
 ```
 
-When `-P` is specified, atom typing is applied before the molecule is reduced,
-and isotopic labels are retained on terminal attachment atoms in the output.
-This can distinguish, for example, the same ring system attached through carbon
-or nitrogen.
-
-Use `-x` with `-u` to ignore singly connected attached atoms:
+When `-P` is specified, atom typing is applied before the molecule is reduced.
+The tool automatically retains one-hop atoms attached to the chemotype core and
+keeps isotopic atom-type labels on non-terminal attachment atoms. Isotopes on
+the core chemotype atoms and on atoms that were singly connected in the parent
+molecule are cleared. This can distinguish, for example, the same ring system
+attached through carbon or nitrogen.
 
 ```shell
-chemotypes -s '[N]' -u -x -P UST:ARY -i smi input.smi > typed.smi
+chemotypes -s '[N]' -P UST:ARY -i smi input.smi > typed.smi
+```
+
+Use `-x` with `-u` to ignore singly connected attached atoms when retaining
+untyped attachment atoms:
+
+```shell
+chemotypes -s '[N]' -u -x -i smi input.smi > attached.smi
 ```
 
 ## Parent Output
 
-Use `-p` to write the parent molecule before each generated chemotype:
+Use `-p <text>` to write the parent molecule before each generated chemotype:
 
 ```shell
-chemotypes -s '[N]' -p -z i -i smi input.smi > parent_and_chemotype.smi
+chemotypes -s '[N]' -p PARENT -z i -i smi input.smi > parent_and_chemotype.smi
 ```
+
+The value is appended to the parent molecule name as a separate token, which
+makes parent records easier to distinguish from chemotype records when reviewing
+SMILES output. Use `-p .`, `-p def`, or `-p default` to write the parent without
+adding an annotation.
 
 This is mainly useful for debugging, review, and explaining why a chemotype was
 generated. The parent is written only for molecules that successfully generate a
@@ -191,10 +214,11 @@ single-ring molecules should simply be skipped.
 | `-u` | Include one-hop atoms attached to retained ring atoms. |
 | `-x` | With `-u`, ignore singly connected attached atoms. |
 | `-I <iso>` | Label retained ring exit-point atoms with isotope `iso`. Incompatible with `-P`. |
-| `-P <atype>` | Atom typing specification for retained terminal attachment atoms. |
-| `-p` | Write the parent molecule before each generated chemotype. |
+| `-P <atype>` | Atom typing specification for retained non-terminal attachment atoms. |
+| `-p <text>` | Write the parent molecule before each generated chemotype; append `<text>` unless it is `.`, `def`, or `default`. |
 | `-F <fname>` | Write accumulated `dicer_data::DicerFragment` textproto summary. |
-| `-z i` | Ignore molecules that do not match any query. |
+| `-z i`, `-z ignore` | Ignore molecules that do not match any query. |
+| `-z f`, `-z first` | Use the first embedding when a query matches multiple ring systems. |
 | `-S <stem>` | Output file stem. Default stdout. |
 | `-i <type>` | Input type. Usually inferred from filename. |
 | `-o <type>` | Output type. Default SMILES. |

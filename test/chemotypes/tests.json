@@ -10,20 +10,42 @@
     {
       "name": "adjacent_ring",
       "args": [
-        "-s '[c]' -n 1 -i smi #{indir}/input.smi"
+        "-s '[c]' -n 1 -z first -i smi #{indir}/input.smi"
       ]
     },
     {
       "name": "ties_at_cutoff",
       "args": [
-        "-s '[c]' -n 1 -t -i smi #{indir}/input.smi"
+        "-s '[c]' -n 1 -t -z first -i smi #{indir}/input.smi"
       ]
     },
     {
       "name": "write_parent",
       "args": [
-        "-s '[N]' -p -z i -i smi #{indir}/input.smi"
+        "-s '[N]' -p PARENT -z i -i smi #{indir}/input.smi"
       ]
+    },
+    {
+      "name": "write_parent_default",
+      "args": [
+        "-s '[N]' -p def -z i -i smi #{indir}/input.smi"
+      ]
+    },
+    {
+      "name": "atom_typing_attachments",
+      "args": [
+        "-s '[N]' -P Z -z i -i smi #{indir}/input.smi"
+      ]
+    },
+    {
+      "name": "ambiguous_query",
+      "preamble": [
+        "cp #{indir}/input.smi input.smi"
+      ],
+      "args": [
+        "-s '[c]' -i smi input.smi"
+      ],
+      "non_zero_rc_expected": true
     },
     {
       "name": "summary_textproto",

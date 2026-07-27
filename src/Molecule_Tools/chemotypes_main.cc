@@ -50,11 +50,13 @@ Options:
  -u             include one-hop atoms attached to retained ring atoms.
  -x             ignore singly connected attached atoms with -u.
  -t             with -n, include all adjacent ring systems tied at the cutoff distance.
- -P <atype>     atom typing specification; terminal attachment atoms become isotopically labelled.
+ -P <atype>     atom typing specification; non-terminal attachment atoms become labelled.
  -I <iso>       label retained ring exit-point atoms with isotope <iso>; incompatible with -P.
- -p             write the parent molecule before each generated chemotype.
+ -p <text>      write the parent before each chemotype; append <text> to parent name.
+                Use -p . or -p def for no parent annotation.
  -F <fname>      write accumulated dicer_data::DicerFragment textproto summary.
- -z i           ignore molecules not matching any query.
+ -z i|ignore    ignore molecules not matching any query.
+ -z f|first     use the first embedding if a query matches multiple ring systems.
  -S <stem>      output file stem; default stdout.
  -i <type>      input type.
  -o <type>      output type, default smiles.
@@ -78,6 +80,7 @@ class Options {
   int _min_rings = 0;
   int _ignore_molecules_not_matching_query = 0;
   int _write_parent = 0;
+  IWString _parent_annotation;
   IWString _summary_fname;
 
   resizable_array_p<Substructure_Query> _queries;
@@ -97,6 +100,7 @@ class Options {
   uint64_t _molecules_not_matching_queries = 0;
   uint64_t _molecules_below_min_rings = 0;
   uint64_t _molecules_matched_query_without_ring_atom = 0;
+  uint64_t _molecules_with_ambiguous_query_matches = 0;
   uint64_t _atom_typing_failures = 0;
 
  public:
@@ -179,6 +183,10 @@ Options::Initialise(Command_Line& cl) {
 
   if (cl.option_present('p')) {
     _write_parent = 1;
+    const_IWSubstring p = cl.string_value('p');
+    if (p != '.' && p != "def" && p != "default") {
+      _parent_annotation << ' ' << p;
+    }
   }
 
   if (cl.option_present('F')) {
@@ -221,8 +229,10 @@ Options::Initialise(Command_Line& cl) {
   if (cl.option_present('z')) {
     IWString z;
     for (int i = 0; cl.value('z', z, i); ++i) {
-      if (z == 'i') {
+      if (z == 'i' || z == "ignore") {
         _ignore_molecules_not_matching_query = 1;
+      } else if (z == 'f' || z == "first") {
+        _chemotype_options.choose_first_embedding = true;
       } else {
         cerr << "Unrecognised -z qualifier '" << z << "'\n";
         return 0;
@@ -248,7 +258,11 @@ Options::Initialise(Command_Line& cl) {
       cerr << "Will ignore singly connected attached atoms\n";
     }
     if (_write_parent) {
-      cerr << "Will write parent molecules before chemotypes\n";
+      cerr << "Will write parent molecules before chemotypes";
+      if (! _parent_annotation.empty()) {
+        cerr << " with parent annotation '" << _parent_annotation << "'";
+      }
+      cerr << '\n';
     }
     if (! _summary_fname.empty()) {
       cerr << "Will write chemotype summary to '" << _summary_fname << "'\n";
@@ -256,8 +270,11 @@ Options::Initialise(Command_Line& cl) {
     if (_chemotype_options.include_tied_adjacent_ring_systems) {
       cerr << "Will include adjacent ring systems tied at the -n cutoff distance\n";
     }
+    if (_chemotype_options.choose_first_embedding) {
+      cerr << "Will use the first query embedding if multiple ring systems match\n";
+    }
     if (_atom_typing_ptr != nullptr) {
-      cerr << "Will label terminal attachment atoms with atom types\n";
+      cerr << "Will label non-terminal attachment atoms with atom types\n";
     }
     if (_chemotype_options.isotope_for_exit_points != 0) {
       cerr << "Will label retained ring exit point atoms with isotope "
@@ -305,6 +322,9 @@ Options::Process(Molecule& m, Molecule_Output_Object& output) {
   switch (status) {
     case chemotypes::ChemotypeQueryMatchStatus::kMatched:
       if (parent) {
+        if (! _parent_annotation.empty()) {
+          parent->append_to_name(_parent_annotation);
+        }
         if (! output.write(*parent)) {
           return 0;
         }
@@ -327,6 +347,12 @@ Options::Process(Molecule& m, Molecule_Output_Object& output) {
     case chemotypes::ChemotypeQueryMatchStatus::kMatchedQueryNoRingAtom:
       ++_molecules_matched_query_without_ring_atom;
       cerr << "Query matched no ring atom in '" << m.name() << "'\n";
+      return 0;
+
+    case chemotypes::ChemotypeQueryMatchStatus::kAmbiguousQueryMatches:
+      ++_molecules_with_ambiguous_query_matches;
+      cerr << "Query matched multiple ring systems in '" << m.name()
+           << "', use -z first to use the first embedding\n";
       return 0;
 
     case chemotypes::ChemotypeQueryMatchStatus::kAtomTypingFailed:
@@ -433,6 +459,10 @@ Options::Report(std::ostream& output) const {
     output << _molecules_matched_query_without_ring_atom
            << " molecules matched a query with no ring atom\n";
   }
+  if (_molecules_with_ambiguous_query_matches) {
+    output << _molecules_with_ambiguous_query_matches
+           << " molecules matched queries in multiple ring systems\n";
+  }
   if (_atom_typing_failures) {
     output << _atom_typing_failures << " atom typing failures\n";
   }
@@ -481,7 +511,7 @@ Chemotypes(Options& options, const char* fname, FileType input_type,
 
 int
 Chemotypes(int argc, char** argv) {
-  Command_Line cl(argc, argv, "vE:A:g:cli:o:S:F:q:s:n:r:D:P:I:upxtz:");
+  Command_Line cl(argc, argv, "vE:A:g:cli:o:S:F:q:s:n:r:D:P:I:up:xtz:");
 
   if (cl.unrecognised_options_encountered()) {
     cerr << "Unrecognised options encountered\n";

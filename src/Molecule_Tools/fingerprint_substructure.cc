@@ -1426,7 +1426,7 @@ Options::Main(int argc, char** argv) {
       return 2;
     }
   } else {
-    atom_typing_specification.set_user_specified_type(IWATTYPE_Z | IWATTYPE_USP_A);
+    atom_typing_specification.set_user_specified_type(IWATTYPE_USP_Z | IWATTYPE_USP_A);
   }
 
   if (!cl.option_present('q') && !cl.option_present('s')) {

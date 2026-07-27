@@ -15,6 +15,7 @@
 #include "Foundational/accumulator/accumulator.h"
 #include "Foundational/cmdline/cmdline.h"
 #include "Foundational/iwmisc/misc.h"
+#include "Foundational/iwmisc/iwdigits.h"
 #include "Foundational/iwmisc/sparse_fp_creator.h"
 
 #include "Molecule_Lib/allowed_elements.h"
@@ -112,6 +113,8 @@ class Options {
   Accumulator_Int<unsigned int> _positive_acc;
   Accumulator_Int<unsigned int> _hydrophobe_acc;
   Accumulator_Int<unsigned int> _features_acc;
+
+  Fraction_as_String _fraction_as_string;
 
   jwcats::JWCats _jwcats_calculator;
 
@@ -310,7 +313,8 @@ Options::Process(Molecule& m, IWString_and_File_Descriptor& output) {
     if (result.scaled_counts[i] == 0.0) {
       output << _output_separator << '0';
     } else {
-      output << _output_separator << static_cast<float>(result.scaled_counts[i]);
+      _fraction_as_string.append_number(output, result.scaled_counts[i]);
+//    output << _output_separator << static_cast<float>(result.scaled_counts[i]);
     }
   }
 
@@ -630,6 +634,14 @@ Options::Main(int argc, char** argv) {
       cerr << "Descriptor output separator set to '" << o << "'\n";
     }
   }
+
+  // After we have set output separator.
+  constexpr int kOutputPrecision = 3;
+  if (!_fraction_as_string.initialise(0.0f, 1.0f, kOutputPrecision)) {
+    cerr << "Cannot initialise fractional descriptor output cache\n";
+    return 0;
+  }
+  _fraction_as_string.set_leading_string(_output_separator);
 
   if (cl.empty()) {
     cerr << "Insufficient arguments\n";

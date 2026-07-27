@@ -58,6 +58,8 @@ static IWString cluster(" CLUSTER ");
 
 static IWDigits iwdigits;  // used for neighbour numbers
 static Fraction_as_String fraction_as_string;
+static Fraction_as_String number_as_string;
+static Fraction_as_String bare_number_as_string;
 
 /*
   We may want to only write (say) the first token in the names
@@ -459,6 +461,28 @@ passes_number_needed_within_distance(
   return 0;
 }
 
+static void
+AppendNumberWithSeparator(IWString& output, float value) {
+  number_as_string.append_number(output, value);
+}
+
+static void
+AppendNumberWithSeparator(IWString& output, double value) {
+  number_as_string.append_number(output, static_cast<float>(value));
+}
+
+static void
+AppendBareNumber(IWString& output, float value) {
+  bare_number_as_string.append_number(output, value);
+}
+
+static void
+WriteBareNumber(std::ostream& output, float value) {
+  IWString tmp;
+  bare_number_as_string.append_number(tmp, value);
+  output << tmp;
+}
+
 static int
 AppendAfterId(const IWString& id,
               const IW_STL_Hash_Map_String& append_to_id,
@@ -534,8 +558,7 @@ write_neighbour_list(const IWString& needle_id,
       if (fraction_as_string.active()) {
         fraction_as_string.append_number(output, d);
       } else {
-        output.append_number(d, output_precision);
-
+        AppendBareNumber(output, d);
         output += neighbour_separator;
       }
     } else {
@@ -592,8 +615,7 @@ write_statistics_for_neighbour_list(const resizable_array_p<T> &neighbours,
     if (d < censor_distances_shorter_than) {
       output << output_separator << '0';
     } else {
-      output << output_separator;
-      output.append_number(d, output_precision);
+      AppendNumberWithSeparator(output, d);
     }
 
     return;
@@ -609,9 +631,7 @@ write_statistics_for_neighbour_list(const resizable_array_p<T> &neighbours,
       output << output_separator << "N=" << n;
     }
 
-    output << output_separator;
-
-    output.append_number(neighbours[0]->distance(), output_precision);
+    AppendNumberWithSeparator(output, neighbours[0]->distance());
 
     return;
   }
@@ -626,20 +646,18 @@ write_statistics_for_neighbour_list(const resizable_array_p<T> &neighbours,
 
   if (tabular_output) {
     if (from_gfp_leader) {
-      output << output_separator << (n + 1) << output_separator;
+      output << output_separator << (n + 1);
     } else {
-      output << output_separator << n << output_separator;
+      output << output_separator << n;
     }
   } else {
-    output << output_separator << "N=" << n << output_separator;
+    output << output_separator << "N=" << n;
   }
 
-  output.append_number(d.minval(), output_precision);
-  output << output_separator;
-  output.append_number(d.maxval(), output_precision);
-  output << output_separator;
+  AppendNumberWithSeparator(output, d.minval());
+  AppendNumberWithSeparator(output, d.maxval());
   if (d.n() > 0) {
-    output.append_number(static_cast<float>(d.average()), output_precision);
+    AppendNumberWithSeparator(output, d.average());
   } else {
     output << output_separator << '0';
   }
@@ -787,11 +805,7 @@ do_three_column_output(const IWString &id,
   for (int i = 0; i < nn; ++i) {
     output << first_token_id << output_separator << neighbours[i]->id();
 
-    if (fraction_as_string.active()) {
-      fraction_as_string.append_number(output, neighbours[i]->distance());
-    } else {
-      output << output_separator << neighbours[i]->distance();
-    }
+    AppendNumberWithSeparator(output, neighbours[i]->distance());
 
     output << '\n';
 
@@ -1681,7 +1695,10 @@ write_normalised_histogram(const IWHistogram &nearest_neighbour_histogram,
 
     float y = static_cast<float>(raw_counts[i]) / float_max_count;
 
-    stream_for_nearest_neighbour_histogram << d << output_separator << y << '\n';
+    WriteBareNumber(stream_for_nearest_neighbour_histogram, d);
+    stream_for_nearest_neighbour_histogram << output_separator;
+    WriteBareNumber(stream_for_nearest_neighbour_histogram, y);
+    stream_for_nearest_neighbour_histogram << '\n';
   }
 
   return 1;
@@ -2548,10 +2565,17 @@ plotnn(int argc, char **argv) {
     iwdigits.append_to_each_stored_string(output_separator);
   }
 
+  IWString output_separator_string(output_separator);
+  number_as_string.set_leading_string(output_separator_string);
+  if (!number_as_string.initialise(0.0, 1.0, output_precision) ||
+      !bare_number_as_string.initialise(0.0, 1.0, output_precision)) {
+    cerr << "Cannot initialise fractional output caches\n";
+    return 1;
+  }
+
   if (!cl.option_present('w')) {
     if (three_column_output) {
-      IWString tmp(output_separator);
-      fraction_as_string.set_leading_string(tmp);
+      fraction_as_string.set_leading_string(output_separator_string);
     }
 
     fraction_as_string.initialise(0.0, 1.0, output_precision);
@@ -2654,7 +2678,10 @@ plotnn(int argc, char **argv) {
     constexpr char kSep = ',';
     stream_for_spread_distances << "sel,distance\n";
     for (uint32_t i = 0; i < spread_distances.size(); ++i) {
-      stream_for_spread_distances << i << kSep << spread_distances[i] << '\n';
+      stream_for_spread_distances << i << kSep;
+      IWString tmp;
+      AppendBareNumber(tmp, spread_distances[i]);
+      stream_for_spread_distances << tmp << '\n';
       stream_for_spread_distances.write_if_buffer_holds_more_than(IW_FLUSH_BUFFER);
     }
   }

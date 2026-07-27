@@ -3,6 +3,7 @@
   "test": [
     {
       "name": "benzene",
+      "difftool": "same_structures -s",
       "shellScript": {
         "scriptName": "benzene.sh"
       }

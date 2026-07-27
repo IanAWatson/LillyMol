@@ -1,6 +1,6 @@
 {
   "executable": "dicer",
-  "difftool": "same_structures",
+  "difftool": "same_structures -s",
   "difftool_options": "-S 1",
   "default_command_components": [
       "-c"

@@ -55,6 +55,8 @@ Options:
  -p <text>      write the parent before each chemotype; append <text> to parent name.
                 Use -p . or -p def for no parent annotation.
  -F <fname>      write accumulated dicer_data::DicerFragment textproto summary.
+ -U <prefix>     with -F, assign DicerFragment.id and append it to chemotype names.
+                 Use -U . or -U def to append the bare id.
  -z i|ignore    ignore molecules not matching any query.
  -z f|first     use the first embedding if a query matches multiple ring systems.
  -S <stem>      output file stem; default stdout.
@@ -82,6 +84,8 @@ class Options {
   int _write_parent = 0;
   IWString _parent_annotation;
   IWString _summary_fname;
+  int _write_unique_chemotype_id = 0;
+  IWString _unique_chemotype_id_prefix;
 
   resizable_array_p<Substructure_Query> _queries;
   chemotypes::ChemotypeOptions _chemotype_options;
@@ -107,7 +111,7 @@ class Options {
   int Initialise(Command_Line& cl);
   int Preprocess(Molecule& m);
   int Process(Molecule& m, Molecule_Output_Object& output);
-  int AccumulateChemotype(Molecule& m, const IWString& parent_name);
+  int AccumulateChemotype(Molecule& m, const IWString& parent_name, uint32_t& chemotype_id);
   int WriteSummary();
   int Report(std::ostream& output) const;
 
@@ -193,6 +197,19 @@ Options::Initialise(Command_Line& cl) {
     _summary_fname = cl.string_value('F');
   }
 
+  if (cl.option_present('U')) {
+    _write_unique_chemotype_id = 1;
+    const_IWSubstring u = cl.string_value('U');
+    if (u != '.' && u != "def" && u != "default") {
+      _unique_chemotype_id_prefix = u;
+    }
+  }
+
+  if (_write_unique_chemotype_id && _summary_fname.empty()) {
+    cerr << "The unique chemotype id option (-U) requires summary accumulation (-F)\n";
+    return 0;
+  }
+
   if (cl.option_present('x')) {
     _chemotype_options.ignore_singly_connected_attached_atoms = 1;
   }
@@ -267,6 +284,13 @@ Options::Initialise(Command_Line& cl) {
     if (! _summary_fname.empty()) {
       cerr << "Will write chemotype summary to '" << _summary_fname << "'\n";
     }
+    if (_write_unique_chemotype_id) {
+      cerr << "Will append unique chemotype ids to chemotype names";
+      if (! _unique_chemotype_id_prefix.empty()) {
+        cerr << " with prefix '" << _unique_chemotype_id_prefix << "'";
+      }
+      cerr << '\n';
+    }
     if (_chemotype_options.include_tied_adjacent_ring_systems) {
       cerr << "Will include adjacent ring systems tied at the -n cutoff distance\n";
     }
@@ -320,7 +344,7 @@ Options::Process(Molecule& m, Molecule_Output_Object& output) {
       m, _queries, _chemotype_options, _scratch, match, _atom_typing_ptr);
 
   switch (status) {
-    case chemotypes::ChemotypeQueryMatchStatus::kMatched:
+    case chemotypes::ChemotypeQueryMatchStatus::kMatched: {
       if (parent) {
         if (! _parent_annotation.empty()) {
           parent->append_to_name(_parent_annotation);
@@ -330,11 +354,18 @@ Options::Process(Molecule& m, Molecule_Output_Object& output) {
         }
         ++_parent_molecules_written;
       }
-      if (! AccumulateChemotype(m, parent_name)) {
+      uint32_t chemotype_id = 0;
+      if (! AccumulateChemotype(m, parent_name, chemotype_id)) {
         return 0;
+      }
+      if (_write_unique_chemotype_id) {
+        IWString suffix;
+        suffix << ' ' << _unique_chemotype_id_prefix << chemotype_id;
+        m.append_to_name(suffix);
       }
       ++_molecules_written;
       return output.write(m);
+    }
 
     case chemotypes::ChemotypeQueryMatchStatus::kNoQueryMatch:
       ++_molecules_not_matching_queries;
@@ -379,7 +410,7 @@ DicerIsotope(const chemotypes::ChemotypeOptions& options,
 }
 
 int
-Options::AccumulateChemotype(Molecule& m, const IWString& parent_name) {
+Options::AccumulateChemotype(Molecule& m, const IWString& parent_name, uint32_t& chemotype_id) {
   if (_summary_fname.empty()) {
     return 1;
   }
@@ -388,15 +419,21 @@ Options::AccumulateChemotype(Molecule& m, const IWString& parent_name) {
   auto iter = _chemotype.find(usmi);
   if (iter != _chemotype.end()) {
     iter->second.set_n(iter->second.n() + 1);
+    chemotype_id = iter->second.id();
     ++_duplicate_chemotypes;
     return 1;
   }
+
+  chemotype_id = _chemotype.size();
 
   dicer_data::DicerFragment proto;
   proto.set_smi(usmi.data(), usmi.length());
   proto.set_par(parent_name.data(), parent_name.length());
   proto.set_nat(m.natoms());
   proto.set_n(1);
+  if (_write_unique_chemotype_id) {
+    proto.set_id(chemotype_id);
+  }
 
   const dicer_data::Isotope iso = DicerIsotope(_chemotype_options, _atom_typing_ptr);
   if (iso != dicer_data::NONE) {
@@ -511,7 +548,7 @@ Chemotypes(Options& options, const char* fname, FileType input_type,
 
 int
 Chemotypes(int argc, char** argv) {
-  Command_Line cl(argc, argv, "vE:A:g:cli:o:S:F:q:s:n:r:D:P:I:up:xtz:");
+  Command_Line cl(argc, argv, "vE:A:g:cli:o:S:F:U:q:s:n:r:D:P:I:up:xtz:");
 
   if (cl.unrecognised_options_encountered()) {
     cerr << "Unrecognised options encountered\n";

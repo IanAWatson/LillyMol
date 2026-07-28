@@ -52,6 +52,12 @@
       "args": [
         "-s '[N]' -z i -i smi -F summary.textproto #{indir}/input.smi"
       ]
+    },
+    {
+      "name": "unique_chemotype_id",
+      "args": [
+        "-s '[N]' -z i -i smi -F summary.textproto -U CT #{indir}/input.smi"
+      ]
     }
   ]
 }

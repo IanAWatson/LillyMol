@@ -1206,12 +1206,11 @@ cc_binary(
     }),
     deps = [
         ":nearneighbours_cc_proto",
-        "//Foundational/accumulator",
+        ":train_test_split_activity",
         "//Foundational/cmdline:iwcmdline",
         "//Foundational/data_source:iwstring_data_source",
         "//Foundational/data_source:iwtfdata_record",
         "//Foundational/iwmisc",
-        "//Foundational/iwmisc:iw_tabular_data",
         "//Foundational/iwstring:absl_hash",
         "@com_google_absl//absl/container:flat_hash_map",
     ] +
@@ -1219,6 +1218,29 @@ cc_binary(
       "darwin": [ "@homebrew_openmp"],
       "//conditions:default": []
     }),
+)
+
+cc_library(
+    name = "train_test_split_activity",
+    srcs = ["train_test_split_activity.cc"],
+    hdrs = ["train_test_split_activity.h"],
+    visibility = ["//visibility:public"],
+    deps = [
+        "//Foundational/iwmisc:iw_tabular_data",
+        "//Foundational/iwstring",
+        "//Foundational/iwstring:absl_hash",
+        "@com_google_absl//absl/container:flat_hash_map",
+    ],
+)
+
+cc_test(
+    name = "train_test_split_activity_test",
+    timeout = "short",
+    srcs = ["train_test_split_activity_test.cc"],
+    deps = [
+        ":train_test_split_activity",
+        "@googletest//:gtest_main",
+    ],
 )
 
 cc_binary(

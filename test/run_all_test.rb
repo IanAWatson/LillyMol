@@ -180,7 +180,14 @@ def get_test_proto(options, dirname, test_json)
   end
   contents = File.read(config)
   $stderr << "Contents #{contents}\n" if options.verbose
-  proto = LillymolTests::TestCase.decode_json(contents)
+  begin
+    proto = LillymolTests::TestCase.decode_json(contents)
+  rescue => e
+    $stderr << "get_test_proto: #{dirname} bad json #{e.message}\n"
+    $stderr << contents
+    return nil
+  end
+
   $stderr << "proto #{proto}\n" if options.verbose
   return proto
 end
@@ -457,7 +464,14 @@ def run_tests_in_dir(options, dirname, parent_tmpdir)
   json_fname = File.join(dirname, 'tests.json')
   contents = File.read(json_fname)
   $stderr << "Contents #{contents}\n" if options.verbose
-  proto = LillymolTests::TestCases.decode_json(contents)
+  begin
+    proto = LillymolTests::TestCases.decode_json(contents)
+  rescue => e
+    $stderr << "run_tests_in_dir: #{dirname} bad json #{e.message}\n"
+    $stderr << contents
+    return 0, 0
+  end
+
   if proto.test.empty?
     $stderr << "No tests in #{proto}\n"
     return 0, 0

@@ -244,7 +244,7 @@ Elements_to_Remove::construct_from_command_line(Command_Line& cl, int verbose,
         }*/
 
     if ("help" == ele) {
-      cerr << "Removes elements, specify atomic symbol or atomic number\n";
+      cerr << "Elements_to_Remove:removes elements, must specify atoms to be removed\n";
       display_element_matcher_syntax(cerr);
       exit(0);
     }

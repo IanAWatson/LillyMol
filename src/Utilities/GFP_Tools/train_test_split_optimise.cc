@@ -14,20 +14,21 @@
 #include <string>
 #include <tuple>
 #include <unordered_map>
+#include <vector>
 
 #include "absl/container/flat_hash_map.h"
 
 #define REPORT_PROGRESS_IMPLEMENTATION
 
-#include "Foundational/accumulator/accumulator.h"
 #include "Foundational/cmdline/cmdline.h"
 #include "Foundational/data_source/iwstring_data_source.h"
 #include "Foundational/data_source/tfdatarecord.h"
 #include "Foundational/iwmisc/misc.h"
-#include "Foundational/iwmisc/iw_tabular_data.h"
 #include "Foundational/iwmisc/report_progress.h"
 #include "Foundational/iwstring/absl_hash.h"
 #include "Foundational/iwstring/iwstring.h"
+
+#include "Utilities/GFP_Tools/train_test_split_activity.h"
 
 #ifdef BUILD_BAZEL
 #include "Utilities/GFP_Tools/nearneighbours.pb.h"
@@ -61,8 +62,9 @@ train_test_split_opt -f 0.85 -n 1 -S OPT -o 2000000 -r 20000 -x 20000 -h 8 file.
  -S <stem>           write splits to <stem>, <stem>R<n> and <stem>E<n>.
  -X                  also write cross split summary stats - expensive to compute.
  -C <fname>          weighted samples. A mapping from ID to number of instances.
- -A <fname>          descriptor file containing activity values.
-                     splits are characterised by activity ranges in train and test splits.
+ -A <fname>          activity file with header and id/activity columns. Repeat for multiple profiles.
+ -A buckets=<n>      set default activity bucket count for subsequent -A files.
+ -A <fname>:buckets=<n>[:quantile|:width] per-file activity bucketisation.
  -o <nopt>           number of optimisation steps to try per split.
  -t <sec>            run each split for <sec> seconds.
  -r <n>              report progress every <n> steps.
@@ -333,8 +335,8 @@ class Optimise {
     std::string* _name;
 
     // If the -A option is specified.
-    std::unique_ptr<float[]> _activity;
-    double _average_activity = 0.0f;
+    ActivityProfileSet _activity;
+    std::vector<uint32_t> _weight;
 
     // Keep track of how many times each needle appears in train.
     int* _times_in_train;
@@ -359,8 +361,6 @@ class Optimise {
     int ReadCounts(IWString& fname);
     int ReadCounts(iwstring_data_source& input);
     int ReadCount(const const_IWSubstring& buffer);
-
-    int ReadActivityData(IWString& fname);
 
     uint32_t GetCount(const IWString& id) const;
 
@@ -391,6 +391,7 @@ class Optimise {
     void AccumulateStats();
 
     int MaybeReportActivityDistribution(std::ostream& output) const;
+    std::vector<int> CurrentTrainMembership() const;
 
   public:
     Optimise();
@@ -401,6 +402,7 @@ class Optimise {
     int ReportSize(std::ostream& output) const;
 
     int ReadFingerprints(const char* fname);
+    int BuildActivityProfiles();
 
     int Doit();
 
@@ -569,57 +571,17 @@ Optimise::Initialise(const Command_Line& cl) {
   }
 
   if (cl.option_present('A')) {
-    IWString fname = cl.string_value('A');
-    if (! ReadActivityData(fname)) {
-      cerr << "Cannot read activity data from '" << fname << "'\n";
-      return 0;
+    for (int i = 0; i < cl.option_count('A'); ++i) {
+      const const_IWSubstring directive = cl.string_value('A', i);
+      if (! _activity.AddDirective(directive)) {
+        cerr << "Cannot process activity directive '" << directive << "'\n";
+        return 0;
+      }
+    }
+    if (_verbose) {
+      cerr << "Read " << cl.option_count('A') << " activity directives\n";
     }
   }
-
-  return 1;
-}
-
-int
-Optimise::ReadActivityData(IWString& fname) {
-  // could/sould use float, but the double template is instantiated...
-  IW_Tabular_Data<double> reader;
-  reader.set_has_header(1);
-  reader.set_first_column_is_identifier(1);
-
-  if (! reader.build(fname.null_terminated_chars(), ' ')) {
-    cerr << "Optimise::ReadActivityData:cannot read activity data from '" << fname << "'\n";
-    return 0;
-  }
-
-  absl::flat_hash_map<IWString, uint32_t> id_to_ndx;
-  for (uint32_t i = 0; i < _number_needles; ++i) {
-    id_to_ndx[_name[i]] = i;
-  }
-
-  _activity = std::make_unique<float[]>(_number_needles);
-
-  // We must have an activity value for each needle.
-  uint32_t values_read = 0;
-
-  for (int i = 0; i < reader.nrows(); ++i) {
-    const IWString& id = reader.ids()[i];
-    const float a = reader.value(i, 0);
-    auto f = id_to_ndx.find(id);
-    if (f == id_to_ndx.end()) {
-      continue;
-    }
-    _activity[f->second] = a;
-    ++values_read;
-  }
-
-  if (values_read != _number_needles) {
-    cerr << "Optimise::ReadActivityData:have " << _number_needles <<
-            " items but only read " << values_read << " activity values\n";
-    return 0;
-  }
-
-  double sum = std::accumulate(_activity.get(), _activity.get() + _number_needles, 0.0);
-  _average_activity = sum / static_cast<float>(_number_needles);
 
   return 1;
 }
@@ -904,6 +866,7 @@ Optimise::ReadNeighbours(const char* fname,
   _smiles = new std::string[_number_needles];
   _name = new std::string[_number_needles];
   _times_in_train = new_int(_number_needles);
+  _weight.resize(_number_needles, 1);
 
   _uniform = std::make_unique<std::uniform_int_distribution<uint32_t>>(0, _number_needles - 1);
 
@@ -926,6 +889,7 @@ Optimise::ReadNeighbours(const char* fname,
 
     const uint32_t count1 = GetCount(tmp);
     _needle[ndx].set_count(count1);
+    _weight[ndx] = count1;
 
     for (const nnbr::Nbr& nbr : needle->nbr()) {
       const auto iter = id_to_ndx.find(nbr.id());
@@ -964,6 +928,40 @@ Optimise::ReadNeighbours(const char* fname,
 #endif
 
   return _number_needles;
+}
+
+int
+Optimise::BuildActivityProfiles() {
+  if (! _activity.has_pending()) {
+    return 1;
+  }
+
+  std::vector<std::string> id;
+  id.reserve(_number_needles);
+  for (uint32_t i = 0; i < _number_needles; ++i) {
+    id.push_back(_name[i]);
+  }
+
+  if (! _activity.Build(id, _weight)) {
+    cerr << "Optimise::BuildActivityProfiles:cannot build activity profiles\n";
+    return 0;
+  }
+
+  if (_verbose) {
+    cerr << "Read " << _activity.number_profiles() << " activity profiles\n";
+  }
+
+  return 1;
+}
+
+std::vector<int>
+Optimise::CurrentTrainMembership() const {
+  std::vector<int> result(_number_needles);
+  for (uint32_t i = 0; i < _number_needles; ++i) {
+    result[i] = _needle[i].in_train();
+  }
+
+  return result;
 }
 
 // Return true if we are now > `seconds` seconds from `tzero`.
@@ -1009,6 +1007,12 @@ Optimise::MakeSplit(int split) {
   }
 
   RandomSplit();
+  if (_activity.active()) {
+    const std::vector<int> in_train = CurrentTrainMembership();
+    if (! _activity.InitialiseSplit(in_train, _weight)) {
+      return 0;
+    }
+  }
   uint64_t score = RecomputeCurrentScore();
   const uint64_t starting_score = score;
   if (_verbose) {
@@ -1037,6 +1041,8 @@ Optimise::MakeSplit(int split) {
 
   for (uint32_t j = 0; j < _nopt; ++j) {
     auto [i1, i2] = ChooseTwo();
+    const uint32_t out_of_train = _needle[i1].in_train() ? i1 : i2;
+    const uint32_t into_train = _needle[i1].in_train() ? i2 : i1;
     _needle[i1].invert_train();
     _needle[i2].invert_train();
 
@@ -1141,6 +1147,9 @@ Optimise::MakeSplit(int split) {
       _needle[i2].invert_train();
     } else { // Better, sets more separated, accept.
       score = new_score;
+      if (_activity.active()) {
+        _activity.ApplySwap(out_of_train, into_train, _weight);
+      }
       ++steps_accepted;
       last_successful_switch = j;
     }
@@ -1192,27 +1201,11 @@ Optimise::AccumulateStats() {
 
 int
 Optimise::MaybeReportActivityDistribution(std::ostream& output) const {
-  if (!_activity) {
+  if (! _activity.active()) {
     return 1;
   }
 
-  Accumulator<double> acc_train, acc_test;
-
-  for (uint32_t i = 0; i < _number_needles; ++i) {
-    if (_needle[i].in_train()) {
-      acc_train.extra(_activity[i]);
-    } else {
-      acc_test.extra(_activity[i]);
-    }
-  }
-
-  output << "train " << static_cast<float>(acc_train.minval()) << ' ' <<
-                        static_cast<float>(acc_train.average()) << ' ' << 
-                        static_cast<float>(acc_train.maxval()) << '\n';
-  output << "test  " << static_cast<float>(acc_test.minval()) << ' ' <<
-                        static_cast<float>(acc_test.average()) << ' ' << 
-                        static_cast<float>(acc_test.maxval()) << '\n';
-  output << "ave   " << static_cast<float>(_average_activity) << '\n';
+  output << "activity penalty " << _activity.current_penalty() << '\n';
 
   return output.good();
 }
@@ -1444,6 +1437,11 @@ Main(int argc, char** argv) {
 
   if (! optimise.ReadFingerprints(cl[0])) {
     cerr << "Cannot read TFDataRecord nearneighbour proto data '" << cl[0] << "'\n";
+    return 1;
+  }
+
+  if (! optimise.BuildActivityProfiles()) {
+    cerr << "Cannot build activity profiles\n";
     return 1;
   }
 

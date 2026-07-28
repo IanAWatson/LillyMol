@@ -22,7 +22,7 @@
     {
       "name": "statistics",
       "args": [
-        "-S stats #{indir}/in.smi"
+        "-S stats -n #{indir}/in.smi"
       ]
     },
     {

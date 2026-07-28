@@ -18,6 +18,7 @@
 
     {
       "name": "atom_types_ARZ",
+      "difftool": "same_structures -s",
       "shellScript": {
         "scriptName": "benzene.sh"
       }
@@ -25,6 +26,7 @@
 
     {
       "name": "atom_types_degenerate",
+      "difftool": "same_structures -s",
       "shellScript": {
         "scriptName": "benzene.sh"
       }

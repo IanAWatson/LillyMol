@@ -99,15 +99,17 @@ Element_Matcher::operator_less_less(std::ostream& os) const {
 void
 display_element_matcher_syntax(std::ostream& os) {
   // clang-format off
-  os << "Element_Matcher recognised syntax options\n";
-  os << " RX=<regexp>      elements whose symbols match <regexp>, e.g. 'RX=^[C,O]$'\n";
-  os << " norganic         organic elements\n";
-  os << " nonorganic       non organic elements\n";
-  os << " nonperiodic      elements not in the periodic table\n";
-  os << " <sym>            match the element with symbol <sym>\n";
-  os << "CSV:<sym1>,<sym2>  multiple specifications in one token\n";
-  os << " <n><sym>         match isotope <n> of <sym>\n";
-//os << " *<sym>           match all isotopic variants of <sym>\n";   not sure this works properly, it just converts to atomic number match, which isn't what should happen
+  os << R"(Element_Matcher recognised syntax options
+ norganic           organic elements.
+ nonorganic         non organic elements.
+ nonperiodic        elements not in the periodic table.
+ <sym>              match the element with symbol <sym>:        C
+ CSV:<sym1>,<sym2>  multiple specifications in one token:       CSV:F,Cl,Br,I
+ RX=<regexp>        elements whose symbols match <regexp>:      'RX=^[C,O]$'
+ <n>                atoms with isotope <n>:                     1
+ <n><sym>           match isotope <n> of <sym>:                 3C
+)";
+
   // clang-format on
 
   return;

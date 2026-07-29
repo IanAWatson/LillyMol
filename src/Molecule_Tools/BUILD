@@ -3024,11 +3024,31 @@ cc_binary(
         "medchemwizard.cc",
     ],
     deps = [
+        ":medchemwizard_lib",
         "//Foundational/cmdline:iwcmdline",
         "//Foundational/iwmisc",
         "//Molecule_Lib:iwmolecule",
+        "//Molecule_Lib:moleculeio",
+    ],
+)
+
+cc_library(
+    name = "medchemwizard_lib",
+    srcs = [
+        "medchemwizard_lib.cc",
+    ],
+    hdrs = [
+        "medchemwizard_lib.h",
+    ],
+    visibility = ["//visibility:public"],
+    deps = [
+        "//Foundational/data_source:iwstring_data_source",
+        "//Foundational/iwmisc",
+        "//Foundational/iwstring",
+        "//Molecule_Lib:iwmolecule",
         "//Molecule_Lib:iwreaction",
         "//Molecule_Lib:moleculeio",
+        "@com_google_protobuf//:protobuf",
     ],
 )
 

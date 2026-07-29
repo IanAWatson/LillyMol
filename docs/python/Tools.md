@@ -85,6 +85,46 @@ The acceptor count follows the simple Lipinski definition: nitrogen and oxygen
 atoms are counted as acceptors. The donor count is the number of nitrogen or
 oxygen atoms with at least one hydrogen.
 
+## MedchemWizard
+
+The `MedchemWizard` class applies the LillyMol MedchemWizard transformation set
+to a `Molecule` and returns generated products as Python `Molecule` objects. It
+is useful when analogue generation needs to be embedded in a Python workflow
+rather than run as a command-line text pipeline.
+
+```python
+from lillymol import MolFromSmiles
+from lillymol_tools import MedchemWizard
+
+mol = MolFromSmiles("CCO ethanol")
+
+wizard = MedchemWizard()
+wizard.initialise_from_environment()
+wizard.set_append_names(True)
+wizard.set_name_separator(" ")
+wizard.set_max_atoms(25)
+
+products = wizard.process(mol)
+for product in products:
+    print(product.smiles(), product.name())
+```
+
+`initialise_from_environment()` loads
+`${LILLYMOL_HOME}/data/MedchemWizard/REACTIONS`. Use `read_reactions(fname)` for
+a custom reaction-list file. The input molecule is copied internally and is not
+modified.
+
+The Python interface also supports protected-atom queries:
+
+```python
+wizard.add_do_not_change_smarts("[CX3](=O)[OH]")
+wizard.set_ignore_do_not_change_queries_not_matching(True)
+products = wizard.process(mol)
+```
+
+See the command-line [medchemwizard documentation](/docs/Molecule_Tools/medchemwizard.md)
+for option details and the full Python method list.
+
 ## Selimsteg
 Selimsteg is an anadrome of getsmiles. At Lilly a variety of selimsteg
 tools are used to fetch the smiles for an identifier, from BerkeleyDB

@@ -1,5 +1,6 @@
 #include "Molecule_Tools/medchemwizard_lib.h"
 
+#include <cstdlib>
 #include <iostream>
 #include <memory>
 #include <optional>
@@ -146,6 +147,20 @@ MedchemWizard::ReadReactions(const char* fname) {
   return _rxn.number_elements();
 }
 
+int
+MedchemWizard::InitialiseFromEnvironment() {
+  const char* lillymol_home = getenv("LILLYMOL_HOME");
+  if (lillymol_home == nullptr) {
+    cerr << "MedchemWizard::InitialiseFromEnvironment:LILLYMOL_HOME not defined\n";
+    return 0;
+  }
+
+  IWString fname(lillymol_home);
+  fname << "/data/MedchemWizard/REACTIONS";
+
+  return ReadReactions(fname.null_terminated_chars());
+}
+
 void
 MedchemWizard::Preprocess(Molecule& m) {
   if (_options.reduce_to_largest_fragment) {
@@ -268,7 +283,7 @@ MedchemWizard::MaybeTruncateNhits(int nhits, IWReaction& reaction, Molecule& m) 
 int
 MedchemWizard::GenerateProducts(Molecule& m, const IWString& mname, int depth,
                        const int* do_not_change, IW_STL_Hash_Set& smiles_hash,
-                       resizable_array_p<Molecule>& output) {
+                       ProductCallback& callback) {
   Molecule_to_Match target(&m);
 
   const int n = _rxn.number_elements();
@@ -315,11 +330,14 @@ MedchemWizard::GenerateProducts(Molecule& m, const IWString& mname, int depth,
 
       product->set_name(product_molecule_name);
       Molecule* product_ptr = product.get();
-      output << product.release();
+
+      if (! callback(product)) {
+        return 0;
+      }
 
       if (depth < _options.max_depth) {
         if (! GenerateProducts(*product_ptr, product_molecule_name, depth + 1, do_not_change,
-                              smiles_hash, output)) {
+                              smiles_hash, callback)) {
           return 0;
         }
       }
@@ -332,9 +350,13 @@ MedchemWizard::GenerateProducts(Molecule& m, const IWString& mname, int depth,
 }
 
 int
-MedchemWizard::ProcessToArray(Molecule& m, resizable_array_p<Molecule>& output) {
+MedchemWizard::Process(Molecule& m, ProductCallback callback) {
   if (_molecules_hitting_reaction == nullptr) {
-    cerr << "MedchemWizard::ProcessToArray:no reactions loaded\n";
+    cerr << "MedchemWizard::Process:no reactions loaded\n";
+    return 0;
+  }
+  if (! callback) {
+    cerr << "MedchemWizard::Process:no product callback specified\n";
     return 0;
   }
 
@@ -347,31 +369,28 @@ MedchemWizard::ProcessToArray(Molecule& m, resizable_array_p<Molecule>& output) 
   }
 
   IW_STL_Hash_Set within_molecule_hash;
-  IW_STL_Hash_Set& smiles_hash = _options.unique_within_molecule ? within_molecule_hash : _smiles_hash;
+  IW_STL_Hash_Set& smiles_hash =
+      _options.unique_within_molecule ? within_molecule_hash : _smiles_hash;
 
   IWString mname(m.name());
-  return GenerateProducts(m, mname, 0, do_not_change.get(), smiles_hash, output);
+  return GenerateProducts(m, mname, 0, do_not_change.get(), smiles_hash, callback);
 }
 
 int
-MedchemWizard::WriteProducts(const resizable_array_p<Molecule>& products,
-                             IWString_and_File_Descriptor& output) const {
-  for (Molecule* product : products) {
-    output << product->smiles() << ' ' << product->name() << '\n';
-    output.write_if_buffer_holds_more_than(8192);
-  }
-
-  return output.good();
+MedchemWizard::ProcessToArray(Molecule& m, resizable_array_p<Molecule>& output) {
+  return Process(m, [&output](std::unique_ptr<Molecule>& product) {
+    output << product.release();
+    return 1;
+  });
 }
 
 int
 MedchemWizard::ProcessToStream(Molecule& m, IWString_and_File_Descriptor& output) {
-  resizable_array_p<Molecule> products;
-  if (! ProcessToArray(m, products)) {
-    return 0;
-  }
-
-  return WriteProducts(products, output);
+  return Process(m, [&output](std::unique_ptr<Molecule>& product) {
+    output << product->smiles() << ' ' << product->name() << '\n';
+    output.write_if_buffer_holds_more_than(8192);
+    return output.good();
+  });
 }
 
 }  // namespace medchemwizard

@@ -203,6 +203,7 @@ pybind_extension(
         "//Molecule_Tools:dicer_api",
         "//Molecule_Tools:iwdescr_lib_shared",
         "//Molecule_Tools:jwcats_lib",
+        "//Molecule_Tools:medchemwizard_lib",
         "//Molecule_Tools:nvrtspsa",
         "//Molecule_Tools:qed_lib",
         "//Molecule_Tools:ring_replacement_lib",
@@ -241,6 +242,15 @@ py_test(
 py_test(
     name = "lillymol_tools_qed_test",
     srcs = ["lillymol_tools_qed_test.py"],
+    deps = [
+        ":lillymol",
+        ":lillymol_tools",
+    ],
+)
+
+py_test(
+    name = "lillymol_tools_medchemwizard_test",
+    srcs = ["lillymol_tools_medchemwizard_test.py"],
     deps = [
         ":lillymol",
         ":lillymol_tools",

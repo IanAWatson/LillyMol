@@ -2,6 +2,7 @@
 #define MOLECULE_TOOLS_MEDCHEMWIZARD_LIB_H_
 
 #include <cstdint>
+#include <functional>
 #include <limits>
 #include <memory>
 
@@ -15,6 +16,12 @@
 #include "Molecule_Lib/substructure.h"
 
 namespace medchemwizard {
+
+// Called once for each generated product that passes filtering. The callback can leave
+// ownership with the library, or release the unique_ptr into a longer-lived container.
+// If recursive generation is enabled, released products must remain alive until
+// Process returns; the built-in ProcessToArray and ProcessToStream adapters satisfy this.
+using ProductCallback = std::function<int(std::unique_ptr<Molecule>&)>;
 
 struct Options {
   int verbose = 0;
@@ -62,9 +69,7 @@ class MedchemWizard {
   int MaybeTruncateNhits(int nhits, IWReaction& reaction, Molecule& m);
   int CheckUniqueness(Molecule& m, int query_just_run, IW_STL_Hash_Set& smiles_hash);
   int GenerateProducts(Molecule& m, const IWString& mname, int depth, const int* do_not_change,
-                       IW_STL_Hash_Set& smiles_hash, resizable_array_p<Molecule>& output);
-  int WriteProducts(const resizable_array_p<Molecule>& products,
-                    IWString_and_File_Descriptor& output) const;
+                       IW_STL_Hash_Set& smiles_hash, ProductCallback& callback);
 
  public:
   MedchemWizard();
@@ -88,10 +93,12 @@ class MedchemWizard {
   }
 
   int ReadReactions(const char* fname);
+  int InitialiseFromEnvironment();
   int number_reactions() const {
     return _rxn.number_elements();
   }
 
+  int Process(Molecule& m, ProductCallback callback);
   int ProcessToArray(Molecule& m, resizable_array_p<Molecule>& output);
   int ProcessToStream(Molecule& m, IWString_and_File_Descriptor& output);
 

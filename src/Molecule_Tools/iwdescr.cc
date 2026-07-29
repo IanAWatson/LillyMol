@@ -1112,6 +1112,8 @@ IWDescrMainOptions::WriteHeader(const IWDescr& iwdescr,
 
   output << '\n';
 
+  output.write_if_buffer_holds_more_than(8192);
+
   if (_verbose) {
     std::cerr << "Output will contain " << n << " descriptors\n";
   }

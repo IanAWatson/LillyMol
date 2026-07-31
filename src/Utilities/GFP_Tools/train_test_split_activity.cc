@@ -6,7 +6,6 @@
 #include <limits>
 #include <numeric>
 #include <string>
-#include <unordered_map>
 #include <utility>
 
 #include "absl/container/flat_hash_map.h"
@@ -57,6 +56,39 @@ ApplyDirective(const const_IWSubstring& token, ActivityProfileOptions& options) 
     return 1;
   }
 
+  if (token.starts_with("weight=") || token.starts_with("objective_weight=")) {
+    const_IWSubstring value(token);
+    if (token.starts_with("weight=")) {
+      value.remove_leading_chars(7);
+    } else {
+      value.remove_leading_chars(17);
+    }
+    if (! value.numeric_value(options.objective_weight) || options.objective_weight == 0) {
+      cerr << "Invalid activity profile objective weight '" << token << "'\n";
+      return 0;
+    }
+    return 1;
+  }
+  if (token.starts_with("tolerance=")) {
+    const_IWSubstring value(token);
+    value.remove_leading_chars(10);
+    if (! value.numeric_value(options.tolerance) || options.tolerance > 100) {
+      cerr << "Invalid activity tolerance '" << token << "'\n";
+      return 0;
+    }
+    return 1;
+  }
+
+  if (token.starts_with("tol=")) {
+    const_IWSubstring value(token);
+    value.remove_leading_chars(4);
+    if (! value.numeric_value(options.tolerance) || options.tolerance > 100) {
+      cerr << "Invalid activity tolerance '" << token << "'\n";
+      return 0;
+    }
+    return 1;
+  }
+
   if (token.starts_with("bucket=")) {
     const_IWSubstring value(token);
     value.remove_leading_chars(7);
@@ -78,6 +110,12 @@ AbsDiff(uint64_t v1, uint64_t v2) {
 }
 
 }  // namespace
+
+int64_t
+CombinedActivityDistanceDelta(int64_t distance_delta, int64_t activity_delta,
+                              uint32_t activity_objective_weight) {
+  return distance_delta + static_cast<int64_t>(activity_objective_weight) * activity_delta;
+}
 
 int
 ActivityProfileSet::AddDirective(const const_IWSubstring& directive) {
@@ -117,11 +155,12 @@ ActivityProfileSet::AddDirective(const const_IWSubstring& directive) {
 
 int
 ActivityProfileSet::Build(const std::vector<std::string>& id,
-                          const std::vector<uint32_t>& weight) {
+                          const std::vector<uint32_t>& sample_weight,
+                          int verbose) {
   _profile.reserve(_pending.size());
   for (const ActivityProfileOptions& options : _pending) {
     ActivityProfile profile;
-    if (! profile.Build(options, id, weight)) {
+    if (! profile.Build(options, id, sample_weight, verbose)) {
       return 0;
     }
     _profile.push_back(std::move(profile));
@@ -133,13 +172,15 @@ ActivityProfileSet::Build(const std::vector<std::string>& id,
 int
 ActivityProfile::Build(const ActivityProfileOptions& options,
                        const std::vector<std::string>& id,
-                       const std::vector<uint32_t>& weight) {
-  if (id.size() != weight.size()) {
-    cerr << "ActivityProfile::Build:size mismatch " << id.size() << " vs " << weight.size() << '\n';
+                       const std::vector<uint32_t>& sample_weight,
+                       int verbose) {
+  if (id.size() != sample_weight.size()) {
+    cerr << "ActivityProfile::Build:size mismatch " << id.size() << " vs " << sample_weight.size() << '\n';
     return 0;
   }
 
   _options = options;
+  _sample_weight = &sample_weight;
 
   IW_Tabular_Data<double> reader;
   reader.set_has_header(1);
@@ -160,81 +201,128 @@ ActivityProfile::Build(const ActivityProfileOptions& options,
   for (uint32_t i = 0; i < id.size(); ++i) {
     id_to_ndx[IWString(id[i])] = i;
   }
+  if (id_to_ndx.size() != id.size()) {
+    cerr << "ActivityProfile::Build:duplicate molecule identifiers supplied\n";
+    return 0;
+  }
 
   std::vector<double> activity(id.size(), 0.0);
   std::vector<uint8_t> seen(id.size(), 0);
+  absl::flat_hash_map<IWString, int> activity_ids_seen;
+  activity_ids_seen.reserve(reader.nrows());
   uint32_t matched = 0;
+  _activity_records_not_used = 0;
 
   for (int i = 0; i < reader.nrows(); ++i) {
     const IWString& activity_id = reader.ids()[i];
+    if (activity_ids_seen.contains(activity_id)) {
+      cerr << "ActivityProfile::Build:duplicate activity for '" << activity_id << "'\n";
+      return 0;
+    }
+    activity_ids_seen[activity_id] = 1;
+
     const auto iter = id_to_ndx.find(activity_id);
     if (iter == id_to_ndx.end()) {
+      ++_activity_records_not_used;
       continue;
     }
 
     const uint32_t ndx = iter->second;
-    if (seen[ndx]) {
-      cerr << "ActivityProfile::Build:duplicate activity for '" << activity_id << "'\n";
-      return 0;
-    }
     seen[ndx] = 1;
     activity[ndx] = reader.value(i, 0);
     ++matched;
   }
 
-  if (matched != id.size()) {
-    cerr << "ActivityProfile::Build:have " << id.size() << " items but only read " <<
-            matched << " activity values from '" << _options.fname << "'\n";
+  _observed = matched;
+  _missing = id.size() - matched;
+  if (_observed == 0) {
+    cerr << "ActivityProfile::Build:no activity values in '" << _options.fname <<
+            "' matched the molecule set\n";
     return 0;
   }
 
-  _scaled.resize(id.size());
-  const auto [min_iter, max_iter] = std::minmax_element(activity.begin(), activity.end());
-  const double minval = *min_iter;
-  const double maxval = *max_iter;
-  if (minval == maxval) {
-    std::fill(_scaled.begin(), _scaled.end(), 0);
-  } else {
-    const double range = maxval - minval;
-    for (uint32_t i = 0; i < activity.size(); ++i) {
-      int scaled = static_cast<int>(std::lround(100.0 * (activity[i] - minval) / range));
-      scaled = std::clamp(scaled, 0, 100);
-      _scaled[i] = static_cast<uint8_t>(scaled);
+  _scaled.assign(id.size(), kMissingScaled);
+  double minval = std::numeric_limits<double>::max();
+  double maxval = -std::numeric_limits<double>::max();
+  for (uint32_t i = 0; i < activity.size(); ++i) {
+    if (! seen[i]) {
+      continue;
     }
+    minval = std::min(minval, activity[i]);
+    maxval = std::max(maxval, activity[i]);
   }
 
-  return AssignBuckets(activity);
+  if (minval == maxval) {
+    cerr << "ActivityProfile::Build:all activity values in '" << _options.fname <<
+            "' are " << minval << ", no bucketisation possible\n";
+    return 0;
+  }
+
+  const double range = maxval - minval;
+  for (uint32_t i = 0; i < activity.size(); ++i) {
+    if (! seen[i]) {
+      continue;
+    }
+    int scaled = static_cast<int>(std::lround(100.0 * (activity[i] - minval) / range));
+    scaled = std::clamp(scaled, 0, 100);
+    _scaled[i] = static_cast<uint8_t>(scaled);
+  }
+
+  if (verbose) {
+    cerr << "ActivityProfile::Build '" << _options.fname << "' observed " << _observed <<
+            " missing " << _missing << " unused " << _activity_records_not_used <<
+            " min " << minval << " max " << maxval << " buckets " << _options.buckets <<
+            " weight " << _options.objective_weight << " tolerance " << _options.tolerance << "%\n";
+  }
+
+  return AssignBuckets(activity, seen, verbose);
 }
 
 int
-ActivityProfile::AssignBuckets(const std::vector<double>& activity) {
-  _bucket.resize(activity.size());
+ActivityProfile::AssignBuckets(const std::vector<double>& activity,
+                               const std::vector<uint8_t>& seen,
+                               int verbose) {
+  _bucket.assign(activity.size(), kMissingBucket);
   _total_bucket_count.assign(_options.buckets, 0);
   _train_bucket_count.assign(_options.buckets, 0);
+  _ideal_bucket_count.assign(_options.buckets, 0);
+  _tolerance.assign(_options.buckets, 0);
 
   if (_options.bucketisation == ActivityBucketisation::kEqualWidth) {
-    return AssignEqualWidthBuckets();
+    if (! AssignEqualWidthBuckets(seen)) {
+      return 0;
+    }
+  } else if (! AssignQuantileBuckets(activity, seen)) {
+    return 0;
   }
 
-  return AssignQuantileBuckets(activity);
+  return CheckBucketPopulation(verbose);
 }
 
 int
-ActivityProfile::AssignEqualWidthBuckets() {
+ActivityProfile::AssignEqualWidthBuckets(const std::vector<uint8_t>& seen) {
   for (uint32_t i = 0; i < _scaled.size(); ++i) {
-    _bucket[i] = std::min<uint32_t>(_options.buckets - 1,
-                                    (static_cast<uint32_t>(_scaled[i]) * _options.buckets) / 101);
+    if (! seen[i]) {
+      continue;
+    }
+    const uint32_t bucket = std::min<uint32_t>(_options.buckets - 1,
+                            (static_cast<uint32_t>(_scaled[i]) * _options.buckets) / 101);
+    _bucket[i] = bucket;
+    ++_total_bucket_count[bucket];
   }
 
   return 1;
 }
 
 int
-ActivityProfile::AssignQuantileBuckets(const std::vector<double>& activity) {
+ActivityProfile::AssignQuantileBuckets(const std::vector<double>& activity,
+                                        const std::vector<uint8_t>& seen) {
   std::vector<std::pair<double, uint32_t>> sorted;
-  sorted.reserve(activity.size());
+  sorted.reserve(_observed);
   for (uint32_t i = 0; i < activity.size(); ++i) {
-    sorted.emplace_back(activity[i], i);
+    if (seen[i]) {
+      sorted.emplace_back(activity[i], i);
+    }
   }
 
   std::sort(sorted.begin(), sorted.end());
@@ -250,6 +338,7 @@ ActivityProfile::AssignQuantileBuckets(const std::vector<double>& activity) {
                                 (begin * _options.buckets) / sorted.size());
     for (uint32_t i = begin; i < end; ++i) {
       _bucket[sorted[i].second] = bucket;
+      ++_total_bucket_count[bucket];
     }
     begin = end;
   }
@@ -257,13 +346,76 @@ ActivityProfile::AssignQuantileBuckets(const std::vector<double>& activity) {
   return 1;
 }
 
+int
+ActivityProfile::CheckBucketPopulation(int verbose) const {
+  uint32_t populated = 0;
+  uint32_t empty = 0;
+  for (uint32_t i = 0; i < _options.buckets; ++i) {
+    if (_total_bucket_count[i] == 0) {
+      ++empty;
+    } else {
+      ++populated;
+    }
+  }
+
+  if (verbose) {
+    cerr << "ActivityProfile::Build bucket counts for '" << _options.fname << "'";
+    for (uint32_t i = 0; i < _options.buckets; ++i) {
+      cerr << ' ' << i << ':' << _total_bucket_count[i];
+    }
+    cerr << '\n';
+  }
+
+  if (empty > 0) {
+    cerr << "ActivityProfile::Build:warning '" << _options.fname << "' has " << empty <<
+            " empty buckets\n";
+  }
+
+  if (populated <= 1) {
+    cerr << "ActivityProfile::Build:only " << populated << " populated bucket in '" <<
+            _options.fname << "'\n";
+    return 0;
+  }
+
+  if (_observed < 2 * _options.buckets) {
+    cerr << "ActivityProfile::Build:warning '" << _options.fname << "' has only " <<
+            _observed << " observations for " << _options.buckets << " buckets\n";
+  }
+
+  return 1;
+}
+
+void
+ActivityProfile::PrecomputeBucketTargets() {
+  for (uint32_t i = 0; i < _options.buckets; ++i) {
+    _ideal_bucket_count[i] = _total_bucket_count[i] * _target_train_sample_weight;
+    _tolerance[i] = (_options.tolerance == 0)
+                    ? 0
+                    : (_ideal_bucket_count[i] * _options.tolerance) / 100;
+  }
+}
+
 uint64_t
-ActivityProfile::Penalty(const std::vector<uint64_t>& train_bucket_count,
-                         uint64_t train_weight) const {
+ActivityProfile::PenaltyForBucket(uint32_t bucket, uint64_t train_bucket_count) const {
+  if (_total_sample_weight == 0) {
+    return 0;
+  }
+
+  const uint64_t actual = train_bucket_count * _total_sample_weight;
+  const uint64_t diff = AbsDiff(actual, _ideal_bucket_count[bucket]);
+
+  if (diff <= _tolerance[bucket]) {
+    return 0;
+  }
+
+  return diff - _tolerance[bucket];
+}
+
+uint64_t
+ActivityProfile::Penalty(const std::vector<uint64_t>& train_bucket_count) const {
   uint64_t penalty = 0;
   for (uint32_t i = 0; i < _options.buckets; ++i) {
-    penalty += AbsDiff(train_bucket_count[i] * _total_weight,
-                       _total_bucket_count[i] * train_weight);
+    penalty += PenaltyForBucket(i, train_bucket_count[i]);
   }
 
   return penalty;
@@ -271,66 +423,102 @@ ActivityProfile::Penalty(const std::vector<uint64_t>& train_bucket_count,
 
 int
 ActivityProfile::InitialiseSplit(const std::vector<int>& in_train,
-                                 const std::vector<uint32_t>& weight) {
-  if (in_train.size() != _bucket.size() || weight.size() != _bucket.size()) {
+                                 const std::vector<uint32_t>& sample_weight,
+                                 uint64_t total_sample_weight,
+                                 uint64_t train_sample_weight) {
+  if (in_train.size() != _bucket.size() || sample_weight.size() != _bucket.size()) {
     cerr << "ActivityProfile::InitialiseSplit:size mismatch\n";
     return 0;
   }
 
-  std::fill(_total_bucket_count.begin(), _total_bucket_count.end(), 0);
   std::fill(_train_bucket_count.begin(), _train_bucket_count.end(), 0);
-  _total_weight = 0;
-  _train_weight = 0;
+  _total_sample_weight = 0;
+  uint64_t observed_train_sample_weight = 0;
 
   for (uint32_t i = 0; i < _bucket.size(); ++i) {
     const uint32_t b = _bucket[i];
-    _total_bucket_count[b] += weight[i];
-    _total_weight += weight[i];
+    if (b == kMissingBucket) {
+      continue;
+    }
+
+    _total_sample_weight += sample_weight[i];
     if (in_train[i]) {
-      _train_bucket_count[b] += weight[i];
-      _train_weight += weight[i];
+      _train_bucket_count[b] += sample_weight[i];
+      observed_train_sample_weight += sample_weight[i];
     }
   }
 
-  _penalty = Penalty(_train_bucket_count, _train_weight);
+  if (total_sample_weight > 0 && train_sample_weight > 0) {
+    _target_train_sample_weight = (_total_sample_weight * train_sample_weight) / total_sample_weight;
+  } else {
+    _target_train_sample_weight = observed_train_sample_weight;
+  }
+
+  PrecomputeBucketTargets();
+  _penalty = Penalty(_train_bucket_count);
   return 1;
 }
 
 uint64_t
 ActivityProfile::RecomputePenalty(const std::vector<int>& in_train,
-                                  const std::vector<uint32_t>& weight) {
-  InitialiseSplit(in_train, weight);
+                                  const std::vector<uint32_t>& sample_weight,
+                                  uint64_t total_sample_weight,
+                                  uint64_t train_sample_weight) {
+  InitialiseSplit(in_train, sample_weight, total_sample_weight, train_sample_weight);
   return _penalty;
 }
 
 int64_t
-ActivityProfile::DeltaForSwap(uint32_t out_of_train, uint32_t into_train,
-                              const std::vector<uint32_t>& weight) const {
-  std::vector<uint64_t> train_bucket_count(_train_bucket_count);
-  uint64_t train_weight = _train_weight;
+ActivityProfile::DeltaForSwap(uint32_t out_of_train, uint32_t into_train) const {
+  const uint32_t b1 = _bucket[out_of_train];
+  const uint32_t b2 = _bucket[into_train];
+  if (b1 == kMissingBucket && b2 == kMissingBucket) {
+    return 0;
+  }
 
-  train_bucket_count[_bucket[out_of_train]] -= weight[out_of_train];
-  train_bucket_count[_bucket[into_train]] += weight[into_train];
-  train_weight = train_weight - weight[out_of_train] + weight[into_train];
+  uint64_t old_penalty = 0;
+  uint64_t new_penalty = 0;
 
-  const uint64_t new_penalty = Penalty(train_bucket_count, train_weight);
-  return static_cast<int64_t>(new_penalty) - static_cast<int64_t>(_penalty);
+  if (b1 != kMissingBucket) {
+    old_penalty += PenaltyForBucket(b1, _train_bucket_count[b1]);
+    const uint64_t new_count = _train_bucket_count[b1] - (*_sample_weight)[out_of_train];
+    new_penalty += PenaltyForBucket(b1, new_count);
+  }
+
+  if (b2 != kMissingBucket && b2 != b1) {
+    old_penalty += PenaltyForBucket(b2, _train_bucket_count[b2]);
+    const uint64_t new_count = _train_bucket_count[b2] + (*_sample_weight)[into_train];
+    new_penalty += PenaltyForBucket(b2, new_count);
+  } else if (b2 != kMissingBucket) {
+    const uint64_t new_count = _train_bucket_count[b2] - (*_sample_weight)[out_of_train] + (*_sample_weight)[into_train];
+    new_penalty = PenaltyForBucket(b2, new_count);
+  }
+
+  return static_cast<int64_t>(old_penalty) - static_cast<int64_t>(new_penalty);
 }
 
 void
-ActivityProfile::ApplySwap(uint32_t out_of_train, uint32_t into_train,
-                           const std::vector<uint32_t>& weight) {
-  _train_bucket_count[_bucket[out_of_train]] -= weight[out_of_train];
-  _train_bucket_count[_bucket[into_train]] += weight[into_train];
-  _train_weight = _train_weight - weight[out_of_train] + weight[into_train];
-  _penalty = Penalty(_train_bucket_count, _train_weight);
+ActivityProfile::ApplySwap(uint32_t out_of_train, uint32_t into_train) {
+  const uint32_t b1 = _bucket[out_of_train];
+  if (b1 != kMissingBucket) {
+    _train_bucket_count[b1] -= (*_sample_weight)[out_of_train];
+  }
+
+  const uint32_t b2 = _bucket[into_train];
+  if (b2 != kMissingBucket) {
+    _train_bucket_count[b2] += (*_sample_weight)[into_train];
+  }
+
+  _penalty = Penalty(_train_bucket_count);
 }
 
 int
 ActivityProfileSet::InitialiseSplit(const std::vector<int>& in_train,
-                                    const std::vector<uint32_t>& weight) {
+                                    const std::vector<uint32_t>& sample_weight,
+                                    uint64_t total_sample_weight,
+                                    uint64_t train_sample_weight) {
   for (ActivityProfile& profile : _profile) {
-    if (! profile.InitialiseSplit(in_train, weight)) {
+    if (! profile.InitialiseSplit(in_train, sample_weight, total_sample_weight, train_sample_weight)) {
       return 0;
     }
   }
@@ -340,31 +528,31 @@ ActivityProfileSet::InitialiseSplit(const std::vector<int>& in_train,
 
 uint64_t
 ActivityProfileSet::RecomputePenalty(const std::vector<int>& in_train,
-                                     const std::vector<uint32_t>& weight) {
+                                     const std::vector<uint32_t>& sample_weight,
+                                     uint64_t total_sample_weight,
+                                     uint64_t train_sample_weight) {
   uint64_t result = 0;
   for (ActivityProfile& profile : _profile) {
-    result += profile.RecomputePenalty(in_train, weight);
+    result += profile.objective_weight() * profile.RecomputePenalty(in_train, sample_weight, total_sample_weight, train_sample_weight);
   }
 
   return result;
 }
 
 int64_t
-ActivityProfileSet::DeltaForSwap(uint32_t out_of_train, uint32_t into_train,
-                                 const std::vector<uint32_t>& weight) const {
+ActivityProfileSet::DeltaForSwap(uint32_t out_of_train, uint32_t into_train) const {
   int64_t result = 0;
   for (const ActivityProfile& profile : _profile) {
-    result += profile.DeltaForSwap(out_of_train, into_train, weight);
+    result += static_cast<int64_t>(profile.objective_weight()) * profile.DeltaForSwap(out_of_train, into_train);
   }
 
   return result;
 }
 
 void
-ActivityProfileSet::ApplySwap(uint32_t out_of_train, uint32_t into_train,
-                              const std::vector<uint32_t>& weight) {
+ActivityProfileSet::ApplySwap(uint32_t out_of_train, uint32_t into_train) {
   for (ActivityProfile& profile : _profile) {
-    profile.ApplySwap(out_of_train, into_train, weight);
+    profile.ApplySwap(out_of_train, into_train);
   }
 }
 
@@ -372,7 +560,7 @@ uint64_t
 ActivityProfileSet::current_penalty() const {
   uint64_t result = 0;
   for (const ActivityProfile& profile : _profile) {
-    result += profile.current_penalty();
+    result += profile.objective_weight() * profile.current_penalty();
   }
 
   return result;

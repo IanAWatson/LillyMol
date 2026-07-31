@@ -65,15 +65,25 @@ train_test_split_opt -f 0.85 -n 1 -S OPT -o 2000000 -r 20000 -x 20000 -h 8 file.
  -A <fname>          activity file with header and id/activity columns. Repeat for multiple profiles.
  -A buckets=<n>      set default activity bucket count for subsequent -A files.
  -A <fname>:buckets=<n>[:quantile|:width] per-file activity bucketisation.
+ -Y <weight>         weight for activity distribution optimisation; required with -A.
  -o <nopt>           number of optimisation steps to try per split.
- -t <sec>            run each split for <sec> seconds.
+ -s <sec>            run each split for <sec> seconds.
  -r <n>              report progress every <n> steps.
  -x <n>              abandon optimisation of <n> steps since last switch accepted.
  -h <n>              number of OMP threads to use during exact calculation.
+ -Z ...              miscellaneous options, enter '-Z help' for info.
  -v                  verbose output.
 )";
 // clang-format on
   
+  ::exit(rc);
+}
+
+void
+DisplayMiscOptions(int rc) {
+  cerr << R"( -Z seed=<n>        seed the random number generator for reproducible splits.
+)";
+
   ::exit(rc);
 }
 
@@ -336,7 +346,12 @@ class Optimise {
 
     // If the -A option is specified.
     ActivityProfileSet _activity;
-    std::vector<uint32_t> _weight;
+
+    // Global weight for mixing activity-bucket balance into the objective.
+    uint32_t _activity_objective_weight;
+
+    // Per-molecule multiplicity from the -C option. Usually all values are 1.
+    std::vector<uint32_t> _sample_weight;
 
     // Keep track of how many times each needle appears in train.
     int* _times_in_train;
@@ -377,6 +392,10 @@ class Optimise {
     std::tuple<float, uint32_t> AveDistNumberMax() const;
 
     std::tuple<uint32_t, uint32_t> ChooseTwo();
+
+    int64_t CombinedObjectiveDelta(int64_t distance_delta, uint32_t out_of_train,
+                                   uint32_t into_train) const;
+    uint64_t ScoreAfterDelta(uint64_t score, int64_t delta) const;
 
     int MakeSplit(int split);
 
@@ -423,6 +442,8 @@ Optimise::Optimise() {
   _needle = nullptr;
 
   _nthreads = 0;
+
+  _activity_objective_weight = 0;
 
   _smiles = nullptr;
   _name = nullptr;
@@ -477,7 +498,13 @@ Optimise::Initialise(const Command_Line& cl) {
     }
   }
 
-  if (cl.option_present('o') && cl.option_present('s')) {
+  const int seconds_option_present = cl.option_present('s') || cl.option_present('t');
+  if (cl.option_present('s') && cl.option_present('t')) {
+    cerr << "The -s and -t options both specify seconds, use only one\n";
+    return 0;
+  }
+
+  if (cl.option_present('o') && seconds_option_present) {
     cerr << "The -o (nopt) and -s (seconds) options are mutually incompatible\n";
     return 0;
   }
@@ -503,9 +530,10 @@ Optimise::Initialise(const Command_Line& cl) {
     }
   }
 
-  if (cl.option_present('s')) {
-    if (! cl.value('s', _seconds) || _seconds < 1) {
-      cerr << "Optimise::Initialise:Invalid seconds (-s)\n";
+  if (seconds_option_present) {
+    const char seconds_option = cl.option_present('s') ? 's' : 't';
+    if (! cl.value(seconds_option, _seconds) || _seconds < 1) {
+      cerr << "Optimise::Initialise:Invalid seconds (-" << seconds_option << ")\n";
       return 0;
     }
 
@@ -570,6 +598,31 @@ Optimise::Initialise(const Command_Line& cl) {
     }
   }
 
+  if (cl.option_present('Z')) {
+    const_IWSubstring z;
+    for (int i = 0; cl.value('Z', z, i); ++i) {
+      if (z == "help") {
+        DisplayMiscOptions(0);
+      }
+
+      if (z.starts_with("seed=")) {
+        z.remove_leading_chars(5);
+        uint32_t seed;
+        if (! z.numeric_value(seed)) {
+          cerr << "Invalid random number seed (-Z seed=) '" << z << "'\n";
+          return 0;
+        }
+        _rng.seed(seed);
+        if (_verbose) {
+          cerr << "Random number seed " << seed << '\n';
+        }
+      } else {
+        cerr << "Unrecognised -Z qualifier '" << z << "'\n";
+        DisplayMiscOptions(1);
+      }
+    }
+  }
+
   if (cl.option_present('A')) {
     for (int i = 0; i < cl.option_count('A'); ++i) {
       const const_IWSubstring directive = cl.string_value('A', i);
@@ -581,6 +634,31 @@ Optimise::Initialise(const Command_Line& cl) {
     if (_verbose) {
       cerr << "Read " << cl.option_count('A') << " activity directives\n";
     }
+  }
+
+  if (cl.option_present('Y')) {
+    if (! cl.value('Y', _activity_objective_weight) || _activity_objective_weight == 0) {
+      cerr << "The activity objective weight (-Y) must be a whole positive number\n";
+      return 0;
+    }
+    if (_verbose) {
+      cerr << "Activity distribution objective weight " << _activity_objective_weight << '\n';
+    }
+  }
+
+  if (cl.option_present('A') && ! _activity.has_pending()) {
+    cerr << "The activity option (-A) must specify at least one activity file\n";
+    return 0;
+  }
+
+  if (_activity.has_pending() && _activity_objective_weight == 0) {
+    cerr << "Activity files specified with -A, but no activity objective weight specified with -Y\n";
+    return 0;
+  }
+
+  if (_activity_objective_weight > 0 && ! _activity.has_pending()) {
+    cerr << "The activity objective weight (-Y) requires at least one activity file (-A)\n";
+    return 0;
   }
 
   return 1;
@@ -866,7 +944,7 @@ Optimise::ReadNeighbours(const char* fname,
   _smiles = new std::string[_number_needles];
   _name = new std::string[_number_needles];
   _times_in_train = new_int(_number_needles);
-  _weight.resize(_number_needles, 1);
+  _sample_weight.resize(_number_needles, 1);
 
   _uniform = std::make_unique<std::uniform_int_distribution<uint32_t>>(0, _number_needles - 1);
 
@@ -889,7 +967,7 @@ Optimise::ReadNeighbours(const char* fname,
 
     const uint32_t count1 = GetCount(tmp);
     _needle[ndx].set_count(count1);
-    _weight[ndx] = count1;
+    _sample_weight[ndx] = count1;
 
     for (const nnbr::Nbr& nbr : needle->nbr()) {
       const auto iter = id_to_ndx.find(nbr.id());
@@ -942,7 +1020,7 @@ Optimise::BuildActivityProfiles() {
     id.push_back(_name[i]);
   }
 
-  if (! _activity.Build(id, _weight)) {
+  if (! _activity.Build(id, _sample_weight, _verbose)) {
     cerr << "Optimise::BuildActivityProfiles:cannot build activity profiles\n";
     return 0;
   }
@@ -989,6 +1067,27 @@ Diff(const uint64_t v1, const uint64_t v2) {
   return - static_cast<int64_t>(v2 - v1);
 }
 
+int64_t
+Optimise::CombinedObjectiveDelta(int64_t distance_delta, uint32_t out_of_train,
+                                 uint32_t into_train) const {
+  if (_activity_objective_weight == 0) {
+    return distance_delta;
+  }
+
+  const int64_t activity_delta = _activity.DeltaForSwap(out_of_train, into_train);
+  return CombinedActivityDistanceDelta(distance_delta, activity_delta,
+                                       _activity_objective_weight);
+}
+
+uint64_t
+Optimise::ScoreAfterDelta(uint64_t score, int64_t delta) const {
+  if (delta >= 0) {
+    return score + delta;
+  }
+
+  return score - static_cast<uint64_t>(-delta);
+}
+
 // #define DEBUG_MAKE_SPLIT
 
 // Starting with a random split, optimize it and write when done.
@@ -1009,7 +1108,15 @@ Optimise::MakeSplit(int split) {
   RandomSplit();
   if (_activity.active()) {
     const std::vector<int> in_train = CurrentTrainMembership();
-    if (! _activity.InitialiseSplit(in_train, _weight)) {
+    uint64_t total_sample_weight = 0;
+    uint64_t train_sample_weight = 0;
+    for (uint32_t i = 0; i < _number_needles; ++i) {
+      total_sample_weight += _sample_weight[i];
+      if (in_train[i]) {
+        train_sample_weight += _sample_weight[i];
+      }
+    }
+    if (! _activity.InitialiseSplit(in_train, _sample_weight, total_sample_weight, train_sample_weight)) {
       return 0;
     }
   }
@@ -1121,9 +1228,11 @@ Optimise::MakeSplit(int split) {
     cerr << "At end of i2 delta " << delta << '\n';
 #endif
 
-    const uint64_t new_score = score + delta;
+    const int64_t combined_delta = CombinedObjectiveDelta(delta, out_of_train, into_train);
+    const uint64_t new_score = ScoreAfterDelta(score, delta);
 #ifdef DEBUG_SWAP_ITEMS
-    cerr << "new_score " << new_score << " cmp " << score << '\n';
+    cerr << "new_score " << new_score << " cmp " << score << " distance_delta " << delta <<
+            " combined_delta " << combined_delta << '\n';
     for (uint32_t y = 0; y < _number_needles; ++y) {
       cerr << " needle " << y << " train " << _needle[y].in_train() << '\n';
     }
@@ -1135,20 +1244,21 @@ Optimise::MakeSplit(int split) {
       accepted_last_report = steps_accepted;
 
       cerr << split << ' ' << j << " score " << new_score << " cmp " << starting_score <<
-      " accepted " << steps_accepted << " delta " << accepted_this_period << ' ' <<
+      " accepted " << steps_accepted << " delta " << accepted_this_period <<
+      " distance_delta " << delta << " combined_delta " << combined_delta << ' ' <<
       iwmisc::Fraction<float>(steps_accepted, j) <<
       " last successful " << last_successful_switch << '\n';
       MaybeReportActivityDistribution(cerr);
     }
 
-    // No improvement, revert.
-    if (new_score <= score)  [[ likely ]] {
+    // No improvement in the active objective, revert.
+    if (combined_delta <= 0)  [[ likely ]] {
       _needle[i1].invert_train();
       _needle[i2].invert_train();
-    } else { // Better, sets more separated, accept.
+    } else { // Better combined objective, accept.
       score = new_score;
       if (_activity.active()) {
-        _activity.ApplySwap(out_of_train, into_train, _weight);
+        _activity.ApplySwap(out_of_train, into_train);
       }
       ++steps_accepted;
       last_successful_switch = j;
@@ -1411,7 +1521,7 @@ Optimise::Report(std::ostream& output) const {
 
 int
 Main(int argc, char** argv) {
-  Command_Line cl(argc, argv, "vf:S:n:o:r:T:s:t:x:C:h:XA:");
+  Command_Line cl(argc, argv, "vf:S:n:o:r:T:s:t:x:C:h:XA:Y:Z:");
   if (cl.unrecognised_options_encountered()) {
     cerr << "unrecognised_options_encountered\n";
     Usage(1);

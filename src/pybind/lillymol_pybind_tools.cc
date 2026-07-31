@@ -13,6 +13,7 @@
 #include "Molecule_Tools/dicer_api.h"
 #include "Molecule_Tools/iwdescr_lib.h"
 #include "Molecule_Tools/jwcats_lib.h"
+#include "Molecule_Tools/medchemwizard_lib.h"
 #include "Molecule_Tools/mformula.h"
 #include "Molecule_Tools/nvrtspsa.h"
 #include "Molecule_Tools/qed.h"
@@ -148,6 +149,24 @@ ThrowForJWCatsStatus(jwcats::ComputeStatus status) {
   }
 
   throw std::runtime_error("JWCats calculation failed: unknown status");
+}
+
+py::dict
+MedchemWizardStatsToDict(const medchemwizard::Stats& stats) {
+  py::dict result;
+  result["molecules_read"] = stats.molecules_read;
+  result["molecules_produced"] = stats.molecules_produced;
+  result["truncated_to_max_hits"] = stats.truncated_to_max_hits;
+  result["duplicate_molecules_suppressed"] = stats.duplicate_molecules_suppressed;
+  result["bad_valences_discarded"] = stats.bad_valences_discarded;
+  result["discarded_for_too_many_atoms"] = stats.discarded_for_too_many_atoms;
+  result["discarded_for_too_few_atoms"] = stats.discarded_for_too_few_atoms;
+  result["molecules_not_matching_do_not_change_queries"] =
+      stats.molecules_not_matching_do_not_change_queries;
+  result["embeddings_rejected_for_changing_protected_atoms"] =
+      stats.embeddings_rejected_for_changing_protected_atoms;
+
+  return result;
 }
 
 }  // namespace
@@ -575,6 +594,146 @@ PYBIND11_MODULE(lillymol_tools, m) {
             return qed.qed(mcopy);
           },
           py::arg("mol"), "Compute QED, returning None if the calculation fails");
+
+  py::class_<medchemwizard::MedchemWizard>(m, "MedchemWizard")
+      .def(py::init<>())
+      .def(
+          "initialise_from_environment",
+          [](medchemwizard::MedchemWizard& wizard) {
+            if (!wizard.InitialiseFromEnvironment()) {
+              throw std::runtime_error(
+                  "Cannot initialise MedchemWizard from "
+                  "LILLYMOL_HOME/data/MedchemWizard/REACTIONS");
+            }
+          },
+          "Initialise reactions from LILLYMOL_HOME/data/MedchemWizard/REACTIONS")
+      .def(
+          "read_reactions",
+          [](medchemwizard::MedchemWizard& wizard, const std::string& fname) {
+            if (!wizard.ReadReactions(fname.c_str())) {
+              throw std::runtime_error("Cannot read MedchemWizard reactions from '" +
+                                       fname + "'");
+            }
+          },
+          py::arg("fname"), "Read reactions from a MedchemWizard REACTIONS file")
+      .def("number_reactions", &medchemwizard::MedchemWizard::number_reactions)
+      .def(
+          "process",
+          [](medchemwizard::MedchemWizard& wizard, const Molecule& mol) {
+            Molecule mcopy(mol);
+            resizable_array_p<Molecule> products;
+            if (!wizard.ProcessToArray(mcopy, products)) {
+              throw std::runtime_error("MedchemWizard product generation failed");
+            }
+
+            std::vector<std::shared_ptr<Molecule>> result;
+            result.reserve(products.number_elements());
+            for (Molecule* product : products) {
+              result.emplace_back(std::shared_ptr<Molecule>(product));
+            }
+            products.resize_no_delete(0);
+            return result;
+          },
+          py::arg("mol"), "Generate MedchemWizard products for a molecule")
+      .def(
+          "add_do_not_change_smarts",
+          [](medchemwizard::MedchemWizard& wizard, const std::string& smarts) {
+            auto query = std::make_unique<Substructure_Query>();
+            if (!query->create_from_smarts(IWString(smarts))) {
+              throw std::invalid_argument("Invalid SMARTS '" + smarts + "'");
+            }
+            wizard.do_not_change_queries() << query.release();
+          },
+          py::arg("smarts"), "Protect atoms matching a SMARTS from reaction changes")
+      .def(
+          "add_do_not_change_query",
+          [](medchemwizard::MedchemWizard& wizard, const std::string& fname) {
+            auto query = std::make_unique<Substructure_Query>();
+            if (!query->read(fname.c_str())) {
+              throw std::runtime_error("Cannot read do-not-change query '" + fname +
+                                       "'");
+            }
+            wizard.do_not_change_queries() << query.release();
+          },
+          py::arg("fname"), "Protect atoms matching a substructure query file")
+      .def(
+          "set_ignore_do_not_change_queries_not_matching",
+          [](medchemwizard::MedchemWizard& wizard, bool value) {
+            wizard.options().ignore_do_not_change_queries_not_matching = value;
+          },
+          py::arg("value"))
+      .def(
+          "set_max_depth",
+          [](medchemwizard::MedchemWizard& wizard, int value) {
+            if (value < 0) {
+              throw std::invalid_argument("max_depth must be non-negative");
+            }
+            wizard.options().max_depth = value;
+          },
+          py::arg("value"))
+      .def(
+          "set_max_hits",
+          [](medchemwizard::MedchemWizard& wizard, int value) {
+            if (value < 1) {
+              throw std::invalid_argument("max_hits must be positive");
+            }
+            wizard.options().max_hits = value;
+          },
+          py::arg("value"))
+      .def(
+          "set_max_atoms",
+          [](medchemwizard::MedchemWizard& wizard, int value) {
+            if (value < 1) {
+              throw std::invalid_argument("max_atoms must be positive");
+            }
+            wizard.options().max_atoms = value;
+          },
+          py::arg("value"))
+      .def(
+          "set_min_atoms",
+          [](medchemwizard::MedchemWizard& wizard, int value) {
+            if (value < 1) {
+              throw std::invalid_argument("min_atoms must be positive");
+            }
+            wizard.options().min_atoms = value;
+          },
+          py::arg("value"))
+      .def(
+          "set_unique_within_molecule",
+          [](medchemwizard::MedchemWizard& wizard, bool value) {
+            wizard.options().unique_within_molecule = value;
+          },
+          py::arg("value"))
+      .def(
+          "set_unique_across_all_molecules",
+          [](medchemwizard::MedchemWizard& wizard, bool value) {
+            wizard.options().unique_across_all_molecules = value;
+          },
+          py::arg("value"))
+      .def(
+          "set_append_names",
+          [](medchemwizard::MedchemWizard& wizard, bool value) {
+            wizard.options().append_names = value;
+          },
+          py::arg("value"))
+      .def(
+          "set_name_separator",
+          [](medchemwizard::MedchemWizard& wizard, const std::string& sep) {
+            wizard.options().sep = sep;
+          },
+          py::arg("sep"))
+      .def(
+          "set_discard_bad_valences",
+          [](medchemwizard::MedchemWizard& wizard, bool value) {
+            wizard.options().discard_bad_valences = value;
+          },
+          py::arg("value"))
+      .def(
+          "stats",
+          [](const medchemwizard::MedchemWizard& wizard) {
+            return MedchemWizardStatsToDict(wizard.stats());
+          },
+          "Return MedchemWizard processing counters");
 
   py::class_<unique_molecules::UniqueMolecules>(m, "UniqueMolecules")
       .def(py::init<>())

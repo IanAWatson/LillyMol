@@ -11,7 +11,7 @@ def usage
   exit(1)
 end
 
-cl = IWCmdline.new('-v-trpct=ipos-nsplit=ipos-niter=ipos-A=sfile-fp=sfile-catboost=close-xgboost=close-xgboost_config=sfile-lightgbm=close-lightgbm_config=sfile-i=ipos')
+cl = IWCmdline.new('-v-trpct=ipos-nsplit=ipos-niter=ipos-A=sfile-fp=sfile-catboost=close-xgboost=close-xgboost_config=sfile-lightgbm=close-lightgbm_config=sfile-i=ipos-extrasplit=s')
 
 if cl.unrecognised_options_encountered
   $stderr << "unrecognised_options_encountered\n"
@@ -89,7 +89,7 @@ if cl.option_present('ps')
 else
   if cl.option_present('nsplit')
     nsplit = cl.value('nsplit')
-  elif cl.option_present('niter')
+  elsif cl.option_present('niter')
     nsplit = cl.value('niter')
   else
     nsplit = 10
@@ -101,6 +101,22 @@ else
   train_files = (0..nsplit).map { |i| "#{prefix}_TRAIN#{i}.smi"}
   test_files = (0..nsplit).map { |i| "#{prefix}_TEST#{i}.smi"}
 end
+
+if cl.option_present('extrasplit')
+  cl.values('extrasplit').each do |split|
+    train_fname = "#{split}R.smi"
+    test_fname = "#{split}E.smi"
+    if File.size?(train_fname) && File.size?(test_fname)
+      train_files << train_fname
+      test_files << test_fname
+      nsplit += 1
+    else
+      raise "Missing or empty file(s) #{train_fname} #{test_fname}"
+    end
+  end
+end
+
+$stderr << train_files << ' ' << test_files << "\n";
 
 stem = if cl.option_present('stem')
     cl.value('stem')

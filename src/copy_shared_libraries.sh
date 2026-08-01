@@ -23,6 +23,8 @@ bazel-bin/pybind/lillymol_fingerprint.so
 bazel-bin/pybind/lillymol_gfp_server.so
 bazel-bin/pybind/lillymol_query.so
 bazel-bin/pybind/lillymol_reaction.so
+bazel-bin/pybind/lillymol_ring.so
+bazel-bin/pybind/lillymol_set_of_atoms.so
 bazel-bin/pybind/lillymol_standardise.so
 bazel-bin/pybind/lillymol_tools.so
 bazel-bin/pybind/lillymol_tsubstructure.so

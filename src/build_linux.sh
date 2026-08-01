@@ -35,6 +35,21 @@ if [[ $(uname) == 'Darwin' ]] ; then
   fi
 fi
 
+# Build only the Python bindings and their shared-library dependencies.
+# This is intended for container builds that do not need LillyMol executables.
+if [[ -v PYTHON_ONLY ]] ; then
+  BUILD_PYTHON=1
+  BUILD_BDB=1
+fi
+
+# Seems like splitting out the BerkeleyDB components of the python
+# bindings is needlessly complex at this stage. If python is being
+# built, also build the BerkeleyDB bindings to avoid that complexity.
+# This must be set before the third_party section so BerkeleyDB can be built.
+if [[ -v BUILD_PYTHON ]] ; then
+    BUILD_BDB=1
+fi
+
 # Create bindir if not already present
 bindir=$REPO_HOME/bin/$(uname)
 if [[ ! -d ${bindir} ]] ; then
@@ -260,8 +275,6 @@ fi
 
 build_options="--cxxopt=-DGIT_HASH=\"$(git rev-parse --short --verify HEAD)\" --cxxopt=-DTODAY=\"$(date +%Y-%b-%d)\" --jobs=${THREADS} -c opt"
 
-build_options="${build_options} --noincompatible_use_python_toolchains"
-
 # Enable partial builds.
 build_options="${build_options} -k"
 
@@ -275,13 +288,6 @@ fi
 if [[ -v BUILD_INCHI ]] ; then
   # might need to also set BUILD_INCHI as a shell variable.
   build_options+=' --config=inchi'
-fi
-
-# Seems like splitting out the BerkeleyDB components of the python
-# bindings is needlessly complex at this stage. If python is being
-# built, also build the BerkeleyDB bindings to avoid that complexity.
-if [[ -v BUILD_PYTHON ]] ; then
-    BUILD_BDB=1
 fi
 
 # For things not being built, assemble an array of tag filters.
@@ -321,6 +327,18 @@ if [[ "${#build_tag_filters[@]}" -gt 0 ]] ; then
 fi
 
 echo "build_options ${build_options}"
+
+if [[ -v PYTHON_ONLY ]] ; then
+    echo "Building Python bindings only"
+    ${bazel} ${bazel_options} build ${build_options} pybind:all
+    ./copy_shared_libraries.sh $REPO_HOME/lib
+    if [[ -v RUN_PYTHON_TESTS ]] ; then
+        ./run_python_unit_tests.sh
+    fi
+    popd
+    popd
+    exit 0
+fi
 
 # First task is unit tests
 

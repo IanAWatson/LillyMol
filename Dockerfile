@@ -1,12 +1,20 @@
 # builder stage
 FROM python:3.11.8 AS build
 
-RUN apt-get update && \ 
-    apt-get upgrade -y
+RUN apt-get update && \
+    apt-get upgrade -y && \
+    apt-get install -y \
+        cmake \
+        golang \
+        libblas-dev \
+        liblapack-dev \
+        npm \
+        protobuf-compiler \
+        xz-utils && \
+    rm -rf /var/lib/apt/lists/*
 
-RUN apt-get install npm -y && \
-    npm install -g @bazel/bazelisk && \
-    apt-get install libblas-dev liblapack-dev libzmq3-dev xz-utils -y
+RUN npm install -g @bazel/bazelisk && \
+    npm cache clean --force
 
 RUN pip install pandas scipy absl-py pybind11 protobuf
 
@@ -20,10 +28,6 @@ ENV LILLYMOL_HOME=/LillyMol \
     BUILD_PYTHON=1 \
     BUILD_GO=1
 
-# Protobuf-compiler needs to be installed before build_linux.sh is run.
-RUN apt-get install -y golang protobuf-compiler 
-RUN apt-get install -y cmake
-
 RUN ./build_linux.sh
 
 # Remove executables currently not being used.
@@ -32,7 +36,7 @@ RUN ./uninstall.sh
 # final stage
 FROM python:3.11.8-slim AS final
 
-RUN apt-get update && \ 
+RUN apt-get update && \
     apt-get upgrade -y && \
     apt-get install build-essential libgomp1 ruby-dev protobuf-compiler -y && \
     rm -rf /var/lib/apt/lists/*

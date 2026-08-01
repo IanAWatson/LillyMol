@@ -58,6 +58,24 @@
       "args": [
         "-s '[N]' -z i -i smi -F summary.textproto -U CT #{indir}/input.smi"
       ]
+    },
+    {
+      "name": "fingerprint_fixed",
+      "args": [
+        "-s '[c]' -J FPCTYPE -i smi #{indir}/input.smi"
+      ]
+    },
+    {
+      "name": "fingerprint_ec_expand",
+      "args": [
+        "-s '[c]' -J NCCTYPE2 -J EXPAND=1 -i smi #{indir}/input.smi"
+      ]
+    },
+    {
+      "name": "fingerprint_tdt_filter",
+      "args": [
+        "-s '[c]' -J FPCTYPE -f #{indir}/input.tdt"
+      ]
     }
   ]
 }

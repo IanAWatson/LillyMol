@@ -3371,8 +3371,12 @@ cc_binary(
     deps = [
         ":chemotypes_lib",
         ":dicer_fragments_cc_proto",
+        ":iwecfp_lib",
         "//Foundational/cmdline:iwcmdline",
+        "//Foundational/data_source:iwstring_data_source",
+        "//Foundational/iwmisc",
         "//Foundational/iwstring:absl_hash",
+        "//Molecule_Lib:iwmfingerprint",
         "//Molecule_Lib:iwmolecule",
         "//Molecule_Lib:moleculeio",
         "@com_google_absl//absl/container:flat_hash_map",

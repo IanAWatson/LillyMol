@@ -16,17 +16,26 @@ namespace lillymol {
 namespace {
 
 // Is the bracket atom that starts at `open` (the '[') and ends at `close`
-// (the ']') an explicit Hydrogen ATOM?
-//   yes  [H] [2H] [3H] [H+] [H-]
+// (the ']') an explicit Hydrogen atom that Molecule::remove_explicit_hydrogens
+// would remove?
+//   yes  [H]
 //   no   [nH] [NH2] [C@@H] [13CH3]   - the H is a hydrogen count, not an atom
 //   no   [He] [Hf] [Hg] [Ho] [Hs]    - elements whose symbol starts with H
+//   no   [2H] [3H] [H+] [H-]         - see below
+//
+// The isotopic and charged forms are the subtle ones. They ARE Hydrogen atoms,
+// but remove_explicit_hydrogens deliberately keeps them, because the isotope or
+// the charge is information that would be lost. A caller that removes explicit
+// Hydrogens and then compares its count against Molecule::natoms must agree
+// with that, so they are not counted here either.
 bool
 BracketIsExplicitHydrogen(const char* s, const int open, const int close) {
   int i = open + 1;
 
-  // An isotope, if present, comes first.
-  while (i < close && isdigit(s[i])) {
-    ++i;
+  // An isotope, if present, comes first. An isotopic Hydrogen is retained by
+  // remove_explicit_hydrogens, so it is not one of these.
+  if (i < close && isdigit(s[i])) {
+    return false;
   }
 
   if (i >= close || 'H' != s[i]) {
@@ -38,6 +47,13 @@ BracketIsExplicitHydrogen(const char* s, const int open, const int close) {
   // A lower case letter here means this is He, Hf, Hg, Ho or Hs.
   if (i < close && islower(s[i])) {
     return false;
+  }
+
+  // A charged Hydrogen is also retained.
+  for (; i < close; ++i) {
+    if ('+' == s[i] || '-' == s[i]) {
+      return false;
+    }
   }
 
   return true;

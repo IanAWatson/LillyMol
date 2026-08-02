@@ -3684,12 +3684,21 @@ Molecule::molecular_weight(const Molecular_Weight_Control & mwc,
     if (iso > 0)
     {
       mwcr._isotopes_found++;
-      if (mwc._ignore_isotopes)
-        ;
-      else
-        amw += static_cast<double>(iso);
 
-      continue;
+      if (! mwc._ignore_isotopes)
+      {
+//      Use the isotope number as the mass. Reasonable for a real isotope,
+//      13C is 13.003, meaningless for an arbitrary label such as 37C, which
+//      is why set_ignore_isotopes exists.
+
+        amw += static_cast<double>(iso);
+        ih += _things[i]->implicit_hydrogens();
+        continue;
+      }
+
+//    Ignoring the isotope means exactly that. The atom is counted at the
+//    normal weight of its element, so 37C weighs the same as any other
+//    carbon. Fall through to the ordinary accounting below.
     }
 
     const Element * e = _things[i]->element();

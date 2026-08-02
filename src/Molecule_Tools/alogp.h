@@ -250,10 +250,37 @@ class ALogP {
     template <typename T>
     int SetWeights(uint32_t n, const T* values);
 
-    // Note that molecules must have formal charges assigned.
+    // WARNING - THIS MODIFIES `m`.
+    //
+    // Two things happen to the molecule you pass in, and both persist after
+    // the call returns.
+    //
+    // 1. Explicit Hydrogen atoms are removed. All of them, including isotopic
+    //    ones - [2H] goes the same way as [H]. The atom count of `m` therefore
+    //    changes, and so does anything derived from it.
+    // 2. If `m` contains isotopes they are stripped and then restored, and
+    //    that round trip resets the implicit Hydrogen count of every isotopic
+    //    atom. An atom written as [13C] with a declared zero Hydrogens comes
+    //    back with however many the valence rules give it. This is usually the
+    //    behaviour wanted in LillyMol, where an isotope is an arbitrary label
+    //    rather than a statement about Hydrogens, but it means the molecular
+    //    weight of an isotopic molecule changes as a side effect of asking for
+    //    its logp.
+    //
+    // Neither is a bug in the calculation - alogp needs the Hydrogen
+    // suppressed graph, and undoing the changes would mean copying the
+    // molecule on every call. But it does mean that ANY property computed
+    // after this call may differ from the same property computed before it.
+    //
+    // If you compute other descriptors on the same molecule, normalise first
+    // rather than relying on the order in which things happen to run. Chemical
+    // standardisation (-g all) removes explicit Hydrogens, which is why
+    // contrib/bin/iwdescr.sh passes it. molecule_filter instead removes them
+    // itself and recomputes the Hydrogen count of isotopic atoms up front.
+    //
+    // Note also that molecules must have formal charges assigned.
     // This class does not check that. Things will silently yield
     // bad values if charges have not been applied.
-    // Note that explicit Hydrogen atoms are removed from `m`.
     std::optional<float> LogP(Molecule& m);
 
     // During alogp_optimise the same molecules are repeatedly

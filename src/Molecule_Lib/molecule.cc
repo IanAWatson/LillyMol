@@ -4597,6 +4597,39 @@ Molecule::remove_all(const Element * to_remove)
   particular case in point
 */
 
+// The criteria here must stay in step with the loop in
+// remove_explicit_hydrogens below.
+bool
+Molecule::ContainsRemovableExplicitHydrogen() const
+{
+  // A molecule that is nothing but a Hydrogen atom is left alone.
+  if (_number_elements <= 1) {
+    return false;
+  }
+
+  for (int i = 0; i < _number_elements; ++i) {
+    const Atom * a = _things[i];
+
+    if (1 != a->atomic_number()) {
+      continue;
+    }
+
+    // An isotopic or charged Hydrogen carries information, it is retained.
+    if (0 != a->isotope() || 0 != a->formal_charge()) {
+      continue;
+    }
+
+    // As is a bridging Hydrogen.
+    if (a->ncon() > 1) {
+      continue;
+    }
+
+    return true;
+  }
+
+  return false;
+}
+
 int
 Molecule::remove_explicit_hydrogens()
 {
@@ -4606,6 +4639,14 @@ Molecule::remove_explicit_hydrogens()
 
   if (1 == _number_elements && 1 == _things[0]->atomic_number())    // do not disappear H
     return 0;
+
+  // Establish that there is something to do before allocating. Several callers
+  // invoke this unconditionally on every molecule and most molecules have no
+  // explicit Hydrogens, so the common case should not be paying for three
+  // arrays it will not use.
+  if (! ContainsRemovableExplicitHydrogen()) {
+    return 0;
+  }
 
   int * hcount = new_int(_number_elements + _number_elements + _number_elements);std::unique_ptr<int[]> free_hcount(hcount);
   int * is_hydrogen = hcount + _number_elements;

@@ -1583,6 +1583,13 @@ class __attribute__((visibility("default"))) Molecule : protected resizable_arra
   int remove_all(const Element*);
   int remove_all_non_natural_elements();
   int remove_explicit_hydrogens();  // need to be treated specially because of H property
+
+  // True if remove_explicit_hydrogens() would remove at least one atom.
+  // Note that not every Hydrogen atom is removable - an isotopic or charged
+  // Hydrogen carries information and is retained, as is a bridging one.
+  // Useful for deciding whether a molecule needs protecting from a calculation
+  // that suppresses Hydrogens. Keep in step with remove_explicit_hydrogens.
+  bool ContainsRemovableExplicitHydrogen() const;
                                     // of adjacent atoms
 
   // Remove the last `items_removed` atoms.

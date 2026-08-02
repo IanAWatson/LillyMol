@@ -201,6 +201,10 @@ class ALogP {
 
     std::optional<float> LogPInner(Molecule& m, PerMoleculeData& pmd);
 
+    // The destructive form. LogP arranges that `m` is either a copy or a
+    // molecule that this will not alter.
+    std::optional<float> LogPDestructive(Molecule& m);
+
     std::optional<double> SingleAtomSpecialCase(Molecule& m);
 
     int ParametersFromProto(const alogp::AlogpParameters& proto);
@@ -250,35 +254,21 @@ class ALogP {
     template <typename T>
     int SetWeights(uint32_t n, const T* values);
 
-    // WARNING - THIS MODIFIES `m`.
+    // Does NOT modify `m`.
     //
-    // Two things happen to the molecule you pass in, and both persist after
-    // the call returns.
+    // The calculation itself is destructive - it needs the Hydrogen suppressed
+    // graph, and it strips isotopes, which resets the implicit Hydrogen count
+    // of those atoms. A molecule that would be affected by either is copied
+    // first, so the caller's molecule is left alone. Molecules with neither a
+    // removable Hydrogen nor an isotope, which is nearly all of them once
+    // chemical standardisation has run, are scored in place and pay only for
+    // the two scans that establish this.
     //
-    // 1. Explicit Hydrogen atoms are removed. All of them, including isotopic
-    //    ones - [2H] goes the same way as [H]. The atom count of `m` therefore
-    //    changes, and so does anything derived from it.
-    // 2. If `m` contains isotopes they are stripped and then restored, and
-    //    that round trip resets the implicit Hydrogen count of every isotopic
-    //    atom. An atom written as [13C] with a declared zero Hydrogens comes
-    //    back with however many the valence rules give it. This is usually the
-    //    behaviour wanted in LillyMol, where an isotope is an arbitrary label
-    //    rather than a statement about Hydrogens, but it means the molecular
-    //    weight of an isotopic molecule changes as a side effect of asking for
-    //    its logp.
+    // Before this was so, any property computed after a call to LogP could
+    // differ from the same property computed before it. The molecular weight
+    // of an isotopic molecule was the visible case.
     //
-    // Neither is a bug in the calculation - alogp needs the Hydrogen
-    // suppressed graph, and undoing the changes would mean copying the
-    // molecule on every call. But it does mean that ANY property computed
-    // after this call may differ from the same property computed before it.
-    //
-    // If you compute other descriptors on the same molecule, normalise first
-    // rather than relying on the order in which things happen to run. Chemical
-    // standardisation (-g all) removes explicit Hydrogens, which is why
-    // contrib/bin/iwdescr.sh passes it. molecule_filter instead removes them
-    // itself and recomputes the Hydrogen count of isotopic atoms up front.
-    //
-    // Note also that molecules must have formal charges assigned.
+    // Note that molecules must have formal charges assigned.
     // This class does not check that. Things will silently yield
     // bad values if charges have not been applied.
     std::optional<float> LogP(Molecule& m);

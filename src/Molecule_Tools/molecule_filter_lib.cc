@@ -533,8 +533,23 @@ MoleculeFilter::Build(const molecule_filter_data::Requirements& proto) {
   return 1;
 }
 
+FeatureCalculators
+MoleculeFilter::MakeCalculators() {
+  return FeatureCalculators{_rotbond, _alogp, _xlogp, _tpsa, _qed};
+}
+
 int
 MoleculeFilter::EvaluateUtilities(Molecule& m, const int matoms, const int nrings,
+                                  std::vector<double>& per_feature_utility,
+                                  double& overall_utility) {
+  FeatureCalculators calculators = MakeCalculators();
+  FeatureValues feature_values(m, matoms, nrings, calculators);
+
+  return EvaluateUtilities(feature_values, per_feature_utility, overall_utility);
+}
+
+int
+MoleculeFilter::EvaluateUtilities(FeatureValues& feature_values,
                                   std::vector<double>& per_feature_utility,
                                   double& overall_utility) {
   per_feature_utility.clear();
@@ -544,8 +559,6 @@ MoleculeFilter::EvaluateUtilities(Molecule& m, const int matoms, const int nring
     return 1;
   }
 
-  FeatureCalculators calculators{_rotbond, _alogp, _xlogp, _tpsa, _qed};
-  FeatureValues feature_values(m, matoms, nrings, calculators);
   per_feature_utility.reserve(_utilities.size());
 
   double weighted_sum = 0.0;
@@ -696,25 +709,30 @@ AromaticRingCount(Molecule& m) {
 
 // Return true if we examine multiple fragments, which
 // means that `largest_frag` will be different from `smiles`.
+// Fragments are compared on heavy atom count. An explicit Hydrogen is not a
+// reason for one fragment to be considered larger than another.
 bool
 LargestFragment(const const_IWSubstring& smiles,
                 const_IWSubstring& largest_frag,
-                int& natoms, int& nrings) {
+                int& natoms, int& nrings, int& explicit_hydrogens) {
   int max_atoms = 0;
   int i = 0;
   const_IWSubstring token;
   int fragments_examined = 0;
+  explicit_hydrogens = 0;
   while (smiles.nextword(token, i, '.')) {
     ++fragments_examined;
     int nri;
-    int nat = lillymol::count_atoms_in_smiles(token, nri);
+    int eh;
+    const int nat = lillymol::count_atoms_in_smiles(token, nri, eh) - eh;
     if (nat > max_atoms) {
       max_atoms = nat;
       nrings = nri;
       largest_frag = token;
+      explicit_hydrogens = eh;
     }
   }
-  
+
   natoms = max_atoms;
 
   if (fragments_examined == 1) {
@@ -906,7 +924,58 @@ MoleculeFilter::Ok(Molecule& m, const int matoms, const int nrings) {
 int
 MoleculeFilter::Ok(Molecule& m, const int matoms, const int nrings,
                    RejectionReason& rejection_reason) {
+  FeatureCalculators calculators = MakeCalculators();
+  FeatureValues feature_values(m, matoms, nrings, calculators);
+
+  return Ok(feature_values, m, matoms, nrings, rejection_reason);
+}
+
+int
+MoleculeFilter::OkAndUtilities(Molecule& m, const int matoms, const int nrings,
+                               RejectionReason& rejection_reason,
+                               std::vector<double>& per_feature_utility,
+                               double& overall_utility) {
+  per_feature_utility.clear();
+  overall_utility = 0.0;
+
+  // One FeatureValues spanning both phases. Everything the filters compute is
+  // still in the cache when the utilities ask for it.
+  FeatureCalculators calculators = MakeCalculators();
+  FeatureValues feature_values(m, matoms, nrings, calculators);
+
+  if (! Ok(feature_values, m, matoms, nrings, rejection_reason)) {
+    return 0;
+  }
+
+  if (! EvaluateUtilities(feature_values, per_feature_utility, overall_utility)) {
+    return -1;
+  }
+
+  return 1;
+}
+
+// The order of the tests below is deliberate and is not simply increasing
+// cost. When a molecule fails more than one requirement, the reason reported
+// is whichever is reached first, and the verbose rejection statistics depend
+// on that. Do not reorder without regenerating the molecule_filter tests.
+//
+// Descriptor values come from `feature_values` rather than being computed
+// here, so that a caller doing both filtering and utility evaluation pays for
+// each descriptor once. `m` is still needed for the handful of properties that
+// are not Features - organic, isotopes, carbon count, aromatic atom count and
+// ring size.
+int
+MoleculeFilter::Ok(FeatureValues& feature_values, Molecule& m,
+                   const int matoms, const int nrings,
+                   RejectionReason& rejection_reason) {
   rejection_reason = RejectionReason::kPass;
+
+  // Every integer valued Feature is always computable, so dereferencing is
+  // safe. The three that can fail - tpsa, alogp and xlogp - are handled
+  // individually below, and note that their failure policies differ.
+  auto ivalue = [&feature_values](Feature feature) {
+    return static_cast<int>(*feature_values.Value(feature));
+  };
 
   if (matoms == 0) {
     return Reject(rejection_reason, RejectionReason::kZeroAtoms);
@@ -932,7 +1001,7 @@ MoleculeFilter::Ok(Molecule& m, const int matoms, const int nrings,
       _requirements.has_max_heteroatom_count() ||
       _requirements.has_min_heteroatom_fraction() ||
       _requirements.has_max_heteroatom_fraction()) {
-    const int hac = CountHeteroatoms(m);
+    const int hac = ivalue(Feature::kHeteroatomCount);
 
     if (_requirements.has_min_heteroatom_count() && hac < _requirements.min_heteroatom_count()) {
       return Reject(rejection_reason, RejectionReason::kTooFewHeteroatoms);
@@ -962,7 +1031,7 @@ MoleculeFilter::Ok(Molecule& m, const int matoms, const int nrings,
   }
 
   if (_requirements.has_min_chiral() || _requirements.has_max_chiral()) {
-    const int chiral_centres = m.chiral_centres();
+    const int chiral_centres = ivalue(Feature::kChiral);
     if (_requirements.has_min_chiral() && chiral_centres < _requirements.min_chiral()) {
       return Reject(rejection_reason, RejectionReason::kTooFewChiral);
     }
@@ -971,22 +1040,16 @@ MoleculeFilter::Ok(Molecule& m, const int matoms, const int nrings,
     }
   }
 
-  int arc = 0;
-  int need_to_compute_aromatic_rings = 0;
   if (_requirements.has_min_aromatic_ring_count() ||
       _requirements.has_max_aromatic_ring_count() ||
       _requirements.has_min_aromatic_rings_in_system() ||
       _requirements.has_max_aromatic_rings_in_system()) {
-    need_to_compute_aromatic_rings = 1;
-  }
-
-  if (need_to_compute_aromatic_rings) {
     // Check nrings first. If not enough rings if all were aromatic...
     if (_requirements.has_min_aromatic_ring_count() && nrings < _requirements.min_aromatic_ring_count()) {
       return Reject(rejection_reason, RejectionReason::kTooFewAromaticRings);
     }
 
-    arc = AromaticRingCount(m);
+    const int arc = ivalue(Feature::kAromaticRingCount);
     if (_requirements.has_min_aromatic_ring_count() && arc < _requirements.min_aromatic_ring_count()) {
       return Reject(rejection_reason, RejectionReason::kTooFewAromaticRings);
     }
@@ -1000,7 +1063,7 @@ MoleculeFilter::Ok(Molecule& m, const int matoms, const int nrings,
     if (_requirements.has_min_aliphatic_ring_count() && nrings < _requirements.min_aliphatic_ring_count()) {
       return Reject(rejection_reason, RejectionReason::kTooFewAliphaticRings);
     }
-    const int alring = nrings - AromaticRingCount(m);
+    const int alring = ivalue(Feature::kAliphaticRingCount);
     if (_requirements.has_min_aliphatic_ring_count() && alring < _requirements.min_aliphatic_ring_count()) {
       return Reject(rejection_reason, RejectionReason::kTooFewAliphaticRings);
     }
@@ -1011,8 +1074,8 @@ MoleculeFilter::Ok(Molecule& m, const int matoms, const int nrings,
 
   if (_requirements.has_min_hba() || _requirements.has_max_hba() ||
       _requirements.has_min_hbd() || _requirements.has_max_hbd()) {
-    int hba, hbd;
-    RuleOfFive(m, hba, hbd);
+    const int hba = ivalue(Feature::kHba);
+    const int hbd = ivalue(Feature::kHbd);
     if (_requirements.has_min_hba() && hba < _requirements.min_hba()) {
       return Reject(rejection_reason, RejectionReason::kTooFewHba);
     }
@@ -1030,7 +1093,7 @@ MoleculeFilter::Ok(Molecule& m, const int matoms, const int nrings,
   if (_requirements.has_min_sp3_carbon() || _requirements.has_max_sp3_carbon() ||
       _requirements.has_min_sp3_carbon_fraction() ||
       _requirements.has_max_sp3_carbon_fraction()) {
-    const int csp3 = Sp3Carbon(m);
+    const int csp3 = ivalue(Feature::kSp3Carbon);
     if (_requirements.has_min_sp3_carbon() && csp3 < _requirements.min_sp3_carbon()) {
       return Reject(rejection_reason, RejectionReason::kTooFewSp3Carbon);
     }
@@ -1054,7 +1117,7 @@ MoleculeFilter::Ok(Molecule& m, const int matoms, const int nrings,
   }
 
   if (_requirements.has_min_halogen_count() || _requirements.has_max_halogen_count()) {
-    const int h = HalogenCount(m);
+    const int h = ivalue(Feature::kHalogenCount);
     if (_requirements.has_min_halogen_count() && h < _requirements.min_halogen_count()) {
       return Reject(rejection_reason, RejectionReason::kTooFewHalogen);
     }
@@ -1065,9 +1128,8 @@ MoleculeFilter::Ok(Molecule& m, const int matoms, const int nrings,
 
   if (_requirements.has_min_hba_rdkit() || _requirements.has_max_hba_rdkit() ||
       _requirements.has_min_hbd_rdkit() || _requirements.has_max_hbd_rdkit()) {
-    int hba;
-    int hbd;
-    m.RDKitHbaHbd(hba, hbd);
+    const int hba = ivalue(Feature::kHbaRdkit);
+    const int hbd = ivalue(Feature::kHbdRdkit);
     if (_requirements.has_min_hba_rdkit() && hba < _requirements.min_hba_rdkit()) {
       return Reject(rejection_reason, RejectionReason::kTooFewHbaRdkit);
     }
@@ -1083,7 +1145,7 @@ MoleculeFilter::Ok(Molecule& m, const int matoms, const int nrings,
   }
 
   if (_requirements.has_min_amw() || _requirements.has_max_amw()) {
-    const float amw = m.molecular_weight_ignore_isotopes();
+    const float amw = *feature_values.Value(Feature::kAmw);
     if (_requirements.has_min_amw() && amw < _requirements.min_amw()) {
       return Reject(rejection_reason, RejectionReason::kLowAmw);
     }
@@ -1100,7 +1162,7 @@ MoleculeFilter::Ok(Molecule& m, const int matoms, const int nrings,
         return Reject(rejection_reason, RejectionReason::kRingTooSmall);
       }
     } else {
-      int rsze = m.ringi(nrings - 1)->number_elements();
+      const int rsze = ivalue(Feature::kLargestRingSize);
       if (_requirements.has_min_largest_ring_size() &&
           rsze < _requirements.min_largest_ring_size()) {
         return Reject(rejection_reason, RejectionReason::kRingTooSmall);
@@ -1113,7 +1175,7 @@ MoleculeFilter::Ok(Molecule& m, const int matoms, const int nrings,
   }
 
   if (_requirements.has_min_rotatable_bonds() || _requirements.has_max_rotatable_bonds()) {
-    int rotb = _rotbond.Process(m);
+    const int rotb = ivalue(Feature::kRotatableBonds);
     if (_requirements.has_min_rotatable_bonds() && rotb < _requirements.min_rotatable_bonds()) {
       return Reject(rejection_reason, RejectionReason::kTooFewRotatableBonds);
     }
@@ -1137,7 +1199,7 @@ MoleculeFilter::Ok(Molecule& m, const int matoms, const int nrings,
         _requirements.has_max_distance() && matoms <= _requirements.max_distance()) {
       // No need to compute; longest path cannot exceed atom count.
     } else {
-      const int d = m.longest_path();
+      const int d = ivalue(Feature::kMaxDistance);
       if (_requirements.has_min_distance() && d < _requirements.min_distance()) {
         return Reject(rejection_reason, RejectionReason::kTooShort);
       }
@@ -1148,7 +1210,9 @@ MoleculeFilter::Ok(Molecule& m, const int matoms, const int nrings,
   }
 
   if (_requirements.has_min_tpsa() || _requirements.has_max_tpsa()) {
-    std::optional<double> tpsa = _tpsa.PolarSurfaceArea(m);
+    // Note that an uncomputable tpsa is a rejection, whereas an uncomputable
+    // logp below is not. Preserving long standing behaviour.
+    std::optional<double> tpsa = feature_values.Value(Feature::kTpsa);
     if (! tpsa) {
       return Reject(rejection_reason, RejectionReason::kLowTpsa);
     }
@@ -1159,9 +1223,6 @@ MoleculeFilter::Ok(Molecule& m, const int matoms, const int nrings,
       return Reject(rejection_reason, RejectionReason::kHighTpsa);
     }
   }
-
-  // A temporary array that some external functions might need.
-  std::unique_ptr<int[]> tmp;
 
   if (_requirements.has_min_ring_system_size() ||
       _requirements.has_max_ring_system_size() ||
@@ -1182,7 +1243,8 @@ MoleculeFilter::Ok(Molecule& m, const int matoms, const int nrings,
     }
 
     if (need_ring_system) {
-      const auto [max_ring_system_size, max_aromatic_rings_in_system] = MaxRingSystemSize(m, tmp);
+      const int max_ring_system_size = ivalue(Feature::kMaxRingSystemSize);
+      const int max_aromatic_rings_in_system = ivalue(Feature::kAromaticRingsInSystem);
       if (_requirements.has_min_ring_system_size() &&
           max_ring_system_size < _requirements.min_ring_system_size()) {
         return Reject(rejection_reason, RejectionReason::kRingSystemTooSmall);
@@ -1202,31 +1264,28 @@ MoleculeFilter::Ok(Molecule& m, const int matoms, const int nrings,
     }
   }
 
+  // A molecule whose logp cannot be computed passes, it is not rejected.
   if (_requirements.has_min_alogp() || _requirements.has_max_alogp()) {
-    std::optional<double> x = _alogp.LogP(m);
-    if (! x) {
-    } else if (_requirements.has_min_alogp() && *x < _requirements.min_alogp()) {
-      return Reject(rejection_reason, RejectionReason::kLowAlogp);
-    }
-    if (!x) {
-    } else if (_requirements.has_max_alogp() && *x > _requirements.max_alogp()) {
-      return Reject(rejection_reason, RejectionReason::kHighAlogp);
+    std::optional<double> x = feature_values.Value(Feature::kAlogp);
+    if (x) {
+      if (_requirements.has_min_alogp() && *x < _requirements.min_alogp()) {
+        return Reject(rejection_reason, RejectionReason::kLowAlogp);
+      }
+      if (_requirements.has_max_alogp() && *x > _requirements.max_alogp()) {
+        return Reject(rejection_reason, RejectionReason::kHighAlogp);
+      }
     }
   }
 
   if (_requirements.has_min_xlogp() || _requirements.has_max_xlogp()) {
-    if (! tmp) {
-      tmp.reset(new int[matoms]);
-    }
-    std::fill_n(tmp.get(), matoms, 0);
-    std::optional<double> x = _xlogp.LogP(m, tmp.get());
-    if (! x) {
-    } else if (_requirements.has_min_xlogp() && *x < _requirements.min_xlogp()) {
-      return Reject(rejection_reason, RejectionReason::kLowXlogp);
-    }
-    if (!x) {
-    } else if (_requirements.has_max_xlogp() && *x > _requirements.max_xlogp()) {
-      return Reject(rejection_reason, RejectionReason::kHighXlogp);
+    std::optional<double> x = feature_values.Value(Feature::kXlogp);
+    if (x) {
+      if (_requirements.has_min_xlogp() && *x < _requirements.min_xlogp()) {
+        return Reject(rejection_reason, RejectionReason::kLowXlogp);
+      }
+      if (_requirements.has_max_xlogp() && *x > _requirements.max_xlogp()) {
+        return Reject(rejection_reason, RejectionReason::kHighXlogp);
+      }
     }
   }
 

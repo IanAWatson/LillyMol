@@ -236,6 +236,18 @@ class MoleculeFilter {
     bool UsesFeature(Feature feature) const;
     int InitialiseQEDIfNeeded();
 
+    // Bundle the calculators for handing to a FeatureValues.
+    FeatureCalculators MakeCalculators();
+
+    // The implementations. Everything public funnels through these so that a
+    // caller wanting both filtering and utilities can share one FeatureValues
+    // and have each descriptor computed once.
+    int Ok(FeatureValues& feature_values, Molecule& m, int matoms, int nrings,
+           RejectionReason& rejection_reason);
+    int EvaluateUtilities(FeatureValues& feature_values,
+                          std::vector<double>& per_feature_utility,
+                          double& overall_utility);
+
   public:
     MoleculeFilter();
 
@@ -260,9 +272,22 @@ class MoleculeFilter {
 
     // Compute per-utility values and the overall utility for `m`. Intended to
     // be called only after the molecule has passed hard filters.
+    // Prefer OkAndUtilities if you are going to filter as well - calling Ok
+    // and then this recomputes every descriptor the two have in common.
     int EvaluateUtilities(Molecule& m, int matoms, int nrings,
                           std::vector<double>& per_feature_utility,
                           double& overall_utility);
+
+    // Apply the hard filters and, if `m` passes, evaluate the utilities,
+    // sharing a single FeatureValues so that nothing is computed twice.
+    // Returns
+    //    0  rejected by a min_/max_ requirement, `rejection_reason` says which
+    //    1  passed, and the utilities such as there are have been evaluated
+    //   -1  passed the filters, but a utility feature could not be computed
+    int OkAndUtilities(Molecule& m, int matoms, int nrings,
+                       RejectionReason& rejection_reason,
+                       std::vector<double>& per_feature_utility,
+                       double& overall_utility);
 
     // Copy `proto` to _requirements and initialise.
     int Build(const molecule_filter_data::Requirements& proto);
@@ -284,7 +309,7 @@ int CountHeteroatoms(const Molecule& m);
 int AromaticRingCount(Molecule& m);
 bool LargestFragment(const const_IWSubstring& smiles,
                 const_IWSubstring& largest_frag,
-                int& natoms, int& nrings);
+                int& natoms, int& nrings, int& explicit_hydrogens);
 std::tuple<int, int> MaxRingSystemSize(Molecule& m, std::unique_ptr<int[]>& tmp);
 void RuleOfFive(Molecule & m, int& acceptor, int& donor);
 int HalogenCount(const Molecule& m);

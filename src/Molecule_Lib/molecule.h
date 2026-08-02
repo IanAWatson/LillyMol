@@ -2669,6 +2669,12 @@ int count_atoms_in_smiles(const const_IWSubstring& smiles);
 
 // Also discern the number of rings. Does NOT handle %nn forms.
 int count_atoms_in_smiles(const const_IWSubstring& smiles, int& nrings);
+
+// As above, but also reports how many of the atoms counted are explicit
+// Hydrogen ATOMS - [H], [2H] and the like, as opposed to a hydrogen count
+// inside a bracket such as [nH]. Subtract to get a heavy atom count.
+int count_atoms_in_smiles(const const_IWSubstring& smiles, int& nrings,
+                          int& explicit_hydrogens);
 }  // namespace lillymol
 
 extern void set_copy_name_in_molecule_copy_constructor(int);

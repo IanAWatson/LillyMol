@@ -13,6 +13,38 @@ constexpr char kCloseBrace = '}';
 
 namespace lillymol {
 
+namespace {
+
+// Is the bracket atom that starts at `open` (the '[') and ends at `close`
+// (the ']') an explicit Hydrogen ATOM?
+//   yes  [H] [2H] [3H] [H+] [H-]
+//   no   [nH] [NH2] [C@@H] [13CH3]   - the H is a hydrogen count, not an atom
+//   no   [He] [Hf] [Hg] [Ho] [Hs]    - elements whose symbol starts with H
+bool
+BracketIsExplicitHydrogen(const char* s, const int open, const int close) {
+  int i = open + 1;
+
+  // An isotope, if present, comes first.
+  while (i < close && isdigit(s[i])) {
+    ++i;
+  }
+
+  if (i >= close || 'H' != s[i]) {
+    return false;
+  }
+
+  ++i;
+
+  // A lower case letter here means this is He, Hf, Hg, Ho or Hs.
+  if (i < close && islower(s[i])) {
+    return false;
+  }
+
+  return true;
+}
+
+}  // namespace
+
 int
 count_atoms_in_smiles(const const_IWSubstring& smiles) {
   int rc = 0;
@@ -53,11 +85,26 @@ count_atoms_in_smiles(const const_IWSubstring& smiles) {
 
 int
 count_atoms_in_smiles(const const_IWSubstring& smiles, int& nrings) {
+  int explicit_hydrogens = 0;
+  return count_atoms_in_smiles(smiles, nrings, explicit_hydrogens);
+}
+
+// The atom count returned includes any explicit Hydrogen atoms, so that the
+// long standing behaviour of the two argument form is unchanged. The number of
+// those atoms is returned separately in `explicit_hydrogens`, so a caller that
+// wants a heavy atom count can subtract. Determining this is nearly free - the
+// bracket contents are being scanned anyway.
+int
+count_atoms_in_smiles(const const_IWSubstring& smiles, int& nrings,
+                      int& explicit_hydrogens) {
   int rc = 0;
 
   nrings = 0;
+  explicit_hydrogens = 0;
 
   int n = smiles.length();
+
+  const char* s = smiles.rawchars();
 
   for (int i = 0; i < n; i++) {
     char c = smiles[i];
@@ -72,10 +119,14 @@ count_atoms_in_smiles(const const_IWSubstring& smiles, int& nrings) {
       rc++;
     } else if ('[' == c) {
       rc++;
+      const int open = i;
       i++;
       while (']' != smiles[i])  // assume smiles is OK
       {
         i++;
+      }
+      if (BracketIsExplicitHydrogen(s, open, i)) {
+        ++explicit_hydrogens;
       }
     } else if (isdigit(c)) {
       nrings++;

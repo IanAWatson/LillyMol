@@ -71,6 +71,8 @@ class Options {
 
     uint64_t _molecules_read = 0;
     uint64_t _molecules_passed = 0;
+    uint64_t _molecules_with_explicit_hydrogens = 0;
+    uint64_t _molecules_with_isotopes_rehydrogenated = 0;
 
     molecule_filter_data::Requirements _requirements;
 
@@ -140,9 +142,11 @@ class Options {
     off_t _stop_at;
 
   // Private functions
-    int Process(Molecule& m, int matoms, int nrings);
+    int Process(Molecule& m, int matoms, int nrings,
+                std::vector<double>& utility_values, double& overall_utility);
     int MaybeWriteToRejectStream(const const_IWSubstring& line);
-    int WriteUtilityValues(Molecule& m, int matoms, int nrings,
+    int WriteUtilityValues(const std::vector<double>& utility_values,
+                           double overall_utility,
                            const const_IWSubstring& smiles,
                            const const_IWSubstring& id,
                            IWString_and_File_Descriptor& output);
@@ -388,6 +392,16 @@ Options::Report(std::ostream& output) const {
     output << _high_tpsa << " high TPSA " << _requirements.max_tpsa() << '\n';
   }
 
+  if (_molecules_with_explicit_hydrogens) {
+    output << _molecules_with_explicit_hydrogens <<
+              " molecules had explicit Hydrogens removed before computing properties\n";
+  }
+
+  if (_molecules_with_isotopes_rehydrogenated) {
+    output << _molecules_with_isotopes_rehydrogenated <<
+              " isotopic molecules had their Hydrogen count recomputed\n";
+  }
+
   if (_requirements.has_min_hba_rdkit()) {
     output << _too_few_hba_rdkit << " too few HBA_RDKIT " << _requirements.min_hba_rdkit() << '\n';
   }
@@ -502,34 +516,8 @@ Options::WriteUtilityHeader(IWString_and_File_Descriptor& output) const {
   return 1;
 }
 
-// Return true if we examine multiple fragments, which
-// means that `largest_frag` will be different from `smiles`.
-bool
-LargestFragment(const const_IWSubstring& smiles,
-                const_IWSubstring& largest_frag,
-                int& natoms, int& nrings) {
-  int max_atoms = 0;
-  int i = 0;
-  const_IWSubstring token;
-  int fragments_examined = 0;
-  while (smiles.nextword(token, i, '.')) {
-    ++fragments_examined;
-    int nri;
-    int nat = lillymol::count_atoms_in_smiles(token, nri);
-    if (nat > max_atoms) {
-      max_atoms = nat;
-      nrings = nri;
-      largest_frag = token;
-    }
-  }
-  
-  natoms = max_atoms;
-
-  if (fragments_examined == 1) {
-    return false;
-  }
-  return true;
-}
+// LargestFragment used to be duplicated here, identical to the one in
+// molecule_filter_lib. Use the library version.
 
 // If chemical standardisation is in effect
 int
@@ -556,15 +544,22 @@ Options::Process(const const_IWSubstring& line,
     }
   }
 
+  // The atom counts below are HEAVY atom counts. The min_natoms/max_natoms
+  // requirements are about heavy atoms, so an explicit Hydrogen must not
+  // count towards them. Determining this costs nothing - the smiles scan that
+  // counts atoms is happening anyway.
   const_IWSubstring largest_frag;
   int matoms = 0;
   int nrings = 0;
+  int explicit_hydrogens = 0;
   if (_reduce_to_largest_fragment) {
-    if (LargestFragment(smiles, largest_frag, matoms, nrings)) {
+    if (molecule_filter_lib::LargestFragment(smiles, largest_frag, matoms,
+                                            nrings, explicit_hydrogens)) {
       smiles_changed = true;
     }
   } else {
-    matoms = lillymol::count_atoms_in_smiles(smiles, nrings);
+    matoms = lillymol::count_atoms_in_smiles(smiles, nrings, explicit_hydrogens) -
+             explicit_hydrogens;
     largest_frag = smiles;
   }
 
@@ -607,6 +602,37 @@ Options::Process(const const_IWSubstring& line,
     return 0;
   }
 
+  // Every property here is intended to be about the heavy atom graph, and
+  // several of the calculators behave differently, or quietly discard them,
+  // when explicit Hydrogens are present. Remove them so the answer does not
+  // depend on how the input happened to be written. The smiles scan above has
+  // already told us whether there are any, so the common case costs nothing.
+  // The output line is left as the caller supplied it - this is a filter, and
+  // rewriting structures is reserved for the options that ask for it.
+  if (explicit_hydrogens > 0) {
+    m.remove_all(1);
+    ++_molecules_with_explicit_hydrogens;
+  }
+
+  // In LillyMol an isotopic label is usually arbitrary - [1C] is a labelled
+  // carbon, not a statement that the atom has no Hydrogens. A strict smiles
+  // reading of a bracket atom says otherwise, so let the Hydrogen count be
+  // recomputed, which is what transform_to_non_isotopic_form and set_isotopes
+  // already do. Doing it here, once, means a property does not depend on
+  // whether something else in the pipeline happened to trigger the recompute
+  // first - notably ALogP::LogP, which round trips the isotopes and so used to
+  // silently change the molecular weight of every isotopic molecule that
+  // reached it.
+  if (m.ContainsIsotopicAtoms()) {
+    const int matoms_now = m.natoms();
+    for (int i = 0; i < matoms_now; ++i) {
+      if (m.isotope(i) > 0) {
+        m.unset_all_implicit_hydrogen_information(i);
+      }
+    }
+    ++_molecules_with_isotopes_rehydrogenated;
+  }
+
   if (_requirements.has_min_chiral() || _requirements.has_max_chiral()) {
     const int chiral_centres = m.chiral_centres();
     if (_requirements.has_min_chiral() && chiral_centres < _requirements.min_chiral()) {
@@ -631,12 +657,15 @@ Options::Process(const const_IWSubstring& line,
     }
   }
 
-  if (Process(m, matoms, nrings)) {
+  std::vector<double> utility_values;
+  double overall_utility = 0.0;
+
+  if (Process(m, matoms, nrings, utility_values, overall_utility)) {
     ++_molecules_passed;
 
     if (_filter.has_utilities()) {
       const const_IWSubstring output_smiles = smiles_changed ? const_IWSubstring(m.smiles()) : smiles;
-      if (! WriteUtilityValues(m, matoms, nrings, output_smiles, id, output)) {
+      if (! WriteUtilityValues(utility_values, overall_utility, output_smiles, id, output)) {
         MaybeWriteToRejectStream(line);
         return 0;
       }
@@ -659,19 +688,14 @@ Options::Process(const const_IWSubstring& line,
   return 0;
 }
 
+// The values are computed alongside the filtering, in Process, so that
+// descriptors common to both are computed once per molecule.
 int
-Options::WriteUtilityValues(Molecule& m, const int matoms, const int nrings,
+Options::WriteUtilityValues(const std::vector<double>& utility_values,
+                            const double overall_utility,
                             const const_IWSubstring& smiles,
                             const const_IWSubstring& id,
                             IWString_and_File_Descriptor& output) {
-  std::vector<double> utility_values;
-  double overall_utility;
-  if (! _filter.EvaluateUtilities(m, matoms, nrings, utility_values, overall_utility)) {
-    cerr << "Options::WriteUtilityValues:cannot evaluate utility values for '" <<
-            id << "'\n";
-    return 0;
-  }
-
   if (_write_smiles_with_utility) {
     output << smiles << ' ' << id << ' ' << overall_utility << '\n';
     return 1;
@@ -871,17 +895,29 @@ Options::NoteRejection(molecule_filter_lib::RejectionReason rejection_reason) {
   }
 }
 
+// Returns 1 if `m` passes the filters, in which case `utility_values` and
+// `overall_utility` have been filled in if any utilities are configured.
+// Returns 0 if rejected by a filter, or if a utility could not be computed.
 int
 Options::Process(Molecule& m,
                  const int matoms,
-                 const int nrings) {
+                 const int nrings,
+                 std::vector<double>& utility_values,
+                 double& overall_utility) {
   if (m.natoms() != matoms) {
     cerr << "Atom count mismatch " << m.natoms() << " vs " << matoms << '\n';
   }
 
   molecule_filter_lib::RejectionReason rejection_reason;
-  if (_filter.Ok(m, matoms, nrings, rejection_reason)) {
+  const int rc = _filter.OkAndUtilities(m, matoms, nrings, rejection_reason,
+                                        utility_values, overall_utility);
+  if (rc == 1) {
     return 1;
+  }
+
+  if (rc < 0) {
+    cerr << "Options::Process:cannot evaluate utility values\n";
+    return 0;
   }
 
   NoteRejection(rejection_reason);

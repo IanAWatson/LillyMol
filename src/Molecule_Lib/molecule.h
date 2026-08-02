@@ -1583,6 +1583,13 @@ class __attribute__((visibility("default"))) Molecule : protected resizable_arra
   int remove_all(const Element*);
   int remove_all_non_natural_elements();
   int remove_explicit_hydrogens();  // need to be treated specially because of H property
+
+  // True if remove_explicit_hydrogens() would remove at least one atom.
+  // Note that not every Hydrogen atom is removable - an isotopic or charged
+  // Hydrogen carries information and is retained, as is a bridging one.
+  // Useful for deciding whether a molecule needs protecting from a calculation
+  // that suppresses Hydrogens. Keep in step with remove_explicit_hydrogens.
+  bool ContainsRemovableExplicitHydrogen() const;
                                     // of adjacent atoms
 
   // Remove the last `items_removed` atoms.
@@ -1819,10 +1826,30 @@ class __attribute__((visibility("default"))) Molecule : protected resizable_arra
   // Returns 1 if any number of H atoms are moved.
   int MoveToEndOfConnectionTable(atomic_number_t z);
 
-  // The Lipinski formula, names mimic RDKit.
-  // the donors call is not const because it needs to determine implicit hydrogens.
-  int LipinskiNumHDonors(); 
+  // The rule of five hydrogen bond counts, exactly as Lipinski specified:
+  // donors are the sum of OHs and NHs (a count of HYDROGENS, so NH2 is 2),
+  // acceptors are the sum of Ns and Os with no exclusions. The names mimic
+  // RDKit but the definitions are Lipinski's, matching RDKit's NHOHCount and
+  // NOCount rather than its NumHDonors and NumHAcceptors.
+  // These are the single source of truth for the whole of LillyMol. Anything
+  // computing a rule of five count must call these rather than open coding a
+  // loop. See the commentary in moleculeh.cc before changing them.
+  // The donors call is not const because it needs to determine implicit hydrogens.
+  int LipinskiNumHDonors();
   int LipinskiNumHAcceptors() const;
+  // Convenience for callers that want both.
+  void LipinskiHbaHbd(int& hba, int& hbd);
+
+  // RDKit compatible hydrogen bond counts - what RDKit's NumHAcceptors and
+  // NumHDonors return, which is a refined, pharmacophore flavoured definition
+  // and NOT a rule of five count. Provided for interoperability only. Never
+  // substitute these into a rule of five; the thresholds were fitted against
+  // the Lipinski counts above. Unlike those, these include sulfur, and they
+  // depend on aromaticity perception, so exact agreement with RDKit is not
+  // achievable. See the commentary in moleculeh.cc.
+  int RDKitNumHDonors();
+  int RDKitNumHAcceptors();
+  void RDKitHbaHbd(int& hba, int& hbd);
 
   //  It is often handy to be able to place atoms around another atom. Both A1 and A2 must
   //  be singly connected atoms that are bonded to a common anchor. This is used by
@@ -2649,6 +2676,12 @@ int count_atoms_in_smiles(const const_IWSubstring& smiles);
 
 // Also discern the number of rings. Does NOT handle %nn forms.
 int count_atoms_in_smiles(const const_IWSubstring& smiles, int& nrings);
+
+// As above, but also reports how many of the atoms counted are explicit
+// Hydrogen ATOMS - [H], [2H] and the like, as opposed to a hydrogen count
+// inside a bracket such as [nH]. Subtract to get a heavy atom count.
+int count_atoms_in_smiles(const const_IWSubstring& smiles, int& nrings,
+                          int& explicit_hydrogens);
 }  // namespace lillymol
 
 extern void set_copy_name_in_molecule_copy_constructor(int);

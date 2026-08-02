@@ -29,6 +29,8 @@ struct JobParams {
   // What to do if  an identifier is not found.
   int ignore_missing_identifiers = 0;
 
+  bool identifier_file_is_descriptor_file = false;
+
   // What to do if we encounter a duplicate identifier.
   DuplicateIdentifer duplicate_identifier;
 
@@ -51,6 +53,7 @@ records are read, a record is written if it has been requested. That is fundamen
 and should be used unless there is a specific reason to preserve the ordering.
  -c <col>       identifier column in identifier file.
  -C <col>       identifier column in smiles file.
+ -j             skip the identifier header record - useful for descriptor files.
  -x             ignore missing identifiers.
  -v             verbose output.
 )";
@@ -95,6 +98,10 @@ FetchSmiles(iwstring_data_source& input,
             IW_STL_Hash_Map_String& data,
             IWString_and_File_Descriptor& output) {
   const_IWSubstring line;
+  if (params.identifier_file_is_descriptor_file) {
+    input.next_record(line);
+  }
+
   while (input.next_record(line)) {
     if (! FetchSmilesRecord(line, params, data, output)) {
       cerr << "Error processing '" << line << "'\n";
@@ -154,6 +161,7 @@ ReadData(iwstring_data_source& input,
          const JobParams& params,
          IW_STL_Hash_Map_String& data) {
   const_IWSubstring line;
+
   while (input.next_record(line)) {
     if (! ReadRecord(line, params, data)) {
       cerr << "Unable to process " << line << '\n';
@@ -179,7 +187,7 @@ ReadData(const char * fname,
 
 int
 FetchSmiles(int argc, char** argv) {
-  Command_Line cl(argc, argv, "vc:C:x");
+  Command_Line cl(argc, argv, "vc:C:xj");
   if (cl.unrecognised_options_encountered()) {
     cerr << "unrecognised_options_encountered\n";
     Usage(1);
@@ -216,6 +224,13 @@ FetchSmiles(int argc, char** argv) {
     params.ignore_missing_identifiers = 1;
     if (verbose) {
       cerr << "Missing identifiers will be ignored\n";
+    }
+  }
+
+  if (cl.option_present('j')) {
+    params.identifier_file_is_descriptor_file = true;
+    if (verbose) {
+      cerr << "Identifier file is a descriptor file - first record skipped\n";
     }
   }
 

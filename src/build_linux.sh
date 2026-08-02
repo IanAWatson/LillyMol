@@ -253,6 +253,7 @@ elif [[ $(df -TP ${HOME}) =~ 'nfs' ]] ; then
     echo "Your HOME dir is an NFS mounted file system. bazel will not work."
     echo "Will attempt to use /tmp/ for bazel cache, that will need to be changed."
     bazel_options="--output_user_root=/tmp/bazel_${USER}"
+    bazel_options="--output_user_root=/projects/bazel_${USER}"
 else
     # Even if outside Lilly, you may still need to set this
     bazel_options=""
@@ -331,6 +332,8 @@ fi
 
 # First task is unit tests
 
+set -x
+
 ${bazel} ${bazel_options} test ${build_options} Foundational/...:all
 ${bazel} ${bazel_options} test ${build_options} Molecule_Lib:all
 ${bazel} ${bazel_options} test ${build_options} Molecule_Tools:all
@@ -399,12 +402,18 @@ fi
 # Deal with compressed files and hidden file names
 LILLYMOL_HOME=${REPO_HOME} ./uncompress_and_install.sh
 
+# The ruby bindings used by test/run_all_test.rb are needed on every platform,
+# not just Macos. Generating them here keeps them matched to the local protoc.
+# Note the form of the generated file matters: protoc older than about 3.25
+# emits a DescriptorPool DSL that the google-protobuf 4.x gem no longer
+# supports, so a file generated long ago will fail to load.
+(cd ${REPO_HOME}/test && protoc --ruby_out=. --proto_path=. lillymol_tests.proto)
+
 # If Macos compile some protos.
 # There are a great many other protos that could be compiled for the platform.
 # bazel query 'kind("proto_library", ...:all)'
 
 if [[ $(uname) == 'Darwin' ]] ; then
-  (cd ${REPO_HOME}/test && protoc --ruby_out=. lillymol_tests.proto)
   if [[ -v BUILD_XGBOOST ]] ; then
     (cd ${REPO_HOME}/src && protoc --python_out=. xgboost/xgboost_model.proto && cp xgboost/xgboost_model_pb2.py ${REPO_HOME}/contrib/bin/xgbd )
     (cd ${REPO_HOME}/src && protoc --python_out=. xgboost/random_forest_model.proto && cp xgboost/random_forest_model_pb2.py ${REPO_HOME}/contrib/bin/xgbd )

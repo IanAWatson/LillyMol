@@ -307,8 +307,136 @@ TEST(FeatureValuesTest, ComputesGroupedRuleOfFiveFeatures) {
 
   ASSERT_TRUE(values.Value(Feature::kHba));
   EXPECT_DOUBLE_EQ(*values.Value(Feature::kHba), 2.0);
+  // NCCO - the NH2 contributes two donors and the OH one. Donors are a count
+  // of hydrogens, not of the heteroatoms carrying them.
+  ASSERT_TRUE(values.Value(Feature::kHbd));
+  EXPECT_DOUBLE_EQ(*values.Value(Feature::kHbd), 3.0);
+}
+
+// The RDKit compatible features are a different definition and must not be
+// confused with the Lipinski ones above. Thioanisole exercises both
+// differences at once - sulfur is an acceptor for RDKit but not for Lipinski,
+// and the amide nitrogen of the acetamide case is an acceptor for Lipinski but
+// not for RDKit. The counts themselves are tested in moleculeh_test, this is
+// checking that the feature names reach the right calculation.
+TEST(FeatureValuesTest, ComputesRdkitHbaHbdFeatures) {
+  Molecule m;
+  ASSERT_TRUE(m.build_from_smiles("CSC"));
+
+  quick_rotbond::QuickRotatableBonds rotbond;
+  rotbond.set_calculation_type(quick_rotbond::QuickRotatableBonds::RotBond::kExpensive);
+  alogp::ALogP alogp;
+  xlogp::XLogPCalc xlogp;
+  nvrtspsa::NovartisPolarSurfaceArea tpsa;
+  qed::Qed qed;
+  FeatureCalculators calculators{rotbond, alogp, xlogp, tpsa, qed};
+
+  FeatureValues values(m, m.natoms(), m.nrings(), calculators);
+
+  // Lipinski counts nitrogen and oxygen only, so a thioether is nothing.
+  ASSERT_TRUE(values.Value(Feature::kHba));
+  EXPECT_DOUBLE_EQ(*values.Value(Feature::kHba), 0.0);
+  ASSERT_TRUE(values.Value(Feature::kHbaRdkit));
+  EXPECT_DOUBLE_EQ(*values.Value(Feature::kHbaRdkit), 1.0);
+  ASSERT_TRUE(values.Value(Feature::kHbdRdkit));
+  EXPECT_DOUBLE_EQ(*values.Value(Feature::kHbdRdkit), 0.0);
+}
+
+TEST(FeatureValuesTest, RdkitHbaExcludesAmideNitrogen) {
+  Molecule m;
+  ASSERT_TRUE(m.build_from_smiles("CC(N)=O"));
+
+  quick_rotbond::QuickRotatableBonds rotbond;
+  rotbond.set_calculation_type(quick_rotbond::QuickRotatableBonds::RotBond::kExpensive);
+  alogp::ALogP alogp;
+  xlogp::XLogPCalc xlogp;
+  nvrtspsa::NovartisPolarSurfaceArea tpsa;
+  qed::Qed qed;
+  FeatureCalculators calculators{rotbond, alogp, xlogp, tpsa, qed};
+
+  FeatureValues values(m, m.natoms(), m.nrings(), calculators);
+
+  // Lipinski counts both the nitrogen and the oxygen, RDKit only the oxygen.
+  ASSERT_TRUE(values.Value(Feature::kHba));
+  EXPECT_DOUBLE_EQ(*values.Value(Feature::kHba), 2.0);
+  ASSERT_TRUE(values.Value(Feature::kHbaRdkit));
+  EXPECT_DOUBLE_EQ(*values.Value(Feature::kHbaRdkit), 1.0);
+  // Lipinski counts the two hydrogens, RDKit counts the one nitrogen.
   ASSERT_TRUE(values.Value(Feature::kHbd));
   EXPECT_DOUBLE_EQ(*values.Value(Feature::kHbd), 2.0);
+  ASSERT_TRUE(values.Value(Feature::kHbdRdkit));
+  EXPECT_DOUBLE_EQ(*values.Value(Feature::kHbdRdkit), 1.0);
+}
+
+// min_ and max_ on a float valued feature are inclusive. Whether a fraction
+// that is conceptually equal to the threshold lands just inside or just
+// outside must not depend on binary representation - the threshold arrives as
+// a 32 bit float while the value is computed as a double, and the direction of
+// that error varies with the number.
+struct SmilesThresholdOutcome {
+  const char* smiles;
+  float threshold;
+  bool passes_min;
+  bool passes_max;
+};
+
+class TestFractionThreshold : public testing::TestWithParam<SmilesThresholdOutcome> {
+};
+
+TEST_P(TestFractionThreshold, InclusiveAtTheBoundary) {
+  const auto params = GetParam();
+
+  molecule_filter_data::Requirements req_min;
+  req_min.set_min_sp3_carbon_fraction(params.threshold);
+  MoleculeFilter filter_min;
+  ASSERT_TRUE(filter_min.Build(req_min));
+
+  molecule_filter_data::Requirements req_max;
+  req_max.set_max_sp3_carbon_fraction(params.threshold);
+  MoleculeFilter filter_max;
+  ASSERT_TRUE(filter_max.Build(req_max));
+
+  Molecule m1, m2;
+  ASSERT_TRUE(m1.build_from_smiles(params.smiles));
+  ASSERT_TRUE(m2.build_from_smiles(params.smiles));
+
+  EXPECT_EQ(static_cast<bool>(filter_min.Ok(m1)), params.passes_min)
+      << params.smiles << " min " << params.threshold;
+  EXPECT_EQ(static_cast<bool>(filter_max.Ok(m2)), params.passes_max)
+      << params.smiles << " max " << params.threshold;
+}
+INSTANTIATE_TEST_SUITE_P(TestFractionThreshold, TestFractionThreshold, testing::Values(
+  // CCCCc1ccccc1 - 4 sp3 carbons of 10, so exactly 0.4. Both bounds keep it.
+  SmilesThresholdOutcome{"CCCCc1ccccc1", 0.4f, true, true},
+  SmilesThresholdOutcome{"CCCCc1ccccc1", 0.35f, true, false},
+  SmilesThresholdOutcome{"CCCCc1ccccc1", 0.45f, false, true},
+  // CCc1ccccc1 - 2 of 8, exactly 0.25. As a float this rounds up, as a double
+  // it is exact, so a bare comparison would reject it from min_.
+  SmilesThresholdOutcome{"CCc1ccccc1", 0.25f, true, true},
+  // Cc1ccccc1 - 1 of 7, a non terminating fraction either way.
+  SmilesThresholdOutcome{"Cc1ccccc1", 0.1f, true, false},
+  SmilesThresholdOutcome{"Cc1ccccc1", 0.2f, false, true}
+));
+
+// Integer requirements are exact - no tolerance is applied.
+TEST(MoleculeFilterTest, IntegerThresholdsAreExact) {
+  molecule_filter_data::Requirements req;
+  req.set_max_natoms(3);
+  MoleculeFilter filter;
+  ASSERT_TRUE(filter.Build(req));
+
+  Molecule m3, m4;
+  ASSERT_TRUE(m3.build_from_smiles("CCO"));
+  ASSERT_TRUE(m4.build_from_smiles("CCCO"));
+  EXPECT_TRUE(filter.Ok(m3));
+  EXPECT_FALSE(filter.Ok(m4));
+}
+
+TEST(FeatureFromNameTest, RdkitHbondNames) {
+  EXPECT_EQ(FeatureFromName("hba_rdkit"), Feature::kHbaRdkit);
+  EXPECT_EQ(FeatureFromName("hbd_rdkit"), Feature::kHbdRdkit);
+  EXPECT_EQ(FeatureName(Feature::kHbaRdkit), "hba_rdkit");
+  EXPECT_EQ(FeatureName(Feature::kHbdRdkit), "hbd_rdkit");
 }
 
 TEST(FeatureValuesTest, ComputesOptionalContinuousFeatures) {

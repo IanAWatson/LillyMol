@@ -15,6 +15,17 @@
       "description": "Number of atoms in the molecule."
     },
     {
+      "name": "amw",
+      "label": "Average molecular weight",
+      "category": "size",
+      "type": "float",
+      "min_field": "min_amw",
+      "max_field": "max_amw",
+      "relative_cost": 3,
+      "utility": true,
+      "description": "Average molecular weight, implicit hydrogens included. Isotopic atoms are treated as their natural abundance form. Unlike atom count this is not free, but it is only computed when requested."
+    },
+    {
       "name": "nrings",
       "label": "Ring count",
       "category": "rings",
@@ -156,6 +167,28 @@
       "relative_cost": 6,
       "utility": true,
       "description": "Hydrogen-bond donor count using molecule_filter Rule-of-Five logic."
+    },
+    {
+      "name": "hba_rdkit",
+      "label": "HBA (RDKit compatible)",
+      "category": "physchem",
+      "type": "int",
+      "min_field": "min_hba_rdkit",
+      "max_field": "max_hba_rdkit",
+      "relative_cost": 10,
+      "utility": true,
+      "description": "Hydrogen-bond acceptor count matching RDKit's NumHAcceptors. NOT a Lipinski count - amide and sulfonamide nitrogen are excluded, aromatic nitrogen must be unsubstituted and two-connected, the hydroxyl of a carboxylic acid is excluded, and sulfur participates. Use hba for the rule of five."
+    },
+    {
+      "name": "hbd_rdkit",
+      "label": "HBD (RDKit compatible)",
+      "category": "physchem",
+      "type": "int",
+      "min_field": "min_hbd_rdkit",
+      "max_field": "max_hbd_rdkit",
+      "relative_cost": 10,
+      "utility": true,
+      "description": "Hydrogen-bond donor count matching RDKit's NumHDonors. NOT a Lipinski count - this counts heteroatoms carrying a hydrogen rather than hydrogens, and sulfur participates. Use hbd for the rule of five."
     },
     {
       "name": "largest_ring_size",

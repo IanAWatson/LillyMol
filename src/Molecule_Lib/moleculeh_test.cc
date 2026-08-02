@@ -181,9 +181,77 @@ TEST_P(TestHbaHbd, Default) {
   EXPECT_EQ(params.hba, hba);
   EXPECT_EQ(params.hbd, hbd);
 }
+// Donors are the sum of OHs and NHs - a count of hydrogens, not of the
+// heteroatoms carrying them. Acceptors are every N and O, with no exclusions.
 INSTANTIATE_TEST_SUITE_P(TestHbaHbd, TestHbaHbd, testing::Values(
   SmilesHbaHbd{"C", 0, 0},
+  SmilesHbaHbd{"CN", 1, 2},
+  SmilesHbaHbd{"COC", 1, 0},
+  SmilesHbaHbd{"CO", 1, 1},
+  SmilesHbaHbd{"O", 1, 2},
+  SmilesHbaHbd{"N", 1, 3},
+  SmilesHbaHbd{"NCCN", 2, 4},
+  SmilesHbaHbd{"NCCO", 2, 3},
+  // Explicit hydrogens must count the same as implicit ones.
+  SmilesHbaHbd{"[NH2]C", 1, 2},
+  // No acceptor exclusions - the amide N and both nitro oxygens all count.
+  SmilesHbaHbd{"CC(N)=O", 2, 2},
+  SmilesHbaHbd{"c1ccccc1[N+](=O)[O-]", 3, 0},
+  // Pyrrole NH is one donor, pyridine N is an acceptor with no donor.
+  SmilesHbaHbd{"c1cc[nH]c1", 1, 1},
+  SmilesHbaHbd{"c1ccncc1", 1, 0},
+  // Sulfur is neither, no matter how it is bonded.
+  SmilesHbaHbd{"CS", 0, 0},
+  SmilesHbaHbd{"CS(=O)(=O)N", 3, 2}
+));
+
+// The RDKit compatible counts. Values here are what RDKit 2026.03.3
+// rdMolDescriptors.CalcNumHBA and CalcNumHBD return. These are deliberately
+// NOT the Lipinski numbers above - note that sulfur participates, that amide
+// nitrogen is not an acceptor, and that a primary amine is one donor rather
+// than two.
+class TestRDKitHbaHbd : public testing::TestWithParam<SmilesHbaHbd> {
+  protected:
+    Molecule _m;
+};
+
+TEST_P(TestRDKitHbaHbd, Default) {
+  const auto params = GetParam();
+  ASSERT_TRUE(_m.build_from_smiles(params.smiles));
+
+  EXPECT_EQ(params.hba, _m.RDKitNumHAcceptors()) << params.smiles;
+  EXPECT_EQ(params.hbd, _m.RDKitNumHDonors()) << params.smiles;
+}
+INSTANTIATE_TEST_SUITE_P(TestRDKitHbaHbd, TestRDKitHbaHbd, testing::Values(
+  SmilesHbaHbd{"C", 0, 0},
+  // Donors count atoms here, not hydrogens - contrast the Lipinski cases.
   SmilesHbaHbd{"CN", 1, 1},
-  SmilesHbaHbd{"COC", 1, 0}
+  SmilesHbaHbd{"NCCN", 2, 2},
+  SmilesHbaHbd{"CO", 1, 1},
+  SmilesHbaHbd{"COC", 1, 0},
+  // Amide and sulfonamide nitrogen are excluded as acceptors.
+  SmilesHbaHbd{"CC(N)=O", 1, 1},
+  SmilesHbaHbd{"CNC(C)=O", 1, 1},
+  SmilesHbaHbd{"CS(=O)(=O)N", 2, 1},
+  // The hydroxyl of a carboxylic acid is not an acceptor, the carbonyl is.
+  SmilesHbaHbd{"OC(=O)c1ccccc1", 1, 1},
+  // A plain alcohol is.
+  SmilesHbaHbd{"OCc1ccccc1", 1, 1},
+  // Aromatic nitrogen must have no hydrogen and exactly two connections.
+  SmilesHbaHbd{"c1ccncc1", 1, 0},
+  SmilesHbaHbd{"c1cc[nH]c1", 0, 1},
+  SmilesHbaHbd{"Cn1cccc1", 0, 0},
+  // Sulfur participates, unlike the Lipinski counts.
+  SmilesHbaHbd{"CSC", 1, 0},
+  SmilesHbaHbd{"CS", 1, 1},
+  SmilesHbaHbd{"c1ccsc1", 1, 0},
+  // Nitro nitrogen is tetravalent, so not an acceptor. Both oxygens count.
+  SmilesHbaHbd{"c1ccccc1[N+](=O)[O-]", 2, 0},
+  // Explicit hydrogens must give the same answer as implicit ones.
+  SmilesHbaHbd{"OCc1ccccc1", 1, 1},
+  SmilesHbaHbd{"[OH]Cc1ccccc1", 1, 1},
+  SmilesHbaHbd{"O([H])Cc1ccccc1", 1, 1},
+  SmilesHbaHbd{"OC(=O)C", 1, 1},
+  SmilesHbaHbd{"O([H])C(=O)C", 1, 1}
 ));
 }  // namespace

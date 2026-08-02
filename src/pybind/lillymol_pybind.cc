@@ -676,6 +676,8 @@ PYBIND11_MODULE(lillymol, m)
                 .def("hcount", static_cast<int (Molecule::*)(atom_number_t)>(&Molecule::hcount), "Explicit and implicit Hydrogens on atom")
                 .def("lipinski_num_h_donors", &Molecule::LipinskiNumHDonors, "Lipinski hydrogen bond donor count")
                 .def("lipinski_num_h_acceptors", &Molecule::LipinskiNumHAcceptors, "Lipinski hydrogen bond acceptor count")
+                .def("rdkit_num_h_donors", &Molecule::RDKitNumHDonors, "RDKit compatible hydrogen bond donor count, NOT a Lipinski count")
+                .def("rdkit_num_h_acceptors", &Molecule::RDKitNumHAcceptors, "RDKit compatible hydrogen bond acceptor count, NOT a Lipinski count")
                 .def("saturated",
                   [](Molecule& m, atom_number_t zatom)->bool{
                     return m.saturated(zatom);
@@ -1776,6 +1778,8 @@ PYBIND11_MODULE(lillymol, m)
   m.def("set_copy_name_in_molecule_copy_constructor", &set_copy_name_in_molecule_copy_constructor, "Copy name in constructor");
   m.def("NumHAcceptors", [](const Molecule& mol) { return mol.LipinskiNumHAcceptors(); }, "Lipinski hydrogen bond acceptor count");
   m.def("NumHDonors", [](Molecule& mol) { return mol.LipinskiNumHDonors(); }, "Lipinski hydrogen bond donor count");
+  m.def("RDKitNumHAcceptors", [](Molecule& mol) { return mol.RDKitNumHAcceptors(); }, "RDKit compatible acceptor count, NOT a Lipinski count");
+  m.def("RDKitNumHDonors", [](Molecule& mol) { return mol.RDKitNumHDonors(); }, "RDKit compatible donor count, NOT a Lipinski count");
   m.def("LillyMolFromSmiles", &MolFromSmiles, "Molecule from smiles");
   m.def("MolFromSmiles",
     [](const std::string& smiles)->std::optional<Molecule> {

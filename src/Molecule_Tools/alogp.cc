@@ -1564,8 +1564,29 @@ ALogP::AddZwitterionCorrection(PerMoleculeData& pmd, float& result) {
 
 std::optional<float>
 ALogP::LogP(Molecule& m) {
+  // The calculation needs the Hydrogen suppressed graph, and it strips
+  // isotopes, which resets the implicit Hydrogen count of those atoms. Both
+  // changes would otherwise persist in the caller's molecule, so that any
+  // property computed afterwards - the molecular weight most visibly - could
+  // differ from the same property computed before.
+  //
+  // Rather than copy every molecule, or try to undo the damage afterwards,
+  // copy only those that would actually be damaged. A molecule with neither a
+  // removable Hydrogen nor an isotope, which is nearly all of them once
+  // chemical standardisation has run, is scored in place and pays only for the
+  // two scans.
+  if (m.ContainsRemovableExplicitHydrogen() || m.ContainsIsotopicAtoms()) [[unlikely]] {
+    Molecule mcopy(m);
+    return LogPDestructive(mcopy);
+  }
 
-  // Silently remove any explicit Hydrogen atoms.
+  return LogPDestructive(m);
+}
+
+// Free to modify `m`. Either it is a copy made by LogP above, or LogP has
+// established that there is nothing here that would modify it.
+std::optional<float>
+ALogP::LogPDestructive(Molecule& m) {
   m.remove_all(1);
 
   const int matoms = m.natoms();
@@ -1578,23 +1599,15 @@ ALogP::LogP(Molecule& m) {
     return SingleAtomSpecialCase(m);
   }
 
-  // If the current molecule contains isotopes, we save and restore them.
-  std::unique_ptr<isotope_t[]> isosave;
-
+  // No need to save and restore these, nobody else is looking at this
+  // molecule.
   if (m.ContainsIsotopicAtoms())  [[unlikely]] {
-    isosave = m.GetIsotopes();
     m.transform_to_non_isotopic_form();
   }
 
   PerMoleculeData pmd(m);
 
-  std::optional<float> result = LogPInner(m, pmd);
-
-  if (isosave) [[unlikely]] {
-    m.set_isotopes(isosave.get());
-  }
-
-  return result;
+  return LogPInner(m, pmd);
 }
 
 std::optional<float>

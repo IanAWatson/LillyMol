@@ -232,15 +232,22 @@ read_identifiers_to_fetch(iwstring_data_source& input,
   return identifiers_to_fetch.size();
 }
 
+// `translate_tabs` should be set when the caller has not specified a column
+// separator for this file. Tabs are then converted to spaces, which makes a
+// tab separated file work without any extra options. When a separator has been
+// specified with -i the tabs in the file are significant and must be preserved.
 static int
 read_identifiers_to_fetch(const char* fname,
-                          IW_STL_Hash_Map_String& identifiers_to_fetch) {
+                          IW_STL_Hash_Map_String& identifiers_to_fetch,
+                          int translate_tabs) {
   iwstring_data_source input(fname);
 
   if (!input.good()) {
     cerr << "Cannot open '" << fname << "'\n";
     return 0;
   }
+
+  input.set_translate_tabs(translate_tabs);
 
   return read_identifiers_to_fetch(input, identifiers_to_fetch);
 }
@@ -574,9 +581,12 @@ fetch_smiles_quick_multiple_files(const Command_Line& cl, const IWString& stem,
   return 1;
 }
 
+// See the comment on read_identifiers_to_fetch for the meaning of
+// `translate_tabs`. Note that because this was previously unconditional, a tab
+// separated smiles file has always worked without needing -I.
 static int
 fetch_smiles_quick(const char* fname, IW_STL_Hash_Map_String& identifiers_to_fetch,
-                   IWString_and_File_Descriptor& output) {
+                   IWString_and_File_Descriptor& output, int translate_tabs) {
   iwstring_data_source input(fname);
 
   if (!input.good()) {
@@ -585,7 +595,7 @@ fetch_smiles_quick(const char* fname, IW_STL_Hash_Map_String& identifiers_to_fet
   }
 
   input.set_dos(1);
-  input.set_translate_tabs(1);
+  input.set_translate_tabs(translate_tabs);
 
   if (verbose > 0) {
     cerr << "Processing '" << fname << "'\n";
@@ -637,16 +647,25 @@ fetch_smiles_quick(int argc, char** argv) {
     }
   }
 
+  // Tabs are translated to spaces only when the column separator for that file
+  // has not been specified. Specifying -i or -I means the tabs in that file are
+  // significant, and translating them would defeat the option.
+
+  int translate_tabs_in_identifier_file = 1;
+  int translate_tabs_in_smiles_file = 1;
+
   if (cl.option_present('i')) {
     if (!determine_inter_column_separator(cl, 'i', identifier_file_column_separator)) {
       return 1;
     }
+    translate_tabs_in_identifier_file = 0;
   }
 
   if (cl.option_present('I')) {
     if (!determine_inter_column_separator(cl, 'I', smiles_file_column_separator)) {
       return 1;
     }
+    translate_tabs_in_smiles_file = 0;
   }
 
   if (cl.option_present('e')) {
@@ -800,7 +819,8 @@ fetch_smiles_quick(int argc, char** argv) {
 
   if (cl.option_present('F')) {  // nobody uses this any more
     const char* f = cl.option_value('F');
-    if (!read_identifiers_to_fetch(f, identifiers_to_fetch)) {
+    if (!read_identifiers_to_fetch(f, identifiers_to_fetch,
+                                   translate_tabs_in_identifier_file)) {
       cerr << "Cannot read identifiers to fetch from '" << f << "'\n";
       return 6;
     }
@@ -821,7 +841,8 @@ fetch_smiles_quick(int argc, char** argv) {
     usage(2);
   } else if (cl.option_present('S')) {
     ;
-  } else if (read_identifiers_to_fetch(cl[0], identifiers_to_fetch)) {
+  } else if (read_identifiers_to_fetch(cl[0], identifiers_to_fetch,
+                                     translate_tabs_in_identifier_file)) {
     ;
   } else if (fail_if_read_identifiers_to_fetch_fails ||
              0 == identifiers_to_fetch.size()) {
@@ -887,9 +908,9 @@ fetch_smiles_quick(int argc, char** argv) {
 
     if (!fetch_smiles_quick_multiple_files(cl, stem, seq_begin, suffix, xstem, ystem)) {
       return 2;
-    } else {
-      return 1;
     }
+
+    return 0;
   }
 
   if (cl.option_present('X')) {
@@ -944,7 +965,8 @@ fetch_smiles_quick(int argc, char** argv) {
 
   int rc = 0;
   for (int i = clstart; i < cl.number_elements(); i++) {
-    if (!fetch_smiles_quick(cl[i], identifiers_to_fetch, output)) {
+    if (!fetch_smiles_quick(cl[i], identifiers_to_fetch, output,
+                            translate_tabs_in_smiles_file)) {
       rc = i + 1;
       break;
     }

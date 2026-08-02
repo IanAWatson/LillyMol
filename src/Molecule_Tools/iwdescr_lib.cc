@@ -6013,26 +6013,13 @@ IWDescr::IWDescrImpl::ComputeMolarRefractivityDescriptors(Molecule& m, PerMolecu
 
 int
 IWDescr::IWDescrImpl::ComputeRuleOfFiveDescriptors(Molecule& m, PerMoleculeData& data) {
-  // Migrated from legacy compute_rule_of_five_stuff(m, z).
-  const int matoms = data.matoms;
-  const atomic_number_t* z = data.atomic_numbers();
-
-  int ohnh = 0;
+  // The counts themselves live in Molecule_Lib. This used to be a local loop,
+  // and it disagreed with the copies in molecule_filter and the python
+  // bindings over whether a donor was a hydrogen or a heteroatom carrying one.
+  // ro5_ohnh is "the sum of OHs and NHs", so it counts hydrogens.
   int on = 0;
-
-  for (int i = 0; i < matoms; ++i) {
-    if (z[i] == 6) {
-      continue;
-    }
-
-    if (z[i] == 7 || z[i] == 8) {
-      ++on;
-
-      if (m.hcount(i) > 0) {
-        ++ohnh;
-      }
-    }
-  }
+  int ohnh = 0;
+  m.LipinskiHbaHbd(on, ohnh);
 
   descriptor[iwdescr_ro5_ohnh].set(static_cast<float>(ohnh));
   descriptor[iwdescr_ro5_on].set(static_cast<float>(on));

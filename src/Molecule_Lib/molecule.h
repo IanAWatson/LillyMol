@@ -1819,10 +1819,19 @@ class __attribute__((visibility("default"))) Molecule : protected resizable_arra
   // Returns 1 if any number of H atoms are moved.
   int MoveToEndOfConnectionTable(atomic_number_t z);
 
-  // The Lipinski formula, names mimic RDKit.
-  // the donors call is not const because it needs to determine implicit hydrogens.
-  int LipinskiNumHDonors(); 
+  // The rule of five hydrogen bond counts, exactly as Lipinski specified:
+  // donors are the sum of OHs and NHs (a count of HYDROGENS, so NH2 is 2),
+  // acceptors are the sum of Ns and Os with no exclusions. The names mimic
+  // RDKit but the definitions are Lipinski's, matching RDKit's NHOHCount and
+  // NOCount rather than its NumHDonors and NumHAcceptors.
+  // These are the single source of truth for the whole of LillyMol. Anything
+  // computing a rule of five count must call these rather than open coding a
+  // loop. See the commentary in moleculeh.cc before changing them.
+  // The donors call is not const because it needs to determine implicit hydrogens.
+  int LipinskiNumHDonors();
   int LipinskiNumHAcceptors() const;
+  // Convenience for callers that want both.
+  void LipinskiHbaHbd(int& hba, int& hbd);
 
   //  It is often handy to be able to place atoms around another atom. Both A1 and A2 must
   //  be singly connected atoms that are bonded to a common anchor. This is used by

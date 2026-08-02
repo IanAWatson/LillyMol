@@ -853,6 +853,8 @@ IWDescrMainOptions::MaybeFlush(IWString_and_File_Descriptor& output) const {
   if (_flush_after_each_molecule) {
     output.flush();
   }
+
+  output.write_if_buffer_holds_more_than(4096);
 }
 
 // Two test values have been reported as different. Are they close enough?

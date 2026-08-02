@@ -1519,27 +1519,48 @@ Molecule::implicit_hydrogens_known(const atom_number_t zatom) const
   return _things[zatom]->implicit_hydrogens_known();
 }
 
-// The Lipinski formula, names mimic RDKit.
+/*
+  The rule of five hydrogen bond counts, exactly as Lipinski specified them
+  in Adv Drug Deliv Rev 23 (1997) 3-25:
+
+    donors    the sum of OHs and NHs
+    acceptors the sum of Ns and Os
+
+  These are the canonical implementations. Everything in LillyMol that claims
+  to compute a Lipinski hydrogen bond count must come through here rather than
+  writing its own loop - molecule_filter, iwdescr and the python bindings each
+  grew their own version and all three had drifted apart, in the donor count
+  especially.
+
+  Two things are deliberate and are easy to get wrong:
+
+  1. The donor count counts HYDROGENS, not the heteroatoms carrying them.
+     An NH2 contributes 2, not 1. Counting atoms instead gives a systematically
+     lower number, which is a different descriptor - one that happens to sit
+     close to RDKit's NumHDonors, but is not what the rule of five was
+     calibrated against.
+  2. Every N and O is an acceptor, with no attempt to exclude amide nitrogen,
+     nitro groups, pyrrole nitrogen or anything else. Refined, pharmacophore
+     aware acceptor definitions exist and are more chemically sensible - see
+     Donor_Acceptor_Assigner - but the rule of five thresholds were fitted
+     against this crude count, so substituting a better one silently moves
+     the population relative to a threshold derived from something else.
+
+  If you want a refined count, ask for it by name. Do not "improve" these.
+*/
+
 int
 Molecule::LipinskiNumHDonors() {
   int rc = 0;
   for (int i = 0; i < _number_elements; ++i) {
     const atomic_number_t z = _things[i]->atomic_number();
-    if (z == 6) {
+
+    if (z != 7 && z != 8) {
       continue;
     }
 
-    if (z == 7) {
-    } else if (z == 8) {
-    } else {
-      continue;
-    }
-
-    if (hcount(i) == 0) {
-      continue;
-    }
-
-    ++rc;
+    // The sum of OHs and NHs. Note the hydrogen count, not ++rc.
+    rc += hcount(i);
   }
 
   return rc;
@@ -1551,14 +1572,16 @@ Molecule::LipinskiNumHAcceptors() const {
   for (int i = 0; i < _number_elements; ++i) {
     const atomic_number_t z = _things[i]->atomic_number();
 
-    if (z == 6) {
-      continue;
-    }
-
     if (z == 7 || z == 8) {
       ++rc;
     }
   }
 
   return rc;
+}
+
+void
+Molecule::LipinskiHbaHbd(int& hba, int& hbd) {
+  hba = LipinskiNumHAcceptors();
+  hbd = LipinskiNumHDonors();
 }

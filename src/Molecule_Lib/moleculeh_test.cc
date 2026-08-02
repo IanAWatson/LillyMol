@@ -181,9 +181,27 @@ TEST_P(TestHbaHbd, Default) {
   EXPECT_EQ(params.hba, hba);
   EXPECT_EQ(params.hbd, hbd);
 }
+// Donors are the sum of OHs and NHs - a count of hydrogens, not of the
+// heteroatoms carrying them. Acceptors are every N and O, with no exclusions.
 INSTANTIATE_TEST_SUITE_P(TestHbaHbd, TestHbaHbd, testing::Values(
   SmilesHbaHbd{"C", 0, 0},
-  SmilesHbaHbd{"CN", 1, 1},
-  SmilesHbaHbd{"COC", 1, 0}
+  SmilesHbaHbd{"CN", 1, 2},
+  SmilesHbaHbd{"COC", 1, 0},
+  SmilesHbaHbd{"CO", 1, 1},
+  SmilesHbaHbd{"O", 1, 2},
+  SmilesHbaHbd{"N", 1, 3},
+  SmilesHbaHbd{"NCCN", 2, 4},
+  SmilesHbaHbd{"NCCO", 2, 3},
+  // Explicit hydrogens must count the same as implicit ones.
+  SmilesHbaHbd{"[NH2]C", 1, 2},
+  // No acceptor exclusions - the amide N and both nitro oxygens all count.
+  SmilesHbaHbd{"CC(N)=O", 2, 2},
+  SmilesHbaHbd{"c1ccccc1[N+](=O)[O-]", 3, 0},
+  // Pyrrole NH is one donor, pyridine N is an acceptor with no donor.
+  SmilesHbaHbd{"c1cc[nH]c1", 1, 1},
+  SmilesHbaHbd{"c1ccncc1", 1, 0},
+  // Sulfur is neither, no matter how it is bonded.
+  SmilesHbaHbd{"CS", 0, 0},
+  SmilesHbaHbd{"CS(=O)(=O)N", 3, 2}
 ));
 }  // namespace

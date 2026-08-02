@@ -59,30 +59,14 @@ CheckCompatibleFingerprint(const gfp_context::GFPList& gfp,
   }
 }
 
+// The counts live in Molecule_Lib. This used to be a local loop that capped
+// the donor contribution of a nitrogen at two and scored every oxygen as one,
+// which agreed with neither Lipinski nor the other copies in the tree.
 std::tuple<int, int>
 LipinskiHbaHbd(Molecule& m) {
-  const int matoms = m.natoms();
-
-  int hbd = 0;
   int hba = 0;
-
-  for (int i = 0; i < matoms; ++i) {
-    const atomic_number_t z = m.atomic_number(i);
-    if (z == 7 || z == 8) {
-      ++hba;
-
-      const int h = m.hcount(i);
-      if (h == 0) {
-        continue;
-      }
-
-      if (z == 7 && h == 2) {
-        hbd += 2;
-      } else {
-        ++hbd;
-      }
-    }
-  }
+  int hbd = 0;
+  m.LipinskiHbaHbd(hba, hbd);
 
   return std::make_tuple(hba, hbd);
 }

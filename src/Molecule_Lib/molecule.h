@@ -1833,6 +1833,17 @@ class __attribute__((visibility("default"))) Molecule : protected resizable_arra
   // Convenience for callers that want both.
   void LipinskiHbaHbd(int& hba, int& hbd);
 
+  // RDKit compatible hydrogen bond counts - what RDKit's NumHAcceptors and
+  // NumHDonors return, which is a refined, pharmacophore flavoured definition
+  // and NOT a rule of five count. Provided for interoperability only. Never
+  // substitute these into a rule of five; the thresholds were fitted against
+  // the Lipinski counts above. Unlike those, these include sulfur, and they
+  // depend on aromaticity perception, so exact agreement with RDKit is not
+  // achievable. See the commentary in moleculeh.cc.
+  int RDKitNumHDonors();
+  int RDKitNumHAcceptors();
+  void RDKitHbaHbd(int& hba, int& hbd);
+
   //  It is often handy to be able to place atoms around another atom. Both A1 and A2 must
   //  be singly connected atoms that are bonded to a common anchor. This is used by
   //  the make_implicit_hydrogens_explicit() functions

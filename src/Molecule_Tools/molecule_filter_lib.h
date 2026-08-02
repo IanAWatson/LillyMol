@@ -77,6 +77,10 @@ enum class RejectionReason : int {
   kHighQed,
   kLowAmw,
   kHighAmw,
+  kTooFewHbaRdkit,
+  kTooManyHbaRdkit,
+  kTooFewHbdRdkit,
+  kTooManyHbdRdkit,
 };
 
 enum class Feature : int {
@@ -104,6 +108,8 @@ enum class Feature : int {
   kNumberFragments,
   kQed,
   kAmw,
+  kHbaRdkit,
+  kHbdRdkit,
 };
 
 std::optional<Feature> FeatureFromName(std::string_view name);
@@ -179,6 +185,8 @@ class FeatureValues {
     std::optional<int> _number_fragments;
     std::optional<double> _qed;
     std::optional<double> _amw;
+    std::optional<int> _hba_rdkit;
+    std::optional<int> _hbd_rdkit;
 
     int HeteroatomCount();
     int AromaticRingCount();
@@ -195,6 +203,7 @@ class FeatureValues {
     int NumberFragments();
     std::optional<double> Qed();
     double Amw();
+    void ComputeRdkitHbaHbd();
 
   public:
     FeatureValues(Molecule& m, int matoms, int nrings, FeatureCalculators& calculators);

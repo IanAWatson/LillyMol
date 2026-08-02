@@ -26,9 +26,11 @@ struct FeatureNameValue {
   Feature feature;
 };
 
-constexpr std::array<FeatureNameValue, 33> kFeatureNameValues = {{
+constexpr std::array<FeatureNameValue, 35> kFeatureNameValues = {{
   {"natoms", Feature::kNatoms},
   {"amw", Feature::kAmw},
+  {"hba_rdkit", Feature::kHbaRdkit},
+  {"hbd_rdkit", Feature::kHbdRdkit},
   {"mw", Feature::kAmw},
   {"molecular_weight", Feature::kAmw},
   {"nrings", Feature::kNrings},
@@ -134,6 +136,10 @@ FeatureName(Feature feature) {
       return "qed";
     case Feature::kAmw:
       return "amw";
+    case Feature::kHbaRdkit:
+      return "hba_rdkit";
+    case Feature::kHbdRdkit:
+      return "hbd_rdkit";
   }
 
   return "unknown";
@@ -384,6 +390,22 @@ FeatureValues::Amw() {
   return *_amw;
 }
 
+// RDKit compatible hydrogen bond counts. Note that these are NOT the Lipinski
+// counts returned by kHba and kHbd - they are a different, more restrictive
+// definition that also counts sulfur. See Molecule::RDKitNumHAcceptors.
+void
+FeatureValues::ComputeRdkitHbaHbd() {
+  if (_hba_rdkit && _hbd_rdkit) {
+    return;
+  }
+
+  int hba;
+  int hbd;
+  _m.RDKitHbaHbd(hba, hbd);
+  _hba_rdkit = hba;
+  _hbd_rdkit = hbd;
+}
+
 std::optional<double>
 FeatureValues::Qed() {
   if (_qed) {
@@ -459,6 +481,12 @@ FeatureValues::Value(Feature feature) {
       return Qed();
     case Feature::kAmw:
       return Amw();
+    case Feature::kHbaRdkit:
+      ComputeRdkitHbaHbd();
+      return *_hba_rdkit;
+    case Feature::kHbdRdkit:
+      ComputeRdkitHbaHbd();
+      return *_hbd_rdkit;
   }
 
   return std::nullopt;
@@ -1032,6 +1060,25 @@ MoleculeFilter::Ok(Molecule& m, const int matoms, const int nrings,
     }
     if (_requirements.has_max_halogen_count() && h > _requirements.max_halogen_count()) {
       return Reject(rejection_reason, RejectionReason::kTooManyHalogen);
+    }
+  }
+
+  if (_requirements.has_min_hba_rdkit() || _requirements.has_max_hba_rdkit() ||
+      _requirements.has_min_hbd_rdkit() || _requirements.has_max_hbd_rdkit()) {
+    int hba;
+    int hbd;
+    m.RDKitHbaHbd(hba, hbd);
+    if (_requirements.has_min_hba_rdkit() && hba < _requirements.min_hba_rdkit()) {
+      return Reject(rejection_reason, RejectionReason::kTooFewHbaRdkit);
+    }
+    if (_requirements.has_max_hba_rdkit() && hba > _requirements.max_hba_rdkit()) {
+      return Reject(rejection_reason, RejectionReason::kTooManyHbaRdkit);
+    }
+    if (_requirements.has_min_hbd_rdkit() && hbd < _requirements.min_hbd_rdkit()) {
+      return Reject(rejection_reason, RejectionReason::kTooFewHbdRdkit);
+    }
+    if (_requirements.has_max_hbd_rdkit() && hbd > _requirements.max_hbd_rdkit()) {
+      return Reject(rejection_reason, RejectionReason::kTooManyHbdRdkit);
     }
   }
 

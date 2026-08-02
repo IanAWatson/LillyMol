@@ -109,6 +109,10 @@ class Options {
     uint64_t _high_alogp = 0;
     uint64_t _low_amw = 0;
     uint64_t _high_amw = 0;
+    uint64_t _too_few_hba_rdkit = 0;
+    uint64_t _too_many_hba_rdkit = 0;
+    uint64_t _too_few_hbd_rdkit = 0;
+    uint64_t _too_many_hbd_rdkit = 0;
     uint64_t _too_few_hba = 0;
     uint64_t _too_many_hba = 0;
     uint64_t _too_few_hbd = 0;
@@ -382,6 +386,19 @@ Options::Report(std::ostream& output) const {
   }
   if (_requirements.has_max_tpsa()) {
     output << _high_tpsa << " high TPSA " << _requirements.max_tpsa() << '\n';
+  }
+
+  if (_requirements.has_min_hba_rdkit()) {
+    output << _too_few_hba_rdkit << " too few HBA_RDKIT " << _requirements.min_hba_rdkit() << '\n';
+  }
+  if (_requirements.has_max_hba_rdkit()) {
+    output << _too_many_hba_rdkit << " too many HBA_RDKIT " << _requirements.max_hba_rdkit() << '\n';
+  }
+  if (_requirements.has_min_hbd_rdkit()) {
+    output << _too_few_hbd_rdkit << " too few HBD_RDKIT " << _requirements.min_hbd_rdkit() << '\n';
+  }
+  if (_requirements.has_max_hbd_rdkit()) {
+    output << _too_many_hbd_rdkit << " too many HBD_RDKIT " << _requirements.max_hbd_rdkit() << '\n';
   }
 
   if (_requirements.has_min_amw()) {
@@ -838,6 +855,18 @@ Options::NoteRejection(molecule_filter_lib::RejectionReason rejection_reason) {
       return;
     case RejectionReason::kHighAmw:
       ++_high_amw;
+      return;
+    case RejectionReason::kTooFewHbaRdkit:
+      ++_too_few_hba_rdkit;
+      return;
+    case RejectionReason::kTooManyHbaRdkit:
+      ++_too_many_hba_rdkit;
+      return;
+    case RejectionReason::kTooFewHbdRdkit:
+      ++_too_few_hbd_rdkit;
+      return;
+    case RejectionReason::kTooManyHbdRdkit:
+      ++_too_many_hbd_rdkit;
       return;
   }
 }

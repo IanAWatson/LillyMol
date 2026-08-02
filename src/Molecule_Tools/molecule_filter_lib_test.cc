@@ -313,6 +313,68 @@ TEST(FeatureValuesTest, ComputesGroupedRuleOfFiveFeatures) {
   EXPECT_DOUBLE_EQ(*values.Value(Feature::kHbd), 3.0);
 }
 
+// The RDKit compatible features are a different definition and must not be
+// confused with the Lipinski ones above. Thioanisole exercises both
+// differences at once - sulfur is an acceptor for RDKit but not for Lipinski,
+// and the amide nitrogen of the acetamide case is an acceptor for Lipinski but
+// not for RDKit. The counts themselves are tested in moleculeh_test, this is
+// checking that the feature names reach the right calculation.
+TEST(FeatureValuesTest, ComputesRdkitHbaHbdFeatures) {
+  Molecule m;
+  ASSERT_TRUE(m.build_from_smiles("CSC"));
+
+  quick_rotbond::QuickRotatableBonds rotbond;
+  rotbond.set_calculation_type(quick_rotbond::QuickRotatableBonds::RotBond::kExpensive);
+  alogp::ALogP alogp;
+  xlogp::XLogPCalc xlogp;
+  nvrtspsa::NovartisPolarSurfaceArea tpsa;
+  qed::Qed qed;
+  FeatureCalculators calculators{rotbond, alogp, xlogp, tpsa, qed};
+
+  FeatureValues values(m, m.natoms(), m.nrings(), calculators);
+
+  // Lipinski counts nitrogen and oxygen only, so a thioether is nothing.
+  ASSERT_TRUE(values.Value(Feature::kHba));
+  EXPECT_DOUBLE_EQ(*values.Value(Feature::kHba), 0.0);
+  ASSERT_TRUE(values.Value(Feature::kHbaRdkit));
+  EXPECT_DOUBLE_EQ(*values.Value(Feature::kHbaRdkit), 1.0);
+  ASSERT_TRUE(values.Value(Feature::kHbdRdkit));
+  EXPECT_DOUBLE_EQ(*values.Value(Feature::kHbdRdkit), 0.0);
+}
+
+TEST(FeatureValuesTest, RdkitHbaExcludesAmideNitrogen) {
+  Molecule m;
+  ASSERT_TRUE(m.build_from_smiles("CC(N)=O"));
+
+  quick_rotbond::QuickRotatableBonds rotbond;
+  rotbond.set_calculation_type(quick_rotbond::QuickRotatableBonds::RotBond::kExpensive);
+  alogp::ALogP alogp;
+  xlogp::XLogPCalc xlogp;
+  nvrtspsa::NovartisPolarSurfaceArea tpsa;
+  qed::Qed qed;
+  FeatureCalculators calculators{rotbond, alogp, xlogp, tpsa, qed};
+
+  FeatureValues values(m, m.natoms(), m.nrings(), calculators);
+
+  // Lipinski counts both the nitrogen and the oxygen, RDKit only the oxygen.
+  ASSERT_TRUE(values.Value(Feature::kHba));
+  EXPECT_DOUBLE_EQ(*values.Value(Feature::kHba), 2.0);
+  ASSERT_TRUE(values.Value(Feature::kHbaRdkit));
+  EXPECT_DOUBLE_EQ(*values.Value(Feature::kHbaRdkit), 1.0);
+  // Lipinski counts the two hydrogens, RDKit counts the one nitrogen.
+  ASSERT_TRUE(values.Value(Feature::kHbd));
+  EXPECT_DOUBLE_EQ(*values.Value(Feature::kHbd), 2.0);
+  ASSERT_TRUE(values.Value(Feature::kHbdRdkit));
+  EXPECT_DOUBLE_EQ(*values.Value(Feature::kHbdRdkit), 1.0);
+}
+
+TEST(FeatureFromNameTest, RdkitHbondNames) {
+  EXPECT_EQ(FeatureFromName("hba_rdkit"), Feature::kHbaRdkit);
+  EXPECT_EQ(FeatureFromName("hbd_rdkit"), Feature::kHbdRdkit);
+  EXPECT_EQ(FeatureName(Feature::kHbaRdkit), "hba_rdkit");
+  EXPECT_EQ(FeatureName(Feature::kHbdRdkit), "hbd_rdkit");
+}
+
 TEST(FeatureValuesTest, ComputesOptionalContinuousFeatures) {
   Molecule m;
   ASSERT_TRUE(m.build_from_smiles("CCO"));

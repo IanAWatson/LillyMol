@@ -1585,3 +1585,226 @@ Molecule::LipinskiHbaHbd(int& hba, int& hbd) {
   hba = LipinskiNumHAcceptors();
   hbd = LipinskiNumHDonors();
 }
+
+/*
+  RDKit compatible hydrogen bond counts.
+
+  These reproduce what RDKit's NumHAcceptors and NumHDonors actually return,
+  which is rdMolDescriptors.CalcNumHBA and CalcNumHBD. Note that these are NOT
+  Lipinski counts and must never be used where a rule of five count is wanted -
+  see LipinskiNumHAcceptors above. They exist so that people inter-operating
+  with RDKit can get comparable numbers.
+
+  The definitions, taken from the SMARTS compiled into RDKit 2026.03.3:
+
+    acceptor  [$([O,S;H1;v2]-[!$(*=[O,N,P,S])]),
+               $([O,S;H0;v2]),
+               $([O,S;-]),
+               $([N;v3;!$(N-*=!@[O,N,P,S])]),
+               $([nH0X2,o,s;+0])]
+
+    donor     [$([N;!H0;v3]),$([N;!H0;+1;v4]),$([O,S;H1;+0]),$([n;H1;+0])]
+
+  A warning for anyone updating these. RDKit's Chem/Lipinski.py contains a
+  module level HAcceptorSmarts that looks authoritative and is NOT what
+  NumHAcceptors computes - it says nH0 where the compiled descriptor says
+  nH0X2. Counting that pattern agrees with CalcNumHBA on only 798/1000
+  molecules of data/Pubchem1000.smi. Validate against CalcNumHBA itself,
+  never against the python source. contrib/bin/rdkit_hbond_compare.py does
+  this.
+
+  Deliberately not implemented with substructure searching. Every condition
+  here is local - an atom, its neighbours, and the bonds of those neighbours -
+  so a scan is both simpler to reason about and very much cheaper.
+
+  Residual disagreement with RDKit is dominated by aromaticity perception,
+  which the two programs will never fully share.
+*/
+
+namespace {
+
+// True if `zatom` has a double bond to an aliphatic O, N, P or S.
+// If `must_be_acyclic` the double bond must not be a ring bond, which is the
+// !@ qualifier in the acceptor nitrogen exclusion N-*=!@[O,N,P,S].
+bool
+DoublyBondedToONPS(Molecule& m, atom_number_t zatom, bool must_be_acyclic) {
+  const Atom& a = m.atom(zatom);
+
+  for (const Bond* b : a) {
+    if (! b->is_double_bond()) {
+      continue;
+    }
+    if (must_be_acyclic && b->nrings()) {
+      continue;
+    }
+
+    const atom_number_t o = b->other(zatom);
+    // O, N, P and S are upper case in the SMARTS, so aliphatic only.
+    if (m.is_aromatic(o)) {
+      continue;
+    }
+
+    const atomic_number_t z = m.atomic_number(o);
+    if (z == 7 || z == 8 || z == 15 || z == 16) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
+}  // namespace
+
+int
+Molecule::RDKitNumHAcceptors() {
+  compute_aromaticity_if_needed();
+  // Bond::nrings() must be valid for the acceptor nitrogen exclusion.
+  ring_membership();
+
+  int rc = 0;
+
+  for (int i = 0; i < _number_elements; ++i) {
+    const atomic_number_t z = _things[i]->atomic_number();
+    if (z != 7 && z != 8 && z != 16) {
+      continue;
+    }
+
+    const formal_charge_t q = formal_charge(i);
+
+    // [nH0X2,o,s;+0]
+    // Parses as ((n and H0 and X2) or o or s) and +0.
+    if (is_aromatic(i)) {
+      if (q != 0) {
+        continue;
+      }
+      if (z == 8 || z == 16) {
+        ++rc;
+      } else if (hcount(i) == 0 && ncon(i) == 2) {
+        ++rc;
+      }
+      continue;
+    }
+
+    const int h = hcount(i);
+    const int valence = _things[i]->nbonds() + implicit_hydrogens(i);
+
+    if (z == 8 || z == 16) {
+      // [O,S;-]
+      if (q == -1) {
+        ++rc;
+        continue;
+      }
+      if (valence != 2) {
+        continue;
+      }
+      // [O,S;H0;v2] - ether, carbonyl, thioether.
+      if (h == 0) {
+        ++rc;
+        continue;
+      }
+      // [O,S;H1;v2]-[!$(*=[O,N,P,S])] - hydroxyl or thiol, but not the OH of
+      // a carboxylic acid.
+      // Valence two with one hydrogen leaves exactly one heavy neighbour, but
+      // do not assume ncon is 1 - if the hydrogen is an explicit atom it is a
+      // connection too. RDKit suppresses explicit hydrogens on input, so
+      // skipping them here is what keeps the two in agreement, and the count
+      // should not depend on how the hydrogens were written in any case.
+      if (h != 1) {
+        continue;
+      }
+      const Atom& oxy = *_things[i];
+      for (const Bond* b : oxy) {
+        if (! b->is_single_bond()) {
+          continue;
+        }
+        const atom_number_t nbr = b->other(i);
+        if (_things[nbr]->atomic_number() == 1) {
+          continue;
+        }
+        if (! DoublyBondedToONPS(*this, nbr, false)) {
+          ++rc;
+        }
+        break;
+      }
+      continue;
+    }
+
+    // [N;v3;!$(N-*=!@[O,N,P,S])]
+    // Trivalent nitrogen, unless a singly bonded neighbour carries an acyclic
+    // double bond to O, N, P or S. That is what removes amides, sulfonamides
+    // and the like. Charged nitrogen fails the valence test.
+    if (valence != 3) {
+      continue;
+    }
+
+    bool excluded = false;
+    const Atom& a = *_things[i];
+    for (const Bond* b : a) {
+      if (! b->is_single_bond()) {
+        continue;
+      }
+      if (DoublyBondedToONPS(*this, b->other(i), true)) {
+        excluded = true;
+        break;
+      }
+    }
+
+    if (! excluded) {
+      ++rc;
+    }
+  }
+
+  return rc;
+}
+
+int
+Molecule::RDKitNumHDonors() {
+  compute_aromaticity_if_needed();
+
+  int rc = 0;
+
+  for (int i = 0; i < _number_elements; ++i) {
+    const atomic_number_t z = _things[i]->atomic_number();
+    if (z != 7 && z != 8 && z != 16) {
+      continue;
+    }
+
+    const int h = hcount(i);
+    if (h == 0) {
+      continue;
+    }
+
+    const formal_charge_t q = formal_charge(i);
+
+    // [n;H1;+0]
+    if (is_aromatic(i)) {
+      if (z == 7 && h == 1 && q == 0) {
+        ++rc;
+      }
+      continue;
+    }
+
+    // [O,S;H1;+0]
+    if (z == 8 || z == 16) {
+      if (h == 1 && q == 0) {
+        ++rc;
+      }
+      continue;
+    }
+
+    const int valence = _things[i]->nbonds() + implicit_hydrogens(i);
+
+    // [N;!H0;v3] or [N;!H0;+1;v4]
+    if (valence == 3 || (valence == 4 && q == 1)) {
+      ++rc;
+    }
+  }
+
+  return rc;
+}
+
+void
+Molecule::RDKitHbaHbd(int& hba, int& hbd) {
+  hba = RDKitNumHAcceptors();
+  hbd = RDKitNumHDonors();
+}

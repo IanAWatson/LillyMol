@@ -95,6 +95,14 @@ message Requirements {
   // these is set, or if an 'amw' Utility is present.
   optional float min_amw = 51;
   optional float max_amw = 52;
+
+  // RDKit compatible hydrogen bond counts. These are NOT Lipinski counts -
+  // they use a refined definition that excludes amide nitrogen and includes
+  // sulfur. Use min_hba/max_hba for the rule of five.
+  optional int32 min_hba_rdkit = 53;
+  optional int32 max_hba_rdkit = 54;
+  optional int32 min_hbd_rdkit = 55;
+  optional int32 max_hbd_rdkit = 56;
 }
 
 message Point {

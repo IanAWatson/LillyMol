@@ -75,6 +75,8 @@ enum class RejectionReason : int {
   kTooManyFragments,
   kLowQed,
   kHighQed,
+  kLowAmw,
+  kHighAmw,
 };
 
 enum class Feature : int {
@@ -101,6 +103,7 @@ enum class Feature : int {
   kChiral,
   kNumberFragments,
   kQed,
+  kAmw,
 };
 
 std::optional<Feature> FeatureFromName(std::string_view name);
@@ -175,6 +178,7 @@ class FeatureValues {
     std::optional<double> _sp3_carbon_fraction;
     std::optional<int> _number_fragments;
     std::optional<double> _qed;
+    std::optional<double> _amw;
 
     int HeteroatomCount();
     int AromaticRingCount();
@@ -190,6 +194,7 @@ class FeatureValues {
     double Sp3CarbonFraction();
     int NumberFragments();
     std::optional<double> Qed();
+    double Amw();
 
   public:
     FeatureValues(Molecule& m, int matoms, int nrings, FeatureCalculators& calculators);

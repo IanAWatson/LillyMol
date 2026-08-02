@@ -107,6 +107,8 @@ class Options {
     uint64_t _high_xlogp = 0;
     uint64_t _low_alogp = 0;
     uint64_t _high_alogp = 0;
+    uint64_t _low_amw = 0;
+    uint64_t _high_amw = 0;
     uint64_t _too_few_hba = 0;
     uint64_t _too_many_hba = 0;
     uint64_t _too_few_hbd = 0;
@@ -380,6 +382,13 @@ Options::Report(std::ostream& output) const {
   }
   if (_requirements.has_max_tpsa()) {
     output << _high_tpsa << " high TPSA " << _requirements.max_tpsa() << '\n';
+  }
+
+  if (_requirements.has_min_amw()) {
+    output << _low_amw << " low AMW " << _requirements.min_amw() << '\n';
+  }
+  if (_requirements.has_max_amw()) {
+    output << _high_amw << " high AMW " << _requirements.max_amw() << '\n';
   }
 
   if (_requirements.has_min_alogp()) {
@@ -823,6 +832,12 @@ Options::NoteRejection(molecule_filter_lib::RejectionReason rejection_reason) {
     case RejectionReason::kLowQed:
       return;
     case RejectionReason::kHighQed:
+      return;
+    case RejectionReason::kLowAmw:
+      ++_low_amw;
+      return;
+    case RejectionReason::kHighAmw:
+      ++_high_amw;
       return;
   }
 }

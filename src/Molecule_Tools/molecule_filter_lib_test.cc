@@ -307,8 +307,10 @@ TEST(FeatureValuesTest, ComputesGroupedRuleOfFiveFeatures) {
 
   ASSERT_TRUE(values.Value(Feature::kHba));
   EXPECT_DOUBLE_EQ(*values.Value(Feature::kHba), 2.0);
+  // NCCO - the NH2 contributes two donors and the OH one. Donors are a count
+  // of hydrogens, not of the heteroatoms carrying them.
   ASSERT_TRUE(values.Value(Feature::kHbd));
-  EXPECT_DOUBLE_EQ(*values.Value(Feature::kHbd), 2.0);
+  EXPECT_DOUBLE_EQ(*values.Value(Feature::kHbd), 3.0);
 }
 
 TEST(FeatureValuesTest, ComputesOptionalContinuousFeatures) {

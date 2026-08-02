@@ -88,6 +88,13 @@ message Requirements {
   // Optional utility functions. Not used by the filtering mode.
   repeated Utility utility = 49;
   optional UtilityCombination utility_combination = 50;
+
+  // Average molecular weight, hydrogens included.
+  // Note that unlike atom count, this is not free - it needs the element
+  // count and the implicit hydrogen count. It is only computed if one of
+  // these is set, or if an 'amw' Utility is present.
+  optional float min_amw = 51;
+  optional float max_amw = 52;
 }
 
 message Point {

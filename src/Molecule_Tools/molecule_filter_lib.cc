@@ -26,8 +26,11 @@ struct FeatureNameValue {
   Feature feature;
 };
 
-constexpr std::array<FeatureNameValue, 30> kFeatureNameValues = {{
+constexpr std::array<FeatureNameValue, 33> kFeatureNameValues = {{
   {"natoms", Feature::kNatoms},
+  {"amw", Feature::kAmw},
+  {"mw", Feature::kAmw},
+  {"molecular_weight", Feature::kAmw},
   {"nrings", Feature::kNrings},
   {"heteroatom_count", Feature::kHeteroatomCount},
   {"heteroatoms", Feature::kHeteroatomCount},
@@ -129,6 +132,8 @@ FeatureName(Feature feature) {
       return "number_fragments";
     case Feature::kQed:
       return "qed";
+    case Feature::kAmw:
+      return "amw";
   }
 
   return "unknown";
@@ -366,6 +371,19 @@ FeatureValues::NumberFragments() {
   return *_number_fragments;
 }
 
+// Average molecular weight, implicit hydrogens included.
+// molecular_weight() refuses to work on molecules containing isotopes, and
+// writes to stderr when it encounters one. Since a filter is typically run
+// across arbitrary collections, use the variant that quietly treats an
+// isotopic atom as its natural abundance form.
+double
+FeatureValues::Amw() {
+  if (! _amw) {
+    _amw = _m.molecular_weight_ignore_isotopes();
+  }
+  return *_amw;
+}
+
 std::optional<double>
 FeatureValues::Qed() {
   if (_qed) {
@@ -439,6 +457,8 @@ FeatureValues::Value(Feature feature) {
       return NumberFragments();
     case Feature::kQed:
       return Qed();
+    case Feature::kAmw:
+      return Amw();
   }
 
   return std::nullopt;
@@ -736,41 +756,13 @@ MaxRingSystemSize(Molecule& m, std::unique_ptr<int[]>& tmp) {
   return std::make_tuple(max_system_size, max_aromatic_rings_in_system);
 }
 
-// Lifted from iwdescr.cc
+// Retained for compatibility with existing callers. The rule of five counts
+// live in Molecule_Lib - this used to be a private copy that had drifted from
+// the other copies in iwdescr and the python bindings. Do not reintroduce a
+// local implementation here.
 void
 RuleOfFive(Molecule & m, int& acceptor, int& donor) {
-  acceptor = 0;
-  donor = 0;
-
-  const int matoms = m.natoms();
-
-  for (int i = 0; i < matoms; i++) {
-    atomic_number_t z = m.atomic_number(i);
-    // Intercept the most common case.
-    if (z == 6) {
-      continue;
-    }
-
-    if (z == 7 || z == 8) {
-    } else {
-      continue;
-    }
-
-    ++acceptor;
-
-    const int h = m.hcount(i);
-
-    // acceptor
-    if (0 == h) {
-      continue;
-    }
-
-    if (7 == z) {
-      donor += 1;
-    } else {
-      donor += 1;
-    }
-  }
+  m.LipinskiHbaHbd(acceptor, donor);
 }
 
 int
@@ -1040,6 +1032,16 @@ MoleculeFilter::Ok(Molecule& m, const int matoms, const int nrings,
     }
     if (_requirements.has_max_halogen_count() && h > _requirements.max_halogen_count()) {
       return Reject(rejection_reason, RejectionReason::kTooManyHalogen);
+    }
+  }
+
+  if (_requirements.has_min_amw() || _requirements.has_max_amw()) {
+    const float amw = m.molecular_weight_ignore_isotopes();
+    if (_requirements.has_min_amw() && amw < _requirements.min_amw()) {
+      return Reject(rejection_reason, RejectionReason::kLowAmw);
+    }
+    if (_requirements.has_max_amw() && amw > _requirements.max_amw()) {
+      return Reject(rejection_reason, RejectionReason::kHighAmw);
     }
   }
 

@@ -15,6 +15,17 @@
       "description": "Number of atoms in the molecule."
     },
     {
+      "name": "amw",
+      "label": "Average molecular weight",
+      "category": "size",
+      "type": "float",
+      "min_field": "min_amw",
+      "max_field": "max_amw",
+      "relative_cost": 3,
+      "utility": true,
+      "description": "Average molecular weight, implicit hydrogens included. Isotopic atoms are treated as their natural abundance form. Unlike atom count this is not free, but it is only computed when requested."
+    },
+    {
       "name": "nrings",
       "label": "Ring count",
       "category": "rings",

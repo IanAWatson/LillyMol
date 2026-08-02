@@ -35,6 +35,29 @@ if [[ $(uname) == 'Darwin' ]] ; then
   fi
 fi
 
+# Build only the Python bindings and their shared-library dependencies.
+# This is intended for container builds that do not need LillyMol executables.
+if [[ -v PYTHON_ONLY ]] ; then
+  BUILD_PYTHON=1
+fi
+
+# Seems like splitting out the BerkeleyDB components of the python
+# bindings is needlessly complex at this stage. If python is being
+# built, also build the BerkeleyDB bindings to avoid that complexity.
+
+# This must be set before the third_party section so BerkeleyDB can be built.
+if [[ -v BUILD_PYTHON ]] ; then
+    BUILD_BDB=1
+fi
+
+# If building only the python bindings, do not enable BDB - that is just because
+# I know that the people using this do not need the BerkeleyDB bindings.
+# There is no technical reason for the choice below, change as needed.
+
+if [[ -v PYTHON_ONLY ]] ; then
+  unset BUILD_BDB
+fi
+
 # Create bindir if not already present
 bindir=$REPO_HOME/bin/$(uname)
 if [[ ! -d ${bindir} ]] ; then
@@ -105,32 +128,9 @@ if [[ ${must_build} -eq 1 || ! -s 'libf2c/libf2c.a' ]] ; then
     (cd libf2c && make -f makefile.u)
 fi
 
-# Proved problematic in many ways. Originally made part of iwdescr and molecule_filter
-# But this does not really perceive the kinds of things we think of as non-planar.
-# Not worth the complexity.
-# must_build=0
-# if [[ ! -d 'edge-addition-planarity-suite' ]] ; then
-#   git clone --branch Version_4.0.1.0 --depth 1 https://github.com/graph-algorithms/edge-addition-planarity-suite
-#   # There is a bug in this version of planarity
-#   # EAPS Version_4.0.1.0 contains a C/C++ incompatibility in
-#   # graphExtensions.private.h. Patch before build.
-#   python3 - <<'PY'
-# from pathlib import Path
-# p = Path("edge-addition-planarity-suite/c/graphLib/extensionSystem/graphExtensions.private.h")
-# s = p.read_text()
-# s = s.replace("typedef struct\n    {", "typedef struct graphExtension\n    {")
-# p.write_text(s)
-# PY
-#   must_build=1
-# fi
-
-if [[ ${must_build} == 1 ]] ; then
-  (cd edge-addition-planarity-suite && autoreconf -fi)
-  (cd edge-addition-planarity-suite && ./configure --prefix=${REPO_HOME}/third_party)
-  (cd edge-addition-planarity-suite && make -j ${THREADS} install)
-  # Copy shared libraries to our lib folder so python bindings work.
-  (cp lib/libplanarity*.${suffix} ${lib}) || echo "Did not copy Planarity shared libraries"
-fi
+# Planarity support proved problematic in many ways. Originally made part of
+# iwdescr and molecule_filter, but it does not really perceive the kinds of
+# things we think of as non-planar. Not worth the complexity.
 
 #if [[ ! -d 'dragonbox' ]] ; then
 #  git clone https://github.com/jk-jeon/dragonbox
@@ -261,28 +261,23 @@ fi
 
 build_options="--cxxopt=-DGIT_HASH=\"$(git rev-parse --short --verify HEAD)\" --cxxopt=-DTODAY=\"$(date +%Y-%b-%d)\" --jobs=${THREADS} -c opt"
 
-build_options="${build_options} --noincompatible_use_python_toolchains"
-
 # Enable partial builds.
 build_options="${build_options} -k"
 
-# Possible selection of location specific architecture
-if [[ ${inside_lilly} -eq 1 ]] ; then
-  build_options="${build_options} --cxxopt=-march=native --cxxopt=-mtune=native"
-else
+# Compile for the build machine by default. This has historically made LillyMol
+# about 5% faster. Set BUILD_NATIVE=0 if the resulting binaries must run across
+# multiple CPU generations or otherwise need a generic architecture.
+if [[ ! -v BUILD_NATIVE ]] ; then
+  BUILD_NATIVE=1
+fi
+
+if [[ ${BUILD_NATIVE} -ne 0 ]] ; then
   build_options="${build_options} --cxxopt=-march=native --cxxopt=-mtune=native"
 fi
 
 if [[ -v BUILD_INCHI ]] ; then
   # might need to also set BUILD_INCHI as a shell variable.
   build_options+=' --config=inchi'
-fi
-
-# Seems like splitting out the BerkeleyDB components of the python
-# bindings is needlessly complex at this stage. If python is being
-# built, also build the BerkeleyDB bindings to avoid that complexity.
-if [[ -v BUILD_PYTHON ]] ; then
-    BUILD_BDB=1
 fi
 
 # For things not being built, assemble an array of tag filters.
@@ -323,6 +318,18 @@ fi
 
 echo "build_options ${build_options}"
 
+if [[ -v PYTHON_ONLY ]] ; then
+    echo "Building Python bindings only"
+    ${bazel} ${bazel_options} build ${build_options} pybind:all
+    ./copy_shared_libraries.sh $REPO_HOME/lib
+    if [[ -v RUN_PYTHON_TESTS ]] ; then
+        ./run_python_unit_tests.sh
+    fi
+    popd
+    popd
+    exit 0
+fi
+
 # First task is unit tests
 
 set -x
@@ -350,12 +357,11 @@ if [[ ! -v BUILD_LIBRARY_ONLY ]] ; then
     ${bazel} ${bazel_options} build ${build_options} Utilities/...:all
 fi  
 
-# Build the Vendor directory regardless of where we are. Executables that
-# link to vendor supplied libraries are tagged with "vendor" and those will not
-# be built outside Lilly.
-# What will be built are pure LillyMol tools that do things like parse the
-# output from Vendor tools.
-if [[ ${inside_lilly} -eq 1 || -v BUILD_VENDOR || true ]] ; then
+# Build the Vendor directory only when explicitly requested or when inside Lilly.
+# Executables that link to vendor supplied libraries are tagged with "vendor" and
+# those will not be built outside Lilly unless BUILD_VENDOR is set. What will be
+# built are pure LillyMol tools that parse the output from Vendor tools.
+if [[ ${inside_lilly} -eq 1 || -v BUILD_VENDOR ]] ; then
     echo "Building Vendor target"
     ${bazel} ${bazel_options} build ${build_options} Vendor/...:all
 else

@@ -964,6 +964,58 @@ MoleculeFilter::OkAndUtilities(Molecule& m, const int matoms, const int nrings,
 // each descriptor once. `m` is still needed for the handful of properties that
 // are not Features - organic, isotopes, carbon count, aromatic atom count and
 // ring size.
+namespace {
+
+/*
+  Comparing a computed value against a floating point threshold is not as
+  simple as < or >.
+
+  The threshold arrives as a 32 bit float from the proto, while values are
+  computed as doubles, so the number the config author wrote is perturbed by
+  about 1e-7 relative before it is ever compared - and in a direction that
+  varies with the number. Written as doubles, (float)0.2 is 0.20000000298 but
+  (float)0.35 is 0.34999999404.
+
+  On top of that the fraction features - heteroatom_fraction,
+  sp3_carbon_fraction, aromatic_density - are ratios of small integers, so
+  they land exactly on the round numbers people write. One sp3 carbon in five
+  is 0.2, and whether that is inside or outside a 0.2 bound should not depend
+  on binary representation.
+
+  So min_ and max_ are inclusive within a tolerance. A value that is
+  conceptually equal to the threshold is kept. The tolerance is relative, with
+  a floor of one so that thresholds at or near zero get an absolute 1e-6. That
+  is three orders above the float32 representation error and far below any
+  difference that means anything chemically.
+
+  Integer valued requirements do not go through here. For those, exact
+  comparison is both correct and what people expect - max_natoms 50 keeps a 50
+  atom molecule and rejects a 51 atom one.
+*/
+
+constexpr double kThresholdTolerance = 1.0e-6;
+
+inline double
+ThresholdSlack(double threshold) {
+  return kThresholdTolerance * std::max(1.0, std::fabs(threshold));
+}
+
+// True if `value` is below `minval` by more than the tolerance.
+inline bool
+BelowMin(double value, float minval) {
+  const double m = minval;
+  return value < m - ThresholdSlack(m);
+}
+
+// True if `value` is above `maxval` by more than the tolerance.
+inline bool
+AboveMax(double value, float maxval) {
+  const double m = maxval;
+  return value > m + ThresholdSlack(m);
+}
+
+}  // namespace
+
 int
 MoleculeFilter::Ok(FeatureValues& feature_values, Molecule& m,
                    const int matoms, const int nrings,
@@ -1012,11 +1064,13 @@ MoleculeFilter::Ok(FeatureValues& feature_values, Molecule& m,
 
     if (_requirements.has_min_heteroatom_fraction() ||
         _requirements.has_max_heteroatom_fraction()) {
-      const float haf = iwmisc::Fraction<float>(hac, matoms);
-      if (_requirements.has_min_heteroatom_fraction() && haf < _requirements.min_heteroatom_fraction()) {
+      const double haf = *feature_values.Value(Feature::kHeteroatomFraction);
+      if (_requirements.has_min_heteroatom_fraction() &&
+          BelowMin(haf, _requirements.min_heteroatom_fraction())) {
         return Reject(rejection_reason, RejectionReason::kMinHeteroatomFraction);
       }
-      if (_requirements.has_max_heteroatom_fraction() && haf > _requirements.max_heteroatom_fraction()) {
+      if (_requirements.has_max_heteroatom_fraction() &&
+          AboveMax(haf, _requirements.max_heteroatom_fraction())) {
         return Reject(rejection_reason, RejectionReason::kMaxHeteroatomFraction);
       }
     }
@@ -1103,14 +1157,13 @@ MoleculeFilter::Ok(FeatureValues& feature_values, Molecule& m,
 
     if (_requirements.has_min_sp3_carbon_fraction() ||
         _requirements.has_max_sp3_carbon_fraction()) {
-      const int carbon = m.natoms(6);
-      const float fcsp3 = carbon == 0 ? 0.0f : iwmisc::Fraction<float>(csp3, carbon);
+      const double fcsp3 = *feature_values.Value(Feature::kSp3CarbonFraction);
       if (_requirements.has_min_sp3_carbon_fraction() &&
-          fcsp3 < _requirements.min_sp3_carbon_fraction()) {
+          BelowMin(fcsp3, _requirements.min_sp3_carbon_fraction())) {
         return Reject(rejection_reason, RejectionReason::kSp3CarbonFractionTooLow);
       }
       if (_requirements.has_max_sp3_carbon_fraction() &&
-          fcsp3 > _requirements.max_sp3_carbon_fraction()) {
+          AboveMax(fcsp3, _requirements.max_sp3_carbon_fraction())) {
         return Reject(rejection_reason, RejectionReason::kSp3CarbonFractionTooHigh);
       }
     }
@@ -1145,11 +1198,11 @@ MoleculeFilter::Ok(FeatureValues& feature_values, Molecule& m,
   }
 
   if (_requirements.has_min_amw() || _requirements.has_max_amw()) {
-    const float amw = *feature_values.Value(Feature::kAmw);
-    if (_requirements.has_min_amw() && amw < _requirements.min_amw()) {
+    const double amw = *feature_values.Value(Feature::kAmw);
+    if (_requirements.has_min_amw() && BelowMin(amw, _requirements.min_amw())) {
       return Reject(rejection_reason, RejectionReason::kLowAmw);
     }
-    if (_requirements.has_max_amw() && amw > _requirements.max_amw()) {
+    if (_requirements.has_max_amw() && AboveMax(amw, _requirements.max_amw())) {
       return Reject(rejection_reason, RejectionReason::kHighAmw);
     }
   }
@@ -1185,11 +1238,13 @@ MoleculeFilter::Ok(FeatureValues& feature_values, Molecule& m,
   }
 
   if (_requirements.has_min_aromatic_density() || _requirements.has_max_aromatic_density()) {
-    const float aromdens = iwmisc::Fraction<float>(m.aromatic_atom_count(), matoms);
-    if (_requirements.has_min_aromatic_density() && aromdens < _requirements.min_aromatic_density()) {
+    const double aromdens = *feature_values.Value(Feature::kAromaticDensity);
+    if (_requirements.has_min_aromatic_density() &&
+        BelowMin(aromdens, _requirements.min_aromatic_density())) {
       return Reject(rejection_reason, RejectionReason::kAromaticDensityTooLow);
     }
-    if (_requirements.has_max_aromatic_density() && aromdens > _requirements.max_aromatic_density()) {
+    if (_requirements.has_max_aromatic_density() &&
+        AboveMax(aromdens, _requirements.max_aromatic_density())) {
       return Reject(rejection_reason, RejectionReason::kAromaticDensityTooHigh);
     }
   }
@@ -1216,10 +1271,10 @@ MoleculeFilter::Ok(FeatureValues& feature_values, Molecule& m,
     if (! tpsa) {
       return Reject(rejection_reason, RejectionReason::kLowTpsa);
     }
-    if (_requirements.has_min_tpsa() && *tpsa < _requirements.min_tpsa()) {
+    if (_requirements.has_min_tpsa() && BelowMin(*tpsa, _requirements.min_tpsa())) {
       return Reject(rejection_reason, RejectionReason::kLowTpsa);
     }
-    if (_requirements.has_max_tpsa() && *tpsa > _requirements.max_tpsa()) {
+    if (_requirements.has_max_tpsa() && AboveMax(*tpsa, _requirements.max_tpsa())) {
       return Reject(rejection_reason, RejectionReason::kHighTpsa);
     }
   }
@@ -1268,10 +1323,10 @@ MoleculeFilter::Ok(FeatureValues& feature_values, Molecule& m,
   if (_requirements.has_min_alogp() || _requirements.has_max_alogp()) {
     std::optional<double> x = feature_values.Value(Feature::kAlogp);
     if (x) {
-      if (_requirements.has_min_alogp() && *x < _requirements.min_alogp()) {
+      if (_requirements.has_min_alogp() && BelowMin(*x, _requirements.min_alogp())) {
         return Reject(rejection_reason, RejectionReason::kLowAlogp);
       }
-      if (_requirements.has_max_alogp() && *x > _requirements.max_alogp()) {
+      if (_requirements.has_max_alogp() && AboveMax(*x, _requirements.max_alogp())) {
         return Reject(rejection_reason, RejectionReason::kHighAlogp);
       }
     }
@@ -1280,10 +1335,10 @@ MoleculeFilter::Ok(FeatureValues& feature_values, Molecule& m,
   if (_requirements.has_min_xlogp() || _requirements.has_max_xlogp()) {
     std::optional<double> x = feature_values.Value(Feature::kXlogp);
     if (x) {
-      if (_requirements.has_min_xlogp() && *x < _requirements.min_xlogp()) {
+      if (_requirements.has_min_xlogp() && BelowMin(*x, _requirements.min_xlogp())) {
         return Reject(rejection_reason, RejectionReason::kLowXlogp);
       }
-      if (_requirements.has_max_xlogp() && *x > _requirements.max_xlogp()) {
+      if (_requirements.has_max_xlogp() && AboveMax(*x, _requirements.max_xlogp())) {
         return Reject(rejection_reason, RejectionReason::kHighXlogp);
       }
     }

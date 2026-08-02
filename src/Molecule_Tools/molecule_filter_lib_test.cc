@@ -368,6 +368,70 @@ TEST(FeatureValuesTest, RdkitHbaExcludesAmideNitrogen) {
   EXPECT_DOUBLE_EQ(*values.Value(Feature::kHbdRdkit), 1.0);
 }
 
+// min_ and max_ on a float valued feature are inclusive. Whether a fraction
+// that is conceptually equal to the threshold lands just inside or just
+// outside must not depend on binary representation - the threshold arrives as
+// a 32 bit float while the value is computed as a double, and the direction of
+// that error varies with the number.
+struct SmilesThresholdOutcome {
+  const char* smiles;
+  float threshold;
+  bool passes_min;
+  bool passes_max;
+};
+
+class TestFractionThreshold : public testing::TestWithParam<SmilesThresholdOutcome> {
+};
+
+TEST_P(TestFractionThreshold, InclusiveAtTheBoundary) {
+  const auto params = GetParam();
+
+  molecule_filter_data::Requirements req_min;
+  req_min.set_min_sp3_carbon_fraction(params.threshold);
+  MoleculeFilter filter_min;
+  ASSERT_TRUE(filter_min.Build(req_min));
+
+  molecule_filter_data::Requirements req_max;
+  req_max.set_max_sp3_carbon_fraction(params.threshold);
+  MoleculeFilter filter_max;
+  ASSERT_TRUE(filter_max.Build(req_max));
+
+  Molecule m1, m2;
+  ASSERT_TRUE(m1.build_from_smiles(params.smiles));
+  ASSERT_TRUE(m2.build_from_smiles(params.smiles));
+
+  EXPECT_EQ(static_cast<bool>(filter_min.Ok(m1)), params.passes_min)
+      << params.smiles << " min " << params.threshold;
+  EXPECT_EQ(static_cast<bool>(filter_max.Ok(m2)), params.passes_max)
+      << params.smiles << " max " << params.threshold;
+}
+INSTANTIATE_TEST_SUITE_P(TestFractionThreshold, TestFractionThreshold, testing::Values(
+  // CCCCc1ccccc1 - 4 sp3 carbons of 10, so exactly 0.4. Both bounds keep it.
+  SmilesThresholdOutcome{"CCCCc1ccccc1", 0.4f, true, true},
+  SmilesThresholdOutcome{"CCCCc1ccccc1", 0.35f, true, false},
+  SmilesThresholdOutcome{"CCCCc1ccccc1", 0.45f, false, true},
+  // CCc1ccccc1 - 2 of 8, exactly 0.25. As a float this rounds up, as a double
+  // it is exact, so a bare comparison would reject it from min_.
+  SmilesThresholdOutcome{"CCc1ccccc1", 0.25f, true, true},
+  // Cc1ccccc1 - 1 of 7, a non terminating fraction either way.
+  SmilesThresholdOutcome{"Cc1ccccc1", 0.1f, true, false},
+  SmilesThresholdOutcome{"Cc1ccccc1", 0.2f, false, true}
+));
+
+// Integer requirements are exact - no tolerance is applied.
+TEST(MoleculeFilterTest, IntegerThresholdsAreExact) {
+  molecule_filter_data::Requirements req;
+  req.set_max_natoms(3);
+  MoleculeFilter filter;
+  ASSERT_TRUE(filter.Build(req));
+
+  Molecule m3, m4;
+  ASSERT_TRUE(m3.build_from_smiles("CCO"));
+  ASSERT_TRUE(m4.build_from_smiles("CCCO"));
+  EXPECT_TRUE(filter.Ok(m3));
+  EXPECT_FALSE(filter.Ok(m4));
+}
+
 TEST(FeatureFromNameTest, RdkitHbondNames) {
   EXPECT_EQ(FeatureFromName("hba_rdkit"), Feature::kHbaRdkit);
   EXPECT_EQ(FeatureFromName("hbd_rdkit"), Feature::kHbdRdkit);

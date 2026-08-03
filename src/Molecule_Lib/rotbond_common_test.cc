@@ -63,6 +63,23 @@ INSTANTIATE_TEST_SUITE_P(ConjugatedLinkages, TestExpensiveRotbond, testing::Valu
   // linkage is still recognised.
   SmilesRotbond{"CCNC(=O)C1CCCC1", 2},
 
+  // Explicit Hydrogens must not change the answer. ncon() counts them and the
+  // terminal atom test is ncon == 1, so a hydroxyl Hydrogen written explicitly
+  // used to make the Oxygen non terminal and the C-O bond rotatable.
+  SmilesRotbond{"CCO", 0},
+  SmilesRotbond{"CCO[H]", 0},
+  SmilesRotbond{"CCO[2H]", 0},
+  SmilesRotbond{"CCN", 0},
+  SmilesRotbond{"CCN([H])[H]", 0},
+  SmilesRotbond{"CCCO", 1},
+  SmilesRotbond{"CCCO[H]", 1},
+  SmilesRotbond{"Oc1ccccc1", 0},
+  SmilesRotbond{"[H]Oc1ccccc1", 0},
+  SmilesRotbond{"CCCC", 1},
+  SmilesRotbond{"C([H])([H])([H])C([H])([H])C([H])([H])C([H])([H])[H]", 1},
+  // The trihalomethyl and t-butyl exclusions must survive explicit Hydrogens.
+  SmilesRotbond{"FC(F)(F)C([H])([H])C([H])([H])[H]", 0},
+
   // The other exclusions, unchanged - terminal atoms, triple bonds, ring bonds,
   // trihalomethyl and t-butyl.
   SmilesRotbond{"CCC#N", 0},

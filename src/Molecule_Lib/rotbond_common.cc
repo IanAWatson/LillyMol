@@ -319,6 +319,13 @@ IsCf3(const Molecule& m,
     }
 
     atomic_number_t jz = m.atomic_number(j);
+
+    // Explicit Hydrogens are invisible here. Including them would make the
+    // attached atoms look inhomogeneous and hide a real CF3 or t-butyl.
+    if (jz == 1) {
+      continue;
+    }
+
     if (attached < 0) {
       attached = jz;
       count = 1;
@@ -481,6 +488,27 @@ QuickRotatableBonds::Expensive(Molecule& m, int* bond_rotatable) {
   std::unique_ptr<int[]> terminal_atom_count(new_int(matoms));
   std::unique_ptr<int[]> in_triple_bond = AtomsWithTripleBonds(m);
 
+  // An explicit Hydrogen must not change the answer. ncon() counts one, and the
+  // terminal atom test below is ncon == 1, so writing the Hydrogen of a hydroxyl
+  // explicitly would make the Oxygen non terminal and the C-O bond rotatable -
+  // CCO has no rotatable bonds, CCO[H] appeared to have one. Use the heavy atom
+  // degree instead, and skip bonds to Hydrogen entirely so they neither become
+  // candidates nor inflate terminal_atom_count.
+  //
+  // Note that this makes no copy and does not modify `m`, which matters because
+  // the optional bond_rotatable array is indexed by the caller's bond numbering.
+  std::unique_ptr<int[]> heavy_ncon(new_int(matoms));
+  for (int i = 0; i < matoms; ++i) {
+    const Atom& a = m.atom(i);
+    int heavy = 0;
+    for (const Bond* b : a) {
+      if (m.atomic_number(b->other(i)) != 1) {
+        ++heavy;
+      }
+    }
+    heavy_ncon[i] = heavy;
+  }
+
   const int nedges = m.nedges();
   for (int i = 0; i < nedges; ++i) {
     const Bond* b = m.bondi(i);
@@ -492,6 +520,11 @@ QuickRotatableBonds::Expensive(Molecule& m, int* bond_rotatable) {
     }
     atom_number_t a1 = b->a1();
     atom_number_t a2 = b->a2();
+
+    if (m.atomic_number(a1) == 1 || m.atomic_number(a2) == 1) {
+      continue;
+    }
+
     if (in_triple_bond[a1] || in_triple_bond[a2]) {
       continue;
     }
@@ -500,13 +533,13 @@ QuickRotatableBonds::Expensive(Molecule& m, int* bond_rotatable) {
       continue;
     }
 
-    const int a1con = m.ncon(b->a1());
-    const int a2con = m.ncon(b->a2());
+    const int a1con = heavy_ncon[a1];
+    const int a2con = heavy_ncon[a2];
     if (a1con == 1) {
-      ++terminal_atom_count[b->a2()];
+      ++terminal_atom_count[a2];
       continue;
     } else if (a2con == 1) {
-      ++terminal_atom_count[b->a1()];
+      ++terminal_atom_count[a1];
       continue;
     }
 

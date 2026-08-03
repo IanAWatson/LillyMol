@@ -1,4 +1,5 @@
 import copy
+import gc
 import math
 import unittest
 
@@ -670,6 +671,64 @@ class TestLillyMol(absltest.TestCase):
       if bond.is_aromatic():
         aromatic_bonds += 1
     self.assertEqual(aromatic_bonds, 18)
+
+  def test_bond_type_between_atoms(self):
+    m = Molecule()
+    self.assertTrue(m.build_from_smiles("c1ccccc1C(=O)NC#CC1CC1"))
+
+    # Neither of these methods requires the caller to perceive aromaticity
+    # first. An aromatic bond reports AROMATIC_BOND rather than the single or
+    # double bond it is stored as.
+    self.assertEqual(m.bond_type_between_atoms(0, 1), BondType.AROMATIC_BOND)
+    self.assertEqual(m.bond_type_between_atoms(6, 7), BondType.DOUBLE_BOND)
+    self.assertEqual(m.bond_type_between_atoms(6, 8), BondType.SINGLE_BOND)
+    self.assertEqual(m.bond_type_between_atoms(9, 10), BondType.TRIPLE_BOND)
+
+    # Not bonded, and the degenerate same atom case. The underlying
+    # bond_between_atoms asserts rather than returning, so these must not reach it.
+    self.assertIsNone(m.bond_type_between_atoms(0, 9))
+    self.assertIsNone(m.bond_type_between_atoms(3, 3))
+
+  def test_bond_between_atoms(self):
+    m = Molecule()
+    self.assertTrue(m.build_from_smiles("c1ccccc1C(=O)NC#CC1CC1"))
+
+    b = m.bond_between_atoms(0, 1)
+    self.assertEqual(b.a1(), 0)
+    self.assertEqual(b.a2(), 1)
+    self.assertEqual(b.other(0), 1)
+    self.assertTrue(b.is_aromatic())
+    # Ring membership on a bond is only valid once aromaticity has been
+    # perceived. Molecule.nrings() does not set it. This is why the binding
+    # perceives aromaticity itself.
+    self.assertEqual(b.nrings(), 1)
+    self.assertEqual(b.btype(), BondType.AROMATIC_BOND)
+
+    exocyclic = m.bond_between_atoms(6, 7)
+    self.assertFalse(exocyclic.is_aromatic())
+    self.assertEqual(exocyclic.nrings(), 0)
+
+    self.assertIsNone(m.bond_between_atoms(0, 9))
+    self.assertIsNone(m.bond_between_atoms(3, 3))
+
+    # The two methods must never disagree about a bond.
+    for a in range(m.natoms()):
+      for bond in m[a]:
+        self.assertEqual(m.bond_type_between_atoms(bond.a1(), bond.a2()),
+                         bond.btype())
+
+  def test_bond_outlives_molecule(self):
+    # A Bond belongs to its Molecule. The binding must not let python take
+    # ownership of it, nor let the molecule be collected while a bond is held.
+    def escape():
+      m = Molecule()
+      self.assertTrue(m.build_from_smiles("c1ccncc1"))
+      return m.bond_between_atoms(2, 3)
+
+    b = escape()
+    gc.collect()
+    self.assertTrue(b.is_aromatic())
+    self.assertEqual(b.nrings(), 1)
 
   def test_formal_charge(self):
     m = Molecule()

@@ -236,7 +236,32 @@ enum BondType {
   kAromaticBond = 4
 };
 
-PYBIND11_MODULE(lillymol, m) 
+// BondType is not bond_type_t, so a cast will not do. Both Bond.btype() and
+// Molecule.bond_between_atoms report a bond type to python and they must not be
+// allowed to disagree, so the mapping lives here.
+// Aromatic is tested first because aromatic rings are stored in a Kekule form -
+// an aromatic bond is also a single or a double bond, and reporting that would
+// be wrong.
+static BondType
+ToBondType(const Bond& b) {
+  if (b.is_aromatic()) {
+    return BondType::kAromaticBond;
+  }
+  if (b.is_single_bond()) {
+    return BondType::kSingleBond;
+  }
+  if (b.is_double_bond()) {
+    return BondType::kDoubleBond;
+  }
+  if (b.is_triple_bond()) {
+    return BondType::kTripleBond;
+  }
+  // kUnknown is deliberately not exported to python, so returning it would hand
+  // back an unnamed enum value. An exception is more useful.
+  throw py::value_error("Unrecognised bond type");
+}
+
+PYBIND11_MODULE(lillymol, m)
 {
 #ifdef LILLYMOL_VECTOR_OPAQUE
   py::bind_vector<std::vector<int>>(m, "VectorInt");
@@ -857,6 +882,44 @@ Never refuses, and issues no warning.)")
                 .def("add", static_cast<int (Molecule::*)(const Molecule*)>(&Molecule::add_molecule), "add molecule, no bonds formed, generates multi-fragment molecule")
                 .def("are_bonded", static_cast<int (Molecule::*)(atom_number_t, atom_number_t)const>(&Molecule::are_bonded), "True if atoms are bonded")
 
+                // Both of these use bond_between_atoms_if_present. The plain
+                // bond_between_atoms asserts when the atoms are not bonded, and
+                // aborting the interpreter is not a reasonable answer to a question.
+                //
+                // Both perceive aromaticity first. Without it a benzene ring bond
+                // reports is_aromatic() False and nrings() 0 - plausible wrong
+                // answers rather than errors. Molecule::nrings() does not help, it
+                // does not push ring membership down onto the bonds. Once perceived
+                // the call is a pointer test.
+                .def("bond_between_atoms",
+                  [](Molecule& m, atom_number_t a1, atom_number_t a2)->const Bond* {
+                    m.compute_aromaticity_if_needed();
+                    return m.bond_between_atoms_if_present(a1, a2);
+                  },
+                  // reference is essential, not decoration. Bond is held by
+                  // shared_ptr, so the default policy for a returned pointer,
+                  // take_ownership, would have python delete a bond the Molecule
+                  // owns. keep_alive stops the molecule being collected while python
+                  // still holds one of its bonds.
+                  py::return_value_policy::reference,
+                  py::keep_alive<0, 1>(),
+                  "The Bond between two atoms, None if they are not bonded"
+                )
+                // Preferred when the type is all that is wanted, which is the usual
+                // case. Constructing the python wrapper for a Bond costs far more
+                // than the lookup itself, and this avoids it.
+                .def("bond_type_between_atoms",
+                  [](Molecule& m, atom_number_t a1, atom_number_t a2)->std::optional<BondType> {
+                    m.compute_aromaticity_if_needed();
+                    const Bond* b = m.bond_between_atoms_if_present(a1, a2);
+                    if (b == nullptr) {
+                      return std::nullopt;
+                    }
+                    return ToBondType(*b);
+                  },
+                  "BondType between two atoms, None if not bonded. Aromatic bonds report AROMATIC_BOND, not their Kekule type"
+                )
+
                 .def("formal_charge", static_cast<formal_charge_t (Molecule::*)(atom_number_t)const>(&Molecule::formal_charge), "formal charge on atom")
                 .def("set_formal_charge", static_cast<void (Molecule::*)(atom_number_t, formal_charge_t)>(&Molecule::set_formal_charge), "set formal charge on atom")
                 .def("has_formal_charges", static_cast<int (Molecule::*)()const>(&Molecule::has_formal_charges), "Does the molecule have atoms with formal charges")
@@ -1449,19 +1512,7 @@ Never refuses, and issues no warning.)")
     )
     .def("btype",
       [](const Bond& b)->BondType{
-        if (b.is_aromatic()) {
-          return BondType::kAromaticBond;
-        }
-        if (b.is_single_bond()) {
-          return BondType::kSingleBond;
-        } 
-        if (b.is_double_bond()) {
-          return BondType::kDoubleBond;
-        }
-        if (b.is_triple_bond()) {
-          return BondType::kTripleBond;
-        }
-        throw py::value_error("Unrecognised bond type");;
+        return ToBondType(b);
       },
       "btype"
     )

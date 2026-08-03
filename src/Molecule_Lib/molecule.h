@@ -1584,6 +1584,14 @@ class __attribute__((visibility("default"))) Molecule : protected resizable_arra
   int remove_all_non_natural_elements();
   int remove_explicit_hydrogens();  // need to be treated specially because of H property
 
+  // Remove every Hydrogen atom, regardless of isotope or formal charge.
+  // remove_all(1) does NOT do this - it retains an isotopic or charged
+  // Hydrogen, which is right when the label carries information and wrong when
+  // a calculation needs the Hydrogen suppressed graph. Use this for the latter.
+  // A bridging Hydrogen is still retained; removing it would disconnect the
+  // molecule. See the commentary in molecule.cc.
+  int RemoveAllHydrogenAtoms();
+
   // True if remove_explicit_hydrogens() would remove at least one atom.
   // Note that not every Hydrogen atom is removable - an isotopic or charged
   // Hydrogen carries information and is retained, as is a bridging one.

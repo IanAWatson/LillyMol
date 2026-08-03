@@ -2948,8 +2948,35 @@ class ScopedAromaticity {
     }
 };
 
+/*
+  Does not modify `m`.
+
+  XLogPWFL needs the Hydrogen suppressed graph and removes explicit Hydrogens to
+  get it, which used to happen to the caller's molecule. A molecule carrying any
+  is copied first.
+
+  Note what this means for `status`. It is filled per atom, and removing
+  Hydrogens renumbers the atoms, so when a copy is made the indices refer to the
+  Hydrogen suppressed molecule and not to `m` as the caller has it. A caller
+  that wants `status` aligned with its own molecule should suppress the
+  Hydrogens itself before calling, which xlogp_main does. Callers that ignore
+  `status`, or that pass a molecule with no explicit Hydrogens, are unaffected.
+*/
+
 std::optional<double>
 XLogPCalc::LogP(Molecule& m, int* status) const {
+  if (m.natoms(1) > 0) [[unlikely]] {
+    Molecule mcopy(m);
+    mcopy.RemoveAllHydrogenAtoms();
+    return LogPHSuppressed(mcopy, status);
+  }
+
+  return LogPHSuppressed(m, status);
+}
+
+// `m` must have no explicit Hydrogens, or be a copy that may be altered.
+std::optional<double>
+XLogPCalc::LogPHSuppressed(Molecule& m, int* status) const {
   std::optional<double> rc;
   {
     ScopedAromaticity aromaticity(WangFuLai);

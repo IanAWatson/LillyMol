@@ -89,6 +89,9 @@ class XLogPCalc {
     bool _display_unclassified_atom_messages = true;
     bool _display_assignments = false;
 
+    // `m` must have no explicit Hydrogens, or be a copy that may be altered.
+    std::optional<double> LogPHSuppressed(Molecule& m, int* status) const;
+
     int ProcessNewFragmentParameter(const XLogP::XlogpParameter& proto);
     int ReadNewFragmentParameters(const XLogP::XlogpParameters& proto);
 
@@ -109,6 +112,14 @@ class XLogPCalc {
     // The calculation mutates `m`: explicit hydrogen atoms are removed,
     // aromaticity is recomputed with the Wang-Fu-Lai model, and then
     // recomputed after restoring the previous global aromaticity model.
+    // Neither of these modifies `m`. The calculation needs the Hydrogen
+    // suppressed graph, so a molecule carrying explicit Hydrogens is copied and
+    // stripped first.
+    //
+    // `status` is filled per atom. When a copy is made its indices refer to the
+    // Hydrogen suppressed molecule, not to `m` as the caller has it, since
+    // removing Hydrogens renumbers the atoms. A caller wanting them aligned
+    // should suppress the Hydrogens itself first - see xlogp_main.
     std::optional<double> LogP(Molecule& m, int* status) const;
     std::optional<double> LogP(Molecule& m) const;
 

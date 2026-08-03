@@ -4662,6 +4662,52 @@ Molecule::ContainsIsotopeOrRemovableHydrogen() const
   return false;
 }
 
+/*
+  remove_all(1) dispatches to remove_explicit_hydrogens, which deliberately
+  retains an isotopic or charged Hydrogen because the isotope or the charge is
+  information. That is usually right, but it is not what a calculation wanting
+  the Hydrogen suppressed graph needs - alogp, xlogp and the polar surface area
+  all read implicit_hydrogens() and ncon(), so a retained Hydrogen atom both
+  hides a Hydrogen from the count and adds a connection, and the atom is typed
+  as something else entirely.
+
+  This removes every Hydrogen atom, whatever it is labelled with. The isotope
+  and charge are cleared first so that the careful removal below takes them,
+  which also means the neighbouring atom's implicit Hydrogen count is
+  maintained rather than the Hydrogen simply vanishing from the molecule.
+
+  One exception remains, and it is deliberate. A bridging Hydrogen, bonded to
+  more than one atom, is retained, because removing it would disconnect the
+  molecule and there is no sensible answer to which neighbour inherits it.
+  Boranes are the realistic case.
+*/
+
+int
+Molecule::RemoveAllHydrogenAtoms()
+{
+  for (int i = 0; i < _number_elements; ++i) {
+    Atom * a = _things[i];
+
+    if (1 != a->atomic_number()) {
+      continue;
+    }
+
+    if (a->ncon() > 1) {   // bridging, see above
+      continue;
+    }
+
+    if (0 != a->isotope()) {
+      _set_isotope_zero(i);
+    }
+
+    if (0 != a->formal_charge()) {
+      set_formal_charge(i, 0);
+    }
+  }
+
+  return remove_explicit_hydrogens();
+}
+
 int
 Molecule::remove_explicit_hydrogens()
 {

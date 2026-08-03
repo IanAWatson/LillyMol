@@ -466,10 +466,9 @@ nvrtspsa::NovartisPolarSurfaceArea::PolarSurfaceAreaInner(Molecule &m, const ato
   small; they are the values belonging to a different substitution pattern.
 
   So any explicit Hydrogens are removed first, on a copy, leaving the caller's
-  molecule alone. Every Hydrogen goes, including the isotopic ones that
-  remove_explicit_hydrogens retains - for this calculation an isotopic label
-  says nothing about how many Hydrogens an atom has, so the isotopes are
-  stripped from the copy first to let the careful removal take them.
+  molecule alone. RemoveAllHydrogenAtoms rather than remove_all(1), since for
+  this calculation an isotopic or charged label says nothing about how many
+  Hydrogens an atom has.
 
   Note also that this sets the global aromaticity type to Daylight for the
   duration, and restores it afterwards. A molecule that already had aromaticity
@@ -482,13 +481,7 @@ std::optional<double>
 nvrtspsa::NovartisPolarSurfaceArea::HydrogenSuppressedCopy(Molecule &m) const {
   Molecule mcopy(m);
 
-  // Isotopic Hydrogens are retained by remove_explicit_hydrogens. Removing the
-  // isotopes first turns them into ordinary Hydrogens so they go too, and lets
-  // the neighbour's implicit Hydrogen count be recomputed, which is the whole
-  // point.
-  mcopy.transform_to_non_isotopic_form();
-
-  mcopy.remove_explicit_hydrogens();
+  mcopy.RemoveAllHydrogenAtoms();
 
   return PolarSurfaceAreaHSuppressed(mcopy);
 }

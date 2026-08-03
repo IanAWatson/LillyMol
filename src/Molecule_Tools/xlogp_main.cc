@@ -549,6 +549,12 @@ Options::Process(Molecule& m, IWString_and_File_Descriptor& output) {
 
   ++_molecules_read;
 
+  // The per atom status array below is indexed against `m`, and XLogPCalc::LogP
+  // needs the Hydrogen suppressed graph. Suppress them here, before sizing the
+  // array, so that the indices line up. Were this left to LogP it would work on
+  // a copy and the indices would refer to that copy instead.
+  m.RemoveAllHydrogenAtoms();
+
   std::unique_ptr<int[]> status(new_int(m.natoms()));
   std::optional<double> x;
   if (_mannhold) {

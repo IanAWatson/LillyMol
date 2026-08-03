@@ -470,13 +470,56 @@ PYBIND11_MODULE(lillymol, m)
                   },
                   "For each atom the ring system identifier"
                 )
-                .def("amw", static_cast<float (Molecule::*)()const>(&Molecule::molecular_weight),
-                     "Average molecular weight. NOTE - returns 0.0 and complains to stderr if "
-                     "the molecule contains isotopes. Use amw_ignore_isotopes for those.")
+                .def("amw",
+                  [](Molecule& m)->float {
+                    if (! m.ContainsIsotopicAtoms()) [[likely]] {
+                      return m.molecular_weight();
+                    }
+
+                    if (PyErr_WarnEx(PyExc_UserWarning,
+                          "amw() erases isotopic labels before weighing, the mass and the "
+                          "Hydrogen count both, so [37C]OC weighs the same as COC. LillyMol "
+                          "has no table of isotopic masses, so a genuine isotopic molecular "
+                          "weight is not available - deuterium is weighed as Hydrogen.", 1) < 0) {
+                      throw py::error_already_set();
+                    }
+
+                    // Erase the labels on a copy. transform_to_non_isotopic_form also unsets
+                    // the implicit Hydrogen known flag, so a bracket atom that declared zero
+                    // Hydrogens gets the count its valence implies - which is what was meant
+                    // when the isotope is an arbitrary marker.
+                    Molecule mcopy(m);
+                    mcopy.transform_to_non_isotopic_form(1);
+                    return mcopy.molecular_weight();
+                  },
+R"(Average molecular weight.
+
+Isotopic labels are erased before weighing, both the mass and the Hydrogen
+count, so [37C]OC weighs the same as COC. In LillyMol an isotope is usually an
+arbitrary atom marker rather than a statement about the nucleus, and a marker
+should not change the weight. A strict smiles reading says [37C] has no
+Hydrogens; that is almost never what was meant. This matches the amw feature of
+molecule_filter.
+
+LillyMol has no table of isotopic masses, so a genuine isotopic molecular weight
+is not available from here at all - deuterium is weighed as Hydrogen. If you
+need one, use a toolkit that has the table.
+
+A warning is issued the first time an isotope is encountered. Silence it with
+warnings.filterwarnings, or turn it into an error with -W error::UserWarning.
+
+See also amw_ignore_isotopes, which differs on one point.)")
                 .def("amw_ignore_isotopes",
                      static_cast<float (Molecule::*)()const>(&Molecule::molecular_weight_ignore_isotopes),
-                     "Average molecular weight, counting an isotopic atom at the normal weight "
-                     "of its element. Unlike amw this never refuses.")
+R"(Average molecular weight, with an isotopic atom counted at the normal weight of
+its element.
+
+Differs from amw in that the declared Hydrogen count is honoured. A bracket atom
+states its own Hydrogen count, and [37C] states zero, so [37C]OC weighs 43.045
+here where amw gives 46.068. Use this only if you want the strict smiles reading;
+amw is what molecule_filter agrees with.
+
+Never refuses, and issues no warning.)")
                 .def("exact_mass", static_cast<exact_mass_t (Molecule::*)()const>(&Molecule::exact_mass), "Exact Mass")
                 .def("ncon", static_cast<int (Molecule::*)(atom_number_t)const>(&Molecule::ncon), "Connections to Atom")
                 .def("connections",

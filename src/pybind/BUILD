@@ -218,6 +218,14 @@ pybind_extension(
 )
 
 py_test(
+    name = "lillymol_amw_test",
+    srcs = ["lillymol_amw_test.py"],
+    deps = [
+        ":lillymol",
+    ],
+)
+
+py_test(
     name = "lillymol_tools_gfp_test",
     srcs = ["lillymol_tools_gfp_test.py"],
     data = [

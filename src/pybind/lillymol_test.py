@@ -672,6 +672,27 @@ class TestLillyMol(absltest.TestCase):
         aromatic_bonds += 1
     self.assertEqual(aromatic_bonds, 18)
 
+  def test_ring_membership_forces_bond_ring_membership(self):
+    # A Molecule computes derived properties only when asked, and a Bond knows
+    # nothing about its Molecule, so on a freshly parsed molecule a ring bond
+    # reports no ring membership at all. Not an error, just not yet computed.
+    m = Molecule()
+    self.assertTrue(m.build_from_smiles("C1CCCCC1"))
+    bond = next(iter(m[0]))
+    self.assertEqual(bond.nrings(), 0)
+    self.assertFalse(bond.IsInRing())
+
+    # nrings() is not the force call - it does not push ring membership down
+    # onto the bonds.
+    m.nrings()
+    self.assertEqual(bond.nrings(), 0)
+
+    # ring_membership() is. It returns nothing; get_ring_membership returns the
+    # per atom counts.
+    self.assertIsNone(m.ring_membership())
+    self.assertEqual(bond.nrings(), 1)
+    self.assertTrue(bond.IsInRing())
+
   def test_bond_type_between_atoms(self):
     m = Molecule()
     self.assertTrue(m.build_from_smiles("c1ccccc1C(=O)NC#CC1CC1"))

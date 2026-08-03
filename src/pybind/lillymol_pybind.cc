@@ -428,6 +428,18 @@ PYBIND11_MODULE(lillymol, m)
                   },
                   "Ring membership for all atoms"
                 )
+                // A Molecule computes derived properties only when asked, and a
+                // Bond holds no back pointer to its Molecule, so until this has
+                // run Bond.nrings() reports 0 and Bond.IsInRing() False for a ring
+                // bond. This is the force call, for callers that want the bonds to
+                // know and have no use for the per atom counts that
+                // get_ring_membership allocates and returns.
+                .def("ring_membership",
+                  [](Molecule& m)->void {
+                    m.ring_membership();
+                  },
+                  "Force ring membership perception, so the bonds know. Returns nothing - get_ring_membership returns the per atom counts"
+                )
                 .def("fused_system_identifier", &Molecule::fused_system_identifier, "Fused system identifier")
                 .def("fused_system_size", &Molecule::fused_system_size, "Fused system size")
                 .def("number_ring_systems", static_cast<int (Molecule::*)()>(&Molecule::number_ring_systems), "Number ring systems")

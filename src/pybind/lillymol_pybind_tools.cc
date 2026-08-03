@@ -516,6 +516,10 @@ PYBIND11_MODULE(lillymol_tools, m) {
   // implementation. TODO:ianwatson understand what is going on.
   // For now this is quite usable, just not efficient.
   py::class_<nvrtspsa::NovartisPolarSurfaceArea>(m, "TPSA")
+      .def("set_rdkit_compatibility",
+           [](nvrtspsa::NovartisPolarSurfaceArea& tpsa) { tpsa.SetRDKitCompatibility(); },
+           "Set the options that make this agree with RDKit's TPSA - charge separated "
+           "form, and zero contribution for sulphur and phosphorus.")
       .def(py::init<>())
       .def(
           "compute",

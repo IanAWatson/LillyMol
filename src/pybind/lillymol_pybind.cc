@@ -470,7 +470,13 @@ PYBIND11_MODULE(lillymol, m)
                   },
                   "For each atom the ring system identifier"
                 )
-                .def("amw", static_cast<float (Molecule::*)()const>(&Molecule::molecular_weight), "AMW")
+                .def("amw", static_cast<float (Molecule::*)()const>(&Molecule::molecular_weight),
+                     "Average molecular weight. NOTE - returns 0.0 and complains to stderr if "
+                     "the molecule contains isotopes. Use amw_ignore_isotopes for those.")
+                .def("amw_ignore_isotopes",
+                     static_cast<float (Molecule::*)()const>(&Molecule::molecular_weight_ignore_isotopes),
+                     "Average molecular weight, counting an isotopic atom at the normal weight "
+                     "of its element. Unlike amw this never refuses.")
                 .def("exact_mass", static_cast<exact_mass_t (Molecule::*)()const>(&Molecule::exact_mass), "Exact Mass")
                 .def("ncon", static_cast<int (Molecule::*)(atom_number_t)const>(&Molecule::ncon), "Connections to Atom")
                 .def("connections",
@@ -1778,6 +1784,33 @@ PYBIND11_MODULE(lillymol, m)
   m.def("set_copy_name_in_molecule_copy_constructor", &set_copy_name_in_molecule_copy_constructor, "Copy name in constructor");
   m.def("NumHAcceptors", [](const Molecule& mol) { return mol.LipinskiNumHAcceptors(); }, "Lipinski hydrogen bond acceptor count");
   m.def("NumHDonors", [](Molecule& mol) { return mol.LipinskiNumHDonors(); }, "Lipinski hydrogen bond donor count");
+  m.def("fraction_csp3",
+      [](Molecule& mol)->double {
+        int carbon = 0;
+        int csp3 = 0;
+
+        const int matoms = mol.natoms();
+        for (int i = 0; i < matoms; ++i) {
+          if (mol.atomic_number(i) != 6) {
+            continue;
+          }
+
+          ++carbon;
+          if (mol.saturated(i)) {
+            ++csp3;
+          }
+        }
+
+        if (carbon == 0) {
+          return 0.0;
+        }
+
+        return static_cast<double>(csp3) / static_cast<double>(carbon);
+      },
+      "Fraction of carbon atoms that are fully saturated. The denominator is the "
+      "carbon count, and a molecule with no carbon gives 0.0 - the same definition "
+      "molecule_filter uses for its sp3_carbon_fraction feature.");
+
   m.def("RDKitNumHAcceptors", [](Molecule& mol) { return mol.RDKitNumHAcceptors(); }, "RDKit compatible acceptor count, NOT a Lipinski count");
   m.def("RDKitNumHDonors", [](Molecule& mol) { return mol.RDKitNumHDonors(); }, "RDKit compatible donor count, NOT a Lipinski count");
   m.def("LillyMolFromSmiles", &MolFromSmiles, "Molecule from smiles");

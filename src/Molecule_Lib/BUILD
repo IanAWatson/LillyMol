@@ -883,6 +883,20 @@ cc_test(
 )
 
 cc_test(
+    name = "util_test",
+    timeout = "short",
+    srcs = [
+        "util_test.cc",
+    ],
+    deps = [
+        ":iwmolecule",
+        ":moleculeio",
+        "@googletest//:gtest",
+        "@googletest//:gtest_main",
+    ],
+)
+
+cc_test(
     name = "molecule_test",
     timeout = "short",
     srcs = [

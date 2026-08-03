@@ -143,6 +143,59 @@ untyped attachment atoms:
 chemotypes -s '[N]' -u -x -i smi input.smi > attached.smi
 ```
 
+## Fingerprint Output
+
+Use `-J` to write a fingerprint for the chemotype atom set instead of writing
+chemotype molecules. Fingerprint mode writes TDT records to stdout and disables
+the normal molecule output and summary options. If no `-P` atom type is
+specified, `UST:ARY` is used.
+
+A tag beginning with `FP` generates a fixed-width linear fingerprint using the
+standard LillyMol linear fingerprint generator:
+
+```shell
+chemotypes -s '[c]' -J FPCTYPE -i smi input.smi > chemotype.gfp
+```
+
+A tag beginning with `NC` generates a non-colliding counted EC fingerprint:
+
+```shell
+chemotypes -s '[c]' -J NCCTYPE -i smi input.smi > chemotype.gfp
+```
+
+For `NC` fingerprints, a trailing digit on the tag sets the EC radius. If no
+trailing digit is present, radius 3 is used.
+
+```shell
+chemotypes -s '[c]' -J NCCTYPE2 -i smi input.smi > chemotype.gfp
+```
+
+By default, only atoms in the chemotype are fingerprinted. Use
+`-J EXPAND=<n>` to include atoms within `n` bonds of that selected atom set:
+
+```shell
+chemotypes -s '[c]' -J NCCTYPE2 -J EXPAND=1 -i smi input.smi > chemotype.gfp
+```
+
+Use `-J INVERT`, or the synonym `-J OUTSIDE`, to fingerprint the atoms outside
+the chemotype instead:
+
+```shell
+chemotypes -s '[c]' -J FPCTYPE -J OUTSIDE -i smi input.smi > outside.gfp
+```
+
+With `-z i` or `-z ignore`, a molecule that does not match the query writes an
+empty fingerprint in a normal TDT record. Without `-z i`, nonmatching molecules
+remain fatal.
+
+Use `-f` to insert the chemotype fingerprint into an existing TDT stream. The
+input is copied to stdout, and the new fingerprint is written immediately after
+each `$SMI<...>` record.
+
+```shell
+chemotypes -s '[c]' -J FPCTYPE -f input.gfp > with_chemotype.gfp
+```
+
 ## Parent Output
 
 Use `-p <text>` to write the parent molecule before each generated chemotype:
@@ -214,7 +267,12 @@ single-ring molecules should simply be skipped.
 | `-u` | Include one-hop atoms attached to retained ring atoms. |
 | `-x` | With `-u`, ignore singly connected attached atoms. |
 | `-I <iso>` | Label retained ring exit-point atoms with isotope `iso`. Incompatible with `-P`. |
-| `-P <atype>` | Atom typing specification for retained non-terminal attachment atoms. |
+| `-P <atype>` | Atom typing specification for retained non-terminal attachment atoms; also controls fingerprint atom types when `-J` is active. |
+| `-J FP<tag>` | Write a fixed-width linear fingerprint of the chemotype atom set. |
+| `-J NC<tag>` | Write a non-colliding counted EC fingerprint of the chemotype atom set; trailing digits set the EC radius. |
+| `-J EXPAND=<n>` | Expand the fingerprinted atom set by `n` bonds. |
+| `-J INVERT`, `-J OUTSIDE` | Fingerprint atoms outside the chemotype. |
+| `-f` | Work as a TDT filter, inserting the `-J` fingerprint after each `$SMI<...>` record. |
 | `-p <text>` | Write the parent molecule before each generated chemotype; append `<text>` unless it is `.`, `def`, or `default`. |
 | `-F <fname>` | Write accumulated `dicer_data::DicerFragment` textproto summary. |
 | `-z i`, `-z ignore` | Ignore molecules that do not match any query. |

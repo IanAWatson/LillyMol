@@ -381,6 +381,20 @@ cc_binary(
 )
 
 cc_binary(
+    name = "gfp_leader_buckets",
+    srcs = [
+        "gfp_leader_buckets.cc",
+    ],
+    deps = [
+        ":gfp",
+        "//Foundational/cmdline:iwcmdline",
+        "//Foundational/data_source:iwstring_data_source",
+        "//Foundational/iw_tdt",
+        "//Foundational/iwmisc",
+    ],
+)
+
+cc_binary(
     name = "gfp_leader_standard",
     srcs = [
         "gfp_leader_standard.cc",

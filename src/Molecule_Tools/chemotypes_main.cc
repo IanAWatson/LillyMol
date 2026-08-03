@@ -1,3 +1,4 @@
+#include <cctype>
 #include <cstdint>
 #include <cstdlib>
 #include <iostream>
@@ -11,13 +12,19 @@
 #include "Molecule_Lib/aromatic.h"
 #include "Molecule_Lib/atom_typing.h"
 #include "Molecule_Lib/etrans.h"
+#include "Foundational/data_source/iwstring_data_source.h"
+#include "Foundational/iwmisc/sparse_fp_creator.h"
+
 #include "Molecule_Lib/istream_and_type.h"
 #include "Molecule_Lib/molecule.h"
+#include "Molecule_Lib/iwmfingerprint.h"
 #include "Molecule_Lib/molecule_preprocessing.h"
 #include "Molecule_Lib/output.h"
 #include "Molecule_Lib/substructure.h"
+#include "Molecule_Lib/util.h"
 
 #include "Molecule_Tools/chemotypes.h"
+#include "Molecule_Tools/iwecfp_lib.h"
 #include "Molecule_Tools/dicer_fragments.pb.h"
 
 #include "absl/container/flat_hash_map.h"
@@ -27,6 +34,97 @@ namespace chemotypes_main {
 
 using std::cerr;
 using molecule_processing::MoleculePreprocessing;
+
+enum class FingerprintKind {
+  kNone,
+  kFixed,
+  kNonColliding,
+};
+
+struct ChemotypeFingerprintSpec {
+  FingerprintKind kind = FingerprintKind::kNone;
+  IWString tag;
+  int ec_radius = 3;
+  int expand = 0;
+  int invert = 0;
+};
+
+int
+EnsureFingerprintTag(IWString& tag) {
+  if (! tag.ends_with('<')) {
+    tag << '<';
+  }
+
+  return 1;
+}
+
+int
+TrailingNumber(const IWString& tag, int default_value) {
+  const int nchars = tag.length();
+  int end = nchars - 1;
+  if (end >= 0 && tag[end] == '<') {
+    --end;
+  }
+
+  if (end < 0 || ! std::isdigit(static_cast<unsigned char>(tag[end]))) {
+    return default_value;
+  }
+
+  int start = end;
+  while (start > 0 && std::isdigit(static_cast<unsigned char>(tag[start - 1]))) {
+    --start;
+  }
+
+  int result = 0;
+  for (int i = start; i <= end; ++i) {
+    result = 10 * result + tag[i] - '0';
+  }
+
+  return result;
+}
+
+int
+ParseDashJQualifier(const const_IWSubstring& qualifier,
+                    ChemotypeFingerprintSpec& spec) {
+  if (qualifier.starts_with("EXPAND=")) {
+    const_IWSubstring value(qualifier);
+    value.remove_leading_chars(7);
+    if (! value.numeric_value(spec.expand) || spec.expand < 0) {
+      cerr << "Invalid -J EXPAND value '" << qualifier << "'\n";
+      return 0;
+    }
+    return 1;
+  }
+
+  if (qualifier == "INVERT" || qualifier == "OUTSIDE") {
+    spec.invert = 1;
+    return 1;
+  }
+
+  if (qualifier.starts_with("FP")) {
+    if (spec.kind != FingerprintKind::kNone) {
+      cerr << "Only one -J fingerprint tag can be specified\n";
+      return 0;
+    }
+    spec.kind = FingerprintKind::kFixed;
+    spec.tag = qualifier;
+    return EnsureFingerprintTag(spec.tag);
+  }
+
+  if (qualifier.starts_with("NC")) {
+    if (spec.kind != FingerprintKind::kNone) {
+      cerr << "Only one -J fingerprint tag can be specified\n";
+      return 0;
+    }
+    spec.kind = FingerprintKind::kNonColliding;
+    spec.tag = qualifier;
+    spec.ec_radius = TrailingNumber(spec.tag, 3);
+    return EnsureFingerprintTag(spec.tag);
+  }
+
+  cerr << "Unrecognised -J qualifier '" << qualifier << "'\n";
+  return 0;
+}
 
 void
 Usage(int rc) {
@@ -52,6 +150,12 @@ Options:
  -t             with -n, include all adjacent ring systems tied at the cutoff distance.
  -P <atype>     atom typing specification; non-terminal attachment atoms become labelled.
  -I <iso>       label retained ring exit-point atoms with isotope <iso>; incompatible with -P.
+ -J FP<tag>     generate fixed-width linear fingerprint of chemotype atoms.
+ -J NC<tag>     generate non-colliding EC fingerprint of chemotype atoms.
+                A trailing digit sets the EC radius, default 3.
+ -J EXPAND=<n>  expand selected fingerprint atoms by <n> bonds.
+ -J INVERT      fingerprint atoms outside the chemotype; OUTSIDE is a synonym.
+ -f             work as a TDT filter; requires -J.
  -p <text>      write the parent before each chemotype; append <text> to parent name.
                 Use -p . or -p def for no parent annotation.
  -F <fname>      write accumulated dicer_data::DicerFragment textproto summary.
@@ -87,6 +191,9 @@ class Options {
   int _write_unique_chemotype_id = 0;
   IWString _unique_chemotype_id_prefix;
 
+  int _function_as_tdt_filter = 0;
+  ChemotypeFingerprintSpec _fingerprint;
+
   resizable_array_p<Substructure_Query> _queries;
   chemotypes::ChemotypeOptions _chemotype_options;
   chemotypes::ChemotypeScratch _scratch;
@@ -111,12 +218,26 @@ class Options {
   int Initialise(Command_Line& cl);
   int Preprocess(Molecule& m);
   int Process(Molecule& m, Molecule_Output_Object& output);
+  int ProcessFingerprint(Molecule& m, IWString_and_File_Descriptor& output);
+  int WriteFingerprint(Molecule& m, const int* include_atom,
+                       const uint32_t* atom_type, IWString_and_File_Descriptor& output);
+  int WriteEmptyFingerprint(IWString_and_File_Descriptor& output);
+  int StartFingerprintRecord(Molecule& m, IWString_and_File_Descriptor& output);
+  int FinishFingerprintRecord(Molecule& m, IWString_and_File_Descriptor& output);
   int AccumulateChemotype(Molecule& m, const IWString& parent_name, uint32_t& chemotype_id);
   int WriteSummary();
   int Report(std::ostream& output) const;
 
   int verbose() const {
     return _verbose;
+  }
+
+  int fingerprinting_active() const {
+    return _fingerprint.kind != FingerprintKind::kNone;
+  }
+
+  int function_as_tdt_filter() const {
+    return _function_as_tdt_filter;
   }
 };
 
@@ -185,6 +306,34 @@ Options::Initialise(Command_Line& cl) {
     _chemotype_options.include_attached_atoms = 1;
   }
 
+  if (cl.option_present('J')) {
+    const_IWSubstring j;
+    for (int i = 0; cl.value('J', j, i); ++i) {
+      if (! ParseDashJQualifier(j, _fingerprint)) {
+        return 0;
+      }
+    }
+    if (_fingerprint.kind == FingerprintKind::kNone) {
+      cerr << "The -J option must specify one fingerprint tag starting with FP or NC\n";
+      return 0;
+    }
+  }
+
+  if (cl.option_present('f')) {
+    _function_as_tdt_filter = 1;
+    if (! fingerprinting_active()) {
+      cerr << "The TDT filter option (-f) requires fingerprint generation (-J)\n";
+      return 0;
+    }
+  }
+
+  if (fingerprinting_active() &&
+      (cl.option_present('o') || cl.option_present('S') || cl.option_present('p') ||
+       cl.option_present('F') || cl.option_present('U') || cl.option_present('I'))) {
+    cerr << "Fingerprint generation (-J) cannot be combined with molecule or summary output options\n";
+    return 0;
+  }
+
   if (cl.option_present('p')) {
     _write_parent = 1;
     const_IWSubstring p = cl.string_value('p');
@@ -235,10 +384,18 @@ Options::Initialise(Command_Line& cl) {
       return 0;
     }
     _atom_typing_ptr = &_atom_typing;
+  } else if (fingerprinting_active()) {
+    const_IWSubstring p("UST:ARY");
+    if (! _atom_typing.build(p)) {
+      cerr << "Cannot initialise default fingerprint atom typing '" << p << "'\n";
+      return 0;
+    }
+    _atom_typing_ptr = &_atom_typing;
   }
 
 
-  if (_chemotype_options.isotope_for_exit_points != 0 && _atom_typing_ptr != nullptr) {
+  if (_chemotype_options.isotope_for_exit_points != 0 && _atom_typing_ptr != nullptr &&
+      ! fingerprinting_active()) {
     cerr << "The fixed exit point isotope option (-I) cannot be used with atom typing (-P)\n";
     return 0;
   }
@@ -320,6 +477,177 @@ Options::Preprocess(Molecule& m) {
   }
 
   return ! m.empty();
+}
+
+int
+Options::WriteEmptyFingerprint(IWString_and_File_Descriptor& output) {
+  output << _fingerprint.tag << ">\n";
+  output.write_if_buffer_holds_more_than(4096);
+  return output.good();
+}
+
+
+
+int
+Options::StartFingerprintRecord(Molecule& m, IWString_and_File_Descriptor& output) {
+  if (! _function_as_tdt_filter) {
+    output << "$SMI<" << m.smiles() << ">\n";
+  }
+
+  return output.good();
+}
+
+int
+Options::FinishFingerprintRecord(Molecule& m, IWString_and_File_Descriptor& output) {
+  if (! _function_as_tdt_filter) {
+    output << "PCN<" << m.name() << ">\n";
+    output << "|\n";
+  }
+
+  ++_molecules_written;
+  output.write_if_buffer_holds_more_than(4096);
+  return output.good();
+}
+
+int
+Options::WriteFingerprint(Molecule& m, const int* include_atom,
+                          const uint32_t* atom_type,
+                          IWString_and_File_Descriptor& output) {
+  const int matoms = m.natoms();
+  int included_atoms = 0;
+  for (int i = 0; i < matoms; ++i) {
+    if (include_atom[i]) {
+      ++included_atoms;
+    }
+  }
+
+  if (included_atoms == 0) {
+    return WriteEmptyFingerprint(output);
+  }
+
+  if (_fingerprint.kind == FingerprintKind::kFixed) {
+    IWMFingerprint fp;
+    if (! fp.construct_fingerprint(m, atom_type, include_atom)) {
+      cerr << "Cannot generate fixed fingerprint for '" << m.name() << "'\n";
+      return 0;
+    }
+
+    IWString tmp;
+    fp.daylight_ascii_representation_including_nset_info(tmp);
+    output << _fingerprint.tag << tmp << ">\n";
+    output.write_if_buffer_holds_more_than(4096);
+    return output.good();
+  }
+
+  if (_fingerprint.kind == FingerprintKind::kNonColliding) {
+    iwecfp::Iwecfp generator;
+    generator.set_max_radius(_fingerprint.ec_radius);
+
+    Sparse_Fingerprint_Creator sfc;
+    const iwecfp::FingerprintResult result =
+        generator.Fingerprint(m, atom_type, include_atom, &sfc);
+    if (result == iwecfp::FingerprintResult::kFatal) {
+      cerr << "Cannot generate EC fingerprint for '" << m.name() << "'\n";
+      return 0;
+    }
+    if (result == iwecfp::FingerprintResult::kNoStartAtoms) {
+      return WriteEmptyFingerprint(output);
+    }
+
+    IWString tmp;
+    sfc.daylight_ascii_form_with_counts_encoded(_fingerprint.tag, tmp);
+    output << tmp << '\n';
+    output.write_if_buffer_holds_more_than(4096);
+    return output.good();
+  }
+
+  cerr << "Options::WriteFingerprint:no fingerprint type active\n";
+  return 0;
+}
+
+int
+Options::ProcessFingerprint(Molecule& m, IWString_and_File_Descriptor& output) {
+  ++_molecules_read;
+  m.compute_aromaticity_if_needed();
+
+  if (_min_rings > 0 && m.nrings() < _min_rings) {
+    ++_molecules_below_min_rings;
+    if (! StartFingerprintRecord(m, output) || ! WriteEmptyFingerprint(output)) {
+      return 0;
+    }
+    return FinishFingerprintRecord(m, output);
+  }
+
+  chemotypes::ChemotypeQueryMatch match;
+  const chemotypes::ChemotypeQueryMatchStatus status = chemotypes::FirstChemotypeQueryMatch(
+      m, _queries, match, _chemotype_options.choose_first_embedding);
+
+  switch (status) {
+    case chemotypes::ChemotypeQueryMatchStatus::kMatched:
+      break;
+
+    case chemotypes::ChemotypeQueryMatchStatus::kNoQueryMatch:
+      ++_molecules_not_matching_queries;
+      if (_ignore_molecules_not_matching_query) {
+        if (! StartFingerprintRecord(m, output) || ! WriteEmptyFingerprint(output)) {
+          return 0;
+        }
+        return FinishFingerprintRecord(m, output);
+      }
+      cerr << "No query matched '" << m.name() << "'\n";
+      return 0;
+
+    case chemotypes::ChemotypeQueryMatchStatus::kMatchedQueryNoRingAtom:
+      ++_molecules_matched_query_without_ring_atom;
+      cerr << "Query matched no ring atom in '" << m.name() << "'\n";
+      return 0;
+
+    case chemotypes::ChemotypeQueryMatchStatus::kAmbiguousQueryMatches:
+      ++_molecules_with_ambiguous_query_matches;
+      cerr << "Query matched multiple ring systems in '" << m.name()
+           << "', use -z first to use the first embedding\n";
+      return 0;
+
+    case chemotypes::ChemotypeQueryMatchStatus::kAtomTypingFailed:
+      ++_atom_typing_failures;
+      cerr << "Atom typing failed for '" << m.name() << "'\n";
+      return 0;
+  }
+
+  std::vector<int> chemotype_mask = chemotypes::ChemotypeAtomMask(
+      m, match, _chemotype_options, _scratch);
+
+  const int matoms = m.natoms();
+  std::vector<int> include_atom(matoms, 0);
+  Set_of_Atoms seeds;
+  for (atom_number_t atom = 0; atom < matoms; ++atom) {
+    const int selected = _fingerprint.invert
+        ? chemotype_mask[atom] == chemotypes::kChemotypeNotKept
+        : chemotype_mask[atom] != chemotypes::kChemotypeNotKept;
+    if (selected) {
+      include_atom[atom] = 1;
+      seeds << atom;
+    }
+  }
+
+  if (_fingerprint.expand > 0) {
+    lillymol::SetAtomsWithinRadius(m, seeds, _fingerprint.expand, 1,
+                                   include_atom.data());
+  }
+
+  std::vector<uint32_t> atom_type(matoms, 0);
+  if (! _atom_typing_ptr->assign_atom_types(m, atom_type.data())) {
+    ++_atom_typing_failures;
+    cerr << "Atom typing failed for '" << m.name() << "'\n";
+    return 0;
+  }
+
+  if (! StartFingerprintRecord(m, output) ||
+      ! WriteFingerprint(m, include_atom.data(), atom_type.data(), output)) {
+    return 0;
+  }
+
+  return FinishFingerprintRecord(m, output);
 }
 
 int
@@ -477,7 +805,11 @@ Options::WriteSummary() {
 int
 Options::Report(std::ostream& output) const {
   output << "Read " << _molecules_read << " molecules\n";
-  output << "Wrote " << _molecules_written << " chemotypes\n";
+  if (fingerprinting_active()) {
+    output << "Wrote " << _molecules_written << " fingerprints\n";
+  } else {
+    output << "Wrote " << _molecules_written << " chemotypes\n";
+  }
   if (_parent_molecules_written) {
     output << "Wrote " << _parent_molecules_written << " parent molecules\n";
   }
@@ -505,6 +837,99 @@ Options::Report(std::ostream& output) const {
   }
 
   return 1;
+}
+
+int
+ChemotypeFingerprints(Options& options, data_source_and_type<Molecule>& input,
+                      IWString_and_File_Descriptor& output) {
+  Molecule* m;
+  while ((m = input.next_molecule()) != nullptr) {
+    std::unique_ptr<Molecule> free_m(m);
+
+    if (! options.Preprocess(*m)) {
+      continue;
+    }
+
+    if (! options.ProcessFingerprint(*m, output)) {
+      return 0;
+    }
+  }
+
+  return output.good();
+}
+
+int
+ChemotypeFingerprints(Options& options, const char* fname, FileType input_type,
+                      IWString_and_File_Descriptor& output) {
+  if (input_type == FILE_TYPE_INVALID) {
+    input_type = discern_file_type_from_name(fname);
+  }
+
+  data_source_and_type<Molecule> input(input_type, fname);
+  if (! input.good()) {
+    cerr << "ChemotypeFingerprints:cannot open '" << fname << "'\n";
+    return 0;
+  }
+
+  if (options.verbose() > 1) {
+    input.set_verbose(1);
+  }
+
+  return ChemotypeFingerprints(options, input, output);
+}
+
+int
+ProcessFilterRecord(Options& options, const const_IWSubstring& buffer,
+                    IWString_and_File_Descriptor& output) {
+  const_IWSubstring smiles(buffer);
+  smiles.remove_up_to_first('<');
+  smiles.chop();
+
+  Molecule m;
+  if (! m.build_from_smiles(smiles)) {
+    cerr << "Cannot parse smiles '" << smiles << "'\n";
+    return 0;
+  }
+
+  if (! options.Preprocess(m)) {
+    return options.WriteEmptyFingerprint(output);
+  }
+
+  return options.ProcessFingerprint(m, output);
+}
+
+int
+ChemotypeFingerprintFilter(Options& options, iwstring_data_source& input,
+                           IWString_and_File_Descriptor& output) {
+  const_IWSubstring buffer;
+  while (input.next_record(buffer)) {
+    output << buffer << '\n';
+
+    if (! buffer.starts_with("$SMI<")) {
+      output.write_if_buffer_holds_more_than(4096);
+      continue;
+    }
+
+    if (! ProcessFilterRecord(options, buffer, output)) {
+      cerr << "Fatal error processing TDT line " << input.lines_read() << '\n';
+      cerr << buffer << '\n';
+      return 0;
+    }
+  }
+
+  return output.good();
+}
+
+int
+ChemotypeFingerprintFilter(Options& options, const char* fname,
+                           IWString_and_File_Descriptor& output) {
+  iwstring_data_source input(fname);
+  if (! input.good()) {
+    cerr << "ChemotypeFingerprintFilter:cannot open '" << fname << "'\n";
+    return 0;
+  }
+
+  return ChemotypeFingerprintFilter(options, input, output);
 }
 
 int
@@ -548,7 +973,7 @@ Chemotypes(Options& options, const char* fname, FileType input_type,
 
 int
 Chemotypes(int argc, char** argv) {
-  Command_Line cl(argc, argv, "vE:A:g:cli:o:S:F:U:q:s:n:r:D:P:I:up:xtz:");
+  Command_Line cl(argc, argv, "vE:A:g:clfi:o:S:F:U:q:s:n:r:D:P:I:up:xtz:J:");
 
   if (cl.unrecognised_options_encountered()) {
     cerr << "Unrecognised options encountered\n";
@@ -578,6 +1003,8 @@ Chemotypes(int argc, char** argv) {
       cerr << "Cannot determine input type\n";
       Usage(1);
     }
+  } else if (options.function_as_tdt_filter()) {
+    // TDT input may not have a molecule-file suffix.
   } else if (cl.number_elements() == 1 && 0 == strcmp(cl[0], "-")) {
     input_type = FILE_TYPE_SMI;
   } else if (! all_files_recognised_by_suffix(cl)) {
@@ -587,6 +1014,27 @@ Chemotypes(int argc, char** argv) {
   if (cl.empty()) {
     cerr << "Insufficient arguments\n";
     Usage(1);
+  }
+
+  if (options.fingerprinting_active()) {
+    IWString_and_File_Descriptor output(1);
+    for (const char* fname : cl) {
+      int ok;
+      if (options.function_as_tdt_filter()) {
+        ok = ChemotypeFingerprintFilter(options, fname, output);
+      } else {
+        ok = ChemotypeFingerprints(options, fname, input_type, output);
+      }
+      if (! ok) {
+        cerr << "Fatal error processing '" << fname << "'\n";
+        return 1;
+      }
+    }
+    output.flush();
+    if (verbose) {
+      options.Report(cerr);
+    }
+    return 0;
   }
 
   Molecule_Output_Object output;

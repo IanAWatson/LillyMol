@@ -210,30 +210,30 @@ distance_filter (GFP_Standard & fp,
 
     computations_done++;
 
-    auto t = fp.tanimoto_distance (pool[i]);
+    const similarity_type_t t = fp.tanimoto_distance (pool[i]);
 
-//#define DEBUG_NN
+// #define DEBUG_NN
 #ifdef DEBUG_NN
-    cerr << "Distance between '" << fp.id() << " and pool " << i << " '" << pool[i].id() << "' is " << t << endl;
+    cerr << "Distance between '" << fp.id() << " and pool " << i << " '" << pool[i]->id() << "' is " << t << endl;
 #endif
+//  cerr << "Dist " << t << '\n';
 
     if (t > static_cast<similarity_type_t> (0.0))
       ;
     else if (ignore_zero_distances)
       continue;
 
-    if (t < lower_distance_threshold)
-    {
+    if (t < lower_distance_threshold) {
       lower_threshold_violation_count++;
-      if (lower_threshold_violation_count >= lower_threshold_violation_threshold)
+      mindist.try_this(t, i);
+      if (lower_threshold_violation_count >= lower_threshold_violation_threshold) {
         keep_going = 0;
+      }
     }
 
-    if (t < upper_distance_threshold)
-    {
+    if (t < upper_distance_threshold) {
       upper_threshold_success_count++;
-      if (upper_threshold_success_count >= upper_threshold_success_requirement)
-      {
+      if (upper_threshold_success_count >= upper_threshold_success_requirement) {
         mindist.try_this(t, i);
         keep_going = 0;
       }
@@ -270,10 +270,13 @@ do_write_smiles (const IW_TDT & tdt,
 
   output << smi << ' ' << fp.id();
   
-  if (shortest_distance_tag.length())
+  if (shortest_distance_tag.length() > 0 && mindist <= 1.0f) {
     output << ' ' << mindist;
+  }
 
   output << '\n';
+
+  output.write_if_buffer_holds_more_than(4096);
 
   return 1;
 }

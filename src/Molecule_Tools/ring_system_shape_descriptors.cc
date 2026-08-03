@@ -50,6 +50,7 @@ Options:
  -x           ignore terminal single-atom ring substituents when larger substituents exist
  -R <fname>   write rod-like molecules as smiles and identifier
  -N <fname>   write non-rod-like molecules as smiles and identifier
+ -s           write a smiles file rather than a descrptor file
  -o <sep>     output separator, recognised names include tab and space
  -i <type>    input type
  -g ...       chemical standardisation
@@ -135,6 +136,9 @@ class Options {
   IWString_and_File_Descriptor _stream_for_rodlike;
   IWString_and_File_Descriptor _stream_for_non_rodlike;
 
+  // By default we write a descriptor file, but we can also write a smiles file.
+  bool _write_smiles = false;
+
   uint64_t _molecules_read = 0;
   uint64_t _atoms_removed = 0;
   uint64_t _rodlike_molecules_written = 0;
@@ -162,6 +166,9 @@ class Options {
   int WriteIfRequested(const Molecule& m, const IWString& smiles,
                        const RingSystemShapeDescriptors& descriptors);
 
+  bool write_smiles() const {
+    return _write_smiles;
+  }
   int WriteHeader(IWString_and_File_Descriptor& output) const;
 
   int Process(Molecule& m, IWString_and_File_Descriptor& output);
@@ -221,6 +228,13 @@ Options::Initialise(Command_Line& cl) {
     }
     if (_verbose) {
       cerr << "non-rod-like molecules written to '" << fname << "'\n";
+    }
+  }
+
+  if (cl.option_present('s')) {
+    _write_smiles = true;
+    if (_write_smiles) {
+      cerr << "Will write smiles\n";
     }
   }
 
@@ -471,6 +485,10 @@ Options::Process(Molecule& m, IWString_and_File_Descriptor& output) {
 
   WriteIfRequested(m, smiles, descriptors);
 
+  if (_write_smiles) {
+    output << m.smiles() << _output_separator;
+  }
+
   output << m.name() << _output_separator << descriptors.number_ring_systems
          << _output_separator << descriptors.terminal << _output_separator
          << descriptors.applicable << _output_separator << descriptors.rod_like
@@ -535,7 +553,7 @@ RingSystemShapeDescriptors(Options& options, const char* fname, FileType input_t
 
 int
 RingSystemShapeDescriptors(int argc, char** argv) {
-  Command_Line cl(argc, argv, "vE:A:lcg:i:o:xR:N:");
+  Command_Line cl(argc, argv, "vE:A:lcg:i:o:xR:N:s");
 
   if (cl.unrecognised_options_encountered()) {
     cerr << "Unrecognised options encountered\n";
@@ -577,7 +595,9 @@ RingSystemShapeDescriptors(int argc, char** argv) {
   }
 
   IWString_and_File_Descriptor output(1);
-  options.WriteHeader(output);
+  if (! options.write_smiles()) {
+    options.WriteHeader(output);
+  }
 
   for (const char* fname : cl) {
     if (!RingSystemShapeDescriptors(options, fname, input_type, output)) {

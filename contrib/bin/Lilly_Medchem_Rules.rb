@@ -94,7 +94,7 @@ unless cl.option_present('okiso')
 end
 
 if cl.option_present('maxringsize')
-  mc_first_pass_options << ' -Z ' << cl.value('maxringsize')
+  mc_first_pass_options << ' -Z ' << cl.value('maxringsize').to_s
 end
 
 mc_first_pass_options << ' -A I -A ipp'

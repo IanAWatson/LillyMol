@@ -1080,9 +1080,17 @@ class TestLillyMol(absltest.TestCase):
       self.assertEqual(mol.unique_smiles(), result)
 
   def test_lipinski_hba_hbd(self):
+    # Lipinski wrote donors as "the sum of OHs and NHs", so a donor count is a
+    # count of Hydrogens, not of the heteroatoms bearing them. An NH2 is two
+    # donors. RDKit's NumHDonors counts matching atoms and would say one - that
+    # is a refinement of Lipinski, not what he specified, and it is available
+    # separately as the rdkit variant.
     cases = [
       ("C", 0, 0),
-      ("CN", 1, 1),
+      ("CN", 1, 2),
+      ("CNC", 1, 1),
+      ("NCCN", 2, 4),
+      ("CO", 1, 1),
       ("COC", 1, 0),
     ]
 

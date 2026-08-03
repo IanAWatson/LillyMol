@@ -23,6 +23,43 @@ class TestExpensiveRotbond : public testing::TestWithParam<SmilesRotbond> {
     }
 };
 
+// The quick calculation has none of the conjugated linkage or trihalomethyl
+// exclusions, but it must be just as indifferent to how the Hydrogens were
+// written.
+struct SmilesPair {
+  const char* implicit;
+  const char* explicit_h;
+};
+
+class TestQuickRotbondHydrogens : public testing::TestWithParam<SmilesPair> {
+  protected:
+    quick_rotbond::QuickRotatableBonds _rotbond;
+
+    void SetUp() override {
+      _rotbond.set_calculation_type(quick_rotbond::QuickRotatableBonds::RotBond::kQuick);
+    }
+};
+
+TEST_P(TestQuickRotbondHydrogens, SameEitherWay) {
+  const auto params = GetParam();
+
+  Molecule m1, m2;
+  ASSERT_TRUE(m1.build_from_smiles(params.implicit));
+  ASSERT_TRUE(m2.build_from_smiles(params.explicit_h));
+
+  EXPECT_EQ(_rotbond.Process(m1), _rotbond.Process(m2))
+      << params.implicit << " vs " << params.explicit_h;
+}
+INSTANTIATE_TEST_SUITE_P(QuickHydrogens, TestQuickRotbondHydrogens, testing::Values(
+  SmilesPair{"CCO", "CCO[H]"},
+  SmilesPair{"CCO", "CCO[2H]"},
+  SmilesPair{"CCO", "CCO[H+]"},
+  SmilesPair{"CCN", "CCN([H])[H]"},
+  SmilesPair{"CCCO", "CCCO[H]"},
+  SmilesPair{"Oc1ccccc1", "[H]Oc1ccccc1"},
+  SmilesPair{"CCCC", "C([H])([H])([H])C([H])([H])C([H])([H])C([H])([H])[H]"}
+));
+
 TEST_P(TestExpensiveRotbond, Count) {
   const auto params = GetParam();
   ASSERT_TRUE(_m.build_from_smiles(params.smiles));

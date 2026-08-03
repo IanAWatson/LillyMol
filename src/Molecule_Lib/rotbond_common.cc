@@ -473,6 +473,38 @@ AtomsWithTripleBonds(const Molecule& m) {
   return result;
 }
 
+/*
+  ncon() counts an explicit Hydrogen, and the terminal atom test in both
+  calculations is a connectivity of one. So writing the Hydrogen of a hydroxyl or
+  an amine explicitly would make that heteroatom non terminal and the bond to it
+  rotatable - CCO has no rotatable bonds, CCO[H] appeared to have one. Both
+  calculations therefore work with the heavy atom degree, and skip bonds to
+  Hydrogen outright.
+
+  Nothing here copies or modifies the molecule, which matters because the
+  optional bond_rotatable array is indexed by the caller's bond numbering.
+*/
+
+static std::unique_ptr<int[]>
+HeavyAtomDegree(const Molecule& m) {
+  const int matoms = m.natoms();
+
+  std::unique_ptr<int[]> result(new_int(matoms));
+
+  for (int i = 0; i < matoms; ++i) {
+    const Atom& a = m.atom(i);
+    int heavy = 0;
+    for (const Bond* b : a) {
+      if (m.atomic_number(b->other(i)) != 1) {
+        ++heavy;
+      }
+    }
+    result[i] = heavy;
+  }
+
+  return result;
+}
+
 int
 QuickRotatableBonds::Expensive(Molecule& m, int* bond_rotatable) {
   const int matoms = m.natoms();
@@ -488,26 +520,9 @@ QuickRotatableBonds::Expensive(Molecule& m, int* bond_rotatable) {
   std::unique_ptr<int[]> terminal_atom_count(new_int(matoms));
   std::unique_ptr<int[]> in_triple_bond = AtomsWithTripleBonds(m);
 
-  // An explicit Hydrogen must not change the answer. ncon() counts one, and the
-  // terminal atom test below is ncon == 1, so writing the Hydrogen of a hydroxyl
-  // explicitly would make the Oxygen non terminal and the C-O bond rotatable -
-  // CCO has no rotatable bonds, CCO[H] appeared to have one. Use the heavy atom
-  // degree instead, and skip bonds to Hydrogen entirely so they neither become
-  // candidates nor inflate terminal_atom_count.
-  //
-  // Note that this makes no copy and does not modify `m`, which matters because
-  // the optional bond_rotatable array is indexed by the caller's bond numbering.
-  std::unique_ptr<int[]> heavy_ncon(new_int(matoms));
-  for (int i = 0; i < matoms; ++i) {
-    const Atom& a = m.atom(i);
-    int heavy = 0;
-    for (const Bond* b : a) {
-      if (m.atomic_number(b->other(i)) != 1) {
-        ++heavy;
-      }
-    }
-    heavy_ncon[i] = heavy;
-  }
+  // See HeavyAtomDegree above. Bonds to Hydrogen are skipped entirely below so
+  // they neither become candidates nor inflate terminal_atom_count.
+  std::unique_ptr<int[]> heavy_ncon = HeavyAtomDegree(m);
 
   const int nedges = m.nedges();
   for (int i = 0; i < nedges; ++i) {
@@ -599,6 +614,9 @@ QuickRotatableBonds::Quickest(Molecule& m) {
 
   std::unique_ptr<int[]> in_triple_bond = AtomsWithTripleBonds(m);
 
+  // See HeavyAtomDegree above.
+  std::unique_ptr<int[]> heavy_ncon = HeavyAtomDegree(m);
+
   const int nedges = m.nedges();
 
   for (int i = 0; i < nedges; ++i) {
@@ -612,11 +630,16 @@ QuickRotatableBonds::Quickest(Molecule& m) {
 
     atom_number_t a1 = b->a1();
     atom_number_t a2 = b->a2();
+
+    if (m.atomic_number(a1) == 1 || m.atomic_number(a2) == 1) {
+      continue;
+    }
+
     if (in_triple_bond[a1] || in_triple_bond[a2]) {
       continue;
     }
 
-    if (m.ncon(a1) == 1 || m.ncon(a2) == 1) {
+    if (heavy_ncon[a1] == 1 || heavy_ncon[a2] == 1) {
       continue;
     }
 

@@ -721,7 +721,7 @@ FileconvConfig::DoAppends(Molecule& m, IWString& extra_stuff) {
 
   if (append_molecular_weight_to_name) {
     MaybeAppendFeatureName("AMW", extra_stuff);
-    extra_stuff << m.molecular_weight();
+    extra_stuff << lillymol::MolecularWeightIsotopesAsLabels(m);
   } else if (append_molecular_weight_ok_isotope_to_name) {
     Molecular_Weight_Control mwc;
     Molecular_Weight_Calculation_Result mwcr;
@@ -2760,15 +2760,15 @@ FileconvConfig::ApplyAllFiltersInner(Molecule& m,
       cerr << "Molecule contains " << m.natoms() << " atoms, which is above cutoff\n";
     rejection_reason = "too many atoms";
   } else if (lower_molecular_weight_cutoff > 0.0 &&
-             m.molecular_weight_ignore_isotopes() < lower_molecular_weight_cutoff) {
+             lillymol::MolecularWeightIsotopesAsLabels(m) < lower_molecular_weight_cutoff) {
     molecules_below_molecular_weight_cutoff++;
-    cerr << "Molecular weight is " << m.molecular_weight_ignore_isotopes()
+    cerr << "Molecular weight is " << lillymol::MolecularWeightIsotopesAsLabels(m)
          << " which is below cutoff\n";
     rejection_reason = "AMW too low";
   } else if (upper_molecular_weight_cutoff > 0.0 &&
-             m.molecular_weight_ignore_isotopes() > upper_molecular_weight_cutoff) {
+             lillymol::MolecularWeightIsotopesAsLabels(m) > upper_molecular_weight_cutoff) {
     molecules_above_molecular_weight_cutoff++;
-    cerr << "Molecular weight is " << m.molecular_weight_ignore_isotopes()
+    cerr << "Molecular weight is " << lillymol::MolecularWeightIsotopesAsLabels(m)
          << " which is above cutoff\n";
     rejection_reason = "AMW too high";
   } else if ((output_organic_only || exclude_non_real_elements) && ExcludeForAtomTypes(m)) {
@@ -2879,7 +2879,9 @@ FileconvConfig::ApplyAllFiltersInner(Molecule& m,
   matoms = m.natoms();  // recompute, as it may have been changed by transformations
 
   if (compute_molecular_weight_for_each || lower_amw_cutoff >= 0.0 || upper_amw_cutoff >= 0.0) {
-    molecular_weight_t amw = m.molecular_weight();
+    // molecular_weight() refuses an isotopic molecule - it returns 0.0 - so
+    // every labelled molecule used to fail a lower cutoff and be discarded.
+    molecular_weight_t amw = lillymol::MolecularWeightIsotopesAsLabels(m);
 
     amw_accumulator.extra(amw);
     atom_count[matoms]++;
@@ -5312,11 +5314,11 @@ FileconvConfig::ReportResults(const Command_Line& cl, std::ostream& output) cons
 
   if (molecules_below_molecular_weight_cutoff) {
     cerr << "Skipped " << molecules_below_molecular_weight_cutoff
-         << " molecules with molecular wieght below " << lower_molecular_weight_cutoff << '\n';
+         << " molecules with molecular weight below " << lower_molecular_weight_cutoff << '\n';
   }
   if (molecules_above_molecular_weight_cutoff) {
     cerr << "Skipped " << molecules_below_molecular_weight_cutoff
-         << " molecules with molecular wieght above " << lower_molecular_weight_cutoff << '\n';
+         << " molecules with molecular weight above " << upper_molecular_weight_cutoff << '\n';
   }
   if (molecules_below_atom_count_cutoff) {
     cerr << "Skipped " << molecules_below_atom_count_cutoff

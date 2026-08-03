@@ -484,13 +484,7 @@ PYBIND11_MODULE(lillymol, m)
                       throw py::error_already_set();
                     }
 
-                    // Erase the labels on a copy. transform_to_non_isotopic_form also unsets
-                    // the implicit Hydrogen known flag, so a bracket atom that declared zero
-                    // Hydrogens gets the count its valence implies - which is what was meant
-                    // when the isotope is an arbitrary marker.
-                    Molecule mcopy(m);
-                    mcopy.transform_to_non_isotopic_form(1);
-                    return mcopy.molecular_weight();
+                    return lillymol::MolecularWeightIsotopesAsLabels(m);
                   },
 R"(Average molecular weight.
 

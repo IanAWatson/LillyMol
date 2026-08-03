@@ -3552,6 +3552,52 @@ Molecule::molecular_weight_ignore_isotopes() const
 
 static const Element * hydrogen = nullptr;
 
+/*
+  There are three ways to weigh a molecule that carries an isotope, and the
+  distinction matters more than the names suggest.
+
+    molecular_weight()                  refuses. Writes to stderr and returns
+                                        0.0, which looks like a usable number.
+    molecular_weight_ignore_isotopes()  counts the atom at the normal weight of
+                                        its element, but honours the Hydrogen
+                                        count the atom declares. A bracket atom
+                                        declares its own, and [37C] declares
+                                        zero, so [37C]OC weighs 43.045.
+    molecular_weight_count_isotopes()   uses the isotope NUMBER as the mass.
+                                        Close for 13C, meaningless for a label.
+
+  This is the fourth, and is what nearly every caller in LillyMol wants. An
+  isotope here is usually an arbitrary atom marker rather than a statement about
+  the nucleus, so the label is erased before weighing - the mass AND the Hydrogen
+  count - and [37C]OC weighs the same as COC, 46.068.
+
+  The Hydrogen part is the half that is easy to miss. Ignoring the isotope for
+  the mass alone still leaves the declared zero Hydrogens, which is a strict
+  smiles reading and almost never what was meant.
+
+  Note that LillyMol has no table of isotopic masses, so a genuine isotopic
+  molecular weight is not available from any of these. Deuterium weighs the same
+  as Hydrogen.
+
+  Costs a copy, but only for a molecule that actually carries an isotope.
+*/
+
+molecular_weight_t
+lillymol::MolecularWeightIsotopesAsLabels(const Molecule& m)
+{
+  if (! m.ContainsIsotopicAtoms()) {
+    return m.molecular_weight();
+  }
+
+  Molecule mcopy(m);
+
+  // The default also unsets the implicit Hydrogen known flag, so an atom that
+  // declared zero Hydrogens gets the count its valence implies.
+  mcopy.transform_to_non_isotopic_form();
+
+  return mcopy.molecular_weight();
+}
+
 molecular_weight_t
 Molecule::molecular_weight_count_isotopes() const
 {

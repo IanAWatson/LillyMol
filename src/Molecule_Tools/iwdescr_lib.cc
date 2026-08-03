@@ -2490,14 +2490,10 @@ IWDescr::IWDescrImpl::StoreBasicAtomDescriptors(
 
   descriptor[iwdescr_natoms].set(static_cast<float>(matoms));
 
-  static Molecular_Weight_Calculation_Result mwcr;
-  mwc.set_ignore_isotopes(1);
-
-  if (m.molecular_weight(mwc, mwcr)) {
-    descriptor[iwdescr_amw].set(mwcr.amw());
-  } else {
-    descriptor[iwdescr_amw].set(0.0f);
-  }
+  // An isotopic label must not change the weight, and must not be read as a
+  // statement that the atom has no Hydrogens. Agrees with molecule_filter,
+  // fileconv and the python bindings.
+  descriptor[iwdescr_amw].set(static_cast<float>(lillymol::MolecularWeightIsotopesAsLabels(m)));
 
   descriptor[iwdescr_bigatom].set(static_cast<float>(counts.bigatom_count));
   descriptor[iwdescr_fbigatom].set(static_cast<float>(counts.bigatom_count) /

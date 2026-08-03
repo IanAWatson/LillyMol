@@ -1621,6 +1621,7 @@ class __attribute__((visibility("default"))) Molecule : protected resizable_arra
   molecular_weight_t molecular_weight_count_isotopes() const;
   molecular_weight_t molecular_weight_ignore_isotopes() const;
 
+
   int molecular_weight(const Molecular_Weight_Control&,
                        Molecular_Weight_Calculation_Result&) const;
 
@@ -2803,6 +2804,17 @@ int Position3D(Molecule& m, atom_number_t atom1, float distance, atom_number_t a
 // impacts on trxn.
 int embedding_symmetry_perception_status();
 void set_simplistic_embedding_symmetry_perception(int s);
+
+// Average molecular weight with any isotopic label erased - the mass and the
+// Hydrogen count both - so [37C]OC weighs the same as COC. In LillyMol an
+// isotope is usually an arbitrary atom marker, and a marker should not change
+// the weight, nor be read as a statement that the atom has no Hydrogens.
+//
+// This is what molecule_filter, iwdescr, fileconv and the python bindings all
+// use, so that they agree. Molecule has three other molecular weight functions
+// and each does something different with an isotope - one refuses outright - so
+// read the commentary in molecule.cc before reaching for one of those.
+molecular_weight_t MolecularWeightIsotopesAsLabels(const Molecule& m);
 
 }  // namespace lillymol
 

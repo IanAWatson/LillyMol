@@ -411,8 +411,8 @@ FeatureValues::Qed() {
   if (_qed) {
     return _qed;
   }
-  Molecule mcopy(_m);
-  std::optional<float> value = _calculators.qed.qed(mcopy);
+  // No defensive copy needed; Qed::qed protects the molecule itself.
+  std::optional<float> value = _calculators.qed.qed(_m);
   if (! value) {
     return std::nullopt;
   }

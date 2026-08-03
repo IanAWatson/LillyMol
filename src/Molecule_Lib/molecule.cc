@@ -4597,8 +4597,32 @@ Molecule::remove_all(const Element * to_remove)
   particular case in point
 */
 
-// The criteria here must stay in step with the loop in
-// remove_explicit_hydrogens below.
+namespace {
+
+/*
+  The single definition of which Hydrogen atoms remove_explicit_hydrogens takes.
+  An isotopic or charged Hydrogen carries information and is retained, as is a
+  bridging one. Callers that remove Hydrogens and then reason about the atom
+  count have to agree with this, and more than one has got it wrong, so the
+  test lives in one place and remove_explicit_hydrogens uses it too.
+*/
+
+inline bool
+IsRemovableExplicitHydrogen(const Atom * a)
+{
+  if (1 != a->atomic_number()) {
+    return false;
+  }
+
+  if (0 != a->isotope() || 0 != a->formal_charge()) {
+    return false;
+  }
+
+  return a->ncon() <= 1;
+}
+
+}  // namespace
+
 bool
 Molecule::ContainsRemovableExplicitHydrogen() const
 {
@@ -4608,23 +4632,31 @@ Molecule::ContainsRemovableExplicitHydrogen() const
   }
 
   for (int i = 0; i < _number_elements; ++i) {
+    if (IsRemovableExplicitHydrogen(_things[i])) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
+bool
+Molecule::ContainsIsotopeOrRemovableHydrogen() const
+{
+  // A molecule that is nothing but a Hydrogen atom is left alone, but an
+  // isotope on it still counts.
+  const bool lone_atom = _number_elements <= 1;
+
+  for (int i = 0; i < _number_elements; ++i) {
     const Atom * a = _things[i];
 
-    if (1 != a->atomic_number()) {
-      continue;
+    if (a->isotope() > 0) {
+      return true;
     }
 
-    // An isotopic or charged Hydrogen carries information, it is retained.
-    if (0 != a->isotope() || 0 != a->formal_charge()) {
-      continue;
+    if (! lone_atom && IsRemovableExplicitHydrogen(a)) {
+      return true;
     }
-
-    // As is a bridging Hydrogen.
-    if (a->ncon() > 1) {
-      continue;
-    }
-
-    return true;
   }
 
   return false;
@@ -4666,16 +4698,11 @@ Molecule::remove_explicit_hydrogens()
 
     const Atom * a = _things[i];
 
-    if (1 != a->atomic_number())
-      continue;
-
-    if (0 != a->isotope() || 0 != a->formal_charge())
-      continue;
-
-    const int acon = a->ncon();
-    if (acon > 1) {
+    if (! IsRemovableExplicitHydrogen(a)) {
       continue;
     }
+
+    const int acon = a->ncon();
 
     is_hydrogen[i] = 1;
     xref[i] = -1;     // in the new molecule, what is the new atom number for atom I

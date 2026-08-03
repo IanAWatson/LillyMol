@@ -1574,8 +1574,8 @@ ALogP::LogP(Molecule& m) {
   // copy only those that would actually be damaged. A molecule with neither a
   // removable Hydrogen nor an isotope, which is nearly all of them once
   // chemical standardisation has run, is scored in place and pays only for the
-  // two scans.
-  if (m.ContainsRemovableExplicitHydrogen() || m.ContainsIsotopicAtoms()) [[unlikely]] {
+  // single scan that establishes this.
+  if (m.ContainsIsotopeOrRemovableHydrogen()) [[unlikely]] {
     Molecule mcopy(m);
     return LogPDestructive(mcopy);
   }

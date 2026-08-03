@@ -370,7 +370,29 @@ Qed::ComputeQed(const QEDProperties& properties) const {
 
 std::optional<float>
 Qed::qed(Molecule& m) {
+  // The calculation is destructive - it suppresses Hydrogens and reduces to the
+  // largest organic fragment, and CalculateProperties computes alogp, which
+  // strips isotopes. All of that would otherwise persist in the caller's
+  // molecule, so any property computed afterwards could differ from the same
+  // property computed before.
+  //
+  // Copy only the molecules that would actually be altered. A single organic
+  // fragment with no removable Hydrogen and no isotope is scored in place, and
+  // pays only for the scans that establish this - negligible beside the rest of
+  // a qed calculation.
+  if (m.number_fragments() > 1 || ! m.organic_only() ||
+      m.ContainsIsotopeOrRemovableHydrogen()) {
+    Molecule mcopy(m);
+    return QedDestructive(mcopy);
+  }
 
+  return QedDestructive(m);
+}
+
+// Free to modify `m`. Either it is a copy made by qed above, or qed has
+// established that there is nothing here that would modify it.
+std::optional<float>
+Qed::QedDestructive(Molecule& m) {
   m.remove_all(1);
 
   QEDProperties properties;

@@ -1590,6 +1590,13 @@ class __attribute__((visibility("default"))) Molecule : protected resizable_arra
   // Useful for deciding whether a molecule needs protecting from a calculation
   // that suppresses Hydrogens. Keep in step with remove_explicit_hydrogens.
   bool ContainsRemovableExplicitHydrogen() const;
+
+  // True if this molecule contains an isotope, or a Hydrogen that
+  // remove_explicit_hydrogens would remove. One pass over the atoms, for the
+  // benefit of calculations that suppress Hydrogens and strip isotopes and
+  // need to know whether they must work on a copy. Cheaper than asking
+  // ContainsIsotopicAtoms and ContainsRemovableExplicitHydrogen separately.
+  bool ContainsIsotopeOrRemovableHydrogen() const;
                                     // of adjacent atoms
 
   // Remove the last `items_removed` atoms.

@@ -937,6 +937,18 @@ cc_test(
 )
 
 cc_test(
+    name = "rotbond_common_test",
+    srcs = [
+        "rotbond_common_test.cc",
+    ],
+    deps = [
+        ":iwmolecule",
+        ":moleculeio",
+        "@googletest//:gtest_main",
+    ],
+)
+
+cc_test(
     name = "moleculer_test",
     srcs = [
         "moleculer_test.cc",

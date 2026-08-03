@@ -457,8 +457,84 @@ nvrtspsa::NovartisPolarSurfaceArea::PolarSurfaceAreaInner(Molecule &m, const ato
 
 
 
+/*
+  The atom classification below assumes the Hydrogen suppressed graph. It reads
+  implicit_hydrogens() and ncon(), so an explicit Hydrogen atom both hides a
+  Hydrogen from the count and adds a connection. A primary amine written as
+  N([H])[H] therefore matches the fully substituted pattern and scores 3.24
+  instead of 26.02, an alcohol scores as an ether, and so on. The errors are not
+  small; they are the values belonging to a different substitution pattern.
+
+  So any explicit Hydrogens are removed first, on a copy, leaving the caller's
+  molecule alone. Every Hydrogen goes, including the isotopic ones that
+  remove_explicit_hydrogens retains - for this calculation an isotopic label
+  says nothing about how many Hydrogens an atom has, so the isotopes are
+  stripped from the copy first to let the careful removal take them.
+
+  Note also that this sets the global aromaticity type to Daylight for the
+  duration, and restores it afterwards. A molecule that already had aromaticity
+  computed under some other model keeps that perception, since the computation
+  here is only "if needed". In practice LillyMol has used Daylight throughout
+  for years, so this does not arise.
+*/
+
 std::optional<double>
-nvrtspsa::NovartisPolarSurfaceArea::PolarSurfaceArea(Molecule &m, const atomic_number_t *z,
+nvrtspsa::NovartisPolarSurfaceArea::HydrogenSuppressedCopy(Molecule &m) const {
+  Molecule mcopy(m);
+
+  // Isotopic Hydrogens are retained by remove_explicit_hydrogens. Removing the
+  // isotopes first turns them into ordinary Hydrogens so they go too, and lets
+  // the neighbour's implicit Hydrogen count be recomputed, which is the whole
+  // point.
+  mcopy.transform_to_non_isotopic_form();
+
+  mcopy.remove_explicit_hydrogens();
+
+  return PolarSurfaceAreaHSuppressed(mcopy);
+}
+
+// `m` must have no explicit Hydrogens. Builds the arrays that the computation
+// needs and evaluates.
+std::optional<double>
+nvrtspsa::NovartisPolarSurfaceArea::PolarSurfaceAreaHSuppressed(Molecule &m) const {
+  const int matoms = m.natoms();
+
+  if (0 == matoms) {
+    cerr << "Cannot compute polar surface area of molecule w/ no atoms\n";
+    return std::nullopt;
+  }
+
+  int aromsave = global_aromaticity_type();
+
+  set_global_aromaticity_type(Daylight);
+
+  atomic_number_t *z = new atomic_number_t[matoms];
+  std::unique_ptr<atomic_number_t[]> free_z(z);
+  m.atomic_numbers(z);
+
+  int *is_aromatic = new int[matoms];
+  std::unique_ptr<int[]> free_is_aromatic(is_aromatic);
+
+  m.compute_aromaticity_if_needed();
+
+  for (int i = 0; i < matoms; i++) {
+    is_aromatic[i] = m.is_aromatic(i);
+  }
+
+  const Atom **atom = new const Atom *[matoms];
+  std::unique_ptr<const Atom *[]> free_atom(atom);
+  m.atoms(atom);
+
+  std::optional<double> rc = PolarSurfaceAreaWithArrays(m, z, atom, is_aromatic);
+
+  set_global_aromaticity_type(aromsave);
+
+  return rc;
+}
+
+std::optional<double>
+nvrtspsa::NovartisPolarSurfaceArea::PolarSurfaceAreaWithArrays(Molecule &m,
+                            const atomic_number_t *z,
                             const Atom **atom, const int *is_aromatic) const {
   // This is a public API entry point, so make sure aromaticity is OK.
   // Because of what we are doing in iwdescr to reverse standardisations.
@@ -492,40 +568,24 @@ nvrtspsa::NovartisPolarSurfaceArea::PolarSurfaceArea(Molecule &m, const atomic_n
 }
 
 std::optional<double>
+nvrtspsa::NovartisPolarSurfaceArea::PolarSurfaceArea(Molecule &m, const atomic_number_t *z,
+                            const Atom **atom, const int *is_aromatic) const {
+  // The supplied arrays describe `m` as it stands. Removing Hydrogens renumbers
+  // the atoms and invalidates them, so that case has to build its own.
+  if (m.natoms(1) > 0) [[unlikely]] {
+    return HydrogenSuppressedCopy(m);
+  }
+
+  return PolarSurfaceAreaWithArrays(m, z, atom, is_aromatic);
+}
+
+std::optional<double>
 nvrtspsa::NovartisPolarSurfaceArea::PolarSurfaceArea(Molecule &m) const {
-  const int matoms = m.natoms();
-
-  if (0 == matoms) {
-    cerr << "Cannot compute polar surface area of molecule w/ no atoms\n";
-    return std::nullopt;
+  if (m.natoms(1) > 0) [[unlikely]] {
+    return HydrogenSuppressedCopy(m);
   }
 
-  int aromsave = global_aromaticity_type();
-
-  set_global_aromaticity_type(Daylight);
-
-  atomic_number_t *z = new atomic_number_t[matoms];
-  std::unique_ptr<atomic_number_t[]> free_z(z);
-  m.atomic_numbers(z);
-
-  int *is_aromatic = new int[matoms];
-  std::unique_ptr<int[]> free_is_aromatic(is_aromatic);
-
-  m.compute_aromaticity_if_needed();
-
-  for (int i = 0; i < matoms; i++) {
-    is_aromatic[i] = m.is_aromatic(i);
-  }
-
-  const Atom **atom = new const Atom *[matoms];
-  std::unique_ptr<const Atom *[]> free_atom(atom);
-  m.atoms(atom);
-
-  std::optional<double> rc = PolarSurfaceArea(m, z, atom, is_aromatic);
-
-  set_global_aromaticity_type(aromsave);
-
-  return rc;
+  return PolarSurfaceAreaHSuppressed(m);
 }
 
 namespace nvrtspsa {

@@ -60,9 +60,30 @@ PYBIND11_MODULE(lillymol_query, q)
     .def("set_min_atoms_to_match", &Substructure_Query::set_min_atoms_to_match, "set_min_atoms_to_match")
     .def("set_max_atoms_to_match", &Substructure_Query::set_max_atoms_to_match, "set_max_atoms_to_match")
     .def("max_query_atoms_matched_in_search", &Substructure_Query::max_query_atoms_matched_in_search, "max_query_atoms_matched_in_search")
-    .def("substructure_search", static_cast<uint32_t (Substructure_Query::*)(Molecule*)>(&Substructure_Query::substructure_search), "substructure_search")
+    // The searches below release the GIL for the duration of the C++ work, so
+    // that other python threads can run. A search is 6 to 18 microseconds, which
+    // is long enough for that to be worth the ~1 microsecond a release and
+    // reacquire pair costs. Nothing inside the released region touches a python
+    // object; the arguments were converted before it and the return value is
+    // converted after it.
+    //
+    // This does NOT make searching thread safe, and cannot. A Substructure_Query
+    // is thread compatible, not thread safe - it accumulates match state such as
+    // _max_query_atoms_matched_in_search - so give each thread its own query.
+    // Building one from smarts costs about 7 microseconds, so that is cheap.
+    // Less obviously, a search also WRITES to the molecule it searches, forcing
+    // ring and aromaticity perception on it, so two threads must not search the
+    // same Molecule either.
     .def("substructure_search",
-      [](Substructure_Query& qry, Molecule& m, Substructure_Results& sresults) {
+      [](Substructure_Query& qry, Molecule& m)->uint32_t {
+        py::gil_scoped_release release;
+        return qry.substructure_search(&m);
+      },
+      "substructure_search"
+    )
+    .def("substructure_search",
+      [](Substructure_Query& qry, Molecule& m, Substructure_Results& sresults)->uint32_t {
+        py::gil_scoped_release release;
         return qry.substructure_search(m, sresults);
       },
       "Substructure search"
@@ -70,14 +91,17 @@ PYBIND11_MODULE(lillymol_query, q)
     .def("substructure_search_matches",
       [](Substructure_Query& qry, Molecule& m)->std::optional<std::vector<Set_of_Atoms>>{
         std::vector<Set_of_Atoms> results;
-        Substructure_Results query_results;
-        if (! qry.substructure_search(&m, query_results)) {
-          return std::nullopt;
-        }
+        {
+          py::gil_scoped_release release;
+          Substructure_Results query_results;
+          if (! qry.substructure_search(&m, query_results)) {
+            return std::nullopt;
+          }
 
-        results.reserve(query_results.number_embeddings());
-        for (const Set_of_Atoms* s : query_results.embeddings()) {
-          results.push_back(Set_of_Atoms(*s));
+          results.reserve(query_results.number_embeddings());
+          for (const Set_of_Atoms* s : query_results.embeddings()) {
+            results.push_back(Set_of_Atoms(*s));
+          }
         }
         return results;
       },

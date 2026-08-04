@@ -227,6 +227,54 @@ almost all of it the crossing rather than the work. Anything that hands back a
 python object costs more. Favour calls that answer a whole question at once, and
 prefer the `Molecule` over its parts.
 
+## Threads, and substructure searching
+
+Substructure searching releases the GIL for the duration of the C++ work, so
+python threads can search concurrently. What you get depends entirely on which
+entry point you use. Measured on 32 cores, one query, 4000 drug sized molecules
+per thread. All three below are `TSubstructure`, so they are directly comparable.
+
+| Approach | 1 thread | 4 threads | 16 threads |
+| -------- | -------- | --------- | ---------- |
+| `substructure_search(mol)`, one call per molecule | **55k mol/s** | 193k (3.5x) | 183k (3.3x) |
+| `substructure_search(list_of_molecules)` | 39k mol/s | 85k (2.2x) | 96k (2.5x) |
+| `substructure_search(list_of_smiles)` | 47k mol/s | 182k (3.9x) | **565k (12.1x)** |
+
+Read that table before choosing.
+
+**One call per molecule stops improving at about three cores.** Each call releases
+the GIL, but the loop around it is python and reacquires the GIL every iteration,
+so you end up bounded by how fast a single python loop can run. Adding cores past
+three or four gains nothing. If that is fast enough it is also the simplest thing
+to write, and the fastest single-threaded option, since it neither copies
+molecules nor reparses smiles.
+
+**Passing a list of `Molecule` objects is the one to avoid.** It is the slowest of
+the three and scales worst - beaten by simply calling once per molecule, at every
+thread count. pybind11 converts the python list into a `std::vector<Molecule>`
+before the search starts, copy constructing every molecule, and that happens with
+the GIL held so it cannot overlap between threads. The same conversion is why
+there is no batch `label_matched_atoms`: it would label copies and discard them.
+
+**Passing a list of smiles is what scales.** All the work, parsing included,
+happens inside one C++ call with the GIL released, so threads genuinely overlap.
+It does more work per molecule than the alternatives - a smiles parse is 14.3 us
+against 5.4 us to copy a Molecule - and still wins by a wide margin once there are
+cores to spend. It peaked at 668k mol/s on 24 threads in a separate run; past
+that, contention on this 32 core machine took it back down.
+
+Whichever you use, the safety contract is the same, and the GIL was previously
+hiding it:
+
+- **Give each thread its own query.** `Substructure_Query` and `TSubstructure` are
+  thread compatible, not thread safe; a search accumulates match state in the
+  query. Building a query from smarts costs about 7 us, so per-thread queries are
+  free in practice.
+- **Give each thread its own molecules.** A search *writes* to the molecule it
+  searches, forcing ring and aromaticity perception on it. Two threads searching
+  one shared `Molecule` is a data race, which rules out the natural-looking
+  "one molecule, many queries in parallel" pattern.
+
 ## Reference
 
 The API reference is [LillyMolPython.md](LillyMolPython.md). Every method named in

@@ -1804,7 +1804,12 @@ class __attribute__((visibility("default"))) Molecule : protected resizable_arra
 
   int longest_path();
   int bonds_between(atom_number_t, atom_number_t);
-  int atoms_between(atom_number_t, atom_number_t, Set_of_Atoms&);
+  // Places into `between` a set of atoms that are on a shortest path between `a1` and `a2`.
+  // If multiple such paths exist, the choice will be arbitrary.
+  int atoms_between(atom_number_t a1, atom_number_t a2, Set_of_Atoms& between);
+  // All atoms that are on a shortest path between `a1` and `a2` are placed in `between`
+  // in breadth first order.
+  int AllAtomsBetween(atom_number_t a1, atom_number_t a2, Set_of_Atoms& between);
 
   //  Asking for the implicit hydrogens attached to an atom may force
   //  computation of all implicit hydrogens, so no const here.

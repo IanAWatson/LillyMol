@@ -405,7 +405,8 @@ The most common methods for a Molecule currently implemented are
 | number_isotopic_atoms() | Number of atoms with non zero isotopes |
 | bonds_between(a1, a2) | Bonds between atoms |
 | longest_path() | Longest through bond path |
-| atoms_on_shortest_path(a1, a2) | Set_of_Atoms holding atoms on shortest path between a1 and a2 |
+| atoms_on_shortest_path(a1, a2) | Set_of_Atoms holding atoms on one shortest path between a1 and a2. May return None |
+| all_atoms_between(a1, a2) | Set_of_Atoms holding all atoms on shortest paths between a1 and a2, in breadth-first order. May return None |
 | down_the_bond(a1, a2) | Return all atoms found by looking down the a1->a2 bond. May return None |
 | atoms_by_radius(starting_atoms, max_radius) | List of Set_of_Atoms grouped by exact minimum bond distance |
 | atom_map_number(atom) | Atom map number on 'atom' |
@@ -453,6 +454,33 @@ The most common methods for a Molecule currently implemented are
 | debug_string() | String representation of internal state: print(m.debug_string())|
 | ----- | ----- |
 
+
+## Through-Bond Paths
+
+`bonds_between(a1, a2)` returns the topological distance between two atoms.
+`atoms_on_shortest_path(a1, a2)` returns atoms on one shortest path between the
+endpoints. If multiple shortest paths exist, the path chosen is arbitrary.
+
+`all_atoms_between(a1, a2)` returns all intermediate atoms that lie on shortest
+paths between the endpoints. The atoms are returned in breadth-first order from
+`a1`. Both path methods omit the endpoint atoms and return `None` when there are
+no intermediate atoms.
+
+```python
+from lillymol import MolFromSmiles
+
+mol = MolFromSmiles("C1CCC1")
+
+# 0 and 2 are opposite atoms in cyclobutane. There are two shortest paths.
+print(list(mol.atoms_on_shortest_path(0, 2)))  # one of [1] or [3]
+print(sorted(mol.all_atoms_between(0, 2)))     # [1, 3]
+
+mol = MolFromSmiles("C1CCCCC1")
+
+# Opposite atoms in cyclohexane. Breadth-first order from atom 0.
+print(list(mol.all_atoms_between(0, 3)))       # [1, 5, 2, 4]
+```
+
 ## Atom Methods
 As mentioned previously, LillyMol Atoms are faily simple, and have no idea
 that they are part of a Molecule. The only atributes an atom has is
@@ -487,6 +515,9 @@ The Atom object supports
 | \__iter__ | List of Bonds attached |
 | \__contains__ | True if atom is bonded to |
 | \__len__ | Number of connections |
+
+It is important to note that `ncon()` returns the number of explicit atoms in
+connected to an atom. Implicit Hydrogen atoms are not counted.
 
 In additon an Atom object inherits from an object that holds coordinates. Subsequent
 versions will enable more of that functionality. For now the subtraction operator

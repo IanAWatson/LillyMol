@@ -18,6 +18,8 @@ namespace {
 using testing::UnorderedElementsAreArray;
 using testing::FloatNear;
 using testing::DoubleNear;
+using testing::ElementsAre;
+using testing::UnorderedElementsAre;
 
 class TestSubstructure : public testing::Test
 {
@@ -413,6 +415,37 @@ INSTANTIATE_TEST_SUITE_P(TestBondsBetween, TestBondsBetween, testing::Values(
   SmilesAtomsBonds{"CCC", 0, 1, 1},
   SmilesAtomsBonds{"CCC", 0, 2, 2}
 ));
+
+TEST(TestAllAtomsBetween, DifferentiatesMultipleShortestPaths) {
+  Molecule m;
+  ASSERT_TRUE(m.build_from_smiles("C1CCC1"));
+
+  Set_of_Atoms one_path;
+  EXPECT_EQ(m.atoms_between(0, 2, one_path), 2);
+  ASSERT_EQ(one_path.number_elements(), 1);
+
+  Set_of_Atoms all_paths;
+  EXPECT_EQ(m.AllAtomsBetween(0, 2, all_paths), 2);
+  EXPECT_THAT(all_paths, UnorderedElementsAre(1, 3));
+}
+
+TEST(TestAllAtomsBetween, BreadthFirstOrder) {
+  Molecule m;
+  ASSERT_TRUE(m.build_from_smiles("C1CCCCC1"));
+
+  Set_of_Atoms all_paths;
+  EXPECT_EQ(m.AllAtomsBetween(0, 3, all_paths), 4);
+  EXPECT_THAT(all_paths, ElementsAre(1, 5, 2, 4));
+}
+
+TEST(TestAllAtomsBetween, AdjacentAtomsReturnEmptySet) {
+  Molecule m;
+  ASSERT_TRUE(m.build_from_smiles("CCC"));
+
+  Set_of_Atoms all_paths;
+  EXPECT_EQ(m.AllAtomsBetween(0, 1, all_paths), 0);
+  EXPECT_TRUE(all_paths.empty());
+}
 
 TEST(TestFsid, TestFsid) {
   Molecule m;

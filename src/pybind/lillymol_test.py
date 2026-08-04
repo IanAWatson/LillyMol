@@ -433,11 +433,17 @@ class TestLillyMol(absltest.TestCase):
     self.assertEqual(m.bonds_between(0, 2), 2)
 
     self.assertIsNone(m.atoms_on_shortest_path(0, 1));
+    self.assertIsNone(m.all_atoms_between(0, 1));
     # logging.info("atoms_between %s", m.atoms_on_shortest_path(0, 2))
     self.assertCountEqual(m.atoms_on_shortest_path(0, 2), [1])
+    self.assertCountEqual(m.all_atoms_between(0, 2), [1, 3])
     # logging.info("atoms_on_shortest_path - 3 %s", m.atoms_on_shortest_path(0, 3))
     self.assertIsNone(m. atoms_on_shortest_path(0, 3))
+    self.assertIsNone(m.all_atoms_between(0, 3))
     self.assertEqual(m.bonds_between(0, 1), 1)
+
+    self.assertTrue(m.build_from_smiles("C1CCCCC1"))
+    self.assertEqual(list(m.all_atoms_between(0, 3)), [1, 5, 2, 4])
 
     self.assertTrue(m.build_from_smiles("N(CC1=CC=C(OCCCC2=CC=CC=C2)C=C1)(CC1=CC=C(OCCCC2=CC=CC=C2)C=C1)CCCCN CHEMBL349114"))
     self.assertEqual(m.fragment_membership(30), m.fragment_membership(39))

@@ -1069,6 +1069,21 @@ Never refuses, and issues no warning.)")
                   },
                   "Return list of atoms on the shortest path between a1 and a2"
                 )
+                .def("all_atoms_between",
+                  [](Molecule& m, atom_number_t a1, atom_number_t a2) ->std::optional<Set_of_Atoms> {
+                    Set_of_Atoms result;
+                    if (! m.AllAtomsBetween(a1, a2, result)) {
+                      return std::nullopt;
+                    }
+
+                    if (result.empty()) {
+                      return std::nullopt;
+                    }
+
+                    return result;
+                  },
+                  "Return all atoms on shortest paths between a1 and a2"
+                )
                 .def("down_the_bond",
                   [](Molecule& m, atom_number_t a1, atom_number_t a2)->std::optional<Set_of_Atoms> {
                     const int matoms = m.natoms();

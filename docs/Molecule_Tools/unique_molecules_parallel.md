@@ -11,7 +11,7 @@ exist, they will be in the same file. unique_molecules_parallel uses [msort_para
 to do this. It sorts by molecular formula, and places the output into the
 specified number of chunks
 ```
-msort_parallel.sh -h <threads> -p -q -M nc=<threads> -D <output> -k formula haystack.smi
+msort_parallel -h <threads> -p -q -M nc=<threads> -D <output> -k formula haystack.smi
 ```
 which creates \<threads\> output files where it is guaranteed that all molecules
 with the same molecular formula will be in the same file. msort_parallel is very

@@ -90,7 +90,7 @@ def unique_molecules_parallel
                  else
                    ""
                  end
-  cmd = "msort_parallel.sh #{msort_options} -h #{nthreads} -p -D #{dstem} -M nc=#{nthreads} -k formula #{input_file}"
+  cmd = "msort_parallel #{msort_options} -h #{nthreads} -p -D #{dstem} -M nc=#{nthreads} -k formula #{input_file}"
   $stderr << "Executing #{cmd}\n" if verbose
   system(cmd)
 

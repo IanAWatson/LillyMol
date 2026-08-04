@@ -698,7 +698,7 @@ dicer ... -J NCDICER -J hash file.smi > file.gfp
 It can be useful to store dicer fragments in a BerkeleyDB database. That way, the
 results of a newly diced molecule can be looked up in that database. This might
 be useful for looking for unprecedented fragments. But if the intent is to
-simply look for synethic precedent, use the `iwecfp_database*` tools, which
+simply look for synthetic precedent, use the `iwecfp_database*` tools, which
 store EC fingerprints rather than dicer fragments. That is more robust for
 that task.
 

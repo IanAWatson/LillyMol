@@ -61,7 +61,7 @@ def main(argv):
 if __name__ == "__main__":
   app.run(main)
 ```
-This does a very dumb N*N nearest neigbour computation. With some book-keeping
+This does a very dumb N*N nearest neighbour computation. With some book-keeping
 only half the calculations need to be performed. This example is just designed
 to demonstrate outlines of how fingerprints in LillyMol python work.
 

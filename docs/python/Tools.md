@@ -1,7 +1,7 @@
 # Tools
 
 The python bindings come with a small number of tools, mostly derived
-from tools otherwise avaialble as c++ executables.
+from tools otherwise available as c++ executables.
 
 ## Molecular Descriptors
 
@@ -343,7 +343,7 @@ me greatly, so perhaps there is something not performant in this
 implementation.
 
 ## Dicer
-[dicer](docs/Molecule_Tools/dicer.md) is one of the more interesting and useful
+[dicer](/docs/Molecule_Tools/dicer.md) is one of the more interesting and useful
 tools in LillyMol, able to efficiently implement a recursive fragment generation
 that has proven useful across a variety of contexts. Python bindings for some
 rudimentary dicer-like functionality is available via python bindings. While

@@ -49,7 +49,7 @@ should decrease monotonically - although there is a low probability of bit
 collisions that might upset this.
 
 And for a shell of radius 3, diameter 6, the rarest grouping of atoms has
-just one examplar - likely the molecule itself which is in Chembl.
+just one exemplar - likely the molecule itself which is in Chembl.
 
 The fundamental idea behind the method is that if there are arrangements of
 atoms in the molecule that are minimally precedented, that raises the risk
@@ -102,7 +102,7 @@ in fact may not react as planned, leading to erroneous conclusions.
 The EC type fingerprints stored in the database are stored with a user
 defined atom typing. Early work with this tool showed that simplistic
 atom typing, atomic number, for example did not adequately capture
-atomic context. We recommend using a custom atom typeing `-P sfx` when
+atomic context. We recommend using a custom atom typing `-P sfx` when
 building a database. This atom type consists of the following atomic
 features
 
@@ -204,9 +204,9 @@ size of the database, and size of any cache, will be substantially
 reduced.
 
 ## Summary
-Assessing the synethic viability of molecules is hard. There are
+Assessing the synthetic viability of molecules is hard. There are
 many retrosynthetic tools, both old and newer AI driven approaches,
-that can be used for assessing synethic feasibility. Most of those
+that can be used for assessing synthetic feasibility. Most of those
 suffer from poor performance, and/or very low throughput.
 
 The approaches outlined here can be a useful component of a 

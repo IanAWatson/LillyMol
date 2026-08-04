@@ -271,7 +271,7 @@ do_output(IW_TDT& tdt, const IW_General_Fingerprint& fp,
   if (write_smiles) {
     do_write_smiles(tdt, fp, mindist.minval(), output);
   } else {
-    if (shortest_distance_tag.length()) {
+    if (shortest_distance_tag.length() && mindist.minval() <= 1.0f) {
       add_shortest_distance(tdt, mindist.minval());
     }
 

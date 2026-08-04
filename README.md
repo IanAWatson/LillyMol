@@ -14,7 +14,7 @@ chemical similarity. These have been developed over many years, driven by the ne
 of Computational and Medicinal Chemists at Lilly and elsewhere.
 
 Recent work has focussed on making *de-novo* molecule construction and there are
-several tools desiged to either support or complement A/I driven molecule
+several tools designed to either support or complement A/I driven molecule
 generation.
 
 LillyMol is fast and scalable, with modest memory requirements.
@@ -35,17 +35,31 @@ This repository includes [AGENTS.md](AGENTS.md), a short orientation file for
 AI/code agents and new contributors working on LillyMol source, tests, and docs.
 
 ## Python
-This release include a python interface to LillyMol via pybind11. This first release
-includes most Molecule related functionality, substructure searching and reaction
-enumeration. In the pybind directory there are some *_test.py files that exemplify
-much of the current functionality. Documentation is in [docs](/docs/python/LillyMolPython.md).
-This should be sufficient support for a great many tasks involving querying
-or manipulation of molecules at the connection table level.
+LillyMol has a python interface, built via pybind11, and it is no longer just a
+prototyping convenience. Where we have measured against RDKit on the same task,
+LillyMol python has run 3 to 7 times faster, because nearly every call does real
+work in C++ rather than moving python objects about.
 
-The current roadmap for the python interface primarily involves two directions
+Available from python: the Molecule and its connection table, substructure
+searching, reaction enumeration, gfp fingerprints and similarity, chemical
+standardisation, and a growing number of the LillyMol command line tools -
+molecular descriptors, QED, Lipinski, MedchemWizard, unique molecules, and
+lookups against structure and synthetic precedent databases. The `*_test.py`
+files in the pybind directory exercise most of this and can be read as examples.
+The bindings can also be packaged as a wheel.
 
-* Enabling gfp fingerprints for similarity calculations.
-* Making existing LillyMol applications available.
+Documentation starts at [docs/python](/docs/python/README.md), with the API
+reference in [LillyMolPython.md](/docs/python/LillyMolPython.md). Read the section
+on the lazy Molecule before writing anything substantial - a LillyMol Molecule
+computes derived properties like aromaticity only when asked, which is where the
+speed comes from and is also the one thing that surprises newcomers.
+
+It is now realistic to hand an existing RDKit program to an LLM and have it
+translated to LillyMol python. Bear in mind that RDKit is vast while LillyMol
+deliberately covers core Cheminformatics only, and that the two toolkits will not
+always agree to the last digit - there is no universally accepted definition of
+aromaticity, among other things. See
+[docs/python](/docs/python/README.md#translating-rdkit-code-and-writing-new-code-with-an-llm).
 
 There is already a Julia interface to an earlier version of LillyMol, and this
 release will soon be adapted to support Julia.
@@ -63,7 +77,7 @@ CC ethane
 where the smiles and the name are separated by whitespace - space or tab.
 Generally LillyMol supports spaces as the preferred delimiter.
 Multiple spaces/tabs between smiles and id are ignored.
-Smiles files to not have header records.
+Smiles files do not have header records.
 
 All tokens after the smiles are part of the molecule name.
 ```
@@ -113,7 +127,7 @@ We do not want isotopes, so `-I 0` does that. We could of course convert them wi
 
 The `-f lod` directive says reduce these molecules to the likely largest fragment of interest.
 
-We alomost certainly do not want molecules with valence errors, `-V` discards those.
+We almost certainly do not want molecules with valence errors, `-V` discards those.
 
 We apply [chemical_standardisation](/docs/Molecule_Lib/chemical_standardisation.md) via the
 `-g all` option.
@@ -157,7 +171,7 @@ Generate fingerprints
 gfp_make.sh external.smi > external.gfp
 ```
 The tool `gfp_lnearneighbours` is used to compare two sets of fingerprints.
-Indeed it can be used to compre two large collections, but it will take
+Indeed it can be used to compare two large collections, but it will take
 forever. In this case split up the external file into chunks of (say)
 5000 fingerprints
 ```
@@ -184,7 +198,7 @@ tdt_sort -T DIST all.nn > all.sorted.nn
 so the fingerprints with closest neighbours are at the top of
 the file.
 
-The file creaed with the -H option contains a histogram of nearest
+The file created with the -H option contains a histogram of nearest
 neighbour distances which can be plotted to get an idea of how
 similar are the new molecules compared to existing collections.
 
@@ -304,7 +318,7 @@ will substantially speed the computation.
 When closely examining larger collections it is usually convenient to use
 a sorted list of molecules
 ```
-msort_parallsl external.smi > external.sorted.smi
+msort_parallel external.smi > external.sorted.smi
 ```
 2.3M Chembl molecules can be processed in 3.8 seconds.
 
@@ -363,7 +377,7 @@ tsubstructure -s '[ND1H2]-[CX4]||[ND2H]([CX4])[CX4]||[ND1H2]-a||[ND2H]([CX4])-a|
 The OR type queries in LillyMol, || are evaluated left to right. When one matches
 matching stops, and the matched atoms will be returned and labelled with an
 isotope. This might match molecules like
-![CHEMBL4101550](docs/Images/CHEMBL4101550.png
+![CHEMBL4101550](docs/Images/CHEMBL4101550.png)
 This match is interesting because it shows how the precedence matching has worked.
 The primary amine is a match, and that was detected first
 ![CHEMBL70445](docs/Images/CHEMBL70445.png).
@@ -395,7 +409,7 @@ tsubstructure -u -s '1[ND2H]([CX4])[CX4]&&0[ND1H2]-[CT1X4]' -m - all.smi | \
 ```
 The first invocation makes a positive match for a secondary amine and the
 second only writes molecules that do **not** contain a primary amine. It is
-upredictable which will be faster - on this system both took about 4.2 seconds
+unpredictable which will be faster - on this system both took about 4.2 seconds
 to process 200k random molecules. The shell is your friend!
 
 As is often the case, there is often no 'right' way of doing a given task,
@@ -423,7 +437,7 @@ sidechain {
 ```
 Remember the amine had been isotopically labelled by tsubstructure, so
 using it in the reaction becomes straightforward. I have seen a great many
-truly incomprensible smarts in reactions written by very clever people trying to express
+truly incomprehensible smarts in reactions written by very clever people trying to express
 complex concepts. That can often be avoided via tricks like this.
 ```
 tsubstructure -j 1 <very complex query> -m R1 start.smi
@@ -472,7 +486,7 @@ Build an XGBoost model
 xgbd_make.sh -mdir MODEL -A train.activity train.dat
 ```
 Evaluate that model
-``
+```
 xgbd_evaluate.sh -mdir MODEL -smi test.smi > test.pred
 ```
 When given the -smi option, it assumes that the input smiles can be converted

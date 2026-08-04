@@ -126,7 +126,7 @@ python implementation it does raise some risks of errors, while making certain o
 easier. Read on...
 
 This works because the LillyMol Molecule is a very lazy object. It never computes
-things like fragment membership, ring membership, aromaticity or canononical
+things like fragment membership, ring membership, aromaticity or canonical
 ordering unless requested. So if you remove an atom, or bond, it will destroy any
 information it has about those derived quantities. Only if requested will any
 be recomputed.
@@ -140,17 +140,19 @@ is requested, the actual unique smiles will not be generated unless requested.
 While this generally works well, there is one caveat. Because of this, things
 like Rings and Bonds, by default, do not know if they are aromatic or not, or
 if they are in a ring or not. Since neither one knows anything about being in
-a Molecule, the following will fail
+a Molecule, the following does *not* do what it looks like
 ```
 benzene.build_from_smiles('c1ccccc1')
-benzene.ring(0).is_aromatic()    # Is the first ring aromatic?
+benzene.ring(0).is_aromatic()    # False. Aromaticity has not been perceived.
 ```
-But this will work
+Note that it does not raise - it returns a plausible wrong answer, quietly.
+After anything that perceives aromaticity, it is right
 ```
-if benzene.is_aromatic(0):    # Is the first atom aromatic?
+if benzene.is_aromatic(0):       # Asking the Molecule perceives aromaticity
   ....
-benzene.ring(0).is_aromatic()  # Is the first ring aromatic?
+benzene.ring(0).is_aromatic()    # True
 ```
+See [The lazy Molecule](README.md#the-lazy-molecule) for which call forces what.
 In this case `benzene.is_aromatic(0)` meant that the Molecule needed to 
 compute fragment membership, ring membership and aromaticity. Then
 when the first ring, `ring(0)` was queried, it now knew that it was
@@ -233,7 +235,7 @@ a 'set_set_connection_table_errors_allowed' method, which allows you
 to set the number of otherwise fatal errors that are ignored. Warnings
 will flash by on stderr, but nothing will show up in python. 
 
-Lillymol has always operated on the principle that your input should
+LillyMol has always operated on the principle that your input should
 be correct. That said, it would not be hard to add an option to return
 a None molecule in the event of an otherwise ignored error.
 
@@ -297,7 +299,7 @@ The most common methods for a Molecule currently implemented are
 | nrings(atom) | Ring membership of 'atom' |
 | is_ring_atom(atom) | True if 'atom' is in a ring |
 | IsInRing(atom) | True if 'atom' is in a ring |
-| in_ring_of_given_size(atom, rsize) | True if 'atom' is in a ring of size 'rsize' |
+| in_ring_of_size(atom, rsize) | True if 'atom' is in a ring of size 'rsize' |
 | IsAtomInRingOfSize(atom, rsize) | True if 'atom' is in a ring of size 'rsize' |
 | ring_bond_count(atom) | Number of ring bonds involving 'atom' |
 | get_ring_membership() | Ring membership for each atom |
@@ -386,7 +388,7 @@ The most common methods for a Molecule currently implemented are
 | are_bonded(a1, a2) | True if a1 and a2 are bonded |
 | add(Molecule other) | Add the atoms and bonds of 'other' |
 | remove_hydrogens_known_flag_to_fix_valence_errors | Remove problematic square brackets |
-| unset_unnecessary_implicit_hydrogens_known_values() | Try to fix certain valence problems |
+| unset_all_implicit_hydrogen_information(atom) | Discard the implicit Hydrogen count held for 'atom' |
 | formal_charge(atom) | Formal charge on atom |
 | set_formal_charge(atom) | Set formal charge on atom |
 | has_formal_charges() | True if any atom has a formal charge |
@@ -394,7 +396,7 @@ The most common methods for a Molecule currently implemented are
 | net_formal_charge() | Net formal charge |
 | number_chiral_centres() | Number of chiral centres |
 | remove_all_chiral_centres() | Remove all chiral centres |
-| chiral_centre(atom) | Return the Chiral_Centre on 'atom' |
+| chiral_centre_at_atom(atom) | Return the Chiral_Centre on 'atom' |
 | invert_chirality_on_atom(atom) | Invert chirality |
 | chiral_centres() | Iterable list of Chiral_Centre |
 | isotope(atom) | Isotope on 'atom' |
@@ -432,15 +434,13 @@ The most common methods for a Molecule currently implemented are
 | dihedral_scan(atom, atom, angle, bump_check | return list of coordinate sets |
 | non_sssr_rings() | Number of non Smallest Set of Smallest Rings rings |
 | non_sssr_ring(i) | The i'th non-SSSR ring |
-| has_partial_charges() | True if the molecule has partial charges |
-| invalidate_charges() | Discard any partial charge information stored |
+| invalidate_partial_charges() | Discard any partial charge information stored |
 | partial_charge_type() | The kind of partial charges stored |
+| partial_charge(atom) | Partial charge on 'atom' |
 | compute_Abraham_partial_charges() | Abraham partial charges |
 | compute_Gasteiger_partial_charges() | Gasteiger partial charges |
 | compute_Huckel_partial_charges() | Huckel partial charges |
 | compute_Gasteiger_Huckel_partial_charges() | Gasteiger Huckel partial charges |
-| compute_Del_Re_partial_charges() | Del Re partial charges |
-| compute_Pullman_partial_charges() | Del Re partial charges |
 | \__eq__ | True if m1 == m2. Will use unique smiles if necessary |
 | m1 += m2 | Adds atoms and bonds from m2 to m1 |
 | m1 + m2 | Returns a new molecule containing m1 and m2 |
@@ -482,8 +482,8 @@ print(list(mol.all_atoms_between(0, 3)))       # [1, 5, 2, 4]
 ```
 
 ## Atom Methods
-As mentioned previously, LillyMol Atoms are faily simple, and have no idea
-that they are part of a Molecule. The only atributes an atom has is
+As mentioned previously, LillyMol Atoms are fairly simple, and have no idea
+that they are part of a Molecule. The only attributes an atom has is
 
 * Pointer to an Element
 * Isotope
@@ -509,8 +509,7 @@ The Atom object supports
 | is_bonded_to(atom) | True if atom is bonded to 'atom' |
 | valence_ok(atom) | True if valence ok |
 | fully_saturated() | True if nbonds() == ncon() |
-| atom_map() | atom map number |
-| connections(atom) | iterable list of atoms attached |
+| connections() | iterable list of atoms attached |
 | implicit_hydrogens | number of implicit hydrogens attached |
 | \__iter__ | List of Bonds attached |
 | \__contains__ | True if atom is bonded to |
@@ -519,7 +518,7 @@ The Atom object supports
 It is important to note that `ncon()` returns the number of explicit atoms in
 connected to an atom. Implicit Hydrogen atoms are not counted.
 
-In additon an Atom object inherits from an object that holds coordinates. Subsequent
+In addition an Atom object inherits from an object that holds coordinates. Subsequent
 versions will enable more of that functionality. For now the subtraction operator
 returns the distance between two atoms, although long term this must be changed
 so that subtraction of two atoms returns the vector between them.
@@ -532,13 +531,13 @@ reports sqrt(3). For now...
 A common construct might be (count the number of carbon=,#nitrogen bonds)
 ```
   result = 0
-  for i,atom in enumerate(mol):
-    if not atom.atomic_number() == 7:
+  for i, atom in enumerate(m):
+    if atom.atomic_number() != 7:
       continue
     for bond in atom:
-      if b.is_single_bond():
+      if bond.is_single_bond():
         continue
-      other = b.other(i)
+      other = bond.other(i)
       if m.atomic_number(other) == 6:
         result += 1
 ```
@@ -547,14 +546,14 @@ above will visit each Bond twice - since each atom knows about all Bonds.
 Traversing the bond list results in each Bond being examined only once.
 ```
   result = 0
-  for bond in m.bond_list():
-    if b.is_single_bond():
+  for bond in m.bonds():
+    if bond.is_single_bond():
       continue
-    a1 = b.a1()
-    a2 = b.a2()
-    if m.atomic_number(a1) == 6 && m.atomic_number(a2) == 7:
+    a1 = bond.a1()
+    a2 = bond.a2()
+    if m.atomic_number(a1) == 6 and m.atomic_number(a2) == 7:
       result += 1
-    elif m.atomic_number(a1) == 7 && m.atomic_number(a2) == 6:
+    elif m.atomic_number(a1) == 7 and m.atomic_number(a2) == 6:
       result += 1
 ```
 Knowing when to solve a problem by traversing atoms and when to traverse
@@ -599,7 +598,7 @@ Set_of_Atoms contained duplicate atom numbers.
 | ------ | ----------- |
 | empty() | True of the set is empty |
 | size() | Number of items |
-| scatter(list, value) | Set values to 'value' |
+| set_vector(list, value) | Set list[i] to 'value' for each atom i in the set |
 | \__len__ | Number of items |
 | \__getitem__ | Access via [i] |
 | \__iter__ | Access atoms via iterators |
@@ -685,7 +684,7 @@ Any work with molecules should ensure that molecules are represented in a consis
 manner. For example, are all the acids in charged or neutral forms? How are the nitro
 groups represented? Etc...
 
-Trying to formulate substruecture queries that can accommodate these variations is
+Trying to formulate substructure queries that can accommodate these variations is
 challenging, and inefficient. LillyMol has a module that enforces consistent
 molecular representations.
 
@@ -706,7 +705,7 @@ for transforming certain forms from LillyMol standard forms back to other forms;
 transforming `N(=O)=O` to `[N+](=O)-[O-]` for example.
 
 ## Substructure Searching
-LillyMol supports a rich set of substructure query capabilities. All invove a
+LillyMol supports a rich set of substructure query capabilities. All involve a
 `Substructure_Query` object that can be instantiate from
 
 * smarts
@@ -1176,7 +1175,7 @@ iterator class. This workflow looks like
 
 1. Instantiate Reaction
 2. Add reagents to the reaction
-3. Process scaffols, generating multiple products for each scaffold.
+3. Process scaffolds, generating multiple products for each scaffold.
 
 In python, for a reaction with a single sidechain, processing a set of
 molecules might look like
@@ -1222,7 +1221,7 @@ for mol in mols:
 If needed, the return code from `chg.process` is the number of formal charges assigned
 to the molecule.
 
-## Donor Acceptor Assigment.
+## Donor Acceptor Assignment.
 LillyMol contains a set of donor acceptor rules primarily developed by Robert F Bruns
 at Lilly during the 1990's. Acknowledge that definitions of donors and acceptors is
 very complex with instances of various weak forms being found in various circumstances.

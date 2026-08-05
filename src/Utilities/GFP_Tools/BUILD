@@ -1070,6 +1070,7 @@ cc_binary(
     srcs = [
         "nndata2bdb.cc",
     ],
+    tags = ["berkeleydb"],
     deps = [
         ":nearneighbours_cc_proto",
         "//Foundational/cmdline_v2:cmdline_v2",

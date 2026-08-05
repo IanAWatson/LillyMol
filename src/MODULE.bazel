@@ -147,7 +147,7 @@ cc_library(
 )
 new_local_repository(
     name = "homebrew_openmp",
-    path = "/opt/homebrew/Cellar/libomp/22.1.6",
+    path = "/opt/homebrew/opt/libomp",
     build_file_content = """
 load("@rules_cc//cc:defs.bzl", "cc_binary", "cc_proto_library", "cc_library", "cc_test")
 cc_library(

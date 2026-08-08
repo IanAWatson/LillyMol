@@ -406,8 +406,8 @@ descriptor_file_select_rows(int argc, char** argv) {
     }
 
     file_to_process = 0;
-  } else if (2 != cl.number_elements()) {
-    cerr << "Insufficient arguments, must have identifier file and descriptor file\n";
+  } else if (cl.number_elements() < 2) {
+    cerr << "Insufficient arguments, must have identifier file and descriptor file(s)\n";
     usage(2);
   }
 
@@ -467,7 +467,12 @@ descriptor_file_select_rows(int argc, char** argv) {
 
   IWString_and_File_Descriptor output(1);
 
-  int rc = descriptor_file_select_rows(cl[file_to_process], ids_to_fetch, output);
+  for (int i = file_to_process; i < cl.number_elements(); ++i) {
+    if (!descriptor_file_select_rows(cl[i], ids_to_fetch, output)) {
+      cerr << "Error processing '" << cl[i] << "'\n";
+      return 1;
+    }
+  }
 
   output.flush();
 
@@ -475,11 +480,7 @@ descriptor_file_select_rows(int argc, char** argv) {
     cerr << "Wrote " << records_written << " of " << records_read << " records read\n";
   }
 
-  if (rc) {
-    return 0;
-  } else {
-    return 1;
-  }
+  return 0;
 }
 
 int

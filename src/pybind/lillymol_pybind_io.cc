@@ -19,6 +19,19 @@ namespace py = pybind11;
 
 using molecule_processing::MoleculePreprocessing;
 
+struct ReaderOptions {
+  bool largest_fragment = false;
+  bool remove_chirality = false;
+  bool remove_cis_trans_bonds = false;
+  bool remove_isotopes = false;
+
+  std::string sdf_identifier;
+  bool sdf_tags_to_json = false;
+  bool all_sdf_tags = false;
+  bool first_sdf_tag = false;
+  bool prepend_sdfid = true;
+};
+
 std::unique_ptr<data_source_and_type<Molecule>>
 MakeReader(const std::string& fname,
            FileType file_type) {
@@ -44,6 +57,7 @@ struct ReaderContext {
     ReaderContext(const std::string& fname);
     ~ReaderContext();
 
+    bool ApplyOptions(const ReaderOptions& options);
     void SetPreprocessing(bool reduce_to_largest_fragment, bool remove_chirality,
                           bool remove_cis_trans_bonds, bool remove_isotopes);
     bool SetSdfOptions(const std::string& sdf_identifier, bool sdf_tags_to_json,
@@ -70,6 +84,15 @@ ReaderContext::ReaderContext(const std::string& fname) {
 
 ReaderContext::~ReaderContext() {
   ResetSdfOptions();
+}
+
+bool
+ReaderContext::ApplyOptions(const ReaderOptions& options) {
+  SetPreprocessing(options.largest_fragment, options.remove_chirality,
+                   options.remove_cis_trans_bonds, options.remove_isotopes);
+  return SetSdfOptions(options.sdf_identifier, options.sdf_tags_to_json,
+                       options.all_sdf_tags, options.first_sdf_tag,
+                       options.prepend_sdfid);
 }
 
 void
@@ -196,6 +219,44 @@ PYBIND11_MODULE(lillymol_io, io)
       return m;
     }
   };
+
+  py::class_<ReaderOptions>(io, "ReaderOptions")
+    .def(py::init([](bool largest_fragment, bool remove_chirality,
+                     bool remove_cis_trans_bonds, bool remove_isotopes,
+                     const std::string& sdf_identifier, bool sdf_tags_to_json,
+                     bool all_sdf_tags, bool first_sdf_tag, bool prepend_sdfid) {
+        ReaderOptions options;
+        options.largest_fragment = largest_fragment;
+        options.remove_chirality = remove_chirality;
+        options.remove_cis_trans_bonds = remove_cis_trans_bonds;
+        options.remove_isotopes = remove_isotopes;
+        options.sdf_identifier = sdf_identifier;
+        options.sdf_tags_to_json = sdf_tags_to_json;
+        options.all_sdf_tags = all_sdf_tags;
+        options.first_sdf_tag = first_sdf_tag;
+        options.prepend_sdfid = prepend_sdfid;
+        return options;
+      }),
+      py::kw_only(),
+      py::arg("largest_fragment") = false,
+      py::arg("remove_chirality") = false,
+      py::arg("remove_cis_trans_bonds") = false,
+      py::arg("remove_isotopes") = false,
+      py::arg("sdf_identifier") = "",
+      py::arg("sdf_tags_to_json") = false,
+      py::arg("all_sdf_tags") = false,
+      py::arg("first_sdf_tag") = false,
+      py::arg("prepend_sdfid") = true)
+    .def_readwrite("largest_fragment", &ReaderOptions::largest_fragment)
+    .def_readwrite("remove_chirality", &ReaderOptions::remove_chirality)
+    .def_readwrite("remove_cis_trans_bonds", &ReaderOptions::remove_cis_trans_bonds)
+    .def_readwrite("remove_isotopes", &ReaderOptions::remove_isotopes)
+    .def_readwrite("sdf_identifier", &ReaderOptions::sdf_identifier)
+    .def_readwrite("sdf_tags_to_json", &ReaderOptions::sdf_tags_to_json)
+    .def_readwrite("all_sdf_tags", &ReaderOptions::all_sdf_tags)
+    .def_readwrite("first_sdf_tag", &ReaderOptions::first_sdf_tag)
+    .def_readwrite("prepend_sdfid", &ReaderOptions::prepend_sdfid)
+  ;
 
   py::class_<MoleculePreprocessing>(io, "MoleculePreprocessing")
     .def(py::init([](bool largest_fragment, bool remove_chirality,
@@ -368,6 +429,27 @@ PYBIND11_MODULE(lillymol_io, io)
 
   py::class_<ReaderContext>(io, "ReaderContext")
     .def(py::init([](const std::string& fname, FileType file_type,
+                     const ReaderOptions& options) {
+        ReaderContext* result = new ReaderContext(fname, file_type);
+        if (! result->ApplyOptions(options)) {
+          delete result;
+          throw py::value_error("Invalid sdf_identifier regular expression");
+        }
+        return result;
+      }),
+      py::arg("fname"), py::arg("file_type"), py::kw_only(),
+      py::arg("options"))
+    .def(py::init([](const std::string& fname, const ReaderOptions& options) {
+        ReaderContext* result = new ReaderContext(fname);
+        if (! result->ApplyOptions(options)) {
+          delete result;
+          throw py::value_error("Invalid sdf_identifier regular expression");
+        }
+        return result;
+      }),
+      py::arg("fname"), py::kw_only(),
+      py::arg("options"))
+    .def(py::init([](const std::string& fname, FileType file_type,
                      bool largest_fragment, bool remove_chirality,
                      bool remove_cis_trans_bonds, bool remove_isotopes,
                      const std::string& sdf_identifier, bool sdf_tags_to_json,
@@ -434,6 +516,12 @@ PYBIND11_MODULE(lillymol_io, io)
         return std::move(*m);
       })
     .def("next", &ReaderContext::Next)
+    .def("apply_options",
+      [](ReaderContext& me, const ReaderOptions& options) {
+        if (! me.ApplyOptions(options)) {
+          throw py::value_error("Invalid sdf_identifier regular expression");
+        }
+      })
     .def("set_preprocessing",
       [](ReaderContext& me, bool largest_fragment, bool remove_chirality,
          bool remove_cis_trans_bonds, bool remove_isotopes) {

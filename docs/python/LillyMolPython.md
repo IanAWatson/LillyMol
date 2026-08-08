@@ -288,10 +288,35 @@ with ReaderContext('/path/to/file.sdf', sdf_tags_to_json=True,
     print(mol.name())
 ```
 There is also a `first_sdf_tag=True` option for using the first SD data item as
-the molecule name. `ReaderContext` stores these SDF naming options on the reader,
-so separate `ReaderContext` objects can use different SDF identifiers. The older
-module-level SDF functions still change the global MDL/SDF defaults used by raw
-`Reader` objects and by newly created reader-local options.
+the molecule name.
+
+When the same read settings are reused, collect them in a `ReaderOptions` object.
+This is often clearer than passing several keyword arguments repeatedly.
+```
+from lillymol_io import ReaderContext, ReaderOptions
+
+options = ReaderOptions(largest_fragment=True,
+                        sdf_identifier='CHEMBL_ID',
+                        prepend_sdfid=False)
+
+with ReaderContext('/path/to/first.sdf', options=options) as reader:
+  for mol in reader:
+    ...
+
+with ReaderContext('/path/to/second.sdf', options=options) as reader:
+  for mol in reader:
+    ...
+```
+`ReaderOptions` has the same fields as the keyword arguments: `largest_fragment`,
+`remove_chirality`, `remove_cis_trans_bonds`, `remove_isotopes`,
+`sdf_identifier`, `sdf_tags_to_json`, `all_sdf_tags`, `first_sdf_tag`, and
+`prepend_sdfid`. The fields are mutable, and an existing `ReaderContext` can be
+updated with `reader.apply_options(options)`.
+
+`ReaderContext` stores these SDF naming options on the reader, so separate
+`ReaderContext` objects can use different SDF identifiers at the same time. The
+older module-level SDF functions still change the global MDL/SDF defaults used
+by raw `Reader` objects and by newly created reader-local options.
 
 `MoleculePreprocessing` can also be used directly when you want explicit control.
 `process()` changes the molecule supplied, while `process_copy()` leaves the

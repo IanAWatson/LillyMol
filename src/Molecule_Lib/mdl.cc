@@ -1765,10 +1765,14 @@ Molecule::write_molecule_mdl(const char* fname, const char* comments) {
 
 int
 Molecule::write_extra_text_info(IWString& buffer) const {
-  int ne = _text_info.number_elements();
+  if (! _text_info) {
+    return buffer.length();
+  }
+
+  int ne = _text_info->number_elements();
 
   for (int i = 0; i < ne; i++) {
-    const IWString* info = _text_info[i];
+    const IWString* info = (*_text_info)[i];
 
     buffer << (*info) << moleculeio::newline_string();
   }

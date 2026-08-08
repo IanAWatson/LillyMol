@@ -402,12 +402,15 @@ Molecule::add_molecule(const Molecule * m2)
     return 0;
   }
 
-  for (int i = 0; i < m2->_text_info.number_elements(); i++)
-  {
-    const IWString * inf = m2->_text_info[i];
+  if (m2->_text_info) {
+    resizable_array_p<IWString>& text_info = _ensure_text_info();
+    for (int i = 0; i < m2->_text_info->number_elements(); i++)
+    {
+      const IWString * inf = (*(m2->_text_info))[i];
 
-    IWString * n = new IWString(*inf);
-    _text_info.add(n);
+      IWString * n = new IWString(*inf);
+      text_info.add(n);
+    }
   }
 
   return 1;

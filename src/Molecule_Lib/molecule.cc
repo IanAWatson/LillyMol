@@ -291,7 +291,7 @@ Molecule::operator=(const Molecule & rhs)
 
   _molecule_name = rhs._molecule_name;
 
-  _text_info.resize(0);
+  _text_info.reset();
 
   add_molecule(&rhs);
 
@@ -317,6 +317,7 @@ Molecule::operator=(Molecule && rhs)
   _bond_list = std::move(rhs._bond_list);
 
   _chiral_centres = std::move(rhs._chiral_centres);
+  _text_info = std::move(rhs._text_info);
 
 //cerr << "We have " << _number_elements << " atoms, RHS has " << rhs._number_elements << " atoms\n";
 
@@ -5186,17 +5187,26 @@ Molecule::compute_centre(const Set_of_Atoms * s, Coordinates & result) const
   return;
 }
 
+resizable_array_p<IWString>&
+Molecule::_ensure_text_info() {
+  if (! _text_info) {
+    _text_info = std::make_unique<resizable_array_p<IWString>>();
+  }
+
+  return *_text_info;
+}
+
 int
 Molecule::add_extra_text_info(IWString * extra)
 {
-  return _text_info.add(extra);
+  return _ensure_text_info().add(extra);
 }
 
 int
 Molecule::add_extra_text_info(const IWString & extra)
 {
   IWString * tmp = new IWString(extra);
-  return _text_info.add(tmp);
+  return _ensure_text_info().add(tmp);
 }
 
 int
@@ -5204,20 +5214,25 @@ Molecule::add_extra_text_info(const char * extra)
 {
   IWString * tmp = new IWString(extra);
 
-  return _text_info.add(tmp);
+  return _ensure_text_info().add(tmp);
 }
 
 int
 Molecule::copy_extra_text_info_to(Molecule & rhs) const
 {
-  int ninfo = _text_info.number_elements();
+  if (! _text_info) {
+    return 0;
+  }
+
+  int ninfo = _text_info->number_elements();
+  resizable_array_p<IWString>& rhs_text_info = rhs._ensure_text_info();
   for (int i = 0; i < ninfo; i++)
   {
-    const IWString & infi = *(_text_info[i]);
+    const IWString & infi = *((*_text_info)[i]);
 
     IWString * tmp = new IWString(infi);
 
-    rhs._text_info.add(tmp);
+    rhs_text_info.add(tmp);
   }
 
   return ninfo;
@@ -5226,7 +5241,7 @@ Molecule::copy_extra_text_info_to(Molecule & rhs) const
 void
 Molecule::discard_extra_text_info()
 {
-  _text_info.resize(0);
+  _text_info.reset();
 
   return;
 }

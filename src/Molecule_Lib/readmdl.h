@@ -372,7 +372,7 @@ Molecule::_read_mdl_data_following_tag(T& input,
     }
 
     if (moleculeio::read_extra_text_info()) {  // even if buffer is empty
-      _text_info.add(new IWString(buffer));
+      _ensure_text_info().add(new IWString(buffer));
     }
 
     static constexpr char kNewLine = 13;  // Ascii encoding.
@@ -413,8 +413,8 @@ Molecule::_read_molecule_mdl_trailing_records(
     T& input, int return_on_m_end,
     MDL_File_Supporting_Material& mdlfos)  // non const because of rx match
 {
-  if (moleculeio::read_extra_text_info() && 0 == _text_info.number_elements()) {
-    _text_info.resize(10);
+  if (moleculeio::read_extra_text_info()) {
+    _ensure_text_info().resize(10);
   }
 
   // Aprop atom_properties[MAX_PAIRS];
@@ -564,7 +564,7 @@ Molecule::_read_molecule_mdl_trailing_records(
     }
 
     if (moleculeio::read_extra_text_info()) {
-      add_to_text_info(_text_info, buffer);
+      add_to_text_info(_ensure_text_info(), buffer);
     }
 
     //  std::cerr << read_extra_text_info() << " now contains " <<
@@ -583,7 +583,7 @@ Molecule::_read_molecule_mdl_trailing_records(
       EXTRA_STRING_RECORD(input, buffer, "read mol mdl");
 
       if (moleculeio::read_extra_text_info()) {
-        add_to_text_info(_text_info, buffer);
+        add_to_text_info(_ensure_text_info(), buffer);
       }
 
       IWString tmp;
@@ -792,10 +792,14 @@ Molecule::write_molecule_mdl(T& os, const IWString& comments) {
 template <typename T>
 int
 Molecule::write_extra_text_info(T& os) const {
-  int ne = _text_info.number_elements();
+  if (! _text_info) {
+    return 1;
+  }
+
+  int ne = _text_info->number_elements();
 
   for (int i = 0; i < ne; i++) {
-    const IWString* info = _text_info[i];
+    const IWString* info = (*_text_info)[i];
     os << (*info) << moleculeio::newline_string();
   }
 

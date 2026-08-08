@@ -1,7 +1,9 @@
 // Tests for Molecule
 
+#include <fstream>
 #include <memory>
 #include <span>
+#include <string>
 #include <vector>
 #include <unordered_map>
 
@@ -10,7 +12,10 @@
 #include "google/protobuf/text_format.h"
 
 
+#include "Foundational/data_source/iwstring_data_source.h"
+
 #include "molecule.h"
+#include "moleculeio.h"
 #include "path.h"
 
 namespace {
@@ -20,6 +25,119 @@ using testing::FloatNear;
 using testing::DoubleNear;
 using testing::ElementsAre;
 using testing::UnorderedElementsAre;
+
+class ExtraTextInfoScope {
+  private:
+    int _read_extra_text_info;
+    int _write_extra_text_info;
+
+  public:
+    ExtraTextInfoScope() :
+        _read_extra_text_info(moleculeio::read_extra_text_info()),
+        _write_extra_text_info(moleculeio::write_extra_text_info()) {
+    }
+
+    ~ExtraTextInfoScope() {
+      moleculeio::set_read_extra_text_info(_read_extra_text_info);
+      moleculeio::set_write_extra_text_info(_write_extra_text_info);
+    }
+};
+
+std::vector<std::string>
+ExtraTextInfo(const Molecule& m) {
+  std::vector<std::string> result;
+  result.reserve(m.number_records_text_info());
+  for (int i = 0; i < m.number_records_text_info(); ++i) {
+    result.push_back(m.text_info(i).AsString());
+  }
+
+  return result;
+}
+
+TEST(MoleculeExtraTextInfo, SdfTextInfoRoundTripAndManipulation) {
+  static constexpr char kSdf[] = R"(methane
+  LillyMol  0808262D
+
+  1  0  0  0  0  0            999 V2000
+    0.0000    0.0000    0.0000 C   0  0  0
+M  END
+>  <ID>
+CHEMBL123
+
+>  <MULTI LINE>
+first line
+second line
+
+$$$$
+)";
+
+  ExtraTextInfoScope scope;
+  moleculeio::set_read_extra_text_info(1);
+
+  const std::string fname = testing::TempDir() + "/extra_text_info.sdf";
+  {
+    std::ofstream output(fname);
+    ASSERT_TRUE(output.good());
+    output << kSdf;
+  }
+
+  iwstring_data_source input(fname.c_str());
+  ASSERT_TRUE(input.good());
+
+  Molecule m;
+  ASSERT_TRUE(m.read_molecule_ds(input, FILE_TYPE_SDF));
+  EXPECT_THAT(ExtraTextInfo(m), ElementsAre(
+      ">  <ID>",
+      "CHEMBL123",
+      "",
+      ">  <MULTI LINE>",
+      "first line",
+      "second line",
+      ""));
+
+  IWString written;
+  EXPECT_GT(m.write_extra_text_info(written), 0);
+  EXPECT_EQ(written.AsString(),
+            ">  <ID>\nCHEMBL123\n\n>  <MULTI LINE>\nfirst line\nsecond line\n\n");
+
+  Molecule copied(m);
+  EXPECT_THAT(ExtraTextInfo(copied), ElementsAre(
+      ">  <ID>",
+      "CHEMBL123",
+      "",
+      ">  <MULTI LINE>",
+      "first line",
+      "second line",
+      ""));
+
+  Molecule assigned;
+  assigned = m;
+  EXPECT_THAT(ExtraTextInfo(assigned), ElementsAre(
+      ">  <ID>",
+      "CHEMBL123",
+      "",
+      ">  <MULTI LINE>",
+      "first line",
+      "second line",
+      ""));
+
+  Molecule moved;
+  moved = std::move(assigned);
+  EXPECT_THAT(ExtraTextInfo(moved), ElementsAre(
+      ">  <ID>",
+      "CHEMBL123",
+      "",
+      ">  <MULTI LINE>",
+      "first line",
+      "second line",
+      ""));
+
+  moved.discard_extra_text_info();
+  EXPECT_EQ(moved.number_records_text_info(), 0);
+
+  EXPECT_EQ(moved.add_extra_text_info("added text"), 1);
+  EXPECT_THAT(ExtraTextInfo(moved), ElementsAre("added text"));
+}
 
 class TestSubstructure : public testing::Test
 {

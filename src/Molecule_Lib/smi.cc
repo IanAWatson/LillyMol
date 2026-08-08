@@ -1517,7 +1517,7 @@ Molecule::read_molecule_tdt_ds (iwstring_data_source & input)
     if (moleculeio::read_extra_text_info())
     {
       IWString * tmp = new IWString(buffer);
-      _text_info.add(tmp);
+      _ensure_text_info().add(tmp);
     }
 
     if (got_structure)
@@ -2578,10 +2578,10 @@ Molecule::_write_molecule_tdt_pcn (std::ostream & os,
   if (comment.length() && comment != _molecule_name)
     os << "REM<" << comment << '>' << newline_string();
 
-  int nt = _text_info.number_elements();
+  const int nt = number_records_text_info();
   for (int i = 0; i < nt; i++)
   {
-    os << (*_text_info[i]) << newline_string();
+    os << text_info(i) << newline_string();
   }
 
   os << '|' << newline_string();

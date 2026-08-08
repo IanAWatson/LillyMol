@@ -677,9 +677,11 @@ class __attribute__((visibility("default"))) Molecule : protected resizable_arra
   Atom_Types* _atom_type;
 
   //  When reading an MDL MOLFILE or a TDT file we can optionally bring
-  //  along the text info from the file
+  //  along the text info from the file. Rarely used, so allocate lazily.
 
-  resizable_array_p<IWString> _text_info;
+  std::unique_ptr<resizable_array_p<IWString>> _text_info;
+
+  resizable_array_p<IWString>& _ensure_text_info();
 
   void* _user_specified_void_ptr;
 
@@ -2057,15 +2059,17 @@ class __attribute__((visibility("default"))) Molecule : protected resizable_arra
   int discern_chirality_from_wedge_bonds();
 
   int number_records_text_info() const {
-    return _text_info.number_elements();
+    return _text_info ? _text_info->number_elements() : 0;
   }
 
   const IWString& text_info(int i) const {
-    return *(_text_info.item(i));
+    assert(_text_info);
+    return *(_text_info->item(i));
   }
 
   IWString& text_info(int i) {
-    return *(_text_info.item(i));
+    assert(_text_info);
+    return *(_text_info->item(i));
   }
 
   template <typename T>

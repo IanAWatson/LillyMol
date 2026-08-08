@@ -1,7 +1,59 @@
 # Fingerprints
-Long term, the LillyMol GFP (Generalised FingerPrints) class will be
-made available from python. In the meantime there are some capabilities
-implemented today that may be useful for computing small numbers of similarities.
+
+New code should usually use the GFP bindings documented in
+[LillyMolPython.md](LillyMolPython.md#gfp-fingerprint-files-and-similarity-search).
+Those bindings expose `GFPContext`, `GFP`, `GFPFingerprint`, and `GFPList`, and
+can generate and search LillyMol GFP fingerprints directly from Python.
+
+The older helpers described later in this page remain available for compatibility
+and for simple counted numpy-array fingerprint experiments, but they are not the
+preferred interface for new fingerprint work.
+
+## Recommended GFP API
+
+Use `GFPContext` to define the fingerprint schema and generate standalone query
+fingerprints:
+
+```python
+from lillymol import MolFromSmiles
+from lillymol_tools import GFP, GFPContext, GFPList
+
+mol = MolFromSmiles("c1ccccc1 benzene")
+ctx = GFPContext.standard()
+fp = ctx.fingerprint(mol)
+
+print(ctx.distance(fp, fp))
+```
+
+Build a searchable collection with `GFPList`:
+
+```python
+gfp = GFPList.standard()
+
+for smiles in ["CC ethane", "CCC propane", "CCCC butane"]:
+  gfp.add(MolFromSmiles(smiles))
+
+query = ctx.fingerprint(MolFromSmiles("CCC query"))
+hits = gfp.nearest_neighbours(query, 3)
+
+for hit in hits:
+  print(hit.index, hit.distance)
+```
+
+Custom GFP schemas are built from immutable `GFP` specifications:
+
+```python
+ctx = GFPContext.from_specs([
+    GFP.iw(),
+    GFP.maccs(level2=True),
+    GFP.mpr(),
+    GFP.ec(radius=3, atom_type="UST:Z"),
+])
+```
+
+See the GFP section of [LillyMolPython.md](LillyMolPython.md#gfp-fingerprint-files-and-similarity-search)
+for the supported generators, file reading, metadata storage, and compatibility
+rules between contexts.
 
 ## Similarity
 There is no best similarity measure. The best similarity measure would
@@ -22,10 +74,10 @@ fingerprints work best for things like SVM fingerprint models, linear
 path fingerprints tend to work best for corresponding to human
 perception. It all depends.
 
-## HowTo
+## Legacy Fingerprint Helpers
 
-The following toy application shows a simple N*N near neighbour
-computation in LillyMol python.
+The following toy application shows a simple N*N nearest-neighbour
+computation with the older `lillymol_fingerprint` helpers.
 ```
 from absl import app
 from absl import logging
@@ -61,24 +113,20 @@ def main(argv):
 if __name__ == "__main__":
   app.run(main)
 ```
-This does a very dumb N*N nearest neighbour computation. With some book-keeping
-only half the calculations need to be performed. This example is just designed
-to demonstrate outlines of how fingerprints in LillyMol python work.
+This does a very simple N*N nearest-neighbour computation. With some book-keeping
+only half the calculations need to be performed. The example is retained because
+it shows how the older counted numpy-array fingerprints work, but it is not the
+recommended way to do nearest-neighbour searching in new code.
 
-Unfortunately this is quite slow. Running 2000 random Chembl molecules takes 21 seconds.
-Running gfp_nearneighbours_single_file on the same input file, but with standard
-gfp fingerprints, takes less than 1 second. But that is dealing with bit vector
-fingerprints and can use popc instructions for computing similarity. This calculation
-is using counted fingerprints, which will necessarily be a much more expensive
-computation.
+For larger collections, prefer `GFPList` and `GFPContext`. The GFP bindings use
+the same binary and sparse fingerprint machinery as the LillyMol command-line GFP
+tools, including efficient bit-vector similarity calculations.
 
-When GFP fingerprints are ported into the LillyMol Python environment, faster
-computation of binary fingerprints will become available. That said, there
-are advantages to counted fingerprints, since they do not suffer from the
-repeated feature problem of binary fingerprints. If a molecule contains
-four instances of a feature, that will still just set the bit once in a binary
-fingerprint, whereas in a counted fingerprint, the number of instances will
-be recorded and will count in the similarity computation.
+The older counted helpers still have value when repeated features should
+contribute directly to similarity. If a molecule contains four instances of a
+feature, a binary fingerprint still sets one bit, whereas a counted fingerprint
+records the number of instances and includes that count in the similarity
+calculation.
 
 Only linear fingerprints have a method for constructing fingerprints such as the above.
 All fingerprints can work via a fingerprint generator, that can be configured with
@@ -112,11 +160,6 @@ Atom pair fingerprints are similar, this time restricting separations to 10 bond
 ```
 All generate numpy byte arrays, containing counted fingerprints.
 
-Again, speed is not good. This can be improved by several approaches
-
-* bitvector based fingerprints
-* GFP fingerprints
-* A multiple fingerprint container that can be queried with just 1 call from python.
-
-And all constructors could be altered to allow pythonic **kwargs to deal with
-settable parameters.
+For new similarity-search workflows, use the GFP API above. The legacy helpers
+are best treated as compatibility functionality or as lower-level building
+blocks for small experiments with counted numpy-array fingerprints.

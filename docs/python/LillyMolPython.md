@@ -288,9 +288,10 @@ with ReaderContext('/path/to/file.sdf', sdf_tags_to_json=True,
     print(mol.name())
 ```
 There is also a `first_sdf_tag=True` option for using the first SD data item as
-the molecule name. These reader keywords restore the previous SDF naming options
-when the context exits, but the underlying MDL/SDF parser still uses global
-state. Avoid simultaneously active SDF readers with different SDF naming options.
+the molecule name. `ReaderContext` stores these SDF naming options on the reader,
+so separate `ReaderContext` objects can use different SDF identifiers. The older
+module-level SDF functions still change the global MDL/SDF defaults used by raw
+`Reader` objects and by newly created reader-local options.
 
 `MoleculePreprocessing` can also be used directly when you want explicit control.
 `process()` changes the molecule supplied, while `process_copy()` leaves the

@@ -22,7 +22,7 @@ check the reference if something does not behave as you expect.
 | [LillyMolPython.md](LillyMolPython.md) | The API reference - Molecule, Atom, Bond, Set_of_Atoms and Ring methods, substructure searching, reactions, GFP |
 | [Tools.md](Tools.md) | LillyMol command line tools exposed to python - QED, Lipinski, MedchemWizard, unique molecules, Position3D |
 | [descriptors.md](descriptors.md) | Molecular descriptors, singly and in batches, numpy and pandas forms |
-| [fingerprints.md](fingerprints.md) | Fingerprints and similarity |
+| [fingerprints.md](fingerprints.md) | Legacy fingerprint helpers and background; prefer `GFPContext`/`GFPList` in `LillyMolPython.md` for new code |
 | [tsubstructure.md](tsubstructure.md) | Substructure searching as the `tsubstructure` tool does it |
 | [structure_database.md](structure_database.md) | Looking molecules up in a structure database |
 | [synthetic_precedent.md](synthetic_precedent.md) | Synthetic precedent from a database of known molecules |
@@ -81,6 +81,38 @@ import lillymol_io
 with lillymol_io.ReaderContext('/path/to/file.smi') as reader:
     for mol in reader:
         print(mol.name(), mol.natoms())
+```
+
+`ReaderContext` can also apply common preprocessing as molecules are read:
+
+```python
+with lillymol_io.ReaderContext('/path/to/file.smi', largest_fragment=True,
+                               remove_chirality=True,
+                               remove_isotopes=True) as reader:
+    for mol in reader:
+        ...
+```
+
+For explicit reuse, `lillymol_io.MoleculePreprocessing` offers the same operations
+with `process(mol)` and `process_copy(mol)`.
+
+SDF names can be taken from SD data tags directly from `ReaderContext`:
+
+```python
+with lillymol_io.ReaderContext('/path/to/file.sdf',
+                               sdf_identifier='CHEMBL_ID') as reader:
+    for mol in reader:
+        print(mol.name())
+```
+
+For workflows that need the SD data, use JSON names:
+
+```python
+with lillymol_io.ReaderContext('/path/to/file.sdf',
+                               sdf_tags_to_json=True,
+                               all_sdf_tags=True) as reader:
+    for mol in reader:
+        print(mol.name())
 ```
 
 There is no `None` molecule from a reader. A connection table error stops the read

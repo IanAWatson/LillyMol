@@ -64,6 +64,7 @@ class MDL_File_Supporting_Material
     IWString _change_long_symbols_to;
     IWString _insert_between_sdf_name_tokens;
     std::unique_ptr<RE2> _sdf_identifier;
+    IWString _sdf_identifier_string;
     IWString _name_in_m_tag;
     IWString _replace_first_sdf_tag;
     int * _input_bond_type_translation_table;
@@ -196,6 +197,7 @@ class MDL_File_Supporting_Material
     const IWString & name_in_m_tag () const { return _name_in_m_tag;}
     const IWString & replace_first_sdf_tag () { return _replace_first_sdf_tag;}
     int sdf_identifier_matches (const IWString &);
+    const IWString& sdf_identifier() const { return _sdf_identifier_string;}
      
     template <typename T> int write_atoms_and_bonds (int, int, T &);
 
@@ -236,6 +238,27 @@ class MDL_File_Supporting_Material
 };
 
 extern MDL_File_Supporting_Material * global_default_MDL_File_Supporting_Material ();
+
+// Temporarily changes the global SDF naming options and restores the previous
+// values when the scope ends. This is a bridge while MDL/SDF input options are
+// still held in global state.
+class MDL_SDF_Naming_Options_Scope {
+  private:
+    IWString _sdf_identifier;
+    int _sdf_tags_to_json;
+    int _all_sdf_tags;
+    int _first_sdf_tag;
+    int _prepend_sdfid;
+    int _active;
+
+  public:
+    MDL_SDF_Naming_Options_Scope();
+    ~MDL_SDF_Naming_Options_Scope();
+
+    int set_options(const const_IWSubstring& sdf_identifier, int sdf_tags_to_json,
+                    int all_sdf_tags, int first_sdf_tag, int prepend_sdfid);
+    void restore();
+};
 
 /*
   A couple of supporting functions used by the various mdl routines

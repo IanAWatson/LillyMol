@@ -231,7 +231,7 @@ for reading .sdf files, those need to be made available via Python.
 
 Note that there will never be a None molecule returned. If a connection
 table error is encountered, reading will cease. The Reader class has
-a 'set_set_connection_table_errors_allowed' method, which allows you
+a `set_ignore_connection_table_errors` method, which allows you
 to set the number of otherwise fatal errors that are ignored. Warnings
 will flash by on stderr, but nothing will show up in python. 
 
@@ -250,7 +250,61 @@ A more pythonic way of reading structures is available as
       for atom in mol:
         ...
 ```
-This last example shows that a molecule is iterable, and a stream
+`ReaderContext` is itself the iterator returned by the context manager. It also
+has a `next()` method that returns a molecule or `None`, plus methods such as
+`molecules_read()` and `set_ignore_connection_table_errors()`.
+
+Common preprocessing can be applied while molecules are read. This uses the same
+`MoleculePreprocessing` object used by LillyMol command line tools.
+```
+from lillymol_io import ReaderContext
+
+with ReaderContext('/path/to/file.smi', largest_fragment=True,
+                   remove_chirality=True, remove_isotopes=True) as reader:
+  for mol in reader:
+    ...
+```
+The preprocessing keyword options are `largest_fragment`, `remove_chirality`,
+`remove_cis_trans_bonds`, and `remove_isotopes`. They default to `False`, so a
+plain `ReaderContext(fname)` preserves the input molecule as before.
+
+SDF naming can also be controlled from `ReaderContext`. By default LillyMol uses
+the first SDF header line as the molecule name. To use a specific SD data tag as
+the identifier:
+```
+with ReaderContext('/path/to/file.sdf', sdf_identifier='CHEMBL_ID') as reader:
+  for mol in reader:
+    print(mol.name())
+```
+By default this produces names like `CHEMBL_ID:CHEMBL123`; use
+`prepend_sdfid=False` if only the tag value should become the molecule name.
+
+To retain SD tag data in the molecule name, ask for JSON form. With
+`all_sdf_tags=True`, every SD tag is included in the JSON object.
+```
+with ReaderContext('/path/to/file.sdf', sdf_tags_to_json=True,
+                   all_sdf_tags=True) as reader:
+  for mol in reader:
+    print(mol.name())
+```
+There is also a `first_sdf_tag=True` option for using the first SD data item as
+the molecule name. These reader keywords restore the previous SDF naming options
+when the context exits, but the underlying MDL/SDF parser still uses global
+state. Avoid simultaneously active SDF readers with different SDF naming options.
+
+`MoleculePreprocessing` can also be used directly when you want explicit control.
+`process()` changes the molecule supplied, while `process_copy()` leaves the
+original molecule unchanged.
+```
+from lillymol import MolFromSmiles
+from lillymol_io import MoleculePreprocessing
+
+mol = MolFromSmiles('C.CC example')
+prep = MoleculePreprocessing(largest_fragment=True)
+fragment = prep.process_copy(mol)
+```
+
+The loop above also shows that a molecule is iterable, and a stream
 of Atom objects is returned. In LillyMol, Atoms know nothing about
 a Molecule, so if you want the atom number something like
 ```

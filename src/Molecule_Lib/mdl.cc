@@ -62,6 +62,7 @@ MDL_File_Supporting_Material::_default_values() {
   _read_isotopes_as_numbers_rather_than_differences_from_normal = 0;
   _read_M_isotopes_as_numbers_rather_than_differences_from_normal = 1;
   _replace_first_sdf_tag.resize(0);
+  _sdf_identifier_string.resize(0);
   _allow_deuterium = 0;
   _allow_tritium = 0;
   if (nullptr != _input_bond_type_translation_table) {
@@ -120,6 +121,53 @@ static MDL_File_Supporting_Material default_mdl_file_optional_settings;
 MDL_File_Supporting_Material*
 global_default_MDL_File_Supporting_Material() {
   return &default_mdl_file_optional_settings;
+}
+
+MDL_SDF_Naming_Options_Scope::MDL_SDF_Naming_Options_Scope() {
+  MDL_File_Supporting_Material* mdlfos = global_default_MDL_File_Supporting_Material();
+  _sdf_identifier = mdlfos->sdf_identifier();
+  _sdf_tags_to_json = mdlfos->sdf_tags_to_json();
+  _all_sdf_tags = mdlfos->fetch_all_sdf_identifiers();
+  _first_sdf_tag = mdlfos->take_first_tag_as_name();
+  _prepend_sdfid = mdlfos->prepend_sdfid();
+  _active = 1;
+}
+
+MDL_SDF_Naming_Options_Scope::~MDL_SDF_Naming_Options_Scope() {
+  restore();
+}
+
+int
+MDL_SDF_Naming_Options_Scope::set_options(const const_IWSubstring& sdf_identifier,
+                                          int sdf_tags_to_json, int all_sdf_tags,
+                                          int first_sdf_tag, int prepend_sdfid) {
+  MDL_File_Supporting_Material* mdlfos = global_default_MDL_File_Supporting_Material();
+  if (! mdlfos->set_sdf_identifier(sdf_identifier)) {
+    return 0;
+  }
+
+  mdlfos->set_sdf_tags_to_json(sdf_tags_to_json);
+  mdlfos->set_fetch_all_sdf_identifiers(all_sdf_tags);
+  mdlfos->set_take_first_tag_as_name(first_sdf_tag);
+  mdlfos->set_prepend_sdfid(prepend_sdfid);
+
+  return 1;
+}
+
+void
+MDL_SDF_Naming_Options_Scope::restore() {
+  if (! _active) {
+    return;
+  }
+
+  MDL_File_Supporting_Material* mdlfos = global_default_MDL_File_Supporting_Material();
+  const_IWSubstring sdfid(_sdf_identifier.data(), _sdf_identifier.length());
+  mdlfos->set_sdf_identifier(sdfid);
+  mdlfos->set_sdf_tags_to_json(_sdf_tags_to_json);
+  mdlfos->set_fetch_all_sdf_identifiers(_all_sdf_tags);
+  mdlfos->set_take_first_tag_as_name(_first_sdf_tag);
+  mdlfos->set_prepend_sdfid(_prepend_sdfid);
+  _active = 0;
 }
 
 int
@@ -2904,9 +2952,11 @@ MDL_File_Supporting_Material::set_sdf_identifier(const const_IWSubstring& sdfid)
     if (_sdf_identifier) {
       _sdf_identifier.reset(nullptr);
     }
+    _sdf_identifier_string.resize(0);
     return 1;
   }
 
+  IWString user_sdfid = sdfid;
   IWString mysdfid = sdfid;
 
   if (mysdfid.starts_with('^')) {
@@ -2928,6 +2978,8 @@ MDL_File_Supporting_Material::set_sdf_identifier(const const_IWSubstring& sdfid)
     cerr << "Cannot set sdfid pattern to '" << mysdfid << "'\n";
     return 0;
   }
+
+  _sdf_identifier_string = user_sdfid;
 
   // cerr << "Pattern set to '" << mysdfid << "'\n";
 

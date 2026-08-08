@@ -1284,8 +1284,12 @@ Optimise::MakeSplit(int split) {
   }
 
   if (_verbose) {
-    RecomputeCurrentScore();
-    cerr << "Writing split " << split << " score " << score << " computed " << _current_score << " diff " << Diff(score, _current_score) << '\n';
+    if (_activity.active()) {
+      // If activity data is present, the score includes the influence of activity, so recomputation is not meaningful.
+    } else {
+      RecomputeCurrentScore();
+      cerr << "Writing split " << split << " score " << score << " computed " << _current_score << " diff " << Diff(score, _current_score) << '\n';
+    }
 
     const auto [across_split, number_at_max] = AveDistNumberMax();
     cerr << "starting_score " << starting_score << " score " << _current_score <<

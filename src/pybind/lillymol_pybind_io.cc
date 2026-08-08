@@ -12,9 +12,12 @@
 #include "Molecule_Lib/istream_and_type.h"
 #include "Molecule_Lib/mdl.h"
 #include "Molecule_Lib/molecule.h"
+#include "Molecule_Lib/molecule_preprocessing.h"
 #include "Molecule_Lib/output.h"
 
 namespace py = pybind11;
+
+using molecule_processing::MoleculePreprocessing;
 
 std::unique_ptr<data_source_and_type<Molecule>>
 MakeReader(const std::string& fname,
@@ -34,10 +37,22 @@ MakeReader(const std::string& fname,
 struct ReaderContext {
   public:
     std::unique_ptr<data_source_and_type<Molecule>> _reader;
+    MoleculePreprocessing _preprocessing;
+
+  private:
+    std::unique_ptr<MDL_SDF_Naming_Options_Scope> _sdf_options_scope;
 
   public:
     ReaderContext(const std::string& fname, FileType file_type);
     ReaderContext(const std::string& fname);
+    ~ReaderContext();
+
+    void SetPreprocessing(bool reduce_to_largest_fragment, bool remove_chirality,
+                          bool remove_cis_trans_bonds, bool remove_isotopes);
+    bool SetSdfOptions(const std::string& sdf_identifier, bool sdf_tags_to_json,
+                       bool all_sdf_tags, bool first_sdf_tag, bool prepend_sdfid);
+    void ResetSdfOptions();
+    std::optional<Molecule> Next();
 };
 
 ReaderContext::ReaderContext(const std::string& fname, FileType file_type) {
@@ -54,6 +69,59 @@ ReaderContext::ReaderContext(const std::string& fname) {
   }
 
   _reader = std::make_unique<data_source_and_type<Molecule>>(file_type, tmp);
+}
+
+ReaderContext::~ReaderContext() {
+  ResetSdfOptions();
+}
+
+void
+ReaderContext::SetPreprocessing(bool reduce_to_largest_fragment, bool remove_chirality,
+                                bool remove_cis_trans_bonds, bool remove_isotopes) {
+  _preprocessing.set_reduce_to_largest_fragment(reduce_to_largest_fragment);
+  _preprocessing.set_remove_chirality(remove_chirality);
+  _preprocessing.set_remove_cis_trans_bonds(remove_cis_trans_bonds);
+  _preprocessing.set_remove_isotopes(remove_isotopes);
+}
+
+bool
+ReaderContext::SetSdfOptions(const std::string& sdf_identifier, bool sdf_tags_to_json,
+                             bool all_sdf_tags, bool first_sdf_tag, bool prepend_sdfid) {
+  if (sdf_identifier.empty() && !sdf_tags_to_json && !all_sdf_tags && !first_sdf_tag &&
+      prepend_sdfid) {
+    return true;
+  }
+
+  if (! _sdf_options_scope) {
+    _sdf_options_scope = std::make_unique<MDL_SDF_Naming_Options_Scope>();
+  }
+
+  const_IWSubstring tmp(sdf_identifier.data(), sdf_identifier.length());
+  return _sdf_options_scope->set_options(tmp, sdf_tags_to_json, all_sdf_tags,
+                                         first_sdf_tag, prepend_sdfid);
+}
+
+void
+ReaderContext::ResetSdfOptions() {
+  _sdf_options_scope.reset(nullptr);
+}
+
+std::optional<Molecule>
+ReaderContext::Next() {
+  if (! _reader) {
+    return std::nullopt;
+  }
+
+  std::unique_ptr<Molecule> m(_reader->next_molecule());
+  if (! m) {
+    return std::nullopt;
+  }
+
+  if (_preprocessing.active()) {
+    _preprocessing.Process(*m);
+  }
+
+  return std::move(*m);
 }
 
 struct ContextWriter {
@@ -119,6 +187,37 @@ PYBIND11_MODULE(lillymol_io, io)
       return m;
     }
   };
+
+  py::class_<MoleculePreprocessing>(io, "MoleculePreprocessing")
+    .def(py::init([](bool largest_fragment, bool remove_chirality,
+                     bool remove_cis_trans_bonds, bool remove_isotopes) {
+        MoleculePreprocessing* result = new MoleculePreprocessing;
+        result->set_reduce_to_largest_fragment(largest_fragment);
+        result->set_remove_chirality(remove_chirality);
+        result->set_remove_cis_trans_bonds(remove_cis_trans_bonds);
+        result->set_remove_isotopes(remove_isotopes);
+        return result;
+      }),
+      py::kw_only(),
+      py::arg("largest_fragment") = false,
+      py::arg("remove_chirality") = false,
+      py::arg("remove_cis_trans_bonds") = false,
+      py::arg("remove_isotopes") = false)
+    .def("active", &MoleculePreprocessing::active)
+    .def("set_largest_fragment", &MoleculePreprocessing::set_reduce_to_largest_fragment)
+    .def("set_reduce_to_largest_fragment", &MoleculePreprocessing::set_reduce_to_largest_fragment)
+    .def("set_remove_chirality", &MoleculePreprocessing::set_remove_chirality)
+    .def("set_remove_cis_trans_bonds", &MoleculePreprocessing::set_remove_cis_trans_bonds)
+    .def("set_remove_isotopes", &MoleculePreprocessing::set_remove_isotopes)
+    .def("process", [](MoleculePreprocessing& preprocessing, Molecule& m)->int {
+        return preprocessing.Process(m);
+      })
+    .def("process_copy", [](MoleculePreprocessing& preprocessing, const Molecule& m)->Molecule {
+        Molecule result(m);
+        preprocessing.Process(result);
+        return result;
+      })
+  ;
 
   py::class_<ReaderIterator>(io, "Iterator")
     .def("__iter__", [](ReaderIterator &it) -> ReaderIterator& { return it; })
@@ -259,14 +358,103 @@ PYBIND11_MODULE(lillymol_io, io)
   ;
 
   py::class_<ReaderContext>(io, "ReaderContext")
-    .def(py::init<const std::string&, FileType>())
-    .def(py::init<const std::string&>())
+    .def(py::init([](const std::string& fname, FileType file_type,
+                     bool largest_fragment, bool remove_chirality,
+                     bool remove_cis_trans_bonds, bool remove_isotopes,
+                     const std::string& sdf_identifier, bool sdf_tags_to_json,
+                     bool all_sdf_tags, bool first_sdf_tag, bool prepend_sdfid) {
+        ReaderContext* result = new ReaderContext(fname, file_type);
+        result->SetPreprocessing(largest_fragment, remove_chirality,
+                                 remove_cis_trans_bonds, remove_isotopes);
+        if (! result->SetSdfOptions(sdf_identifier, sdf_tags_to_json, all_sdf_tags,
+                                    first_sdf_tag, prepend_sdfid)) {
+          delete result;
+          throw py::value_error("Invalid sdf_identifier regular expression");
+        }
+        return result;
+      }),
+      py::arg("fname"), py::arg("file_type"), py::kw_only(),
+      py::arg("largest_fragment") = false,
+      py::arg("remove_chirality") = false,
+      py::arg("remove_cis_trans_bonds") = false,
+      py::arg("remove_isotopes") = false,
+      py::arg("sdf_identifier") = "",
+      py::arg("sdf_tags_to_json") = false,
+      py::arg("all_sdf_tags") = false,
+      py::arg("first_sdf_tag") = false,
+      py::arg("prepend_sdfid") = true)
+    .def(py::init([](const std::string& fname, bool largest_fragment,
+                     bool remove_chirality, bool remove_cis_trans_bonds,
+                     bool remove_isotopes, const std::string& sdf_identifier,
+                     bool sdf_tags_to_json, bool all_sdf_tags, bool first_sdf_tag,
+                     bool prepend_sdfid) {
+        ReaderContext* result = new ReaderContext(fname);
+        result->SetPreprocessing(largest_fragment, remove_chirality,
+                                 remove_cis_trans_bonds, remove_isotopes);
+        if (! result->SetSdfOptions(sdf_identifier, sdf_tags_to_json, all_sdf_tags,
+                                    first_sdf_tag, prepend_sdfid)) {
+          delete result;
+          throw py::value_error("Invalid sdf_identifier regular expression");
+        }
+        return result;
+      }),
+      py::arg("fname"), py::kw_only(),
+      py::arg("largest_fragment") = false,
+      py::arg("remove_chirality") = false,
+      py::arg("remove_cis_trans_bonds") = false,
+      py::arg("remove_isotopes") = false,
+      py::arg("sdf_identifier") = "",
+      py::arg("sdf_tags_to_json") = false,
+      py::arg("all_sdf_tags") = false,
+      py::arg("first_sdf_tag") = false,
+      py::arg("prepend_sdfid") = true)
     .def("__enter__",
-      [](ReaderContext& me) {
-        return me._reader.get();
+      [](ReaderContext& me)->ReaderContext& {
+        return me;
       },
-      py::return_value_policy::reference
+      py::return_value_policy::reference_internal
     )
+    .def("__iter__", [](ReaderContext& me)->ReaderContext& { return me; },
+      py::return_value_policy::reference_internal)
+    .def("__next__",
+      [](ReaderContext& me)->Molecule {
+        std::optional<Molecule> m = me.Next();
+        if (! m) {
+          throw py::stop_iteration();
+        }
+        return std::move(*m);
+      })
+    .def("next", &ReaderContext::Next)
+    .def("set_preprocessing",
+      [](ReaderContext& me, bool largest_fragment, bool remove_chirality,
+         bool remove_cis_trans_bonds, bool remove_isotopes) {
+        me.SetPreprocessing(largest_fragment, remove_chirality,
+                            remove_cis_trans_bonds, remove_isotopes);
+      },
+      py::kw_only(),
+      py::arg("largest_fragment") = false,
+      py::arg("remove_chirality") = false,
+      py::arg("remove_cis_trans_bonds") = false,
+      py::arg("remove_isotopes") = false)
+    .def("preprocessing_active",
+      [](const ReaderContext& me)->bool {
+        return me._preprocessing.active();
+      })
+    .def("set_sdf_options",
+      [](ReaderContext& me, const std::string& sdf_identifier, bool sdf_tags_to_json,
+         bool all_sdf_tags, bool first_sdf_tag, bool prepend_sdfid) {
+        if (! me.SetSdfOptions(sdf_identifier, sdf_tags_to_json, all_sdf_tags,
+                               first_sdf_tag, prepend_sdfid)) {
+          throw py::value_error("Invalid sdf_identifier regular expression");
+        }
+      },
+      py::kw_only(),
+      py::arg("sdf_identifier") = "",
+      py::arg("sdf_tags_to_json") = false,
+      py::arg("all_sdf_tags") = false,
+      py::arg("first_sdf_tag") = false,
+      py::arg("prepend_sdfid") = true)
+    .def("reset_sdf_options", &ReaderContext::ResetSdfOptions)
     .def("set_ignore_connection_table_errors",
       [](ReaderContext& me, int value) {
         me._reader->set_connection_table_errors_allowed(value);
@@ -287,10 +475,22 @@ PYBIND11_MODULE(lillymol_io, io)
       },
       "number of molecules yet to be read - fails on pipes"
     )
+    .def("molecules_read",
+      [](const ReaderContext& me)->uint64_t {
+        if (! me._reader) {
+          return 0;
+        }
+        return me._reader->molecules_read();
+      },
+      "molecules read"
+    )
     .def("__exit__",
-      [](ReaderContext& me, 
+      [](ReaderContext& me,
         pybind11::object exc_type, pybind11::object exc_value, pybind11::object traceback) {
-          me._reader->do_close();
+          if (me._reader) {
+            me._reader->do_close();
+          }
+          me.ResetSdfOptions();
       }
     )
   ;

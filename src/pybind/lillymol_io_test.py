@@ -76,6 +76,22 @@ https://www.enaminestore.com/catalog/Z33546370
 $$$$
 """
 
+SDF_MULTILINE="""methane
+iwcorina  09042307323D 1   1.00000     0.00000     0
+CORINA-API 3.49 0006  12.02.2015
+  1  0  0  0  0  0            999 V2000
+   -0.0127    1.0858    0.0080 C   0  0  0
+M  END
+>  <COMMENT>
+first line
+second line
+
+>  <SINGLE>
+value
+
+$$$$
+"""
+
 
 class TestLillyMolSubstructure(absltest.TestCase):
   def test_open_file_ok_suffix(self):
@@ -374,6 +390,48 @@ class TestLillyMolSubstructure(absltest.TestCase):
         self.assertEqual(next(reader1).name(), "Z33546370")
         self.assertEqual(next(reader2).name(), "0.5")
 
+  def test_reader_context_keep_sdf_tags_keyword(self):
+    tmpdir = tempfile.mkdtemp(dir=absltest.TEST_TMPDIR.value)
+    fname = os.path.join(tmpdir, "input.sdf")
+    with open(fname, "w") as writer:
+      writer.write(ENAMINE)
+
+    set_mdlquiet(True)
+    set_ignore_bad_m(True)
+    with ReaderContext(fname, keep_sdf_tags=True) as reader:
+      mol = next(reader)
+
+    self.assertEqual(mol.sdf_tags()["idnumber"], "Z33546370")
+    self.assertEqual(mol.sdf_tags()["LogP"], "-1.114")
+    self.assertEqual(mol.sdf_tags()["PSA"], "43.09")
+
+  def test_reader_context_sdf_tags_default_empty(self):
+    tmpdir = tempfile.mkdtemp(dir=absltest.TEST_TMPDIR.value)
+    fname = os.path.join(tmpdir, "input.sdf")
+    with open(fname, "w") as writer:
+      writer.write(ENAMINE)
+
+    set_mdlquiet(True)
+    set_ignore_bad_m(True)
+    with ReaderContext(fname) as reader:
+      mol = next(reader)
+
+    self.assertEqual(mol.sdf_tags(), {})
+
+  def test_reader_context_sdf_tags_multiline_values(self):
+    tmpdir = tempfile.mkdtemp(dir=absltest.TEST_TMPDIR.value)
+    fname = os.path.join(tmpdir, "input.sdf")
+    with open(fname, "w") as writer:
+      writer.write(SDF_MULTILINE)
+
+    set_mdlquiet(True)
+    set_ignore_bad_m(True)
+    with ReaderContext(fname, keep_sdf_tags=True) as reader:
+      mol = next(reader)
+
+    self.assertEqual(mol.sdf_tags()["COMMENT"], "first line\nsecond line")
+    self.assertEqual(mol.sdf_tags()["SINGLE"], "value")
+
   def test_reader_context_reader_options_sdf_identifier(self):
     tmpdir = tempfile.mkdtemp(dir=absltest.TEST_TMPDIR.value)
     fname = os.path.join(tmpdir, "input.sdf")
@@ -579,6 +637,20 @@ class TestLillyMolSubstructure(absltest.TestCase):
       self.assertEqual(mol.natoms(), 2)
       self.assertIsNone(reader.next())
       self.assertEqual(reader.molecules_read(), 1)
+
+  def test_reader_options_keep_sdf_tags(self):
+    tmpdir = tempfile.mkdtemp(dir=absltest.TEST_TMPDIR.value)
+    fname = os.path.join(tmpdir, "input.sdf")
+    with open(fname, "w") as writer:
+      writer.write(ENAMINE)
+
+    set_mdlquiet(True)
+    set_ignore_bad_m(True)
+    options = ReaderOptions(keep_sdf_tags=True)
+    with ReaderContext(fname, options=options) as reader:
+      mol = next(reader)
+
+    self.assertEqual(mol.sdf_tags()["idnumber"], "Z33546370")
 
   def test_reader_options_preprocessing(self):
     tmpdir = tempfile.mkdtemp(dir=absltest.TEST_TMPDIR.value)

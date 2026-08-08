@@ -3,6 +3,7 @@
 #include <queue>
 #include <sstream>
 #include <string>
+#include <vector>
 
 #include "pybind11/pybind11.h"
 #include "pybind11/numpy.h"
@@ -45,6 +46,71 @@ template <typename T>
 py::array mkarray_via_buffer(size_t n) {
     return py::array(py::buffer_info(
         nullptr, sizeof(T), py::format_descriptor<T>::format(), 1, {n}, {sizeof(T)}));
+}
+
+
+static bool
+LooksLikeSdfTagRecord(const std::string& line) {
+  const size_t open = line.find('<');
+  const size_t close = line.rfind('>');
+  return line.size() >= 4 && line[0] == '>' && open != std::string::npos &&
+         close != std::string::npos && open < close;
+}
+
+static std::string
+SdfTagName(const std::string& line) {
+  const size_t open = line.find('<');
+  const size_t close = line.rfind('>');
+  if (open == std::string::npos || close == std::string::npos || open >= close) {
+    return std::string();
+  }
+
+  std::string result = line.substr(open + 1, close - open - 1);
+  std::replace(result.begin(), result.end(), ' ', '_');
+  return result;
+}
+
+static py::dict
+SdfTags(const Molecule& m) {
+  py::dict result;
+
+  std::string current_tag;
+  std::string current_value;
+
+  auto flush_current_tag = [&]() {
+    if (current_tag.empty()) {
+      return;
+    }
+    result[py::str(current_tag)] = py::str(current_value);
+    current_tag.clear();
+    current_value.clear();
+  };
+
+  for (int i = 0; i < m.number_records_text_info(); ++i) {
+    const std::string line = m.text_info(i).AsString();
+    if (LooksLikeSdfTagRecord(line)) {
+      flush_current_tag();
+      current_tag = SdfTagName(line);
+      continue;
+    }
+
+    if (current_tag.empty()) {
+      continue;
+    }
+
+    if (line.empty()) {
+      flush_current_tag();
+      continue;
+    }
+
+    if (! current_value.empty()) {
+      current_value.append("\n");
+    }
+    current_value.append(line);
+  }
+
+  flush_current_tag();
+  return result;
 }
 
 static void
@@ -1179,6 +1245,19 @@ Never refuses, and issues no warning.)")
                 // Besides, I don't think I want to enable mol.name = xxx, when everything else is via functions.
                 //.def_property("name", &Molecule::Name, static_cast<void (Molecule::*)(const std::string&)>(&Molecule::set_name), "name")
                 .def("name", &Molecule::Name, "Name")
+                .def("sdf_tags", &SdfTags, "Return retained SDF tags as a dict")
+                .def("number_records_text_info", &Molecule::number_records_text_info,
+                  "Number of retained SDF/text records")
+                .def("text_info",
+                  [](const Molecule& m)->std::vector<std::string> {
+                    std::vector<std::string> result;
+                    result.reserve(m.number_records_text_info());
+                    for (int i = 0; i < m.number_records_text_info(); ++i) {
+                      result.push_back(m.text_info(i).AsString());
+                    }
+                    return result;
+                  },
+                  "Retained SDF/text records")
                 .def("set_name",
                   [](Molecule& m, const std::string& s) {
                     m.set_name(s);

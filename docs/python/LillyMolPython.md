@@ -290,6 +290,17 @@ with ReaderContext('/path/to/file.sdf', sdf_tags_to_json=True,
 There is also a `first_sdf_tag=True` option for using the first SD data item as
 the molecule name.
 
+If you want SD tag data as structured Python data, keep the SDF tags while
+reading and call `sdf_tags()` on the molecule. Multi-line SD values are returned
+as one string with embedded newline characters.
+```
+with ReaderContext('/path/to/file.sdf', keep_sdf_tags=True) as reader:
+  for mol in reader:
+    tags = mol.sdf_tags()
+    print(tags.get('CHEMBL_ID'))
+```
+Without `keep_sdf_tags=True`, `mol.sdf_tags()` returns an empty dictionary.
+
 When the same read settings are reused, collect them in a `ReaderOptions` object.
 This is often clearer than passing several keyword arguments repeatedly.
 ```
@@ -309,9 +320,9 @@ with ReaderContext('/path/to/second.sdf', options=options) as reader:
 ```
 `ReaderOptions` has the same fields as the keyword arguments: `largest_fragment`,
 `remove_chirality`, `remove_cis_trans_bonds`, `remove_isotopes`,
-`sdf_identifier`, `sdf_tags_to_json`, `all_sdf_tags`, `first_sdf_tag`, and
-`prepend_sdfid`. The fields are mutable, and an existing `ReaderContext` can be
-updated with `reader.apply_options(options)`.
+`keep_sdf_tags`, `sdf_identifier`, `sdf_tags_to_json`, `all_sdf_tags`,
+`first_sdf_tag`, and `prepend_sdfid`. The fields are mutable, and an existing
+`ReaderContext` can be updated with `reader.apply_options(options)`.
 
 `ReaderContext` stores these SDF naming options on the reader, so separate
 `ReaderContext` objects can use different SDF identifiers at the same time. The

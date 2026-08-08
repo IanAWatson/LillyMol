@@ -4,7 +4,6 @@
 #include <algorithm>
 #include <iostream>
 #include <limits>
-#include <memory>
 #include <string>
 #include <thread>
 #include <unordered_map>
@@ -12,6 +11,7 @@
 
 #include "Foundational/cmdline/cmdline.h"
 #include "Foundational/data_source/iwstring_data_source.h"
+#include "Foundational/iwaray/iwaray.h"
 #include "Foundational/iw_tdt/iw_tdt.h"
 
 #include "Utilities/GFP_Tools/gfp.h"
@@ -175,11 +175,11 @@ class Bucket {
     ++_previously_selected;
   }
 
-  int NextAvailable(const std::vector<std::unique_ptr<Candidate>>& pool);
+  int NextAvailable(const resizable_array_p<Candidate>& pool);
 };
 
 int
-Bucket::NextAvailable(const std::vector<std::unique_ptr<Candidate>>& pool) {
+Bucket::NextAvailable(const resizable_array_p<Candidate>& pool) {
   while (_cursor < _members.size()) {
     const int ndx = _members[_cursor];
     if (pool[ndx]->available()) {
@@ -480,8 +480,8 @@ BucketLeaderOptions::AssignBucket(Candidate& candidate) const {
 class BucketLeader {
  private:
   BucketLeaderOptions _options;
-  std::vector<std::unique_ptr<Candidate>> _pool;
-  std::vector<std::unique_ptr<Bucket>> _buckets;
+  resizable_array_p<Candidate> _pool;
+  resizable_array_p<Bucket> _buckets;
   std::unordered_map<std::string, int> _bucket_number;
   int _first_unselected = 0;
   int _leaders_found = 0;
@@ -502,7 +502,7 @@ class BucketLeader {
   int AvailableCount() const;
   void MaybeReportProgress() const;
   int BuildPool(iwstring_data_source& input);
-  int AddCandidate(std::unique_ptr<Candidate> candidate);
+  int AddCandidate(Candidate* candidate);
   int BucketNumber(const IWString& label);
   int ChooseNextLeader() const;
   int FormCluster(int leader, std::vector<int>& cluster_members);
@@ -527,14 +527,14 @@ BucketLeader::BucketNumber(const IWString& label) {
     return iter->second;
   }
 
-  const int result = _buckets.size();
+  const int result = _buckets.number_elements();
   _bucket_number.emplace(key, result);
-  _buckets.emplace_back(std::make_unique<Bucket>(label));
+  _buckets.add(new Bucket(label));
   return result;
 }
 
 int
-BucketLeader::AddCandidate(std::unique_ptr<Candidate> candidate) {
+BucketLeader::AddCandidate(Candidate* candidate) {
   if (! _options.AssignBucket(*candidate)) {
     return 0;
   }
@@ -542,8 +542,8 @@ BucketLeader::AddCandidate(std::unique_ptr<Candidate> candidate) {
   const int b = BucketNumber(candidate->bucket_label());
   candidate->set_bucket(b, candidate->bucket_label());
 
-  const int ndx = _pool.size();
-  _pool.push_back(std::move(candidate));
+  const int ndx = _pool.number_elements();
+  _pool.add(candidate);
   _buckets[b]->AddMember(ndx);
   return 1;
 }
@@ -552,9 +552,10 @@ int
 BucketLeader::BuildPool(iwstring_data_source& input) {
   IW_TDT tdt;
   while (tdt.next(input)) {
-    std::unique_ptr<Candidate> candidate = std::make_unique<Candidate>();
+    Candidate* candidate = new Candidate;
     int fatal = 0;
     if (! candidate->ConstructFromTdt(tdt, _options.smiles_tag(), _options.id_tag(), fatal)) {
+      delete candidate;
       if (fatal) {
         cerr << "Cannot parse TDT\n" << tdt;
         return 0;
@@ -562,7 +563,8 @@ BucketLeader::BuildPool(iwstring_data_source& input) {
       continue;
     }
 
-    if (! AddCandidate(std::move(candidate))) {
+    if (! AddCandidate(candidate)) {
+      delete candidate;
       cerr << "Cannot assign bucket to TDT\n" << tdt;
       return 0;
     }
@@ -574,7 +576,7 @@ BucketLeader::BuildPool(iwstring_data_source& input) {
   }
 
   if (_options.verbose()) {
-    cerr << "Read " << _pool.size() << " fingerprints in " << _buckets.size()
+    cerr << "Read " << _pool.number_elements() << " fingerprints in " << _buckets.number_elements()
          << " buckets\n";
   }
 
@@ -638,7 +640,7 @@ BucketLeader::MarkPreviouslySelected(int ndx, similarity_type_t d) {
 
 void
 BucketLeader::AdvanceFirstUnselected() {
-  while (_first_unselected < static_cast<int>(_pool.size()) &&
+  while (_first_unselected < _pool.number_elements() &&
          _pool[_first_unselected]->selected()) {
     ++_first_unselected;
   }
@@ -647,7 +649,7 @@ BucketLeader::AdvanceFirstUnselected() {
 int
 BucketLeader::ChooseNextLeader() const {
   int best_bucket = -1;
-  for (int i = 0; i < static_cast<int>(_buckets.size()); ++i) {
+  for (int i = 0; i < _buckets.number_elements(); ++i) {
     const Bucket& bucket = *_buckets[i];
     if (bucket.available() == 0) {
       continue;
@@ -698,7 +700,7 @@ BucketLeader::FindWithinThreshold(IW_General_Fingerprint& reference,
                                   std::vector<DistanceHit>& hits) const {
   hits.clear();
 
-  const int pool_size = static_cast<int>(_pool.size());
+  const int pool_size = _pool.number_elements();
   if (_first_unselected >= pool_size) {
     return 1;
   }
@@ -825,13 +827,13 @@ BucketLeader::ApplyPreviouslySelected(const char* fname) {
          << " fingerprints by previously selected file(s)\n";
   }
 
-  return _first_unselected < static_cast<int>(_pool.size());
+  return _first_unselected < _pool.number_elements();
 }
 
 int
 BucketLeader::AvailableCount() const {
   int result = 0;
-  for (const std::unique_ptr<Bucket>& bucket : _buckets) {
+  for (const Bucket* bucket : _buckets) {
     result += bucket->available();
   }
 
@@ -899,7 +901,7 @@ BucketLeader::WriteBucketSummary() const {
          << "cluster_members" << sep << "previously_selected" << sep
          << "available\n";
 
-  for (const std::unique_ptr<Bucket>& bucket : _buckets) {
+  for (const Bucket* bucket : _buckets) {
     output << bucket->label() << sep << bucket->total() << sep << bucket->leaders()
            << sep << bucket->cluster_members() << sep << bucket->previously_selected()
            << sep << bucket->available() << '\n';
@@ -918,7 +920,7 @@ BucketLeader::Report(std::ostream& output) const {
            << " fingerprints by previously selected file(s)\n";
   }
 
-  for (const std::unique_ptr<Bucket>& bucket : _buckets) {
+  for (const Bucket* bucket : _buckets) {
     output << "Bucket '" << bucket->label() << "' total " << bucket->total()
            << " leaders " << bucket->leaders()
            << " cluster_members " << bucket->cluster_members()

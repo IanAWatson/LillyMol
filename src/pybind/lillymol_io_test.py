@@ -361,6 +361,19 @@ class TestLillyMolSubstructure(absltest.TestCase):
     self.assertTrue(set_sdf_identifier(""))
     set_prepend_sdfid(True)
 
+  def test_reader_context_independent_sdf_options(self):
+    tmpdir = tempfile.mkdtemp(dir=absltest.TEST_TMPDIR.value)
+    fname = os.path.join(tmpdir, "input.sdf")
+    with open(fname, "w") as writer:
+      writer.write(ENAMINE)
+
+    set_mdlquiet(True)
+    set_ignore_bad_m(True)
+    with ReaderContext(fname, sdf_identifier="idnumber", prepend_sdfid=False) as reader1:
+      with ReaderContext(fname, sdf_identifier="LogS", prepend_sdfid=False) as reader2:
+        self.assertEqual(next(reader1).name(), "Z33546370")
+        self.assertEqual(next(reader2).name(), "0.5")
+
   def test_reader_context_sdf_tags_to_json_keywords(self):
     tmpdir = tempfile.mkdtemp(dir=absltest.TEST_TMPDIR.value)
     fname = os.path.join(tmpdir, "input.sdf")

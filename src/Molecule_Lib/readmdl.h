@@ -108,6 +108,14 @@ Molecule::_read_molecule_mdl_ds(T& input, int return_on_m_end,
 template <typename T>
 int
 Molecule::read_molecule_mdl_ds(T& input, int return_on_m_end) {
+  MDL_File_Supporting_Material* mdlfos = global_default_MDL_File_Supporting_Material();
+  return read_molecule_mdl_ds(input, *mdlfos, return_on_m_end);
+}
+
+template <typename T>
+int
+Molecule::read_molecule_mdl_ds(T& input, MDL_File_Supporting_Material& mdlfos,
+                               int return_on_m_end) {
   assert(ok());
 
   resize(0);
@@ -117,11 +125,9 @@ Molecule::read_molecule_mdl_ds(T& input, int return_on_m_end) {
     return 0;
   }
 
-  MDL_File_Supporting_Material* mdlfos = global_default_MDL_File_Supporting_Material();
+  mdlfos.reset_for_next_molecule();
 
-  mdlfos->reset_for_next_molecule();
-
-  if (!_read_molecule_mdl_ds(input, return_on_m_end, *mdlfos)) {
+  if (!_read_molecule_mdl_ds(input, return_on_m_end, mdlfos)) {
     return 0;
   }
 
@@ -133,7 +139,7 @@ Molecule::read_molecule_mdl_ds(T& input, int return_on_m_end) {
 
   if (moleculeio::ignore_all_chiral_information_on_input()) {
     _chiral_centres.resize(0);
-  } else if (mdlfos->discern_chirality_from_wedge_bonds()) {
+  } else if (mdlfos.discern_chirality_from_wedge_bonds()) {
     (void)discern_chirality_from_wedge_bonds();
   } else if (0 == _chiral_centres.number_elements() && number_up_or_down_wedge_bonds()) {
     (void)discern_chirality_from_wedge_bonds();
@@ -152,7 +158,7 @@ Molecule::read_molecule_mdl_ds(T& input, int return_on_m_end) {
 
   if (0 == _chiral_centres.number_elements()) {  // none to worry about
     ;
-  } else if (_complete_chiral_centres_from_mdl_files(*mdlfos)) {  // good
+  } else if (_complete_chiral_centres_from_mdl_files(mdlfos)) {  // good
     ;
   } else  // OOPS, bad chirality info
   {

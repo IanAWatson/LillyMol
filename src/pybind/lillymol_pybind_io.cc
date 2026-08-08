@@ -39,9 +39,6 @@ struct ReaderContext {
     std::unique_ptr<data_source_and_type<Molecule>> _reader;
     MoleculePreprocessing _preprocessing;
 
-  private:
-    std::unique_ptr<MDL_SDF_Naming_Options_Scope> _sdf_options_scope;
-
   public:
     ReaderContext(const std::string& fname, FileType file_type);
     ReaderContext(const std::string& fname);
@@ -92,18 +89,30 @@ ReaderContext::SetSdfOptions(const std::string& sdf_identifier, bool sdf_tags_to
     return true;
   }
 
-  if (! _sdf_options_scope) {
-    _sdf_options_scope = std::make_unique<MDL_SDF_Naming_Options_Scope>();
+  if (! _reader) {
+    return false;
   }
 
+  MDL_File_Supporting_Material& mdlfos =
+      _reader->mutable_molecule_read_options().mdl_file_supporting_material();
   const_IWSubstring tmp(sdf_identifier.data(), sdf_identifier.length());
-  return _sdf_options_scope->set_options(tmp, sdf_tags_to_json, all_sdf_tags,
-                                         first_sdf_tag, prepend_sdfid);
+  if (! mdlfos.set_sdf_identifier(tmp)) {
+    return false;
+  }
+
+  mdlfos.set_sdf_tags_to_json(sdf_tags_to_json);
+  mdlfos.set_fetch_all_sdf_identifiers(all_sdf_tags);
+  mdlfos.set_take_first_tag_as_name(first_sdf_tag);
+  mdlfos.set_prepend_sdfid(prepend_sdfid);
+
+  return true;
 }
 
 void
 ReaderContext::ResetSdfOptions() {
-  _sdf_options_scope.reset(nullptr);
+  if (_reader) {
+    _reader->reset_molecule_read_options();
+  }
 }
 
 std::optional<Molecule>

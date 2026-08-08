@@ -27,6 +27,7 @@ class iwstring_data_source;
 #include "Foundational/iwbits/iwbits.h"
 
 #include "iwmtypes.h"
+#include "mdl.h"
 
 #include "atom.h"
 #include "bond.h"
@@ -38,6 +39,21 @@ class iwstring_data_source;
 #include "iwrcb.h"
 #include "mol2graph.h"
 #include "set_of_atoms.h"
+
+class Molecule_Read_Options {
+  private:
+    MDL_File_Supporting_Material _mdl_file_supporting_material;
+
+  public:
+    Molecule_Read_Options();
+
+    MDL_File_Supporting_Material& mdl_file_supporting_material() {
+      return _mdl_file_supporting_material;
+    }
+    const MDL_File_Supporting_Material& mdl_file_supporting_material() const {
+      return _mdl_file_supporting_material;
+    }
+};
 
 // forward declaration
 
@@ -1346,9 +1362,12 @@ class __attribute__((visibility("default"))) Molecule : protected resizable_arra
                                                std::ostream& output) const;
 
   int read_molecule_ds(iwstring_data_source&, FileType);
+  int read_molecule_ds(iwstring_data_source&, FileType, Molecule_Read_Options&);
   int read_molecule_pdb_ds(iwstring_data_source&);
   template <typename T>
   int read_molecule_mdl_ds(T&, int = 0);
+  template <typename T>
+  int read_molecule_mdl_ds(T&, MDL_File_Supporting_Material&, int = 0);
   int read_molecule_rdf_ds(iwstring_data_source&);
   int read_molecule_smi_ds(iwstring_data_source&);
   int read_molecule_tdt_ds(iwstring_data_source&);

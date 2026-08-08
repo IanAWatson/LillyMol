@@ -76,6 +76,18 @@
       "args": [
         "-s '[c]' -J FPCTYPE -f #{indir}/input.tdt"
       ]
+    },
+    {
+      "name": "hash_output",
+      "args": [
+        "-s '[N]' -z i -i smi -H def #{indir}/input.smi"
+      ]
+    },
+    {
+      "name": "hash_xref",
+      "args": [
+        "-s '[N]' -z i -i smi -H xref=xref.txt #{indir}/input.smi"
+      ]
     }
   ]
 }

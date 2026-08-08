@@ -213,6 +213,36 @@ This is mainly useful for debugging, review, and explaining why a chemotype was
 generated. The parent is written only for molecules that successfully generate a
 chemotype.
 
+
+## Chemotype Hashes
+
+Use `-H def` to append a deterministic fixed-width alphanumeric hash to each
+written chemotype record:
+
+```shell
+chemotypes -s '[N]' -z i -i smi -H def input.smi > chemotypes.smi
+```
+
+The hash is computed from the unique SMILES of the reduced chemotype, so the
+same chemotype receives the same identifier regardless of which parent molecule
+or input file generated it. The default hash is a 26-character uppercase base32
+encoding derived from an MD5 digest. Use `-H width=<n>` to request a shorter
+fixed width when a compact identifier is more important than collision margin.
+
+The tool checks for collisions among chemotypes seen in the current run. A
+collision, where two different unique chemotype SMILES map to the same hash, is
+a fatal error.
+
+Use `-H xref=<fname>` to also write a cross-reference file:
+
+```shell
+chemotypes -s '[N]' -z i -i smi -H xref=chemotype_hashes.txt input.smi > chemotypes.smi
+```
+
+The cross-reference file contains the hash, unique chemotype SMILES, count,
+and first parent molecule name. The parent name is written last so the first
+three fields remain easy to parse when parent names contain spaces.
+
 ## Summary Output
 
 Use `-F <fname>` to accumulate generated chemotypes as
@@ -275,6 +305,9 @@ single-ring molecules should simply be skipped.
 | `-f` | Work as a TDT filter, inserting the `-J` fingerprint after each `$SMI<...>` record. |
 | `-p <text>` | Write the parent molecule before each generated chemotype; append `<text>` unless it is `.`, `def`, or `default`. |
 | `-F <fname>` | Write accumulated `dicer_data::DicerFragment` textproto summary. |
+| `-H def` | Append a deterministic fixed-width alphanumeric hash of the unique chemotype SMILES. |
+| `-H xref=<fname>` | Also write a hash cross-reference file. |
+| `-H width=<n>` | Set hash width. Default and maximum are 26 characters. |
 | `-z i`, `-z ignore` | Ignore molecules that do not match any query. |
 | `-z f`, `-z first` | Use the first embedding when a query matches multiple ring systems. |
 | `-S <stem>` | Output file stem. Default stdout. |

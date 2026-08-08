@@ -4,6 +4,7 @@
 #include <iostream>
 #include <memory>
 #include <string>
+#include <vector>
 
 #include "Foundational/cmdline/cmdline.h"
 #include "Foundational/iwstring/absl_hash.h"
@@ -13,6 +14,7 @@
 #include "Molecule_Lib/atom_typing.h"
 #include "Molecule_Lib/etrans.h"
 #include "Foundational/data_source/iwstring_data_source.h"
+#include "Foundational/iwmisc/md5.h"
 #include "Foundational/iwmisc/sparse_fp_creator.h"
 
 #include "Molecule_Lib/istream_and_type.h"
@@ -34,6 +36,51 @@ namespace chemotypes_main {
 
 using std::cerr;
 using molecule_processing::MoleculePreprocessing;
+
+constexpr int kDefaultHashWidth = 26;
+constexpr int kMaxHashWidth = 26;
+
+IWString
+Base32Hash(const unsigned char* digest, int width) {
+  static constexpr char kAlphabet[] = "0123456789ABCDEFGHJKMNPQRSTVWXYZ";
+
+  IWString result;
+  int bit = 0;
+  for (int i = 0; i < width; ++i) {
+    int value = 0;
+    for (int j = 0; j < 5; ++j, ++bit) {
+      value <<= 1;
+      if (bit >= 128) {
+        continue;
+      }
+      const int byte = bit / 8;
+      const int offset = 7 - (bit % 8);
+      value |= (digest[byte] >> offset) & 0x01;
+    }
+    result << kAlphabet[value];
+  }
+
+  return result;
+}
+
+IWString
+ChemotypeHashString(const IWString& smiles, int width) {
+  unsigned char digest[16];
+  MD5_CTX ctx;
+  MD5Init(&ctx);
+  MD5Update(&ctx, reinterpret_cast<unsigned char*>(const_cast<char*>(smiles.data())),
+            smiles.length());
+  MD5Final(digest, &ctx);
+
+  return Base32Hash(digest, width);
+}
+
+struct ChemotypeHashXref {
+  IWString smiles;
+  IWString parent;
+  uint32_t n = 0;
+};
+
 
 enum class FingerprintKind {
   kNone,
@@ -155,6 +202,9 @@ Options:
                 A trailing digit sets the EC radius, default 3.
  -J EXPAND=<n>  expand selected fingerprint atoms by <n> bonds.
  -J INVERT      fingerprint atoms outside the chemotype; OUTSIDE is a synonym.
+ -H def         append a deterministic fixed-width alphanumeric hash of the chemotype.
+ -H xref=<fname> also write hash, unique smiles, first parent, and count cross-reference.
+ -H width=<n>   hash width, default 26, max 26.
  -f             work as a TDT filter; requires -J.
  -p <text>      write the parent before each chemotype; append <text> to parent name.
                 Use -p . or -p def for no parent annotation.
@@ -188,6 +238,9 @@ class Options {
   int _write_parent = 0;
   IWString _parent_annotation;
   IWString _summary_fname;
+  int _hash_chemotypes = 0;
+  int _hash_width = kDefaultHashWidth;
+  IWString _hash_xref_fname;
   int _write_unique_chemotype_id = 0;
   IWString _unique_chemotype_id_prefix;
 
@@ -202,6 +255,9 @@ class Options {
   Atom_Typing_Specification* _atom_typing_ptr = nullptr;
 
   absl::flat_hash_map<IWString, dicer_data::DicerFragment> _chemotype;
+  absl::flat_hash_map<IWString, IWString> _hash_from_usmi;
+  absl::flat_hash_map<IWString, ChemotypeHashXref> _hash_xref;
+  std::vector<IWString> _hash_order;
 
   uint64_t _molecules_read = 0;
   uint64_t _molecules_written = 0;
@@ -225,7 +281,9 @@ class Options {
   int StartFingerprintRecord(Molecule& m, IWString_and_File_Descriptor& output);
   int FinishFingerprintRecord(Molecule& m, IWString_and_File_Descriptor& output);
   int AccumulateChemotype(Molecule& m, const IWString& parent_name, uint32_t& chemotype_id);
+  int ChemotypeHash(Molecule& m, const IWString& parent_name, IWString& hash);
   int WriteSummary();
+  int WriteHashXref();
   int Report(std::ostream& output) const;
 
   int verbose() const {
@@ -329,7 +387,8 @@ Options::Initialise(Command_Line& cl) {
 
   if (fingerprinting_active() &&
       (cl.option_present('o') || cl.option_present('S') || cl.option_present('p') ||
-       cl.option_present('F') || cl.option_present('U') || cl.option_present('I'))) {
+       cl.option_present('F') || cl.option_present('U') || cl.option_present('I') ||
+       cl.option_present('H'))) {
     cerr << "Fingerprint generation (-J) cannot be combined with molecule or summary output options\n";
     return 0;
   }
@@ -344,6 +403,35 @@ Options::Initialise(Command_Line& cl) {
 
   if (cl.option_present('F')) {
     _summary_fname = cl.string_value('F');
+  }
+
+
+  if (cl.option_present('H')) {
+    _hash_chemotypes = 1;
+    IWString h;
+    for (int i = 0; cl.value('H', h, i); ++i) {
+      if (h == "def" || h == "default" || h == "hash") {
+        continue;
+      }
+      if (h.starts_with("xref=")) {
+        h.remove_leading_chars(5);
+        if (h.empty()) {
+          cerr << "The -H xref= qualifier requires a file name\n";
+          return 0;
+        }
+        _hash_xref_fname = h;
+      } else if (h.starts_with("width=")) {
+        h.remove_leading_chars(6);
+        if (! h.numeric_value(_hash_width) || _hash_width <= 0 ||
+            _hash_width > kMaxHashWidth) {
+          cerr << "The -H width= qualifier must be between 1 and " << kMaxHashWidth << '\n';
+          return 0;
+        }
+      } else {
+        cerr << "Unrecognised -H qualifier '" << h << "'\n";
+        return 0;
+      }
+    }
   }
 
   if (cl.option_present('U')) {
@@ -447,6 +535,12 @@ Options::Initialise(Command_Line& cl) {
         cerr << " with prefix '" << _unique_chemotype_id_prefix << "'";
       }
       cerr << '\n';
+    }
+    if (_hash_chemotypes) {
+      cerr << "Will append " << _hash_width << " character chemotype hashes\n";
+      if (! _hash_xref_fname.empty()) {
+        cerr << "Will write chemotype hash cross-reference to '" << _hash_xref_fname << "'\n";
+      }
     }
     if (_chemotype_options.include_tied_adjacent_ring_systems) {
       cerr << "Will include adjacent ring systems tied at the -n cutoff distance\n";
@@ -691,6 +785,15 @@ Options::Process(Molecule& m, Molecule_Output_Object& output) {
         suffix << ' ' << _unique_chemotype_id_prefix << chemotype_id;
         m.append_to_name(suffix);
       }
+      if (_hash_chemotypes) {
+        IWString hash;
+        if (! ChemotypeHash(m, parent_name, hash)) {
+          return 0;
+        }
+        IWString suffix;
+        suffix << ' ' << hash;
+        m.append_to_name(suffix);
+      }
       ++_molecules_written;
       return output.write(m);
     }
@@ -773,6 +876,40 @@ Options::AccumulateChemotype(Molecule& m, const IWString& parent_name, uint32_t&
   return 1;
 }
 
+
+int
+Options::ChemotypeHash(Molecule& m, const IWString& parent_name, IWString& hash) {
+  const IWString& usmi = m.unique_smiles();
+
+  auto existing = _hash_from_usmi.find(usmi);
+  if (existing != _hash_from_usmi.end()) {
+    hash = existing->second;
+    auto xref = _hash_xref.find(hash);
+    if (xref != _hash_xref.end()) {
+      ++xref->second.n;
+    }
+    return 1;
+  }
+
+  hash = ChemotypeHashString(usmi, _hash_width);
+  auto collision = _hash_xref.find(hash);
+  if (collision != _hash_xref.end()) {
+    cerr << "Chemotype hash collision for '" << hash << "'\n";
+    cerr << " existing " << collision->second.smiles << '\n';
+    cerr << " new      " << usmi << '\n';
+    return 0;
+  }
+
+  ChemotypeHashXref xref;
+  xref.smiles = usmi;
+  xref.parent = parent_name;
+  xref.n = 1;
+  _hash_xref.emplace(hash, std::move(xref));
+  _hash_from_usmi.emplace(usmi, hash);
+  _hash_order.push_back(hash);
+  return 1;
+}
+
 int
 Options::WriteSummary() {
   if (_summary_fname.empty()) {
@@ -800,6 +937,35 @@ Options::WriteSummary() {
 
   output.flush();
   return 1;
+}
+
+
+int
+Options::WriteHashXref() {
+  if (_hash_xref_fname.empty()) {
+    return 1;
+  }
+
+  IWString_and_File_Descriptor output;
+  if (! output.open(_hash_xref_fname.null_terminated_chars())) {
+    cerr << "Options::WriteHashXref:cannot open '" << _hash_xref_fname << "'\n";
+    return 0;
+  }
+
+  output << "chemotype_hash smiles n parent\n";
+  for (const IWString& hash : _hash_order) {
+    auto iter = _hash_xref.find(hash);
+    if (iter == _hash_xref.end()) {
+      cerr << "Options::WriteHashXref:internal error, missing hash '" << hash << "'\n";
+      return 0;
+    }
+    const ChemotypeHashXref& xref = iter->second;
+    output << hash << ' ' << xref.smiles << ' ' << xref.n << ' ' << xref.parent << '\n';
+    output.write_if_buffer_holds_more_than(4096);
+  }
+
+  output.flush();
+  return output.good();
 }
 
 int
@@ -973,7 +1139,7 @@ Chemotypes(Options& options, const char* fname, FileType input_type,
 
 int
 Chemotypes(int argc, char** argv) {
-  Command_Line cl(argc, argv, "vE:A:g:clfi:o:S:F:U:q:s:n:r:D:P:I:up:xtz:J:");
+  Command_Line cl(argc, argv, "vE:A:g:clfi:o:S:F:U:H:q:s:n:r:D:P:I:up:xtz:J:");
 
   if (cl.unrecognised_options_encountered()) {
     cerr << "Unrecognised options encountered\n";
@@ -1067,6 +1233,10 @@ Chemotypes(int argc, char** argv) {
   }
 
   if (! options.WriteSummary()) {
+    return 1;
+  }
+
+  if (! options.WriteHashXref()) {
     return 1;
   }
 

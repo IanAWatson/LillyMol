@@ -13,26 +13,11 @@
 #include "Molecule_Lib/mdl.h"
 #include "Molecule_Lib/molecule.h"
 #include "Molecule_Lib/molecule_preprocessing.h"
-#include "Molecule_Lib/moleculeio.h"
 #include "Molecule_Lib/output.h"
 
 namespace py = pybind11;
 
 using molecule_processing::MoleculePreprocessing;
-
-class ReadExtraTextInfoScope {
-  private:
-    int _previous;
-
-  public:
-    ReadExtraTextInfoScope() : _previous(moleculeio::read_extra_text_info()) {
-      moleculeio::set_read_extra_text_info(1);
-    }
-
-    ~ReadExtraTextInfoScope() {
-      moleculeio::set_read_extra_text_info(_previous);
-    }
-};
 
 struct ReaderOptions {
   bool largest_fragment = false;
@@ -67,7 +52,6 @@ struct ReaderContext {
   public:
     std::unique_ptr<data_source_and_type<Molecule>> _reader;
     MoleculePreprocessing _preprocessing;
-    bool _keep_sdf_tags = false;
 
   public:
     ReaderContext(const std::string& fname, FileType file_type);
@@ -107,7 +91,11 @@ bool
 ReaderContext::ApplyOptions(const ReaderOptions& options) {
   SetPreprocessing(options.largest_fragment, options.remove_chirality,
                    options.remove_cis_trans_bonds, options.remove_isotopes);
-  _keep_sdf_tags = options.keep_sdf_tags;
+  if (_reader) {
+    _reader->mutable_molecule_read_options()
+        .mdl_file_supporting_material()
+        .set_read_extra_text_info(options.keep_sdf_tags);
+  }
   return SetSdfOptions(options.sdf_identifier, options.sdf_tags_to_json,
                        options.all_sdf_tags, options.first_sdf_tag,
                        options.prepend_sdfid);
@@ -160,11 +148,6 @@ std::optional<Molecule>
 ReaderContext::Next() {
   if (! _reader) {
     return std::nullopt;
-  }
-
-  std::unique_ptr<ReadExtraTextInfoScope> read_text_info_scope;
-  if (_keep_sdf_tags) {
-    read_text_info_scope = std::make_unique<ReadExtraTextInfoScope>();
   }
 
   std::unique_ptr<Molecule> m(_reader->next_molecule());
@@ -485,7 +468,9 @@ PYBIND11_MODULE(lillymol_io, io)
         ReaderContext* result = new ReaderContext(fname, file_type);
         result->SetPreprocessing(largest_fragment, remove_chirality,
                                  remove_cis_trans_bonds, remove_isotopes);
-        result->_keep_sdf_tags = keep_sdf_tags;
+        result->_reader->mutable_molecule_read_options()
+            .mdl_file_supporting_material()
+            .set_read_extra_text_info(keep_sdf_tags);
         if (! result->SetSdfOptions(sdf_identifier, sdf_tags_to_json, all_sdf_tags,
                                     first_sdf_tag, prepend_sdfid)) {
           delete result;
@@ -512,7 +497,9 @@ PYBIND11_MODULE(lillymol_io, io)
         ReaderContext* result = new ReaderContext(fname);
         result->SetPreprocessing(largest_fragment, remove_chirality,
                                  remove_cis_trans_bonds, remove_isotopes);
-        result->_keep_sdf_tags = keep_sdf_tags;
+        result->_reader->mutable_molecule_read_options()
+            .mdl_file_supporting_material()
+            .set_read_extra_text_info(keep_sdf_tags);
         if (! result->SetSdfOptions(sdf_identifier, sdf_tags_to_json, all_sdf_tags,
                                     first_sdf_tag, prepend_sdfid)) {
           delete result;

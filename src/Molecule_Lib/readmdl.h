@@ -355,6 +355,11 @@ Molecule::_read_mdl_bond_list(T& input, int nb, int* aromatic_atoms, int* aromat
 
 extern int looks_like_sdf_tag(const const_IWSubstring& buffer);
 
+static int
+MdlReadExtraTextInfo(const MDL_File_Supporting_Material& mdlfos) {
+  return mdlfos.read_extra_text_info() || moleculeio::read_extra_text_info();
+}
+
 template <typename T>
 int
 Molecule::_read_mdl_data_following_tag(T& input,
@@ -371,7 +376,7 @@ Molecule::_read_mdl_data_following_tag(T& input,
       buffer.gsub(' ', mdlfos.gsub_mdl_file_data());
     }
 
-    if (moleculeio::read_extra_text_info()) {  // even if buffer is empty
+    if (MdlReadExtraTextInfo(mdlfos)) {  // even if buffer is empty
       _ensure_text_info().add(new IWString(buffer));
     }
 
@@ -413,7 +418,7 @@ Molecule::_read_molecule_mdl_trailing_records(
     T& input, int return_on_m_end,
     MDL_File_Supporting_Material& mdlfos)  // non const because of rx match
 {
-  if (moleculeio::read_extra_text_info()) {
+  if (MdlReadExtraTextInfo(mdlfos)) {
     _ensure_text_info().resize(10);
   }
 
@@ -563,7 +568,7 @@ Molecule::_read_molecule_mdl_trailing_records(
       continue;
     }
 
-    if (moleculeio::read_extra_text_info()) {
+    if (MdlReadExtraTextInfo(mdlfos)) {
       add_to_text_info(_ensure_text_info(), buffer);
     }
 
@@ -582,7 +587,7 @@ Molecule::_read_molecule_mdl_trailing_records(
 
       EXTRA_STRING_RECORD(input, buffer, "read mol mdl");
 
-      if (moleculeio::read_extra_text_info()) {
+      if (MdlReadExtraTextInfo(mdlfos)) {
         add_to_text_info(_ensure_text_info(), buffer);
       }
 

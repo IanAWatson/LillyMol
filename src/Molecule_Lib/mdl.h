@@ -41,6 +41,7 @@ class MDL_File_Supporting_Material
     int _prepend_sdfid;
     int _sdf_tags_to_json;
     int _name_to_json;
+    int _read_extra_text_info;
     int _discard_sdf_molecule_name;
     int _multi_record_tag_data_present;
     int _mdl_write_aromatic_bonds;
@@ -126,6 +127,7 @@ class MDL_File_Supporting_Material
     void set_prepend_sdfid (int s) { _prepend_sdfid = s;}
     void set_sdf_tags_to_json(int s) { _sdf_tags_to_json = s;}
     void set_name_to_json(int s) { _name_to_json = s;}
+    void set_read_extra_text_info(int s) { _read_extra_text_info = s;}
     void set_discard_sdf_molecule_name (int s) { _discard_sdf_molecule_name = s;}
     void set_multi_record_tag_data_present (int s) { _multi_record_tag_data_present = s;}
     void set_mdl_write_aromatic_bonds (int s) { _mdl_write_aromatic_bonds = s;}
@@ -170,6 +172,7 @@ class MDL_File_Supporting_Material
     int prepend_sdfid () const { return _prepend_sdfid;}
     int sdf_tags_to_json() const { return _sdf_tags_to_json;}
     int name_to_json() const { return _name_to_json;}
+    int read_extra_text_info() const { return _read_extra_text_info;}
     int discard_sdf_molecule_name () const { return _discard_sdf_molecule_name;}
     int multi_record_tag_data_present () const { return _multi_record_tag_data_present;}
     int mdl_write_aromatic_bonds () const { return _mdl_write_aromatic_bonds;}

@@ -39,6 +39,8 @@ Molecule_Read_Options::Molecule_Read_Options() {
   _mdl_file_supporting_material.set_prepend_sdfid(global->prepend_sdfid());
   _mdl_file_supporting_material.set_sdf_tags_to_json(global->sdf_tags_to_json());
   _mdl_file_supporting_material.set_name_to_json(global->name_to_json());
+  _mdl_file_supporting_material.set_read_extra_text_info(
+      moleculeio::read_extra_text_info());
   _mdl_file_supporting_material.set_discard_sdf_molecule_name(
       global->discard_sdf_molecule_name());
   _mdl_file_supporting_material.set_multi_record_tag_data_present(
@@ -806,7 +808,9 @@ ReadMolecule(iwstring_data_source& input, FileType input_type, Molecule& mol,
     if (options) {
       rc = mol.read_molecule_mdl_ds(input, options->mdl_file_supporting_material());
     } else {
-      rc = mol.read_molecule_mdl_ds(input);
+      Molecule_Read_Options default_options;
+      rc = mol.read_molecule_mdl_ds(input,
+                                    default_options.mdl_file_supporting_material());
     }
   }
 

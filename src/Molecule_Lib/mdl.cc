@@ -48,6 +48,7 @@ MDL_File_Supporting_Material::_default_values() {
   _prepend_sdfid = 1;
   _sdf_tags_to_json = 0;
   _name_to_json = 0;
+  _read_extra_text_info = 0;
   _discard_sdf_molecule_name = 0;
   _multi_record_tag_data_present = 1;
   _mdl_write_aromatic_bonds = 0;

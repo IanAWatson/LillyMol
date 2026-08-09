@@ -54,6 +54,54 @@ ExtraTextInfo(const Molecule& m) {
   return result;
 }
 
+static std::string
+WriteSdfFixture(const char* stem) {
+  static constexpr char kSdf[] = R"(methane
+  LillyMol  0808262D
+
+  1  0  0  0  0  0            999 V2000
+    0.0000    0.0000    0.0000 C   0  0  0
+M  END
+>  <ID>
+CHEMBL123
+
+$$$$
+)";
+
+  const std::string fname = testing::TempDir() + stem;
+  std::ofstream output(fname);
+  EXPECT_TRUE(output.good());
+  output << kSdf;
+  return fname;
+}
+
+TEST(MoleculeExtraTextInfo, ReaderLocalSdfTextInfo) {
+  ExtraTextInfoScope scope;
+  moleculeio::set_read_extra_text_info(0);
+
+  const std::string keep_fname = WriteSdfFixture("/keep_extra_text_info.sdf");
+  iwstring_data_source keep_input(keep_fname.c_str());
+  ASSERT_TRUE(keep_input.good());
+
+  Molecule_Read_Options keep_options;
+  keep_options.mdl_file_supporting_material().set_read_extra_text_info(1);
+
+  Molecule keep;
+  ASSERT_TRUE(keep.read_molecule_ds(keep_input, FILE_TYPE_SDF, keep_options));
+  EXPECT_THAT(ExtraTextInfo(keep), ElementsAre(">  <ID>", "CHEMBL123", ""));
+
+  const std::string discard_fname = WriteSdfFixture("/discard_extra_text_info.sdf");
+  iwstring_data_source discard_input(discard_fname.c_str());
+  ASSERT_TRUE(discard_input.good());
+
+  Molecule_Read_Options discard_options;
+  discard_options.mdl_file_supporting_material().set_read_extra_text_info(0);
+
+  Molecule discard;
+  ASSERT_TRUE(discard.read_molecule_ds(discard_input, FILE_TYPE_SDF, discard_options));
+  EXPECT_EQ(discard.number_records_text_info(), 0);
+}
+
 TEST(MoleculeExtraTextInfo, SdfTextInfoRoundTripAndManipulation) {
   static constexpr char kSdf[] = R"(methane
   LillyMol  0808262D

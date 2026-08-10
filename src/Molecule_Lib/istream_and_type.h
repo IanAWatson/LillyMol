@@ -91,9 +91,7 @@ class data_source_and_type : public iwstring_data_source {
   int set_connection_table_error_file(const IWString&);
 
   Molecule_Read_Options& mutable_molecule_read_options();
-  void reset_molecule_read_options() {
-    _molecule_read_options.reset(nullptr);
-  }
+  void reset_molecule_read_options();
   const Molecule_Read_Options* molecule_read_options() const {
     return _molecule_read_options.get();
   }
@@ -130,6 +128,12 @@ data_source_and_type<T>::mutable_molecule_read_options() {
   }
 
   return *_molecule_read_options;
+}
+
+template <typename T>
+void
+data_source_and_type<T>::reset_molecule_read_options() {
+  _molecule_read_options.reset(nullptr);
 }
 
 template <typename T>

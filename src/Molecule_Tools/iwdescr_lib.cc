@@ -80,6 +80,57 @@ AssignDistanceMatrixAtomTypes(Molecule& m, const atomic_number_t* z) {
 }
 
 int
+LongestContiguousRotatableBondGroup(Molecule& m, const int* bond_rotatable) {
+  const int nedges = m.nedges();
+  if (nedges == 0) {
+    return 0;
+  }
+
+  std::vector<int> visited(nedges, 0);
+  std::vector<int> to_process;
+  to_process.reserve(nedges);
+
+  int longest = 0;
+  for (int bond_number = 0; bond_number < nedges; ++bond_number) {
+    if (! bond_rotatable[bond_number] || visited[bond_number]) {
+      continue;
+    }
+
+    int bonds_in_component = 0;
+    to_process.resize(0);
+    to_process.push_back(bond_number);
+    visited[bond_number] = 1;
+
+    while (! to_process.empty()) {
+      const int current_bond_number = to_process.back();
+      to_process.pop_back();
+      ++bonds_in_component;
+
+      const Bond* current_bond = m.bondi(current_bond_number);
+      const atom_number_t atoms[2] = {current_bond->a1(), current_bond->a2()};
+      for (atom_number_t atom : atoms) {
+        const Atom& a = m.atom(atom);
+        for (const Bond* b : a) {
+          const int other_bond_number = b->bond_number();
+          if (other_bond_number == current_bond_number ||
+              ! bond_rotatable[other_bond_number] || visited[other_bond_number]) {
+            continue;
+          }
+          visited[other_bond_number] = 1;
+          to_process.push_back(other_bond_number);
+        }
+      }
+    }
+
+    if (bonds_in_component > longest) {
+      longest = bonds_in_component;
+    }
+  }
+
+  return longest;
+}
+
+int
 AllFlexibleBonds(const Molecule& m, atom_number_t zatom, atom_number_t destination,
                  int dist, const int* dm) {
   const int matoms = m.natoms();
@@ -1391,6 +1442,9 @@ IWDescr::IWDescrImpl::AllocateDescriptors() {
     SetDescriptorName(iwdescr_frspch, "frspch");
     SetDescriptorName(iwdescr_spchtro, "spchtro");
     SetDescriptorName(iwdescr_rbfrspch, "rbfrspch");
+    SetDescriptorName(iwdescr_scafrotb, "scafrotb");
+    SetDescriptorName(iwdescr_spchrotb, "spchrotb");
+    SetDescriptorName(iwdescr_maxrotbgrp, "maxrotbgrp");
     SetDescriptorName(iwdescr_satspcha, "satspcha");
     SetDescriptorName(iwdescr_unsatspcha, "unsatspcha");
     SetDescriptorName(iwdescr_fsatspcha, "fsatspcha");
@@ -5090,9 +5144,36 @@ IWDescr::IWDescrImpl::ComputeSpinachDescriptors(Molecule& m, PerMoleculeData& da
   const int* ring_membership = data.ring_membership_data();
   const Atom** atom = data.atoms();
 
+  const int nedges = m.nedges();
+  std::vector<int> bond_rotatable(nedges, 0);
+  m.assign_bond_numbers_to_bonds_if_needed();
+
+  int total_rotatable_bonds = 0;
+  for (int bond_number = 0; bond_number < nedges; ++bond_number) {
+    const Bond* b = m.bondi(bond_number);
+    if (b->nrings() || ! b->is_single_bond()) {
+      continue;
+    }
+
+    const atom_number_t a1 = b->a1();
+    const atom_number_t a2 = b->a2();
+    if (ncon[a1] <= 1 || ncon[a2] <= 1 || TripleBondAtEitherEnd(m, b) ||
+        part_of_otherwise_non_rotabable_entity(m, a1, a2)) {
+      continue;
+    }
+
+    bond_rotatable[bond_number] = 1;
+    ++total_rotatable_bonds;
+  }
+
+  descriptor[iwdescr_maxrotbgrp].set(
+      static_cast<float>(LongestContiguousRotatableBondGroup(m, bond_rotatable.data())));
+
   if (m.nrings() == 0) {
     ++molecules_with_no_rings;
     descriptor[iwdescr_frspch].set(1.0f);
+    descriptor[iwdescr_scafrotb].set(0.0f);
+    descriptor[iwdescr_spchrotb].set(static_cast<float>(total_rotatable_bonds));
     return 1;
   }
 
@@ -5103,8 +5184,6 @@ IWDescr::IWDescrImpl::ComputeSpinachDescriptors(Molecule& m, PerMoleculeData& da
 
   int non_ring_non_spinach_atoms = 0;
   int heteroatoms_in_spinach = 0;
-  int rotatable_bonds_in_spinach = 0;
-  int rotatable_bonds_in_scaffold = 0;
   int bonds_in_spinach = 0;
   int saturated_spinach_atoms = 0;
   int unsaturated_spinach_atoms = 0;
@@ -5137,28 +5216,25 @@ IWDescr::IWDescrImpl::ComputeSpinachDescriptors(Molecule& m, PerMoleculeData& da
         }
 
         ++bonds_in_spinach;
-
-        if (b->is_single_bond() && ncon[i] > 1 && ncon[k] > 1) {
-          ++rotatable_bonds_in_spinach;
-        }
-      }
-    } else {
-      for (int j = 0; j < icon; ++j) {
-        const Bond* b = ai->item(j);
-
-        if (b->nrings()) {
-          continue;
-        }
-
-        atom_number_t k = b->other(i);
-
-        if (b->is_single_bond() && ncon[i] > 1 && ncon[k] > 1 &&
-            ring_membership[i] == 0 && ring_membership[k] == 0) {
-          ++rotatable_bonds_in_scaffold;
-        }
       }
     }
   }
+
+  int rotatable_bonds_in_scaffold = 0;
+  for (int bond_number = 0; bond_number < nedges; ++bond_number) {
+    if (! bond_rotatable[bond_number]) {
+      continue;
+    }
+    const Bond* b = m.bondi(bond_number);
+    if (spinach[b->a1()] == 0 && spinach[b->a2()] == 0) {
+      ++rotatable_bonds_in_scaffold;
+    }
+  }
+  const int rotatable_bonds_in_spinach =
+      total_rotatable_bonds - rotatable_bonds_in_scaffold;
+
+  descriptor[iwdescr_scafrotb].set(static_cast<float>(rotatable_bonds_in_scaffold));
+  descriptor[iwdescr_spchrotb].set(static_cast<float>(rotatable_bonds_in_spinach));
 
   if (spinach_atoms > 0) {
     descriptor[iwdescr_spchtro].set(

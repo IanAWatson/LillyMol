@@ -407,6 +407,9 @@ A flexible chain is a chain region whose bonds are likely to be rotatable. "Spin
 | frspch | Fraction of atoms outside the molecular scaffold. | `spch` |
 | spchtro | Number of heteroatoms outside the molecular scaffold. | `spch` |
 | rbfrspch | Fraction of bonds outside the molecular scaffold that are rotatable. | `spch` |
+| scafrotb | Number of rotatable bonds whose two endpoint atoms are in the molecular scaffold. | `spch` |
+| spchrotb | Number of rotatable bonds not wholly contained in the molecular scaffold. This includes rotatable bonds wholly in spinach and rotatable bonds joining spinach to scaffold atoms. | `spch` |
+| maxrotbgrp | Largest connected component of rotatable bonds, counted as bonds. Adjacent rotatable bonds are connected when they share an atom. | `spch` |
 | nrnspch | Number of non-ring, non-spinach atoms. Chain atoms joining rings. | `spch` |
 | fnrnspc | Fraction of non-spinach atoms that are non-ring. | `spch` |
 | satspcha | Number of saturated atoms outside the molecular scaffold. | `spch` |

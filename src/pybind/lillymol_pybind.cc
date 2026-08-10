@@ -3,6 +3,7 @@
 #include <queue>
 #include <sstream>
 #include <string>
+#include <tuple>
 #include <vector>
 
 #include "pybind11/pybind11.h"
@@ -2110,6 +2111,26 @@ Never refuses, and issues no warning.)")
         return rotb.Process(m, nullptr);
       },
       "Number of rotatable bonds in `m`"
+    )
+    .def("rotatable_bond_atoms",
+      [](quick_rotbond::QuickRotatableBonds& rotb, Molecule& m) {
+        std::vector<int> bond_rotatable(m.nedges(), 0);
+        rotb.Process(m, bond_rotatable.data());
+
+        std::vector<std::tuple<atom_number_t, atom_number_t>> result;
+        result.reserve(m.nedges());
+        const int nedges = m.nedges();
+        for (int bond_number = 0; bond_number < nedges; ++bond_number) {
+          if (! bond_rotatable[bond_number]) {
+            continue;
+          }
+          const Bond* b = m.bondi(bond_number);
+          result.emplace_back(b->a1(), b->a2());
+        }
+
+        return result;
+      },
+      "Atom pairs defining the rotatable bonds in `m`"
     )
     .def("set_calculation_type", &quick_rotbond::QuickRotatableBonds::set_calculation_type)
   ;

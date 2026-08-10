@@ -1154,6 +1154,33 @@ class TestLillyMol(absltest.TestCase):
     self.assertTrue(m.build_from_smiles("C1CC1C"))
     self.assertEqual(rotbond_calc.rotatable_bonds(m), 0)
 
+  def test_rotatable_bond_atoms(self):
+    m = Molecule()
+    rotbond_calc = RotatableBonds()
+    rotbond_calc.set_calculation_type(EXPENSIVE)
+
+    self.assertTrue(m.build_from_smiles("CCCC"))
+    self.assertEqual(rotbond_calc.rotatable_bonds(m), 1)
+    self.assertEqual(rotbond_calc.rotatable_bond_atoms(m), [(1, 2)])
+
+    self.assertTrue(m.build_from_smiles("CCCCC"))
+    self.assertEqual(rotbond_calc.rotatable_bonds(m), 2)
+    self.assertEqual(rotbond_calc.rotatable_bond_atoms(m), [(1, 2), (2, 3)])
+
+    self.assertTrue(m.build_from_smiles("C1CC1C"))
+    self.assertEqual(rotbond_calc.rotatable_bond_atoms(m), [])
+
+  def test_rotatable_bond_atoms_calculation_type(self):
+    m = Molecule()
+    self.assertTrue(m.build_from_smiles("CC(=O)NCC"))
+
+    rotbond_calc = RotatableBonds()
+    rotbond_calc.set_calculation_type(QUICK)
+    self.assertEqual(rotbond_calc.rotatable_bond_atoms(m), [(1, 3), (3, 4)])
+
+    rotbond_calc.set_calculation_type(EXPENSIVE)
+    self.assertEqual(rotbond_calc.rotatable_bond_atoms(m), [(3, 4)])
+
   def test_down_the_bond(self):
     m = Molecule();
     self.assertTrue(m.build_from_smiles("CCC"))

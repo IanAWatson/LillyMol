@@ -448,7 +448,7 @@ QuickRotatableBonds::Process(Molecule& m, int* bond_rotatable) {
       cerr << "QuickRotatableBonds::Process:no calculation defined\n";
       return 0;
     case RotBond::kQuick:
-      return Quickest(m);
+      return Quickest(m, bond_rotatable);
     case RotBond::kExpensive:
       return Expensive(m, bond_rotatable);
     default:
@@ -609,7 +609,7 @@ QuickRotatableBonds::Expensive(Molecule& m, int* bond_rotatable) {
 }
 
 int
-QuickRotatableBonds::Quickest(Molecule& m) {
+QuickRotatableBonds::Quickest(Molecule& m, int* bond_rotatable) {
   int rc = 0;
 
   std::unique_ptr<int[]> in_triple_bond = AtomsWithTripleBonds(m);
@@ -644,6 +644,10 @@ QuickRotatableBonds::Quickest(Molecule& m) {
     }
 
     ++rc;
+
+    if (bond_rotatable != nullptr) {
+      bond_rotatable[b->bond_number()] = 1;
+    }
 
     if (_isotope) {
       m.set_isotope(b->a1(), _isotope);

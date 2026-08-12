@@ -162,7 +162,6 @@ CountPolySpiroCycloPropane(Molecule& m, const std::vector<const Ring*>& r3) {
   const int matoms = m.natoms();
 
   std::unique_ptr<int[]> in_system = std::make_unique<int[]>(matoms);
-  std::fill_n(in_system.get(), matoms, 0);
 
   const int nr = r3.size();
   for (int i = 0; i < nr; ++i) {

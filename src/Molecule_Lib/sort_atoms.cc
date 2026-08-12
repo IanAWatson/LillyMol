@@ -159,15 +159,22 @@ int
 Molecule::renumber_atoms(const int* new_number) {
   assert(ok());
 
+  std::unique_ptr<int[]> seen = std::make_unique<int[]>(_number_elements);
+
   for (int i = 0; i < _number_elements; i++) {
-    int j = new_number[i];
+    const int j = new_number[i];
 
     if (j < 0 || j >= _number_elements) {
       cerr << "Molecule::renumber_atoms: i = " << i << " new number " << new_number[i]
            << " is invalid. Natoms = " << _number_elements << endl;
-      abort();
       return 0;
     }
+
+    if (seen[j]) {
+      cerr << "Molecule::renumber_atoms: duplicate destination atom number " << j << endl;
+      return 0;
+    }
+    seen[j] = 1;
   }
 
   int* complete = new_int(_number_elements);

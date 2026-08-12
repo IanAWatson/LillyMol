@@ -83,6 +83,22 @@ class TestLillyMol(absltest.TestCase):
     m.add_bond(0, c, SINGLE_BOND)
     self.assertEqual(m.number_fragments(), 1)
 
+  def test_renumber_atoms(self):
+    m = MolFromSmiles("CNO")
+    self.assertEqual(m.renumber_atoms([2, 0, 1]), 1)
+    self.assertEqual(m.atomic_number(0), 7)
+    self.assertEqual(m.atomic_number(1), 8)
+    self.assertEqual(m.atomic_number(2), 6)
+
+    with self.assertRaises(ValueError):
+      m.renumber_atoms([0, 1])
+
+    with self.assertRaises(ValueError):
+      m.renumber_atoms([0, 0, 1])
+
+    with self.assertRaises(ValueError):
+      m.renumber_atoms([0, 1, 3])
+
   def test_copy_constructor_with_name(self):
     m = Molecule()
     set_copy_name_in_molecule_copy_constructor(True)

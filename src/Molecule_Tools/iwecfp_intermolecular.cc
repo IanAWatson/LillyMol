@@ -1147,7 +1147,6 @@ iwecfp_intermolecular (Molecule & protein,
     cerr << "Ligand contains " << ligand_matoms << " atoms, protein " << protein.natoms() << endl;
 
   std::unique_ptr<uint32_t[]> atom_constant = std::make_unique<uint32_t[]>(ligand_matoms + protein.natoms());
-  std::fill_n(atom_constant.get(), ligand_matoms + protein.natoms(), 0);
 
   if (! do_atom_typing (ligand, protein, atom_constant.get(), ligand_atom_type, protein_atom_type)) {
     cerr << "Cannot assign atom types '" << ligand.name() << "'\n";

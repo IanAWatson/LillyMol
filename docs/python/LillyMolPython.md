@@ -476,6 +476,7 @@ The most common methods for a Molecule currently implemented are
 | smarts() | Molecule as smarts - does not work for searching |
 | smiles_starting_with_atom(atom) | smiles where 'atom' is the first atom |
 | smiles_atom_order() | atom order in must recent smiles produced |
+| renumber_atoms(new_number) | Renumber atoms in place. `new_number[i]` is the new atom number for current atom `i` |
 | are_bonded(a1, a2) | True if a1 and a2 are bonded |
 | add(Molecule other) | Add the atoms and bonds of 'other' |
 | remove_hydrogens_known_flag_to_fix_valence_errors | Remove problematic square brackets |
@@ -556,6 +557,17 @@ endpoints. If multiple shortest paths exist, the path chosen is arbitrary.
 paths between the endpoints. The atoms are returned in breadth-first order from
 `a1`. Both path methods omit the endpoint atoms and return `None` when there are
 no intermediate atoms.
+
+`renumber_atoms(new_number)` changes atom numbering in place. The list must be a
+permutation of `range(mol.natoms())`; `new_number[i]` is the new atom number for
+the atom currently numbered `i`. Invalid length, duplicate atom numbers, or atom
+numbers outside `[0, natoms)` raise `ValueError`.
+
+```python
+mol = MolFromSmiles("CNO")
+mol.renumber_atoms([2, 0, 1])
+print([mol.atomic_number(i) for i in range(mol.natoms())])  # [7, 8, 6]
+```
 
 ```python
 from lillymol import MolFromSmiles

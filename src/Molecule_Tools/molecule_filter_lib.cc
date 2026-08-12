@@ -755,7 +755,6 @@ MaxRingSystemSize(Molecule& m, std::unique_ptr<int[]>& tmp) {
   const int nrings = m.nrings();
 
   std::unique_ptr<int[]> ring_already_done = std::make_unique<int[]>(nrings);
-  std::fill_n(ring_already_done.get(), nrings, 0);
 
   int max_system_size = 0;
   int max_aromatic_rings_in_system = 0;

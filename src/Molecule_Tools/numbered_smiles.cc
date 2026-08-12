@@ -493,7 +493,6 @@ numbered_smiles(Molecule& m, Molecule_Output_Object& output)
   }
 
   std::unique_ptr<isotope_t[]> isotope = std::make_unique<isotope_t[]>(matoms);
-  std::fill_n(isotope.get(), matoms, 0);
 
   return numbered_smiles(m, isotope.get(), output);
 }

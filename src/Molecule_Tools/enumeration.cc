@@ -383,7 +383,6 @@ Fragment::DetermineFormalCharges(Charge_Assigner& charge_assigner) {
   const int matoms = _frag->natoms();
 
   std::unique_ptr<formal_charge_t[]> q = std::make_unique<formal_charge_t[]>(matoms);
-  std::fill_n(q.get(), matoms, 0);
 
   if (charge_assigner.process(*_frag, q.get()) == 0) {
     return 1;

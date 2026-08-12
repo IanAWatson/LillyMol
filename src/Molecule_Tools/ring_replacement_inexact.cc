@@ -1422,7 +1422,6 @@ ExtendMatchedAtomsAcrossFusions(Molecule& m,
   m.ring_membership();  // Force sssr
 
   std::unique_ptr<int[]> visited = std::make_unique<int[]>(matoms);
-  std::fill_n(visited.get(), matoms, 0);
 
   int system_number = 0;
   for (int i = 0; i < matoms; ++i) {
@@ -1467,7 +1466,6 @@ Options::ProcessInner(Molecule& m, IWString_and_File_Descriptor& output) {
   const int matoms = m.natoms();
 
   std::unique_ptr<int[]> matched_atoms = std::make_unique<int[]>(matoms);
-  std::fill_n(matched_atoms.get(), matoms, 0);
 
   if (! IdentifyMatchedAtoms(m, matched_atoms.get())) {
     ++_molecules_not_matching_queries;

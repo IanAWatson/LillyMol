@@ -251,7 +251,6 @@ Molecule::AllAtomsBetween(atom_number_t a1, atom_number_t a2, Set_of_Atoms& betw
 
   std::queue<AtomAndDistance> to_process;
   std::unique_ptr<int[]> visited = std::make_unique<int[]>(_number_elements);
-  std::fill_n(visited.get(), _number_elements, 0);
   visited[a1] = 1;
   visited[a2] = 1;
 

@@ -1722,9 +1722,7 @@ Options::ReduceToFragmentOfInterest(Molecule& m, MoleculeData& mdata, atom_numbe
   const int initial_matoms = m.natoms();
 
   std::unique_ptr<int[]> tmp = std::make_unique<int[]>(initial_matoms);
-  std::fill_n(tmp.get(), initial_matoms, 0);
   std::unique_ptr<isotope_t[]> iso = std::make_unique<isotope_t[]>(initial_matoms);
-  std::fill_n(iso.get(), initial_matoms, 0);
 
   m.compute_aromaticity_if_needed();
 
@@ -2059,7 +2057,6 @@ Options::DoLookups(Molecule& m,
   const int matoms = m.natoms();
 
   std::unique_ptr<int[]> process_atom = std::make_unique<int[]>(matoms);
-  std::fill_n(process_atom.get(), matoms, 0);
 
   if (_queries.empty()) {
     DefaultAtomsToProces(m, process_atom.get());

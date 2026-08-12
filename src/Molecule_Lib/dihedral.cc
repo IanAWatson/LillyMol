@@ -709,7 +709,6 @@ Molecule::set_bond_angle(atom_number_t a1,
 #endif
 
   std::unique_ptr<int[]> moving_atoms = std::make_unique<int[]>(_number_elements);
-  std::fill_n(moving_atoms.get(), _number_elements, 0);
 
   // special flag - if this value is encountered, in _determine_moving_atoms fail.
   moving_atoms[a1] = 2;

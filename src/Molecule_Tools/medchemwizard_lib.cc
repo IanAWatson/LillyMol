@@ -142,7 +142,6 @@ MedchemWizard::ReadReactions(const char* fname) {
   }
 
   _molecules_hitting_reaction = std::make_unique<int[]>(_rxn.number_elements());
-  std::fill_n(_molecules_hitting_reaction.get(), _rxn.number_elements(), 0);
 
   return _rxn.number_elements();
 }
@@ -195,7 +194,6 @@ MedchemWizard::IdentifyAtomsThatMustNotChange(Molecule& m,
 
     if (! do_not_change) {
       do_not_change = std::make_unique<int[]>(m.natoms());
-      std::fill_n(do_not_change.get(), m.natoms(), 0);
     }
     sresults.each_embedding_set_vector(do_not_change.get(), 1);
     matched += nhits;

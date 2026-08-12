@@ -505,14 +505,16 @@ ProperIsotopicLabelling(Molecule& m, int* tmp) {
   // Each isotopic value must have been encountered once.
   // Could use all_of, but the loop seems simpler
   // std::all_of(tmp.get(), tmp.get() + matoms, [](int one) { return one == 1;});
+  rc = 0;
   for (int i = 0; i < matoms; ++i) {
     if (tmp[i] != 1) {
-      cerr << "isotope " << i << " not initialised, count " << tmp[i] << '\n';
-      return false;
+      cerr << "isotope " << i << " not initialised, count " << tmp[i]
+           << ' ' << m.smarts_equivalent_for_atom(i) << '\n';
+      rc = 1;
     }
   }
 
-  return true;
+  return rc;
 }
 
 int
@@ -533,7 +535,6 @@ DicedMolecule::Build(const Options& options, const dicer_data::DicedMolecule& pr
   _mol.set_name(proto.name());
 
   std::unique_ptr<int[]> tmp = std::make_unique<int[]>(matoms);
-  std::fill_n(tmp.get(), matoms, 0);
 
   // All atoms must have an isotopic label.
   if (! ProperIsotopicLabelling(_mol, tmp.get())) {

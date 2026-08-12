@@ -79,6 +79,27 @@ for mol in molecules:
 All descriptors are computed by every call to `process()`, even when the
 application uses only a few values.
 
+## Rotatable Bonds
+
+The `RotatableBonds` helper can return either the count of rotatable bonds or
+the atom pairs that define those bonds. Atom numbers are zero-based LillyMol atom
+indices. The order of atoms within each pair is the order stored in the molecule
+`Bond` object and should be treated as an implementation detail.
+
+```python
+from lillymol import MolFromSmiles, RotatableBonds, EXPENSIVE
+
+mol = MolFromSmiles("CCCCC pentane")
+rotb = RotatableBonds()
+rotb.set_calculation_type(EXPENSIVE)
+
+print(rotb.rotatable_bonds(mol))       # 2
+print(rotb.rotatable_bond_atoms(mol))  # [(1, 2), (2, 3)]
+```
+
+`QUICK` uses the fast LillyMol definition. `EXPENSIVE` excludes additional
+non-freely-rotatable linkages such as conjugated amide-like bonds.
+
 ## Batch Processing
 
 For collections of molecules, `process_list()` is more convenient than calling

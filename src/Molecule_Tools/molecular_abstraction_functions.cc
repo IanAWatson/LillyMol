@@ -1217,7 +1217,6 @@ Molecular_Abstraction_CScaffold::process(Molecule_With_Info_About_Parent& m,
 
   const int matoms = m.natoms();
   std::unique_ptr<int[]> tmp = std::make_unique<int[]>(matoms);
-  std::fill_n(tmp.get(), matoms, 0);
   m.identify_spinach(tmp.get());
 
   // Invert, we want tmp to be the scaffold atoms.

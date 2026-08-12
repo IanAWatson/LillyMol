@@ -359,7 +359,6 @@ Molecule::CahnIngoldPrelogValue(const Chiral_Centre* c, int top_front, int top_b
 
   // Atom needs to be resolved by expansion.
   std::unique_ptr<int[]> tmp = std::make_unique<int[]>(4 * _number_elements);
-  std::fill_n(tmp.get(), 4 * _number_elements, 0);
   // For each expansion, mark the centre atom.
   for (int i = 0; i < 4; ++i) {
     tmp.get()[i * _number_elements + c->a()] = kCentre;

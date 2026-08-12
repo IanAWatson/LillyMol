@@ -491,7 +491,6 @@ IWDescrMainOptions::InitialiseRangesAndFilters(Command_Line& cl, IWDescr& iwdesc
   if (_ntest > 0) {
     const int n = iwdescr.number_descriptors();
     _descriptor_failure = std::make_unique<uint32_t[]>(n);
-    std::fill_n(_descriptor_failure.get(), n, 0);
   }
 
   return 1;

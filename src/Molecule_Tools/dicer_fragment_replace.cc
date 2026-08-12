@@ -1522,7 +1522,6 @@ RetrieveFragmentBeingRemoved(Molecule& m,
 
   const int matoms = m.natoms();
   std::unique_ptr<int[]> my_atoms = std::make_unique<int[]>(matoms);
-  std::fill_n(my_atoms.get(), matoms, 0);
 
   for (int i = 0; i < matoms; ++i) {
     if (m.fragment_membership(i) == my_frag) {

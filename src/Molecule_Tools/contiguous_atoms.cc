@@ -11,7 +11,6 @@ LargestContiguousCarbonGroup(Molecule& m) {
   const int matoms = m.natoms();
 
   std::unique_ptr<int[]> tmp = std::make_unique<int[]>(matoms);
-  std::fill_n(tmp.get(), matoms, 0);
 
   return LargestContiguousCarbonGroup(m, tmp.get());
 }

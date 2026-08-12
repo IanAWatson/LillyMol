@@ -947,6 +947,29 @@ Never refuses, and issues no warning.)")
                   },
                   "atom order in most recent smiles"
                 )
+                .def("renumber_atoms",
+                  [](Molecule& m, const std::vector<int>& new_number)->int {
+                    const int matoms = m.natoms();
+                    if (static_cast<int>(new_number.size()) != matoms) {
+                      throw py::value_error("renumber_atoms requires one entry for each atom");
+                    }
+
+                    std::vector<int> seen(matoms, 0);
+                    for (int i = 0; i < matoms; ++i) {
+                      const int destination = new_number[i];
+                      if (destination < 0 || destination >= matoms) {
+                        throw py::value_error("renumber_atoms mapping contains an atom number outside [0, natoms)");
+                      }
+                      if (seen[destination]) {
+                        throw py::value_error("renumber_atoms mapping contains duplicate atom numbers");
+                      }
+                      seen[destination] = 1;
+                    }
+
+                    return m.renumber_atoms(new_number.data());
+                  },
+                  "Renumber atoms. new_number[i] is the new atom number for current atom i"
+                )
                 .def("smiles_starting_with_atom",
                   [](Molecule& m, atom_number_t zatom) {
                     const IWString& s = m.smiles_starting_with_atom(zatom);
@@ -1155,7 +1178,6 @@ Never refuses, and issues no warning.)")
                   [](Molecule& m, atom_number_t a1, atom_number_t a2)->std::optional<Set_of_Atoms> {
                     const int matoms = m.natoms();
                     std::unique_ptr<int[]> dtb = std::make_unique<int[]>(matoms);
-                    std::fill_n(dtb.get(), matoms, 0);
                     std::optional<int> maybe_n = m.DownTheBond(a1, a2, dtb.get());
                     if (! maybe_n) {
                       return std::nullopt;
@@ -2165,7 +2187,6 @@ Never refuses, and issues no warning.)")
       }
 
       std::unique_ptr<formal_charge_t[]> charges_assigned = std::make_unique<formal_charge_t[]>(matoms);
-      std::fill_n(charges_assigned.get(), matoms, 0);
       if (chg.process(m, charges_assigned.get()) == 0) {
         std::cerr << "No charges assigned\n";
         return 0;

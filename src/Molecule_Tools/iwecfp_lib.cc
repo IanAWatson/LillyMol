@@ -700,7 +700,6 @@ Iwecfp::Fingerprint(Molecule& m, const atype_t* atom_constant,
   std::unique_ptr<int[]> start_atom_query_match;
   if (_start_atom_query.size() > 0) {
     start_atom_query_match = std::make_unique<int[]>(matoms);
-    std::fill_n(start_atom_query_match.get(), matoms, 0);
 
     if (!IdentifyStartAtoms(m, start_atom_query_match.get(), 1)) {
       if (_verbose) {
@@ -804,7 +803,6 @@ Iwecfp::Fingerprint(Molecule& m, const atype_t* atom_constant,
   std::unique_ptr<int[]> start_atom_query_match;
   if (_start_atom_query.size() > 0) {
     start_atom_query_match = std::make_unique<int[]>(matoms);
-    std::fill_n(start_atom_query_match.get(), matoms, 0);
 
     if (!IdentifyStartAtoms(m, start_atom_query_match.get(), 1)) {
       if (_verbose) {

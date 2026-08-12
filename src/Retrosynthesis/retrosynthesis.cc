@@ -160,7 +160,6 @@ MoleculeAndFragmentation::LabelByMaxFound() {
   const int matoms = m.natoms();
 
   std::unique_ptr<int[]> found = std::make_unique<int[]>(matoms);
-  std::fill_n(found.get(), matoms, 0);
 
   int rc = 0;
   int max_coverage = 0;

@@ -222,6 +222,24 @@ TEST_F(TestSubstructure, TestSwapAtomsChiral) {
   EXPECT_EQ(initial_usmi, _m.unique_smiles());
 }
 
+TEST_F(TestSubstructure, TestRenumberAtoms) {
+  _smiles = "CNO";
+  ASSERT_TRUE(_m.build_from_smiles(_smiles));
+
+  // new_number[i] is the new atom number for atom i in the starting molecule.
+  static constexpr int kNewNumber[] = {2, 0, 1};
+  EXPECT_EQ(_m.renumber_atoms(kNewNumber), 1);
+  EXPECT_EQ(_m.atomic_number(0), 7);
+  EXPECT_EQ(_m.atomic_number(1), 8);
+  EXPECT_EQ(_m.atomic_number(2), 6);
+
+  static constexpr int kDuplicate[] = {0, 0, 1};
+  EXPECT_EQ(_m.renumber_atoms(kDuplicate), 0);
+
+  static constexpr int kOutOfRange[] = {0, 1, 3};
+  EXPECT_EQ(_m.renumber_atoms(kOutOfRange), 0);
+}
+
 // Tests the "ok_atom_number" method which tells if a given atom index is valid for a given molecule
 
 TEST_F(TestSubstructure, TestAtomNumberIndex1) {

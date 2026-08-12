@@ -644,7 +644,6 @@ Options::Process(Molecule& m,
   const int matoms = m.natoms();
 
   std::unique_ptr<float[]> vi = std::make_unique<float[]>(matoms);
-  std::fill_n(vi.get(), matoms, 0.0f);
 
   m.compute_aromaticity_if_needed();
 
@@ -745,7 +744,6 @@ Options::EStateAtomicProperties(Molecule& m,
   const int matoms = m.natoms();
 
   std::unique_ptr<double[]> e_state = std::make_unique<double[]>(matoms);
-  std::fill_n(e_state.get(), matoms, 0.0f);
 
   lillymol_estate::determine_atom_e_state_index(m, e_state.get());
   return CommonOutput(m, vi, e_state.get(), _buckets[static_cast<int>(PartialChargeType::kEState)], output);

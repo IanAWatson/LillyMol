@@ -2179,7 +2179,7 @@ Substructure_Atom::ParseIWDirective(const_IWSubstring c) {  // note local copy
   } else if (c.starts_with("gid")) {
     c.remove_leading_chars(3);
     int gsign;
-    if (c[0] == '-') {
+    if (c[0] == '-' || c[0] == '!') {
       gsign = -1;
       ++c;
     } else {
@@ -3115,7 +3115,7 @@ Substructure_Atom_Specifier::construct_from_smarts_token(
         nchars = 3 + 4 + 1 - 1;  // will fail if more than two digits for fsid
       } else if (c.length() > 3 && c.starts_with("gid")) {
         nchars = 3 + 3 + 1 - 1;  // will fail if more than two digits for gid
-        if (c.contains('-')) {
+        if (c.contains('-') || c.contains('!')) {
           ++nchars;
         }
       } else if (c.length() > 3 && c.starts_with("fragid")) {

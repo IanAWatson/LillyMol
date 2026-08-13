@@ -451,6 +451,7 @@ The most common methods for a Molecule currently implemented are
 | remove_bond_between_atoms(a1, a2) | Remove bond between atoms |
 | remove_all_bonds() | All atoms become their own fragment |
 | smarts_equivalent_for_atom(atom) | Smarts for 'atom' |
+| hybridization(atom) | RDKit-like computed atom hybridization; see [hybridisation](/docs/Molecule_Lib/hybridisation.md) |
 | number_fragments() | number of fragments |
 | fragment_membership(atom) | Fragment number for 'atom' |
 | atoms_in_fragment(frag) | Number of atoms in a fragment |
@@ -546,6 +547,25 @@ The most common methods for a Molecule currently implemented are
 | debug_string() | String representation of internal state: print(m.debug_string())|
 | ----- | ----- |
 
+
+## Atom Hybridization
+
+`hybridization(atom)` returns a `Hybridization` enum value computed from the
+current molecular graph. There is also a module-level `hybridization(mol, atom)`
+function and `hybridization_name(value)` for converting enum values to strings
+such as `SP2` and `SP3`.
+
+This is a small RDKit-compatibility convenience for Python workflows, not a
+substructure-search feature. The detailed behaviour and known limits are in
+[Molecule_Lib/hybridisation.md](/docs/Molecule_Lib/hybridisation.md).
+
+```python
+from lillymol import MolFromSmiles, Hybridization, hybridization_name
+
+mol = MolFromSmiles("CC(=O)N")
+print(mol.hybridization(3) == Hybridization.SP2)
+print(hybridization_name(mol.hybridization(3)))
+```
 
 ## Through-Bond Paths
 

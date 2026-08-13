@@ -28,6 +28,7 @@ PYBIND11_MAKE_OPAQUE(std::vector<int>);
 #include "Molecule_Lib/chiral_centre.h"
 #include "Molecule_Lib/donor_acceptor.h"
 #include "Molecule_Lib/etrans.h"
+#include "Molecule_Lib/hybridization.h"
 #include "Molecule_Lib/molecule.h"
 #include "Molecule_Lib/mol2graph.pb.h"
 #include "Molecule_Lib/path.h"
@@ -832,6 +833,15 @@ Never refuses, and issues no warning.)")
                   "True if atom is fully saturated"
                 )
                 .def("unsaturation", &Molecule::unsaturation)
+                .def("hybridization",
+                  [](Molecule& m, atom_number_t zatom) -> Hybridization {
+                    if (! m.ok_atom_number(zatom)) {
+                      throw py::value_error("hybridization atom number outside [0, natoms)");
+                    }
+                    return HybridizationState(m, zatom);
+                  },
+                  "RDKit-like hybridization of atom, computed on demand"
+                )
                 .def("implicit_hydrogens_known", &Molecule::implicit_hydrogens_known, "True if atom had [] in smiles")
                 .def("unset_all_implicit_hydrogen_information", &Molecule::unset_all_implicit_hydrogen_information, "Discard implicit hydrogen known")
                 .def("make_implicit_hydrogens_explicit", static_cast<int (Molecule::*)()>(&Molecule::make_implicit_hydrogens_explicit), "Make implicit hydrogens implicit")
@@ -2071,6 +2081,35 @@ Never refuses, and issues no warning.)")
     .value("AROMATIC_BOND", kAromaticBond)
     .export_values();
   ;
+
+  py::enum_<Hybridization> hybridization_enum(m, "Hybridization");
+  hybridization_enum
+    .value("UNSPECIFIED", Hybridization::kUnspecified)
+    .value("S", Hybridization::kS)
+    .value("SP", Hybridization::kSp)
+    .value("SP2", Hybridization::kSp2)
+    .value("SP3", Hybridization::kSp3)
+    .value("SP2D", Hybridization::kSp2d)
+    .value("SP3D", Hybridization::kSp3d)
+    .value("SP3D2", Hybridization::kSp3d2)
+    .value("OTHER", Hybridization::kOther)
+    .export_values();
+  m.def("hybridization_name",
+    [](Hybridization hybridization) {
+      return ToString(hybridization);
+    },
+    "String name for a Hybridization enum value"
+  );
+
+  m.def("hybridization",
+    [](Molecule& mol, atom_number_t zatom) -> Hybridization {
+      if (! mol.ok_atom_number(zatom)) {
+        throw py::value_error("hybridization atom number outside [0, natoms)");
+      }
+      return HybridizationState(mol, zatom);
+    },
+    "RDKit-like hybridization of atom, computed on demand"
+  );
 
   m.def("is_chiral_implicit_hydrogen",
     [](int c)->bool {

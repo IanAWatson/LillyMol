@@ -324,6 +324,51 @@ class TestLillyMol(absltest.TestCase):
     self.assertEqual(m.unsaturation(5), 0)
     self.assertEqual(m.unsaturation(6), 1)
 
+  def test_hybridization(self):
+    m = MolFromSmiles("CC=CC#CCc1ccccc1")
+    self.assertEqual(m.hybridization(0), Hybridization.SP3)
+    self.assertEqual(hybridization_name(m.hybridization(0)), "SP3")
+    self.assertEqual(hybridization(m, 1), Hybridization.SP2)
+    self.assertEqual(m.hybridization(3), Hybridization.SP)
+    self.assertEqual(m.hybridization(6), Hybridization.SP2)
+
+    amide = MolFromSmiles("CC(=O)N")
+    self.assertEqual(amide.hybridization(3), Hybridization.SP2)
+
+    ester = MolFromSmiles("CC(=O)OC")
+    self.assertEqual(ester.hybridization(3), Hybridization.SP2)
+
+    phenol = MolFromSmiles("Oc1ccccc1")
+    self.assertEqual(phenol.hybridization(0), Hybridization.SP2)
+
+    ethanol = MolFromSmiles("CCO")
+    self.assertEqual(ethanol.hybridization(2), Hybridization.SP3)
+
+    oxime = MolFromSmiles("ON=C")
+    self.assertEqual(oxime.hybridization(0), Hybridization.SP2)
+
+    quaternary_nitrogen = MolFromSmiles("C[N+](C)(C)C")
+    self.assertEqual(quaternary_nitrogen.hybridization(1), Hybridization.SP3)
+
+    sulfonamide = MolFromSmiles("CNS(=O)(=O)C")
+    self.assertEqual(sulfonamide.hybridization(1), Hybridization.SP3)
+
+    sulfonamide_amide = MolFromSmiles("CS(=O)(=O)NC(=O)C")
+    self.assertEqual(sulfonamide_amide.hybridization(4), Hybridization.SP3)
+
+    sulfonamide_aniline = MolFromSmiles("C1=CN=C(C=N1)NS(=O)(=O)C1=CC=CC=C1 CHEMBL596295")
+    self.assertEqual(sulfonamide_aniline.hybridization(6), Hybridization.SP2)
+    self.assertEqual(sulfonamide_aniline.hybridization(7), Hybridization.SP3)
+
+    sulfoxide = MolFromSmiles("CS(=O)C")
+    self.assertEqual(sulfoxide.hybridization(1), Hybridization.SP3)
+
+    phosphate = MolFromSmiles("COP(=O)(O)O")
+    self.assertEqual(phosphate.hybridization(2), Hybridization.SP3)
+
+    with self.assertRaises(ValueError):
+      m.hybridization(m.natoms())
+
   def test_remove_atom(self):
     m = Molecule()
     self.assertTrue(m.build_from_smiles("CCC"))

@@ -32,7 +32,7 @@
         "spaces, so the records are echoed with their tabs intact.",
         "Contrast with separator_I_tab_default below."
       ],
-      "name": "separator_I_tab",
+      "name": "separator_II_tab",
       "difftool": "diff",
       "difftool_options": "",
       "args": [ "-I tab #{datadir}/ids.txt #{datadir}/haystack_tab.smi" ]
@@ -45,7 +45,7 @@
         "records therefore contain spaces, not the original tabs.",
         "This is long standing behaviour and must not change."
       ],
-      "name": "separator_I_tab_default",
+      "name": "separator_II_tab_default",
       "difftool": "diff",
       "difftool_options": "",
       "args": [ "#{datadir}/ids.txt #{datadir}/haystack_tab.smi" ]

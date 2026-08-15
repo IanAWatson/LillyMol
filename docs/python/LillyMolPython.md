@@ -1275,8 +1275,45 @@ The Python API is designed to fail loudly in notebooks:
 
 Repeated calls to `distance(i, j)` perform repeated distance computations. For
 large all-against-all or repeated-nearest-neighbour workflows, prefer the
-nearest-neighbour methods. A cached nearest-neighbour interface is planned for a
-future version.
+nearest-neighbour methods.
+
+### Precomputed truncated distance matrices
+
+`lillymol_tools.TruncatedDistanceMatrix` loads a TFDataRecord file of serialized
+near-neighbour protos, normally produced by
+`gfp_nearneighbours_single_file_tbb -S`, and provides repeated lookup of stored
+pair-wise distances. Distances not present in the file are treated as omitted
+long-range pairs: `distance(i, j)`
+returns `None`, while `distance_or_default(i, j)` returns the matrix default
+distance.
+
+```python
+from lillymol_tools import (
+    TruncatedDistanceMatrix, TruncatedDistanceMatrixStorage,
+    TruncatedDistanceMatrixProto,
+)
+
+dm = TruncatedDistanceMatrix(
+    "file.nn.tfdata",
+    storage=TruncatedDistanceMatrixStorage.ROW_SPARSE,
+)
+
+indexed_dm = TruncatedDistanceMatrix(
+    "file.indexed.nn.tfdata",
+    storage=TruncatedDistanceMatrixStorage.ROW_SPARSE,
+    proto_type=TruncatedDistanceMatrixProto.NEARNEIGHBOURS_INDICES,
+)
+
+print(dm.index("CHEMBL123"))
+print(dm.name(17))
+print(dm.distance(10, 17))
+print(dm.distance_or_default(10, 17))
+```
+
+Use `distances_or_default(i_values, j_values)` for batch lookup from Python.
+See [Truncated Distance Matrix](/docs/GFP/truncated_distance_matrix.md) for the
+file-generation requirements, storage modes, default-distance behaviour, and C++
+API.
 
 ## Reactions
 Enable reactions via

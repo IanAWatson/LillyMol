@@ -115,6 +115,7 @@ static int nworkers = 2;
 
 // If we are writing TFDataRecord protos.
 static int write_as_tfdata_record = 0;
+static int write_indexed_tfdata_record = 0;
 static iw_tf_data_record::TFDataWriter tfdata_writer;
 
 // We can write both a TFDataWriter and to stdout.
@@ -163,8 +164,9 @@ decode_id(const uint64_t did)
 }
 
 template <typename T>
-int 
-NbrsToTFData(const T& target, const T* pool, iw_tf_data_record::TFDataWriter& writer) {
+int
+NbrsToTFDataNameBased(const T& target, const T* pool,
+                      iw_tf_data_record::TFDataWriter& writer) {
   nnbr::NearNeighbours proto;
   const IWString& s = target.smiles();
   proto.set_smiles(s.data(), s.length());
@@ -189,6 +191,43 @@ NbrsToTFData(const T& target, const T* pool, iw_tf_data_record::TFDataWriter& wr
   }
 
   return writer.WriteSerializedProto<nnbr::NearNeighbours>(proto);
+}
+
+template <typename T>
+int
+NbrsToTFDataIndexed(const T& target, iw_tf_data_record::TFDataWriter& writer) {
+  nnbr::NearNeighboursIndices proto;
+  const IWString& s = target.smiles();
+  proto.set_smiles(s.data(), s.length());
+  const IWString& id = target.id();
+  proto.set_name(id.data(), id.length());
+
+  const resizable_array<uint64_t>& nbrs = target.nbrs();
+
+  if (nbrs.empty() && !write_molecules_with_no_neighbours) {
+    return 1;
+  }
+
+  for (uint64_t i : target.nbrs()) {
+    const uint32_t ndx = decode_id(i);
+    const float d = decode_distance(i);
+
+    auto* nbr = proto.mutable_nbr()->Add();
+    nbr->set_id(ndx);
+    nbr->set_dist(d);
+  }
+
+  return writer.WriteSerializedProto<nnbr::NearNeighboursIndices>(proto);
+}
+
+template <typename T>
+int
+NbrsToTFData(const T& target, const T* pool, iw_tf_data_record::TFDataWriter& writer) {
+  if (write_indexed_tfdata_record) {
+    return NbrsToTFDataIndexed(target, writer);
+  }
+
+  return NbrsToTFDataNameBased(target, pool, writer);
 }
 
 int
@@ -2314,6 +2353,7 @@ usage(int rc)
   cerr << " -y               allow arbitrary distances\n";
   cerr << " -u               include number of neighbours with target identifier\n";
   cerr << " -S <fname>       write nnbr::NearNeighbours TFDataRecord serialized protos to <fname>\n";
+  cerr << " -S indexed       write nnbr::NearNeighboursIndices protos, with neighbour indices\n";
   // cerr << " -C <nthreads>    number of TBB threads to use\n";
   cerr << " -v               verbose output\n";
   // clang-format on
@@ -2463,6 +2503,8 @@ nearneighbours(int argc, char** argv)
     for (int i = 0; cl.value('S', s, i); ++i) {
       if (s == "stdout") {
         also_write_stdout = 1;
+      } else if (s == "indexed") {
+        write_indexed_tfdata_record = 1;
       } else {
         fname = s;
       }
@@ -2479,7 +2521,13 @@ nearneighbours(int argc, char** argv)
     }
 
     if (verbose) {
-      cerr << "TFdataRecord protos written to '" << fname << "'\n";
+      cerr << "TFdataRecord protos written to '" << fname << "'";
+      if (write_indexed_tfdata_record) {
+        cerr << " as nnbr::NearNeighboursIndices";
+      } else {
+        cerr << " as nnbr::NearNeighbours";
+      }
+      cerr << '\n';
     }
     write_as_tfdata_record = 1;
   }

@@ -701,6 +701,7 @@ cc_binary(
     srcs = [
         "gfp_nearneighbours_single_file_tbb.cc",
     ],
+    visibility = ["//visibility:public"],
 
     copts = select({
         ":darwin": ["-Xclang", "-fopenmp"],

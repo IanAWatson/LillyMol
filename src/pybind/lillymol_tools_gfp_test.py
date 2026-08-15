@@ -1,5 +1,6 @@
 import os
 import struct
+import subprocess
 import sys
 import tempfile
 import unittest
@@ -9,7 +10,7 @@ sys.path.insert(0, os.path.dirname(__file__))
 from lillymol import Molecule
 from lillymol_tools import (
     GFP, GFPContext, GFPList, TruncatedDistanceMatrix,
-    TruncatedDistanceMatrixStorage,
+    TruncatedDistanceMatrixProto, TruncatedDistanceMatrixStorage,
 )
 from Utilities.GFP_Tools import nearneighbours_pb2
 
@@ -75,6 +76,29 @@ def _write_file(contents):
         output.write(contents)
     return fname
 
+
+def _runfile(path):
+    candidates = [
+        os.path.join(os.path.dirname(__file__), path),
+        os.path.join(os.getcwd(), path),
+        os.path.join(os.getcwd(), 'bazel-bin', path),
+    ]
+    test_srcdir = os.environ.get('TEST_SRCDIR')
+    if test_srcdir:
+        candidates.extend([
+            os.path.join(test_srcdir, '_main', path),
+            os.path.join(test_srcdir, path),
+        ])
+    runfiles_dir = os.environ.get('RUNFILES_DIR')
+    if runfiles_dir:
+        candidates.extend([
+            os.path.join(runfiles_dir, '_main', path),
+            os.path.join(runfiles_dir, path),
+        ])
+    for candidate in candidates:
+        if os.path.exists(candidate):
+            return candidate
+    raise FileNotFoundError(path)
 
 def _testdata_file(fname):
     candidates = [
@@ -168,6 +192,30 @@ class TestTruncatedDistanceMatrix(unittest.TestCase):
             self.assertAlmostEqual(dm.distance(0, 1), 10.0 / 255.0, places=6)
         finally:
             os.remove(fname)
+
+    def test_tbb_tool_writes_indexed_tfdatarecord(self):
+        exe = _runfile('Utilities/GFP_Tools/gfp_nearneighbours_single_file_tbb')
+        input_fname = _testdata_file('rand10.standard.gfp')
+        fd, output_fname = tempfile.mkstemp(suffix='.indexed.nn.tfdata')
+        os.close(fd)
+        os.remove(output_fname)
+        try:
+            subprocess.run([
+                exe, '-T', '0.6', '-S', 'indexed', '-S', output_fname, input_fname,
+            ], check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+
+            dm = TruncatedDistanceMatrix(
+                output_fname,
+                storage=TruncatedDistanceMatrixStorage.ROW_SPARSE,
+                proto_type=TruncatedDistanceMatrixProto.NEARNEIGHBOURS_INDICES,
+            )
+            self.assertEqual(dm.size(), 12)
+            self.assertGreater(dm.number_distances(), 0)
+            self.assertEqual(dm.index(dm.name(0)), 0)
+            self.assertAlmostEqual(dm.distance_or_default(0, 0), 0.0, places=6)
+        finally:
+            if os.path.exists(output_fname):
+                os.remove(output_fname)
 
     def test_rejects_conflicting_duplicate_distance(self):
         fname = _write_tfdatarecord([

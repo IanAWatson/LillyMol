@@ -232,6 +232,7 @@ py_test(
     data = [
         "testdata/rand10.complex.gfp",
         "testdata/rand10.standard.gfp",
+        "//Utilities/GFP_Tools:gfp_nearneighbours_single_file_tbb",
     ],
     deps = [
         ":lillymol",

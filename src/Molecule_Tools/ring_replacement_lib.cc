@@ -1,9 +1,13 @@
 // Infrastructure for ring replacement. Shared between C++ and Python
 
 #include <iostream>
+#include <filesystem>
 #include <memory>
 #include <optional>
+#include <string>
 #include <vector>
+
+namespace fs = std::filesystem;
 
 #include "google/protobuf/io/zero_copy_stream_impl_lite.h"
 #include "google/protobuf/text_format.h"
@@ -51,6 +55,7 @@ Usage(int rc) {
   // clang-format off
   cerr << R"(Performs ring replacement given an existing set of replacement rings from ring_extraction.
  -R <fname>    file(s) of labelled rings created by ring_extraction
+                 use -R F:<fname> for a file containing a list of replacement ring files.
  -s <smarts>   only replace rings containing atoms matched by <smarts>
  -q <query>    only replace rings containing atoms matched by <query>
  -z i          ignore molecules not matching any of the queries.
@@ -891,6 +896,10 @@ RingReplacement::set_ring_atom_smarts(const std::string& smarts) {
 
 int
 RingReplacement::ReadReplacementRings(IWString& fname, int ndx) {
+  if (fname.starts_with("F:")) {
+    return ReadFileOfReplacementRings(fname, ndx);
+  }
+
   iwstring_data_source input(fname);
   if (! input.good()) {
     cerr << "RingReplacement::ReadReplacementRings:cannot open '" << fname << "'\n";
@@ -898,6 +907,61 @@ RingReplacement::ReadReplacementRings(IWString& fname, int ndx) {
   }
 
   return ReadReplacementRings(input, ndx);
+}
+
+int
+RingReplacement::ReadFileOfReplacementRings(IWString& fname, int ndx) {
+  assert(fname.starts_with("F:"));
+  IWString myfname(fname);
+  myfname.remove_leading_chars(2);
+
+  iwstring_data_source input(myfname);
+  if (! input.good()) {
+    cerr << "RingReplacement::ReadFileOfReplacementRings:cannot open F:" << myfname << "\n";
+    return 0;
+  }
+
+  std::string tmp(myfname.data(), myfname.length());
+  fs::path filePath = tmp;
+
+  fs::path dirPath = filePath.parent_path();
+
+  myfname = dirPath.string();
+
+  return ReadFileOfReplacementRings(myfname, ndx, input);
+}
+
+int
+RingReplacement::ReadFileOfReplacementRings(const IWString& dirname,
+                        int ndx,
+                        iwstring_data_source& input) {
+  IWString buffer;
+  while (input.next_record(buffer)) {
+    if (buffer.starts_with("#")) {
+      continue;
+    }
+
+    if (! ReadSetOfReplacementRings(dirname, buffer, ndx)) {
+      cerr << "RingReplacement::ReadFileOfReplacementRings:invalid input '" << buffer << "'\n";
+      return 0;
+    }
+  }
+
+  return 1;
+}
+
+int
+RingReplacement::ReadSetOfReplacementRings(const IWString& dirname,
+                IWString& fname,
+                int ndx) {
+  if (dash_s(fname.null_terminated_chars())) {
+    return ReadReplacementRings(fname, ndx);
+  }
+
+  IWString path_name;
+  path_name << dirname << fs::path::preferred_separator << fname;
+
+  return ReadReplacementRings(path_name, ndx);
 }
 
 int

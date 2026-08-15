@@ -108,6 +108,13 @@ class RingReplacement {
 
     int ReadReplacementRings(IWString& fname, int ndx);
     int ReadReplacementRings(iwstring_data_source& input, int ndx);
+
+    int ReadFileOfReplacementRings(IWString& fname, int ndx);
+    int ReadFileOfReplacementRings(const IWString& dirname,
+                        int ndx, iwstring_data_source& input);
+    int ReadSetOfReplacementRings(const IWString& dirname,
+                IWString& fname, int ndx);
+
     int OkSupport(const Replacement& r);
     int IsUnique(Molecule& m);
     int OkProductQueryConstraints(Molecule& m);

@@ -227,6 +227,16 @@ py_test(
 )
 
 py_test(
+    name = "lillymol_substructure_test",
+    srcs = ["lillymol_substructure_test.py"],
+    deps = [
+        ":lillymol",
+        ":lillymol_query",
+        "//Molecule_Lib:substructure_py_proto",
+    ],
+)
+
+py_test(
     name = "lillymol_tools_gfp_test",
     srcs = ["lillymol_tools_gfp_test.py"],
     data = [

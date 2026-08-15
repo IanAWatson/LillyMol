@@ -951,6 +951,33 @@ for match in query.substructure_search_matches(m):
 ```
 Note that the isotope placed is incremented by 1 since isotope 0 does not mean anything.
 
+For one-off SMARTS searches there are convenience functions whose names are
+close to the common RDKit spelling. These build a temporary query, apply any
+keyword options, search the molecule, and discard the query.
+
+```python
+m = MolFromSmiles("CCOC ethoxyethane")
+
+if HasSubstructMatch(m, "[OD2]-C"):
+  print("ether oxygen")
+
+print(CountSubstructMatches(m, "C", max_matches_to_find=2))
+
+for embedding in GetSubstructMatches(m, "[OD2]-C",
+                                     unique_embeddings_only=True):
+  print(embedding)
+```
+
+`GetSubstructMatches` returns a Python list of embeddings, where each embedding
+is a list of atom numbers. The atom numbers within each embedding follow the atom
+order in the query.
+
+The keyword options accepted by these transient SMARTS helpers are
+`max_matches_to_find`, `unique_embeddings_only`, `one_embedding_per_start_atom`,
+and `perceive_symmetry_equivalent_matches`. Reusable `SubstructureQuery` objects
+do not accept per-call overrides; their match policy remains a property of the
+query and is controlled by the setter methods below.
+
 The Substructure_Query class has a wide variety of options that control the matching. Those
 are described in the `trxn` usage document. Here they are just listed
 

@@ -1,5 +1,6 @@
 #include <iostream>
 #include <memory>
+#include <optional>
 #include <string>
 
 #include "pybind11/pybind11.h"
@@ -11,6 +12,63 @@
 #include "Molecule_Lib/substructure.pb.h"
 
 namespace py = pybind11;
+
+namespace {
+
+struct SmartsSearchOptions {
+  std::optional<int> max_matches_to_find;
+  std::optional<bool> unique_embeddings_only;
+  std::optional<bool> one_embedding_per_start_atom;
+  std::optional<bool> perceive_symmetry_equivalent_matches;
+};
+
+std::unique_ptr<Substructure_Query>
+BuildQueryFromSmarts(const std::string& smarts,
+                     const SmartsSearchOptions& options) {
+  auto query = std::make_unique<Substructure_Query>();
+  if (! query->CreateFromSmarts(smarts)) {
+    throw py::value_error("Invalid smarts");
+  }
+
+  if (options.max_matches_to_find) {
+    query->set_max_matches_to_find(*options.max_matches_to_find);
+  }
+  if (options.unique_embeddings_only) {
+    query->set_find_unique_embeddings_only(*options.unique_embeddings_only);
+  }
+  if (options.one_embedding_per_start_atom) {
+    query->set_find_one_embedding_per_atom(*options.one_embedding_per_start_atom);
+  }
+  if (options.perceive_symmetry_equivalent_matches) {
+    query->set_perceive_symmetry_equivalent_matches(
+        *options.perceive_symmetry_equivalent_matches);
+  }
+
+  return query;
+}
+
+std::vector<std::vector<int>>
+SubstructureSearchMatches(Substructure_Query& query, Molecule& molecule) {
+  Substructure_Results query_results;
+  if (! query.substructure_search(&molecule, query_results)) {
+    return std::vector<std::vector<int>>();
+  }
+
+  std::vector<std::vector<int>> results;
+  results.reserve(query_results.number_embeddings());
+  for (const Set_of_Atoms* embedding : query_results.embeddings()) {
+    std::vector<int> atoms;
+    atoms.reserve(embedding->number_elements());
+    for (atom_number_t atom : *embedding) {
+      atoms.push_back(atom);
+    }
+    results.push_back(std::move(atoms));
+  }
+
+  return results;
+}
+
+}  // namespace
 
 PYBIND11_MODULE(lillymol_query, q)
 {
@@ -140,6 +198,84 @@ PYBIND11_MODULE(lillymol_query, q)
     },
     py::arg("smarts"),
     "Return a SubstructureQuery built from `smarts`, or None if parsing fails."
+  );
+
+  q.def("HasSubstructMatch",
+    [](Molecule& molecule, const std::string& smarts,
+       std::optional<int> max_matches_to_find,
+       std::optional<bool> unique_embeddings_only,
+       std::optional<bool> one_embedding_per_start_atom,
+       std::optional<bool> perceive_symmetry_equivalent_matches)->bool {
+      SmartsSearchOptions options;
+      options.max_matches_to_find = max_matches_to_find;
+      options.unique_embeddings_only = unique_embeddings_only;
+      options.one_embedding_per_start_atom = one_embedding_per_start_atom;
+      options.perceive_symmetry_equivalent_matches = perceive_symmetry_equivalent_matches;
+
+      std::unique_ptr<Substructure_Query> query = BuildQueryFromSmarts(smarts, options);
+      py::gil_scoped_release release;
+      return query->substructure_search(&molecule);
+    },
+    py::arg("molecule"),
+    py::arg("smarts"),
+    py::kw_only(),
+    py::arg("max_matches_to_find") = py::none(),
+    py::arg("unique_embeddings_only") = py::none(),
+    py::arg("one_embedding_per_start_atom") = py::none(),
+    py::arg("perceive_symmetry_equivalent_matches") = py::none(),
+    "Return True if `smarts` matches `molecule`."
+  );
+
+  q.def("CountSubstructMatches",
+    [](Molecule& molecule, const std::string& smarts,
+       std::optional<int> max_matches_to_find,
+       std::optional<bool> unique_embeddings_only,
+       std::optional<bool> one_embedding_per_start_atom,
+       std::optional<bool> perceive_symmetry_equivalent_matches)->uint32_t {
+      SmartsSearchOptions options;
+      options.max_matches_to_find = max_matches_to_find;
+      options.unique_embeddings_only = unique_embeddings_only;
+      options.one_embedding_per_start_atom = one_embedding_per_start_atom;
+      options.perceive_symmetry_equivalent_matches = perceive_symmetry_equivalent_matches;
+
+      std::unique_ptr<Substructure_Query> query = BuildQueryFromSmarts(smarts, options);
+      py::gil_scoped_release release;
+      return query->substructure_search(&molecule);
+    },
+    py::arg("molecule"),
+    py::arg("smarts"),
+    py::kw_only(),
+    py::arg("max_matches_to_find") = py::none(),
+    py::arg("unique_embeddings_only") = py::none(),
+    py::arg("one_embedding_per_start_atom") = py::none(),
+    py::arg("perceive_symmetry_equivalent_matches") = py::none(),
+    "Return the number of embeddings for `smarts` in `molecule`."
+  );
+
+  q.def("GetSubstructMatches",
+    [](Molecule& molecule, const std::string& smarts,
+       std::optional<int> max_matches_to_find,
+       std::optional<bool> unique_embeddings_only,
+       std::optional<bool> one_embedding_per_start_atom,
+       std::optional<bool> perceive_symmetry_equivalent_matches)->std::vector<std::vector<int>> {
+      SmartsSearchOptions options;
+      options.max_matches_to_find = max_matches_to_find;
+      options.unique_embeddings_only = unique_embeddings_only;
+      options.one_embedding_per_start_atom = one_embedding_per_start_atom;
+      options.perceive_symmetry_equivalent_matches = perceive_symmetry_equivalent_matches;
+
+      std::unique_ptr<Substructure_Query> query = BuildQueryFromSmarts(smarts, options);
+      py::gil_scoped_release release;
+      return SubstructureSearchMatches(*query, molecule);
+    },
+    py::arg("molecule"),
+    py::arg("smarts"),
+    py::kw_only(),
+    py::arg("max_matches_to_find") = py::none(),
+    py::arg("unique_embeddings_only") = py::none(),
+    py::arg("one_embedding_per_start_atom") = py::none(),
+    py::arg("perceive_symmetry_equivalent_matches") = py::none(),
+    "Return embeddings as lists of atom numbers, in query atom order."
   );
 
 }

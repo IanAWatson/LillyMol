@@ -10,7 +10,13 @@
 # does is to run copy_shared_libraries.sh, which copies the compiled
 # shared libraries out of bazel-bin to ../lib
 
-# Assume that lib, with the shared libraries, is one above where this script is.
+EXPECTED_VERSION="3.13"
+actual_version=$(python3 -c "import sys; print(f'{sys.version_info.major}.{sys.version_info.minor}')")
+if [[ "${actual_version}" != "${EXPECTED_VERSION}" ]]; then
+  echo -e "\nWarning: python version mismatch: got ${actual_version} need ${EXPECTED_VERSION}. Likely problems ahead\n" >&2
+fi
+
+# Assume that lib, with the shared libraries, is at the same level as this script.
 my_dir=$(dirname $0)
 export LD_LIBRARY_PATH=${my_dir}/lib:${LD_LIBRARY_PATH}
-PYTHONPATH=${my_dir}/lib:${my_dir}/src:${PYTHONPATH} python3 "$@"
+PYTHONPATH=${my_dir}/lib:${my_dir}/src:${PYTHONPATH} python3 -P "$@"

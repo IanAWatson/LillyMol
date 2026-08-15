@@ -490,6 +490,8 @@ The most common methods for a Molecule currently implemented are
 | number_chiral_centres() | Number of chiral centres |
 | remove_all_chiral_centres() | Remove all chiral centres |
 | chiral_centre_at_atom(atom) | Return the Chiral_Centre on 'atom' |
+| is_actually_chiral(mol, atom) | Module-level function: True if 'atom' is actually chiral |
+| tetrahedral_chirality(mol, atom, check_is_chiral=False) | Module-level function: LillyMol-defined tetrahedral chirality for 'atom', or None |
 | invert_chirality_on_atom(atom) | Invert chirality |
 | chiral_centres() | Iterable list of Chiral_Centre |
 | isotope(atom) | Isotope on 'atom' |
@@ -546,6 +548,44 @@ The most common methods for a Molecule currently implemented are
 | ok | True if the internal state of the Molecule is ok |
 | debug_string() | String representation of internal state: print(m.debug_string())|
 | ----- | ----- |
+
+
+## Chirality
+
+LillyMol stores chiral centres on the `Molecule`, not on `Atom` objects.
+`chiral_centre_at_atom(atom)` returns the stored `Chiral_Centre` for an atom,
+if one is present. A stored chiral centre records molecular annotation; it does
+not by itself prove that the atom is actually stereogenic.
+
+`is_actually_chiral(mol, atom)` performs the more expensive check for whether an
+atom is actually chiral.
+
+`tetrahedral_chirality(mol, atom, check_is_chiral=False)` returns a `ChiralType`
+value for a stored tetrahedral centre, or `None` if there is no chiral centre at
+that atom. Values include `ChiralType.CHI_TETRAHEDRAL_CW`,
+`ChiralType.CHI_TETRAHEDRAL_CCW`, `ChiralType.CHI_UNSPECIFIED`, and
+`ChiralType.CHI_OTHER`.
+
+The CW/CCW designator is LillyMol-defined. It is computed relative to ascending
+explicit atom numbers, with an implicit Hydrogen ordered after all explicit
+atoms. This makes the result deterministic and independent of input bond order;
+it is not intended to reproduce RDKit's bond-order-dependent `ChiralTag`.
+
+If `check_is_chiral=True`, `tetrahedral_chirality` first calls
+`is_actually_chiral`, which may trigger a more expensive scan of the molecule.
+This is useful for filtering stored chiral annotations that are not actually
+stereogenic.
+
+```python
+from lillymol import MolFromSmiles, ChiralType, tetrahedral_chirality
+
+mol = MolFromSmiles("C[C@H](N)F")
+print(tetrahedral_chirality(mol, 1) == ChiralType.CHI_TETRAHEDRAL_CCW)
+
+mol = MolFromSmiles("N[C@H]1CCC1")
+print(tetrahedral_chirality(mol, 1) is not None)                     # stored
+print(tetrahedral_chirality(mol, 1, check_is_chiral=True) is None)   # checked
+```
 
 
 ## Atom Hybridization

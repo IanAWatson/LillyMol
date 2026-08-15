@@ -29,6 +29,7 @@ PYBIND11_MAKE_OPAQUE(std::vector<int>);
 #include "Molecule_Lib/donor_acceptor.h"
 #include "Molecule_Lib/etrans.h"
 #include "Molecule_Lib/hybridization.h"
+#include "Molecule_Lib/is_actually_chiral.h"
 #include "Molecule_Lib/molecule.h"
 #include "Molecule_Lib/mol2graph.pb.h"
 #include "Molecule_Lib/path.h"
@@ -170,9 +171,9 @@ AppendChiralComponent(int a,
                       IWString& result) {
   if (a >= 0) {
     result << a;
-  } else if (a == CHIRAL_CONNECTION_IS_IMPLICIT_HYDROGEN) {
+  } else if (a == kChiralConnectionIsImplicitHydrogen) {
     result << 'H';
-  } else if (a == CHIRAL_CONNECTION_IS_LONE_PAIR) {
+  } else if (a == kChiralConnectionIsLonePair) {
     result << '^';
   } else {
     result << '?';
@@ -304,6 +305,13 @@ enum BondType {
   kAromaticBond = 4
 };
 
+enum ChiralType {
+  kChiUnspecified = 0,
+  kChiTetrahedralCw = 1,
+  kChiTetrahedralCcw = 2,
+  kChiOther = 3
+};
+
 // BondType is not bond_type_t, so a cast will not do. Both Bond.btype() and
 // Molecule.bond_between_atoms report a bond type to python and they must not be
 // allowed to disagree, so the mapping lives here.
@@ -327,6 +335,102 @@ ToBondType(const Bond& b) {
   // kUnknown is deliberately not exported to python, so returning it would hand
   // back an unnamed enum value. An exception is more useful.
   throw py::value_error("Unrecognised bond type");
+}
+
+static std::optional<int>
+IndexOf(const int* values, int needle) {
+  for (int i = 0; i < 4; ++i) {
+    if (values[i] == needle) {
+      return i;
+    }
+  }
+
+  return std::nullopt;
+}
+
+static int
+InversionCount(const std::vector<int>& values) {
+  int result = 0;
+  for (int i = 0; i < static_cast<int>(values.size()); ++i) {
+    for (int j = i + 1; j < static_cast<int>(values.size()); ++j) {
+      if (values[i] > values[j]) {
+        ++result;
+      }
+    }
+  }
+
+  return result;
+}
+
+static int
+ChiralConnectionSortKey(int member, int matoms) {
+  if (member >= 0) {
+    return member;
+  }
+  if (member == kChiralConnectionIsImplicitHydrogen) {
+    return matoms;
+  }
+  if (member == kChiralConnectionIsLonePair) {
+    return matoms + 1;
+  }
+
+  return matoms + 2;
+}
+
+// Return a LillyMol-defined tetrahedral chiral tag for `zatom`. The tag is
+// relative to atom-number order, with implicit Hydrogen after explicit atoms.
+static std::optional<ChiralType>
+TetrahedralChirality(Molecule& m, atom_number_t zatom, bool check_is_chiral) {
+  if (zatom < 0 || zatom >= m.natoms()) {
+    throw py::value_error("atom number outside molecule");
+  }
+
+  if (check_is_chiral && ! ::is_actually_chiral(m, zatom)) {
+    return std::nullopt;
+  }
+
+  const Chiral_Centre* c = m.chiral_centre_at_atom(zatom);
+  if (c == nullptr) {
+    return std::nullopt;
+  }
+
+  if (! c->chirality_known() || ! c->complete()) {
+    return ChiralType::kChiUnspecified;
+  }
+
+  if (c->lone_pair_count() > 0) {
+    return ChiralType::kChiOther;
+  }
+
+  const int stored[4] = {
+    c->top_front(),
+    c->top_back(),
+    c->left_down(),
+    c->right_down()
+  };
+
+  std::vector<int> ordered_members(std::begin(stored), std::end(stored));
+  const int matoms = m.natoms();
+  std::sort(ordered_members.begin(), ordered_members.end(),
+    [matoms](int c1, int c2) {
+      return ChiralConnectionSortKey(c1, matoms) < ChiralConnectionSortKey(c2, matoms);
+    });
+
+  std::vector<int> permutation;
+  permutation.reserve(4);
+  for (int member : ordered_members) {
+    std::optional<int> index = IndexOf(stored, member);
+    if (! index) {
+      return ChiralType::kChiUnspecified;
+    }
+    permutation.push_back(*index);
+  }
+
+  if (InversionCount(permutation) % 2 == 0) {
+    return ChiralType::kChiTetrahedralCcw;
+  }
+
+  return ChiralType::kChiTetrahedralCw;
 }
 
 PYBIND11_MODULE(lillymol, m)
@@ -2008,6 +2112,17 @@ Never refuses, and issues no warning.)")
     })
   ;
 
+  m.def("tetrahedral_chirality", &TetrahedralChirality,
+    py::arg("mol"), py::arg("atom"), py::arg("check_is_chiral") = false,
+    "LillyMol-defined tetrahedral chiral tag for an atom, or None. Tags are relative to atom-number order with implicit Hydrogen after explicit atoms. If check_is_chiral is true, first verify the atom is actually chiral");
+  m.def("is_actually_chiral",
+    [](Molecule& mol, atom_number_t zatom)->bool {
+      if (zatom < 0 || zatom >= mol.natoms()) {
+        throw py::value_error("atom number outside molecule");
+      }
+      return ::is_actually_chiral(mol, zatom);
+    },
+    "True if an atom is actually chiral");
   m.def("set_copy_name_in_molecule_copy_constructor", &set_copy_name_in_molecule_copy_constructor, "Copy name in constructor");
   m.def("NumHAcceptors", [](const Molecule& mol) { return mol.LipinskiNumHAcceptors(); }, "Lipinski hydrogen bond acceptor count");
   m.def("NumHDonors", [](Molecule& mol) { return mol.LipinskiNumHDonors(); }, "Lipinski hydrogen bond donor count");
@@ -2079,6 +2194,14 @@ Never refuses, and issues no warning.)")
     .value("DOUBLE_BOND", kDoubleBond)
     .value("TRIPLE_BOND", kTripleBond)
     .value("AROMATIC_BOND", kAromaticBond)
+    .export_values();
+  ;
+
+  py::enum_<ChiralType>(m, "ChiralType")
+    .value("CHI_UNSPECIFIED", kChiUnspecified)
+    .value("CHI_TETRAHEDRAL_CW", kChiTetrahedralCw)
+    .value("CHI_TETRAHEDRAL_CCW", kChiTetrahedralCcw)
+    .value("CHI_OTHER", kChiOther)
     .export_values();
   ;
 

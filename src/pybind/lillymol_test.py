@@ -1110,6 +1110,44 @@ class TestLillyMol(absltest.TestCase):
     self.assertNotEqual(usmi, m.unique_smiles())
     self.assertFalse('@' in m.unique_smiles())
 
+  def test_is_actually_chiral(self):
+    m = Molecule()
+    self.assertTrue(m.build_from_smiles("C[C@H](N)F"))
+    self.assertTrue(is_actually_chiral(m, 1))
+    self.assertFalse(is_actually_chiral(m, 0))
+
+    self.assertTrue(m.build_from_smiles("N[C@H]1CCC1"))
+    self.assertIsNotNone(m.chiral_centre_at_atom(1))
+    self.assertFalse(is_actually_chiral(m, 1))
+
+  def test_tetrahedral_chirality(self):
+    m = Molecule()
+    self.assertTrue(m.build_from_smiles("CC"))
+    self.assertIsNone(tetrahedral_chirality(m, 0))
+
+    self.assertTrue(m.build_from_smiles("C[C@H](N)F"))
+    self.assertEqual(tetrahedral_chirality(m, 1), ChiralType.CHI_TETRAHEDRAL_CCW)
+    self.assertIsNone(tetrahedral_chirality(m, 0))
+
+    self.assertTrue(m.build_from_smiles("C[C@@H](N)F"))
+    self.assertEqual(tetrahedral_chirality(m, 1), ChiralType.CHI_TETRAHEDRAL_CW)
+
+    self.assertTrue(m.build_from_smiles("[C@H](N)(F)Cl"))
+    self.assertEqual(tetrahedral_chirality(m, 0), ChiralType.CHI_TETRAHEDRAL_CW)
+
+    self.assertTrue(m.build_from_smiles("[C@@H](N)(F)Cl"))
+    self.assertEqual(tetrahedral_chirality(m, 0), ChiralType.CHI_TETRAHEDRAL_CCW)
+
+    self.assertTrue(m.build_from_smiles("F[C@](Cl)(Br)I"))
+    self.assertEqual(tetrahedral_chirality(m, 1), ChiralType.CHI_TETRAHEDRAL_CCW)
+
+    self.assertTrue(m.build_from_smiles("F[C@@](Cl)(Br)I"))
+    self.assertEqual(tetrahedral_chirality(m, 1), ChiralType.CHI_TETRAHEDRAL_CW)
+
+    self.assertTrue(m.build_from_smiles("N[C@H]1CCC1"))
+    self.assertIsNotNone(tetrahedral_chirality(m, 1))
+    self.assertIsNone(tetrahedral_chirality(m, 1, check_is_chiral=True))
+
   def test_revert_all_directional_bonds_to_non_directional(self):
     m = Molecule()
     self.assertTrue(m.build_from_smiles(r"C\C=C\F"))

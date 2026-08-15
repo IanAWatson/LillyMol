@@ -23,6 +23,7 @@
 #include "Molecule_Tools_Bdb/selimsteg.h"
 #include "Molecule_Tools_Bdb/structure_database.h"
 #include "Utilities/GFP_Tools/gfp_context.h"
+#include "Utilities/GFP_Tools/truncated_distance_matrix.h"
 #include "pybind11/stl.h"
 
 namespace py = pybind11;
@@ -162,6 +163,97 @@ PYBIND11_MODULE(lillymol_tools, m) {
   using gfp_context::GFPList;
   using gfp_context::NearestNeighbour;
   using unique_molecules::UniqueMolecules;
+  using truncated_distance_matrix::ProtoType;
+  using truncated_distance_matrix::Storage;
+  using truncated_distance_matrix::TruncatedDistanceMatrix;
+
+  py::enum_<Storage>(m, "TruncatedDistanceMatrixStorage")
+      .value("ROW_SPARSE", Storage::kRowSparse)
+      .value("ROW_HASH", Storage::kRowHash)
+      .export_values();
+
+  py::enum_<ProtoType>(m, "TruncatedDistanceMatrixProto")
+      .value("NEARNEIGHBOURS", ProtoType::kNearNeighbours)
+      .value("NEARNEIGHBOURS_INDICES", ProtoType::kNearNeighboursIndices)
+      .export_values();
+
+  py::class_<TruncatedDistanceMatrix>(m, "TruncatedDistanceMatrix")
+      .def(py::init([](const std::string& fname, Storage storage, ProtoType proto_type) {
+             auto result = std::make_unique<TruncatedDistanceMatrix>();
+             if (!result->Build(fname, storage, proto_type)) {
+               throw std::runtime_error("Cannot build TruncatedDistanceMatrix from " + fname);
+             }
+             return result;
+           }),
+           py::arg("fname"), py::arg("storage") = Storage::kRowSparse,
+           py::arg("proto_type") = ProtoType::kNearNeighbours)
+      .def("size", &TruncatedDistanceMatrix::size)
+      .def("__len__", &TruncatedDistanceMatrix::size)
+      .def("number_distances", &TruncatedDistanceMatrix::number_distances)
+      .def("duplicate_distances_differing_by_one",
+           &TruncatedDistanceMatrix::duplicate_distances_differing_by_one)
+      .def("max_stored_distance", &TruncatedDistanceMatrix::MaxStoredDistance)
+      .def("default_distance", &TruncatedDistanceMatrix::DefaultDistance)
+      .def("max_stored_distance_byte", &TruncatedDistanceMatrix::MaxStoredDistanceByte)
+      .def("default_distance_byte", &TruncatedDistanceMatrix::DefaultDistanceByte)
+      .def("set_default_distance",
+           [](TruncatedDistanceMatrix& dm, float d) {
+             if (!dm.SetDefaultDistance(d)) {
+               throw std::invalid_argument("default distance cannot be below max stored distance");
+             }
+           },
+           py::arg("distance"))
+      .def("set_default_distance_byte",
+           [](TruncatedDistanceMatrix& dm, uint8_t d) {
+             if (!dm.SetDefaultDistanceByte(d)) {
+               throw std::invalid_argument("default distance cannot be below max stored distance");
+             }
+           },
+           py::arg("distance"))
+      .def("index", &TruncatedDistanceMatrix::Index, py::arg("name"))
+      .def("name",
+           [](const TruncatedDistanceMatrix& dm, uint32_t ndx) -> std::string {
+             if (ndx >= dm.size()) {
+               throw py::index_error("index out of range");
+             }
+             return dm.Name(ndx);
+           },
+           py::arg("index"))
+      .def("distance",
+           [](const TruncatedDistanceMatrix& dm, uint32_t i, uint32_t j) {
+             if (i >= dm.size() || j >= dm.size()) {
+               throw py::index_error("index out of range");
+             }
+             return dm.Distance(i, j);
+           },
+           py::arg("i"), py::arg("j"))
+      .def("distance_or_default",
+           [](const TruncatedDistanceMatrix& dm, uint32_t i, uint32_t j) {
+             if (i >= dm.size() || j >= dm.size()) {
+               throw py::index_error("index out of range");
+             }
+             return dm.DistanceOrDefault(i, j);
+           },
+           py::arg("i"), py::arg("j"))
+      .def("distances_or_default",
+           [](const TruncatedDistanceMatrix& dm, const std::vector<uint32_t>& i,
+              const std::vector<uint32_t>& j) {
+             if (i.size() != j.size()) {
+               throw std::invalid_argument("index arrays must have the same length");
+             }
+             for (uint32_t ndx : i) {
+               if (ndx >= dm.size()) {
+                 throw py::index_error("index out of range");
+               }
+             }
+             for (uint32_t ndx : j) {
+               if (ndx >= dm.size()) {
+                 throw py::index_error("index out of range");
+               }
+             }
+             return dm.DistancesOrDefault(i, j);
+           },
+           py::arg("i"), py::arg("j"));
 
   py::class_<GFPFingerprint>(m, "GFPFingerprint")
       .def("context_hash", &GFPFingerprint::context_hash);

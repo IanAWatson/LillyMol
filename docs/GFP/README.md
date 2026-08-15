@@ -14,6 +14,9 @@ is major design goal.
 
 See [tools](tools.md) for a listing of available gfp tools.
 
+For large workflows that need repeated lookup of precomputed short-range
+pair-wise distances, see [Truncated Distance Matrix](truncated_distance_matrix.md).
+
 ## gfp_make
 The most convenient way to generate a fingerprint file is via `gfp_make`. This takes
 one or more structure files and passes those molecules to one or more

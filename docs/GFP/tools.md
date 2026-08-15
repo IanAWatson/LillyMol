@@ -30,7 +30,10 @@ gfp_nearneighbours_single_file_tbb
 The first is a serial version, while the second is parallelised
 using Intel's Threading Building Blocks (TBB)[https://github.com/oneapi-src/oneTBB].
 
-See [gfp_nearneighbours_single_file](gfp_nearneighbours_single_file.md)
+See [gfp_nearneighbours_single_file](gfp_nearneighbours_single_file.md).
+The TFDataRecord output from these tools can be loaded by the
+[Truncated Distance Matrix](truncated_distance_matrix.md) API for repeated
+sparse pair-distance lookup.
 
 ## Inter-Library similarity
 There are several tools for doing this. Generally we will be comparing a

@@ -95,6 +95,9 @@ cc_proto_library(
 
 py_proto_library(
     name = "nearneighbours_py_proto",
+    visibility = [
+        "//visibility:public",
+    ],
     deps = [
         ":nearneighbours_proto",
     ],
@@ -1233,6 +1236,30 @@ cc_binary(
       "darwin": [ "@homebrew_openmp"],
       "//conditions:default": []
     }),
+)
+
+cc_library(
+    name = "truncated_distance_matrix",
+    srcs = ["truncated_distance_matrix.cc"],
+    hdrs = ["truncated_distance_matrix.h"],
+    visibility = ["//visibility:public"],
+    deps = [
+        ":nearneighbours_cc_proto",
+        "//Foundational/data_source:iwtfdata_record",
+        "@com_google_absl//absl/container:flat_hash_map",
+    ],
+)
+
+cc_test(
+    name = "truncated_distance_matrix_test",
+    timeout = "short",
+    srcs = ["truncated_distance_matrix_test.cc"],
+    deps = [
+        ":nearneighbours_cc_proto",
+        ":truncated_distance_matrix",
+        "//Foundational/data_source:iwtfdata_record",
+        "@googletest//:gtest_main",
+    ],
 )
 
 cc_library(

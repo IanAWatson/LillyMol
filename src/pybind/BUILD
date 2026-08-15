@@ -212,6 +212,7 @@ pybind_extension(
         "//Molecule_Tools_Bdb:selimsteg",
         "//Molecule_Tools_Bdb:structure_database_shared",
         "//Utilities/GFP_Tools:gfp_context",
+        "//Utilities/GFP_Tools:truncated_distance_matrix",
         "@third_party//:berkeley_shared",
 #       "@python",
     ],
@@ -235,6 +236,7 @@ py_test(
     deps = [
         ":lillymol",
         ":lillymol_tools",
+        "//Utilities/GFP_Tools:nearneighbours_py_proto",
     ],
 )
 

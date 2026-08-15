@@ -56,6 +56,12 @@ are accumulated, so it is very likely that the molecules will have differing num
 neighbours.
 
 This tool can be used to compute the nearest neighbour data used by [train_test_split_optimise](train_test_split_optimise.md).
+The `-S` TFDataRecord output can also be loaded by the
+[Truncated Distance Matrix](truncated_distance_matrix.md) API for repeated
+pair-distance lookup without materialising a full dense matrix. Use `-T`
+rather than a fixed neighbour count when the file is intended to represent a
+truncated symmetric matrix, and do not use `-z` because omitted no-neighbour
+records cannot be recovered by the loader.
 
 ### TBB
 There is a version of this tool that uses TBB (Threading Building Blocks) to subdivide
@@ -66,7 +72,7 @@ determination.
 This turns out to be a something complex operation involving a need to identify
 chunks of the data that can be updated in parallel.
 
-Currently the number of workers, -h option, can be one of 1,2,4,8,16. The degree
+Currently the number of workers, -h option, can be one of 1,2,4,8,16,32. The degree
 of parallelism is approximately half of the -h value. So, on an 8 core machine
 -h 16 will result in almost full use of the machine, but as usual, scaling is
 not linear.

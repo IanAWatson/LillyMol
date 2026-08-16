@@ -1,8 +1,33 @@
 #include "nanobind/lillymol_nb_internal.h"
 
+#include "Molecule_Lib/donor_acceptor.h"
+#include "Molecule_Lib/qry_wstats.h"
 #include "Molecule_Lib/standardise.h"
 
 namespace lillymol_nb {
+namespace {
+
+void
+InitialiseDonorAcceptor(Donor_Acceptor_Assigner& donor_acceptor, const IWString& dirname) {
+  static constexpr int kVerbose = 0;
+  if (!donor_acceptor.BuildFromDir(dirname, kVerbose)) {
+    throw std::runtime_error("DonorAcceptor:cannot initialise from '" +
+                             dirname.AsString() + "'");
+  }
+  donor_acceptor.set_apply_isotopic_labels(1);
+}
+
+void
+InitialiseDonorAcceptorFromDefaultEnv(Donor_Acceptor_Assigner& donor_acceptor) {
+  static constexpr int kVerbose = 0;
+  if (!donor_acceptor.BuildFromDefaultEnv(kVerbose)) {
+    throw std::runtime_error(
+        "DonorAcceptor:cannot initialise from C3TK_DATA_PERSISTENT or LILLYMOL_HOME");
+  }
+  donor_acceptor.set_apply_isotopic_labels(1);
+}
+
+}  // namespace
 
 void
 BindStandardise(nb::module_& m) {
@@ -29,6 +54,31 @@ BindStandardise(nb::module_& m) {
       .def("process",
            [](Element_Transformations& etrans, Molecule& mol) { return etrans.process(mol); },
            nb::arg("mol"), "Apply transformations to molecule");
+
+  nb::class_<Donor_Acceptor_Assigner>(m, "DonorAcceptor")
+      .def("__init__",
+           [](Donor_Acceptor_Assigner* donor_acceptor) {
+             new (donor_acceptor) Donor_Acceptor_Assigner();
+             InitialiseDonorAcceptorFromDefaultEnv(*donor_acceptor);
+           },
+           "Build donor/acceptor queries from C3TK_DATA_PERSISTENT or LILLYMOL_HOME")
+      .def("__init__",
+           [](Donor_Acceptor_Assigner* donor_acceptor, const std::string& query_dir) {
+             new (donor_acceptor) Donor_Acceptor_Assigner();
+             InitialiseDonorAcceptor(*donor_acceptor, IWString(query_dir));
+           },
+           nb::arg("query_dir"),
+           "Build donor/acceptor queries from an explicit hbonds query directory")
+      .def("active",
+           [](const Donor_Acceptor_Assigner& donor_acceptor) {
+             return static_cast<bool>(donor_acceptor.active());
+           },
+           "True if donor or acceptor queries are loaded")
+      .def("process",
+           [](Donor_Acceptor_Assigner& donor_acceptor, Molecule& mol) {
+             return donor_acceptor.process(mol);
+           },
+           nb::arg("mol"), "Assign donor/acceptor isotopic labels to a molecule");
 }
 
 }  // namespace lillymol_nb

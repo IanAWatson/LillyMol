@@ -19,6 +19,29 @@ def _trace_process_exit():
 atexit.register(_trace_process_exit)
 
 
+def _hbonds_query_dir():
+    for envvar in ("C3TK_DATA_PERSISTENT", "LILLYMOL_HOME"):
+        home = os.environ.get(envvar)
+        if not home:
+            continue
+        if envvar == "C3TK_DATA_PERSISTENT":
+            candidate = os.path.join(home, "queries", "hbonds")
+        else:
+            candidate = os.path.join(home, "data", "queries", "hbonds")
+        if os.path.isdir(candidate):
+            return candidate
+
+    # Direct execution from the source checkout has nanobind/ two levels below
+    # the repository root. Bazel runfiles only see declared data, so this path
+    # normally exists only outside sandboxed test execution.
+    candidate = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..",
+                                             "data", "queries", "hbonds"))
+    if os.path.isdir(candidate):
+        return candidate
+
+    return None
+
+
 class LillyMolNanobindTestCase(unittest.TestCase):
 
     def setUp(self):
@@ -851,6 +874,30 @@ $$$$
         standardise.activate_all()
         self.assertEqual(standardise.process(mol), 1)
         self.assertEqual(mol.smiles(), "CC(=O)O")
+
+    def test_donor_acceptor(self):
+        hbonds = _hbonds_query_dir()
+        if hbonds is None:
+            self.skipTest("donor/acceptor hbonds query directory not available")
+
+        donor_acceptor = lillymol_nb.DonorAcceptor(hbonds)
+        self.assertTrue(donor_acceptor.active())
+
+        smiles = [
+            "NC1=CC=NN1 CHEMBL3217770",
+            "O(C)C(=O)NN CHEMBL3183780",
+            "N#CCC(=O)NN CHEMBL2106008",
+        ]
+        expected = [
+            "[2NH2]c1[3nH][1n]cc1",
+            "[1O]=C(OC)[3NH][2NH2]",
+            "[1O]=C([3NH][2NH2])CC#[1N]",
+        ]
+
+        for smi, result in zip(smiles, expected):
+            mol = lillymol_nb.MolFromSmiles(smi)
+            donor_acceptor.process(mol)
+            self.assertEqual(mol.unique_smiles(), result)
 
     def test_fingerprint_default_and_tanimoto(self):
         mol = lillymol_nb.MolFromSmiles("CCO ethanol")

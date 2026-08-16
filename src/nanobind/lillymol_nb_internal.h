@@ -27,6 +27,7 @@
 #include "Molecule_Lib/molecule.h"
 #include "Molecule_Lib/molecule_preprocessing.h"
 #include "Molecule_Lib/molecule_to_query.h"
+#include "Molecule_Lib/rotbond_common.h"
 #include "Molecule_Lib/output.h"
 #include "Molecule_Lib/path.h"
 #include "Molecule_Lib/substructure.h"

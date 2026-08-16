@@ -904,6 +904,31 @@ $$$$
         self.assertIn(lillymol_nb.interpret_D_as_deuterium(), [0, 1])
         self.assertIn(lillymol_nb.interpret_T_as_deuterium(), [0, 1])
 
+    def test_rotatable_bonds(self):
+        rotbond_calc = lillymol_nb.RotatableBonds()
+        rotbond_calc.set_calculation_type(lillymol_nb.EXPENSIVE)
+
+        mol = lillymol_nb.MolFromSmiles("CC ethane")
+        self.assertEqual(rotbond_calc.rotatable_bonds(mol), 0)
+        mol = lillymol_nb.MolFromSmiles("CCC propane")
+        self.assertEqual(rotbond_calc.rotatable_bonds(mol), 0)
+        mol = lillymol_nb.MolFromSmiles("CC(F)(F)F trifluoroethane")
+        self.assertEqual(rotbond_calc.rotatable_bonds(mol), 0)
+        mol = lillymol_nb.MolFromSmiles("CCCC butane")
+        self.assertEqual(rotbond_calc.rotatable_bonds(mol), 1)
+        self.assertEqual(rotbond_calc.rotatable_bond_atoms(mol), [(1, 2)])
+        mol = lillymol_nb.MolFromSmiles("C1CC1C methylcyclopropane")
+        self.assertEqual(rotbond_calc.rotatable_bonds(mol), 0)
+        self.assertEqual(rotbond_calc.rotatable_bond_atoms(mol), [])
+
+    def test_rotatable_bond_calculation_type(self):
+        mol = lillymol_nb.MolFromSmiles("CC(=O)NCC amide")
+        rotbond_calc = lillymol_nb.RotatableBonds()
+        rotbond_calc.set_calculation_type(lillymol_nb.RotBond.QUICK)
+        self.assertEqual(rotbond_calc.rotatable_bond_atoms(mol), [(1, 3), (3, 4)])
+        rotbond_calc.set_calculation_type(lillymol_nb.RotBond.EXPENSIVE)
+        self.assertEqual(rotbond_calc.rotatable_bond_atoms(mol), [(3, 4)])
+
     def test_descriptor_helpers(self):
         mol = lillymol_nb.MolFromSmiles("CCO ethanol")
         self.assertIsNotNone(lillymol_nb.alogp(mol))

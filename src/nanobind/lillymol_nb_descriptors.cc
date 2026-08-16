@@ -15,6 +15,41 @@ BindDescriptors(nb::module_& m) {
       .value("SP3D2", Hybridization::kSp3d2)
       .value("OTHER", Hybridization::kOther);
 
+  nb::enum_<quick_rotbond::QuickRotatableBonds::RotBond>(m, "RotBond")
+      .value("UNDEFINED", quick_rotbond::QuickRotatableBonds::RotBond::kUndefined)
+      .value("QUICK", quick_rotbond::QuickRotatableBonds::RotBond::kQuick)
+      .value("EXPENSIVE", quick_rotbond::QuickRotatableBonds::RotBond::kExpensive);
+  m.attr("UNDEFINED") = nb::cast(quick_rotbond::QuickRotatableBonds::RotBond::kUndefined);
+  m.attr("QUICK") = nb::cast(quick_rotbond::QuickRotatableBonds::RotBond::kQuick);
+  m.attr("EXPENSIVE") = nb::cast(quick_rotbond::QuickRotatableBonds::RotBond::kExpensive);
+
+  nb::class_<quick_rotbond::QuickRotatableBonds>(m, "RotatableBonds")
+      .def(nb::init<>())
+      .def("rotatable_bonds",
+           [](quick_rotbond::QuickRotatableBonds& rotbond, Molecule& mol) {
+             return rotbond.Process(mol, nullptr);
+           },
+           nb::arg("mol"), "Return number of rotatable bonds")
+      .def("rotatable_bond_atoms",
+           [](quick_rotbond::QuickRotatableBonds& rotbond, Molecule& mol) {
+             std::vector<int> bond_rotatable(mol.nedges(), 0);
+             rotbond.Process(mol, bond_rotatable.data());
+             std::vector<std::tuple<atom_number_t, atom_number_t>> result;
+             result.reserve(mol.nedges());
+             const int nedges = mol.nedges();
+             for (int bond_number = 0; bond_number < nedges; ++bond_number) {
+               if (!bond_rotatable[bond_number]) {
+                 continue;
+               }
+               const Bond* bond = mol.bondi(bond_number);
+               result.emplace_back(bond->a1(), bond->a2());
+             }
+             return result;
+           },
+           nb::arg("mol"), "Return atom pairs defining rotatable bonds")
+      .def("set_calculation_type", &quick_rotbond::QuickRotatableBonds::set_calculation_type,
+           nb::arg("calculation_type"));
+
   m.def("MolFromSmiles", &MolFromSmiles, nb::arg("smiles"),
         "Build a Molecule from SMILES, returning None on parse failure");
   m.def("LillyMolFromSmiles", &MolFromSmiles, nb::arg("smiles"),

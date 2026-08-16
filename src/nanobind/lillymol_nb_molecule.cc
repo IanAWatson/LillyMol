@@ -302,6 +302,10 @@ BindMolecule(nb::module_& m) {
            },
            nb::arg("symbol"))
       .def("GetNumAtoms", [](const Molecule& mol) { return mol.natoms(); })
+      .def("GetNumHeavyAtoms",
+           [](const Molecule& mol) { return mol.natoms() - mol.natoms(1); },
+           "Return the number of non-hydrogen atoms")
+      .def("GetNumBonds", &Molecule::nedges, "Return the number of bonds")
       .def("empty", [](const Molecule& mol) { return static_cast<bool>(mol.empty()); })
       .def("resize", &Molecule::resize, nb::arg("natoms"))
       .def("add_atom",
@@ -315,11 +319,22 @@ BindMolecule(nb::module_& m) {
            },
            nb::arg("atomic_number"))
       .def("atom", &Molecule::atomi, nb::arg("atom"), nb::rv_policy::reference_internal)
+      .def("GetAtomWithIdx", &Molecule::atomi, nb::arg("atom"),
+           nb::rv_policy::reference_internal)
+      .def("GetAtoms",
+           [](const Molecule& mol) {
+             return nb::make_iterator<nb::rv_policy::reference_internal>(
+                 nb::type<Molecule>(), "AtomIterator", mol.begin(), mol.end());
+           },
+           nb::keep_alive<0, 1>(), "Return an iterator over atoms")
       .def("nedges", &Molecule::nedges,
            "Return the number of bonds")
       .def("bond", nb::overload_cast<int>(&Molecule::bondi, nb::const_), nb::arg("bond"),
            nb::rv_policy::reference_internal)
+      .def("GetBondWithIdx", nb::overload_cast<int>(&Molecule::bondi, nb::const_),
+           nb::arg("bond"), nb::rv_policy::reference_internal)
       .def("bonds", &Bonds, nb::rv_policy::reference_internal)
+      .def("GetBonds", &Bonds, nb::rv_policy::reference_internal)
       .def("nrings", [](Molecule& mol) { return mol.nrings(); },
            "Return the number of SSSR rings")
       .def("get_ring_membership", &GetRingMembership,

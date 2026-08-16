@@ -210,6 +210,20 @@ $$$$
         mol.set_name("renamed")
         self.assertEqual(mol.name(), "renamed")
 
+    def test_rdkit_style_molecule_access_aliases(self):
+        mol = lillymol_nb.MolFromSmiles("[H]OC ethanol")
+        self.assertEqual(mol.GetNumAtoms(), 3)
+        self.assertEqual(mol.GetNumHeavyAtoms(), 2)
+        self.assertEqual(mol.GetNumBonds(), mol.nedges())
+        self.assertEqual(mol.GetAtomWithIdx(1).atomic_symbol(), "O")
+        self.assertEqual(mol.GetBondWithIdx(0).GetBeginAtomIdx(), 0)
+        self.assertEqual([atom.atomic_symbol() for atom in mol.GetAtoms()], ["H", "O", "C"])
+        self.assertEqual([(bond.a1(), bond.a2()) for bond in mol.GetBonds()], [(0, 1), (1, 2)])
+
+        oxygen = mol.GetAtomWithIdx(1)
+        mol.set_atomic_number(1, 7)
+        self.assertEqual(oxygen.atomic_symbol(), "N")
+
     def test_molecule_common_aliases_and_counts(self):
         mol = lillymol_nb.MolFromSmiles("CCO ethanol")
         self.assertTrue(mol.ok())

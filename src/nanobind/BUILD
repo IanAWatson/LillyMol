@@ -39,6 +39,7 @@ nanobind_extension(
         "//Molecule_Tools:ring_replacement_lib",
         "//Molecule_Tools:unique_molecules_api",
         "//Molecule_Tools:xlogp_lib",
+        "//Utilities/GFP_Tools:gfp_context",
         "//Utilities/GFP_Tools:truncated_distance_matrix",
     ],
 )
@@ -46,7 +47,10 @@ nanobind_extension(
 py_test(
     name = "lillymol_nb_test",
     srcs = ["lillymol_nb_test.py"],
-    data = [":lillymol_nb"],
+    data = [
+        ":lillymol_nb",
+        "//pybind:testdata/rand10.standard.gfp",
+    ],
     deps = ["//Utilities/GFP_Tools:nearneighbours_py_proto"],
 )
 

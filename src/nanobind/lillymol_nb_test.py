@@ -135,6 +135,32 @@ def _nearneighbours_indices(name, nbrs):
     return proto
 
 
+def _write_text_file(contents, suffix=".txt"):
+    fd, fname = tempfile.mkstemp(suffix=suffix)
+    with os.fdopen(fd, "w") as output:
+        output.write(contents)
+    return fname
+
+
+def _testdata_file(fname):
+    candidates = []
+    for envvar in ("TEST_SRCDIR", "RUNFILES_DIR"):
+        root = os.environ.get(envvar)
+        if root:
+            candidates.extend([
+                os.path.join(root, "_main", "pybind", "testdata", fname),
+                os.path.join(root, "pybind", "testdata", fname),
+            ])
+    candidates.extend([
+        os.path.join(os.path.dirname(__file__), "..", "pybind", "testdata", fname),
+        os.path.join(os.path.dirname(__file__), "..", "..", "pybind", "testdata", fname),
+    ])
+    for candidate in candidates:
+        if os.path.exists(candidate):
+            return candidate
+    raise FileNotFoundError(fname)
+
+
 class LillyMolNanobindTestCase(unittest.TestCase):
 
     def setUp(self):
@@ -144,6 +170,18 @@ class LillyMolNanobindTestCase(unittest.TestCase):
     def tearDown(self):
         if os.environ.get("LILLYMOL_NB_TEST_TRACE"):
             print(f"END {self.id()}", file=sys.stderr, flush=True)
+
+CARBON_GFP = """
+$SMI<C>
+PCN<Methane>
+FCTS<.E..........2;1;1;1;1>
+|
+$SMI<CC>
+PCN<Ethane>
+FCTS<.U..........2;1;1;1;1>
+|
+"""
+
 
 SMILES = """C(=O)NCCCC CHEMBL45466
 C(O)(=O)CCC(O)=O CHEMBL1200345
@@ -1295,6 +1333,109 @@ sidechain {
         product = reaction.perform_reaction(core, lillymol_nb.Set_of_Atoms(matches[0]), iterator)
         self.assertIsNotNone(product)
         self.assertEqual(product.unique_smiles(), "CNc1ccccc1")
+
+    def test_gfp_list_read_and_distance(self):
+        fname = _write_text_file(CARBON_GFP, suffix=".gfp")
+        try:
+            gfp = lillymol_nb.GFPList.from_file(fname)
+            self.assertEqual(len(gfp), 2)
+            self.assertEqual(gfp.size(), 2)
+            self.assertEqual(gfp.tags(), ["FCTS<"])
+            self.assertEqual(gfp.smiles(0), "C")
+            self.assertEqual(gfp.id(1), "Ethane")
+            self.assertAlmostEqual(gfp.distance(0, 0), 0.0, places=6)
+            self.assertAlmostEqual(gfp.distance(0, 1), 0.5, places=6)
+            self.assertAlmostEqual(gfp.distance(1, 0), 0.5, places=6)
+        finally:
+            os.remove(fname)
+
+    def test_gfp_nearest_neighbours(self):
+        fname = _write_text_file(CARBON_GFP, suffix=".gfp")
+        try:
+            gfp = lillymol_nb.GFPList.from_file(fname)
+            hits = gfp.nearest_neighbours(0, 1)
+            self.assertEqual(len(hits), 1)
+            self.assertEqual(hits[0].index, 1)
+            self.assertAlmostEqual(hits[0].distance, 0.5, places=6)
+            self.assertIn("GFPNearestNeighbour", repr(hits[0]))
+
+            close = gfp.nearest_neighbours_within_distance(0, 0.5)
+            self.assertEqual(len(close), 1)
+            self.assertEqual(close[0].index, 1)
+            self.assertEqual(gfp.nearest_neighbours_within_distance(0, 0.49), [])
+        finally:
+            os.remove(fname)
+
+    def test_gfp_standard_golden_distances(self):
+        gfp = lillymol_nb.GFPList.from_file(_testdata_file("rand10.standard.gfp"))
+        self.assertGreater(len(gfp), 3)
+        self.assertEqual(gfp.id(0), "CHEMBL3460651")
+        self.assertEqual(gfp.id(1), "CHEMBL3460651.a")
+        self.assertEqual(gfp.id(3), "CHEMBL1417367")
+
+        self.assertAlmostEqual(gfp.distance(0, 1), 0.0421, delta=0.0001)
+        self.assertAlmostEqual(gfp.distance(1, 0), 0.0421, delta=0.0001)
+        self.assertAlmostEqual(gfp.distance(3, 0), 0.499, delta=0.001)
+        self.assertAlmostEqual(gfp.distance(0, 3), 0.499, delta=0.001)
+
+    def test_gfp_generator_specs_match_standard_context(self):
+        standard = lillymol_nb.GFPContext.standard()
+        from_specs = lillymol_nb.GFPContext.from_specs([
+            lillymol_nb.GFP.iw(),
+            lillymol_nb.GFP.maccs(),
+            lillymol_nb.GFP.mpr(),
+        ])
+
+        self.assertEqual(from_specs.tags(), standard.tags())
+        mol = lillymol_nb.MolFromSmiles("CCO ethanol")
+        fp_standard = standard.fingerprint(mol)
+        fp_from_specs = from_specs.fingerprint(mol)
+        self.assertEqual(fp_standard.context_hash(), fp_from_specs.context_hash())
+        self.assertAlmostEqual(standard.distance(fp_standard, fp_from_specs),
+                               0.0, places=6)
+
+    def test_gfp_standard_list_add_and_query_fingerprint(self):
+        gfp = lillymol_nb.GFPList.standard()
+        self.assertEqual(gfp.tags(), ["FPIW<", "FPMK<", "FPMK2<", "MPR<"])
+
+        for smiles in ["CC ethane", "CCC propane", "CCCC butane"]:
+            gfp.add(lillymol_nb.MolFromSmiles(smiles))
+
+        self.assertEqual(len(gfp), 3)
+        self.assertEqual(gfp.id(0), "ethane")
+        self.assertAlmostEqual(gfp.distance(0, 0), 0.0, places=6)
+
+        query = lillymol_nb.MolFromSmiles("CCC query")
+        fp = lillymol_nb.GFPContext.standard().fingerprint(query)
+        self.assertAlmostEqual(gfp.distance(fp, 1), 0.0, places=6)
+
+        hits = gfp.nearest_neighbours(fp, 2)
+        self.assertEqual(hits[0].index, 1)
+        self.assertAlmostEqual(hits[0].distance, 0.0, places=6)
+
+    def test_gfp_generator_specs_and_errors(self):
+        self.assertEqual(lillymol_nb.GFP.maccs(level2=False).components(), ["FPMK<"])
+        self.assertEqual(lillymol_nb.GFP.formula().components(), ["FCFML<"])
+        self.assertEqual(lillymol_nb.GFP.atom_pair(min_separation=0, max_separation=2,
+                                                   include_out_of_range=True).components(),
+                         ["NCAPT0M2USTY<"])
+        self.assertEqual(lillymol_nb.GFP.ec(radius=3, atom_type="UST:AY").components(),
+                         ["NCEC3USTAY<"])
+        self.assertEqual(lillymol_nb.GFP.spinach(label_join_points=True).components(),
+                         ["FPSPINI<"])
+        self.assertEqual(lillymol_nb.GFP.scaffold(label_join_points=True).components(),
+                         ["FPSCAFI<"])
+        substructure = lillymol_nb.GFP.substructure("c1ccccc1", radius=1)
+        self.assertTrue(substructure.components()[0].startswith("FPSUB1USTARY"))
+
+        with self.assertRaises(ValueError):
+            lillymol_nb.GFP.alogp(replicates=0)
+        with self.assertRaises(ValueError):
+            lillymol_nb.GFP.atom_pair(min_separation=4, max_separation=3)
+        with self.assertRaises(ValueError):
+            lillymol_nb.GFP.substructure("C", no_match="skip")
+        with self.assertRaises(RuntimeError):
+            lillymol_nb.GFPContext.from_specs([lillymol_nb.GFP.iw(), lillymol_nb.GFP.iw()])
 
     def _run_truncated_distance_matrix_storage_case(self, storage):
         fname = _write_tfdatarecord([

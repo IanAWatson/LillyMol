@@ -2,12 +2,17 @@
 
 #include "nanobind/lillymol_nb_internal.h"
 
+#include <cmath>
+#include <memory>
+
+#include <nanobind/stl/shared_ptr.h>
 #include <nanobind/stl/unordered_map.h>
 
 #include "Molecule_Lib/mol2graph.h"
 #include "Molecule_Tools/dicer_api.h"
 #include "Molecule_Tools/ring_replacement_lib.h"
 #include "Molecule_Tools/unique_molecules_api.h"
+#include "Utilities/GFP_Tools/gfp_context.h"
 #include "Utilities/GFP_Tools/truncated_distance_matrix.h"
 
 namespace lillymol_nb {
@@ -83,6 +88,249 @@ DiceMolecule(dicer_api::Dicer& dicer, Molecule& mol) {
   return result;
 }
 
+struct GFPFactory {};
+
+std::string
+GFPTagToString(const IWString& tag) {
+  return tag.AsString();
+}
+
+void
+CheckGFPListIndex(const gfp_context::GFPList& gfp, int ndx, const char* argname) {
+  if (ndx < 0 || ndx >= gfp.size()) {
+    throw std::out_of_range(std::string(argname) + " index out of range");
+  }
+}
+
+void
+CheckGFPListMetadata(const gfp_context::GFPList& gfp) {
+  if (!gfp.metadata_stored()) {
+    throw std::runtime_error("GFPList does not store smiles/id metadata");
+  }
+}
+
+void
+CheckCompatibleFingerprint(const gfp_context::GFPList& gfp,
+                           const gfp_context::GFPFingerprint& fingerprint) {
+  if (fingerprint.context_hash() != gfp.context().context_hash()) {
+    throw std::invalid_argument(
+        "GFPFingerprint was generated with an incompatible GFPContext");
+  }
+}
+
+std::vector<Molecule*>
+MoleculePointerVector(std::vector<Molecule>& molecules) {
+  std::vector<Molecule*> result;
+  result.reserve(molecules.size());
+  for (Molecule& molecule : molecules) {
+    result.push_back(&molecule);
+  }
+  return result;
+}
+
+std::vector<std::string>
+GFPGeneratorSpecComponents(const gfp_context::GFPGeneratorSpec& spec) {
+  std::vector<std::string> result;
+  for (const gfp_context::Component& component : spec.Components()) {
+    result.push_back(component.tag.AsString());
+  }
+  return result;
+}
+
+std::shared_ptr<gfp_context::GFPContext>
+StandardGFPContext(bool preprocess) {
+  auto result = std::make_shared<gfp_context::GFPContext>();
+  if (!result->BuildStandard(preprocess)) {
+    throw std::runtime_error("Cannot initialise standard GFP context");
+  }
+  return result;
+}
+
+std::shared_ptr<gfp_context::GFPContext>
+GFPContextFromSpecs(const std::vector<gfp_context::GFPGeneratorSpec>& specs,
+                    bool preprocess) {
+  auto result = std::make_shared<gfp_context::GFPContext>();
+  if (!result->BuildFromSpecs(specs, preprocess)) {
+    throw std::runtime_error("Cannot initialise GFP context from specs");
+  }
+  return result;
+}
+
+std::unique_ptr<gfp_context::GFPFingerprint>
+GFPContextFingerprint(gfp_context::GFPContext& context, Molecule& mol) {
+  auto result = std::make_unique<gfp_context::GFPFingerprint>();
+  if (!context.Fingerprint(mol, *result)) {
+    throw std::runtime_error("Cannot generate GFP fingerprint");
+  }
+  return result;
+}
+
+void
+GFPContextSetWeight(gfp_context::GFPContext& context, const std::string& tag,
+                    float weight) {
+  if (!context.SetWeight(IWString(tag), weight)) {
+    throw std::runtime_error("Cannot set GFP weight for tag '" + tag + "'");
+  }
+}
+
+void
+GFPContextUseOnly(gfp_context::GFPContext& context,
+                  const std::vector<std::string>& tags) {
+  std::vector<IWString> iwtags;
+  iwtags.reserve(tags.size());
+  for (const std::string& tag : tags) {
+    iwtags.emplace_back(tag);
+  }
+  if (!context.UseOnly(iwtags)) {
+    throw std::runtime_error("Cannot restrict GFP components");
+  }
+}
+
+std::shared_ptr<gfp_context::GFPList>
+StandardGFPList(bool preprocess) {
+  auto result = gfp_context::GFPList::Standard(preprocess);
+  if (result == nullptr) {
+    throw std::runtime_error("Cannot initialise standard GFP list");
+  }
+  return result;
+}
+
+std::shared_ptr<gfp_context::GFPList>
+StandardGFPListFromMolecules(std::vector<Molecule>& molecules, bool preprocess,
+                             bool store_metadata) {
+  std::vector<Molecule*> molecule_ptrs = MoleculePointerVector(molecules);
+  auto result = gfp_context::GFPList::StandardFromMolecules(
+      molecule_ptrs, preprocess, store_metadata);
+  if (result == nullptr) {
+    throw std::runtime_error("Cannot build standard GFP list from molecules");
+  }
+  return result;
+}
+
+std::shared_ptr<gfp_context::GFPList>
+GFPListFromFile(const std::string& fname, int size_hint) {
+  auto result = std::make_shared<gfp_context::GFPList>();
+  if (!result->ReadFile(fname.c_str(), size_hint)) {
+    throw std::runtime_error("Cannot read GFP file '" + fname + "'");
+  }
+  return result;
+}
+
+void
+GFPListReadFile(gfp_context::GFPList& gfp, const std::string& fname, int size_hint) {
+  if (!gfp.ReadFile(fname.c_str(), size_hint)) {
+    throw std::runtime_error("Cannot read GFP file '" + fname + "'");
+  }
+}
+
+std::string
+GFPListSmiles(const gfp_context::GFPList& gfp, int ndx) {
+  CheckGFPListIndex(gfp, ndx, "i");
+  CheckGFPListMetadata(gfp);
+  return GFPTagToString(gfp.smiles(ndx));
+}
+
+std::string
+GFPListId(const gfp_context::GFPList& gfp, int ndx) {
+  CheckGFPListIndex(gfp, ndx, "i");
+  CheckGFPListMetadata(gfp);
+  return GFPTagToString(gfp.id(ndx));
+}
+
+void
+GFPListAdd(gfp_context::GFPList& gfp, Molecule& mol) {
+  if (!gfp.Add(mol)) {
+    throw std::runtime_error("Cannot add molecule to GFPList");
+  }
+}
+
+void
+GFPListAddMolecules(gfp_context::GFPList& gfp, std::vector<Molecule>& molecules,
+                    bool store_metadata) {
+  std::vector<Molecule*> molecule_ptrs = MoleculePointerVector(molecules);
+  if (!gfp.AddMolecules(molecule_ptrs, store_metadata)) {
+    throw std::runtime_error("Cannot add molecules to GFPList");
+  }
+}
+
+float
+GFPListDistanceIndices(const gfp_context::GFPList& gfp, int i, int j) {
+  CheckGFPListIndex(gfp, i, "i");
+  CheckGFPListIndex(gfp, j, "j");
+  return gfp.Distance(i, j);
+}
+
+float
+GFPListDistanceFingerprint(const gfp_context::GFPList& gfp,
+                           const gfp_context::GFPFingerprint& fingerprint, int j) {
+  CheckCompatibleFingerprint(gfp, fingerprint);
+  CheckGFPListIndex(gfp, j, "j");
+  const float result = gfp.Distance(fingerprint, j);
+  if (!std::isfinite(result)) {
+    throw std::runtime_error("GFP distance calculation failed");
+  }
+  return result;
+}
+
+std::vector<gfp_context::NearestNeighbour>
+GFPListNearestNeighboursIndex(const gfp_context::GFPList& gfp, int query, int k) {
+  CheckGFPListIndex(gfp, query, "query");
+  return gfp.NearestNeighbours(query, k);
+}
+
+std::vector<gfp_context::NearestNeighbour>
+GFPListNearestNeighboursFingerprint(const gfp_context::GFPList& gfp,
+                                    const gfp_context::GFPFingerprint& query, int k) {
+  CheckCompatibleFingerprint(gfp, query);
+  return gfp.NearestNeighbours(query, k);
+}
+
+std::vector<gfp_context::NearestNeighbour>
+GFPListNearestNeighboursWithinDistanceIndex(const gfp_context::GFPList& gfp,
+                                            int query, float max_distance) {
+  CheckGFPListIndex(gfp, query, "query");
+  if (max_distance < 0.0f) {
+    throw std::invalid_argument("max_distance must be non-negative");
+  }
+  return gfp.NearestNeighboursWithinDistance(query, max_distance);
+}
+
+std::vector<gfp_context::NearestNeighbour>
+GFPListNearestNeighboursWithinDistanceFingerprint(
+    const gfp_context::GFPList& gfp, const gfp_context::GFPFingerprint& query,
+    float max_distance) {
+  CheckCompatibleFingerprint(gfp, query);
+  if (max_distance < 0.0f) {
+    throw std::invalid_argument("max_distance must be non-negative");
+  }
+  return gfp.NearestNeighboursWithinDistance(query, max_distance);
+}
+
+void
+GFPListSetWeight(gfp_context::GFPList& gfp, const std::string& tag, float weight) {
+  if (!gfp.mutable_context().SetWeight(IWString(tag), weight)) {
+    throw std::runtime_error("Cannot set GFP weight for tag '" + tag + "'");
+  }
+}
+
+void
+GFPListUseOnly(gfp_context::GFPList& gfp, const std::vector<std::string>& tags) {
+  std::vector<IWString> iwtags;
+  iwtags.reserve(tags.size());
+  for (const std::string& tag : tags) {
+    iwtags.emplace_back(tag);
+  }
+  if (!gfp.mutable_context().UseOnly(iwtags)) {
+    throw std::runtime_error("Cannot restrict GFP components");
+  }
+}
+
+std::string
+NearestNeighbourRepr(const gfp_context::NearestNeighbour& neighbour) {
+  return "GFPNearestNeighbour(index=" + std::to_string(neighbour.index) +
+         ", distance=" + std::to_string(neighbour.distance) + ")";
+}
+
 }  // namespace
 
 void
@@ -139,6 +387,179 @@ BindTools(nb::module_& m) {
            nb::arg("i"), nb::arg("j"))
       .def("distances_or_default", &TruncatedDistanceMatrixDistancesOrDefault,
            nb::arg("i"), nb::arg("j"));
+
+  nb::class_<gfp_context::GFPFingerprint>(m, "GFPFingerprint")
+      .def("context_hash", &gfp_context::GFPFingerprint::context_hash);
+
+  nb::class_<gfp_context::GFPGeneratorSpec>(m, "GFPGeneratorSpec")
+      .def("components", &GFPGeneratorSpecComponents)
+      .def("__repr__", &gfp_context::GFPGeneratorSpec::Repr);
+
+  nb::class_<GFPFactory>(m, "GFP")
+      .def_static("mpr", &gfp_context::GFPGeneratorSpec::MolecularProperties)
+      .def_static("iw", &gfp_context::GFPGeneratorSpec::IWMFingerprint)
+      .def_static("maccs", &gfp_context::GFPGeneratorSpec::MACCSKeys,
+                  nb::arg("level2") = true)
+      .def_static("formula", &gfp_context::GFPGeneratorSpec::FormulaFingerprint)
+      .def_static("cats",
+           [](int max_path_length, bool include_hydrophobic_pairs) {
+             if (max_path_length < 1) {
+               throw std::invalid_argument("max_path_length must be positive");
+             }
+             return gfp_context::GFPGeneratorSpec::CATS(max_path_length,
+                                                        include_hydrophobic_pairs);
+           },
+           nb::arg("max_path_length") = 10,
+           nb::arg("include_hydrophobic_pairs") = true)
+      .def_static("alogp",
+           [](int replicates) {
+             if (replicates <= 0) {
+               throw std::invalid_argument("replicates must be positive");
+             }
+             return gfp_context::GFPGeneratorSpec::ALogP(replicates);
+           },
+           nb::arg("replicates") = 9)
+      .def_static("xlogp",
+           [](int replicates) {
+             if (replicates <= 0) {
+               throw std::invalid_argument("replicates must be positive");
+             }
+             return gfp_context::GFPGeneratorSpec::XLogP(replicates);
+           },
+           nb::arg("replicates") = 9)
+      .def_static("tpsa",
+           [](int replicates) {
+             if (replicates <= 0) {
+               throw std::invalid_argument("replicates must be positive");
+             }
+             return gfp_context::GFPGeneratorSpec::TPSA(replicates);
+           },
+           nb::arg("replicates") = 9)
+      .def_static("atom_pair",
+           [](int min_separation, int max_separation, const std::string& atom_type,
+              bool include_out_of_range) {
+             if (min_separation < 0) {
+               throw std::invalid_argument("min_separation must be non-negative");
+             }
+             if (max_separation < min_separation) {
+               throw std::invalid_argument("max_separation must be >= min_separation");
+             }
+             if (atom_type.empty()) {
+               throw std::invalid_argument("atom_type must be non-empty");
+             }
+             return gfp_context::GFPGeneratorSpec::AtomPair(
+                 min_separation, max_separation, IWString(atom_type),
+                 include_out_of_range);
+           },
+           nb::arg("min_separation") = 1, nb::arg("max_separation") = 10,
+           nb::arg("atom_type") = "UST:Y", nb::arg("include_out_of_range") = false)
+      .def_static("ec",
+           [](int radius, const std::string& atom_type) {
+             if (radius < 0) {
+               throw std::invalid_argument("radius must be non-negative");
+             }
+             if (atom_type.empty()) {
+               throw std::invalid_argument("atom_type must be non-empty");
+             }
+             return gfp_context::GFPGeneratorSpec::ECFingerprint(radius,
+                                                                 IWString(atom_type));
+           },
+           nb::arg("radius") = 3, nb::arg("atom_type") = "UST:Z")
+      .def_static("ring_substitution", &gfp_context::GFPGeneratorSpec::RingSubstitution)
+      .def_static("spinach", &gfp_context::GFPGeneratorSpec::SpinachFingerprint,
+                  nb::arg("label_join_points") = false)
+      .def_static("scaffold", &gfp_context::GFPGeneratorSpec::ScaffoldFingerprint,
+                  nb::arg("label_join_points") = false)
+      .def_static("substructure",
+           [](const std::string& smarts, int radius, const std::string& atom_type,
+              const std::string& no_match) {
+             if (smarts.empty()) {
+               throw std::invalid_argument("smarts must be non-empty");
+             }
+             if (radius < 0) {
+               throw std::invalid_argument("radius must be non-negative");
+             }
+             if (atom_type.empty()) {
+               throw std::invalid_argument("atom_type must be non-empty");
+             }
+             bool no_match_is_empty;
+             if (no_match == "empty") {
+               no_match_is_empty = true;
+             } else if (no_match == "error") {
+               no_match_is_empty = false;
+             } else {
+               throw std::invalid_argument("no_match must be 'empty' or 'error'");
+             }
+             return gfp_context::GFPGeneratorSpec::SubstructureFingerprint(
+                 IWString(smarts), radius, IWString(atom_type), no_match_is_empty);
+           },
+           nb::arg("smarts"), nb::arg("radius") = 0,
+           nb::arg("atom_type") = "UST:ARY", nb::arg("no_match") = "empty");
+
+  nb::class_<gfp_context::GFPContext>(m, "GFPContext")
+      .def(nb::init<>())
+      .def_static("standard", &StandardGFPContext, nb::arg("preprocess") = true,
+                  "Create a context that generates the standard LillyMol GFP fingerprint")
+      .def_static("from_specs", &GFPContextFromSpecs, nb::arg("specs"),
+                  nb::arg("preprocess") = true,
+                  "Create a context from GFP generator specifications")
+      .def("tags", &gfp_context::GFPContext::Tags)
+      .def("can_generate_fingerprints",
+           &gfp_context::GFPContext::can_generate_fingerprints)
+      .def("fingerprint", &GFPContextFingerprint, nb::arg("mol"))
+      .def("distance", &gfp_context::GFPContext::Distance,
+           nb::arg("lhs"), nb::arg("rhs"))
+      .def("set_weight", &GFPContextSetWeight, nb::arg("tag"), nb::arg("weight"))
+      .def("use_only", &GFPContextUseOnly, nb::arg("tags"))
+      .def("use_all", &gfp_context::GFPContext::UseAll);
+
+  nb::class_<gfp_context::NearestNeighbour>(m, "GFPNearestNeighbour")
+      .def_ro("index", &gfp_context::NearestNeighbour::index)
+      .def_ro("distance", &gfp_context::NearestNeighbour::distance)
+      .def("__repr__", &NearestNeighbourRepr);
+
+  nb::class_<gfp_context::GFPList>(m, "GFPList")
+      .def(nb::init<>())
+      .def(nb::init<std::shared_ptr<gfp_context::GFPContext>>(), nb::arg("context"))
+      .def_static("standard", &StandardGFPList, nb::arg("preprocess") = true,
+                  "Create an empty GFPList that generates standard LillyMol GFP fingerprints")
+      .def_static("standard_from_molecules", &StandardGFPListFromMolecules,
+                  nb::arg("molecules"), nb::arg("preprocess") = true,
+                  nb::arg("store_metadata") = false,
+                  "Build a standard GFPList from molecules")
+      .def_static("from_file", &GFPListFromFile, nb::arg("fname"),
+                  nb::arg("size_hint") = 0, "Read a GFP/TDT fingerprint file")
+      .def("read_file", &GFPListReadFile, nb::arg("fname"),
+           nb::arg("size_hint") = 0,
+           "Read a GFP/TDT fingerprint file into this object")
+      .def("__len__", &gfp_context::GFPList::size)
+      .def("size", &gfp_context::GFPList::size)
+      .def("metadata_stored", &gfp_context::GFPList::metadata_stored)
+      .def("tags", [](const gfp_context::GFPList& gfp) {
+        return gfp.context().Tags();
+      })
+      .def("smiles", &GFPListSmiles, nb::arg("i"))
+      .def("id", &GFPListId, nb::arg("i"))
+      .def("add", &GFPListAdd, nb::arg("mol"))
+      .def("add_molecules", &GFPListAddMolecules, nb::arg("molecules"),
+           nb::arg("store_metadata") = false)
+      .def("distance", &GFPListDistanceIndices, nb::arg("i"), nb::arg("j"))
+      .def("distance", &GFPListDistanceFingerprint, nb::arg("fp"), nb::arg("j"))
+      .def("nearest_neighbours", &GFPListNearestNeighboursIndex,
+           nb::arg("query"), nb::arg("k"))
+      .def("nearest_neighbours", &GFPListNearestNeighboursFingerprint,
+           nb::arg("query"), nb::arg("k"))
+      .def("nearest_neighbours_within_distance",
+           &GFPListNearestNeighboursWithinDistanceIndex,
+           nb::arg("query"), nb::arg("max_distance"))
+      .def("nearest_neighbours_within_distance",
+           &GFPListNearestNeighboursWithinDistanceFingerprint,
+           nb::arg("query"), nb::arg("max_distance"))
+      .def("set_weight", &GFPListSetWeight, nb::arg("tag"), nb::arg("weight"))
+      .def("use_only", &GFPListUseOnly, nb::arg("tags"))
+      .def("use_all", [](gfp_context::GFPList& gfp) {
+        gfp.mutable_context().UseAll();
+      });
 
   nb::class_<Mol2Graph>(m, "Mol2Graph")
       .def(nb::init<>())

@@ -6,6 +6,20 @@ void
 BindDescriptors(nb::module_& m) {
   m.def("MolFromSmiles", &MolFromSmiles, nb::arg("smiles"),
         "Build a Molecule from SMILES, returning None on parse failure");
+  m.def("LillyMolFromSmiles", &MolFromSmiles, nb::arg("smiles"),
+        "Build a Molecule from SMILES, returning None on parse failure");
+  m.def("MolFromSmiles",
+        [](const std::vector<std::string>& smiles) {
+          std::vector<Molecule> result(smiles.size());
+          for (uint32_t i = 0; i < smiles.size(); ++i) {
+            if (!result[i].build_from_smiles(smiles[i])) {
+              result[i].resize(0);
+            }
+          }
+          return result;
+        },
+        nb::arg("smiles"),
+        "Build molecules from a list of SMILES strings; invalid entries are empty molecules");
 
   m.def("QueryFromSmarts",
         [](const std::string& smarts) -> std::unique_ptr<Substructure_Query> {

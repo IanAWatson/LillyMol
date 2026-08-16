@@ -62,6 +62,26 @@ class TestNanobindMolecule(LillyMolNanobindTestCase):
         self.assertEqual(mol.name(), "benzene")
         self.assertIsNone(lillymol_nb.MolFromSmiles("["))
 
+    def test_lillymol_from_smiles_and_batch_smiles(self):
+        mol = lillymol_nb.LillyMolFromSmiles("CCO ethanol")
+        self.assertIsNotNone(mol)
+        self.assertEqual(mol.name(), "ethanol")
+
+        molecules = lillymol_nb.MolFromSmiles(["C methane", "CC ethane", "["])
+        self.assertEqual(len(molecules), 3)
+        self.assertEqual(molecules[0].name(), "methane")
+        self.assertEqual(molecules[1].natoms(), 2)
+        self.assertEqual(molecules[2].natoms(), 0)
+
+    def test_molecule_equality(self):
+        mol1 = lillymol_nb.MolFromSmiles("CCO ethanol")
+        mol2 = lillymol_nb.MolFromSmiles("CCO other")
+        mol3 = lillymol_nb.MolFromSmiles("CCN ethylamine")
+        self.assertEqual(mol1, mol2)
+        self.assertNotEqual(mol1, mol3)
+        mol2.set_atomic_number(2, 7)
+        self.assertEqual(mol2, mol3)
+
     def test_reader_open_and_next(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             fname = os.path.join(tmpdir, "input.smi")

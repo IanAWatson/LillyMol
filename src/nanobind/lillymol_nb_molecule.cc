@@ -895,6 +895,9 @@ BindMolecule(nb::module_& m) {
            nb::rv_policy::reference_internal)
       .def("__add__",
            [](const Molecule& lhs, const Molecule& rhs) { return lhs + rhs; })
+      .def("__eq__",
+           [](Molecule& lhs, Molecule& rhs) { return lhs == rhs; },
+           nb::arg("rhs"))
       .def("__len__", [](const Molecule& mol) { return mol.natoms(); })
       .def("__getitem__",
            [](const Molecule& mol, int index) { return mol[index]; },

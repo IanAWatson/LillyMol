@@ -3,6 +3,7 @@
 #include "Molecule_Lib/atom_typing.h"
 #include "Molecule_Lib/qry_wstats.h"
 #include "Molecule_Tools/jwcats_lib.h"
+#include "Molecule_Tools/qed.h"
 
 namespace lillymol_nb {
 namespace {
@@ -113,6 +114,34 @@ ComputeJWCats(jwcats::JWCats& jwcats, Molecule& mol) {
   return JWCatsResultToVector(jwcats, result);
 }
 
+void
+InitialiseQedFromEnvironment(qed::Qed& qed) {
+  if (!qed.InitialiseFromEnvironment()) {
+    throw std::runtime_error(
+        "Cannot initialise QED; ensure LILLYMOL_HOME points to a LillyMol tree");
+  }
+}
+
+void
+InitialiseQedFromDirectory(qed::Qed& qed, const std::string& dirname) {
+  if (!qed.InitialiseFromDirectory(IWString(dirname))) {
+    throw std::runtime_error("Cannot initialise QED from '" + dirname + "'");
+  }
+}
+
+std::optional<float>
+QedScore(qed::Qed& qed, const Molecule& mol) {
+  Molecule mcopy(mol);
+  return qed.qed(mcopy);
+}
+
+std::optional<float>
+QedScoreFromEnvironment(const Molecule& mol) {
+  qed::Qed calc;
+  InitialiseQedFromEnvironment(calc);
+  return QedScore(calc, mol);
+}
+
 }  // namespace
 
 void
@@ -179,6 +208,42 @@ BindDescriptors(nb::module_& m) {
       .def("logp",
            [](alogp::ALogP& calc, Molecule& mol) { return calc.LogP(mol); },
            nb::arg("mol"), "Compute AlogP");
+
+  nb::class_<qed::Qed>(m, "QED")
+      .def("__init__",
+           [](qed::Qed* qed, bool initialise_from_environment) {
+             new (qed) qed::Qed();
+             if (initialise_from_environment) {
+               InitialiseQedFromEnvironment(*qed);
+             }
+           },
+           nb::arg("initialise_from_environment") = true)
+      .def("__init__",
+           [](qed::Qed* qed, const std::string& query_dir) {
+             new (qed) qed::Qed();
+             InitialiseQedFromDirectory(*qed, query_dir);
+           },
+           nb::arg("query_dir"))
+      .def("initialise_from_environment",
+           [](qed::Qed& qed) {
+             InitialiseQedFromEnvironment(qed);
+             return true;
+           },
+           "Initialise QED from LILLYMOL_HOME/data/queries/QED")
+      .def("initialise_from_directory",
+           [](qed::Qed& qed, const std::string& dirname) {
+             InitialiseQedFromDirectory(qed, dirname);
+             return true;
+           },
+           nb::arg("dirname"),
+           "Initialise QED from a directory containing the QED smarts files")
+      .def("qed", &QedScore, nb::arg("mol"),
+           "Compute QED, returning None if the calculation fails")
+      .def("score", &QedScore, nb::arg("mol"),
+           "Compute QED, returning None if the calculation fails");
+
+  m.def("qed_score", &QedScoreFromEnvironment, nb::arg("mol"),
+        "Compute QED with query data from LILLYMOL_HOME, returning None on failure");
 
   nb::class_<jwcats::JWCats>(m, "JWCats")
       .def("__init__",

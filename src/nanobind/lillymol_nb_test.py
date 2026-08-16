@@ -50,6 +50,10 @@ def _charges_query_dir():
     return _query_dir("charges")
 
 
+def _qed_query_dir():
+    return _query_dir("QED")
+
+
 class LillyMolNanobindTestCase(unittest.TestCase):
 
     def setUp(self):
@@ -1007,6 +1011,25 @@ $$$$
         calc.set_rdkit_phoshoric_acid_hydrogen(True)
         calc.set_use_alcohol_for_acid(True)
         self.assertIsNotNone(calc.logp(mol))
+
+    def test_qed(self):
+        query_dir = _qed_query_dir()
+        if query_dir is None:
+            self.skipTest("QED query directory not available")
+
+        mol = lillymol_nb.MolFromSmiles("CC(=O)Oc1ccccc1C(=O)O aspirin")
+        initial_smiles = mol.smiles()
+
+        calc = lillymol_nb.QED(initialise_from_environment=False)
+        self.assertTrue(calc.initialise_from_directory(query_dir))
+        value = calc.qed(mol)
+        self.assertIsNotNone(value)
+        self.assertGreaterEqual(value, 0.0)
+        self.assertLessEqual(value, 1.0)
+        self.assertEqual(mol.smiles(), initial_smiles)
+
+        calc_from_dir = lillymol_nb.QED(query_dir)
+        self.assertAlmostEqual(calc_from_dir.score(mol), value, delta=1.0e-6)
 
     def test_jwcats(self):
         charges = _charges_query_dir()

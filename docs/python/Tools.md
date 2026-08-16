@@ -5,8 +5,11 @@ from tools otherwise available as c++ executables.
 
 ## Molecular Descriptors
 
-The `IWDescr` class computes the complete set of molecular descriptors provided
-by `iwdescr.sh` and returns them as a NumPy array. See
+`IWDescr` computes the complete descriptor set provided by `iwdescr.sh` and
+returns NumPy arrays. `MolecularDescriptors` wraps the same calculation with
+friendlier `names()`, `compute()`, and `compute_array()` methods. Common scalar
+helpers such as `molecular_weight`, `alogp`, `xlogp`, `tpsa`, and `qed_score`
+are also available from `lillymol_tools`. See
 [Molecular Descriptors](descriptors.md) for usage, requirements, descriptor
 ordering, and performance information.
 

@@ -1,12 +1,19 @@
 # Molecular Descriptors
 
-The `IWDescr` Python class provides the molecular descriptors computed by
-[`iwdescr.sh`](https://github.com/IanAWatson/LillyMol/blob/master/docs/Molecule_Tools/iwdescr.md).
-It is intended for applications that need descriptor values directly in Python
-rather than a descriptor file.
+The `lillymol_tools` module exposes molecular descriptor calculations for use
+directly in Python rather than via descriptor files.
 
-`IWDescr` always computes the complete descriptor set. The Python interface does
-not provide options for enabling or disabling individual descriptor families.
+`IWDescr` is the primary high-throughput descriptor engine. It computes the same
+complete descriptor set as
+[`iwdescr.sh`](https://github.com/IanAWatson/LillyMol/blob/master/docs/Molecule_Tools/iwdescr.md)
+and returns NumPy arrays.
+
+`MolecularDescriptors` is a small convenience wrapper around `IWDescr` for more
+discoverable Python usage. It provides descriptor names, NumPy array output,
+dictionary output for one molecule, and batch output.
+
+The Python interface does not provide options for enabling or disabling
+individual `IWDescr` descriptor families.
 
 ## Requirements
 
@@ -30,10 +37,31 @@ For DataFrame output, pandas is also required:
 pip install pandas
 ```
 
-Construction fails if `LILLYMOL_HOME` is not defined or the standard query files
-cannot be loaded.
+Construction of `IWDescr` or `MolecularDescriptors` fails if `LILLYMOL_HOME` is
+not defined or the standard query files cannot be loaded.
 
 ## Basic Usage
+
+For exploratory Python code, `MolecularDescriptors` is usually the easiest
+starting point:
+
+```python
+from lillymol import MolFromSmiles
+from lillymol_tools import MolecularDescriptors
+
+mol = MolFromSmiles("CCO ethanol")
+descriptors = MolecularDescriptors()
+
+values = descriptors.compute(mol)
+print(values["amw"])
+print(values["nrings"])
+```
+
+`compute()` returns a normal Python `dict` keyed by descriptor name.
+`compute_array()` returns the same values as a one-dimensional NumPy array, and
+`names()` gives the corresponding column order.
+
+For code that is already array-oriented, use `IWDescr` directly:
 
 ```python
 from lillymol import MolFromSmiles
@@ -76,8 +104,32 @@ for mol in molecules:
     print(values[name_to_column["amw"]])
 ```
 
-All descriptors are computed by every call to `process()`, even when the
-application uses only a few values.
+All descriptors are computed by every call to `process()` or
+`MolecularDescriptors.compute()`, even when the application uses only a few
+values.
+
+## Scalar Helpers
+
+Common one-off descriptor calculations are also available as free functions from
+`lillymol_tools`:
+
+```python
+from lillymol import MolFromSmiles
+from lillymol_tools import alogp, molecular_weight, qed_score, tpsa, xlogp
+
+mol = MolFromSmiles("CCO ethanol")
+
+print(molecular_weight(mol))
+print(alogp(mol))
+print(xlogp(mol))
+print(tpsa(mol))
+print(qed_score(mol))
+```
+
+`alogp`, `xlogp`, `tpsa`, and `qed_score` return `None` if the calculation
+fails. `qed_score` constructs and initialises a temporary QED calculator from
+`LILLYMOL_HOME`; use the `QED` class directly when computing QED for many
+molecules.
 
 ## Rotatable Bonds
 

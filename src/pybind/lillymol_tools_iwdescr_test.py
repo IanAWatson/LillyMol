@@ -29,6 +29,62 @@ def _make_molecule(smiles, name):
 # Existing single-molecule tests (unchanged)
 # ---------------------------------------------------------------------------
 
+class TestDescriptorConvenienceFunctions(unittest.TestCase):
+
+    def test_molecular_weight(self):
+        mol = _make_molecule("CCO", "ethanol")
+        self.assertAlmostEqual(molecular_weight(mol), 46.069, delta=0.001)
+
+    def test_tpsa(self):
+        mol = _make_molecule("CCO", "ethanol")
+        value = tpsa(mol)
+        self.assertIsNotNone(value)
+        self.assertGreater(value, 0.0)
+
+    def test_alogp_and_xlogp(self):
+        mol = _make_molecule("CCO", "ethanol")
+        self.assertIsNotNone(alogp(mol))
+        mol = _make_molecule("CCO", "ethanol")
+        self.assertIsNotNone(xlogp(mol))
+
+
+class TestMolecularDescriptors(unittest.TestCase):
+
+    def setUp(self):
+        _skip_guards(self)
+        self._descriptors = MolecularDescriptors()
+
+    def test_names(self):
+        names = self._descriptors.names()
+        self.assertGreater(len(names), 0)
+        self.assertEqual(names, self._descriptors.feature_names())
+        self.assertEqual(names[0], "natoms")
+        self.assertEqual(names[1], "nrings")
+
+    def test_compute_array(self):
+        mol = _make_molecule("CCO", "ethanol")
+        values = self._descriptors.compute_array(mol)
+        self.assertEqual(values.dtype.name, "float32")
+        self.assertEqual(values.ndim, 1)
+        self.assertEqual(values.size, len(self._descriptors.names()))
+
+    def test_compute_dict(self):
+        mol = _make_molecule("CCO", "ethanol")
+        values = self._descriptors.compute(mol)
+        self.assertIsInstance(values, dict)
+        self.assertEqual(values["natoms"], 3.0)
+        self.assertEqual(values["nrings"], 0.0)
+        self.assertIn("amw", values)
+
+    def test_compute_list(self):
+        mols = [
+            _make_molecule("CCO", "ethanol"),
+            _make_molecule("c1ccccc1", "benzene"),
+        ]
+        values = self._descriptors.compute_list(mols)
+        self.assertEqual(values.shape, (2, len(self._descriptors.names())))
+
+
 class TestIWDescr(unittest.TestCase):
 
     def test_all_descriptors(self):

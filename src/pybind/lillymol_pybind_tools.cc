@@ -10,6 +10,7 @@
 #include "pybind11/numpy.h"
 #include "pybind11/pybind11.h"
 // to convert C++ STL containers to python list
+#include "Molecule_Tools/alogp.h"
 #include "Molecule_Tools/dicer_api.h"
 #include "Molecule_Tools/iwdescr_lib.h"
 #include "Molecule_Tools/jwcats_lib.h"
@@ -19,6 +20,7 @@
 #include "Molecule_Tools/qed.h"
 #include "Molecule_Tools/ring_replacement_lib.h"
 #include "Molecule_Tools/unique_molecules_api.h"
+#include "Molecule_Tools/xlogp.h"
 #include "Molecule_Tools_Bdb/iwecfp_database_lookup_lib.h"
 #include "Molecule_Tools_Bdb/selimsteg.h"
 #include "Molecule_Tools_Bdb/structure_database.h"
@@ -71,6 +73,87 @@ LipinskiHbaHbd(Molecule& m) {
 
   return std::make_tuple(hba, hbd);
 }
+
+class MolecularDescriptors {
+  private:
+    IWDescr _iwdescr;
+
+    py::list FeatureNamesAsPyList() const {
+      py::list result;
+      const int ndescr = _iwdescr.number_descriptors();
+      for (int i = 0; i < ndescr; ++i) {
+        result.append(_iwdescr.descriptor_name(i).AsString());
+      }
+      return result;
+    }
+
+  public:
+    MolecularDescriptors() {
+      if (!_iwdescr.InitialiseAll()) {
+        throw std::runtime_error(
+            "Cannot initialise MolecularDescriptors; ensure LILLYMOL_HOME is defined "
+            "and contains the standard charge and donor/acceptor queries");
+      }
+    }
+
+    std::vector<std::string> Names() const {
+      std::vector<std::string> result;
+      const int ndescr = _iwdescr.number_descriptors();
+      result.reserve(ndescr);
+      for (int i = 0; i < ndescr; ++i) {
+        result.push_back(_iwdescr.descriptor_name(i).AsString());
+      }
+      return result;
+    }
+
+    py::array_t<float> ComputeArray(Molecule& mol) {
+      py::array_t<float> result(_iwdescr.number_descriptors());
+      if (!_iwdescr.Process(mol, result.mutable_data())) {
+        throw std::runtime_error("MolecularDescriptors calculation failed");
+      }
+      return result;
+    }
+
+    py::dict Compute(Molecule& mol) {
+      py::array_t<float> values = ComputeArray(mol);
+      const float* ptr = values.data();
+      py::dict result;
+      const int ndescr = _iwdescr.number_descriptors();
+      for (int i = 0; i < ndescr; ++i) {
+        result[py::str(_iwdescr.descriptor_name(i).AsString())] = ptr[i];
+      }
+      return result;
+    }
+
+    py::object ComputeList(std::vector<Molecule*>& mols, bool as_dataframe) {
+      const int nmols = static_cast<int>(mols.size());
+      const int ndescr = _iwdescr.number_descriptors();
+
+      py::array_t<float> result({nmols, ndescr});
+      float* ptr = result.mutable_data();
+
+      for (int i = 0; i < nmols; ++i) {
+        if (!_iwdescr.Process(*mols[i], ptr + i * ndescr)) {
+          throw std::runtime_error(
+              std::string("MolecularDescriptors calculation failed for molecule ") +
+              mols[i]->name().AsString());
+        }
+      }
+
+      if (!as_dataframe) {
+        return py::object(result);
+      }
+
+      py::list index;
+      for (int i = 0; i < nmols; ++i) {
+        index.append(mols[i]->name().AsString());
+      }
+
+      py::module_ pd = py::module_::import("pandas");
+      return pd.attr("DataFrame")(result, py::arg("columns") = FeatureNamesAsPyList(),
+                                   py::arg("index") = index);
+    }
+};
 
 std::unique_ptr<jwcats::JWCats>
 MakeJWCats(bool initialise_default_assigners) {
@@ -645,6 +728,59 @@ PYBIND11_MODULE(lillymol_tools, m) {
       "HbaHbd", [](Molecule& mol) { return LipinskiHbaHbd(mol); }, py::arg("mol"),
       "Return Lipinski-style hydrogen-bond acceptor and donor counts as (hba, hbd)");
 
+  m.def(
+      "molecular_weight",
+      [](const Molecule& mol) { return lillymol::MolecularWeightIsotopesAsLabels(mol); },
+      py::arg("mol"),
+      "Return molecular weight, treating isotope labels as labels rather than masses");
+
+  m.def(
+      "alogp",
+      [](Molecule& mol) -> std::optional<float> {
+        alogp::ALogP calc;
+        calc.set_use_alcohol_for_acid(1);
+        calc.set_rdkit_phoshoric_acid_hydrogen(1);
+        std::optional<double> result = calc.LogP(mol);
+        if (!result) {
+          return std::nullopt;
+        }
+        return static_cast<float>(*result);
+      },
+      py::arg("mol"), "Compute ALogP, returning None if the calculation fails");
+
+  m.def(
+      "xlogp",
+      [](Molecule& mol) -> std::optional<float> {
+        xlogp::XLogPCalc calc;
+        std::optional<double> result = calc.LogP(mol);
+        if (!result) {
+          return std::nullopt;
+        }
+        return static_cast<float>(*result);
+      },
+      py::arg("mol"), "Compute XLogP, returning None if the calculation fails");
+
+  m.def(
+      "tpsa",
+      [](Molecule& mol) -> std::optional<double> {
+        nvrtspsa::NovartisPolarSurfaceArea calc;
+        return calc.PolarSurfaceArea(mol);
+      },
+      py::arg("mol"), "Compute topological polar surface area");
+
+  m.def(
+      "qed_score",
+      [](const Molecule& mol) -> std::optional<float> {
+        qed::Qed calc;
+        if (!calc.InitialiseFromEnvironment()) {
+          throw std::runtime_error(
+              "Cannot initialise QED; ensure LILLYMOL_HOME points to a LillyMol tree");
+        }
+        Molecule mcopy(mol);
+        return calc.qed(mcopy);
+      },
+      py::arg("mol"), "Compute QED, returning None if the calculation fails");
+
   py::class_<qed::Qed>(m, "QED")
       .def(py::init([](bool initialise_from_environment) {
              auto result = std::make_unique<qed::Qed>();
@@ -1122,6 +1258,20 @@ PYBIND11_MODULE(lillymol_tools, m) {
            "Make implicit hydrogens explicit during calculation")
       .def("initialised", &jwcats::JWCats::initialised,
            "Return whether the object has been initialised");
+
+  py::class_<MolecularDescriptors>(m, "MolecularDescriptors")
+      .def(py::init<>())
+      .def("names", &MolecularDescriptors::Names,
+           "Return descriptor names in the same order as compute_array() values")
+      .def("feature_names", &MolecularDescriptors::Names,
+           "Alias for names()")
+      .def("compute_array", &MolecularDescriptors::ComputeArray, py::arg("mol"),
+           "Compute all descriptors for one molecule as a float32 NumPy array")
+      .def("compute", &MolecularDescriptors::Compute, py::arg("mol"),
+           "Compute all descriptors for one molecule as a dict keyed by descriptor name")
+      .def("compute_list", &MolecularDescriptors::ComputeList,
+           py::arg("mols"), py::arg("as_dataframe") = false,
+           "Compute all descriptors for a list of molecules as an array or DataFrame");
 
   py::class_<IWDescr>(m, "IWDescr")
       .def(py::init([]() {

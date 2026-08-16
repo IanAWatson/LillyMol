@@ -150,6 +150,7 @@ void BindSubstructure(nb::module_& m);
 void BindTSubstructure(nb::module_& m);
 void BindMolecule(nb::module_& m);
 void BindDescriptors(nb::module_& m);
+void BindStandardise(nb::module_& m);
 
 }  // namespace lillymol_nb
 

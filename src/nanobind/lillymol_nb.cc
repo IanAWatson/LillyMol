@@ -13,4 +13,5 @@ NB_MODULE(lillymol_nb, m) {
   lillymol_nb::BindTSubstructure(m);
   lillymol_nb::BindMolecule(m);
   lillymol_nb::BindDescriptors(m);
+  lillymol_nb::BindStandardise(m);
 }

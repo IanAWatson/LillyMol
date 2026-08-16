@@ -30,8 +30,8 @@ The binding implementation is split by functional area:
 - `lillymol_nb_common.cc` contains shared helper implementations;
 - `lillymol_nb_io.cc`, `lillymol_nb_molecule.cc`,
   `lillymol_nb_atom_bond.cc`, `lillymol_nb_set_of_atoms.cc`,
-  `lillymol_nb_substructure.cc`, and `lillymol_nb_descriptors.cc` contain the
-  Python-visible bindings.
+  `lillymol_nb_substructure.cc`, `lillymol_nb_descriptors.cc`, and
+  `lillymol_nb_standardise.cc` contain the Python-visible bindings.
 
 To stage the nanobind modules separately from the pybind modules:
 
@@ -69,6 +69,7 @@ separate from `lib` while both pybind and nanobind builds exist.
   `CountSubstructMatches`, `GetSubstructMatches`);
 - GIL release around substructure search calls;
 - simple descriptor helper dependencies (`alogp`, `xlogp`, `tpsa`);
+- basic `Chemical_Standardisation` access via `Standardise`;
 - basic molecule file I/O via `Reader`, `Writer`, `MolReaderContext`, and
   `MolWriterContext`, with `ReaderContext` and `ContextWriter` retained as
   compatibility aliases;

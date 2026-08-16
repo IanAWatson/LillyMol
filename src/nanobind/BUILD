@@ -15,6 +15,7 @@ nanobind_extension(
         "lillymol_nb_io.cc",
         "lillymol_nb_molecule.cc",
         "lillymol_nb_set_of_atoms.cc",
+        "lillymol_nb_standardise.cc",
         "lillymol_nb_substructure.cc",
         "lillymol_nb_tsubstructure.cc",
     ],

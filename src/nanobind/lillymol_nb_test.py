@@ -497,6 +497,16 @@ class TestNanobindMolecule(unittest.TestCase):
             lillymol_nb.HasSubstructMatch(mol, "[")
 
 
+    def test_standardise(self):
+        mol = lillymol_nb.MolFromSmiles("CC(=O)[O-] acetate")
+        standardise = lillymol_nb.Standardise()
+        self.assertEqual(standardise.process(mol), 0)
+        self.assertEqual(mol.smiles(), "CC(=O)[O-]")
+
+        standardise.activate_all()
+        self.assertEqual(standardise.process(mol), 1)
+        self.assertEqual(mol.smiles(), "CC(=O)O")
+
     def test_descriptor_helpers(self):
         mol = lillymol_nb.MolFromSmiles("CCO ethanol")
         self.assertIsNotNone(lillymol_nb.alogp(mol))

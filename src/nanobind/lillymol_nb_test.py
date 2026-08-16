@@ -300,6 +300,30 @@ $$$$
         self.assertEqual(mol.partial_charge_type(), "")
         self.assertGreaterEqual(mol.compute_Gasteiger_partial_charges(), 0)
 
+    def test_atoms_by_radius_single_starting_atom(self):
+        mol = lillymol_nb.MolFromSmiles("CCCCC pentane")
+        shells = mol.atoms_by_radius(lillymol_nb.Set_of_Atoms([2]), 3)
+        self.assertEqual(len(shells), 4)
+        self.assertCountEqual(shells[0], [2])
+        self.assertCountEqual(shells[1], [1, 3])
+        self.assertCountEqual(shells[2], [0, 4])
+        self.assertEqual(shells[3], [])
+
+    def test_atoms_by_radius_multiple_starting_atoms(self):
+        mol = lillymol_nb.MolFromSmiles("CCCCC pentane")
+        shells = mol.atoms_by_radius(lillymol_nb.Set_of_Atoms([0, 4]), 3)
+        self.assertCountEqual(shells[0], [0, 4])
+        self.assertCountEqual(shells[1], [1, 3])
+        self.assertCountEqual(shells[2], [2])
+        self.assertEqual(shells[3], [])
+
+    def test_atoms_by_radius_validation(self):
+        mol = lillymol_nb.MolFromSmiles("CCC propane")
+        with self.assertRaises(Exception):
+            mol.atoms_by_radius(lillymol_nb.Set_of_Atoms([3]), 1)
+        with self.assertRaises(Exception):
+            mol.atoms_by_radius(lillymol_nb.Set_of_Atoms([0]), -1)
+
     def test_atom_map_number_helpers(self):
         mol = lillymol_nb.MolFromSmiles("CCO ethanol")
         self.assertEqual(mol.atom_map_number(1), 0)

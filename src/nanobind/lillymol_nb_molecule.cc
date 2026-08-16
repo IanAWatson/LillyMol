@@ -1,5 +1,7 @@
 #include "nanobind/lillymol_nb_internal.h"
 
+#include <queue>
+
 namespace lillymol_nb {
 
 namespace {
@@ -148,6 +150,54 @@ RingInfoAreBondsInSameRing(RingInfo& ring_info, int bond1, int bond2) {
     }
   }
   return false;
+}
+
+std::vector<std::vector<int>>
+AtomsByRadius(const Molecule& mol, const Set_of_Atoms& starting_atoms, int max_radius) {
+  if (max_radius < 0) {
+    throw std::invalid_argument("max_radius must be non-negative");
+  }
+
+  std::vector<std::vector<int>> result(max_radius + 1);
+  const int matoms = mol.natoms();
+  std::vector<int> distance(matoms, -1);
+  std::queue<atom_number_t> to_process;
+
+  for (atom_number_t atom : starting_atoms) {
+    if (atom < 0 || atom >= matoms) {
+      throw std::invalid_argument("starting atom is outside the molecule");
+    }
+    if (distance[atom] >= 0) {
+      continue;
+    }
+
+    distance[atom] = 0;
+    result[0].push_back(atom);
+    to_process.push(atom);
+  }
+
+  while (!to_process.empty()) {
+    const atom_number_t atom = to_process.front();
+    to_process.pop();
+
+    const int next_radius = distance[atom] + 1;
+    if (next_radius > max_radius) {
+      continue;
+    }
+
+    for (const Bond* bond : mol[atom]) {
+      const atom_number_t other = bond->other(atom);
+      if (distance[other] >= 0) {
+        continue;
+      }
+
+      distance[other] = next_radius;
+      result[next_radius].push_back(other);
+      to_process.push(other);
+    }
+  }
+
+  return result;
 }
 
 }  // namespace
@@ -631,6 +681,8 @@ BindMolecule(nb::module_& m) {
              return result;
            },
            nb::arg("a1"), nb::arg("a2"), "Return atoms down the bond from a1 to a2")
+      .def("atoms_by_radius", &AtomsByRadius, nb::arg("starting_atoms"), nb::arg("max_radius"),
+           "Return atom shells by minimum bond distance from starting_atoms")
       .def("reset_atom_map_numbers", &Molecule::reset_all_atom_map_numbers,
            "Reset atom map numbers")
       .def("set_atom_map_number",

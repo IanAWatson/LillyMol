@@ -18,6 +18,7 @@
 #include <nanobind/stl/vector.h>
 
 #include "Molecule_Lib/element.h"
+#include "Molecule_Lib/etrans.h"
 #include "Molecule_Lib/istream_and_type.h"
 #include "Molecule_Lib/is_actually_chiral.h"
 #include "Molecule_Lib/mdl.h"

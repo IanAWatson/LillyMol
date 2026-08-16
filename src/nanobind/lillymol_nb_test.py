@@ -806,6 +806,22 @@ $$$$
             lillymol_nb.HasSubstructMatch(mol, "[")
 
 
+    def test_element_transformations(self):
+        etrans = lillymol_nb.ElementTransformations()
+        self.assertFalse(etrans.active())
+        self.assertTrue(etrans.add("I=Cl"))
+        self.assertTrue(etrans.add("Br=Cl"))
+        self.assertTrue(etrans.active())
+        self.assertFalse(etrans.add("not a transform"))
+
+        mol = lillymol_nb.MolFromSmiles("ICBr halides")
+        self.assertEqual(mol.natoms("I"), 1)
+        self.assertEqual(mol.natoms("Br"), 1)
+        self.assertEqual(etrans.process(mol), 2)
+        self.assertEqual(mol.natoms("I"), 0)
+        self.assertEqual(mol.natoms("Br"), 0)
+        self.assertEqual(mol.natoms("Cl"), 2)
+
     def test_standardise(self):
         mol = lillymol_nb.MolFromSmiles("CC(=O)[O-] acetate")
         standardise = lillymol_nb.Standardise()

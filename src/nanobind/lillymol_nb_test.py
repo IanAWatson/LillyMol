@@ -550,6 +550,20 @@ $$$$
         self.assertEqual(carbon.unsaturation(), 0)
         self.assertTrue(carbon.fully_saturated())
 
+    def test_atom_coordinate_distance_helpers(self):
+        mol = lillymol_nb.MolFromSmiles("CCO ethanol")
+        mol.set_coordinates([0.0, 0.0, 0.0,
+                             1.0, 0.0, 0.0,
+                             1.0, 1.0, 0.0])
+        a0 = mol.atom(0)
+        a1 = mol.atom(1)
+        self.assertAlmostEqual(a0.x(), 0.0)
+        self.assertAlmostEqual(a1.x(), 1.0)
+        self.assertAlmostEqual(a0.distance(a1), 1.0)
+        self.assertAlmostEqual(a0.distance(lillymol_nb.Coordinates(0.0, 1.0, 0.0)), 1.0)
+        self.assertAlmostEqual(a0 - a1, 1.0)
+        self.assertIn("<Atom C", str(a0))
+
     def test_atom_view_reflects_parent_mutation(self):
         mol = lillymol_nb.MolFromSmiles("CCO ethanol")
         atom = mol.atom(1)
@@ -587,6 +601,16 @@ $$$$
         self.assertFalse(bond.is_single_bond())
         self.assertTrue(bond.is_double_bond())
         self.assertEqual(bond.btype(), lillymol_nb.BondType.DOUBLE_BOND)
+
+    def test_bond_rdkit_style_aliases_and_contains(self):
+        mol = lillymol_nb.MolFromSmiles("CCO ethanol")
+        bond = mol.bond(0)
+        self.assertEqual(bond.GetBeginAtomIdx(), 0)
+        self.assertEqual(bond.GetEndAtomIdx(), 1)
+        self.assertEqual(bond.GetBondType(), lillymol_nb.BondType.SINGLE_BOND)
+        self.assertIn(0, bond)
+        self.assertNotIn(2, bond)
+        self.assertIn("<Bond 0-1>", str(bond))
 
     def test_bond_ring_membership(self):
         mol = lillymol_nb.MolFromSmiles("c1ccccc1 benzene")

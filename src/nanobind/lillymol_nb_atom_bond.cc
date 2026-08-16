@@ -25,6 +25,15 @@ BindAtomBond(nb::module_& m) {
       .def("unsaturation", &Atom::unsaturation)
       .def("other", nb::overload_cast<atom_number_t, int>(&Atom::other, nb::const_), nb::arg("atom"), nb::arg("connection"))
       .def("is_organic", &Atom::is_organic)
+      .def("x", [](const Atom& atom) { return atom.x(); }, "Return x coordinate")
+      .def("y", [](const Atom& atom) { return atom.y(); }, "Return y coordinate")
+      .def("z", [](const Atom& atom) { return atom.z(); }, "Return z coordinate")
+      .def("distance",
+           [](const Atom& atom, const Atom& other) { return atom.distance(other); },
+           nb::arg("other"), "Return spatial distance to atom")
+      .def("distance",
+           [](const Atom& atom, const Coordinates& coords) { return atom.distance(coords); },
+           nb::arg("coords"), "Return spatial distance to point")
       .def("connections",
            [](const Atom& atom, atom_number_t atom_number) {
              std::vector<int> result;
@@ -49,7 +58,11 @@ BindAtomBond(nb::module_& m) {
                  nb::type<Atom>(), "BondIterator", atom.begin(), atom.end());
            },
            nb::keep_alive<0, 1>())
-      .def("__repr__", &AtomRepr);
+      .def("__sub__",
+           [](const Atom& atom, const Atom& other) { return atom.distance(other); },
+           nb::arg("other"))
+      .def("__repr__", &AtomRepr)
+      .def("__str__", &AtomRepr);
 
   nb::class_<Bond>(m, "Bond")
       .def(nb::init<>())
@@ -72,7 +85,13 @@ BindAtomBond(nb::module_& m) {
       .def("IsInRing", [](const Bond& bond) { return BondNrings(bond) > 0; })
       .def("bond_number_assigned", &Bond::bond_number_assigned)
       .def("bond_number", &Bond::bond_number)
-      .def("__repr__", &BondRepr);
+      .def("GetBeginAtomIdx", &Bond::a1)
+      .def("GetEndAtomIdx", &Bond::a2)
+      .def("GetBondType", &ToBondType)
+      .def("__contains__",
+           [](const Bond& bond, atom_number_t atom) { return static_cast<bool>(bond.involves(atom)); })
+      .def("__repr__", &BondRepr)
+      .def("__str__", &BondRepr);
 
 
 }

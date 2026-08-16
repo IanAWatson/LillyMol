@@ -1078,6 +1078,64 @@ $$$$
         calc.set_use_alcohol_for_acid(True)
         self.assertIsNotNone(calc.logp(mol))
 
+    def test_dicer_default_and_break_cc(self):
+        dicer = lillymol_nb.Dicer()
+        mol = lillymol_nb.MolFromSmiles("CCCC butane")
+        self.assertEqual(dicer.dice(mol), {})
+
+        dicer.set_break_cc_bonds(True)
+        self.assertEqual(dicer.dice(mol), {"CC": 2, "CCC": 2, "C": 2})
+
+    def test_dicer_join_point_labels_and_size_limits(self):
+        dicer = lillymol_nb.Dicer()
+        dicer.set_label_join_points(8)
+        mol = lillymol_nb.MolFromSmiles("CCO ethanol")
+        self.assertEqual(dicer.dice(mol), {"[8CH3]C": 1, "[8OH2]": 1})
+
+        dicer = lillymol_nb.Dicer()
+        dicer.set_label_join_points(8)
+        dicer.set_min_fragment_size(2)
+        self.assertEqual(dicer.dice(mol), {"[8CH3]C": 1})
+
+        dicer = lillymol_nb.Dicer()
+        dicer.set_label_join_points(8)
+        dicer.set_max_fragment_size(1)
+        self.assertEqual(dicer.dice(mol), {"[8OH2]": 1})
+
+    def test_dicer_increment_join_points_and_global_counts(self):
+        dicer = lillymol_nb.Dicer()
+        dicer.set_increment_isotope_for_join_points(100)
+        mol = lillymol_nb.MolFromSmiles("CC[23CH2]NCC")
+        self.assertEqual(dicer.dice(mol), {
+            "[100CH3]C": 1,
+            "[100NH2]CC": 1,
+            "[100NH2][100CH2]CC": 1,
+            "[123CH3]CC": 1,
+        })
+
+        dicer = lillymol_nb.Dicer()
+        dicer.set_accumulate_global_fragment_count(True)
+        dicer.set_break_cc_bonds(True)
+        self.assertEqual(dicer.dice(lillymol_nb.MolFromSmiles("CC ethane")), {"C": 2})
+        self.assertEqual(dicer.get_global_fragment_count(), {"C": 1})
+        self.assertEqual(dicer.dice(lillymol_nb.MolFromSmiles("CC ethane")), {"C": 2})
+        self.assertEqual(dicer.get_global_fragment_count(), {"C": 2})
+
+    def test_dicer_break_bond_smarts(self):
+        dicer = lillymol_nb.Dicer()
+        dicer.set_label_join_points(8)
+        dicer.set_break_cc_bonds(True)
+        dicer.set_max_bonds_to_break(3)
+        self.assertTrue(dicer.add_bond_break_smarts("C-F"))
+        self.assertFalse(dicer.add_bond_break_smarts("["))
+        mol = lillymol_nb.MolFromSmiles("CC(F)(F)F trifluoroethane")
+        self.assertEqual(dicer.dice(mol), {
+            "[8FH]": 15,
+            "[8CH3]C": 6,
+            "F[8CH2]C": 6,
+            "C[8CH](F)F": 3,
+        })
+
     def _run_truncated_distance_matrix_storage_case(self, storage):
         fname = _write_tfdatarecord([
             _nearneighbours("A", [("B", 0.25), ("C", 0.50)]),

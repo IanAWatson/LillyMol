@@ -29,6 +29,7 @@ nanobind_extension(
         "//Molecule_Lib:moleculeio",
         "//pybind:tsubstructure",
         "//Molecule_Tools:alogp_lib",
+        "//Molecule_Tools:dicer_api",
         "//Molecule_Tools:ec_fingerprint_lib",
         "//Molecule_Tools:jwcats_lib",
         "//Molecule_Tools:nvrtspsa",

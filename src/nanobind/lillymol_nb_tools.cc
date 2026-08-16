@@ -2,7 +2,10 @@
 
 #include "nanobind/lillymol_nb_internal.h"
 
+#include <nanobind/stl/unordered_map.h>
+
 #include "Molecule_Lib/mol2graph.h"
+#include "Molecule_Tools/dicer_api.h"
 #include "Molecule_Tools/unique_molecules_api.h"
 #include "Utilities/GFP_Tools/truncated_distance_matrix.h"
 
@@ -70,6 +73,13 @@ SetTruncatedDistanceMatrixDefaultDistanceByte(
   if (!dm.SetDefaultDistanceByte(distance)) {
     throw std::invalid_argument("default distance cannot be below max stored distance");
   }
+}
+
+std::unordered_map<std::string, uint32_t>
+DiceMolecule(dicer_api::Dicer& dicer, Molecule& mol) {
+  std::unordered_map<std::string, uint32_t> result;
+  dicer.Dice(mol, result);
+  return result;
 }
 
 }  // namespace
@@ -152,6 +162,54 @@ BindTools(nb::module_& m) {
       .def("turn_on_most_useful_options", &Mol2Graph::TurnOnMostUsefulOptions)
       .def("set_active", &Mol2Graph::set_active, nb::arg("value"))
       .def("active", &Mol2Graph::active);
+
+  nb::class_<dicer_api::Dicer>(m, "Dicer")
+      .def(nb::init<>())
+      .def("set_max_bonds_to_break", &dicer_api::Dicer::set_max_bonds_to_break,
+           nb::arg("value"), "Set maximum number of bonds to break")
+      .def("set_min_fragment_size", &dicer_api::Dicer::set_min_fragment_size,
+           nb::arg("value"), "Set minimum fragment size")
+      .def("set_max_fragment_size", &dicer_api::Dicer::set_max_fragment_size,
+           nb::arg("value"), "Set maximum fragment size")
+      .def("set_break_cc_bonds", &dicer_api::Dicer::set_break_cc_bonds,
+           nb::arg("value"), "Control whether C-C bonds are broken")
+      .def("set_break_cc_bonds_at_highly_connected",
+           &dicer_api::Dicer::set_break_cc_bonds_at_highly_connected,
+           nb::arg("value"), "Control whether C-[CD>2] bonds are broken")
+      .def("set_break_amide_bonds", &dicer_api::Dicer::set_break_amide_bonds,
+           nb::arg("value"), "Control whether amide bonds are broken")
+      .def("set_label_join_points", &dicer_api::Dicer::set_label_join_points,
+           nb::arg("value"), "Set isotope label for join points")
+      .def("set_increment_isotope_for_join_points",
+           &dicer_api::Dicer::set_increment_isotope_for_join_points,
+           nb::arg("value"), "Increment isotopes at join points")
+      .def("set_accumulate_global_fragment_count",
+           &dicer_api::Dicer::set_accumulate_global_fragment_count,
+           nb::arg("value"), "Accumulate fragments across dice() calls")
+      .def("get_global_fragment_count", &dicer_api::Dicer::global_fragment_count,
+           "Return accumulated global fragment counts")
+      .def("set_perceive_symmetry_equivalent_matches",
+           &dicer_api::Dicer::set_perceive_symmetry_equivalent_matches,
+           nb::arg("value"), "Control symmetry-equivalent query matches")
+      .def("set_determine_fragment_counts",
+           &dicer_api::Dicer::set_determine_fragment_counts, nb::arg("value"),
+           "Control whether per-molecule fragment counts are determined")
+      .def("set_work_like_recap", &dicer_api::Dicer::set_work_like_recap,
+           nb::arg("value"), "Work like Recap without recursion")
+      .def("set_atom_type", &dicer_api::Dicer::set_atom_type, nb::arg("specification"),
+           "Set atom typing used by dicer")
+      .def("add_bond_break_smarts", &dicer_api::Dicer::AddBreakBondSmarts,
+           nb::arg("smarts"), "Add bond-breaking SMARTS")
+      .def("add_bond_break_query", &dicer_api::Dicer::AddBreakBondQuery,
+           nb::arg("fname"), "Add bond-breaking query from a file directive")
+      .def("add_fragment_requirement_smarts",
+           &dicer_api::Dicer::AddFragmentRequirementSmarts, nb::arg("smarts"),
+           "Require generated fragments to match SMARTS")
+      .def("add_fragment_disqualifier_smarts",
+           &dicer_api::Dicer::AddFragmentDisqualifierSmarts, nb::arg("smarts"),
+           "Discard generated fragments matching SMARTS")
+      .def("dice", &DiceMolecule, nb::arg("mol"),
+           "Dice a molecule and return fragment unique smiles mapped to counts");
 
   nb::class_<unique_molecules::UniqueMolecules>(m, "UniqueMolecules")
       .def(nb::init<>())

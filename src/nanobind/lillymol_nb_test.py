@@ -856,6 +856,16 @@ $$$$
         self.assertIsNotNone(lillymol_nb.xlogp(mol))
         self.assertIsNotNone(lillymol_nb.tpsa(mol))
         self.assertEqual(lillymol_nb.HbaHbd(mol), (1, 1))
+        self.assertEqual(lillymol_nb.NumHAcceptors(mol), mol.lipinski_num_h_acceptors())
+        self.assertEqual(lillymol_nb.NumHDonors(mol), mol.lipinski_num_h_donors())
+        self.assertEqual(lillymol_nb.RDKitNumHAcceptors(mol), mol.rdkit_num_h_acceptors())
+        self.assertEqual(lillymol_nb.RDKitNumHDonors(mol), mol.rdkit_num_h_donors())
+        self.assertAlmostEqual(lillymol_nb.fraction_csp3(mol), 1.0)
+
+        benzene = lillymol_nb.MolFromSmiles("c1ccccc1 benzene")
+        self.assertAlmostEqual(lillymol_nb.fraction_csp3(benzene), 0.0)
+        water = lillymol_nb.MolFromSmiles("O water")
+        self.assertAlmostEqual(lillymol_nb.fraction_csp3(water), 0.0)
 
 
 class TestNanobindTSubstructure(LillyMolNanobindTestCase):

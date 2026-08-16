@@ -78,6 +78,35 @@ BindDescriptors(nb::module_& m) {
         nb::arg("mol"));
   m.def("HbaHbd", &LipinskiHbaHbd, nb::arg("mol"),
         "Return Lipinski HBA/HBD counts as (hba, hbd)");
+  m.def("NumHAcceptors", [](const Molecule& mol) { return mol.LipinskiNumHAcceptors(); },
+        nb::arg("mol"), "Lipinski hydrogen bond acceptor count");
+  m.def("NumHDonors", [](Molecule& mol) { return mol.LipinskiNumHDonors(); },
+        nb::arg("mol"), "Lipinski hydrogen bond donor count");
+  m.def("RDKitNumHAcceptors", [](Molecule& mol) { return mol.RDKitNumHAcceptors(); },
+        nb::arg("mol"), "RDKit-compatible hydrogen bond acceptor count");
+  m.def("RDKitNumHDonors", [](Molecule& mol) { return mol.RDKitNumHDonors(); },
+        nb::arg("mol"), "RDKit-compatible hydrogen bond donor count");
+  m.def("fraction_csp3",
+        [](Molecule& mol) {
+          int carbon = 0;
+          int csp3 = 0;
+          const int matoms = mol.natoms();
+          for (int i = 0; i < matoms; ++i) {
+            if (mol.atomic_number(i) != 6) {
+              continue;
+            }
+            ++carbon;
+            if (mol.saturated(i)) {
+              ++csp3;
+            }
+          }
+          if (carbon == 0) {
+            return 0.0;
+          }
+          return static_cast<double>(csp3) / static_cast<double>(carbon);
+        },
+        nb::arg("mol"),
+        "Fraction of carbon atoms that are fully saturated");
   m.def("alogp", &ALogP, nb::arg("mol"));
   m.def("xlogp", &XLogPValue, nb::arg("mol"));
   m.def("tpsa",

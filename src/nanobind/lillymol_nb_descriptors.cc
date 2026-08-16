@@ -4,6 +4,17 @@ namespace lillymol_nb {
 
 void
 BindDescriptors(nb::module_& m) {
+  nb::enum_<Hybridization>(m, "Hybridization")
+      .value("UNSPECIFIED", Hybridization::kUnspecified)
+      .value("S", Hybridization::kS)
+      .value("SP", Hybridization::kSp)
+      .value("SP2", Hybridization::kSp2)
+      .value("SP3", Hybridization::kSp3)
+      .value("SP2D", Hybridization::kSp2d)
+      .value("SP3D", Hybridization::kSp3d)
+      .value("SP3D2", Hybridization::kSp3d2)
+      .value("OTHER", Hybridization::kOther);
+
   m.def("MolFromSmiles", &MolFromSmiles, nb::arg("smiles"),
         "Build a Molecule from SMILES, returning None on parse failure");
   m.def("LillyMolFromSmiles", &MolFromSmiles, nb::arg("smiles"),
@@ -20,6 +31,38 @@ BindDescriptors(nb::module_& m) {
         },
         nb::arg("smiles"),
         "Build molecules from a list of SMILES strings; invalid entries are empty molecules");
+  m.def("set_auto_create_new_elements", &set_auto_create_new_elements,
+        nb::arg("value"), "Allow arbitrary two-letter elements");
+  m.def("set_atomic_symbols_can_have_arbitrary_length",
+        &set_atomic_symbols_can_have_arbitrary_length, nb::arg("value"),
+        "Allow atomic symbols with arbitrary length");
+  m.def("interpret_D_as_deuterium", &element::interpret_d_as_deuterium,
+        "Return whether D is interpreted as deuterium");
+  m.def("interpret_T_as_deuterium", &element::interpret_t_as_tritium,
+        "Return whether T is interpreted as tritium");
+  m.def("set_display_strange_chemistry_messages", &set_display_strange_chemistry_messages,
+        nb::arg("value"), "Control strange chemistry messages");
+  m.def("set_display_smiles_interpretation_error_messages",
+        &set_display_smiles_interpretation_error_messages, nb::arg("value"),
+        "Control SMILES interpretation error messages");
+  m.def("count_atoms_in_smiles",
+        [](const std::string& smiles) {
+          const const_IWSubstring tmp(smiles);
+          return lillymol::count_atoms_in_smiles(tmp);
+        },
+        nb::arg("smiles"));
+  m.def("hybridization_name",
+        [](Hybridization hybridization) { return std::string(ToString(hybridization)); },
+        nb::arg("hybridization"));
+  m.def("hybridization",
+        [](Molecule& mol, atom_number_t atom) {
+          if (!mol.ok_atom_number(atom)) {
+            throw std::invalid_argument("hybridization atom number outside [0, natoms)");
+          }
+          return HybridizationState(mol, atom);
+        },
+        nb::arg("mol"), nb::arg("atom"),
+        "RDKit-like hybridization of atom, computed on demand");
 
   m.def("QueryFromSmarts",
         [](const std::string& smarts) -> std::unique_ptr<Substructure_Query> {

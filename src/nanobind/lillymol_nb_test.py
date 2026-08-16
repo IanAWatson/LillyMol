@@ -886,6 +886,24 @@ $$$$
         atom_pair.set_max_separation(5)
         self.assertEqual(len(atom_pair.fingerprint(mol)), 256)
 
+    def test_element_and_hybridization_helpers(self):
+        self.assertEqual(lillymol_nb.count_atoms_in_smiles("CCO"), 3)
+        self.assertEqual(lillymol_nb.count_atoms_in_smiles("c1ccccc1"), 6)
+
+        mol = lillymol_nb.MolFromSmiles("CC#N acetonitrile")
+        self.assertEqual(lillymol_nb.hybridization(mol, 0), lillymol_nb.Hybridization.SP3)
+        self.assertEqual(lillymol_nb.hybridization(mol, 1), lillymol_nb.Hybridization.SP)
+        self.assertEqual(lillymol_nb.hybridization_name(lillymol_nb.Hybridization.SP3), "SP3")
+        with self.assertRaises(Exception):
+            lillymol_nb.hybridization(mol, 99)
+
+        lillymol_nb.set_auto_create_new_elements(0)
+        lillymol_nb.set_atomic_symbols_can_have_arbitrary_length(0)
+        lillymol_nb.set_display_strange_chemistry_messages(1)
+        lillymol_nb.set_display_smiles_interpretation_error_messages(1)
+        self.assertIn(lillymol_nb.interpret_D_as_deuterium(), [0, 1])
+        self.assertIn(lillymol_nb.interpret_T_as_deuterium(), [0, 1])
+
     def test_descriptor_helpers(self):
         mol = lillymol_nb.MolFromSmiles("CCO ethanol")
         self.assertIsNotNone(lillymol_nb.alogp(mol))

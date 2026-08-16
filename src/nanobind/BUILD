@@ -35,6 +35,7 @@ nanobind_extension(
         "//Molecule_Tools:qed_lib",
         "//Molecule_Tools:unique_molecules_api",
         "//Molecule_Tools:xlogp_lib",
+        "//Utilities/GFP_Tools:truncated_distance_matrix",
     ],
 )
 
@@ -42,4 +43,5 @@ py_test(
     name = "lillymol_nb_test",
     srcs = ["lillymol_nb_test.py"],
     data = [":lillymol_nb"],
+    deps = ["//Utilities/GFP_Tools:nearneighbours_py_proto"],
 )

@@ -2,6 +2,7 @@ import atexit
 import copy
 import math
 import os
+import struct
 import sys
 import tempfile
 import unittest
@@ -9,6 +10,7 @@ import unittest
 sys.path.insert(0, os.path.dirname(__file__))
 
 import lillymol_nb
+from Utilities.GFP_Tools import nearneighbours_pb2
 
 
 def _trace_process_exit():
@@ -52,6 +54,70 @@ def _charges_query_dir():
 
 def _qed_query_dir():
     return _query_dir("QED")
+
+
+_CRC32C_TABLE = None
+
+
+def _crc32c_table():
+    global _CRC32C_TABLE
+    if _CRC32C_TABLE is not None:
+        return _CRC32C_TABLE
+    table = []
+    for i in range(256):
+        crc = i
+        for _ in range(8):
+            if crc & 1:
+                crc = (crc >> 1) ^ 0x82F63B78
+            else:
+                crc >>= 1
+        table.append(crc & 0xffffffff)
+    _CRC32C_TABLE = table
+    return table
+
+
+def _crc32c(data):
+    crc = 0xffffffff
+    table = _crc32c_table()
+    for byte in data:
+        crc = table[(crc ^ byte) & 0xff] ^ (crc >> 8)
+    return (~crc) & 0xffffffff
+
+
+def _masked_crc32c(data):
+    crc = _crc32c(data)
+    return (((crc >> 15) | ((crc << 17) & 0xffffffff)) + 0xa282ead8) & 0xffffffff
+
+
+def _write_tfdatarecord(protos):
+    fd, fname = tempfile.mkstemp(suffix=".nn.tfrecord")
+    with os.fdopen(fd, "wb") as output:
+        for proto in protos:
+            data = proto.SerializeToString()
+            length = struct.pack("<Q", len(data))
+            output.write(length)
+            output.write(struct.pack("<I", _masked_crc32c(length)))
+            output.write(data)
+            output.write(struct.pack("<I", _masked_crc32c(data)))
+    return fname
+
+
+def _nearneighbours(name, nbrs):
+    proto = nearneighbours_pb2.NearNeighbours(name=name)
+    for nbr_id, dist in nbrs:
+        nbr = proto.nbr.add()
+        nbr.id = nbr_id
+        nbr.dist = dist
+    return proto
+
+
+def _nearneighbours_indices(name, nbrs):
+    proto = nearneighbours_pb2.NearNeighboursIndices(name=name)
+    for nbr_id, dist in nbrs:
+        nbr = proto.nbr.add()
+        nbr.id = nbr_id
+        nbr.dist = dist
+    return proto
 
 
 class LillyMolNanobindTestCase(unittest.TestCase):
@@ -1011,6 +1077,94 @@ $$$$
         calc.set_rdkit_phoshoric_acid_hydrogen(True)
         calc.set_use_alcohol_for_acid(True)
         self.assertIsNotNone(calc.logp(mol))
+
+    def _run_truncated_distance_matrix_storage_case(self, storage):
+        fname = _write_tfdatarecord([
+            _nearneighbours("A", [("B", 0.25), ("C", 0.50)]),
+            _nearneighbours("B", [("A", 0.25)]),
+            _nearneighbours("C", [("A", 0.50)]),
+            _nearneighbours("D", []),
+        ])
+        try:
+            dm = lillymol_nb.TruncatedDistanceMatrix(fname, storage=storage)
+            self.assertEqual(len(dm), 4)
+            self.assertEqual(dm.size(), 4)
+            self.assertEqual(dm.number_distances(), 2)
+            self.assertEqual(dm.index("A"), 0)
+            self.assertIsNone(dm.index("missing"))
+            self.assertEqual(dm.name(2), "C")
+
+            self.assertAlmostEqual(dm.distance(0, 1), 0.25, delta=1.0 / 255.0)
+            self.assertAlmostEqual(dm.distance(1, 0), 0.25, delta=1.0 / 255.0)
+            self.assertAlmostEqual(dm.distance(0, 2), 0.50, delta=1.0 / 255.0)
+            self.assertIsNone(dm.distance(1, 2))
+            self.assertAlmostEqual(dm.distance_or_default(1, 2),
+                                   dm.max_stored_distance(), places=6)
+            self.assertAlmostEqual(dm.distance_or_default(3, 3), 0.0, places=6)
+
+            with self.assertRaises(ValueError):
+                dm.set_default_distance(0.25)
+            dm.set_default_distance(1.0)
+            self.assertAlmostEqual(dm.distance_or_default(1, 2), 1.0, places=6)
+            self.assertEqual(dm.distances_or_default([0, 1, 3], [1, 2, 3]),
+                             [dm.distance(0, 1), 1.0, 0.0])
+            with self.assertRaises(Exception):
+                dm.name(99)
+            with self.assertRaises(Exception):
+                dm.distances_or_default([0], [1, 2])
+        finally:
+            os.remove(fname)
+
+    def test_truncated_distance_matrix_row_sparse(self):
+        self._run_truncated_distance_matrix_storage_case(
+            lillymol_nb.TruncatedDistanceMatrixStorage.ROW_SPARSE)
+
+    def test_truncated_distance_matrix_row_hash(self):
+        self._run_truncated_distance_matrix_storage_case(
+            lillymol_nb.TruncatedDistanceMatrixStorage.ROW_HASH)
+
+    def test_truncated_distance_matrix_indexed_proto(self):
+        fname = _write_tfdatarecord([
+            _nearneighbours_indices("A", [(1, 0.25), (2, 0.50)]),
+            _nearneighbours_indices("B", [(0, 0.25)]),
+            _nearneighbours_indices("C", [(0, 0.50)]),
+            _nearneighbours_indices("D", []),
+        ])
+        try:
+            dm = lillymol_nb.TruncatedDistanceMatrix(
+                fname,
+                storage=lillymol_nb.TruncatedDistanceMatrixStorage.ROW_SPARSE,
+                proto_type=lillymol_nb.TruncatedDistanceMatrixProto.NEARNEIGHBOURS_INDICES)
+            self.assertEqual(dm.size(), 4)
+            self.assertEqual(dm.number_distances(), 2)
+            self.assertEqual(dm.name(1), "B")
+            self.assertAlmostEqual(dm.distance(2, 0), 0.50, delta=1.0 / 255.0)
+        finally:
+            os.remove(fname)
+
+    def test_truncated_distance_matrix_one_byte_duplicate(self):
+        fname = _write_tfdatarecord([
+            _nearneighbours("A", [("B", 10.0 / 255.0)]),
+            _nearneighbours("B", [("A", 11.0 / 255.0)]),
+        ])
+        try:
+            dm = lillymol_nb.TruncatedDistanceMatrix(fname)
+            self.assertEqual(dm.number_distances(), 1)
+            self.assertEqual(dm.duplicate_distances_differing_by_one(), 1)
+            self.assertAlmostEqual(dm.distance(0, 1), 10.0 / 255.0, places=6)
+        finally:
+            os.remove(fname)
+
+    def test_truncated_distance_matrix_rejects_conflicting_duplicate(self):
+        fname = _write_tfdatarecord([
+            _nearneighbours("A", [("B", 0.25)]),
+            _nearneighbours("B", [("A", 0.75)]),
+        ])
+        try:
+            with self.assertRaises(RuntimeError):
+                lillymol_nb.TruncatedDistanceMatrix(fname)
+        finally:
+            os.remove(fname)
 
     def test_unique_molecules(self):
         unique = lillymol_nb.UniqueMolecules()

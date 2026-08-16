@@ -60,6 +60,12 @@ struct SmartsSearchOptions {
   std::optional<bool> perceive_symmetry_equivalent_matches;
 };
 
+struct RingInfo {
+  Molecule* mol = nullptr;
+
+  explicit RingInfo(Molecule* m) : mol(m) {}
+};
+
 struct ReaderOptions {
   bool largest_fragment = false;
   bool remove_chirality = false;

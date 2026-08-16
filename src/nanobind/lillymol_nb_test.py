@@ -642,6 +642,30 @@ $$$$
         self.assertEqual(atoms.as_list()[-2:], [7, 8])
         self.assertEqual(lillymol_nb.Set_of_Atoms([1, 2]), [1, 2])
 
+    def test_ring_info_helpers(self):
+        mol = lillymol_nb.MolFromSmiles("c1ccccc1 benzene")
+        ring_info = mol.GetRingInfo()
+        self.assertEqual(ring_info.NumRings(), 1)
+        self.assertEqual(ring_info.num_rings(), 1)
+        self.assertEqual([sorted(ring) for ring in ring_info.AtomRings()], [[0, 1, 2, 3, 4, 5]])
+        bond_rings = ring_info.BondRings()
+        self.assertEqual(len(bond_rings), 1)
+        self.assertEqual(len(bond_rings[0]), 6)
+        self.assertEqual(ring_info.NumAtomRings(0), 1)
+        self.assertEqual(ring_info.NumBondRings(0), 1)
+        self.assertTrue(ring_info.IsAtomInRingOfSize(0, 6))
+        self.assertTrue(ring_info.AreAtomsInSameRing(0, 3))
+        self.assertTrue(ring_info.AreBondsInSameRing(0, 2))
+        with self.assertRaises(Exception):
+            ring_info.NumBondRings(99)
+
+        fused = lillymol_nb.MolFromSmiles("c1ccc2ccccc2c1 naphthalene")
+        fused_info = fused.ring_info()
+        self.assertEqual(fused_info.NumRings(), 2)
+        self.assertEqual(len(fused_info.AtomRings()), 2)
+        self.assertEqual(len(fused_info.BondRings()), 2)
+        self.assertGreaterEqual(fused_info.NumAtomRings(3), 1)
+
     def test_ring_access(self):
         mol = lillymol_nb.MolFromSmiles("c1ccccc1 benzene")
         self.assertEqual(mol.nrings(), 1)

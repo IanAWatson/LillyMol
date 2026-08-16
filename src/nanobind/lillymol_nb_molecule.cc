@@ -68,10 +68,132 @@ SdfTags(const Molecule& mol) {
   return result;
 }
 
+std::vector<int>
+RingAtoms(const Ring& ring) {
+  return std::vector<int>(ring.rawdata(), ring.rawdata() + ring.size());
+}
+
+std::vector<std::vector<int>>
+RingInfoAtomRings(RingInfo& ring_info) {
+  Molecule& mol = *ring_info.mol;
+  const int nrings = mol.nrings();
+  std::vector<std::vector<int>> result;
+  result.reserve(nrings);
+  for (int i = 0; i < nrings; ++i) {
+    result.push_back(RingAtoms(*mol.ringi(i)));
+  }
+  return result;
+}
+
+std::vector<int>
+RingBondNumbers(Molecule& mol, const Ring& ring) {
+  mol.assign_bond_numbers_to_bonds_if_needed();
+  std::vector<int> result;
+  result.reserve(ring.size());
+  const int ring_size = ring.size();
+  for (int i = 0; i < ring_size; ++i) {
+    const atom_number_t a1 = ring[i];
+    const atom_number_t a2 = ring[(i + 1) % ring_size];
+    const Bond* bond = mol.bond_between_atoms_if_present(a1, a2);
+    if (bond != nullptr && bond->bond_number_assigned()) {
+      result.push_back(bond->bond_number());
+    }
+  }
+  return result;
+}
+
+std::vector<std::vector<int>>
+RingInfoBondRings(RingInfo& ring_info) {
+  Molecule& mol = *ring_info.mol;
+  const int nrings = mol.nrings();
+  std::vector<std::vector<int>> result;
+  result.reserve(nrings);
+  for (int i = 0; i < nrings; ++i) {
+    result.push_back(RingBondNumbers(mol, *mol.ringi(i)));
+  }
+  return result;
+}
+
+int
+RingInfoNumBondRings(RingInfo& ring_info, int bond_number) {
+  Molecule& mol = *ring_info.mol;
+  if (bond_number < 0 || bond_number >= mol.nedges()) {
+    throw std::invalid_argument("bond number outside molecule");
+  }
+  const Bond* bond = mol.bondi(bond_number);
+  int result = 0;
+  const int nrings = mol.nrings();
+  for (int i = 0; i < nrings; ++i) {
+    if (mol.ringi(i)->contains_bond(bond->a1(), bond->a2())) {
+      ++result;
+    }
+  }
+  return result;
+}
+
+bool
+RingInfoAreBondsInSameRing(RingInfo& ring_info, int bond1, int bond2) {
+  Molecule& mol = *ring_info.mol;
+  if (bond1 < 0 || bond1 >= mol.nedges() || bond2 < 0 || bond2 >= mol.nedges()) {
+    throw std::invalid_argument("bond number outside molecule");
+  }
+  const Bond* b1 = mol.bondi(bond1);
+  const Bond* b2 = mol.bondi(bond2);
+  const int nrings = mol.nrings();
+  for (int i = 0; i < nrings; ++i) {
+    const Ring* ring = mol.ringi(i);
+    if (ring->contains_bond(b1->a1(), b1->a2()) &&
+        ring->contains_bond(b2->a1(), b2->a2())) {
+      return true;
+    }
+  }
+  return false;
+}
+
 }  // namespace
 
 void
 BindMolecule(nb::module_& m) {
+  nb::class_<RingInfo>(m, "RingInfo")
+      .def("NumRings", [](RingInfo& ring_info) { return ring_info.mol->nrings(); })
+      .def("num_rings", [](RingInfo& ring_info) { return ring_info.mol->nrings(); })
+      .def("AtomRings", &RingInfoAtomRings)
+      .def("atom_rings", &RingInfoAtomRings)
+      .def("BondRings", &RingInfoBondRings)
+      .def("bond_rings", &RingInfoBondRings)
+      .def("NumAtomRings",
+           [](RingInfo& ring_info, atom_number_t atom) { return ring_info.mol->nrings(atom); },
+           nb::arg("atom"))
+      .def("num_atom_rings",
+           [](RingInfo& ring_info, atom_number_t atom) { return ring_info.mol->nrings(atom); },
+           nb::arg("atom"))
+      .def("NumBondRings", &RingInfoNumBondRings, nb::arg("bond"))
+      .def("num_bond_rings", &RingInfoNumBondRings, nb::arg("bond"))
+      .def("IsAtomInRingOfSize",
+           [](RingInfo& ring_info, atom_number_t atom, int ring_size) {
+             return ring_info.mol->in_ring_of_given_size(atom, ring_size);
+           },
+           nb::arg("atom"), nb::arg("ring_size"))
+      .def("is_atom_in_ring_of_size",
+           [](RingInfo& ring_info, atom_number_t atom, int ring_size) {
+             return ring_info.mol->in_ring_of_given_size(atom, ring_size);
+           },
+           nb::arg("atom"), nb::arg("ring_size"))
+      .def("AreAtomsInSameRing",
+           [](RingInfo& ring_info, atom_number_t a1, atom_number_t a2) {
+             return static_cast<bool>(ring_info.mol->in_same_ring(a1, a2));
+           },
+           nb::arg("a1"), nb::arg("a2"))
+      .def("are_atoms_in_same_ring",
+           [](RingInfo& ring_info, atom_number_t a1, atom_number_t a2) {
+             return static_cast<bool>(ring_info.mol->in_same_ring(a1, a2));
+           },
+           nb::arg("a1"), nb::arg("a2"))
+      .def("AreBondsInSameRing", &RingInfoAreBondsInSameRing,
+           nb::arg("bond1"), nb::arg("bond2"))
+      .def("are_bonds_in_same_ring", &RingInfoAreBondsInSameRing,
+           nb::arg("bond1"), nb::arg("bond2"));
+
   nb::class_<Coordinates>(m, "Coordinates")
       .def(nb::init<>())
       .def(nb::init<coord_t, coord_t, coord_t>(), nb::arg("x"), nb::arg("y"), nb::arg("z"))
@@ -178,6 +300,10 @@ BindMolecule(nb::module_& m) {
       .def("ring", nb::overload_cast<int>(&Molecule::ringi), nb::arg("ring"),
            nb::rv_policy::reference_internal)
       .def("rings", &Rings)
+      .def("ring_info", [](Molecule& mol) { return RingInfo(&mol); },
+           nb::keep_alive<0, 1>(), "Return a RingInfo view")
+      .def("GetRingInfo", [](Molecule& mol) { return RingInfo(&mol); },
+           nb::keep_alive<0, 1>(), "Return a RingInfo view")
       .def("in_same_ring",
            [](Molecule& mol, atom_number_t a1, atom_number_t a2) {
              return static_cast<bool>(mol.in_same_ring(a1, a2));

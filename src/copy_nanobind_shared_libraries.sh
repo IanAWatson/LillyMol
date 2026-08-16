@@ -19,6 +19,9 @@ fi
 
 mkdir -p "${destdir}"
 
+# Avoid stale ABI-tagged modules shadowing the current extension on import.
+rm -f "${destdir}/lillymol_nb.abi3.so" "${destdir}/lillymol_nb.pyd"
+
 copy_if_newer() {
   local source=$1
   local libname

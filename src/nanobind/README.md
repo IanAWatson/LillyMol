@@ -30,8 +30,9 @@ The binding implementation is split by functional area:
 - `lillymol_nb_common.cc` contains shared helper implementations;
 - `lillymol_nb_io.cc`, `lillymol_nb_molecule.cc`,
   `lillymol_nb_atom_bond.cc`, `lillymol_nb_set_of_atoms.cc`,
-  `lillymol_nb_substructure.cc`, `lillymol_nb_descriptors.cc`, and
-  `lillymol_nb_standardise.cc` contain the Python-visible bindings.
+  `lillymol_nb_substructure.cc`, `lillymol_nb_descriptors.cc`,
+  `lillymol_nb_standardise.cc`, and `lillymol_nb_fingerprint.cc` contain the
+  Python-visible bindings.
 
 To stage the nanobind modules separately from the pybind modules:
 
@@ -48,7 +49,8 @@ separate from `lib` while both pybind and nanobind builds exist.
 
 - constructing, copying, indexing, and iterating over a `Molecule`;
 - common `Molecule` accessors, RDKit-style aliases, mutators, bond lookup,
-  formal-charge, isotope, Hydrogen, ring, aromaticity, and chirality helpers;
+  formal-charge, isotope, Hydrogen, ring, aromaticity, symmetry, path, SMILES,
+  atom-renumbering, organic-element, and chirality helpers;
 - `MolFromSmiles` returning an owned `Molecule` or `None`;
 - basic string, scalar, tuple, optional, and `list[int]` conversions;
 - molecule-owned `Atom` and `Bond` references from `atom(i)`, `mol[i]`,
@@ -70,6 +72,7 @@ separate from `lib` while both pybind and nanobind builds exist.
 - GIL release around substructure search calls;
 - simple descriptor helper dependencies (`alogp`, `xlogp`, `tpsa`);
 - basic `Chemical_Standardisation` access via `Standardise`;
+- list-returning linear, ECFP, and atom-pair fingerprint helpers plus `tanimoto`;
 - basic molecule file I/O via `Reader`, `Writer`, `MolReaderContext`, and
   `MolWriterContext`, with `ReaderContext` and `ContextWriter` retained as
   compatibility aliases;
@@ -82,7 +85,8 @@ Still to explore:
   workflows;
 - broader object lifetime and reference return policies for molecule-owned
   objects, especially if mutable atom or bond operations are added;
-- NumPy returns, or acceptable non-NumPy replacements;
+- whether NumPy-returning fingerprint helpers can be safely reintroduced with a
+  newer nanobind or a different ownership strategy;
 - module naming and packaging if nanobind replaces pybind11;
 - build time, import time, call overhead, and extension size comparisons against
   functionally equivalent pybind11 modules.

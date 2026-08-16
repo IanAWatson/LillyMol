@@ -1,3 +1,4 @@
+import atexit
 import copy
 import os
 import sys
@@ -8,6 +9,24 @@ sys.path.insert(0, os.path.dirname(__file__))
 
 import lillymol_nb
 
+
+def _trace_process_exit():
+    if os.environ.get("LILLYMOL_NB_TEST_TRACE"):
+        print("ATEXIT unittest complete", file=sys.stderr, flush=True)
+
+
+atexit.register(_trace_process_exit)
+
+
+class LillyMolNanobindTestCase(unittest.TestCase):
+
+    def setUp(self):
+        if os.environ.get("LILLYMOL_NB_TEST_TRACE"):
+            print(f"START {self.id()}", file=sys.stderr, flush=True)
+
+    def tearDown(self):
+        if os.environ.get("LILLYMOL_NB_TEST_TRACE"):
+            print(f"END {self.id()}", file=sys.stderr, flush=True)
 
 SMILES = """C(=O)NCCCC CHEMBL45466
 C(O)(=O)CCC(O)=O CHEMBL1200345
@@ -22,7 +41,7 @@ N1(C(C#N)C1)C(=O)NCC CHEMBL150159
 """
 
 
-class TestNanobindMolecule(unittest.TestCase):
+class TestNanobindMolecule(LillyMolNanobindTestCase):
 
     def test_build_from_smiles(self):
         mol = lillymol_nb.Molecule()
@@ -202,6 +221,71 @@ class TestNanobindMolecule(unittest.TestCase):
         mol = lillymol_nb.MolFromSmiles("CCO ethanol")
         self.assertEqual(mol.remove_atoms(lillymol_nb.Set_of_Atoms([0, 2])), 2)
         self.assertEqual(mol.natoms(), 1)
+    def test_molecule_convenience_methods(self):
+        mol = lillymol_nb.MolFromSmiles("CCO ethanol")
+        self.assertTrue(mol.organic_only())
+        self.assertEqual(mol.non_organic_atom_count(), 0)
+        self.assertTrue(mol.is_organic(0))
+        self.assertTrue(mol.are_bonded(0, 1))
+        self.assertFalse(mol.are_bonded(0, 2))
+        self.assertEqual(mol.bonds_between(0, 2), 2)
+        self.assertEqual(mol.longest_path(), 2)
+        self.assertEqual(mol.most_distant_pair(), (0, 2))
+        self.assertEqual(mol.atoms_on_shortest_path(0, 2), [1])
+        self.assertEqual(mol.all_atoms_between(0, 2), [1])
+        self.assertEqual(mol.down_the_bond(0, 1), [2])
+        self.assertEqual(mol.lipinski_num_h_donors(), 1)
+        self.assertEqual(mol.lipinski_num_h_acceptors(), 1)
+        self.assertEqual(mol.rdkit_num_h_donors(), 1)
+        self.assertEqual(mol.rdkit_num_h_acceptors(), 1)
+        self.assertTrue(mol.saturated(0))
+        self.assertEqual(mol.unsaturation(0), 0)
+
+        smiles = mol.random_smiles()
+        self.assertIsInstance(smiles, str)
+        self.assertGreater(len(smiles), 0)
+        self.assertEqual(mol.unique_kekule_smiles(), "OCC")
+        self.assertEqual(mol.smiles_starting_with_atom(2), "OCC")
+        order = mol.smiles_atom_order()
+        self.assertEqual(sorted(order), [0, 1, 2])
+
+        self.assertEqual(mol.renumber_atoms([2, 1, 0]), 1)
+        self.assertEqual(mol.atomic_symbol(0), "O")
+        with self.assertRaises(Exception):
+            mol.renumber_atoms([0, 0, 1])
+
+    def test_canonical_and_symmetry_helpers(self):
+        mol = lillymol_nb.MolFromSmiles("CCO ethanol")
+        ranks = mol.canonical_ranks()
+        self.assertEqual(len(ranks), mol.natoms())
+        self.assertEqual(mol.canonical_rank(0), ranks[0])
+        classes = [mol.symmetry_class(i) for i in range(mol.natoms())]
+        self.assertEqual(mol.number_symmetry_classes(), len(set(classes)))
+
+        ethane = lillymol_nb.MolFromSmiles("CC ethane")
+        equivalents = ethane.symmetry_equivalents(0)
+        self.assertIn(1, equivalents)
+
+    def test_remove_helpers(self):
+        mol = lillymol_nb.MolFromSmiles("[Na]OC sodium_ethoxide")
+        self.assertEqual(mol.non_organic_atom_count(), 1)
+        self.assertEqual(mol.remove_non_periodic_table_elements(), 0)
+
+        mol = lillymol_nb.MolFromSmiles("CC ethane")
+        self.assertEqual(mol.AddHs(), 6)
+        self.assertEqual(mol.remove_explicit_hydrogens(), 2)
+        self.assertEqual(mol.natoms(), 2)
+
+        mol = lillymol_nb.MolFromSmiles("CCO ethanol")
+        self.assertTrue(mol.remove_bonds_to_atom(1))
+        self.assertEqual(mol.nedges(), 0)
+
+        mol = lillymol_nb.MolFromSmiles("CCO ethanol")
+        self.assertEqual(mol.remove_edge(0), 1)
+        self.assertEqual(mol.nedges(), 1)
+        self.assertEqual(mol.chop(1), 2)
+        self.assertEqual(mol.natoms(), 2)
+
     def test_charges_isotopes_and_hydrogens(self):
         mol = lillymol_nb.MolFromSmiles("C[NH3+] methylammonium")
         self.assertTrue(mol.has_formal_charges())
@@ -507,6 +591,40 @@ class TestNanobindMolecule(unittest.TestCase):
         self.assertEqual(standardise.process(mol), 1)
         self.assertEqual(mol.smiles(), "CC(=O)O")
 
+    def test_fingerprint_default_and_tanimoto(self):
+        mol = lillymol_nb.MolFromSmiles("CCO ethanol")
+        bits = lillymol_nb.linear_fingerprint(mol)
+        self.assertIsInstance(bits, list)
+        self.assertEqual(len(bits), 2048)
+        self.assertGreater(sum(bits), 0)
+        self.assertAlmostEqual(lillymol_nb.tanimoto(bits, bits), 1.0)
+
+        bits2 = lillymol_nb.linear_fingerprint(mol, nbits=512, atype_specification="")
+        self.assertIsNotNone(bits2)
+        self.assertEqual(len(bits2), 512)
+        self.assertIsNone(lillymol_nb.linear_fingerprint(mol, nbits=512, atype_specification="BAD"))
+
+    def test_fingerprint_creators(self):
+        mol = lillymol_nb.MolFromSmiles("CN1C=NC2=C1C(=O)N(C(=O)N2C)C caffeine")
+        ecfp = lillymol_nb.ECFingerprintCreator(512)
+        bits = ecfp.fingerprint(mol)
+        self.assertIsInstance(bits, list)
+        self.assertEqual(len(bits), 512)
+        self.assertGreater(sum(bits), 0)
+
+        same_molecule = lillymol_nb.MolFromSmiles("Cn1c(=O)c2c(ncn2C)n(C)c1=O caffeine")
+        self.assertEqual(mol.unique_smiles(), same_molecule.unique_smiles())
+        self.assertEqual(bits, ecfp.fingerprint(same_molecule))
+
+        linear = lillymol_nb.LinearFingerprintCreator(256)
+        linear.set_max_length(5)
+        self.assertEqual(len(linear.fingerprint(mol)), 256)
+
+        atom_pair = lillymol_nb.AtomPairFingerprintCreator(256)
+        atom_pair.set_min_separation(1)
+        atom_pair.set_max_separation(5)
+        self.assertEqual(len(atom_pair.fingerprint(mol)), 256)
+
     def test_descriptor_helpers(self):
         mol = lillymol_nb.MolFromSmiles("CCO ethanol")
         self.assertIsNotNone(lillymol_nb.alogp(mol))
@@ -515,7 +633,7 @@ class TestNanobindMolecule(unittest.TestCase):
         self.assertEqual(lillymol_nb.HbaHbd(mol), (1, 1))
 
 
-class TestNanobindTSubstructure(unittest.TestCase):
+class TestNanobindTSubstructure(LillyMolNanobindTestCase):
 
     def test_no_queries(self):
         ts = lillymol_nb.TSubstructure()

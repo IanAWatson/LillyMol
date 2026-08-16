@@ -93,6 +93,17 @@ BindMolecule(nb::module_& m) {
            "Return the number of fragments")
       .def("atoms_in_largest_fragment", [](Molecule& mol) { return mol.atoms_in_largest_fragment(); },
            "Return the number of atoms in the largest fragment")
+      .def("remove_non_periodic_table_elements", &Molecule::remove_all_non_natural_elements,
+           "Remove non periodic table elements")
+      .def("organic_only", nb::overload_cast<>(&Molecule::organic_only, nb::const_),
+           "True if only organic elements are present")
+      .def("non_organic_atom_count", &Molecule::non_organic_atom_count,
+           "Return the number of non-organic atoms")
+      .def("is_organic",
+           [](const Molecule& mol, atom_number_t atom) { return static_cast<bool>(mol.is_organic(atom)); },
+           nb::arg("atom"), "True if atom is organic")
+      .def("remove_explicit_hydrogens", nb::overload_cast<>(&Molecule::remove_explicit_hydrogens),
+           "Remove explicit hydrogens")
       .def("atomic_number", &Molecule::atomic_number, nb::arg("atom"),
            "Return the atomic number for atom")
       .def("set_atomic_number", &Molecule::set_atomic_number, nb::arg("atom"),
@@ -138,6 +149,12 @@ BindMolecule(nb::module_& m) {
       .def("remove_bond_between_atoms", &Molecule::remove_bond_between_atoms,
            nb::arg("a1"), nb::arg("a2"))
       .def("remove_all_bonds", &Molecule::remove_all_bonds)
+      .def("remove_bonds_to_atom",
+           [](Molecule& mol, atom_number_t atom) { return static_cast<bool>(mol.remove_bonds_to_atom(atom, 0)); },
+           nb::arg("atom"), "Remove all bonds to an atom")
+      .def("remove_edge", nb::overload_cast<int>(&Molecule::remove_bond),
+           nb::arg("bond"), "Remove a bond by bond number")
+      .def("chop", &Molecule::chop, nb::arg("natoms"), "Remove the last atoms")
       .def("remove_all", nb::overload_cast<atomic_number_t>(&Molecule::remove_all),
            nb::arg("atomic_number"))
       .def("atomic_numbers", &AtomicNumbers,
@@ -239,10 +256,24 @@ BindMolecule(nb::module_& m) {
       .def("implicit_hydrogens_known", &Molecule::implicit_hydrogens_known,
            nb::arg("atom"))
       .def("make_implicit_hydrogens_explicit", nb::overload_cast<>(&Molecule::make_implicit_hydrogens_explicit))
+      .def("unset_all_implicit_hydrogen_information", &Molecule::unset_all_implicit_hydrogen_information,
+           "Discard all implicit hydrogen known flags")
       .def("AddHs", [](Molecule& mol) { return mol.make_implicit_hydrogens_explicit(); })
       .def("RemoveHs", [](Molecule& mol) { return mol.remove_all(1); })
       .def("valence_ok", nb::overload_cast<>(&Molecule::valence_ok))
       .def("valence_ok", nb::overload_cast<atom_number_t>(&Molecule::valence_ok), nb::arg("atom"))
+      .def("lipinski_num_h_donors", &Molecule::LipinskiNumHDonors,
+           "Lipinski hydrogen bond donor count")
+      .def("lipinski_num_h_acceptors", &Molecule::LipinskiNumHAcceptors,
+           "Lipinski hydrogen bond acceptor count")
+      .def("rdkit_num_h_donors", &Molecule::RDKitNumHDonors,
+           "RDKit compatible hydrogen bond donor count")
+      .def("rdkit_num_h_acceptors", &Molecule::RDKitNumHAcceptors,
+           "RDKit compatible hydrogen bond acceptor count")
+      .def("saturated",
+           [](Molecule& mol, atom_number_t atom) { return static_cast<bool>(mol.saturated(atom)); },
+           nb::arg("atom"))
+      .def("unsaturation", &Molecule::unsaturation, nb::arg("atom"))
       .def("smiles",
            [](Molecule& mol) { return mol.smiles().AsString(); },
            "Return a non-unique SMILES")
@@ -252,12 +283,135 @@ BindMolecule(nb::module_& m) {
       .def("unique_smiles",
            [](Molecule& mol) { return mol.unique_smiles().AsString(); },
            "Return the unique SMILES")
+      .def("random_smiles",
+           [](Molecule& mol) { return mol.random_smiles().AsString(); },
+           "Return a random SMILES")
+      .def("isotopically_labelled_smiles",
+           [](Molecule& mol) { return mol.isotopically_labelled_smiles().AsString(); },
+           "Return SMILES with isotopes as atom numbers")
+      .def("unique_kekule_smiles",
+           [](Molecule& mol) { return mol.UniqueKekuleSmiles().AsString(); },
+           "Return unique Kekule SMILES")
+      .def("smiles_atom_order",
+           [](Molecule& mol) {
+             std::vector<int> result(mol.natoms());
+             mol.smiles_atom_order(result.data());
+             return result;
+           },
+           "Return atom order from the most recent SMILES generation")
+      .def("renumber_atoms",
+           [](Molecule& mol, const std::vector<int>& new_number) {
+             const int matoms = mol.natoms();
+             if (static_cast<int>(new_number.size()) != matoms) {
+               throw std::invalid_argument("renumber_atoms requires one entry for each atom");
+             }
+             std::vector<int> seen(matoms, 0);
+             for (int i = 0; i < matoms; ++i) {
+               const int destination = new_number[i];
+               if (destination < 0 || destination >= matoms) {
+                 throw std::invalid_argument("renumber_atoms mapping contains an atom number outside [0, natoms)");
+               }
+               if (seen[destination]) {
+                 throw std::invalid_argument("renumber_atoms mapping contains duplicate atom numbers");
+               }
+               seen[destination] = 1;
+             }
+             return mol.renumber_atoms(new_number.data());
+           },
+           nb::arg("new_number"), "Renumber atoms")
+      .def("smiles_starting_with_atom",
+           [](Molecule& mol, atom_number_t atom) { return mol.smiles_starting_with_atom(atom).AsString(); },
+           nb::arg("atom"), "Return SMILES starting at atom")
       .def("name",
            [](const Molecule& mol) { return mol.name().AsString(); },
            "Return the molecule name")
       .def("set_name",
            [](Molecule& mol, const std::string& name) { mol.set_name(name); },
            nb::arg("name"))
+      .def("are_bonded", nb::overload_cast<atom_number_t, atom_number_t>(&Molecule::are_bonded, nb::const_),
+           nb::arg("a1"), nb::arg("a2"), "True if atoms are bonded")
+      .def("bonds_between", nb::overload_cast<atom_number_t, atom_number_t>(&Molecule::bonds_between),
+           nb::arg("a1"), nb::arg("a2"), "Return topological distance between atoms")
+      .def("longest_path", nb::overload_cast<>(&Molecule::longest_path),
+           "Return the longest topological path")
+      .def("most_distant_pair",
+           [](Molecule& mol) {
+             atom_number_t a1 = INVALID_ATOM_NUMBER;
+             atom_number_t a2 = INVALID_ATOM_NUMBER;
+             int longest_distance = 0;
+             const int matoms = mol.natoms();
+             for (int i = 0; i < matoms; ++i) {
+               for (int j = i + 1; j < matoms; ++j) {
+                 if (mol.fragment_membership(i) != mol.fragment_membership(j)) {
+                   continue;
+                 }
+                 const int distance = mol.bonds_between(i, j);
+                 if (distance > longest_distance) {
+                   a1 = i;
+                   a2 = j;
+                   longest_distance = distance;
+                 }
+               }
+             }
+             return std::make_tuple(a1, a2);
+           },
+           "Return the most separated atom pair")
+      .def("atoms_on_shortest_path",
+           [](Molecule& mol, atom_number_t a1, atom_number_t a2) -> std::optional<std::vector<int>> {
+             Set_of_Atoms atoms;
+             if (!mol.atoms_between(a1, a2, atoms) || atoms.empty()) {
+               return std::nullopt;
+             }
+             return std::vector<int>(atoms.rawdata(), atoms.rawdata() + atoms.size());
+           },
+           nb::arg("a1"), nb::arg("a2"), "Return atoms on the shortest path between a1 and a2")
+      .def("all_atoms_between",
+           [](Molecule& mol, atom_number_t a1, atom_number_t a2) -> std::optional<std::vector<int>> {
+             Set_of_Atoms atoms;
+             if (!mol.AllAtomsBetween(a1, a2, atoms) || atoms.empty()) {
+               return std::nullopt;
+             }
+             return std::vector<int>(atoms.rawdata(), atoms.rawdata() + atoms.size());
+           },
+           nb::arg("a1"), nb::arg("a2"), "Return all atoms on shortest paths between a1 and a2")
+      .def("down_the_bond",
+           [](Molecule& mol, atom_number_t a1, atom_number_t a2) -> std::optional<std::vector<int>> {
+             const int matoms = mol.natoms();
+             std::unique_ptr<int[]> dtb = std::make_unique<int[]>(matoms);
+             std::optional<int> maybe_n = mol.DownTheBond(a1, a2, dtb.get());
+             if (!maybe_n) {
+               return std::nullopt;
+             }
+             std::vector<int> result;
+             result.reserve(*maybe_n);
+             for (int i = 0; i < matoms; ++i) {
+               if (i != a2 && dtb[i]) {
+                 result.push_back(i);
+               }
+             }
+             return result;
+           },
+           nb::arg("a1"), nb::arg("a2"), "Return atoms down the bond from a1 to a2")
+      .def("canonical_rank", nb::overload_cast<atom_number_t>(&Molecule::canonical_rank),
+           nb::arg("atom"), "Return atom canonical rank")
+      .def("canonical_ranks",
+           [](Molecule& mol) {
+             std::vector<int> result(mol.natoms());
+             mol.canonical_ranks(result.data());
+             return result;
+           },
+           "Return canonical ranks for all atoms")
+      .def("symmetry_class", nb::overload_cast<atom_number_t>(&Molecule::symmetry_class),
+           nb::arg("atom"), "Return atom symmetry class")
+      .def("number_symmetry_classes", nb::overload_cast<>(&Molecule::number_symmetry_classes),
+           "Return number of symmetry classes")
+      .def("symmetry_equivalents",
+           [](Molecule& mol, atom_number_t atom) {
+             Set_of_Atoms tmp;
+             mol.symmetry_equivalents(atom, tmp);
+             return std::vector<int>(tmp.rawdata(), tmp.rawdata() + tmp.size());
+           },
+           nb::arg("atom"), "Return atoms symmetry-equivalent to atom")
       .def("__len__", [](const Molecule& mol) { return mol.natoms(); })
       .def("__getitem__",
            [](const Molecule& mol, int index) { return mol[index]; },

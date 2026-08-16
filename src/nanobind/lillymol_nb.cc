@@ -15,5 +15,6 @@ NB_MODULE(lillymol_nb, m) {
   lillymol_nb::BindDescriptors(m);
   lillymol_nb::BindStandardise(m);
   lillymol_nb::BindFingerprint(m);
+  lillymol_nb::BindReaction(m);
   lillymol_nb::BindTools(m);
 }

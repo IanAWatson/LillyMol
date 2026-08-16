@@ -1214,6 +1214,88 @@ $$$$
         self.assertTrue(all(product.number_isotopic_atoms() == 0
                             for product in products))
 
+    def test_reaction_rdkit_cookbook_smirks(self):
+        core = lillymol_nb.MolFromSmiles("*c1c(C)cccc1O")
+        sidechain = lillymol_nb.MolFromSmiles("CN*")
+
+        lillymol_nb.set_smirks_lost_atom_means_remove_frgment(1)
+
+        reaction = lillymol_nb.Reaction()
+        self.assertTrue(reaction.construct_from_smirks(
+            "[c:1][#0:3].[#0:4][*:2]>>[*:1]-[*:2]"))
+        smc = lillymol_nb.SidechainMatchConditions()
+        self.assertTrue(reaction.add_sidechain_reagent(0, sidechain, smc))
+        self.assertEqual(reaction.number_sidechains(), 1)
+        self.assertEqual(reaction.number_sidechains_with_reagents(), 1)
+        self.assertEqual(reaction.sidechain_name(0, 0), sidechain.name())
+
+        products = reaction.perform_reaction(core, sidechain)
+        self.assertIsNotNone(products)
+        self.assertEqual(len(products), 1)
+        self.assertEqual(products[0].unique_smiles(), "Oc1c(NC)c(C)ccc1")
+
+    def test_reaction_textproto_multiple_reagents(self):
+        reagents = [
+            lillymol_nb.MolFromSmiles("O-C(=O)c1ccc(Cl)cc1 scaffold"),
+            lillymol_nb.MolFromSmiles("Nc1ccc(S)cc1 R1"),
+            lillymol_nb.MolFromSmiles("C R2"),
+        ]
+        reaction_textproto = """scaffold {
+  id: 0
+  smarts: "[OD1]-C=O.[Cl:3]"
+  remove_atom: 0
+  remove_atom: 3
+}
+sidechain {
+  id: 1
+  smarts: "[N]-[c:1].[c:2]-[S:3]"
+  remove_atom: 3
+  join {
+    a1: 1
+    a2: 0
+  }
+}
+sidechain {
+  id: 2
+  smarts: "C"
+  join {
+    c1 {
+      component: 1
+      atom: 2
+    }
+    a2: 0
+  }
+}
+"""
+        reaction = lillymol_nb.Reaction()
+        self.assertTrue(reaction.construct_from_textproto(reaction_textproto))
+        self.assertEqual(reaction.number_sidechains(), 2)
+
+        product = reaction.perform_reaction(reagents)
+        self.assertIsNotNone(product)
+        self.assertEqual(product.unique_smiles(), "O=C(Nc1ccc(C)cc1)c1ccccc1")
+
+    def test_reaction_iterator_and_reagent_names(self):
+        core = lillymol_nb.MolFromSmiles("*c1ccccc1 scaffold")
+        sidechain = lillymol_nb.MolFromSmiles("CN* methylamine")
+
+        reaction = lillymol_nb.Reaction()
+        self.assertTrue(reaction.construct_from_smirks(
+            "[c:1][#0:3].[#0:4][*:2]>>[*:1]-[*:2]"))
+        smc = lillymol_nb.SidechainMatchConditions()
+        self.assertTrue(reaction.add_sidechain_reagent(0, sidechain, smc))
+
+        iterator = lillymol_nb.ReactionIterator(reaction)
+        self.assertTrue(iterator.active())
+        self.assertEqual(iterator.reagent(0), 0)
+        self.assertEqual(reaction.reagent_names(iterator), ["methylamine"])
+
+        matches = reaction.substructure_search_matches(core)
+        self.assertIsNotNone(matches)
+        product = reaction.perform_reaction(core, lillymol_nb.Set_of_Atoms(matches[0]), iterator)
+        self.assertIsNotNone(product)
+        self.assertEqual(product.unique_smiles(), "CNc1ccccc1")
+
     def _run_truncated_distance_matrix_storage_case(self, storage):
         fname = _write_tfdatarecord([
             _nearneighbours("A", [("B", 0.25), ("C", 0.50)]),

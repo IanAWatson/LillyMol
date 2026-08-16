@@ -412,6 +412,115 @@ BindMolecule(nb::module_& m) {
              return std::vector<int>(tmp.rawdata(), tmp.rawdata() + tmp.size());
            },
            nb::arg("atom"), "Return atoms symmetry-equivalent to atom")
+      .def("partial_charge_type",
+           [](const Molecule& mol) { return mol.partial_charge_type().AsString(); },
+           "Return the type of partial charges stored")
+      .def("invalidate_partial_charges",
+           [](Molecule& mol) { mol.invalidate_charges(); },
+           "Discard partial charge information")
+      .def("partial_charge",
+           [](const Molecule& mol, atom_number_t atom) { return mol.partial_charge(atom); },
+           nb::arg("atom"), "Return partial charge on atom")
+      .def("compute_Abraham_partial_charges",
+           [](Molecule& mol) { return mol.compute_Abraham_partial_charges(); },
+           "Compute Abraham partial charges")
+      .def("compute_Gasteiger_partial_charges",
+           [](Molecule& mol) { return mol.compute_Gasteiger_partial_charges(); },
+           "Compute Gasteiger partial charges")
+      .def("compute_Huckel_partial_charges",
+           [](Molecule& mol) { return mol.compute_Huckel_partial_charges(); },
+           "Compute Huckel partial charges")
+      .def("compute_Gasteiger_Huckel_partial_charges",
+           [](Molecule& mol) { return mol.compute_Gasteiger_Huckel_partial_charges(); },
+           "Compute Gasteiger-Huckel partial charges")
+      .def("gasteiger_partial_charges",
+           [](Molecule& mol) -> std::vector<float> {
+             mol.compute_Gasteiger_partial_charges();
+             std::vector<float> result;
+             result.reserve(mol.natoms());
+             for (int i = 0; i < mol.natoms(); ++i) {
+               result.push_back(mol.partial_charge(i));
+             }
+             return result;
+           },
+           "Return list of Gasteiger partial charges")
+      .def("x", nb::overload_cast<atom_number_t>(&Molecule::x, nb::const_),
+           nb::arg("atom"), "Return x coordinate")
+      .def("y", nb::overload_cast<atom_number_t>(&Molecule::y, nb::const_),
+           nb::arg("atom"), "Return y coordinate")
+      .def("z", nb::overload_cast<atom_number_t>(&Molecule::z, nb::const_),
+           nb::arg("atom"), "Return z coordinate")
+      .def("setx", static_cast<void (Molecule::*)(atom_number_t, coord_t)>(&Molecule::setx),
+           nb::arg("atom"), nb::arg("x"), "Set x coordinate")
+      .def("sety", static_cast<void (Molecule::*)(atom_number_t, coord_t)>(&Molecule::sety),
+           nb::arg("atom"), nb::arg("y"), "Set y coordinate")
+      .def("setz", static_cast<void (Molecule::*)(atom_number_t, coord_t)>(&Molecule::setz),
+           nb::arg("atom"), nb::arg("z"), "Set z coordinate")
+      .def("setxyz",
+           static_cast<void (Molecule::*)(atom_number_t, coord_t, coord_t, coord_t)>(&Molecule::setxyz),
+           nb::arg("atom"), nb::arg("x"), nb::arg("y"), nb::arg("z"),
+           "Set atom coordinates")
+      .def("get_coordinates",
+           [](const Molecule& mol) {
+             const int matoms = mol.natoms();
+             std::vector<float> result;
+             result.reserve(matoms * 3);
+             for (int i = 0; i < matoms; ++i) {
+               result.push_back(mol.x(i));
+               result.push_back(mol.y(i));
+               result.push_back(mol.z(i));
+             }
+             return result;
+           },
+           "Return coordinates as [x0, y0, z0, x1, y1, z1, ...]")
+      .def("set_coordinates",
+           [](Molecule& mol, const std::vector<float>& coords) {
+             const int expected = 3 * mol.natoms();
+             if (static_cast<int>(coords.size()) != expected) {
+               throw std::invalid_argument("set_coordinates requires 3 values per atom");
+             }
+             mol.SetCoordinates(coords.data());
+           },
+           nb::arg("coords"), "Set coordinates from [x0, y0, z0, x1, y1, z1, ...]")
+      .def("bond_length",
+           [](const Molecule& mol, atom_number_t a1, atom_number_t a2) -> std::optional<float> {
+             if (!mol.are_bonded(a1, a2)) {
+               return std::nullopt;
+             }
+             return mol.bond_length(a1, a2);
+           },
+           nb::arg("a1"), nb::arg("a2"), "Return distance between bonded atoms")
+      .def("bond_angle",
+           [](const Molecule& mol, atom_number_t centre, atom_number_t a1, atom_number_t a2) {
+             return mol.bond_angle(centre, a1, a2, BondedStatus::kOkNotBonded);
+           },
+           nb::arg("centre"), nb::arg("a1"), nb::arg("a2"),
+           "Return angle defined by three atoms")
+      .def("dihedral_angle",
+           [](const Molecule& mol, atom_number_t a1, atom_number_t a2,
+              atom_number_t a3, atom_number_t a4) {
+             return mol.dihedral_angle(a1, a2, a3, a4, BondedStatus::kOkNotBonded);
+           },
+           nb::arg("a1"), nb::arg("a2"), nb::arg("a3"), nb::arg("a4"),
+           "Return dihedral angle defined by four atoms")
+      .def("signed_dihedral_angle",
+           nb::overload_cast<atom_number_t, atom_number_t, atom_number_t, atom_number_t>(
+               &Molecule::signed_dihedral_angle, nb::const_),
+           nb::arg("a1"), nb::arg("a2"), nb::arg("a3"), nb::arg("a4"),
+           "Return signed dihedral angle defined by four atoms")
+      .def("distance_between_atoms",
+           nb::overload_cast<atom_number_t, atom_number_t>(
+               &Molecule::distance_between_atoms, nb::const_),
+           nb::arg("a1"), nb::arg("a2"), "Return spatial distance between atoms")
+      .def("longest_intra_molecular_distance", &Molecule::longest_intra_molecular_distance,
+           "Return longest spatial distance within the molecule")
+      .def("bump_check",
+           [](const Molecule& mol, distance_t dist) { return mol.bump_check(dist); },
+           nb::arg("dist"), "Return number of non-bonded atom pairs closer than dist")
+      .def("highest_coordinate_dimensionality", &Molecule::highest_coordinate_dimensionality,
+           "Return highest coordinate dimensionality present")
+      .def("discern_chirality_from_3d_structure", &Molecule::discern_chirality_from_3d_structure,
+           "Perceive chiral centres from 3D coordinates")
       .def("__len__", [](const Molecule& mol) { return mol.natoms(); })
       .def("__getitem__",
            [](const Molecule& mol, int index) { return mol[index]; },

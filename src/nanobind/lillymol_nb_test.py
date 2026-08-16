@@ -254,6 +254,51 @@ class TestNanobindMolecule(LillyMolNanobindTestCase):
         with self.assertRaises(Exception):
             mol.renumber_atoms([0, 0, 1])
 
+    def test_partial_charge_helpers(self):
+        mol = lillymol_nb.MolFromSmiles("CCO ethanol")
+        charges = mol.gasteiger_partial_charges()
+        self.assertEqual(len(charges), mol.natoms())
+        self.assertEqual(mol.partial_charge_type(), "GASTEIGER")
+        self.assertAlmostEqual(mol.partial_charge(0), charges[0])
+        self.assertNotEqual(sum(abs(charge) for charge in charges), 0.0)
+        mol.invalidate_partial_charges()
+        self.assertEqual(mol.partial_charge_type(), "")
+        self.assertGreaterEqual(mol.compute_Gasteiger_partial_charges(), 0)
+
+    def test_coordinate_and_geometry_helpers(self):
+        mol = lillymol_nb.MolFromSmiles("CCCO propanol")
+        mol.setxyz(0, 0.0, 0.0, 0.0)
+        mol.setxyz(1, 1.0, 0.0, 0.0)
+        mol.setxyz(2, 1.0, 1.0, 0.0)
+        mol.setxyz(3, 1.0, 1.0, 1.0)
+
+        self.assertAlmostEqual(mol.x(1), 1.0)
+        self.assertAlmostEqual(mol.y(2), 1.0)
+        self.assertAlmostEqual(mol.z(3), 1.0)
+        mol.setx(0, 0.25)
+        mol.sety(0, 0.5)
+        mol.setz(0, 0.75)
+        self.assertEqual(mol.get_coordinates()[:3], [0.25, 0.5, 0.75])
+
+        coords = [0.0, 0.0, 0.0,
+                  1.0, 0.0, 0.0,
+                  1.0, 1.0, 0.0,
+                  1.0, 1.0, 1.0]
+        mol.set_coordinates(coords)
+        self.assertEqual(mol.get_coordinates(), coords)
+        with self.assertRaises(Exception):
+            mol.set_coordinates(coords[:-1])
+
+        self.assertAlmostEqual(mol.distance_between_atoms(0, 1), 1.0)
+        self.assertAlmostEqual(mol.bond_length(0, 1), 1.0)
+        self.assertIsNone(mol.bond_length(0, 2))
+        self.assertGreater(mol.bond_angle(1, 0, 2), 0.0)
+        self.assertGreater(mol.dihedral_angle(0, 1, 2, 3), 0.0)
+        self.assertNotEqual(mol.signed_dihedral_angle(0, 1, 2, 3), 0.0)
+        self.assertAlmostEqual(mol.longest_intra_molecular_distance(), 3 ** 0.5)
+        self.assertEqual(mol.highest_coordinate_dimensionality(), 3)
+        self.assertGreater(mol.bump_check(2.0), 0)
+
     def test_canonical_and_symmetry_helpers(self):
         mol = lillymol_nb.MolFromSmiles("CCO ethanol")
         ranks = mol.canonical_ranks()

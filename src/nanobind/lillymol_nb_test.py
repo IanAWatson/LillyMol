@@ -56,6 +56,21 @@ def _qed_query_dir():
     return _query_dir("QED")
 
 
+def _ring_replacement_file(fname="6a.smi"):
+    home = os.environ.get("LILLYMOL_HOME")
+    if home:
+        candidate = os.path.join(home, "contrib", "test", "ring_replacement", fname)
+        if os.path.exists(candidate):
+            return candidate
+
+    candidate = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..",
+                                             "contrib", "test", "ring_replacement", fname))
+    if os.path.exists(candidate):
+        return candidate
+
+    return None
+
+
 _CRC32C_TABLE = None
 
 
@@ -1135,6 +1150,69 @@ $$$$
             "F[8CH2]C": 6,
             "C[8CH](F)F": 3,
         })
+
+    def test_ring_replacement_no_match(self):
+        replacement_file = _ring_replacement_file()
+        if replacement_file is None:
+            self.skipTest("ring replacement test data not available")
+
+        replacement = lillymol_nb.RingReplacement()
+        self.assertTrue(replacement.set_ring_atom_smarts("[#7]"))
+        self.assertGreater(replacement.read_replacement_rings(replacement_file), 0)
+        self.assertGreater(replacement.number_replacement_rings(), 0)
+
+        mol = lillymol_nb.MolFromSmiles("Oc1ccc(OC)cc1")
+        self.assertEqual(replacement.process(mol), [])
+
+    def test_ring_replacement_products(self):
+        replacement_file = _ring_replacement_file()
+        if replacement_file is None:
+            self.skipTest("ring replacement test data not available")
+
+        replacement = lillymol_nb.RingReplacement()
+        self.assertTrue(replacement.set_ring_atom_smarts("[1c]"))
+        self.assertGreater(replacement.read_replacement_rings(replacement_file), 0)
+
+        mol = lillymol_nb.MolFromSmiles("O[1c]1cc[1c](OC)cc1")
+        products = replacement.process(mol)
+        self.assertEqual(len(products), 12)
+        self.assertTrue(all(isinstance(product, lillymol_nb.Molecule)
+                            for product in products))
+        self.assertTrue(all(product.number_isotopic_atoms() == 2
+                            for product in products))
+
+    def test_ring_replacement_unique_only(self):
+        replacement_file = _ring_replacement_file()
+        if replacement_file is None:
+            self.skipTest("ring replacement test data not available")
+
+        replacement = lillymol_nb.RingReplacement()
+        self.assertTrue(replacement.set_ring_atom_smarts("c"))
+        replacement.set_unique_molecules_only(True)
+        replacement.set_min_support_requirement(100)
+        self.assertGreater(replacement.read_replacement_rings(replacement_file), 0)
+
+        mol = lillymol_nb.MolFromSmiles("Oc1ccc(OC)cc1 start")
+        self.assertEqual(len(replacement.process(mol)), 7)
+        self.assertEqual(replacement.process(mol), [])
+        replacement.clear_unique_molecule_cache()
+        self.assertEqual(len(replacement.process(mol)), 7)
+
+    def test_ring_replacement_remove_isotopes(self):
+        replacement_file = _ring_replacement_file()
+        if replacement_file is None:
+            self.skipTest("ring replacement test data not available")
+
+        replacement = lillymol_nb.RingReplacement()
+        self.assertTrue(replacement.set_ring_atom_smarts("[1c]"))
+        replacement.set_remove_isotopes(True)
+        self.assertGreater(replacement.read_replacement_rings(replacement_file), 0)
+
+        mol = lillymol_nb.MolFromSmiles("O[1c]1cc[1c](OC)cc1")
+        products = replacement.process(mol)
+        self.assertEqual(len(products), 12)
+        self.assertTrue(all(product.number_isotopic_atoms() == 0
+                            for product in products))
 
     def _run_truncated_distance_matrix_storage_case(self, storage):
         fname = _write_tfdatarecord([

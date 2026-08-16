@@ -34,6 +34,7 @@ nanobind_extension(
         "//Molecule_Tools:jwcats_lib",
         "//Molecule_Tools:nvrtspsa",
         "//Molecule_Tools:qed_lib",
+        "//Molecule_Tools:ring_replacement_lib",
         "//Molecule_Tools:unique_molecules_api",
         "//Molecule_Tools:xlogp_lib",
         "//Utilities/GFP_Tools:truncated_distance_matrix",

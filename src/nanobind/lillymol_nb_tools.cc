@@ -6,6 +6,7 @@
 
 #include "Molecule_Lib/mol2graph.h"
 #include "Molecule_Tools/dicer_api.h"
+#include "Molecule_Tools/ring_replacement_lib.h"
 #include "Molecule_Tools/unique_molecules_api.h"
 #include "Utilities/GFP_Tools/truncated_distance_matrix.h"
 
@@ -210,6 +211,45 @@ BindTools(nb::module_& m) {
            "Discard generated fragments matching SMARTS")
       .def("dice", &DiceMolecule, nb::arg("mol"),
            "Dice a molecule and return fragment unique smiles mapped to counts");
+
+  nb::class_<ring_replacement::RingReplacement>(m, "RingReplacement")
+      .def(nb::init<>())
+      .def("set_ring_atom_smarts",
+           &ring_replacement::RingReplacement::set_ring_atom_smarts,
+           nb::arg("smarts"),
+           "Set SMARTS for an atom in ring systems to be replaced")
+      .def("set_unique_molecules_only",
+           &ring_replacement::RingReplacement::set_unique_molecules_only,
+           nb::arg("value"), "Control duplicate product suppression")
+      .def("clear_unique_molecule_cache",
+           &ring_replacement::RingReplacement::clear_unique_molecule_cache,
+           "Clear products retained for duplicate suppression")
+      .def("set_min_support_requirement",
+           &ring_replacement::RingReplacement::set_min_support_requirement,
+           nb::arg("value"),
+           "Set minimum number of examples needed for a replacement ring")
+      .def("set_max_formula_difference",
+           &ring_replacement::RingReplacement::set_max_formula_difference,
+           nb::arg("value"),
+           "Set maximum formula difference between removed and replacement rings")
+      .def("set_remove_isotopes",
+           &ring_replacement::RingReplacement::set_remove_isotopes,
+           nb::arg("value"), "Control whether isotopic labels are removed from products")
+      .def("read_replacement_rings",
+           [](ring_replacement::RingReplacement& replacement,
+              const std::string& fname) -> uint32_t {
+             return replacement.ReadReplacementRings(fname);
+           },
+           nb::arg("fname"), "Read replacement rings from a textproto file")
+      .def("number_replacement_rings",
+           &ring_replacement::RingReplacement::number_replacement_rings,
+           "Return the number of replacement rings read")
+      .def("process",
+           [](ring_replacement::RingReplacement& replacement,
+              Molecule& mol) -> std::vector<Molecule> {
+             return replacement.Process(mol);
+           },
+           nb::arg("mol"), "Replace matching ring systems");
 
   nb::class_<unique_molecules::UniqueMolecules>(m, "UniqueMolecules")
       .def(nb::init<>())

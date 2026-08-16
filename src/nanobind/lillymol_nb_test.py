@@ -1041,9 +1041,9 @@ $$$$
         graph = unique.graph_specifications()
         self.assertFalse(graph.active())
         graph.turn_on_most_useful_options()
-        self.assertFalse(graph.active())
-        graph.set_active(True)
         self.assertTrue(graph.active())
+        graph.set_active(False)
+        self.assertFalse(graph.active())
         self.assertEqual(unique.report(), 1)
 
     def test_qed(self):

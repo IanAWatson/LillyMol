@@ -18,6 +18,7 @@ nanobind_extension(
         "lillymol_nb_set_of_atoms.cc",
         "lillymol_nb_standardise.cc",
         "lillymol_nb_substructure.cc",
+        "lillymol_nb_tools.cc",
         "lillymol_nb_tsubstructure.cc",
     ],
     deps = [
@@ -32,6 +33,7 @@ nanobind_extension(
         "//Molecule_Tools:jwcats_lib",
         "//Molecule_Tools:nvrtspsa",
         "//Molecule_Tools:qed_lib",
+        "//Molecule_Tools:unique_molecules_api",
         "//Molecule_Tools:xlogp_lib",
     ],
 )

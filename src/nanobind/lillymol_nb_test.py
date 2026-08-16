@@ -1012,6 +1012,40 @@ $$$$
         calc.set_use_alcohol_for_acid(True)
         self.assertIsNotNone(calc.logp(mol))
 
+    def test_unique_molecules(self):
+        unique = lillymol_nb.UniqueMolecules()
+        self.assertTrue(unique.is_unique(lillymol_nb.MolFromSmiles("C methane")))
+        self.assertFalse(unique.is_unique(lillymol_nb.MolFromSmiles("C methane_again")))
+
+        chiral = lillymol_nb.UniqueMolecules()
+        self.assertTrue(chiral.is_unique(lillymol_nb.MolFromSmiles("C(O)[C@@H](N)C")))
+        self.assertTrue(chiral.is_unique(lillymol_nb.MolFromSmiles("C(O)[C@H](N)C")))
+
+        achiral = lillymol_nb.UniqueMolecules()
+        achiral.set_include_chiral_info(False)
+        self.assertTrue(achiral.is_unique(lillymol_nb.MolFromSmiles("C(O)[C@@H](N)C")))
+        self.assertFalse(achiral.is_unique(lillymol_nb.MolFromSmiles("C(O)[C@H](N)C")))
+
+        fragments = lillymol_nb.UniqueMolecules()
+        fragments.set_strip_to_largest_fragment(True)
+        self.assertTrue(fragments.is_unique(lillymol_nb.MolFromSmiles("CC.C")))
+        self.assertFalse(fragments.is_unique(lillymol_nb.MolFromSmiles("CC.O")))
+
+        isotopes = lillymol_nb.UniqueMolecules()
+        isotopes.set_consider_isotopes(False)
+        mol = lillymol_nb.MolFromSmiles("C methane")
+        self.assertTrue(isotopes.is_unique(mol))
+        mol.set_isotope(0, 1)
+        self.assertFalse(isotopes.is_unique(mol))
+
+        graph = unique.graph_specifications()
+        self.assertFalse(graph.active())
+        graph.turn_on_most_useful_options()
+        self.assertFalse(graph.active())
+        graph.set_active(True)
+        self.assertTrue(graph.active())
+        self.assertEqual(unique.report(), 1)
+
     def test_qed(self):
         query_dir = _qed_query_dir()
         if query_dir is None:

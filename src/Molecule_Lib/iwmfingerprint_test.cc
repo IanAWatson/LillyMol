@@ -31,6 +31,22 @@ TEST(TestIWMFingerprint, ExplicitOptionsControlBitCount) {
   set_iwmfingerprint_nbits(original_nbits);
 }
 
+TEST(TestIWMFingerprint, WidthConstructorControlsBitVector) {
+  Molecule mol;
+  ASSERT_TRUE(mol.build_from_smiles("CCO ethanol"));
+
+  IWMFingerprint fp512(512);
+  ASSERT_TRUE(fp512.construct_fingerprint(mol));
+  EXPECT_EQ(fp512.nbits(), 512);
+  ASSERT_NE(fp512.vector(), nullptr);
+
+  int sum = 0;
+  for (int i = 0; i < fp512.nbits(); ++i) {
+    sum += fp512.vector()[i];
+  }
+  EXPECT_GT(sum, 0);
+}
+
 TEST(TestIWMFingerprint, LegacySetterControlsDefaultOptions) {
   const int original_nbits = iwmfingerprint_nbits();
 

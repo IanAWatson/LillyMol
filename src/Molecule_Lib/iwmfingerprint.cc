@@ -248,6 +248,7 @@ IWMFingerprint::IWMFingerprint(const IWMFingerprintOptions& options) : _options(
 IWMFingerprint::IWMFingerprint (int s) : IW_Bits_Base (s), _options(DefaultIWMFingerprintOptions())
 {
   _default_values();
+  _options.bits_per_fingerprint = s;
 
   return;
 }
@@ -255,6 +256,7 @@ IWMFingerprint::IWMFingerprint (int s) : IW_Bits_Base (s), _options(DefaultIWMFi
 IWMFingerprint::IWMFingerprint(int s, const IWMFingerprintOptions& options) : IW_Bits_Base(s), _options(options)
 {
   _default_values();
+  _options.bits_per_fingerprint = s;
 
   return;
 }

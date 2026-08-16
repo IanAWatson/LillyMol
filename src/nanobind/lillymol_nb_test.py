@@ -904,6 +904,14 @@ $$$$
         self.assertIn(lillymol_nb.interpret_D_as_deuterium(), [0, 1])
         self.assertIn(lillymol_nb.interpret_T_as_deuterium(), [0, 1])
 
+    def test_alogp_class(self):
+        mol = lillymol_nb.MolFromSmiles("CCO ethanol")
+        calc = lillymol_nb.ALogP()
+        self.assertAlmostEqual(calc.logp(mol), lillymol_nb.alogp(mol), delta=1.0e-6)
+        calc.set_rdkit_phoshoric_acid_hydrogen(True)
+        calc.set_use_alcohol_for_acid(True)
+        self.assertIsNotNone(calc.logp(mol))
+
     def test_rotatable_bonds(self):
         rotbond_calc = lillymol_nb.RotatableBonds()
         rotbond_calc.set_calculation_type(lillymol_nb.EXPENSIVE)

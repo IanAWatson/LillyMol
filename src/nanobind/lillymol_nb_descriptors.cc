@@ -23,6 +23,17 @@ BindDescriptors(nb::module_& m) {
   m.attr("QUICK") = nb::cast(quick_rotbond::QuickRotatableBonds::RotBond::kQuick);
   m.attr("EXPENSIVE") = nb::cast(quick_rotbond::QuickRotatableBonds::RotBond::kExpensive);
 
+  nb::class_<alogp::ALogP>(m, "ALogP")
+      .def(nb::init<>())
+      .def("set_rdkit_phoshoric_acid_hydrogen",
+           &alogp::ALogP::set_rdkit_phoshoric_acid_hydrogen,
+           "Mimic RDKit handling of hydrogens on phosphoric acids")
+      .def("set_use_alcohol_for_acid", &alogp::ALogP::set_use_alcohol_for_acid,
+           "Mimic RDKit handling of oxygen atoms in acids")
+      .def("logp",
+           [](alogp::ALogP& calc, Molecule& mol) { return calc.LogP(mol); },
+           nb::arg("mol"), "Compute AlogP");
+
   nb::class_<quick_rotbond::QuickRotatableBonds>(m, "RotatableBonds")
       .def(nb::init<>())
       .def("rotatable_bonds",

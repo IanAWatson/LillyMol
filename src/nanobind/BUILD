@@ -49,3 +49,25 @@ py_test(
     data = [":lillymol_nb"],
     deps = ["//Utilities/GFP_Tools:nearneighbours_py_proto"],
 )
+
+nanobind_extension(
+    name = "lillymol_nb_bdb",
+    srcs = ["lillymol_nb_bdb.cc"],
+    deps = [
+        "//Molecule_Lib:iwmolecule",
+        "//Molecule_Lib:moleculeio",
+        "//Molecule_Tools_Bdb:iwecfp_database_lookup_lib_shared",
+        "//Molecule_Tools_Bdb:selimsteg",
+        "@third_party//:berkeley_shared",
+    ],
+)
+
+py_test(
+    name = "lillymol_nb_bdb_test",
+    srcs = ["lillymol_nb_bdb_test.py"],
+    data = [
+        ":lillymol_nb",
+        ":lillymol_nb_bdb",
+        "//BerkeleyDB:iwbdb_load",
+    ],
+)

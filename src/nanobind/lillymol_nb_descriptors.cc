@@ -2,6 +2,7 @@
 
 #include "Molecule_Lib/atom_typing.h"
 #include "Molecule_Lib/qry_wstats.h"
+#include "Molecule_Tools/jwcats_lib.h"
 
 namespace lillymol_nb {
 namespace {
@@ -47,6 +48,69 @@ AtomTypingTag(const Atom_Typing_Specification& atom_typing, const std::string& s
     throw std::runtime_error("AtomTypingSpecification:cannot append atom type tag");
   }
   return result.AsString();
+}
+
+void
+ThrowForJWCatsStatus(jwcats::ComputeStatus status) {
+  switch (status) {
+    case jwcats::ComputeStatus::kOk:
+      return;
+    case jwcats::ComputeStatus::kMissingChargeData:
+      throw std::runtime_error("JWCats calculation failed: missing charge data");
+    case jwcats::ComputeStatus::kNotInitialised:
+      throw std::runtime_error("JWCats calculation failed: object is not initialised");
+    case jwcats::ComputeStatus::kError:
+      throw std::runtime_error("JWCats calculation failed");
+  }
+
+  throw std::runtime_error("JWCats calculation failed: unknown status");
+}
+
+bool
+BuildJWCatsAssigners(jwcats::JWCats& jwcats, const IWString& charges_dir,
+                     const IWString& hbonds_dir) {
+  static constexpr int kVerbose = 0;
+  return jwcats.charge_assigner().BuildFromDir(charges_dir) &&
+         jwcats.donor_acceptor_assigner().BuildFromDir(hbonds_dir, kVerbose);
+}
+
+void
+BuildJWCatsDefaultAssigners(jwcats::JWCats& jwcats) {
+  IWString default_dir("DEF");
+  if (!BuildJWCatsAssigners(jwcats, default_dir, default_dir)) {
+    throw std::runtime_error(
+        "Cannot initialise JWCats assigners from C3TK_DATA_PERSISTENT or LILLYMOL_HOME");
+  }
+}
+
+void
+InitialiseJWCats(jwcats::JWCats& jwcats) {
+  if (!jwcats.Initialise()) {
+    throw std::runtime_error("Cannot initialise JWCats");
+  }
+}
+
+std::vector<double>
+JWCatsResultToVector(const jwcats::JWCats& jwcats, const jwcats::Result& result) {
+  const std::vector<int>& write_array_value = jwcats.write_array_value();
+  std::vector<double> values;
+  values.reserve(jwcats.FeatureNames().size());
+
+  for (int i = 0; i < static_cast<int>(write_array_value.size()); ++i) {
+    if (write_array_value[i]) {
+      values.push_back(result.scaled_counts[i]);
+    }
+  }
+
+  return values;
+}
+
+std::vector<double>
+ComputeJWCats(jwcats::JWCats& jwcats, Molecule& mol) {
+  jwcats::Result result;
+  const jwcats::ComputeStatus status = jwcats.Compute(mol, result);
+  ThrowForJWCatsStatus(status);
+  return JWCatsResultToVector(jwcats, result);
 }
 
 }  // namespace
@@ -115,6 +179,57 @@ BindDescriptors(nb::module_& m) {
       .def("logp",
            [](alogp::ALogP& calc, Molecule& mol) { return calc.LogP(mol); },
            nb::arg("mol"), "Compute AlogP");
+
+  nb::class_<jwcats::JWCats>(m, "JWCats")
+      .def("__init__",
+           [](jwcats::JWCats* jwcats, bool initialise_default_assigners) {
+             new (jwcats) jwcats::JWCats();
+             if (initialise_default_assigners) {
+               BuildJWCatsDefaultAssigners(*jwcats);
+             }
+             InitialiseJWCats(*jwcats);
+           },
+           nb::arg("initialise_default_assigners") = true,
+           "Create a JWCats descriptor calculator")
+      .def("initialise",
+           [](jwcats::JWCats& jwcats) {
+             InitialiseJWCats(jwcats);
+             return true;
+           },
+           "Initialise after changing settings")
+      .def("build_default_assigners",
+           [](jwcats::JWCats& jwcats) {
+             BuildJWCatsDefaultAssigners(jwcats);
+             return true;
+           },
+           "Initialise charge and donor/acceptor assigners from default envs")
+      .def("build_assigners",
+           [](jwcats::JWCats& jwcats, const std::string& charges_dir,
+              const std::string& hbonds_dir) {
+             if (!BuildJWCatsAssigners(jwcats, IWString(charges_dir), IWString(hbonds_dir))) {
+               throw std::runtime_error("Cannot initialise JWCats assigners");
+             }
+             return true;
+           },
+           nb::arg("charges_dir"), nb::arg("hbonds_dir"),
+           "Initialise assigners from explicit charge and hbonds query directories")
+      .def("feature_names", &jwcats::JWCats::FeatureNames,
+           "Return descriptor names in the same order as process() values")
+      .def("process", &ComputeJWCats, nb::arg("mol"),
+           "Compute JWCats descriptors for one molecule as a list of floats")
+      .def("set_include_hydrophobic_pairs", &jwcats::JWCats::SetIncludeHydrophobicPairs,
+           nb::arg("value"), "Control whether hydrophobe-hydrophobe pair columns are emitted")
+      .def("set_min_bond_separation", &jwcats::JWCats::SetMinBondSeparation,
+           nb::arg("value"), "Set the minimum bond separation")
+      .def("set_max_bond_separation", &jwcats::JWCats::SetMaxBondSeparation,
+           nb::arg("value"), "Set the maximum bond separation")
+      .def("set_scaling_type", &jwcats::JWCats::SetScalingType, nb::arg("value"),
+           "Set scaling type: 0 none, 1 heavy atoms, 2 feature counts, 3 heavy atoms / feature counts")
+      .def("set_make_implicit_hydrogens_explicit",
+           &jwcats::JWCats::SetMakeImplicitHydrogensExplicit, nb::arg("value"),
+           "Make implicit hydrogens explicit during calculation")
+      .def("initialised", &jwcats::JWCats::initialised,
+           "Return whether the object has been initialised");
 
   nb::class_<quick_rotbond::QuickRotatableBonds>(m, "RotatableBonds")
       .def(nb::init<>())

@@ -1008,6 +1008,28 @@ $$$$
         calc.set_use_alcohol_for_acid(True)
         self.assertIsNotNone(calc.logp(mol))
 
+    def test_jwcats(self):
+        charges = _charges_query_dir()
+        hbonds = _hbonds_query_dir()
+        if charges is None or hbonds is None:
+            self.skipTest("JWCats query directories not available")
+
+        calc = lillymol_nb.JWCats(initialise_default_assigners=False)
+        self.assertTrue(calc.build_assigners(charges, hbonds))
+        self.assertTrue(calc.initialise())
+        self.assertTrue(calc.initialised())
+
+        names = calc.feature_names()
+        self.assertGreater(len(names), 0)
+        mol = lillymol_nb.MolFromSmiles("CCN(CC)C tertiary_amine")
+        values = calc.process(mol)
+        self.assertEqual(len(values), len(names))
+        self.assertTrue(all(isinstance(value, float) for value in values))
+
+        calc.set_include_hydrophobic_pairs(False)
+        self.assertTrue(calc.initialise())
+        self.assertLess(len(calc.feature_names()), len(names))
+
     def test_rotatable_bonds(self):
         rotbond_calc = lillymol_nb.RotatableBonds()
         rotbond_calc.set_calculation_type(lillymol_nb.EXPENSIVE)

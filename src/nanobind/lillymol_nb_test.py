@@ -19,15 +19,15 @@ def _trace_process_exit():
 atexit.register(_trace_process_exit)
 
 
-def _hbonds_query_dir():
+def _query_dir(kind):
     for envvar in ("C3TK_DATA_PERSISTENT", "LILLYMOL_HOME"):
         home = os.environ.get(envvar)
         if not home:
             continue
         if envvar == "C3TK_DATA_PERSISTENT":
-            candidate = os.path.join(home, "queries", "hbonds")
+            candidate = os.path.join(home, "queries", kind)
         else:
-            candidate = os.path.join(home, "data", "queries", "hbonds")
+            candidate = os.path.join(home, "data", "queries", kind)
         if os.path.isdir(candidate):
             return candidate
 
@@ -35,11 +35,19 @@ def _hbonds_query_dir():
     # the repository root. Bazel runfiles only see declared data, so this path
     # normally exists only outside sandboxed test execution.
     candidate = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..",
-                                             "data", "queries", "hbonds"))
+                                             "data", "queries", kind))
     if os.path.isdir(candidate):
         return candidate
 
     return None
+
+
+def _hbonds_query_dir():
+    return _query_dir("hbonds")
+
+
+def _charges_query_dir():
+    return _query_dir("charges")
 
 
 class LillyMolNanobindTestCase(unittest.TestCase):
@@ -874,6 +882,22 @@ $$$$
         standardise.activate_all()
         self.assertEqual(standardise.process(mol), 1)
         self.assertEqual(mol.smiles(), "CC(=O)O")
+
+    def test_charge_assigner(self):
+        charges = _charges_query_dir()
+        if charges is None:
+            self.skipTest("charge query directory not available")
+
+        charge_assigner = lillymol_nb.ChargeAssigner(charges)
+        self.assertTrue(charge_assigner.active())
+
+        mol = lillymol_nb.MolFromSmiles("CC(=O)O acetate")
+        self.assertEqual(charge_assigner.process(mol), 1)
+        self.assertEqual(mol.smiles(), "CC(=O)[O-]")
+
+        mol = lillymol_nb.MolFromSmiles("CCN(CC)C tertiary_amine")
+        self.assertEqual(charge_assigner.process(mol), 1)
+        self.assertEqual(mol.smiles(), "CC[NH+](C)CC")
 
     def test_donor_acceptor(self):
         hbonds = _hbonds_query_dir()

@@ -1,11 +1,52 @@
 #include "nanobind/lillymol_nb_internal.h"
 
+#include "Molecule_Lib/charge_assigner.h"
 #include "Molecule_Lib/donor_acceptor.h"
 #include "Molecule_Lib/qry_wstats.h"
 #include "Molecule_Lib/standardise.h"
 
 namespace lillymol_nb {
 namespace {
+
+void
+InitialiseChargeAssigner(Charge_Assigner& charge_assigner, const IWString& dirname) {
+  if (!charge_assigner.BuildFromDir(dirname)) {
+    throw std::runtime_error("ChargeAssigner:cannot initialise from '" + dirname.AsString() + "'");
+  }
+}
+
+void
+InitialiseChargeAssignerFromDefaultEnv(Charge_Assigner& charge_assigner) {
+  if (!charge_assigner.BuildFromDefaultEnvs()) {
+    throw std::runtime_error(
+        "ChargeAssigner:cannot initialise from C3TK_DATA_PERSISTENT or LILLYMOL_HOME");
+  }
+}
+
+int
+AssignCharges(Charge_Assigner& charge_assigner, Molecule& mol) {
+  const int matoms = mol.natoms();
+  if (matoms == 0) {
+    return 0;
+  }
+
+  std::unique_ptr<formal_charge_t[]> charges_assigned =
+      std::make_unique<formal_charge_t[]>(matoms);
+  if (!charge_assigner.process(mol, charges_assigned.get())) {
+    return 0;
+  }
+
+  int rc = 0;
+  for (int i = 0; i < matoms; ++i) {
+    if (charges_assigned[i] == 0) {
+      continue;
+    }
+    mol.set_formal_charge(i, charges_assigned[i]);
+    ++rc;
+  }
+
+  return rc;
+}
 
 void
 InitialiseDonorAcceptor(Donor_Acceptor_Assigner& donor_acceptor, const IWString& dirname) {
@@ -54,6 +95,32 @@ BindStandardise(nb::module_& m) {
       .def("process",
            [](Element_Transformations& etrans, Molecule& mol) { return etrans.process(mol); },
            nb::arg("mol"), "Apply transformations to molecule");
+
+  nb::class_<Charge_Assigner>(m, "ChargeAssigner")
+      .def("__init__",
+           [](Charge_Assigner* charge_assigner) {
+             new (charge_assigner) Charge_Assigner();
+             InitialiseChargeAssignerFromDefaultEnv(*charge_assigner);
+           },
+           "Build charge queries from C3TK_DATA_PERSISTENT or LILLYMOL_HOME")
+      .def("__init__",
+           [](Charge_Assigner* charge_assigner, const std::string& query_dir) {
+             new (charge_assigner) Charge_Assigner();
+             InitialiseChargeAssigner(*charge_assigner, IWString(query_dir));
+           },
+           nb::arg("query_dir"),
+           "Build charge queries from an explicit charges query directory")
+      .def("active",
+           [](const Charge_Assigner& charge_assigner) {
+             return static_cast<bool>(charge_assigner.active());
+           },
+           "True if charge assignment queries are loaded")
+      .def("set_min_distance_between_charges",
+           &Charge_Assigner::set_min_distance_between_charges,
+           nb::arg("distance"),
+           "Specify minimum bond separation between formal charges assigned")
+      .def("process", &AssignCharges, nb::arg("mol"),
+           "Assign formal charges to a molecule and return the number of changed atoms");
 
   nb::class_<Donor_Acceptor_Assigner>(m, "DonorAcceptor")
       .def("__init__",

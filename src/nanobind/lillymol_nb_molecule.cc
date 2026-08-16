@@ -2,6 +2,74 @@
 
 namespace lillymol_nb {
 
+namespace {
+
+bool
+LooksLikeSdfTagRecord(const std::string& line) {
+  const size_t open = line.find('<');
+  const size_t close = line.rfind('>');
+  return !line.empty() && line[0] == '>' && open != std::string::npos &&
+         close != std::string::npos && open < close;
+}
+
+std::string
+SdfTagName(const std::string& line) {
+  const size_t open = line.find('<');
+  const size_t close = line.rfind('>');
+  if (open == std::string::npos || close == std::string::npos || open >= close) {
+    return std::string();
+  }
+
+  std::string result = line.substr(open + 1, close - open - 1);
+  std::replace(result.begin(), result.end(), ' ', '_');
+  return result;
+}
+
+nb::dict
+SdfTags(const Molecule& mol) {
+  nb::dict result;
+
+  std::string current_tag;
+  std::string current_value;
+
+  auto flush_current_tag = [&]() {
+    if (current_tag.empty()) {
+      return;
+    }
+    result[nb::str(current_tag.c_str())] = nb::str(current_value.c_str());
+    current_tag.clear();
+    current_value.clear();
+  };
+
+  for (int i = 0; i < mol.number_records_text_info(); ++i) {
+    const std::string line = mol.text_info(i).AsString();
+    if (LooksLikeSdfTagRecord(line)) {
+      flush_current_tag();
+      current_tag = SdfTagName(line);
+      continue;
+    }
+
+    if (current_tag.empty()) {
+      continue;
+    }
+
+    if (line.empty()) {
+      flush_current_tag();
+      continue;
+    }
+
+    if (!current_value.empty()) {
+      current_value.append("\n");
+    }
+    current_value.append(line);
+  }
+
+  flush_current_tag();
+  return result;
+}
+
+}  // namespace
+
 void
 BindMolecule(nb::module_& m) {
   nb::class_<Molecule>(m, "Molecule")
@@ -328,6 +396,19 @@ BindMolecule(nb::module_& m) {
       .def("set_name",
            [](Molecule& mol, const std::string& name) { mol.set_name(name); },
            nb::arg("name"))
+      .def("number_records_text_info", &Molecule::number_records_text_info,
+           "Return number of retained SDF/text records")
+      .def("text_info",
+           [](const Molecule& mol) {
+             std::vector<std::string> result;
+             result.reserve(mol.number_records_text_info());
+             for (int i = 0; i < mol.number_records_text_info(); ++i) {
+               result.push_back(mol.text_info(i).AsString());
+             }
+             return result;
+           },
+           "Return retained SDF/text records")
+      .def("sdf_tags", &SdfTags, "Return retained SDF tags as a dict")
       .def("are_bonded", nb::overload_cast<atom_number_t, atom_number_t>(&Molecule::are_bonded, nb::const_),
            nb::arg("a1"), nb::arg("a2"), "True if atoms are bonded")
       .def("bonds_between", nb::overload_cast<atom_number_t, atom_number_t>(&Molecule::bonds_between),
@@ -392,6 +473,16 @@ BindMolecule(nb::module_& m) {
              return result;
            },
            nb::arg("a1"), nb::arg("a2"), "Return atoms down the bond from a1 to a2")
+      .def("reset_atom_map_numbers", &Molecule::reset_all_atom_map_numbers,
+           "Reset atom map numbers")
+      .def("set_atom_map_number",
+           static_cast<void (Molecule::*)(atom_number_t, int)>(&Molecule::set_atom_map_number),
+           nb::arg("atom"), nb::arg("map_number"), "Set atom map number")
+      .def("atom_map_number",
+           nb::overload_cast<atom_number_t>(&Molecule::atom_map_number, nb::const_),
+           nb::arg("atom"), "Return atom map number")
+      .def("atom_with_atom_map_number", &Molecule::atom_with_atom_map_number,
+           nb::arg("map_number"), "Return atom with atom map number")
       .def("canonical_rank", nb::overload_cast<atom_number_t>(&Molecule::canonical_rank),
            nb::arg("atom"), "Return atom canonical rank")
       .def("canonical_ranks",
@@ -521,6 +612,30 @@ BindMolecule(nb::module_& m) {
            "Return highest coordinate dimensionality present")
       .def("discern_chirality_from_3d_structure", &Molecule::discern_chirality_from_3d_structure,
            "Perceive chiral centres from 3D coordinates")
+      .def("debug_string", &Molecule::debug_string,
+           "Return a dump of internal data structures")
+      .def("__repr__",
+           [](Molecule& mol) {
+             IWString formula;
+             mol.isis_like_molecular_formula(formula);
+             IWString result;
+             result << '<' << mol.name() << " with " << mol.natoms() << " atoms " << formula << '>';
+             return result.AsString();
+           })
+      .def("__str__",
+           [](Molecule& mol) {
+             IWString result;
+             result << mol.smiles() << ' ' << mol.name();
+             return result.AsString();
+           })
+      .def("__iadd__",
+           [](Molecule& mol, const Molecule& rhs) -> Molecule& {
+             mol += rhs;
+             return mol;
+           },
+           nb::rv_policy::reference_internal)
+      .def("__add__",
+           [](const Molecule& lhs, const Molecule& rhs) { return lhs + rhs; })
       .def("__len__", [](const Molecule& mol) { return mol.natoms(); })
       .def("__getitem__",
            [](const Molecule& mol, int index) { return mol[index]; },

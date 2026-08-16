@@ -147,6 +147,40 @@ class TestNanobindMolecule(LillyMolNanobindTestCase):
             self.assertEqual(mol.natoms(), 2)
             self.assertIsNone(reader.next())
 
+    def test_retained_sdf_text_info_and_tags(self):
+        sdf = """ethanol
+  LillyMol          2D
+
+  3  2  0  0  0  0            999 V2000
+    0.0000    0.0000    0.0000 C   0  0  0  0  0  0  0  0  0  0  0  0
+    1.5000    0.0000    0.0000 C   0  0  0  0  0  0  0  0  0  0  0  0
+    3.0000    0.0000    0.0000 O   0  0  0  0  0  0  0  0  0  0  0  0
+  1  2  1  0  0  0  0
+  2  3  1  0  0  0  0
+M  END
+>  <ID Number>
+CHEMBL1
+
+>  <Comment>
+first line
+second line
+
+$$$$
+"""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            fname = os.path.join(tmpdir, "input.sdf")
+            with open(fname, "w") as writer:
+                writer.write(sdf)
+
+            reader = lillymol_nb.MolReaderContext(
+                fname, lillymol_nb.FileType.SDF, keep_sdf_tags=True)
+            mol = reader.next()
+            self.assertIsNotNone(mol)
+            self.assertGreater(mol.number_records_text_info(), 0)
+            self.assertIn(">  <ID Number>", mol.text_info())
+            self.assertEqual(mol.sdf_tags()["ID_Number"], "CHEMBL1")
+            self.assertEqual(mol.sdf_tags()["Comment"], "first line\nsecond line")
+
     def test_writer_and_context_writer(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             stem = os.path.join(tmpdir, "written")
@@ -264,6 +298,30 @@ class TestNanobindMolecule(LillyMolNanobindTestCase):
         mol.invalidate_partial_charges()
         self.assertEqual(mol.partial_charge_type(), "")
         self.assertGreaterEqual(mol.compute_Gasteiger_partial_charges(), 0)
+
+    def test_atom_map_number_helpers(self):
+        mol = lillymol_nb.MolFromSmiles("CCO ethanol")
+        self.assertEqual(mol.atom_map_number(1), 0)
+        mol.set_atom_map_number(1, 17)
+        self.assertEqual(mol.atom_map_number(1), 17)
+        self.assertEqual(mol.atom_with_atom_map_number(17), 1)
+        self.assertEqual(mol.atom_with_atom_map_number(99), -1)
+        mol.reset_atom_map_numbers()
+        self.assertEqual(mol.atom_map_number(1), 0)
+
+    def test_molecule_repr_debug_and_addition(self):
+        mol = lillymol_nb.MolFromSmiles("CCO ethanol")
+        self.assertIn("ethanol", repr(mol))
+        self.assertIn("3 atoms", repr(mol))
+        self.assertEqual(str(mol), "CCO ethanol")
+        self.assertIn("Molecule", mol.debug_string())
+
+        methane = lillymol_nb.MolFromSmiles("C methane")
+        combined = mol + methane
+        self.assertEqual(mol.natoms(), 3)
+        self.assertEqual(combined.natoms(), 4)
+        mol += methane
+        self.assertEqual(mol.natoms(), 4)
 
     def test_coordinate_and_geometry_helpers(self):
         mol = lillymol_nb.MolFromSmiles("CCCO propanol")

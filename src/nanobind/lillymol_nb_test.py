@@ -975,6 +975,31 @@ $$$$
         self.assertIn(lillymol_nb.interpret_D_as_deuterium(), [0, 1])
         self.assertIn(lillymol_nb.interpret_T_as_deuterium(), [0, 1])
 
+    def test_atom_typing_specification(self):
+        mol = lillymol_nb.MolFromSmiles("CCO ethanol")
+        atom_typing = lillymol_nb.AtomTypingSpecification("UST:Y")
+        self.assertTrue(atom_typing.active())
+
+        types = atom_typing.assign_atom_types(mol)
+        self.assertEqual(len(types), mol.natoms())
+        self.assertEqual(types, lillymol_nb.assign_atom_types(mol, "UST:Y"))
+        self.assertEqual(types[0], types[1])
+        self.assertNotEqual(types[1], types[2])
+        self.assertTrue(all(isinstance(value, int) for value in types))
+        with self.assertRaises(Exception):
+            atom_typing.string_representation()
+        self.assertTrue(atom_typing.append_to_tag("FP").startswith("FP"))
+
+        atomic_number_typing = lillymol_nb.AtomTypingSpecification("z")
+        self.assertEqual(atomic_number_typing.string_representation(), "z")
+
+        empty = lillymol_nb.AtomTypingSpecification()
+        self.assertFalse(empty.active())
+        self.assertTrue(empty.build("UST:AY"))
+        self.assertTrue(empty.active())
+        with self.assertRaises(Exception):
+            lillymol_nb.AtomTypingSpecification("BAD")
+
     def test_alogp_class(self):
         mol = lillymol_nb.MolFromSmiles("CCO ethanol")
         calc = lillymol_nb.ALogP()

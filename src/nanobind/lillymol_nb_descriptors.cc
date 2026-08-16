@@ -1,6 +1,55 @@
 #include "nanobind/lillymol_nb_internal.h"
 
+#include "Molecule_Lib/atom_typing.h"
+#include "Molecule_Lib/qry_wstats.h"
+
 namespace lillymol_nb {
+namespace {
+
+void
+BuildAtomTyping(Atom_Typing_Specification& atom_typing, const std::string& specification) {
+  const const_IWSubstring tmp(specification);
+  if (!atom_typing.build(tmp)) {
+    throw std::runtime_error("AtomTypingSpecification:invalid atom type '" + specification + "'");
+  }
+}
+
+std::vector<uint32_t>
+AssignAtomTypes(Atom_Typing_Specification& atom_typing, Molecule& mol) {
+  std::vector<uint32_t> result(mol.natoms());
+  if (!atom_typing.assign_atom_types(mol, result.data())) {
+    throw std::runtime_error("AtomTypingSpecification:cannot assign atom types");
+  }
+
+  return result;
+}
+
+std::vector<uint32_t>
+AssignAtomTypesFromSpecification(Molecule& mol, const std::string& specification) {
+  Atom_Typing_Specification atom_typing;
+  BuildAtomTyping(atom_typing, specification);
+  return AssignAtomTypes(atom_typing, mol);
+}
+
+std::string
+AtomTypingStringRepresentation(const Atom_Typing_Specification& atom_typing) {
+  IWString result;
+  if (!atom_typing.string_representation(result)) {
+    throw std::runtime_error("AtomTypingSpecification:cannot form string representation");
+  }
+  return result.AsString();
+}
+
+std::string
+AtomTypingTag(const Atom_Typing_Specification& atom_typing, const std::string& stem) {
+  IWString result(stem);
+  if (!atom_typing.append_to_tag(result)) {
+    throw std::runtime_error("AtomTypingSpecification:cannot append atom type tag");
+  }
+  return result.AsString();
+}
+
+}  // namespace
 
 void
 BindDescriptors(nb::module_& m) {
@@ -22,6 +71,39 @@ BindDescriptors(nb::module_& m) {
   m.attr("UNDEFINED") = nb::cast(quick_rotbond::QuickRotatableBonds::RotBond::kUndefined);
   m.attr("QUICK") = nb::cast(quick_rotbond::QuickRotatableBonds::RotBond::kQuick);
   m.attr("EXPENSIVE") = nb::cast(quick_rotbond::QuickRotatableBonds::RotBond::kExpensive);
+
+  nb::class_<Atom_Typing_Specification>(m, "AtomTypingSpecification")
+      .def("__init__",
+           [](Atom_Typing_Specification* atom_typing) {
+             new (atom_typing) Atom_Typing_Specification();
+           })
+      .def("__init__",
+           [](Atom_Typing_Specification* atom_typing, const std::string& specification) {
+             new (atom_typing) Atom_Typing_Specification();
+             BuildAtomTyping(*atom_typing, specification);
+           },
+           nb::arg("specification"))
+      .def("build",
+           [](Atom_Typing_Specification& atom_typing, const std::string& specification) {
+             BuildAtomTyping(atom_typing, specification);
+             return true;
+           },
+           nb::arg("specification"), "Build from an atom typing specification string")
+      .def("active",
+           [](const Atom_Typing_Specification& atom_typing) {
+             return static_cast<bool>(atom_typing.active());
+           },
+           "True if an atom typing specification has been configured")
+      .def("atom_type", &Atom_Typing_Specification::atom_type,
+           "Return the configured atom typing mode")
+      .def("user_specified_type", &Atom_Typing_Specification::user_specified_type,
+           "Return the UST component bit mask")
+      .def("string_representation", &AtomTypingStringRepresentation,
+           "Return the atom typing string representation")
+      .def("append_to_tag", &AtomTypingTag, nb::arg("stem"),
+           "Append the atom typing suffix to a tag stem")
+      .def("assign_atom_types", &AssignAtomTypes, nb::arg("mol"),
+           "Assign atom types and return one integer per atom");
 
   nb::class_<alogp::ALogP>(m, "ALogP")
       .def(nb::init<>())
@@ -60,6 +142,10 @@ BindDescriptors(nb::module_& m) {
            nb::arg("mol"), "Return atom pairs defining rotatable bonds")
       .def("set_calculation_type", &quick_rotbond::QuickRotatableBonds::set_calculation_type,
            nb::arg("calculation_type"));
+
+  m.def("assign_atom_types", &AssignAtomTypesFromSpecification, nb::arg("mol"),
+        nb::arg("specification"),
+        "Assign atom types from a transient specification and return one integer per atom");
 
   m.def("MolFromSmiles", &MolFromSmiles, nb::arg("smiles"),
         "Build a Molecule from SMILES, returning None on parse failure");

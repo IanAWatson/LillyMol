@@ -72,6 +72,38 @@ SdfTags(const Molecule& mol) {
 
 void
 BindMolecule(nb::module_& m) {
+  nb::class_<Coordinates>(m, "Coordinates")
+      .def(nb::init<>())
+      .def(nb::init<coord_t, coord_t, coord_t>(), nb::arg("x"), nb::arg("y"), nb::arg("z"))
+      .def("x", nb::overload_cast<>(&Coordinates::x, nb::const_))
+      .def("y", nb::overload_cast<>(&Coordinates::y, nb::const_))
+      .def("z", nb::overload_cast<>(&Coordinates::z, nb::const_))
+      .def("setxyz", static_cast<void (Coordinates::*)(coord_t, coord_t, coord_t)>(&Coordinates::setxyz), nb::arg("x"), nb::arg("y"), nb::arg("z"))
+      .def("set_x", &Coordinates::set_x, nb::arg("x"))
+      .def("set_y", &Coordinates::set_y, nb::arg("y"))
+      .def("set_z", &Coordinates::set_z, nb::arg("z"))
+      .def("normalise", &Coordinates::normalise)
+      .def("norm", &Coordinates::norm)
+      .def("length", &Coordinates::length)
+      .def("distance",
+           [](const Coordinates& coords, const Coordinates& other) { return coords.distance(other); },
+           nb::arg("other"))
+      .def("dot_product",
+           [](const Coordinates& coords, const Coordinates& other) { return coords.dot_product(other); },
+           nb::arg("other"))
+      .def("__repr__",
+           [](const Coordinates& coords) {
+             IWString result;
+             result << '(' << coords.x() << ',' << coords.y() << ',' << coords.z() << ')';
+             return result.AsString();
+           })
+      .def("__str__",
+           [](const Coordinates& coords) {
+             IWString result;
+             result << '(' << coords.x() << ',' << coords.y() << ',' << coords.z() << ')';
+             return result.AsString();
+           });
+
   nb::class_<Molecule>(m, "Molecule")
       .def(nb::init<>())
       .def("build_from_smiles",
@@ -573,6 +605,40 @@ BindMolecule(nb::module_& m) {
              mol.SetCoordinates(coords.data());
            },
            nb::arg("coords"), "Set coordinates from [x0, y0, z0, x1, y1, z1, ...]")
+      .def("translate",
+           [](Molecule& mol, coord_t x, coord_t y, coord_t z) {
+             mol.translate_atoms(x, y, z);
+           },
+           nb::arg("x"), nb::arg("y"), nb::arg("z"), "Translate all atoms")
+      .def("translate",
+           [](Molecule& mol, const Coordinates& delta) { mol.translate_atoms(delta); },
+           nb::arg("delta"), "Translate all atoms")
+      .def("translate",
+           [](Molecule& mol, const std::vector<int>& to_move, int flag,
+              coord_t x, coord_t y, coord_t z) {
+             if (static_cast<int>(to_move.size()) != mol.natoms()) {
+               throw std::invalid_argument("translate selection requires one value per atom");
+             }
+             const Coordinates delta(x, y, z);
+             mol.translate_atoms(delta, to_move.data(), flag);
+           },
+           nb::arg("to_move"), nb::arg("flag"), nb::arg("x"), nb::arg("y"), nb::arg("z"),
+           "Translate selected atoms where to_move[i] == flag")
+      .def("rotate",
+           [](Molecule& mol, const Coordinates& axis, angle_t angle) {
+             return mol.rotate_atoms(axis, angle);
+           },
+           nb::arg("axis"), nb::arg("angle"), "Rotate all atoms around axis")
+      .def("rotate",
+           [](Molecule& mol, const std::vector<int>& to_move, int flag,
+              const Coordinates& axis, angle_t angle) {
+             if (static_cast<int>(to_move.size()) != mol.natoms()) {
+               throw std::invalid_argument("rotate selection requires one value per atom");
+             }
+             return mol.rotate_atoms(axis, angle, to_move.data(), flag);
+           },
+           nb::arg("to_move"), nb::arg("flag"), nb::arg("axis"), nb::arg("angle"),
+           "Rotate selected atoms where to_move[i] == flag")
       .def("bond_length",
            [](const Molecule& mol, atom_number_t a1, atom_number_t a2) -> std::optional<float> {
              if (!mol.are_bonded(a1, a2)) {

@@ -1,5 +1,6 @@
 import atexit
 import copy
+import math
 import os
 import sys
 import tempfile
@@ -322,6 +323,41 @@ $$$$
         self.assertEqual(combined.natoms(), 4)
         mol += methane
         self.assertEqual(mol.natoms(), 4)
+
+    def test_coordinates_object_and_transforms(self):
+        coords = lillymol_nb.Coordinates(3.0, 4.0, 0.0)
+        self.assertAlmostEqual(coords.x(), 3.0)
+        self.assertAlmostEqual(coords.y(), 4.0)
+        self.assertAlmostEqual(coords.z(), 0.0)
+        self.assertAlmostEqual(coords.norm(), 5.0)
+        self.assertEqual(str(coords), "(3,4,0)")
+        coords.normalise()
+        self.assertAlmostEqual(coords.norm(), 1.0)
+        coords.setxyz(1.0, 2.0, 3.0)
+        coords.set_z(4.0)
+        self.assertAlmostEqual(coords.length(), math.sqrt(21.0), delta=1.0e-6)
+        self.assertAlmostEqual(coords.distance(lillymol_nb.Coordinates(1.0, 2.0, 4.0)), 0.0)
+        self.assertAlmostEqual(coords.dot_product(lillymol_nb.Coordinates(0.0, 1.0, 0.0)), 2.0)
+
+        mol = lillymol_nb.MolFromSmiles("CCC propane")
+        mol.set_coordinates([0.0, 0.0, 0.0,
+                             1.0, 0.0, 0.0,
+                             2.0, 0.0, 0.0])
+        mol.translate(1.0, 2.0, 3.0)
+        self.assertEqual(mol.get_coordinates(), [1.0, 2.0, 3.0,
+                                                 2.0, 2.0, 3.0,
+                                                 3.0, 2.0, 3.0])
+        mol.translate([0, 1, 0], 1, 0.0, 1.0, 0.0)
+        self.assertEqual(mol.get_coordinates()[3:6], [2.0, 3.0, 3.0])
+        with self.assertRaises(Exception):
+            mol.translate([1, 1], 1, 0.0, 0.0, 1.0)
+
+        ethane = lillymol_nb.MolFromSmiles("CC ethane")
+        ethane.set_coordinates([0.0, 0.0, 0.0,
+                                1.0, 0.0, 0.0])
+        ethane.rotate(lillymol_nb.Coordinates(0.0, 0.0, 1.0), math.pi / 2.0)
+        self.assertAlmostEqual(ethane.x(1), 0.0, delta=1.0e-5)
+        self.assertAlmostEqual(ethane.y(1), 1.0, delta=1.0e-5)
 
     def test_coordinate_and_geometry_helpers(self):
         mol = lillymol_nb.MolFromSmiles("CCCO propanol")

@@ -162,6 +162,10 @@ class TestLillyMolSubstructure(absltest.TestCase):
       molecules_read += 1
     self.assertEqual(reader.molecules_read(), molecules_read)
 
+  def test_context_aliases(self):
+    self.assertIs(ReaderContext, MolReaderContext)
+    self.assertIs(ContextWriter, MolWriterContext)
+
   def test_read_smiles_via_context_reader(self):
     tmpdir = tempfile.mkdtemp(dir=absltest.TEST_TMPDIR.value)
     fname = os.path.join(tmpdir, "input.smi")
@@ -169,7 +173,7 @@ class TestLillyMolSubstructure(absltest.TestCase):
       writer.write(SMILES)
 
     molecules_read = 0
-    with ReaderContext(fname, FileType.SMI) as reader:
+    with MolReaderContext(fname, FileType.SMI) as reader:
       for mol in reader:
         molecules_read += 1
     self.assertEqual(molecules_read, 10)
@@ -264,7 +268,7 @@ class TestLillyMolSubstructure(absltest.TestCase):
 
     mols = [LillyMolFromSmiles("CN" * (i + 1)) for i in range(10)]
 
-    with ContextWriter(stem, FileType.SMI) as writer:
+    with MolWriterContext(stem, FileType.SMI) as writer:
       for m in mols:
         writer.write(m)
 

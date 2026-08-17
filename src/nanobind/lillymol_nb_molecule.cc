@@ -916,6 +916,12 @@ BindMolecule(nb::module_& m) {
   m.def("set_copy_name_in_molecule_copy_constructor",
         &set_copy_name_in_molecule_copy_constructor, nb::arg("value"),
         "Control whether Molecule copy construction copies the molecule name");
+  m.def("Position3D",
+        [](Molecule& mol, atom_number_t atom1, float distance, atom_number_t atom2) {
+          return lillymol::Position3D(mol, atom1, distance, atom2);
+        },
+        nb::arg("mol"), nb::arg("atom1"), nb::arg("distance"), nb::arg("atom2"),
+        "Move the fragment containing atom2 so atom1 and atom2 are distance apart");
 }
 
 }  // namespace lillymol_nb

@@ -913,7 +913,9 @@ BindMolecule(nb::module_& m) {
       .def("__contains__", &MoleculeContainsElementSymbol)
       .def("__contains__", &MoleculeContainsSubstructureQuery);
 
-
+  m.def("set_copy_name_in_molecule_copy_constructor",
+        &set_copy_name_in_molecule_copy_constructor, nb::arg("value"),
+        "Control whether Molecule copy construction copies the molecule name");
 }
 
 }  // namespace lillymol_nb

@@ -1165,6 +1165,35 @@ $$$$
         calc.set_use_alcohol_for_acid(True)
         self.assertIsNotNone(calc.logp(mol))
 
+    def test_tpsa_class(self):
+        mol = lillymol_nb.MolFromSmiles("CCO ethanol")
+        tpsa = lillymol_nb.TPSA()
+        value = tpsa.compute(mol)
+        self.assertIsNotNone(value)
+        self.assertIsInstance(value, float)
+        self.assertGreater(value, 0.0)
+        self.assertAlmostEqual(value, lillymol_nb.tpsa(mol), delta=1.0e-6)
+
+    def test_tpsa_empty_molecule_returns_none(self):
+        self.assertIsNone(lillymol_nb.TPSA().compute(lillymol_nb.Molecule()))
+
+    def test_tpsa_options_and_rdkit_compatibility(self):
+        tpsa = lillymol_nb.TPSA()
+        tpsa.set_display_psa_unclassified_atom_messages(0)
+        tpsa.set_return_zero_for_unclassified_atoms(0)
+        tpsa.set_non_zero_contribution_for_SD2(1)
+        tpsa.set_zero_for_all_sulphur_atoms(0)
+        tpsa.set_zero_for_all_phosphorus_atoms(0)
+        tpsa.set_convert_to_charge_separated(0)
+        self.assertEqual(tpsa.display_psa_unclassified_atom_messages(), 0)
+        self.assertEqual(tpsa.zero_for_all_sulphur_atoms(), 0)
+
+        tpsa.set_rdkit_compatibility()
+        self.assertEqual(tpsa.zero_for_all_sulphur_atoms(), 1)
+        self.assertEqual(tpsa.zero_for_all_phosphorus_atoms(), 1)
+        self.assertEqual(tpsa.convert_to_charge_separated(), 1)
+        self.assertIsNotNone(tpsa.compute(lillymol_nb.MolFromSmiles("CCO ethanol")))
+
     def _medchemwizard(self):
         reactions = _medchemwizard_reactions_file()
         if reactions is None:

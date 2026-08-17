@@ -3,6 +3,7 @@
 #include "Molecule_Lib/atom_typing.h"
 #include "Molecule_Lib/qry_wstats.h"
 #include "Molecule_Tools/jwcats_lib.h"
+#include "Molecule_Tools/nvrtspsa.h"
 #include "Molecule_Tools/qed.h"
 
 namespace lillymol_nb {
@@ -208,6 +209,51 @@ BindDescriptors(nb::module_& m) {
       .def("logp",
            [](alogp::ALogP& calc, Molecule& mol) { return calc.LogP(mol); },
            nb::arg("mol"), "Compute AlogP");
+
+  nb::class_<nvrtspsa::NovartisPolarSurfaceArea>(m, "TPSA")
+      .def(nb::init<>())
+      .def("set_rdkit_compatibility",
+           [](nvrtspsa::NovartisPolarSurfaceArea& tpsa) {
+             tpsa.SetRDKitCompatibility();
+           },
+           "Set RDKit-compatible TPSA options")
+      .def("compute",
+           [](nvrtspsa::NovartisPolarSurfaceArea& tpsa, Molecule& mol)
+               -> std::optional<double> { return tpsa.PolarSurfaceArea(mol); },
+           nb::arg("mol"),
+           "Compute TPSA, returning None for molecules that cannot be classified")
+      .def("set_display_psa_unclassified_atom_messages",
+           &nvrtspsa::NovartisPolarSurfaceArea::
+               set_display_psa_unclassified_atom_messages,
+           nb::arg("value"), "Control warnings for unclassified atoms")
+      .def("display_psa_unclassified_atom_messages",
+           &nvrtspsa::NovartisPolarSurfaceArea::
+               display_psa_unclassified_atom_messages)
+      .def("set_return_zero_for_unclassified_atoms",
+           &nvrtspsa::NovartisPolarSurfaceArea::set_return_zero_for_unclassified_atoms,
+           nb::arg("value"), "Return zero for unclassified atoms")
+      .def("return_zero_for_unclassified_atoms",
+           &nvrtspsa::NovartisPolarSurfaceArea::return_zero_for_unclassified_atoms)
+      .def("set_non_zero_contribution_for_SD2",
+           &nvrtspsa::NovartisPolarSurfaceArea::set_non_zero_contribution_for_SD2,
+           nb::arg("value"), "Control the SD2 sulphur contribution")
+      .def("non_zero_contribution_for_SD2",
+           &nvrtspsa::NovartisPolarSurfaceArea::non_zero_contribution_for_SD2)
+      .def("set_zero_for_all_sulphur_atoms",
+           &nvrtspsa::NovartisPolarSurfaceArea::set_zero_for_all_sulphur_atoms,
+           nb::arg("value"), "Set all sulphur atom TPSA contributions to zero")
+      .def("zero_for_all_sulphur_atoms",
+           &nvrtspsa::NovartisPolarSurfaceArea::zero_for_all_sulphur_atoms)
+      .def("set_zero_for_all_phosphorus_atoms",
+           &nvrtspsa::NovartisPolarSurfaceArea::set_zero_for_all_phosphorus_atoms,
+           nb::arg("value"), "Set all phosphorus atom TPSA contributions to zero")
+      .def("zero_for_all_phosphorus_atoms",
+           &nvrtspsa::NovartisPolarSurfaceArea::zero_for_all_phosphorus_atoms)
+      .def("set_convert_to_charge_separated",
+           &nvrtspsa::NovartisPolarSurfaceArea::set_convert_to_charge_separated,
+           nb::arg("value"), "Convert to charge-separated forms before computing TPSA")
+      .def("convert_to_charge_separated",
+           &nvrtspsa::NovartisPolarSurfaceArea::convert_to_charge_separated);
 
   nb::class_<qed::Qed>(m, "QED")
       .def("__init__",

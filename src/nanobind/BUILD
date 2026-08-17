@@ -35,6 +35,7 @@ nanobind_extension(
         "//Molecule_Tools:ec_fingerprint_lib",
         "//Molecule_Tools:jwcats_lib",
         "//Molecule_Tools:medchemwizard_lib",
+        "//Molecule_Tools:mformula",
         "//Molecule_Tools:nvrtspsa",
         "//Molecule_Tools:qed_lib",
         "//Molecule_Tools:ring_replacement_lib",

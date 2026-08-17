@@ -3,6 +3,7 @@
 #include "Molecule_Lib/atom_typing.h"
 #include "Molecule_Lib/qry_wstats.h"
 #include "Molecule_Tools/jwcats_lib.h"
+#include "Molecule_Tools/mformula.h"
 #include "Molecule_Tools/nvrtspsa.h"
 #include "Molecule_Tools/qed.h"
 
@@ -143,6 +144,15 @@ QedScoreFromEnvironment(const Molecule& mol) {
   return QedScore(calc, mol);
 }
 
+std::vector<int>
+MFormulaFixedCountedFingerprint(const mformula::MFormula& formula) {
+  std::vector<int> result(mformula::kMFOther + 1);
+  if (!formula.ToFixedCountedFingerprint(result.data(), result.size())) {
+    throw std::runtime_error("Cannot form MFormula fixed counted fingerprint");
+  }
+  return result;
+}
+
 }  // namespace
 
 void
@@ -165,6 +175,46 @@ BindDescriptors(nb::module_& m) {
   m.attr("UNDEFINED") = nb::cast(quick_rotbond::QuickRotatableBonds::RotBond::kUndefined);
   m.attr("QUICK") = nb::cast(quick_rotbond::QuickRotatableBonds::RotBond::kQuick);
   m.attr("EXPENSIVE") = nb::cast(quick_rotbond::QuickRotatableBonds::RotBond::kExpensive);
+
+  nb::class_<mformula::MFormula>(m, "MFormula")
+      .def(nb::init<>())
+      .def("build",
+           [](mformula::MFormula& formula, Molecule& mol) {
+             return formula.Build(mol);
+           },
+           nb::arg("mol"), "Build formula counts from a molecule")
+      .def("build",
+           [](mformula::MFormula& formula, Molecule& mol,
+              const Set_of_Atoms& atoms) {
+             return formula.Build(mol, atoms);
+           },
+           nb::arg("mol"), nb::arg("atoms"),
+           "Build formula counts from selected molecule atoms")
+      .def("build_from_smiles",
+           [](mformula::MFormula& formula, const std::string& smiles) {
+             return formula.Build(IWString(smiles));
+           },
+           nb::arg("smiles"), "Build formula counts directly from SMILES text")
+      .def("set_consider_aromatic", &mformula::MFormula::set_consider_aromatic,
+           nb::arg("value"), "Control whether aromatic atoms are distinguished")
+      .def("set_log_scaling_factors", &mformula::MFormula::set_log_scaling_factors,
+           nb::arg("s"), nb::arg("d"), "Set log scaling factors for fingerprints")
+      .def("initialised", &mformula::MFormula::initialised)
+      .def("natoms", &mformula::MFormula::natoms)
+      .def("diff", &mformula::MFormula::Diff, nb::arg("rhs"))
+      .def("is_subset", &mformula::MFormula::IsSubset, nb::arg("rhs"))
+      .def("is_element_count_subset", &mformula::MFormula::IsElementCountSubset,
+           nb::arg("rhs"))
+      .def("fixed_counted_fingerprint", &MFormulaFixedCountedFingerprint)
+      .def("carbon", &mformula::MFormula::Carbon)
+      .def("nitrogen", &mformula::MFormula::Nitrogen)
+      .def("oxygen", &mformula::MFormula::Oxygen)
+      .def("fluorine", &mformula::MFormula::Fluorine)
+      .def("phosphorus", &mformula::MFormula::Phosphorus)
+      .def("sulphur", &mformula::MFormula::Sulphur)
+      .def("chlorine", &mformula::MFormula::Chlorine)
+      .def("bromine", &mformula::MFormula::Bromine)
+      .def("iodine", &mformula::MFormula::Iodine);
 
   nb::class_<Atom_Typing_Specification>(m, "AtomTypingSpecification")
       .def("__init__",

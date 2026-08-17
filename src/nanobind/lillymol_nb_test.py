@@ -1132,6 +1132,40 @@ $$$$
         self.assertIn(lillymol_nb.interpret_D_as_deuterium(), [0, 1])
         self.assertIn(lillymol_nb.interpret_T_as_deuterium(), [0, 1])
 
+    def test_mformula_build_counts_and_fingerprint(self):
+        formula = lillymol_nb.MFormula()
+        self.assertFalse(formula.initialised())
+        self.assertEqual(formula.build_from_smiles("CCO"), 3)
+        self.assertTrue(formula.initialised())
+        self.assertEqual(formula.natoms(), 3)
+        self.assertEqual(formula.carbon(), 2)
+        self.assertEqual(formula.oxygen(), 1)
+        self.assertEqual(formula.nitrogen(), 0)
+        self.assertEqual(len(formula.fixed_counted_fingerprint()), 18)
+
+    def test_mformula_build_from_molecule_and_subset(self):
+        ethanol = lillymol_nb.MolFromSmiles("CCO ethanol")
+        ethoxy = lillymol_nb.MolFromSmiles("CCOC ethoxy")
+        formula = lillymol_nb.MFormula()
+        larger = lillymol_nb.MFormula()
+
+        self.assertEqual(formula.build(ethanol), 1)
+        self.assertEqual(larger.build(ethoxy), 1)
+        self.assertEqual(formula.carbon(), 2)
+        self.assertEqual(formula.oxygen(), 1)
+        self.assertEqual(larger.carbon(), 3)
+        self.assertEqual(larger.oxygen(), 1)
+        self.assertTrue(formula.is_subset(formula))
+        self.assertTrue(formula.is_element_count_subset(larger))
+        self.assertGreater(larger.diff(formula), 0)
+
+    def test_mformula_build_from_selected_atoms(self):
+        mol = lillymol_nb.MolFromSmiles("CCO ethanol")
+        formula = lillymol_nb.MFormula()
+        self.assertEqual(formula.build(mol, lillymol_nb.Set_of_Atoms([1, 2])), 1)
+        self.assertEqual(formula.carbon(), 1)
+        self.assertEqual(formula.oxygen(), 1)
+
     def test_atom_typing_specification(self):
         mol = lillymol_nb.MolFromSmiles("CCO ethanol")
         atom_typing = lillymol_nb.AtomTypingSpecification("UST:Y")

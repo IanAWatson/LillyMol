@@ -71,6 +71,40 @@ def _ring_replacement_file(fname="6a.smi"):
     return None
 
 
+def _medchemwizard_reactions_file():
+    candidates = []
+
+    home = os.environ.get("LILLYMOL_HOME")
+    if home:
+        candidates.append(os.path.join(home, "data", "MedchemWizard", "REACTIONS"))
+
+    candidates.extend([
+        os.path.join(os.getcwd(), "data", "MedchemWizard", "REACTIONS"),
+        os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..",
+                                     "data", "MedchemWizard", "REACTIONS")),
+    ])
+
+    for envvar in ("TEST_SRCDIR", "RUNFILES_DIR"):
+        root = os.environ.get(envvar)
+        if root:
+            candidates.extend([
+                os.path.join(root, "_main", "data", "MedchemWizard", "REACTIONS"),
+                os.path.join(root, "data", "MedchemWizard", "REACTIONS"),
+            ])
+
+    for candidate in candidates:
+        if os.path.exists(candidate):
+            return candidate
+
+    return None
+
+
+def _methane():
+    mol = lillymol_nb.Molecule()
+    assert mol.build_from_smiles("C methane")
+    return mol
+
+
 _CRC32C_TABLE = None
 
 
@@ -1130,6 +1164,65 @@ $$$$
         calc.set_rdkit_phoshoric_acid_hydrogen(True)
         calc.set_use_alcohol_for_acid(True)
         self.assertIsNotNone(calc.logp(mol))
+
+    def _medchemwizard(self):
+        reactions = _medchemwizard_reactions_file()
+        if reactions is None:
+            self.skipTest("Cannot locate MedchemWizard REACTIONS data")
+
+        wizard = lillymol_nb.MedchemWizard()
+        wizard.read_reactions(reactions)
+        wizard.set_max_atoms(3)
+        wizard.set_append_names(True)
+        wizard.set_name_separator(" ")
+        return wizard
+
+    def test_medchemwizard_initialise_from_environment(self):
+        if "LILLYMOL_HOME" not in os.environ:
+            self.skipTest("LILLYMOL_HOME not set")
+
+        wizard = lillymol_nb.MedchemWizard()
+        wizard.initialise_from_environment()
+        self.assertGreater(wizard.number_reactions(), 0)
+
+    def test_medchemwizard_products_do_not_change_input(self):
+        wizard = self._medchemwizard()
+        mol = _methane()
+        initial_smiles = mol.smiles()
+
+        products = wizard.process(mol)
+
+        self.assertGreater(len(products), 0)
+        self.assertEqual(mol.smiles(), initial_smiles)
+        self.assertTrue(all(isinstance(product, lillymol_nb.Molecule)
+                            for product in products))
+        self.assertTrue(all(product.natoms() <= 3 for product in products))
+
+        stats = wizard.stats()
+        self.assertEqual(stats["molecules_read"], 1)
+        self.assertGreaterEqual(stats["molecules_produced"], len(products))
+
+    def test_medchemwizard_protected_atoms_suppress_products(self):
+        wizard = self._medchemwizard()
+        wizard.add_do_not_change_smarts("[*]")
+
+        products = wizard.process(_methane())
+
+        self.assertEqual(len(products), 0)
+        self.assertGreater(
+            wizard.stats()["embeddings_rejected_for_changing_protected_atoms"], 0)
+
+    def test_medchemwizard_protected_query_no_match_can_be_ignored(self):
+        wizard = self._medchemwizard()
+        wizard.add_do_not_change_smarts("[Cl]")
+
+        with self.assertRaises(RuntimeError):
+            wizard.process(_methane())
+
+        wizard = self._medchemwizard()
+        wizard.add_do_not_change_smarts("[Cl]")
+        wizard.set_ignore_do_not_change_queries_not_matching(True)
+        self.assertGreater(len(wizard.process(_methane())), 0)
 
     def test_dicer_default_and_break_cc(self):
         dicer = lillymol_nb.Dicer()

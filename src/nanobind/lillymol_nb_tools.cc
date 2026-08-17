@@ -10,6 +10,7 @@
 
 #include "Molecule_Lib/mol2graph.h"
 #include "Molecule_Tools/dicer_api.h"
+#include "Molecule_Tools/medchemwizard_lib.h"
 #include "Molecule_Tools/ring_replacement_lib.h"
 #include "Molecule_Tools/unique_molecules_api.h"
 #include "Utilities/GFP_Tools/gfp_context.h"
@@ -86,6 +87,40 @@ DiceMolecule(dicer_api::Dicer& dicer, Molecule& mol) {
   std::unordered_map<std::string, uint32_t> result;
   dicer.Dice(mol, result);
   return result;
+}
+
+std::vector<Molecule>
+MedchemWizardProcess(medchemwizard::MedchemWizard& wizard, const Molecule& mol) {
+  Molecule mcopy(mol);
+  resizable_array_p<Molecule> products;
+  if (!wizard.ProcessToArray(mcopy, products)) {
+    throw std::runtime_error("MedchemWizard product generation failed");
+  }
+
+  std::vector<Molecule> result;
+  result.reserve(products.number_elements());
+  for (Molecule* product : products) {
+    result.emplace_back(*product);
+  }
+
+  return result;
+}
+
+std::unordered_map<std::string, uint64_t>
+MedchemWizardStatsToMap(const medchemwizard::Stats& stats) {
+  return {
+      {"molecules_read", stats.molecules_read},
+      {"molecules_produced", stats.molecules_produced},
+      {"truncated_to_max_hits", stats.truncated_to_max_hits},
+      {"duplicate_molecules_suppressed", stats.duplicate_molecules_suppressed},
+      {"bad_valences_discarded", stats.bad_valences_discarded},
+      {"discarded_for_too_many_atoms", stats.discarded_for_too_many_atoms},
+      {"discarded_for_too_few_atoms", stats.discarded_for_too_few_atoms},
+      {"molecules_not_matching_do_not_change_queries",
+       stats.molecules_not_matching_do_not_change_queries},
+      {"embeddings_rejected_for_changing_protected_atoms",
+       stats.embeddings_rejected_for_changing_protected_atoms},
+  };
 }
 
 struct GFPFactory {};
@@ -632,6 +667,115 @@ BindTools(nb::module_& m) {
            "Discard generated fragments matching SMARTS")
       .def("dice", &DiceMolecule, nb::arg("mol"),
            "Dice a molecule and return fragment unique smiles mapped to counts");
+
+  nb::class_<medchemwizard::MedchemWizard>(m, "MedchemWizard")
+      .def(nb::init<>())
+      .def("initialise_from_environment",
+           [](medchemwizard::MedchemWizard& wizard) {
+             if (!wizard.InitialiseFromEnvironment()) {
+               throw std::runtime_error(
+                   "Cannot initialise MedchemWizard from "
+                   "LILLYMOL_HOME/data/MedchemWizard/REACTIONS");
+             }
+           },
+           "Initialise reactions from LILLYMOL_HOME/data/MedchemWizard/REACTIONS")
+      .def("read_reactions",
+           [](medchemwizard::MedchemWizard& wizard, const std::string& fname) {
+             if (!wizard.ReadReactions(fname.c_str())) {
+               throw std::runtime_error("Cannot read MedchemWizard reactions from '" +
+                                        fname + "'");
+             }
+           },
+           nb::arg("fname"), "Read reactions from a MedchemWizard REACTIONS file")
+      .def("number_reactions", &medchemwizard::MedchemWizard::number_reactions)
+      .def("process", &MedchemWizardProcess, nb::arg("mol"),
+           "Generate MedchemWizard products for a molecule")
+      .def("add_do_not_change_smarts",
+           [](medchemwizard::MedchemWizard& wizard, const std::string& smarts) {
+             auto query = std::make_unique<Substructure_Query>();
+             if (!query->create_from_smarts(IWString(smarts))) {
+               throw std::invalid_argument("Invalid SMARTS '" + smarts + "'");
+             }
+             wizard.do_not_change_queries() << query.release();
+           },
+           nb::arg("smarts"), "Protect atoms matching a SMARTS from reaction changes")
+      .def("add_do_not_change_query",
+           [](medchemwizard::MedchemWizard& wizard, const std::string& fname) {
+             auto query = std::make_unique<Substructure_Query>();
+             if (!query->read(fname.c_str())) {
+               throw std::runtime_error("Cannot read do-not-change query '" + fname +
+                                        "'");
+             }
+             wizard.do_not_change_queries() << query.release();
+           },
+           nb::arg("fname"), "Protect atoms matching a substructure query file")
+      .def("set_ignore_do_not_change_queries_not_matching",
+           [](medchemwizard::MedchemWizard& wizard, bool value) {
+             wizard.options().ignore_do_not_change_queries_not_matching = value;
+           },
+           nb::arg("value"))
+      .def("set_max_depth",
+           [](medchemwizard::MedchemWizard& wizard, int value) {
+             if (value < 0) {
+               throw std::invalid_argument("max_depth must be non-negative");
+             }
+             wizard.options().max_depth = value;
+           },
+           nb::arg("value"))
+      .def("set_max_hits",
+           [](medchemwizard::MedchemWizard& wizard, int value) {
+             if (value < 1) {
+               throw std::invalid_argument("max_hits must be positive");
+             }
+             wizard.options().max_hits = value;
+           },
+           nb::arg("value"))
+      .def("set_max_atoms",
+           [](medchemwizard::MedchemWizard& wizard, int value) {
+             if (value < 1) {
+               throw std::invalid_argument("max_atoms must be positive");
+             }
+             wizard.options().max_atoms = value;
+           },
+           nb::arg("value"))
+      .def("set_min_atoms",
+           [](medchemwizard::MedchemWizard& wizard, int value) {
+             if (value < 1) {
+               throw std::invalid_argument("min_atoms must be positive");
+             }
+             wizard.options().min_atoms = value;
+           },
+           nb::arg("value"))
+      .def("set_unique_within_molecule",
+           [](medchemwizard::MedchemWizard& wizard, bool value) {
+             wizard.options().unique_within_molecule = value;
+           },
+           nb::arg("value"))
+      .def("set_unique_across_all_molecules",
+           [](medchemwizard::MedchemWizard& wizard, bool value) {
+             wizard.options().unique_across_all_molecules = value;
+           },
+           nb::arg("value"))
+      .def("set_append_names",
+           [](medchemwizard::MedchemWizard& wizard, bool value) {
+             wizard.options().append_names = value;
+           },
+           nb::arg("value"))
+      .def("set_name_separator",
+           [](medchemwizard::MedchemWizard& wizard, const std::string& sep) {
+             wizard.options().sep = sep;
+           },
+           nb::arg("sep"))
+      .def("set_discard_bad_valences",
+           [](medchemwizard::MedchemWizard& wizard, bool value) {
+             wizard.options().discard_bad_valences = value;
+           },
+           nb::arg("value"))
+      .def("stats",
+           [](const medchemwizard::MedchemWizard& wizard) {
+             return MedchemWizardStatsToMap(wizard.stats());
+           },
+           "Return MedchemWizard processing counters");
 
   nb::class_<ring_replacement::RingReplacement>(m, "RingReplacement")
       .def(nb::init<>())

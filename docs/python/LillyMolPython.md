@@ -245,34 +245,34 @@ to check each molecule and skip those having an invalid valence.
 
 A more pythonic way of reading structures is available as
 ```
-  with ReaderContext('/path/to/file.sdf') as reader:
+  with MolReaderContext('/path/to/file.sdf') as reader:
     for mol in reader:
       for atom in mol:
         ...
 ```
-`ReaderContext` is itself the iterator returned by the context manager. It also
+`MolReaderContext` is itself the iterator returned by the context manager. It also
 has a `next()` method that returns a molecule or `None`, plus methods such as
 `molecules_read()` and `set_ignore_connection_table_errors()`.
 
 Common preprocessing can be applied while molecules are read. This uses the same
 `MoleculePreprocessing` object used by LillyMol command line tools.
 ```
-from lillymol_io import ReaderContext
+from lillymol_io import MolReaderContext
 
-with ReaderContext('/path/to/file.smi', largest_fragment=True,
+with MolReaderContext('/path/to/file.smi', largest_fragment=True,
                    remove_chirality=True, remove_isotopes=True) as reader:
   for mol in reader:
     ...
 ```
 The preprocessing keyword options are `largest_fragment`, `remove_chirality`,
 `remove_cis_trans_bonds`, and `remove_isotopes`. They default to `False`, so a
-plain `ReaderContext(fname)` preserves the input molecule as before.
+plain `MolReaderContext(fname)` preserves the input molecule as before.
 
-SDF naming can also be controlled from `ReaderContext`. By default LillyMol uses
+SDF naming can also be controlled from `MolReaderContext`. By default LillyMol uses
 the first SDF header line as the molecule name. To use a specific SD data tag as
 the identifier:
 ```
-with ReaderContext('/path/to/file.sdf', sdf_identifier='CHEMBL_ID') as reader:
+with MolReaderContext('/path/to/file.sdf', sdf_identifier='CHEMBL_ID') as reader:
   for mol in reader:
     print(mol.name())
 ```
@@ -282,7 +282,7 @@ By default this produces names like `CHEMBL_ID:CHEMBL123`; use
 To retain SD tag data in the molecule name, ask for JSON form. With
 `all_sdf_tags=True`, every SD tag is included in the JSON object.
 ```
-with ReaderContext('/path/to/file.sdf', sdf_tags_to_json=True,
+with MolReaderContext('/path/to/file.sdf', sdf_tags_to_json=True,
                    all_sdf_tags=True) as reader:
   for mol in reader:
     print(mol.name())
@@ -294,7 +294,7 @@ If you want SD tag data as structured Python data, keep the SDF tags while
 reading and call `sdf_tags()` on the molecule. Multi-line SD values are returned
 as one string with embedded newline characters.
 ```
-with ReaderContext('/path/to/file.sdf', keep_sdf_tags=True) as reader:
+with MolReaderContext('/path/to/file.sdf', keep_sdf_tags=True) as reader:
   for mol in reader:
     tags = mol.sdf_tags()
     print(tags.get('CHEMBL_ID'))
@@ -304,17 +304,17 @@ Without `keep_sdf_tags=True`, `mol.sdf_tags()` returns an empty dictionary.
 When the same read settings are reused, collect them in a `ReaderOptions` object.
 This is often clearer than passing several keyword arguments repeatedly.
 ```
-from lillymol_io import ReaderContext, ReaderOptions
+from lillymol_io import MolReaderContext, ReaderOptions
 
 options = ReaderOptions(largest_fragment=True,
                         sdf_identifier='CHEMBL_ID',
                         prepend_sdfid=False)
 
-with ReaderContext('/path/to/first.sdf', options=options) as reader:
+with MolReaderContext('/path/to/first.sdf', options=options) as reader:
   for mol in reader:
     ...
 
-with ReaderContext('/path/to/second.sdf', options=options) as reader:
+with MolReaderContext('/path/to/second.sdf', options=options) as reader:
   for mol in reader:
     ...
 ```
@@ -322,12 +322,15 @@ with ReaderContext('/path/to/second.sdf', options=options) as reader:
 `remove_chirality`, `remove_cis_trans_bonds`, `remove_isotopes`,
 `keep_sdf_tags`, `sdf_identifier`, `sdf_tags_to_json`, `all_sdf_tags`,
 `first_sdf_tag`, and `prepend_sdfid`. The fields are mutable, and an existing
-`ReaderContext` can be updated with `reader.apply_options(options)`.
+`MolReaderContext` can be updated with `reader.apply_options(options)`.
 
-`ReaderContext` stores these SDF naming options on the reader, so separate
-`ReaderContext` objects can use different SDF identifiers at the same time. The
+`MolReaderContext` stores these SDF naming options on the reader, so separate
+`MolReaderContext` objects can use different SDF identifiers at the same time. The
 older module-level SDF functions still change the global MDL/SDF defaults used
 by raw `Reader` objects and by newly created reader-local options.
+
+`ReaderContext` remains available as a compatibility alias for `MolReaderContext`.
+`ContextWriter` remains available as a compatibility alias for `MolWriterContext`.
 
 `MoleculePreprocessing` can also be used directly when you want explicit control.
 `process()` changes the molecule supplied, while `process_copy()` leaves the

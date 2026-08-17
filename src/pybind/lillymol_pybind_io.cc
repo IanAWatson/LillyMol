@@ -437,7 +437,7 @@ PYBIND11_MODULE(lillymol_io, io)
     .export_values();
   ;
 
-  py::class_<ReaderContext>(io, "ReaderContext")
+  py::class_<ReaderContext>(io, "MolReaderContext")
     .def(py::init([](const std::string& fname, FileType file_type,
                      const ReaderOptions& options) {
         ReaderContext* result = new ReaderContext(fname, file_type);
@@ -611,7 +611,9 @@ PYBIND11_MODULE(lillymol_io, io)
     )
   ;
 
-  py::class_<ContextWriter>(io, "ContextWriter")
+  io.attr("ReaderContext") = io.attr("MolReaderContext");
+
+  py::class_<ContextWriter>(io, "MolWriterContext")
     .def(py::init<const std::string&, FileType>())
     .def(py::init<const std::string&>())
     .def("__enter__",
@@ -644,6 +646,8 @@ PYBIND11_MODULE(lillymol_io, io)
       "File names created from a token in the molecule name"
     )
   ;
+
+  io.attr("ContextWriter") = io.attr("MolWriterContext");
 
   io.def("slurp",
     [](const std::string& fname)->std::optional<std::vector<Molecule>> {

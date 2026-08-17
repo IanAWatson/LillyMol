@@ -72,21 +72,21 @@ bad = MolFromSmiles('c1ccc')          # None, with a complaint on stderr
 mols = MolFromSmiles(['C', 'CC', 'C1CC1'])   # a list form also exists
 ```
 
-Reading files is usually what you want. `ReaderContext` infers the file type from
+Reading files is usually what you want. `MolReaderContext` infers the file type from
 the name:
 
 ```python
 import lillymol_io
 
-with lillymol_io.ReaderContext('/path/to/file.smi') as reader:
+with lillymol_io.MolReaderContext('/path/to/file.smi') as reader:
     for mol in reader:
         print(mol.name(), mol.natoms())
 ```
 
-`ReaderContext` can also apply common preprocessing as molecules are read:
+`MolReaderContext` can also apply common preprocessing as molecules are read:
 
 ```python
-with lillymol_io.ReaderContext('/path/to/file.smi', largest_fragment=True,
+with lillymol_io.MolReaderContext('/path/to/file.smi', largest_fragment=True,
                                remove_chirality=True,
                                remove_isotopes=True) as reader:
     for mol in reader:
@@ -96,10 +96,10 @@ with lillymol_io.ReaderContext('/path/to/file.smi', largest_fragment=True,
 For explicit reuse, `lillymol_io.MoleculePreprocessing` offers the same operations
 with `process(mol)` and `process_copy(mol)`.
 
-SDF names can be taken from SD data tags directly from `ReaderContext`:
+SDF names can be taken from SD data tags directly from `MolReaderContext`:
 
 ```python
-with lillymol_io.ReaderContext('/path/to/file.sdf',
+with lillymol_io.MolReaderContext('/path/to/file.sdf',
                                sdf_identifier='CHEMBL_ID') as reader:
     for mol in reader:
         print(mol.name())
@@ -108,7 +108,7 @@ with lillymol_io.ReaderContext('/path/to/file.sdf',
 For workflows that need the SD data, use JSON names:
 
 ```python
-with lillymol_io.ReaderContext('/path/to/file.sdf',
+with lillymol_io.MolReaderContext('/path/to/file.sdf',
                                sdf_tags_to_json=True,
                                all_sdf_tags=True) as reader:
     for mol in reader:
@@ -119,6 +119,9 @@ There is no `None` molecule from a reader. A connection table error stops the re
 unless you have raised the allowed error count. Note also that in LillyMol a
 molecule with a bad valence is still a valid molecule - call `valence_ok()` if you
 care.
+
+`ReaderContext` remains available as a compatibility alias for `MolReaderContext`.
+`ContextWriter` remains available as a compatibility alias for `MolWriterContext`.
 
 Molecules are always mutable. There is no distinction between a molecule you may
 edit and one you may not, which removes a whole category of ceremony, at the cost

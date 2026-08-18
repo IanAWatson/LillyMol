@@ -1324,6 +1324,19 @@ class Sidechain_Reaction_Site : public Reaction_Site
 
     int add_inter_particle_bond (int, int, int, bond_type_t);
 
+    // Destroys all reagents in this sidechain. Correct when the reagents were
+    // added with add_reagent(const Molecule&) or add_sidechain_reagent, both of
+    // which build a Molecule_and_Embedding from a copy, so this sidechain owns it.
+    void remove_all_reagents();
+
+    // Detach the reagents without destroying them. Necessary, not vestigial:
+    // add_reagent(Molecule_and_Embedding*) takes a pointer and does NOT copy, so
+    // a caller that owns its reagents must detach them before this sidechain is
+    // destroyed, or they are deleted underneath it. make_these_molecules.cc keeps
+    // its reagents in its own hash and relies on this - see the comment there
+    // about making sure no reaction thinks it owns any of the reagents.
+    // If the reagents were added by copy, this leaks them. Use
+    // remove_all_reagents for that case.
     int remove_first_reagent_no_delete();
     int remove_no_delete_all_reagents();
 
@@ -1689,8 +1702,17 @@ class IWReaction : public Scaffold_Reaction_Site
       return _sidechains;
     }
 
-    // remove, without deleting, all reagents in all sidechains.
+    // Remove, without deleting, all reagents in all sidechains.
+    // Almost certainly not what you want. Unlike the per sidechain version, which
+    // exists so a caller owning its reagents can detach them, no caller was found
+    // for this one that had added reagents by pointer. Everything that reached it
+    // had used add_sidechain_reagent, which copies, so this leaked one
+    // Molecule_and_Embedding per reagent per call. Use remove_all_reagents.
     int remove_no_delete_all_reagents();
+
+    // Destroy all reagents in each sidechain.
+    // Returns the number of sidechains.
+    int remove_all_reagents();
 
     int all_sidechains_have_reagents () const;
 

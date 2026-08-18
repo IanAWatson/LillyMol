@@ -2549,6 +2549,11 @@ Sidechain_Reaction_Site::remove_no_delete_all_reagents()
   return 1;
 }
 
+void
+Sidechain_Reaction_Site::remove_all_reagents() {
+  _reagents.resize(0);
+}
+
 int
 Sidechain_Reaction_Site::construct_from_msi_object(const msi_object & msi,
                 int query_files_in_current_directory,
@@ -3731,6 +3736,15 @@ IWReaction::remove_no_delete_all_reagents() {
     if (s->number_reagents() > 0) {
       s->remove_no_delete_all_reagents();
     }
+  }
+
+  return _sidechains.number_elements();
+}
+
+int
+IWReaction::remove_all_reagents() {
+  for (Sidechain_Reaction_Site* s : _sidechains) {
+    s->remove_all_reagents();
   }
 
   return _sidechains.number_elements();
@@ -7003,7 +7017,7 @@ Reaction_Site::_do_restore_saved_chiral_centre (Molecule & result,
       atoms_no_longer_attached.add(j);    // may need to change to a new atom
   }
 
-// The same atoms still attached, and there were 4 of them - should not happen - we know a bond was broken
+// The same atoms still attached, and there were 4 of them - should not happenï¿½- we know a bond was broken
 
   if (atoms_no_longer_attached.empty() && 4 == atoms_in_chiral_centre)    // should not happen, all atoms the same, but we know a bond was broken? Maybe they broke and re-formed something???
   {

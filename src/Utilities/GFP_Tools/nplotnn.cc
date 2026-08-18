@@ -1547,8 +1547,12 @@ process_molecule_gfp_leader(iwstring_data_source &input, int &fatal,
   } else if (!distances_present_in_input && tabular_leader_output) {
     id << output_separator << clusters_found << output_separator << 'P';
   } else if (tabular_leader_output) {
-    id << output_separator << clusters_found << output_separator << 'P'
-       << output_separator << '0';
+    id << output_separator << clusters_found << output_separator << 'P';
+    if (neighbours.empty()) {
+      output  << output_separator << (neighbours.number_elements() + 1);
+    } else {
+      output  << output_separator << '0';
+    }
   } else {
     id << cluster << clusters_found << output_separator << "("
        << (neighbours_initially_found + 1) << output_separator << "members)";

@@ -1,5 +1,5 @@
 load("@com_google_protobuf//bazel:py_proto_library.bzl", "py_proto_library")
-load("@rules_cc//cc:defs.bzl", "cc_binary", "cc_proto_library", "cc_library", "cc_test")
+load("@rules_cc//cc:defs.bzl", "cc_binary", "cc_proto_library", "cc_library", "cc_shared_library", "cc_test")
 load("@rules_proto//proto:defs.bzl", "proto_library")
 load("@com_google_protobuf//bazel:cc_proto_library.bzl", "cc_proto_library")
 # load("@rules_python//python:defs.bzl", "py_library")
@@ -1370,5 +1370,57 @@ cc_library(
     ],
     deps = [
         ":iwmolecule",
+    ],
+)
+
+# One shared copy of Molecule_Lib, for the python extension modules to link
+# against dynamically.
+#
+# Each pybind_extension used to link Molecule_Lib statically, so every module got
+# its own copy of all of its global state - the element table, the aromaticity
+# model, the smiles parsing flags. In a single process that means
+# lillymol.set_auto_create_new_elements(True) configured lillymol.so and had no
+# effect on lillymol_tsubstructure.so, so a molecule built inside one module was
+# not the same as a molecule built inside another, and the same query could match
+# one and not the other. The -Wl,-Bsymbolic that pybind_extension adds makes each
+# module prefer its own copy, so nothing unified them at load time.
+#
+# Extensions declare this in dynamic_deps and keep their existing deps; bazel then
+# resolves those libraries against this one .so instead of copying them in.
+# Anything holding Molecule_Lib global state belongs here rather than being linked
+# statically into a module.
+cc_shared_library(
+    name = "molecule_lib_shared",
+    shared_lib_name = "libmolecule_lib.so",
+    # Everything absorbed into this .so is genuinely exported from it - there is no
+    # version script and the symbols have default visibility - so declare that, or
+    # bazel refuses to let an extension resolve them here.
+    # Everything absorbed into this .so is exported from it, so extensions resolve
+    # against it rather than linking their own copy. The libraries named here carry
+    # alwayslink, which they must: the linker only pulls the archive members
+    # something references, so without it a library can be "in" this .so with most
+    # of its object files omitted, and an extension that stopped linking it
+    # statically then fails to resolve them at load time.
+    exports_filter = [
+        "//Foundational:__subpackages__",
+        "//Molecule_Lib:__subpackages__",
+        "//Molecule_Tools:__subpackages__",
+        "@com_google_absl//:__subpackages__",
+        "@fmt//:__subpackages__",
+        "@com_google_protobuf//:__subpackages__",
+        "@re2//:__subpackages__",
+    ],
+    visibility = ["//visibility:public"],
+    deps = [
+        ":iwmolecule",
+        ":iwreaction",
+        ":moleculeio",
+        # Anything two or more extensions link must live here, not just anything
+        # holding global state. These two carry generated protobuf descriptors, and
+        # a descriptor may be registered only once per process; with a private
+        # protobuf runtime per module that was invisible, with one shared runtime it
+        # aborts at load.
+        "//Molecule_Tools:alogp_lib",
+        "//Molecule_Tools:xlogp_lib",
     ],
 )

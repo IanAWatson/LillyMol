@@ -17,6 +17,9 @@ pybind_extension(
     copts = [
         "-save-temps",
     ],
+    # Molecule_Lib comes from the one shared copy, not statically per module.
+    # See the comment on //Molecule_Lib:molecule_lib_shared.
+    dynamic_deps = ["//Molecule_Lib:molecule_lib_shared"],
     deps = [
         ":molecule",
         "//Molecule_Lib:iwmolecule",
@@ -53,6 +56,7 @@ pybind_extension(
     srcs = [
         "lillymol_pybind_fingerprint.cc",
     ],
+    dynamic_deps = ["//Molecule_Lib:molecule_lib_shared"],
     deps = [
         ":molecule",
         "//Molecule_Lib:atom_pair_fingerprint",
@@ -71,6 +75,7 @@ pybind_extension(
     srcs = [
         "lillymol_pybind_query.cc",
     ],
+    dynamic_deps = ["//Molecule_Lib:molecule_lib_shared"],
     deps = [
         ":molecule",
         "//Molecule_Lib:iwmolecule",
@@ -84,6 +89,7 @@ pybind_extension(
     srcs = [
         "lillymol_pybind_std.cc",
     ],
+    dynamic_deps = ["//Molecule_Lib:molecule_lib_shared"],
     deps = [
         "//Molecule_Lib:iwmolecule",
         "//Molecule_Lib:moleculeio",
@@ -96,6 +102,7 @@ pybind_extension(
     srcs = [
         "lillymol_pybind_set_of_atoms.cc",
     ],
+    dynamic_deps = ["//Molecule_Lib:molecule_lib_shared"],
     deps = [
         "//Molecule_Lib:iwmolecule",
         "//Molecule_Lib:moleculeio",
@@ -108,6 +115,7 @@ pybind_extension(
     srcs = [
         "lillymol_pybind_ring.cc",
     ],
+    dynamic_deps = ["//Molecule_Lib:molecule_lib_shared"],
     deps = [
         "//Molecule_Lib:iwmolecule",
         "//Molecule_Lib:moleculeio",
@@ -120,6 +128,7 @@ pybind_extension(
     srcs = [
         "lillymol_pybind_io.cc",
     ],
+    dynamic_deps = ["//Molecule_Lib:molecule_lib_shared"],
     deps = [
         "//Molecule_Lib:iwmolecule",
         "//Molecule_Lib:moleculeio",
@@ -146,6 +155,7 @@ pybind_extension(
     srcs = [
         "lillymol_pybind_reaction.cc",
     ],
+    dynamic_deps = ["//Molecule_Lib:molecule_lib_shared"],
     deps = [
         "//Molecule_Lib:iwmolecule",
         "//Molecule_Lib:iwreaction",
@@ -159,6 +169,7 @@ pybind_extension(
     srcs = [
         "lillymol_pybind_tsubstructure.cc",
     ],
+    dynamic_deps = ["//Molecule_Lib:molecule_lib_shared"],
     deps = [
         ":tsubstructure",
         "//Molecule_Lib:iwmolecule",
@@ -186,6 +197,8 @@ pybind_extension(
     srcs = [
         "lillymol_pybind_gfp_server.cc",
     ],
+    # Molecule_Lib arrives transitively through gfp_server_lib.
+    dynamic_deps = ["//Molecule_Lib:molecule_lib_shared"],
     deps = [
         "//Utilities/GFP_Tools:gfp_server_lib",
     ],
@@ -196,6 +209,7 @@ pybind_extension(
     srcs = [
         "lillymol_pybind_tools.cc",
     ],
+    dynamic_deps = ["//Molecule_Lib:molecule_lib_shared"],
     deps = [
         "//Molecule_Lib:iwmolecule",
         "//Molecule_Lib:iwreaction",

@@ -28,7 +28,7 @@ bazel_dep(name = "fmt", version = "12.1.0")
 
 bazel_dep(name = "google_benchmark", version = "1.9.5", repo_name="benchmark")
 bazel_dep(name = "googletest", version = "1.17.0.bcr.2")
-bazel_dep(name = "nanobind_bazel", version = "2.9.2")
+bazel_dep(name = "nanobind_bazel", version = "2.12.0")
 bazel_dep(name = "onetbb", version = "2022.3.0", repo_name="onetbb")
 bazel_dep(name = "platforms", version = "1.1.0")
 # Version 27.0 works for c++, but does not work with python 3.11

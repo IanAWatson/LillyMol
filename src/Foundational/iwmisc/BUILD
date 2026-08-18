@@ -66,6 +66,11 @@ cc_library(
 
 cc_library(
     name = "iwmisc",
+    # Linked whole into //Molecule_Lib:molecule_lib_shared, which claims to export
+    # it. Without this the linker drops the members Molecule_Lib does not itself
+    # reference, and extensions resolving against the shared library cannot find
+    # them at load time.
+    alwayslink = 1,
     srcs = [
         "_iw_write_array_int.cc",
         "_iwmaxid_double_int.cc",

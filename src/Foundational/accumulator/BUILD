@@ -24,6 +24,11 @@ cc_proto_library(
 
 cc_library(
     name = "accumulator",
+    # Linked whole into //Molecule_Lib:molecule_lib_shared, which claims to export
+    # it. Without this the linker drops the members Molecule_Lib does not itself
+    # reference, and extensions resolving against the shared library cannot find
+    # them at load time.
+    alwayslink = 1,
     srcs = [
         "KahanSum.cc",
         "_accumulator_double.cc",

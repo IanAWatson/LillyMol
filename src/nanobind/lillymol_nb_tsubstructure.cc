@@ -25,14 +25,30 @@ BindTSubstructure(nb::module_& m) {
              return ts.SubstructureSearch(mol);
            },
            nb::arg("mol"))
+      // Note the Molecule*. With std::vector<Molecule> nanobind copy constructs
+      // every molecule at the boundary, about 5.4us each, and does it while
+      // holding the GIL so it cannot overlap between threads. Measured on the
+      // pybind equivalent, that made this batch call slower than a python loop
+      // over the single molecule overload, and capped scaling at under 3x on 32
+      // cores; with pointers it reached 10x. The python signature is the same.
+      //
+      // Taking pointers means None arrives as nullptr, so the list is checked
+      // before the GIL is released - throwing needs the GIL, and dereferencing
+      // nullptr takes the interpreter down.
       .def("substructure_search",
-           [](TSubstructure& ts, std::vector<Molecule>& mols) {
+           [](TSubstructure& ts, std::vector<Molecule*> mols) {
              const uint32_t number_molecules = mols.size();
+             for (uint32_t i = 0; i < number_molecules; ++i) {
+               if (mols[i] == nullptr) {
+                 throw nb::value_error("substructure_search:None in list of molecules");
+               }
+             }
+
              std::vector<bool> results(number_molecules);
              {
                nb::gil_scoped_release release;
                for (uint32_t i = 0; i < number_molecules; ++i) {
-                 results[i] = ts.SubstructureSearch(mols[i]);
+                 results[i] = ts.SubstructureSearch(*mols[i]);
                }
              }
              return results;
@@ -69,8 +85,14 @@ BindTSubstructure(nb::module_& m) {
              return ts.NumofMatches(mol);
            },
            nb::arg("mol"))
+      // Molecule*, for the reason given above the batch substructure_search.
       .def("num_matches",
-           [](TSubstructure& ts, std::vector<Molecule>& mols) {
+           [](TSubstructure& ts, std::vector<Molecule*> mols) {
+             for (uint32_t i = 0; i < mols.size(); ++i) {
+               if (mols[i] == nullptr) {
+                 throw nb::value_error("num_matches:None in list of molecules");
+               }
+             }
              nb::gil_scoped_release release;
              return ts.NumberMatches(mols);
            },
@@ -91,6 +113,27 @@ BindTSubstructure(nb::module_& m) {
              return ts.LabelMatchedAtoms(mol);
            },
            nb::arg("mol"))
+      // Only possible taking pointers. With std::vector<Molecule> the labels are
+      // applied to the copies nanobind made at the boundary and then discarded,
+      // which is why the pybind bindings carried this under an ifdef for years.
+      .def("label_matched_atoms",
+           [](TSubstructure& ts, std::vector<Molecule*> mols) {
+             for (uint32_t i = 0; i < mols.size(); ++i) {
+               if (mols[i] == nullptr) {
+                 throw nb::value_error("label_matched_atoms:None in list of molecules");
+               }
+             }
+
+             uint32_t rc = 0;
+             nb::gil_scoped_release release;
+             for (Molecule* m : mols) {
+               if (ts.LabelMatchedAtoms(*m)) {
+                 ++rc;
+               }
+             }
+             return rc;
+           },
+           nb::arg("mols"))
       .def("matched_atoms",
            [](TSubstructure& ts, const std::string& smiles) {
              return ts.MatchedAtoms(smiles);

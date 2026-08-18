@@ -1344,7 +1344,7 @@ class __attribute__((visibility("default"))) Molecule : protected resizable_arra
   int write_molecule_smarts(std::ostream&);
 
   int write_molecule_mrv(std::ostream&);
-  int write_molecule_inchi(std::ostream&);
+  int write_molecule_inchi(std::ostream&, bool write_key=false);
 
   int write_molecule_xyz(std::ostream&) const;
 

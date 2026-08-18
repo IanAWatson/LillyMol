@@ -266,6 +266,10 @@ suffix_for_file_type(FileType file_type) {
       return "inchi";
       break;
 
+    case FILE_TYPE_INCHIKEY:
+      return "inchikey";
+      break;
+
     case FILE_TYPE_TDT_NAUSMI:
       return "tdt";
       break;
@@ -290,116 +294,6 @@ suffix_for_file_type(FileType file_type) {
   iwabort();
   return nullptr;  // should never come here
 }
-
-#ifdef NOLONGER_NEEDED_ASDASD
-const char*
-suffix_for_file_type(int file_type) {
-  switch (file_type) {
-    case MDL:
-      return "mdl";
-      break;
-
-    case PDB:
-      return "pdb";
-      break;
-
-    case MMOD:
-      return "mmod";
-      break;
-
-    case SMI:
-      return "smi";
-      break;
-
-    case USMI:
-      return "smi";
-      break;
-
-    case MSI:
-      return "msi";
-      break;
-
-    case TDT:
-      return "tdt";
-      break;
-
-    case UTDT:
-      return "tdt";
-      break;
-
-    case RDF:
-      return "rdf";
-      break;
-
-    case QRY:
-      return "qry";
-      break;
-
-    case RSMI:
-      return "smi";
-      break;
-
-    case SDF:
-      return "sdf";
-      break;
-
-    case MOL2:
-      return "mol2";
-      break;
-
-    case IWMTYPE_PSF:
-      return "psf";
-      break;
-
-    case IWMTYPE_CRD:
-      return "crd";
-      break;
-
-    case IWMTYPE_MOE:
-      return "moe";
-      break;
-
-    case IWMTYPE_MRK:
-      return "mrk";
-      break;
-
-    case IWMTYPE_NAUSMI:
-      return "smi";
-      break;
-
-    case IWMTYPE_WCHM:
-      return "chm";
-      break;
-
-    case IWMTYPE_CIF:
-      return "cif";
-      break;
-
-    case IWMTYPE_SMT:
-      return "smt";
-      break;
-
-    case IWMTYPE_MRV:
-      return "mrv";
-      break;
-
-    case IWMTYPE_INCHI:
-      return "inchi";
-      break;
-
-    case IWMTYPE_TDT_NAUSMI:
-      return "tdt";
-      break;
-
-    default:
-      return nullptr;
-      break;
-  }
-
-  iwabort();
-  return nullptr;  // should never come here
-}
-#endif
 
 /*
   We must be careful stripping off old prefixes in case the directory name
@@ -583,6 +477,7 @@ discern_file_type_from_name(const IWString& file_name) {
   if (file_name.ends_with(".inchi")) {
     return FILE_TYPE_INCHI;
   }
+  // Inchi keys cannot be read so not recognised here.
   if (file_name.ends_with(".cif")) {
     return FILE_TYPE_CIF;
   }
@@ -651,117 +546,6 @@ int
 valid_file_type(FileType ftype) {
   return ftype != FILE_TYPE_INVALID;
 }
-
-#ifdef NOLONGERUSED_QWE
-int
-valid_file_type(int ftype) {
-  switch (ftype) {
-    case MDL:
-      return 1;
-      break;
-
-    case PDB:
-      return 1;
-      break;
-
-    case MMOD:
-      return 1;
-      break;
-
-    case SMI:
-      return 1;
-      break;
-
-    case USMI:
-      return 1;
-      break;
-
-    case MSI:
-      return 1;
-      break;
-
-    case TDT:
-      return 1;
-      break;
-
-    case UTDT:
-      return 1;
-      break;
-
-    case RDF:
-      return 1;
-      break;
-
-    case RSMI:
-      return 1;
-      break;
-
-    case SDF:
-      return 1;
-      break;
-
-    case MOL2:
-      return 1;
-      break;
-
-    case FILE_TYPE_PSF:
-      return 1;
-      break;
-
-    case FILE_TYPE_CRD:
-      return 1;
-      break;
-
-    case FILE_TYPE_CHM:
-      return 1;
-      break;
-
-    case FILE_TYPE_MOE:
-      return 1;
-      break;
-
-    case FILE_TYPE_MRK:
-      return 1;
-      break;
-
-    case FILE_TYPE_WCHM:
-      return 1;
-      break;
-
-    case FILE_TYPE_NAUSMI:
-      return 1;
-      break;
-
-    case FILE_TYPE_CIF:
-      return 1;
-      break;
-
-    case FILE_TYPE_SMT:
-      return 1;
-      break;
-
-    case FILE_TYPE_MRV:
-      return 1;
-      break;
-
-    case FILE_TYPE_INCHI:
-      return 1;
-      break;
-
-    case FILE_TYPE_TDT_NAUSMI:
-      return 1;
-      break;
-
-    case FILE_TYPE_XYZ:
-      return 1;
-      break;
-
-    default:
-      return 0;
-      break;
-  }
-}
-#endif
 
 /*
   We have read a molecule with aromatic atoms. Before doing Kekule perception
@@ -995,6 +779,8 @@ Molecule::write_molecule(std::ostream& os, FileType output_type,
     rc = write_molecule_mrv(os);
   } else if (FILE_TYPE_INCHI == output_type) {
     rc = write_molecule_inchi(os);
+  } else if (FILE_TYPE_INCHIKEY == output_type) {
+    rc = write_molecule_inchi(os, true);
   } else if (FILE_TYPE_CSV == output_type) {
     rc = write_molecule_csv(os);
   } else if (FILE_TYPE_TXTPROTO == output_type) {

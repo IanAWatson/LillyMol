@@ -371,6 +371,9 @@ _string_to_file_type(const const_IWSubstring& file_type) {
   if ("inchi" == file_type) {
     return FILE_TYPE_INCHI;
   }
+  if ("inchikey" == file_type) {
+    return FILE_TYPE_INCHIKEY;
+  }
   if ("csv" == file_type) {
     return FILE_TYPE_CSV;
   }

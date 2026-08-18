@@ -1,19 +1,7 @@
 # LillyMol Python
-This release contains experimental python bindings for some parts of LillyMol.
-
-We find that using LillyMol from python can be a very effective means of prototyping
-an idea, or doing things that are not time sensitive.
-
-This first release comprises three main components
-
-1. The Molecule object
-2. Substructure Searching
-3. Reaction Handling
-
-More functionality will become available.
-
-The current python bindings may not reflect final names or functionality, this
-is a work in progress, but has already proven useful.
+The LillyMol Python environment provides most core LillyMol functionality to
+python.  We find that using LillyMol Python can be a very effective means of prototyping
+an idea, or doing things where run times are short.
 
 ## Background
 Python bindings for LillyMol were implemented at Google in 2019 using 
@@ -493,8 +481,6 @@ The most common methods for a Molecule currently implemented are
 | number_chiral_centres() | Number of chiral centres |
 | remove_all_chiral_centres() | Remove all chiral centres |
 | chiral_centre_at_atom(atom) | Return the Chiral_Centre on 'atom' |
-| is_actually_chiral(mol, atom) | Module-level function: True if 'atom' is actually chiral |
-| tetrahedral_chirality(mol, atom, check_is_chiral=False) | Module-level function: LillyMol-defined tetrahedral chirality for 'atom', or None |
 | invert_chirality_on_atom(atom) | Invert chirality |
 | chiral_centres() | Iterable list of Chiral_Centre |
 | isotope(atom) | Isotope on 'atom' |
@@ -556,6 +542,8 @@ The most common methods for a Molecule currently implemented are
 ## Chirality
 
 LillyMol stores chiral centres on the `Molecule`, not on `Atom` objects.
+An `Atom` only becomes a chiral centre because of its relationship to 
+other atoms in a `Molecule`.
 `chiral_centre_at_atom(atom)` returns the stored `Chiral_Centre` for an atom,
 if one is present. A stored chiral centre records molecular annotation; it does
 not by itself prove that the atom is actually stereogenic.
@@ -692,7 +680,12 @@ so that subtraction of two atoms returns the vector between them.
 m.build_from_smiles("C{{0,0,0}}C{{1,1,1}}"))
 m[0] - m[1]
 ```
-reports sqrt(3). For now...
+reports sqrt(3). For now... Use `m.distance_between_atoms(atom1, atom2)` to
+reliably obtain the geometric distance between two atoms in a molecule.
+The same result will be obtained by the atom based method `m[atom1].distance(m[atom2]).
+That latter invocation would be very inefficient, since two `Atom` objects
+would need to be instantiated in Python, whereas the `Molecule` based
+method avoids that conversion entirely.
 
 A common construct might be (count the number of carbon=,#nitrogen bonds)
 ```
@@ -724,6 +717,23 @@ Traversing the bond list results in each Bond being examined only once.
 ```
 Knowing when to solve a problem by traversing atoms and when to traverse
 bonds can be hard.
+
+Even if you need to scan all atoms and their bonds, there is a more efficient
+way of performing the first loop
+```
+```
+  result = 0
+  for i, atom in enumerate(m):
+    if atom.atomic_number() != 7:
+      continue
+    for other in atom.connections(i):
+    for bond in atom:
+      if bond.is_single_bond():
+        continue
+      other = bond.other(i)
+      if m.atomic_number(other) == 6:
+        result += 1
+```
 
 ## Bond Methods
 Again, the Bond class really does not know much.

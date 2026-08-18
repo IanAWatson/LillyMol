@@ -744,6 +744,7 @@ display_dash_W_options(std::ostream & os)
   os << " -W nokekule          aromatic bonds no longer remember their Kekule forms\n";
   os << " -W slist             write a sorted list of demerit values and reasons\n";
   os << " -W demerits=<fname>  read query name/demerit value overrides from <fname>\n";
+  os << " -W tabular           create a tabular output of 'smiles id demerit'\n";
 
   exit(1);
 }

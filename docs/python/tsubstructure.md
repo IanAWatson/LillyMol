@@ -116,6 +116,10 @@ to Carbon, 2 matches to the Nitrogen query and no matches to the Oxygen
 query. There is also a signature that accepts a single molecule as argument,
 in which case the value returned is just a list, rather than a list of lists.
 
+Prefer the list form when you have more than a handful of molecules. It does the
+whole loop inside one c++ call, and releases the GIL while it does, so python
+threads searching concurrently actually overlap. See [Performance](#performance).
+
 ## Label Matched Atoms
 A common use case for `tsubstructure` is to place isotopic labels on the matched atoms.
 The most common use cases are enabled via python.
@@ -137,9 +141,28 @@ nhits = ts.label_matched_atoms(mol)
 `nhits` will be 2, since two of the queries match the input. `mol` will have
 isotopes applied and the unique smiles will be `[1F][1c]1c[n]c([1CH3])cc1`.
 
-Unfortunately, multiple molecules cannot be processed this way, due to some
-complexities in how lists and vectors are passed between python and c++, but
-obviously molecules can be processed in a loop or list comprehension.
+A list of molecules can be labelled in one call, which returns the number of
+molecules where something matched
+```
+ts = TSubstructure()
+ts.add_query_from_smarts("c1ccccc1 benzene")
+ts.isotope = 5
+
+mols = [MolFromSmiles(smi) for smi in ["c1ccccc1C", "CCO", "c1ccccc1N"]]
+print(ts.label_matched_atoms(mols))          # 2
+print([mol.smiles() for mol in mols])
+```
+prints `2`, then
+`['[5CH]1=[5CH][5CH]=[5CH][5CH]=[5C]1C', 'CCO', '[5CH]1=[5CH][5CH]=[5CH][5CH]=[5C]1N']`.
+The labels are applied to the molecules you passed in - the ethanol, which does not
+match, is untouched.
+
+This did not used to work, and the reason is worth knowing. The binding took a
+`std::vector<Molecule>`, which makes pybind copy every molecule in the list at the
+boundary, so the labels went onto the copies and were discarded - there was no way
+to get the result back. Taking a `std::vector<Molecule*>` instead copies nothing,
+and the same change made the batch `substructure_search` and `num_matches`
+substantially faster. See [Performance](#performance).
 
 The other kind of matched atom is where the atoms are labelled by the number
 of the query that matches that atom.
@@ -180,39 +203,41 @@ for smi in smiles:
 
 print(f"Matched {matches}")
 ```
-runs in about 0.44 seconds on SandyBridge hardware released in 2012. Running the same
-queries through command line `tsubstructure` takes about 0.26 seconds.
-Running the vectorized form of the query
+There are four ways to run that, and they do not perform alike. Measured with 74
+queries against 2000 molecules, best of five runs on a modern 32 core machine,
+built `-c opt`:
+
+| | | |
+| --- | --- | --- |
+| loop over single molecules, as above | 0.136 s | 1.0x |
+| **a list of Molecule** | **0.072 s** | **1.9x** |
+| a list of smiles | 0.099 s | 1.4x |
+| bulk `MolFromSmiles` then a list of Molecule | 0.116 s | 1.2x |
+
 ```
+# the fastest of the four
 mols = [MolFromSmiles(smi) for smi in smiles]
 result = ts.substructure_search(mols)
 matches = op.countOf(result, True)
 ```
-runs in about 0.40 seconds, indicating that minimising the number of times the c++/python barrier
-is crossed may be beneficial. Further gains are possible if smiles interpretation is done
-entirely within c++ by passing a list of smiles to `TSubstructure`.
-```
-smiles = [ 2000 smiles ]
-result = ts.substructure_search(smiles)
-matched = op.countOf(result, True)
-print(f"matched {matched} queries")
-```
-which runs in 0.30 seconds. But this has the disadvantage of never having a Molecule
-object available within python. Which might be fine.
+Passing the list does the whole loop inside one c++ call, crossing the boundary
+once instead of once per molecule, and releases the GIL while it runs so that
+python threads searching concurrently genuinely overlap.
 
-Yet another variant which relies on a bulk conversion from smiles to Molecule
-```
-smiles = [ 2000 smiles ]
-mols = MolFromSmiles(smiles)
-result = ts.substructure_search(mols)
-matched = op.countOf(result, True)
-print(f"matched {matched} queries")
-```
-runs in 0.36 seconds.
+Passing a list of smiles builds the molecules inside c++, which avoids creating
+python Molecule objects at all, at the cost of never having one available. It used
+to be the fastest of the four; it no longer is, and it re-parses each smiles.
 
-As you contemplate whether to use the python `tsubstructure`
-implementation or the command line version will depend on the size of the dataset being
-processed.
+An older version of this document reported these as 0.44, 0.40, 0.30 and 0.36
+seconds on 2012 SandyBridge hardware, when the list forms took a
+`std::vector<Molecule>` and pybind therefore copy constructed every molecule at
+the boundary. A Molecule copy is about 5.4 microseconds, comparable to a whole
+search, so the copying dominated and the ordering came out differently. The
+bindings now take `std::vector<Molecule*>`, which copies nothing. Do not restore
+the by value form.
+
+Whether to use the python implementation or the command line version depends on
+the size of the dataset being processed.
 
 
 ## Summary

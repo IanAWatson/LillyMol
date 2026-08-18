@@ -276,12 +276,20 @@ class TestNanobindMolecule(LillyMolNanobindTestCase):
             with open(fname, "w") as writer:
                 writer.write(SMILES)
 
+            # Readers must be closed before the temporary directory goes away.
+            # On a local filesystem unlinking a file that is still open works, so
+            # leaving it open passes; on NFS the unlink becomes a silly rename to
+            # .nfsXXXX, the directory is then not empty and TemporaryDirectory
+            # cleanup fails with ENOTEMPTY. The bazel sandbox puts /tmp on NFS
+            # here, so a leaked reader fails under bazel and passes when run by
+            # hand.
             reader = lillymol_nb.Reader()
             self.assertTrue(reader.open(fname))
             mol = reader.next()
             self.assertIsNotNone(mol)
             self.assertEqual(mol.name(), "CHEMBL45466")
             self.assertEqual(reader.molecules_read(), 1)
+            reader.close()
 
     def test_reader_bad_suffix_and_explicit_type(self):
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -293,6 +301,7 @@ class TestNanobindMolecule(LillyMolNanobindTestCase):
             self.assertFalse(reader.open(fname))
             self.assertTrue(reader.open(fname, lillymol_nb.FileType.SMI))
             self.assertEqual(reader.next().name(), "CHEMBL45466")
+            reader.close()
 
     def test_reader_iter(self):
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -305,6 +314,7 @@ class TestNanobindMolecule(LillyMolNanobindTestCase):
             names = [mol.name() for mol in reader]
             self.assertEqual(len(names), 10)
             self.assertEqual(reader.molecules_read(), 10)
+            reader.close()
 
     def test_slurp(self):
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -350,11 +360,11 @@ class TestNanobindMolecule(LillyMolNanobindTestCase):
             with open(fname, "w") as writer:
                 writer.write("CC.O mixture\n")
 
-            reader = lillymol_nb.MolReaderContext(fname, largest_fragment=True)
-            mol = reader.next()
-            self.assertIsNotNone(mol)
-            self.assertEqual(mol.natoms(), 2)
-            self.assertIsNone(reader.next())
+            with lillymol_nb.MolReaderContext(fname, largest_fragment=True) as reader:
+                mol = reader.next()
+                self.assertIsNotNone(mol)
+                self.assertEqual(mol.natoms(), 2)
+                self.assertIsNone(reader.next())
 
     def test_retained_sdf_text_info_and_tags(self):
         sdf = """ethanol
@@ -381,14 +391,14 @@ $$$$
             with open(fname, "w") as writer:
                 writer.write(sdf)
 
-            reader = lillymol_nb.MolReaderContext(
-                fname, lillymol_nb.FileType.SDF, keep_sdf_tags=True)
-            mol = reader.next()
-            self.assertIsNotNone(mol)
-            self.assertGreater(mol.number_records_text_info(), 0)
-            self.assertIn(">  <ID Number>", mol.text_info())
-            self.assertEqual(mol.sdf_tags()["ID_Number"], "CHEMBL1")
-            self.assertEqual(mol.sdf_tags()["Comment"], "first line\nsecond line")
+            with lillymol_nb.MolReaderContext(
+                    fname, lillymol_nb.FileType.SDF, keep_sdf_tags=True) as reader:
+                mol = reader.next()
+                self.assertIsNotNone(mol)
+                self.assertGreater(mol.number_records_text_info(), 0)
+                self.assertIn(">  <ID Number>", mol.text_info())
+                self.assertEqual(mol.sdf_tags()["ID_Number"], "CHEMBL1")
+                self.assertEqual(mol.sdf_tags()["Comment"], "first line\nsecond line")
 
     def test_writer_and_context_writer(self):
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -403,6 +413,7 @@ $$$$
             reader = lillymol_nb.Reader()
             self.assertTrue(reader.open(stem + ".smi"))
             self.assertEqual(reader.next().name(), "ethanol")
+            reader.close()
 
             stem = os.path.join(tmpdir, "context")
             with lillymol_nb.MolWriterContext(stem, lillymol_nb.FileType.SMI) as writer:
@@ -411,6 +422,7 @@ $$$$
             reader = lillymol_nb.Reader()
             self.assertTrue(reader.open(stem + ".smi"))
             self.assertEqual(reader.next().smiles(), "CCO")
+            reader.close()
 
     def test_set_name(self):
         mol = lillymol_nb.Molecule()

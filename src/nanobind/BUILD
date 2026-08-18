@@ -22,11 +22,10 @@ nanobind_extension(
         "lillymol_nb_tools.cc",
         "lillymol_nb_tsubstructure.cc",
     ],
+    dynamic_deps = ["//Molecule_Lib:molecule_lib_shared"],
     deps = [
         "//Molecule_Lib:atom_pair_fingerprint",
         "//Molecule_Lib:iwmfingerprint",
-        "//Molecule_Lib:iwmolecule",
-        "//Molecule_Lib:iwreaction",
         "//Molecule_Lib:linear_fingerprint",
         "//Molecule_Lib:moleculeio",
         "//pybind:tsubstructure",

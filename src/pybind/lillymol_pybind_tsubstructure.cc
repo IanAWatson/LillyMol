@@ -62,22 +62,29 @@ PYBIND11_MODULE(lillymol_tsubstructure, s) {
           },
           "Matched atoms in `m` are labelled with isotope"
         )
-#ifdef THIS_DOES_NOT_WORK
-        // due to how things are passed through pybind
+        // This could not work with std::vector<Molecule>, because pybind copies
+        // the list at the boundary and the labels were applied to the copies and
+        // then discarded. std::vector<Molecule*> labels the caller's molecules,
+        // which is the whole point of the method.
         .def("label_matched_atoms",
-          [](TSubstructure& ts, std::vector<Molecule>& mols)->uint32_t {
-            int rc = 0;
-            for (Molecule& m : mols) {
-              if (ts.LabelMatchedAtoms(m)) {
-                std::cerr << "After label " << m.unique_smiles() << '\n';
+          [](TSubstructure& ts, std::vector<Molecule*> mols)->uint32_t {
+            for (uint32_t i = 0; i < mols.size(); ++i) {
+              if (mols[i] == nullptr) {
+                throw py::value_error("label_matched_atoms:None at index " + std::to_string(i));
+              }
+            }
+
+            uint32_t rc = 0;
+            py::gil_scoped_release release;
+            for (Molecule* m : mols) {
+              if (ts.LabelMatchedAtoms(*m)) {
                 ++rc;
               }
             }
             return rc;
           },
-          "Apply isotopic labels to matched atoms"
+          "Apply isotopic labels to matched atoms, in place. Returns how many molecules were labelled"
         )
-#endif
         // The batch entry points below release the GIL for the whole loop, so
         // other python threads run while the search proceeds. This matters more
         // here than for a single search: holding the GIL across a batch of a few
@@ -93,42 +100,61 @@ PYBIND11_MODULE(lillymol_tsubstructure, s) {
         // the label_matched_atoms batch overload above cannot work); for the
         // smiles overload the molecules are built inside C++.
         //
-        // Prefer smiles for a batch. Measured on 32 cores, one query, 4000 drug
-        // sized molecules per thread, all three on this same class:
+        // Note the Molecule* below. It is not decoration.
         //
-        //                          1 thread   4 threads      16 threads
-        //   one call per molecule    55k       193k (3.5x)    183k (3.3x)
-        //   batch of Molecule        39k        85k (2.2x)     96k (2.5x)
-        //   batch of smiles          47k       182k (3.9x)    565k (12.1x)
+        // With std::vector<Molecule> pybind11 has to convert the python list into
+        // a vector of Molecule before the search starts, copy constructing every
+        // one, about 5.4us each. list_caster reserves, so no reallocation is
+        // involved - it is the element copies. Worse, that conversion happens
+        // while the GIL is held, so it cannot overlap between threads, and it
+        // capped the scaling at under 3x. Measured that way this batch call was
+        // SLOWER than simply calling once per molecule, at every thread count,
+        // which made the obvious looking optimisation a pessimisation.
         //
-        // The Molecule batch is the slowest of the three and scales worst - it is
-        // beaten by simply calling once per molecule, at every thread count.
-        // pybind11 must convert the python list into a std::vector<Molecule>
-        // before the search starts. list_caster reserves, so there is no
-        // reallocation, but it still copy constructs every Molecule, about 5.4us
-        // each. The measured overhead is larger than one copy per molecule and
-        // the remainder has not been tracked down. The conversion happens while
-        // the GIL is held, so it cannot overlap between threads, and that is what
-        // limits the scaling.
+        // std::vector<Molecule*> takes pointers to the molecules the caller
+        // already has, so nothing is copied. Same python signature - callers
+        // still pass a list of Molecule. Measured on 32 cores, one query, 4000
+        // drug sized molecules per thread:
         //
-        // So there is no longer a reason to reach for it. It is kept only because
-        // it is documented in docs/python/tsubstructure.md and covered by tests,
-        // so removing it is a breaking change rather than a cleanup. Do not
-        // "optimise" it - the cost is in pybind's list conversion, not in
-        // anything reachable from here.
+        //                                1 thread   4 threads     16 threads
+        //   one call per molecule           54k      181k (3.4x)   199k (3.7x)
+        //   batch, vector<Molecule>         36k       83k (2.3x)    99k (2.7x)
+        //   batch, vector<Molecule*>        57k      218k (3.8x)   570k (10.0x)
+        //   batch, vector<string>           45k      163k (3.7x)   517k (11.6x)
+        //
+        // So keep the star. If a batch entry point here is ever slower than the
+        // loop it replaces, look at what pybind is copying at the boundary before
+        // looking anywhere else.
+        //
+        // One consequence of not copying. Preprocess() may reduce a molecule to
+        // its largest fragment or make its implicit Hydrogens explicit, if those
+        // options are set, and those now happen to the caller's molecules rather
+        // than to throwaway copies. That matches what the single molecule
+        // overload has always done - the copy was the anomaly, not the mutation -
+        // and with the default options Preprocess does nothing.
         .def("substructure_search",
-          [](TSubstructure& ts, std::vector<Molecule>& mols) ->std::vector<bool> {
+          [](TSubstructure& ts, std::vector<Molecule*> mols) ->std::vector<bool> {
             const uint32_t number_molecules = mols.size();
+            // Taking pointers means pybind converts a python None to nullptr,
+            // where the by value form would have raised. Check before releasing
+            // the GIL, since throwing needs it. Without this, a None in the list
+            // dereferences nullptr and takes the interpreter down.
+            for (uint32_t i = 0; i < number_molecules; ++i) {
+              if (mols[i] == nullptr) {
+                throw py::value_error("substructure_search:None at index " + std::to_string(i));
+              }
+            }
+
             std::vector<bool> results(number_molecules);
             {
               py::gil_scoped_release release;
               for (uint32_t i = 0; i < number_molecules; ++i) {
-                results[i] = ts.SubstructureSearch(mols[i]);
+                results[i] = ts.SubstructureSearch(*mols[i]);
               }
             }
             return results;
           },
-          "For each molecule, the number of queries matching"
+          "For each molecule, whether the queries matched"
         )
         .def("substructure_search",
           [](TSubstructure& ts, const std::vector<std::string>& smiles)->std::vector<bool>{
@@ -153,8 +179,14 @@ PYBIND11_MODULE(lillymol_tsubstructure, s) {
           },
           "Perform substructure search on list of smiles"
         )
+        // Molecule*, for the reason given above the batch substructure_search.
         .def("num_matches",
-          [](TSubstructure& ts, std::vector<Molecule>& mols)->std::vector<std::vector<uint32_t>> {
+          [](TSubstructure& ts, std::vector<Molecule*> mols)->std::vector<std::vector<uint32_t>> {
+            for (uint32_t i = 0; i < mols.size(); ++i) {
+              if (mols[i] == nullptr) {
+                throw py::value_error("num_matches:None at index " + std::to_string(i));
+              }
+            }
             py::gil_scoped_release release;
             return ts.NumberMatches(mols);
           },

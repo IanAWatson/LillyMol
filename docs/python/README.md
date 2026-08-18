@@ -205,6 +205,46 @@ need a real `Bond` to ask about ring membership or direction, and
 `bond_type_between_atoms(a1, a2)` when the type is all you want. Both return
 `None` when the atoms are not bonded.
 
+### Copying at the boundary
+
+The costs above are all one thing: **what gets copied or wrapped when a call
+crosses between python and C++.** It is worth knowing the going rate, because it
+is usually larger than the chemistry.
+
+| crossing | cost |
+| -------- | ---- |
+| a trivial bound call, `natoms()`, `atomic_number()` | ~150 ns, nearly all of it the crossing |
+| constructing a python wrapper for one `Bond` | enough that iterating an atom's bonds cost 166 us per molecule against 9 us for `connections()` |
+| copy constructing one `Molecule` | 5.4 us |
+| parsing one smiles | 14.3 us |
+| a substructure search on a drug sized molecule | 6 to 18 us |
+
+A `Molecule` copy costs about as much as the search you are about to do on it, so
+a call that copies its input has doubled the price before starting. This is not
+hypothetical - it is the largest performance defect we have found in these
+bindings. `TSubstructure`'s batch entry points took a `std::vector<Molecule>`,
+which makes pybind11 copy construct every molecule in the list, and because that
+happens with the GIL held it also cannot overlap between threads. The batch call
+was slower than the python loop it exists to replace, and capped at under 3x on
+32 cores. Changing the signature to `std::vector<Molecule*>` - same python
+signature, callers pass the same list - took it from 99k to 570k molecules per
+second.
+
+**If you are extending these bindings**, that is the rule to internalise: a
+parameter of type `std::vector<SomeBoundType>` copies every element, silently, and
+under the GIL. Take `std::vector<SomeBoundType*>` unless you specifically want the
+caller's objects protected from mutation. Two things follow from taking pointers,
+both of which the existing bindings handle explicitly and yours should too:
+pybind11 converts a python `None` to `nullptr`, so an unchecked list containing
+`None` will dereference it and take the interpreter down; and anything the C++
+code writes to a molecule now lands on the caller's object rather than on a
+discarded copy. The second is usually what you wanted - it is why a batch
+`label_matched_atoms` was impossible before and works now.
+
+**If you are using them**, the practical form of the rule is to prefer calls that
+answer a whole question at once, and to be suspicious of any batch call that is
+not faster than the loop it replaces.
+
 ## Translating RDKit code, and writing new code with an LLM
 
 Translating an existing RDKit program to LillyMol python is now a realistic thing
@@ -271,32 +311,34 @@ per thread. All three below are `TSubstructure`, so they are directly comparable
 
 | Approach | 1 thread | 4 threads | 16 threads |
 | -------- | -------- | --------- | ---------- |
-| `substructure_search(mol)`, one call per molecule | **55k mol/s** | 193k (3.5x) | 183k (3.3x) |
-| `substructure_search(list_of_molecules)` | 39k mol/s | 85k (2.2x) | 96k (2.5x) |
-| `substructure_search(list_of_smiles)` | 47k mol/s | 182k (3.9x) | **565k (12.1x)** |
+| `substructure_search(mol)`, one call per molecule | 54k mol/s | 181k (3.4x) | 199k (3.7x) |
+| `substructure_search(list_of_molecules)` | **57k mol/s** | 218k (3.8x) | **570k (10.0x)** |
+| `substructure_search(list_of_smiles)` | 45k mol/s | 163k (3.7x) | 517k (11.6x) |
 
-Read that table before choosing.
+**Pass a batch.** Either batch form is a good answer - a list of the molecules you
+already have, or a list of smiles if that is what you are holding. Both do the
+whole loop inside one C++ call with the GIL released, so threads genuinely
+overlap.
 
-**One call per molecule stops improving at about three cores.** Each call releases
-the GIL, but the loop around it is python and reacquires the GIL every iteration,
-so you end up bounded by how fast a single python loop can run. Adding cores past
-three or four gains nothing. If that is fast enough it is also the simplest thing
-to write, and the fastest single-threaded option, since it neither copies
-molecules nor reparses smiles.
+**One call per molecule stops improving at about three or four cores.** Each call
+releases the GIL, but the loop around it is python and reacquires the GIL every
+iteration, so you end up bounded by how fast a single python loop can run. Adding
+cores past that gains nothing. It is still the simplest thing to write, and fine
+if its ceiling is fast enough for you.
 
-**Passing a list of `Molecule` objects is the one to avoid.** It is the slowest of
-the three and scales worst - beaten by simply calling once per molecule, at every
-thread count. pybind11 converts the python list into a `std::vector<Molecule>`
-before the search starts, copy constructing every molecule, and that happens with
-the GIL held so it cannot overlap between threads. The same conversion is why
-there is no batch `label_matched_atoms`: it would label copies and discard them.
+`num_matches(list_of_molecules)` behaves the same way - 57k on one thread, 682k on
+16 - and `label_matched_atoms(list_of_molecules)` now exists at all, which it could
+not before.
 
-**Passing a list of smiles is what scales.** All the work, parsing included,
-happens inside one C++ call with the GIL released, so threads genuinely overlap.
-It does more work per molecule than the alternatives - a smiles parse is 14.3 us
-against 5.4 us to copy a Molecule - and still wins by a wide margin once there are
-cores to spend. It peaked at 668k mol/s on 24 threads in a separate run; past
-that, contention on this 32 core machine took it back down.
+The batch forms used to be the slowest option rather than the fastest, for the
+reason set out in [Copying at the boundary](#copying-at-the-boundary). Worth
+reading if you are ever tempted to reintroduce it.
+
+One consequence of the batch forms no longer copying: if you have set
+`set_reduce_to_largest_fragment` or `set_make_implicit_hydrogens_explicit`, those
+transformations now apply to **your** molecules rather than to copies the call
+throws away. That is what the single molecule calls have always done, and with the
+default options neither transformation runs at all.
 
 Whichever you use, the safety contract is the same, and the GIL was previously
 hiding it:

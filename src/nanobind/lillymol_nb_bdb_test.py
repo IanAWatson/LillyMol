@@ -54,21 +54,35 @@ class TestNanobindBdb(unittest.TestCase):
 
             subprocess.run([loader, "-d", dbname, input_fname], check=True)
 
-            lookup = lillymol_nb_bdb.Selimsteg()
-            self.assertTrue(lookup.open_database(dbname))
-            self.assertEqual(lookup.get_smiles("mol1"), "CCO")
-            self.assertIsNone(lookup.get_smiles("missing"))
+            # In a with block so the database is closed before the temporary
+            # directory goes away. Leaving it open passes on a local filesystem,
+            # where unlinking an open file works, but on NFS the unlink becomes a
+            # silly rename to .nfsXXXX and cleanup fails with ENOTEMPTY. The bazel
+            # sandbox puts /tmp on NFS here.
+            with lillymol_nb_bdb.Selimsteg() as lookup:
+                self.assertTrue(lookup.open_database(dbname))
+                self.assertEqual(lookup.get_smiles("mol1"), "CCO")
+                self.assertIsNone(lookup.get_smiles("missing"))
 
-            mol = lookup.get_molecule("mol2")
-            self.assertIsNotNone(mol)
-            self.assertEqual(mol.unique_smiles(), "c1ccccc1")
-            self.assertEqual(mol.name(), "mol2")
+                mol = lookup.get_molecule("mol2")
+                self.assertIsNotNone(mol)
+                self.assertEqual(mol.unique_smiles(), "c1ccccc1")
+                self.assertEqual(mol.name(), "mol2")
 
-            mols = lookup.get_molecules(["mol1", "missing", "mol2"])
-            self.assertEqual(len(mols), 3)
-            self.assertEqual(mols[0].unique_smiles(), "OCC")
-            self.assertEqual(mols[1].natoms(), 0)
-            self.assertEqual(mols[2].unique_smiles(), "c1ccccc1")
+                mols = lookup.get_molecules(["mol1", "missing", "mol2"])
+                self.assertEqual(len(mols), 3)
+                self.assertEqual(mols[0].unique_smiles(), "OCC")
+                self.assertEqual(mols[1].natoms(), 0)
+                self.assertEqual(mols[2].unique_smiles(), "c1ccccc1")
+
+    def test_selimsteg_with_no_database_open(self):
+        """Used to dereference a null Db* and take the process down."""
+        lookup = lillymol_nb_bdb.Selimsteg()
+        self.assertIsNone(lookup.get_smiles("anything"))
+        self.assertIsNone(lookup.get_molecule("anything"))
+        self.assertEqual(lookup.get_molecules(["a", "b"])[0].natoms(), 0)
+        lookup.close()          # idempotent, and safe with nothing open
+        lookup.close()
 
 
 

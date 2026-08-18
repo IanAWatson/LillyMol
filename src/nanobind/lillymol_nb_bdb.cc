@@ -60,5 +60,22 @@ NB_MODULE(lillymol_nb_bdb, m) {
       .def("get_molecule", &selimsteg::Selimsteg::GetMolecule,
            nb::arg("identifier"), "Fetch a Molecule for an identifier")
       .def("get_molecules", &selimsteg::Selimsteg::GetMolecules,
-           nb::arg("identifiers"), "Fetch Molecules for a list of identifiers");
+           nb::arg("identifiers"), "Fetch Molecules for a list of identifiers")
+      .def("close", &selimsteg::Selimsteg::Close, "Close the database. Idempotent")
+      // A database holds a file handle, so give it the same shape as Reader - use
+      // it in a with block, or call close(). Relying on the object being
+      // collected works but is not something a caller can see or control.
+      // Returns the python object, not a Selimsteg&. Returning a reference lets
+      // the default return value policy copy it, and then the with block operates
+      // on a copy while __exit__ closes the original.
+      .def("__enter__", [](nb::object self) { return self; })
+      // nanobind rejects None for an argument unless .none() says otherwise, and
+      // python passes three Nones when the block exits without an exception.
+      .def("__exit__",
+           [](selimsteg::Selimsteg& s, nb::object, nb::object, nb::object) -> bool {
+             s.Close();
+             return false;   // do not suppress an exception from the block
+           },
+           nb::arg("exc_type").none(), nb::arg("exc_value").none(),
+           nb::arg("traceback").none());
 }

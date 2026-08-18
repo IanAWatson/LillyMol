@@ -1042,7 +1042,20 @@ PYBIND11_MODULE(lillymol_tools, m) {
       .def("get_molecule", &selimsteg::Selimsteg::GetMolecule,
            "Fetch a Molecule for an identifier")
       .def("get_molecules", &selimsteg::Selimsteg::GetMolecules,
-           "Fetch a list of Molecules for list of identifiers");
+           "Fetch a list of Molecules for list of identifiers")
+      .def("close", &selimsteg::Selimsteg::Close, "Close the database. Idempotent")
+      // A database holds a file handle, so give it the same shape as Reader - use
+      // it in a with block, or call close(). Relying on the object being
+      // collected works but is not something a caller can see or control.
+      // Returns the python object, not a Selimsteg&. Returning a reference lets
+      // the default return value policy copy it, and then the with block operates
+      // on a copy while __exit__ closes the original.
+      .def("__enter__", [](py::object self) { return self; })
+      .def("__exit__",
+           [](selimsteg::Selimsteg& s, py::object, py::object, py::object)->bool {
+             s.Close();
+             return false;   // do not suppress an exception from the block
+           });
 
   py::enum_<structure_database::Lookup>(m, "LookupParams", py::arithmetic())
       .value("EXACT", structure_database::kExact)

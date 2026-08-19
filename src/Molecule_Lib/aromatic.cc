@@ -8464,14 +8464,11 @@ Molecule::set_bond_types_for_isis_aromaticity_matching()
 
       Bond * b = const_cast<Bond *>(_things[a1]->bond_to_atom(a2));
 
-      Connection * c = b;
-
 #ifdef DEBUG_SET_BOND_TYPES_FOR_ISIS_AROMATICITY_MATCHING
       cerr << "Set bond btw " << a1 << " and " << a2 << '\n';
 #endif
 
-      c->set_bond_type(
-          AROMATIC_BOND);    // use the underlying Connection method so we avoid an OK_BOND_TYPE check
+      b->set_bond_type(AROMATIC_BOND);
     }
 
     rc++;

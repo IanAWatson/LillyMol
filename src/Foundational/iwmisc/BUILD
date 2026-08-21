@@ -133,6 +133,7 @@ cc_library(
         "//Foundational/cmdline:iwcmdline",
         "//Foundational/data_source:iwstring_data_source",
         "//Foundational/iwqsort",
+        "//Foundational/iwstring:string_with_commas",
         "@com_google_protobuf//:protobuf",
         "@fmt//:fmt",
     ],

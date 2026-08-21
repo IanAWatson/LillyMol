@@ -35,6 +35,11 @@ cd ../python
 python -m pip install build wheel setuptools
 python -m build --wheel
 ```
+If using uv try
+```
+uv build --wheel
+```
+instead.
 
 The wheel will be written to `python/dist/`.
 

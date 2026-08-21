@@ -10,6 +10,29 @@
 
 #include "molecular_abstraction_specifications.h"
 
+class Connection {
+  private:
+    atom_number_t _a2;
+    bond_type_t _btype;
+
+  public:
+    Connection() {
+      _a2 = kInvalidAtomNumber;
+      _btype = INVALID_BOND_TYPE;
+    }
+    Connection(atom_number_t atom, bond_type_t bt) {
+      _a2 = atom;
+      _btype = bt;
+    }
+
+    atom_number_t a2() const {
+      return _a2;
+    }
+    bond_type_t btype() const {
+      return _btype;
+    }
+};
+
 class Molecular_Abstraction_Base_Class {
  protected:
   int _molecules_processed;

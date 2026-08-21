@@ -166,7 +166,7 @@ leader(IWString_and_File_Descriptor& output) {
 
     start = icentre + 1;
 
-#pragma omp parallel for schedule(dynamic, 256)
+#pragma omp parallel for schedule(static) if (pool_size - start > 500)
 #ifdef DEBUG_LEADER1
     cerr << "leader was " << icentre << " scanning from " << start << " to " << pool_size
          << endl;

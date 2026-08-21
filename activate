@@ -74,4 +74,4 @@ deactivate_lillymol() {
   unset -f deactivate_lillymol
 }
 
-echo "LillyMol environment activated."
+echo "LillyMol environment activated. Enter deactivate_lillymol to deactivate"

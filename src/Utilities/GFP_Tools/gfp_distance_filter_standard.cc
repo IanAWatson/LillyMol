@@ -14,16 +14,16 @@
 #define IWMINMAX_IMPLEMENTATION
 #include "Foundational/iw_tdt/iw_tdt.h"
 #include "Foundational/iwmisc/iwminmax.h"
+#include "Foundational/iwstring/string_with_commas.h"
 #include "Foundational/iwmisc/report_progress.h"
 
 #include "Utilities/GFP_Tools/gfp_standard.h"
 
 using std::cerr;
-using std::endl;
 
-/*
-  Our pool is an array of FP objects
-*/
+using iwstring::with_commas;
+
+// The comparison pool.
 
 static GFP_Standard* pool = nullptr;
 
@@ -130,7 +130,7 @@ build_pool(iwstring_data_source& input) {
     items_in_pool++;
 
     if (items_in_pool >= pool_size) {
-      cerr << "Pool is full, max " << pool_size << endl;
+      cerr << "Pool is full, max " << pool_size << '\n';
       return 1;
     }
   }
@@ -163,11 +163,11 @@ build_pool(const const_IWSubstring& fname) {
 
     pool = new GFP_Standard[pool_size];
     if (NULL == pool) {
-      cerr << "Yipes, could not allocate pool of size " << pool_size << endl;
+      cerr << "Yipes, could not allocate pool of size " << pool_size << '\n';
       return 62;
     }
 
-    cerr << "Pool automatically sized to " << pool_size << endl;
+    cerr << "Pool automatically sized to " << pool_size << '\n';
   }
 
   return build_pool(input);
@@ -198,7 +198,7 @@ distance_filter(GFP_Standard& fp, iwminid<similarity_type_t, int>& mindist) {
 // #define DEBUG_NN
 #ifdef DEBUG_NN
     cerr << "Distance between '" << fp.id() << " and pool " << i << " '" << pool[i]->id()
-         << "' is " << t << endl;
+         << "' is " << t << '\n';
 #endif
     //  cerr << "Dist " << t << '\n';
 
@@ -280,7 +280,7 @@ do_output(IW_TDT& tdt, const IW_General_Fingerprint& fp,
 
   tdts_written++;
   if (verbose > 1) {
-    cerr << fp.id() << " written, total written " << tdts_written << endl;
+    cerr << fp.id() << " written, total written " << tdts_written << '\n';
   }
 
   output.write_if_buffer_holds_more_than(8192);
@@ -311,7 +311,12 @@ distance_filter(iwstring_data_source& input, IWString_and_File_Descriptor& outpu
     stdfp.build_mk2(gfp[2]);
 
     if (report_progress()) {
-      cerr << tdts_read << " fingerprints processed, " << tdts_written << " written\n";
+      if (report_progress.human()) {
+        cerr << with_commas(tdts_read) << " fingerprints processed " <<
+                with_commas(tdts_written) << " written\n";
+      } else {
+        cerr << tdts_read << " fingerprints processed, " << tdts_written << " written\n";
+      }
     }
 
     iwminid<similarity_type_t, int> mindist(1.01, -1);
@@ -422,7 +427,7 @@ distance_filter(int argc, char** argv) {
     }
 
     if (verbose) {
-      cerr << "Lower distance threshold set to " << lower_distance_threshold << endl;
+      cerr << "Lower distance threshold set to " << lower_distance_threshold << '\n';
     }
   }
 
@@ -434,7 +439,7 @@ distance_filter(int argc, char** argv) {
     }
 
     if (verbose) {
-      cerr << "Upper distance threshold set to " << upper_distance_threshold << endl;
+      cerr << "Upper distance threshold set to " << upper_distance_threshold << '\n';
     }
   }
 
@@ -589,12 +594,12 @@ distance_filter(int argc, char** argv) {
 
     pool = new GFP_Standard[pool_size];
     if (NULL == pool) {
-      cerr << "Yipes, could not allocate pool of size " << pool_size << endl;
+      cerr << "Yipes, could not allocate pool of size " << pool_size << '\n';
       return 62;
     }
 
     if (verbose) {
-      cerr << "system sized to " << pool_size << endl;
+      cerr << "system sized to " << pool_size << '\n';
     }
 
     if (0 == lower_threshold_violation_threshold)
@@ -602,7 +607,7 @@ distance_filter(int argc, char** argv) {
     else if (lower_threshold_violation_threshold > pool_size) {
       cerr << "The lower threshold violation count "
            << lower_threshold_violation_threshold << " must be <= pool size " << pool_size
-           << endl;
+           << '\n';
       usage(7);
     }
 
@@ -611,7 +616,7 @@ distance_filter(int argc, char** argv) {
     else if (upper_threshold_success_requirement > pool_size) {
       cerr << "The upper threshold success requirement "
            << upper_threshold_success_requirement << " must be <= pool size " << pool_size
-           << endl;
+           << '\n';
       usage(7);
     }
   }
@@ -635,7 +640,7 @@ distance_filter(int argc, char** argv) {
   output.flush();
 
   if (verbose) {
-    cerr << "Read " << tdts_read << " wrote " << tdts_written << endl;
+    cerr << "Read " << tdts_read << " wrote " << tdts_written << '\n';
     unsigned long long possible_computations =
         static_cast<unsigned long long>(pool_size) *
         static_cast<unsigned long long>(tdts_read);
@@ -643,7 +648,7 @@ distance_filter(int argc, char** argv) {
          << " possible distance computations "
          << static_cast<float>(computations_done) /
                 static_cast<float>(possible_computations)
-         << endl;
+         << '\n';
   }
 
   return 0;

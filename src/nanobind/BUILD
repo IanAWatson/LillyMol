@@ -53,7 +53,10 @@ py_test(
         ":lillymol_nb",
         "//pybind:testdata/rand10.standard.gfp",
     ],
-    deps = ["//Utilities/GFP_Tools:nearneighbours_py_proto"],
+    deps = [
+        "//Molecule_Lib:substructure_py_proto",
+        "//Utilities/GFP_Tools:nearneighbours_py_proto",
+    ],
 )
 
 nanobind_extension(

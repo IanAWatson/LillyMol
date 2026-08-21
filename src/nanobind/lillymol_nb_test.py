@@ -9,7 +9,10 @@ import unittest
 
 sys.path.insert(0, os.path.dirname(__file__))
 
+from google.protobuf import text_format
+
 import lillymol_nb
+from Molecule_Lib import substructure_pb2
 from Utilities.GFP_Tools import nearneighbours_pb2
 
 
@@ -803,18 +806,64 @@ $$$$
         self.assertEqual(mol.atomic_numbers(), [6, 6, 8])
         self.assertEqual(mol.ncon(1), 2)
         self.assertEqual(mol.nbonds(1), 2)
+        self.assertEqual(mol.attached_heteroatom_count(1), 1)
+        self.assertFalse(mol.is_halogen(0))
+        self.assertTrue(lillymol_nb.MolFromSmiles("Cl chloromethane").is_halogen(0))
         self.assertEqual(mol.isotopes(), [0, 0, 0])
         self.assertEqual(mol.set_isotope(1, 7), 1)
         self.assertEqual(mol.isotope(1), 7)
         self.assertEqual(mol.isotopes(), [0, 7, 0])
-        self.assertEqual(mol.remove_isotopes(), 1)
+        self.assertEqual(mol.set_isotopes([0, 2], 5), 1)
+        self.assertEqual(mol.isotopes(), [5, 7, 5])
+        self.assertEqual(mol.set_isotopes(lillymol_nb.Set_of_Atoms([1]), 9), 1)
+        self.assertEqual(mol.isotopes(), [5, 9, 5])
+        try:
+            import numpy as np
+        except ImportError:
+            pass
+        else:
+            mol.set_isotopes(np.asarray([1, 2, 3], dtype=np.int32))
+            self.assertEqual(mol.isotopes(), [1, 2, 3])
+            with self.assertRaises(Exception):
+                mol.set_isotopes(np.asarray([1, 2], dtype=np.int32))
+        self.assertEqual(mol.remove_isotopes(), 3)
         self.assertEqual(mol.isotopes(), [0, 0, 0])
 
     def test_fragments_and_formula(self):
         mol = lillymol_nb.MolFromSmiles("CC.O mixture")
         self.assertEqual(mol.number_fragments(), 2)
+        self.assertEqual(mol.fragment_membership(0), 0)
+        self.assertEqual(mol.get_fragment_membership(), [0, 0, 1])
+        self.assertEqual(mol.atoms_in_fragment(0), 2)
+        self.assertEqual(mol.atoms_in_fragment(1), 1)
         self.assertEqual(mol.atoms_in_largest_fragment(), 2)
         self.assertEqual(mol.molecular_formula(), "C2OH8")
+        components = mol.create_components()
+        self.assertEqual([component.natoms() for component in components], [2, 1])
+        single = lillymol_nb.MolFromSmiles("CC ethane")
+        self.assertIsNone(single.create_components())
+
+    def test_fragment_mutators(self):
+        mol = lillymol_nb.MolFromSmiles("CC.O.N mixture")
+        self.assertEqual(mol.delete_fragment(1), 1)
+        self.assertEqual(mol.number_fragments(), 2)
+        self.assertEqual(mol.natoms(), 3)
+
+        mol = lillymol_nb.MolFromSmiles("CC.O.N mixture")
+        self.assertEqual(mol.remove_fragment(2), 1)
+        self.assertEqual(mol.natoms(), 3)
+
+        mol = lillymol_nb.MolFromSmiles("CC.O.N mixture")
+        self.assertEqual(mol.remove_fragment_containing_atom(2), 1)
+        self.assertEqual(mol.natoms(), 3)
+
+        mol = lillymol_nb.MolFromSmiles("CC.O mixture")
+        self.assertEqual(mol.reduce_to_largest_fragment(), 1)
+        self.assertEqual(mol.unique_smiles(), "CC")
+
+        mol = lillymol_nb.MolFromSmiles("CC.O mixture")
+        self.assertEqual(mol.reduce_to_largest_fragment_carefully(), 1)
+        self.assertEqual(mol.natoms(), 2)
 
     def test_molecular_weight(self):
         mol = lillymol_nb.MolFromSmiles("CCO ethanol")
@@ -993,6 +1042,13 @@ $$$$
         self.assertEqual(len(rings), 1)
         self.assertEqual(rings[0].as_list(), ring.as_list())
 
+        bridged = lillymol_nb.MolFromSmiles("C1CC2CCC1CC2 bridged")
+        self.assertEqual(bridged.nrings(), 2)
+        self.assertEqual(bridged.non_sssr_rings(), 1)
+        non_sssr = bridged.non_sssr_ring(0)
+        self.assertEqual(non_sssr.size(), 6)
+        self.assertEqual(sorted(non_sssr.as_list()), [2, 3, 4, 5, 6, 7])
+
 
     def test_molecule_sequence_and_copy(self):
         mol = lillymol_nb.MolFromSmiles("CCO ethanol")
@@ -1071,6 +1127,30 @@ $$$$
 
         qry.set_max_matches_to_find(1)
         self.assertEqual(qry.substructure_search(mol), 1)
+
+    def test_substructure_query_from_proto(self):
+        mol = lillymol_nb.MolFromSmiles("Oc1ccccc1 phenol")
+        proto_string = """
+query {
+  smarts: "[OD1]-c:c"
+  unique_embeddings_only: true
+}
+"""
+        proto = text_format.Parse(proto_string, substructure_pb2.SubstructureQuery())
+        qry = lillymol_nb.SubstructureQuery()
+        self.assertTrue(qry.construct_from_proto(proto))
+        self.assertEqual(qry.substructure_search(mol), 2)
+        self.assertIn(qry, mol)
+
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".textproto", delete=False) as writer:
+            writer.write(proto_string)
+            fname = writer.name
+        try:
+            from_file = lillymol_nb.SubstructureQuery()
+            self.assertTrue(from_file.read_proto(fname))
+            self.assertEqual(from_file.substructure_search(mol), 2)
+        finally:
+            os.remove(fname)
 
     def test_substructure_results_object(self):
         mol = lillymol_nb.MolFromSmiles("CCO ethanol")
@@ -1253,6 +1333,61 @@ $$$$
         assert_numpy_fingerprint_matches_list(atom_pair, 256)
 
         gc.collect()
+
+    def test_recent_molecule_helper_methods(self):
+        benzene = lillymol_nb.MolFromSmiles("c1ccccc1 benzene")
+        self.assertEqual(benzene.compute_aromaticity_if_needed(), 1)
+        self.assertGreaterEqual(benzene.pi_electrons(0), 0)
+        self.assertGreaterEqual(benzene.lone_pair_count(0), 0)
+        self.assertIn("c", benzene.smarts_equivalent_for_atom(0))
+        self.assertIn("c", benzene.smarts())
+        atoms = [1] * benzene.natoms()
+        self.assertTrue(benzene.find_kekule_form(atoms))
+        self.assertEqual(benzene.compute_distance_matrix(), 1)
+        self.assertEqual(benzene.revert_all_directional_bonds_to_non_directional(), 0)
+
+        labelled = lillymol_nb.MolFromSmiles("CCO ethanol")
+        labelled.label_atoms_by_atom_number()
+        self.assertEqual(labelled.isotopes(), [0, 1, 2])
+
+        fused = lillymol_nb.MolFromSmiles("C1CCC2(CC1)CCCC2 spiro")
+        self.assertTrue(any(fused.is_spiro_fused(i) for i in range(fused.natoms())))
+        ring_systems = fused.label_atoms_by_ring_system()
+        ring_systems_spiro = fused.label_atoms_by_ring_system_including_spiro_fused()
+        self.assertEqual(len(ring_systems), fused.natoms())
+        self.assertEqual(len(ring_systems_spiro), fused.natoms())
+        try:
+            import numpy as np
+        except ImportError:
+            pass
+        else:
+            ring_systems_np = fused.label_atoms_by_ring_system_including_spiro_fused_np()
+            self.assertEqual(ring_systems_np.dtype, np.dtype("int32"))
+            self.assertEqual(ring_systems_np.shape, (fused.natoms(),))
+            np.testing.assert_array_equal(ring_systems_np, np.asarray(ring_systems_spiro, dtype=np.int32))
+
+        sorted_mol = lillymol_nb.MolFromSmiles("OCN sort")
+        self.assertEqual(sorted_mol.sort_atoms([2, 1, 0]), 1)
+        self.assertEqual(sorted_mol.atomic_numbers(), [8, 6, 7])
+        with self.assertRaises(Exception):
+            sorted_mol.sort_atoms([1, 2])
+
+        moved = lillymol_nb.MolFromSmiles("OCC move")
+        self.assertEqual(moved.move_to_end_of_connection_table(8), 1)
+        self.assertEqual(moved.atomic_numbers()[-1], 8)
+
+        scaffold_source = lillymol_nb.MolFromSmiles("CCc1ccccc1C(=O)O scaffold")
+        scaffold = scaffold_source.scaffold()
+        self.assertLess(scaffold.natoms(), scaffold_source.natoms())
+        self.assertGreater(scaffold_source.to_scaffold(), 0)
+        self.assertEqual(scaffold_source.unique_smiles(), scaffold.unique_smiles())
+
+        graph = lillymol_nb.MolFromSmiles("CCO graph")
+        self.assertEqual(graph.change_to_graph_form(), 1)
+        graph2 = lillymol_nb.MolFromSmiles("CCO graph")
+        mol2graph = lillymol_nb.Mol2Graph()
+        mol2graph.turn_on_most_useful_options()
+        self.assertEqual(graph2.to_graph(mol2graph), 1)
 
     def test_element_and_hybridization_helpers(self):
         self.assertEqual(lillymol_nb.count_atoms_in_smiles("CCO"), 3)

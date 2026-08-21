@@ -1,5 +1,7 @@
 #include "nanobind/lillymol_nb_internal.h"
 
+#include "Molecule_Lib/mol2graph.h"
+
 #include <queue>
 
 #include <nanobind/ndarray.h>
@@ -90,12 +92,20 @@ RingInfoAtomRings(RingInfo& ring_info) {
 }
 
 using FloatNumpyArray1D = nb::ndarray<nb::numpy, float, nb::shape<-1>>;
+using IntNumpyArray1D = nb::ndarray<nb::numpy, int, nb::shape<-1>>;
 
 FloatNumpyArray1D
 MakeFloatNumpyArray1D(size_t n) {
   float* data = new float[n];
   nb::capsule owner(data, [](void* p) noexcept { delete[] static_cast<float*>(p); });
   return FloatNumpyArray1D(data, {n}, owner);
+}
+
+IntNumpyArray1D
+MakeIntNumpyArray1D(size_t n) {
+  int* data = new int[n];
+  nb::capsule owner(data, [](void* p) noexcept { delete[] static_cast<int*>(p); });
+  return IntNumpyArray1D(data, {n}, owner);
 }
 
 FloatNumpyArray1D
@@ -118,6 +128,47 @@ SetCoordinatesNumpy(Molecule& mol, FloatNumpyArray1D coords) {
     throw std::invalid_argument("set_coordinates_numpy requires 3 values per atom");
   }
   mol.SetCoordinates(coords.data());
+}
+
+int
+ToScaffoldInPlace(Molecule& mol) {
+  const int matoms = mol.natoms();
+  if (matoms <= 3) {
+    return 0;
+  }
+  if (mol.nrings() == 0) {
+    return 0;
+  }
+
+  std::unique_ptr<int[]> spinach = std::make_unique<int[]>(matoms);
+  mol.identify_spinach(spinach.get());
+  if (std::count(spinach.get(), spinach.get() + matoms, 0) == matoms) {
+    return 0;
+  }
+
+  for (int i = 0; i < matoms; ++i) {
+    const Atom& atom = mol[i];
+    if (atom.ncon() != 1) {
+      continue;
+    }
+    const Bond* bond = atom[0];
+    if (!bond->is_double_bond()) {
+      continue;
+    }
+    const atom_number_t other = bond->other(i);
+    if (spinach[other] == 0) {
+      spinach[i] = 0;
+    }
+  }
+
+  return mol.remove_atoms(spinach.get(), 1);
+}
+
+Molecule
+ScaffoldMolecule(const Molecule& mol) {
+  Molecule result(mol);
+  ToScaffoldInPlace(result);
+  return result;
 }
 
 std::vector<int>
@@ -397,6 +448,10 @@ BindMolecule(nb::module_& m) {
       .def("number_ring_systems", nb::overload_cast<>(&Molecule::number_ring_systems))
       .def("ring", nb::overload_cast<int>(&Molecule::ringi), nb::arg("ring"),
            nb::rv_policy::reference_internal)
+      .def("non_sssr_rings", &Molecule::non_sssr_rings,
+           "Number non SSSR rings")
+      .def("non_sssr_ring", &Molecule::non_sssr_ring, nb::arg("ring"),
+           nb::rv_policy::reference_internal, "Fetch the ith non SSSR ring")
       .def("rings", &Rings)
       .def("ring_info", [](Molecule& mol) { return RingInfo(&mol); },
            nb::keep_alive<0, 1>(), "Return a RingInfo view")
@@ -413,8 +468,78 @@ BindMolecule(nb::module_& m) {
            },
            nb::arg("a1"), nb::arg("a2"))
       .def("largest_ring_size", &Molecule::LargestRingSize)
+      .def("is_spiro_fused", nb::overload_cast<atom_number_t>(&Molecule::is_spiro_fused),
+           nb::arg("atom"), "True if atom is spiro fused")
+      .def("label_atoms_by_atom_number",
+           [](Molecule& mol) {
+             const int matoms = mol.natoms();
+             for (int i = 1; i < matoms; ++i) {
+               mol.set_isotope(i, i);
+             }
+           },
+           "Set isotope labels to atom numbers")
+      .def("label_atoms_by_ring_system",
+           [](Molecule& mol) {
+             std::vector<int> result(mol.natoms());
+             mol.label_atoms_by_ring_system(result.data());
+             return result;
+           },
+           "Return ring system identifier for each atom")
+      .def("label_atoms_by_ring_system_including_spiro_fused",
+           [](Molecule& mol) {
+             std::vector<int> result(mol.natoms());
+             mol.label_atoms_by_ring_system_including_spiro_fused(result.data());
+             return result;
+           },
+           "Return ring system identifier for each atom, including spiro fusion")
+      .def("label_atoms_by_ring_system_including_spiro_fused_np",
+           [](Molecule& mol) {
+             IntNumpyArray1D result = MakeIntNumpyArray1D(mol.natoms());
+             mol.label_atoms_by_ring_system_including_spiro_fused(result.data());
+             return result;
+           },
+           "Return ring system identifier for each atom as a NumPy array")
       .def("number_fragments", [](Molecule& mol) { return mol.number_fragments(); },
            "Return the number of fragments")
+      .def("fragment_membership", nb::overload_cast<atom_number_t>(&Molecule::fragment_membership),
+           nb::arg("atom"), "Return the fragment containing atom")
+      .def("get_fragment_membership",
+           [](Molecule& mol) {
+             std::vector<int> result(mol.natoms());
+             mol.fragment_membership(result.data());
+             return result;
+           },
+           "Return fragment membership for each atom")
+      .def("atoms_in_fragment", nb::overload_cast<int>(&Molecule::atoms_in_fragment),
+           nb::arg("fragment"), "Return number of atoms in fragment")
+      .def("delete_fragment", nb::overload_cast<int>(&Molecule::delete_fragment),
+           nb::arg("fragment"), "Remove a fragment")
+      .def("remove_fragment", nb::overload_cast<int>(&Molecule::delete_fragment),
+           nb::arg("fragment"), "Remove a fragment")
+      .def("remove_fragment_containing_atom", &Molecule::remove_fragment_containing_atom,
+           nb::arg("atom"), "Remove the fragment containing atom")
+      .def("reduce_to_largest_fragment", nb::overload_cast<>(&Molecule::reduce_to_largest_fragment),
+           "Strip to the largest fragment")
+      .def("reduce_to_largest_fragment_carefully",
+           nb::overload_cast<>(&Molecule::reduce_to_largest_fragment_carefully),
+           "Strip to the largest fragment with heuristic fragment selection")
+      .def("create_components",
+           [](Molecule& mol) -> std::optional<std::vector<Molecule>> {
+             if (mol.number_fragments() < 2) {
+               return std::nullopt;
+             }
+             resizable_array_p<Molecule> components;
+             if (!mol.create_components(components)) {
+               return std::nullopt;
+             }
+             std::vector<Molecule> result;
+             result.reserve(components.number_elements());
+             for (const Molecule* component : components) {
+               result.push_back(*component);
+             }
+             return result;
+           },
+           "Split a multi-fragment molecule into component molecules")
       .def("atoms_in_largest_fragment", [](Molecule& mol) { return mol.atoms_in_largest_fragment(); },
            "Return the number of atoms in the largest fragment")
       .def("remove_non_periodic_table_elements", &Molecule::remove_all_non_natural_elements,
@@ -501,13 +626,43 @@ BindMolecule(nb::module_& m) {
       .def("atomic_symbol",
            [](const Molecule& mol, atom_number_t atom) { return mol.atomic_symbol(atom).AsString(); },
            nb::arg("atom"))
+      .def("attached_heteroatom_count", nb::overload_cast<atom_number_t>(&Molecule::attached_heteroatom_count, nb::const_),
+           nb::arg("atom"), "Return number of attached heteroatoms")
+      .def("is_halogen", &Molecule::is_halogen, nb::arg("atom"), "True if atom is a halogen")
+      .def("smarts_equivalent_for_atom",
+           [](Molecule& mol, atom_number_t atom) { return mol.smarts_equivalent_for_atom(atom).AsString(); },
+           nb::arg("atom"), "Return SMARTS equivalent for atom")
+      .def("smarts", [](Molecule& mol) { return mol.smarts().AsString(); },
+           "Return molecule as SMARTS")
       .def("is_aromatic",
            [](Molecule& mol, atom_number_t atom) { return static_cast<bool>(mol.IsAromatic(atom)); },
            nb::arg("atom"))
+      .def("find_kekule_form",
+           [](Molecule& mol, std::vector<int>& atoms) { return static_cast<bool>(mol.find_kekule_form(atoms.data())); },
+           nb::arg("atoms"), "Find a Kekule form for atoms")
+      .def("pi_electrons",
+           [](Molecule& mol, atom_number_t atom) {
+             int pi = 0;
+             mol.pi_electrons(atom, pi);
+             return pi;
+           },
+           nb::arg("atom"), "Return pi electron count for atom")
+      .def("lone_pair_count",
+           [](Molecule& mol, atom_number_t atom) {
+             int lone_pairs = 0;
+             mol.lone_pair_count(atom, lone_pairs);
+             return lone_pairs;
+           },
+           nb::arg("atom"), "Return lone pair count for atom")
+      .def("compute_aromaticity_if_needed", &Molecule::compute_aromaticity_if_needed,
+           "Ensure aromaticity has been perceived")
       .def("aromatic_atom_count", nb::overload_cast<>(&Molecule::aromatic_atom_count))
       .def("aromatic_ring_count", nb::overload_cast<>(&Molecule::aromatic_ring_count))
       .def("number_chiral_centres", nb::overload_cast<>(&Molecule::chiral_centres, nb::const_))
       .def("remove_all_chiral_centres", &Molecule::remove_all_chiral_centres)
+      .def("revert_all_directional_bonds_to_non_directional",
+           &Molecule::revert_all_directional_bonds_to_non_directional,
+           "Remove directional bond annotations")
       .def("chiral_centre_at_atom",
            [](const Molecule& mol, atom_number_t atom) -> std::optional<Chiral_Centre> {
              Chiral_Centre* centre = mol.chiral_centre_at_atom(atom);
@@ -539,6 +694,27 @@ BindMolecule(nb::module_& m) {
              return mol.set_isotope(atom, isotope);
            },
            nb::arg("atom"), nb::arg("isotope"))
+      .def("set_isotopes",
+           [](Molecule& mol, const Set_of_Atoms& atoms, isotope_t isotope) {
+             return mol.set_isotope(atoms, isotope);
+           },
+           nb::arg("atoms"), nb::arg("isotope"))
+      .def("set_isotopes",
+           [](Molecule& mol, const std::vector<int>& atoms, isotope_t isotope) {
+             return mol.set_isotope(atoms, isotope);
+           },
+           nb::arg("atoms"), nb::arg("isotope"))
+      .def("set_isotopes",
+           [](Molecule& mol, IntNumpyArray1D isotopes) {
+             if (isotopes.ndim() != 1 || static_cast<int>(isotopes.shape(0)) != mol.natoms()) {
+               throw std::invalid_argument("set_isotopes requires one isotope value per atom");
+             }
+             const int* data = isotopes.data();
+             for (int i = 0; i < mol.natoms(); ++i) {
+               mol.set_isotope(i, data[i]);
+             }
+           },
+           nb::arg("isotopes"))
       .def("remove_isotopes",
            [](Molecule& mol, int unset_implicit_h) {
              return mol.unset_isotopes(unset_implicit_h);
@@ -582,8 +758,18 @@ BindMolecule(nb::module_& m) {
       .def("make_implicit_hydrogens_explicit", nb::overload_cast<>(&Molecule::make_implicit_hydrogens_explicit))
       .def("unset_all_implicit_hydrogen_information", &Molecule::unset_all_implicit_hydrogen_information,
            "Discard all implicit hydrogen known flags")
+      .def("remove_hydrogens_known_flag_to_fix_valence_errors",
+           &Molecule::remove_hydrogens_known_flag_to_fix_valence_errors,
+           "Remove problematic implicit hydrogen known flags")
       .def("AddHs", [](Molecule& mol) { return mol.make_implicit_hydrogens_explicit(); })
       .def("RemoveHs", [](Molecule& mol) { return mol.remove_all(1); })
+      .def("to_scaffold", &ToScaffoldInPlace, "Convert to scaffold in place")
+      .def("scaffold", &ScaffoldMolecule, "Return a new Molecule containing the scaffold")
+      .def("change_to_graph_form", nb::overload_cast<>(&Molecule::change_to_graph_form),
+           "Convert to default graph form in place")
+      .def("to_graph",
+           [](Molecule& mol, const Mol2Graph& mol2graph) { return mol.change_to_graph_form(mol2graph); },
+           nb::arg("mol2graph"), "Convert to graph form under Mol2Graph control")
       .def("valence_ok", nb::overload_cast<>(&Molecule::valence_ok))
       .def("valence_ok", nb::overload_cast<atom_number_t>(&Molecule::valence_ok), nb::arg("atom"))
       .def("lipinski_num_h_donors", &Molecule::LipinskiNumHDonors,
@@ -623,6 +809,17 @@ BindMolecule(nb::module_& m) {
              return result;
            },
            "Return atom order from the most recent SMILES generation")
+      .def("sort_atoms",
+           [](Molecule& mol, const std::vector<int>& order) {
+             if (static_cast<int>(order.size()) != mol.natoms()) {
+               throw std::invalid_argument("sort_atoms requires one value per atom");
+             }
+             static constexpr int kAscending = 1;
+             return mol.sort(order.data(), kAscending);
+           },
+           nb::arg("order"), "Sort atoms by ascending values in order")
+      .def("compute_distance_matrix", &Molecule::recompute_distance_matrix,
+           "Compute or recompute the topological distance matrix")
       .def("renumber_atoms",
            [](Molecule& mol, const std::vector<int>& new_number) {
              const int matoms = mol.natoms();
@@ -793,6 +990,8 @@ BindMolecule(nb::module_& m) {
              return result;
            },
            "Return list of Gasteiger partial charges")
+      .def("move_to_end_of_connection_table", &Molecule::MoveToEndOfConnectionTable,
+           nb::arg("atomic_number"), "Move atoms of atomic_number to end of connection table")
       .def("x", nb::overload_cast<atom_number_t>(&Molecule::x, nb::const_),
            nb::arg("atom"), "Return x coordinate")
       .def("y", nb::overload_cast<atom_number_t>(&Molecule::y, nb::const_),

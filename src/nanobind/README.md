@@ -91,6 +91,9 @@ uv pip install --python /home/ian/lillymol_py313_venv/bin/python numpy protobuf
 - `slurp` and the small global MDL/SDF reader option helpers exposed by the
   pybind I/O module.
 
+See `changeover_checklist.md` for the current pybind-to-nanobind gap triage and
+changeover tasks.
+
 Still to explore:
 
 - broader query functionality, including proto construction and richer query-file

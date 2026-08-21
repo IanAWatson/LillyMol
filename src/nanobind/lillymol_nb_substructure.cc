@@ -96,6 +96,29 @@ BindSubstructure(nb::module_& m) {
              return static_cast<bool>(query.ReadProto(IWString(fname)));
            },
            nb::arg("fname"))
+      .def("construct_from_proto",
+           [](Substructure_Query& query, nb::object proto) {
+             if (!nb::hasattr(proto, "SerializeToString")) {
+               throw nb::type_error("construct_from_proto requires a Python protobuf object");
+             }
+             nb::object serialized_obj = proto.attr("SerializeToString")();
+             PyObject* bytes = serialized_obj.ptr();
+             if (!PyBytes_Check(bytes)) {
+               throw nb::type_error("SerializeToString() did not return bytes");
+             }
+             char* data = nullptr;
+             Py_ssize_t size = 0;
+             if (PyBytes_AsStringAndSize(bytes, &data, &size) != 0) {
+               throw nb::python_error();
+             }
+             SubstructureSearch::SubstructureQuery cproto;
+             if (!cproto.ParseFromArray(data, static_cast<int>(size))) {
+               throw std::invalid_argument("construct_from_proto could not parse serialized SubstructureQuery proto");
+             }
+             return static_cast<bool>(query.ConstructFromProto(cproto));
+           },
+           nb::arg("proto"),
+           "Construct from a Python SubstructureQuery protobuf object. The nanobind boundary serializes the proto before constructing the C++ query.")
       .def("read_msi",
            [](Substructure_Query& query, const std::string& fname) {
              return static_cast<bool>(query.read(IWString(fname)));

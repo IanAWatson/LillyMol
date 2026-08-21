@@ -8,7 +8,6 @@ build --macos_minimum_os=10.15
 build --host_macos_minimum_os=10.15
 
 build --enable_bzlmod 
-build --copt=-march=native
 # https://groups.google.com/g/bazel-discuss/c/5cbRuLuTwNg
 build --per_file_copt=external/.*@-Wno-error=maybe-uninitialized
 

@@ -272,6 +272,7 @@ if [[ ! -v BUILD_NATIVE ]] ; then
 fi
 
 if [[ ${BUILD_NATIVE} -ne 0 ]] ; then
+  build_options="${build_options} --copt=-march=native"
   build_options="${build_options} --cxxopt=-march=native --cxxopt=-mtune=native"
 fi
 

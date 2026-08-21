@@ -7,8 +7,9 @@ runs enough molecules for per-call overhead to show up consistently.
 ## Run Context
 
 - Date: 2026-08-21
-- Source checkout HEAD at run time: `dc7aa79d`
-- Python: `3.13.7`, `/home/ian/.local/bin/python3.13`
+- Source checkout HEAD at run time: `24e9f3da`
+- Python: `3.13.7`, `/home/ian/lillymol_py313_venv/bin/python`
+- NumPy: `2.5.2`
 - Platform: `Linux-6.8.0-137-generic-x86_64-with-glibc2.39`
 - Input: `/home/ian/rand10k.smi`
 - Molecules: 10,000
@@ -21,7 +22,7 @@ Commands:
 ```shell
 PYTHONPATH="$PWD/bazel-bin/pybind:$PWD/bazel-bin" \
 LILLYMOL_HOME=/home/ian/LillyMol_IWFORK \
-/home/ian/.local/bin/python3.13 \
+/home/ian/lillymol_py313_venv/bin/python \
   nanobind/benchmarks/benchmark_lillymol_bindings.py \
   --binding pybind --smiles-file /home/ian/rand10k.smi \
   --loops 5 --json \
@@ -29,7 +30,7 @@ LILLYMOL_HOME=/home/ian/LillyMol_IWFORK \
 
 PYTHONPATH="$PWD/bazel-bin/nanobind:$PWD/bazel-bin" \
 LILLYMOL_HOME=/home/ian/LillyMol_IWFORK \
-/home/ian/.local/bin/python3.13 \
+/home/ian/lillymol_py313_venv/bin/python \
   nanobind/benchmarks/benchmark_lillymol_bindings.py \
   --binding nanobind --smiles-file /home/ian/rand10k.smi \
   --loops 5 --json \
@@ -42,28 +43,24 @@ Lower `best_s` is faster. The ratio is `nanobind best_s / pybind best_s`.
 
 | Benchmark | pybind best s | nanobind best s | Ratio |
 | --- | ---: | ---: | ---: |
-| atom_index_access | 0.168106 | 0.059509 | 0.35 |
-| atom_iteration | 0.435647 | 0.101374 | 0.23 |
-| parse | 0.295018 | 0.045976 | 0.16 |
-| scalar_properties | 0.009007 | 0.002887 | 0.32 |
-| substructure_count | 0.173931 | 0.168235 | 0.97 |
-| unique_smiles | 0.004577 | 0.002363 | 0.52 |
-
-## Nanobind-only Completed Benchmarks
-
-These benchmarks completed for nanobind in this environment, but the comparable
-pybind benchmark was unavailable or skipped.
-
-| Benchmark | nanobind best s | Checksum |
-| --- | ---: | ---: |
-| coordinates_list | 0.064923 | 887082 |
-| ecfp | 0.226203 | 10240000 |
-| linear_fingerprint | 1.010351 | 20480000 |
-| substructure_embeddings | 0.097961 | 219365 |
+| atom_index_access | 0.173033 | 0.063464 | 0.37 |
+| atom_iteration | 0.440423 | 0.105229 | 0.24 |
+| coordinates_list | 0.140071 | 0.068161 | 0.49 |
+| coordinates_numpy | 0.156259 | 0.098843 | 0.63 |
+| ecfp | 0.242689 | 0.246199 | 1.01 |
+| ecfp_numpy | 0.308462 | 0.278444 | 0.90 |
+| iwdescr | 2.768553 | 2.655178 | 0.96 |
+| iwdescr_list | 2.277313 | 2.273640 | 1.00 |
+| linear_fingerprint | 1.027003 | 1.041146 | 1.01 |
+| linear_fingerprint_numpy | 1.063631 | 1.037910 | 0.98 |
+| parse | 0.305769 | 0.049755 | 0.16 |
+| scalar_properties | 0.009010 | 0.002534 | 0.28 |
+| substructure_count | 0.186422 | 0.170045 | 0.91 |
+| unique_smiles | 0.004524 | 0.002784 | 0.62 |
 
 ## Skips
 
-NumPy was not installed in this Python 3.13 environment. NumPy-specific
-benchmarks were therefore skipped. Importing the pybind `lillymol_fingerprint`
-module in this environment also required NumPy, so pybind fingerprint benchmarks
-were skipped in this run.
+The only skipped benchmark in this run was pybind
+`substructure_embeddings`, because the pybind `SubstructureQuery` module does
+not expose `substructure_search_match_lists`. Nanobind completed all benchmark
+cases.

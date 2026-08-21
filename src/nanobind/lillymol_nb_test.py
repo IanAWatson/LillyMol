@@ -986,6 +986,15 @@ $$$$
         self.assertAlmostEqual(mol.distance_between_atoms(0, 2), 1.5, delta=1.0e-5)
         self.assertFalse(mol.are_bonded(0, 2))
 
+    def test_position_3d_handles_single_atom_fragments(self):
+        mol = lillymol_nb.MolFromSmiles("C.C dimethane")
+        mol.set_coordinates([0.0, 0.0, 0.0,
+                             10.0, 0.0, 0.0])
+
+        self.assertEqual(lillymol_nb.Position3D(mol, 0, 1.5, 1), 1)
+        self.assertAlmostEqual(mol.distance_between_atoms(0, 1), 1.5, delta=1.0e-5)
+        self.assertFalse(mol.are_bonded(0, 1))
+
     def test_position_3d_rejects_atoms_in_same_fragment(self):
         mol = lillymol_nb.MolFromSmiles("CC ethane")
         mol.set_coordinates([0.0, 0.0, 0.0,

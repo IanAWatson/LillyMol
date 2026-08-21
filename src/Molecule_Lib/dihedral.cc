@@ -969,6 +969,8 @@ TryPlacing(Molecule& m,
            const int* fragment_membership) {
   const Atom& a1 = m[atom1];
   const Atom& a2 = m[atom2];
+  const Coordinates starting_atom1 = a1;
+  const Coordinates starting_atom2 = a2;
 
 #ifdef DEBUG_3D_POSITIONING
   cerr << "atoms " << atom1 << ' ' << m.smarts_equivalent_for_atom(atom1) << " and " <<
@@ -1028,8 +1030,15 @@ TryPlacing(Molecule& m,
 
   // Now set the bond length.
   float current_distance = m.distance_between_atoms(atom1, atom2);
-  // The vector along which we will move.
+  // The vector along which we will move. If the trial placement has collapsed
+  // the two atoms to the same coordinate, fall back to their original direction.
   v1 = a2 - a1;
+  if (v1.norm() <= 1.0e-06) {
+    v1 = starting_atom2 - starting_atom1;
+  }
+  if (v1.norm() <= 1.0e-06) {
+    v1.setxyz(1.0, 0.0, 0.0);
+  }
   v1.normalise();
   v1 *= (distance - current_distance);
   m.translate_atoms(v1, fragment_membership, moving_fragment);
@@ -1202,6 +1211,7 @@ Position3DInner(Molecule& m,
   // fragments, and we want this to be as large as possible.
   float furthest_separation = 0.0f;
   std::unique_ptr<float[]> best_coords;
+  int found_placement = 0;
 
   const int nh1 = hydrogen1.size();
   const int nh2 = hydrogen2.size();
@@ -1210,13 +1220,19 @@ Position3DInner(Molecule& m,
     for (int j = 0; j < nh2; ++j) {
       float score = TryPlacing(m, initial_natoms, atom1, hcoords1[i], atom2, hcoords2[j],
                                distance, fragment_membership.get());
-      if (score > furthest_separation) {
+      if (! found_placement || score > furthest_separation) {
+        found_placement = 1;
         furthest_separation = score;
         best_coords = m.GetCoordinates();
       }
 
       m.SetCoordinates(starting_coords.get());
     }
+  }
+
+  if (! found_placement) {
+    cerr << "Position3D:no viable placement found " << atom1 << ' ' << atom2 << '\n';
+    return 0;
   }
 
   m.SetCoordinates(best_coords.get());

@@ -75,6 +75,38 @@ class TestNanobindBdb(unittest.TestCase):
                 self.assertEqual(mols[1].natoms(), 0)
                 self.assertEqual(mols[2].unique_smiles(), "c1ccccc1")
 
+    def test_structure_database_lookup(self):
+        loader = _runfile_path("Molecule_Tools_Bdb/structure_database_load")
+        if loader is None:
+            self.skipTest("structure_database_load not available in runfiles")
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            input_fname = os.path.join(tmpdir, "molecules.smi")
+            dbstem = os.path.join(tmpdir, "structures")
+            with open(input_fname, "w", encoding="utf-8") as writer:
+                writer.write("CCO ethanol\n")
+                writer.write("C1CCCCC1 cyclohexane\n")
+
+            subprocess.run([loader, "-d", dbstem, input_fname], check=True)
+
+            db = lillymol_nb_bdb.StructureDatabase()
+            self.assertTrue(db.open_read(dbstem))
+            self.assertEqual(lillymol_nb_bdb.value(lillymol_nb_bdb.LookupParams.EXACT), 1)
+            self.assertEqual(lillymol_nb_bdb.value(lillymol_nb_bdb.LookupParams.GRAPH), 8)
+
+            ethanol = lillymol_nb.MolFromSmiles("CCO query")
+            self.assertEqual(db.lookup(ethanol), "ethanol")
+
+            propanol = lillymol_nb.MolFromSmiles("CCCO propanol")
+            self.assertIsNone(db.lookup(propanol))
+
+            strip_mask = lillymol_nb_bdb.value(lillymol_nb_bdb.LookupParams.STRIP)
+            mixture = lillymol_nb.MolFromSmiles("CCO.O mixture")
+            self.assertEqual(db.lookup(mixture, strip_mask), "ethanol")
+
+            graph_mask = lillymol_nb_bdb.value(lillymol_nb_bdb.LookupParams.GRAPH)
+            self.assertEqual(db.lookup(ethanol, graph_mask), "ethanol")
+
     def test_selimsteg_with_no_database_open(self):
         """Used to dereference a null Db* and take the process down."""
         lookup = lillymol_nb_bdb.Selimsteg()

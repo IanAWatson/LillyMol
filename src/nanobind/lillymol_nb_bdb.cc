@@ -12,6 +12,7 @@
 #include "Molecule_Lib/molecule.h"
 #include "Molecule_Tools_Bdb/iwecfp_database_lookup_lib.h"
 #include "Molecule_Tools_Bdb/selimsteg.h"
+#include "Molecule_Tools_Bdb/structure_database.h"
 
 namespace nb = nanobind;
 
@@ -33,9 +34,49 @@ SyntheticPrecedentDatabasesRepr(
   return "Synthetic Precedent databases";
 }
 
+
+std::optional<std::string>
+StructureDatabaseLookup(structure_database::StructureDatabase& db, Molecule& mol,
+                        uint32_t params) {
+  IWString ids_matched;
+  if (!db.Lookup(mol, params, ids_matched)) {
+    return std::nullopt;
+  }
+  return ids_matched.AsString();
+}
+
+bool
+StructureDatabaseOpenRead(structure_database::StructureDatabase& db,
+                          const std::string& dbname) {
+  IWString tmp(dbname);
+  return db.OpenForReading(tmp);
+}
+
 }  // namespace
 
 NB_MODULE(lillymol_nb_bdb, m) {
+  nb::enum_<structure_database::Lookup>(m, "LookupParams")
+      .value("EXACT", structure_database::kExact)
+      .value("STRIP", structure_database::kStrip)
+      .value("NOCHIRAL", structure_database::kNoChiral)
+      .value("GRAPH", structure_database::kGraph)
+      .value("NOSTD", structure_database::kNoStandardise);
+
+  m.def("value", [](structure_database::Lookup e) { return static_cast<int>(e); },
+        nb::arg("lookup"));
+
+  nb::class_<structure_database::StructureDatabase>(m, "StructureDatabase")
+      .def(nb::init<>())
+      .def("open_read", &StructureDatabaseOpenRead, nb::arg("dbname"),
+           "Open paired structure databases for reading from a stem")
+      .def("lookup",
+           [](structure_database::StructureDatabase& db, Molecule& mol) {
+             return StructureDatabaseLookup(db, mol, structure_database::kExact);
+           },
+           nb::arg("mol"), "Lookup exact molecule matches")
+      .def("lookup", &StructureDatabaseLookup, nb::arg("mol"), nb::arg("params"),
+           "Lookup molecule with a bit mask of LookupParams values");
+
   nb::class_<iwecfp_database_lookup::SP_Set_of_Databases>(
       m, "SyntheticPrecedentDatabases")
       .def(nb::init<>())

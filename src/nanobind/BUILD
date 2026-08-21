@@ -63,6 +63,7 @@ nanobind_extension(
         "//Molecule_Lib:moleculeio",
         "//Molecule_Tools_Bdb:iwecfp_database_lookup_lib_shared",
         "//Molecule_Tools_Bdb:selimsteg",
+        "//Molecule_Tools_Bdb:structure_database_shared",
         "@third_party//:berkeley_shared",
     ],
 )
@@ -74,5 +75,6 @@ py_test(
         ":lillymol_nb",
         ":lillymol_nb_bdb",
         "//BerkeleyDB:iwbdb_load",
+        "//Molecule_Tools_Bdb:structure_database_load",
     ],
 )

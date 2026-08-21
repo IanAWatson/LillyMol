@@ -6,6 +6,8 @@
 #include <memory>
 #include <stdexcept>
 
+#include <nanobind/ndarray.h>
+
 #include "Foundational/iwmisc/misc.h"
 #include "Molecule_Lib/atom_pair_fingerprint.h"
 #include "Molecule_Lib/atom_typing.h"
@@ -18,6 +20,7 @@ namespace lillymol_nb {
 namespace {
 
 using IntVector = std::vector<int>;
+using UInt8NumpyArray = nb::ndarray<nb::numpy, uint8_t, nb::shape<-1>>;
 
 IntVector
 MakeIntVector(size_t n) {
@@ -32,6 +35,47 @@ LinearFingerprintToVector(IWMFingerprint& generator, T* destination) {
 
   for (int i = 0; i < nbits; ++i) {
     destination[i] = bits[i];
+  }
+}
+
+UInt8NumpyArray
+MakeUInt8NumpyArray(size_t n) {
+  uint8_t* data = new uint8_t[n];
+  std::fill_n(data, n, uint8_t{0});
+  nb::capsule owner(data, [](void* p) noexcept { delete[] static_cast<uint8_t*>(p); });
+  return UInt8NumpyArray(data, {n}, owner);
+}
+
+void
+IncrementUInt8(uint8_t& destination, uint32_t count) {
+  const uint32_t available =
+      static_cast<uint32_t>(std::numeric_limits<uint8_t>::max() - destination);
+  if (count >= available) {
+    destination = std::numeric_limits<uint8_t>::max();
+  } else {
+    destination += static_cast<uint8_t>(count);
+  }
+}
+
+void
+SparseFingerprintToUInt8Array(const Sparse_Fingerprint_Creator& sfc, UInt8NumpyArray& destination) {
+  const int nbits = destination.shape(0);
+  uint8_t* data = destination.data();
+  for (const auto& [bit, count] : sfc.bits_found()) {
+    IncrementUInt8(data[bit % nbits], count);
+  }
+}
+
+void
+LinearFingerprintToUInt8Array(IWMFingerprint& generator, UInt8NumpyArray& destination) {
+  const int nbits = generator.nbits();
+  const int* bits = generator.vector();
+  uint8_t* data = destination.data();
+
+  for (int i = 0; i < nbits; ++i) {
+    data[i] = bits[i] > std::numeric_limits<uint8_t>::max()
+                  ? std::numeric_limits<uint8_t>::max()
+                  : static_cast<uint8_t>(bits[i]);
   }
 }
 
@@ -90,6 +134,21 @@ class LinearFingerprintByte : public BaseFpGenerator {
 
     return result;
   }
+
+  UInt8NumpyArray FingerprintNumpy(Molecule& mol) {
+    std::unique_ptr<linear_fingerprint::atom_type_t[]> atype =
+        std::make_unique<linear_fingerprint::atom_type_t[]>(mol.natoms());
+    if (!_atype.assign_atom_types(mol, atype.get())) {
+      throw std::runtime_error("LinearFingerprintCreator cannot assign atom types");
+    }
+
+    UInt8NumpyArray result = MakeUInt8NumpyArray(_nbits);
+    Sparse_Fingerprint_Creator sfc;
+    _fp.Fingerprint(mol, nullptr, atype.get(), sfc);
+    SparseFingerprintToUInt8Array(sfc, result);
+
+    return result;
+  }
 };
 
 class ECFingerprintByte : public BaseFpGenerator {
@@ -123,6 +182,20 @@ class ECFingerprintByte : public BaseFpGenerator {
         ptr[b] += count;
       }
     }
+
+    return result;
+  }
+
+  UInt8NumpyArray FingerprintNumpy(Molecule& mol) {
+    std::unique_ptr<atom_type_t[]> atype = std::make_unique<atom_type_t[]>(mol.natoms());
+    if (!_atype.assign_atom_types(mol, atype.get())) {
+      throw std::runtime_error("ECFingerprintCreator cannot assign atom types");
+    }
+
+    UInt8NumpyArray result = MakeUInt8NumpyArray(_nbits);
+    ec_fingerprint::ProduceFingerprint bits;
+    _fp.Fingerprint(mol, nullptr, atype.get(), bits);
+    SparseFingerprintToUInt8Array(bits.sfc(), result);
 
     return result;
   }
@@ -160,6 +233,20 @@ class AtomPairFingerprintByte : public BaseFpGenerator {
 
     return result;
   }
+
+  UInt8NumpyArray FingerprintNumpy(Molecule& mol) {
+    std::unique_ptr<uint64_t[]> atype = std::make_unique<uint64_t[]>(mol.natoms());
+    if (!_atype.assign_atom_types(mol, atype.get())) {
+      throw std::runtime_error("AtomPairFingerprintCreator cannot assign atom types");
+    }
+
+    UInt8NumpyArray result = MakeUInt8NumpyArray(_nbits);
+    Sparse_Fingerprint_Creator sfc;
+    _fp.Fingerprint(mol, nullptr, atype.get(), sfc);
+    SparseFingerprintToUInt8Array(sfc, result);
+
+    return result;
+  }
 };
 
 IntVector
@@ -171,6 +258,18 @@ LinearFingerprintDefault(Molecule& mol) {
   IWMFingerprint generator(kNBits);
   generator.construct_fingerprint(mol);
   LinearFingerprintToVector(generator, ptr);
+
+  return result;
+}
+
+UInt8NumpyArray
+LinearFingerprintDefaultNumpy(Molecule& mol) {
+  static constexpr int kNBits = 2048;
+  UInt8NumpyArray result = MakeUInt8NumpyArray(kNBits);
+
+  IWMFingerprint generator(kNBits);
+  generator.construct_fingerprint(mol);
+  LinearFingerprintToUInt8Array(generator, result);
 
   return result;
 }
@@ -246,6 +345,8 @@ void
 BindFingerprint(nb::module_& m) {
   m.def("linear_fingerprint", &LinearFingerprintDefault,
         "Linear path based fingerprints with default atom type");
+  m.def("linear_fingerprint_numpy", &LinearFingerprintDefaultNumpy,
+        "Linear path based fingerprint as a NumPy uint8 array");
   m.def("linear_fingerprint", &LinearFingerprintWithOptions,
         nb::arg("m"), nb::kw_only(), nb::arg("nbits"), nb::arg("atype_specification"),
         "Linear fingerprint with atom type and number of bits");
@@ -259,7 +360,9 @@ BindFingerprint(nb::module_& m) {
       .def("set_max_radius", &ECFingerprintByte::set_max_radius,
            "Max radius for fingerprints")
       .def("fingerprint", &ECFingerprintByte::Fingerprint,
-           "Generate a fixed width counted fingerprint for a molecule");
+           "Generate a fixed width counted fingerprint for a molecule")
+      .def("fingerprint_numpy", &ECFingerprintByte::FingerprintNumpy,
+           "Generate a fixed width counted fingerprint as a NumPy uint8 array");
 
   nb::class_<LinearFingerprintByte>(m, "LinearFingerprintCreator")
       .def(nb::init<int>())
@@ -270,7 +373,9 @@ BindFingerprint(nb::module_& m) {
       .def("set_max_length", &LinearFingerprintByte::set_max_length,
            "Max path length")
       .def("fingerprint", &LinearFingerprintByte::Fingerprint,
-           "Generate a fixed width counted fingerprint for a molecule");
+           "Generate a fixed width counted fingerprint for a molecule")
+      .def("fingerprint_numpy", &LinearFingerprintByte::FingerprintNumpy,
+           "Generate a fixed width counted fingerprint as a NumPy uint8 array");
 
   nb::class_<AtomPairFingerprintByte>(m, "AtomPairFingerprintCreator")
       .def(nb::init<int>())
@@ -283,7 +388,9 @@ BindFingerprint(nb::module_& m) {
       .def("set_max_separation", &AtomPairFingerprintByte::set_max_separation,
            "max separation between atoms")
       .def("fingerprint", &AtomPairFingerprintByte::Fingerprint,
-           "Generate a fixed width counted fingerprint for a molecule");
+           "Generate a fixed width counted fingerprint for a molecule")
+      .def("fingerprint_numpy", &AtomPairFingerprintByte::FingerprintNumpy,
+           "Generate a fixed width counted fingerprint as a NumPy uint8 array");
 
   m.def("tanimoto", &Tanimoto,
         "Compute Tanimoto coefficient between two counted integer sequences");

@@ -32,6 +32,7 @@ nanobind_extension(
         "//Molecule_Tools:alogp_lib",
         "//Molecule_Tools:dicer_api",
         "//Molecule_Tools:ec_fingerprint_lib",
+        "//Molecule_Tools:iwdescr_lib_shared",
         "//Molecule_Tools:jwcats_lib",
         "//Molecule_Tools:medchemwizard_lib",
         "//Molecule_Tools:mformula",

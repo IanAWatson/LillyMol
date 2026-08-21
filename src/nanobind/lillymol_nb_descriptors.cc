@@ -1,7 +1,10 @@
 #include "nanobind/lillymol_nb_internal.h"
 
+#include <nanobind/ndarray.h>
+
 #include "Molecule_Lib/atom_typing.h"
 #include "Molecule_Lib/qry_wstats.h"
+#include "Molecule_Tools/iwdescr_lib.h"
 #include "Molecule_Tools/jwcats_lib.h"
 #include "Molecule_Tools/mformula.h"
 #include "Molecule_Tools/nvrtspsa.h"
@@ -93,28 +96,149 @@ InitialiseJWCats(jwcats::JWCats& jwcats) {
   }
 }
 
-std::vector<double>
-JWCatsResultToVector(const jwcats::JWCats& jwcats, const jwcats::Result& result) {
-  const std::vector<int>& write_array_value = jwcats.write_array_value();
-  std::vector<double> values;
-  values.reserve(jwcats.FeatureNames().size());
+using FloatNumpyArray1D = nb::ndarray<nb::numpy, float, nb::shape<-1>>;
+using FloatNumpyArray2D = nb::ndarray<nb::numpy, float, nb::shape<-1, -1>>;
+using DoubleNumpyArray1D = nb::ndarray<nb::numpy, double, nb::shape<-1>>;
+using DoubleNumpyArray2D = nb::ndarray<nb::numpy, double, nb::shape<-1, -1>>;
 
-  for (int i = 0; i < static_cast<int>(write_array_value.size()); ++i) {
-    if (write_array_value[i]) {
-      values.push_back(result.scaled_counts[i]);
-    }
-  }
-
-  return values;
+FloatNumpyArray1D
+MakeFloatNumpyArray1D(size_t n) {
+  float* data = new float[n];
+  nb::capsule owner(data, [](void* p) noexcept { delete[] static_cast<float*>(p); });
+  return FloatNumpyArray1D(data, {n}, owner);
 }
 
-std::vector<double>
-ComputeJWCats(jwcats::JWCats& jwcats, Molecule& mol) {
+FloatNumpyArray2D
+MakeFloatNumpyArray2D(size_t rows, size_t columns) {
+  float* data = new float[rows * columns];
+  nb::capsule owner(data, [](void* p) noexcept { delete[] static_cast<float*>(p); });
+  return FloatNumpyArray2D(data, {rows, columns}, owner);
+}
+
+DoubleNumpyArray1D
+MakeDoubleNumpyArray1D(size_t n) {
+  double* data = new double[n];
+  nb::capsule owner(data, [](void* p) noexcept { delete[] static_cast<double*>(p); });
+  return DoubleNumpyArray1D(data, {n}, owner);
+}
+
+DoubleNumpyArray2D
+MakeDoubleNumpyArray2D(size_t rows, size_t columns) {
+  double* data = new double[rows * columns];
+  nb::capsule owner(data, [](void* p) noexcept { delete[] static_cast<double*>(p); });
+  return DoubleNumpyArray2D(data, {rows, columns}, owner);
+}
+
+void
+JWCatsResultToArray(const jwcats::JWCats& jwcats, const jwcats::Result& result,
+                    double* destination) {
+  const std::vector<int>& write_array_value = jwcats.write_array_value();
+  int ndx = 0;
+  for (int i = 0; i < static_cast<int>(write_array_value.size()); ++i) {
+    if (write_array_value[i]) {
+      destination[ndx] = result.scaled_counts[i];
+      ++ndx;
+    }
+  }
+}
+
+DoubleNumpyArray1D
+ComputeJWCatsArray(jwcats::JWCats& jwcats, Molecule& mol) {
   jwcats::Result result;
   const jwcats::ComputeStatus status = jwcats.Compute(mol, result);
   ThrowForJWCatsStatus(status);
-  return JWCatsResultToVector(jwcats, result);
+
+  DoubleNumpyArray1D array = MakeDoubleNumpyArray1D(jwcats.FeatureNames().size());
+  JWCatsResultToArray(jwcats, result, array.data());
+  return array;
 }
+
+DoubleNumpyArray2D
+ComputeJWCatsListArray(jwcats::JWCats& jwcats, std::vector<Molecule*>& mols) {
+  const size_t nmols = mols.size();
+  const size_t nfeatures = jwcats.FeatureNames().size();
+  DoubleNumpyArray2D array = MakeDoubleNumpyArray2D(nmols, nfeatures);
+  double* data = array.data();
+
+  for (size_t i = 0; i < nmols; ++i) {
+    jwcats::Result result;
+    const jwcats::ComputeStatus status = jwcats.Compute(*mols[i], result);
+    ThrowForJWCatsStatus(status);
+    JWCatsResultToArray(jwcats, result, data + i * nfeatures);
+  }
+
+  return array;
+}
+
+class NanobindIWDescr {
+ private:
+  IWDescr _iwdescr;
+
+ public:
+  NanobindIWDescr() {
+    if (!_iwdescr.InitialiseAll()) {
+      throw std::runtime_error(
+          "Cannot initialise IWDescr; ensure LILLYMOL_HOME is defined and contains "
+          "the standard charge and donor/acceptor queries");
+    }
+  }
+
+  std::vector<std::string> FeatureNames() const {
+    std::vector<std::string> result;
+    const int ndescr = _iwdescr.number_descriptors();
+    result.reserve(ndescr);
+    for (int i = 0; i < ndescr; ++i) {
+      result.push_back(_iwdescr.descriptor_name(i).AsString());
+    }
+    return result;
+  }
+
+  int number_descriptors() const {
+    return _iwdescr.number_descriptors();
+  }
+
+  FloatNumpyArray1D Process(Molecule& mol) {
+    const int ndescr = _iwdescr.number_descriptors();
+    FloatNumpyArray1D result = MakeFloatNumpyArray1D(ndescr);
+    if (!_iwdescr.Process(mol, result.data())) {
+      throw std::runtime_error("IWDescr calculation failed");
+    }
+    return result;
+  }
+
+  FloatNumpyArray2D ProcessList(std::vector<Molecule*>& mols) {
+    const size_t nmols = mols.size();
+    const int ndescr = _iwdescr.number_descriptors();
+    FloatNumpyArray2D result = MakeFloatNumpyArray2D(nmols, ndescr);
+    float* data = result.data();
+
+    for (size_t i = 0; i < nmols; ++i) {
+      if (!_iwdescr.Process(*mols[i], data + i * ndescr)) {
+        throw std::runtime_error(
+            std::string("IWDescr calculation failed for molecule ") +
+            mols[i]->name().AsString());
+      }
+    }
+
+    return result;
+  }
+
+  nb::dict Compute(Molecule& mol) {
+    FloatNumpyArray1D values = Process(mol);
+    const float* data = values.data();
+    nb::dict result;
+    const int ndescr = _iwdescr.number_descriptors();
+    for (int i = 0; i < ndescr; ++i) {
+      result[nb::str(_iwdescr.descriptor_name(i).AsString().c_str())] = data[i];
+    }
+    return result;
+  }
+};
+
+class MolecularDescriptors : public NanobindIWDescr {
+ public:
+  using NanobindIWDescr::NanobindIWDescr;
+};
 
 void
 InitialiseQedFromEnvironment(qed::Qed& qed) {
@@ -341,6 +465,32 @@ BindDescriptors(nb::module_& m) {
   m.def("qed_score", &QedScoreFromEnvironment, nb::arg("mol"),
         "Compute QED with query data from LILLYMOL_HOME, returning None on failure");
 
+  nb::class_<NanobindIWDescr>(m, "IWDescr")
+      .def(nb::init<>())
+      .def("feature_names", &NanobindIWDescr::FeatureNames,
+           "Return descriptor names in the same order as process() values")
+      .def("names", &NanobindIWDescr::FeatureNames,
+           "Alias for feature_names()")
+      .def("number_descriptors", &NanobindIWDescr::number_descriptors,
+           "Return the number of active descriptors")
+      .def("process", &NanobindIWDescr::Process, nb::arg("mol"),
+           "Compute descriptors for one molecule as a float32 NumPy array")
+      .def("process_list", &NanobindIWDescr::ProcessList, nb::arg("mols"),
+           "Compute descriptors for molecules as a 2D float32 NumPy array");
+
+  nb::class_<MolecularDescriptors>(m, "MolecularDescriptors")
+      .def(nb::init<>())
+      .def("names", &MolecularDescriptors::FeatureNames,
+           "Return descriptor names in the same order as compute_array() values")
+      .def("feature_names", &MolecularDescriptors::FeatureNames,
+           "Alias for names()")
+      .def("compute_array", &MolecularDescriptors::Process, nb::arg("mol"),
+           "Compute descriptors for one molecule as a float32 NumPy array")
+      .def("compute", &MolecularDescriptors::Compute, nb::arg("mol"),
+           "Compute descriptors for one molecule as a dict keyed by descriptor name")
+      .def("compute_list", &MolecularDescriptors::ProcessList, nb::arg("mols"),
+           "Compute descriptors for molecules as a 2D float32 NumPy array");
+
   nb::class_<jwcats::JWCats>(m, "JWCats")
       .def("__init__",
            [](jwcats::JWCats* jwcats, bool initialise_default_assigners) {
@@ -376,8 +526,10 @@ BindDescriptors(nb::module_& m) {
            "Initialise assigners from explicit charge and hbonds query directories")
       .def("feature_names", &jwcats::JWCats::FeatureNames,
            "Return descriptor names in the same order as process() values")
-      .def("process", &ComputeJWCats, nb::arg("mol"),
-           "Compute JWCats descriptors for one molecule as a list of floats")
+      .def("process", &ComputeJWCatsArray, nb::arg("mol"),
+           "Compute JWCats descriptors for one molecule as a float64 NumPy array")
+      .def("process_list", &ComputeJWCatsListArray, nb::arg("mols"),
+           "Compute JWCats descriptors for molecules as a 2D float64 NumPy array")
       .def("set_include_hydrophobic_pairs", &jwcats::JWCats::SetIncludeHydrophobicPairs,
            nb::arg("value"), "Control whether hydrophobe-hydrophobe pair columns are emitted")
       .def("set_min_bond_separation", &jwcats::JWCats::SetMinBondSeparation,

@@ -2,6 +2,8 @@
 
 #include <queue>
 
+#include <nanobind/ndarray.h>
+
 namespace lillymol_nb {
 
 namespace {
@@ -85,6 +87,37 @@ RingInfoAtomRings(RingInfo& ring_info) {
     result.push_back(RingAtoms(*mol.ringi(i)));
   }
   return result;
+}
+
+using FloatNumpyArray1D = nb::ndarray<nb::numpy, float, nb::shape<-1>>;
+
+FloatNumpyArray1D
+MakeFloatNumpyArray1D(size_t n) {
+  float* data = new float[n];
+  nb::capsule owner(data, [](void* p) noexcept { delete[] static_cast<float*>(p); });
+  return FloatNumpyArray1D(data, {n}, owner);
+}
+
+FloatNumpyArray1D
+GetCoordinatesNumpy(const Molecule& mol) {
+  const int matoms = mol.natoms();
+  FloatNumpyArray1D result = MakeFloatNumpyArray1D(3 * matoms);
+  float* data = result.data();
+  for (int i = 0; i < matoms; ++i) {
+    data[3 * i + 0] = mol.x(i);
+    data[3 * i + 1] = mol.y(i);
+    data[3 * i + 2] = mol.z(i);
+  }
+  return result;
+}
+
+void
+SetCoordinatesNumpy(Molecule& mol, FloatNumpyArray1D coords) {
+  const int expected = 3 * mol.natoms();
+  if (coords.ndim() != 1 || static_cast<int>(coords.shape(0)) != expected) {
+    throw std::invalid_argument("set_coordinates_numpy requires 3 values per atom");
+  }
+  mol.SetCoordinates(coords.data());
 }
 
 std::vector<int>
@@ -789,6 +822,8 @@ BindMolecule(nb::module_& m) {
              return result;
            },
            "Return coordinates as [x0, y0, z0, x1, y1, z1, ...]")
+      .def("get_coordinates_numpy", &GetCoordinatesNumpy,
+           "Return coordinates as a flat float32 NumPy array")
       .def("set_coordinates",
            [](Molecule& mol, const std::vector<float>& coords) {
              const int expected = 3 * mol.natoms();
@@ -798,6 +833,8 @@ BindMolecule(nb::module_& m) {
              mol.SetCoordinates(coords.data());
            },
            nb::arg("coords"), "Set coordinates from [x0, y0, z0, x1, y1, z1, ...]")
+      .def("set_coordinates_numpy", &SetCoordinatesNumpy, nb::arg("coords"),
+           "Set coordinates from a flat float32 NumPy array")
       .def("translate",
            [](Molecule& mol, coord_t x, coord_t y, coord_t z) {
              mol.translate_atoms(x, y, z);

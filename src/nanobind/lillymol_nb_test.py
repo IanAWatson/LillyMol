@@ -617,6 +617,39 @@ $$$$
         self.assertAlmostEqual(ethane.x(1), 0.0, delta=1.0e-5)
         self.assertAlmostEqual(ethane.y(1), 1.0, delta=1.0e-5)
 
+    def test_coordinates_numpy(self):
+        try:
+            import gc
+            import numpy as np
+        except ImportError:
+            self.skipTest("numpy is not available")
+
+        mol = lillymol_nb.MolFromSmiles("CCC propane")
+        coords = np.array([0.0, 0.0, 0.0,
+                           1.0, 0.0, 0.0,
+                           2.0, 0.0, 0.0], dtype=np.float32)
+        mol.set_coordinates_numpy(coords)
+
+        array = mol.get_coordinates_numpy()
+        self.assertEqual(array.dtype, np.dtype("float32"))
+        self.assertEqual(array.shape, (9,))
+        np.testing.assert_array_equal(array, coords)
+        self.assertEqual(array.tolist(), mol.get_coordinates())
+
+        updated = np.array([0.25, 0.5, 0.75,
+                            1.25, 1.5, 1.75,
+                            2.25, 2.5, 2.75], dtype=np.float32)
+        mol.set_coordinates_numpy(updated)
+        self.assertAlmostEqual(mol.x(0), 0.25)
+        self.assertAlmostEqual(mol.y(1), 1.5)
+        self.assertAlmostEqual(mol.z(2), 2.75)
+
+        with self.assertRaises(Exception):
+            mol.set_coordinates_numpy(updated[:-1])
+
+        del array
+        gc.collect()
+
     def test_coordinate_and_geometry_helpers(self):
         mol = lillymol_nb.MolFromSmiles("CCCO propanol")
         mol.setxyz(0, 0.0, 0.0, 0.0)
@@ -1147,6 +1180,25 @@ $$$$
         self.assertEqual(len(bits2), 512)
         self.assertIsNone(lillymol_nb.linear_fingerprint(mol, nbits=512, atype_specification="BAD"))
 
+    def test_linear_fingerprint_numpy(self):
+        try:
+            import gc
+            import numpy as np
+        except ImportError:
+            self.skipTest("numpy is not available")
+
+        mol = lillymol_nb.MolFromSmiles("CCO ethanol")
+        bits = lillymol_nb.linear_fingerprint(mol)
+        array = lillymol_nb.linear_fingerprint_numpy(mol)
+
+        self.assertEqual(array.dtype, np.dtype("uint8"))
+        self.assertEqual(array.shape, (2048,))
+        self.assertEqual(array.tolist(), bits)
+        self.assertGreater(int(array.sum()), 0)
+
+        del array
+        gc.collect()
+
     def test_fingerprint_creators(self):
         mol = lillymol_nb.MolFromSmiles("CN1C=NC2=C1C(=O)N(C(=O)N2C)C caffeine")
         ecfp = lillymol_nb.ECFingerprintCreator(512)
@@ -1167,6 +1219,40 @@ $$$$
         atom_pair.set_min_separation(1)
         atom_pair.set_max_separation(5)
         self.assertEqual(len(atom_pair.fingerprint(mol)), 256)
+
+    def test_fingerprint_creator_numpy(self):
+        try:
+            import gc
+            import numpy as np
+        except ImportError:
+            self.skipTest("numpy is not available")
+
+        mol = lillymol_nb.MolFromSmiles("CN1C=NC2=C1C(=O)N(C(=O)N2C)C caffeine")
+
+        def assert_numpy_fingerprint_matches_list(generator, nbits):
+            as_list = generator.fingerprint(mol)
+            array = generator.fingerprint_numpy(mol)
+            expected = np.minimum(np.asarray(as_list, dtype=np.int64), 255).astype(np.uint8)
+            self.assertEqual(array.dtype, np.dtype("uint8"))
+            self.assertEqual(array.shape, (nbits,))
+            np.testing.assert_array_equal(array, expected)
+            del array
+
+        ecfp = lillymol_nb.ECFingerprintCreator(512)
+        assert_numpy_fingerprint_matches_list(ecfp, 512)
+        ecfp.set_max_radius(1)
+        assert_numpy_fingerprint_matches_list(ecfp, 512)
+
+        linear = lillymol_nb.LinearFingerprintCreator(256)
+        linear.set_max_length(5)
+        assert_numpy_fingerprint_matches_list(linear, 256)
+
+        atom_pair = lillymol_nb.AtomPairFingerprintCreator(256)
+        atom_pair.set_min_separation(1)
+        atom_pair.set_max_separation(5)
+        assert_numpy_fingerprint_matches_list(atom_pair, 256)
+
+        gc.collect()
 
     def test_element_and_hybridization_helpers(self):
         self.assertEqual(lillymol_nb.count_atoms_in_smiles("CCO"), 3)
@@ -1788,6 +1874,75 @@ sidechain {
         calc_from_dir = lillymol_nb.QED(query_dir)
         self.assertAlmostEqual(calc_from_dir.score(mol), value, delta=1.0e-6)
 
+    def test_iwdescr_numpy(self):
+        try:
+            import gc
+            import numpy as np
+        except ImportError:
+            self.skipTest("numpy is not available")
+
+        calc = lillymol_nb.IWDescr()
+        names = calc.feature_names()
+        self.assertGreater(len(names), 0)
+        self.assertEqual(names, calc.names())
+        self.assertEqual(len(names), calc.number_descriptors())
+
+        ethanol = lillymol_nb.MolFromSmiles("CCO ethanol")
+        values = calc.process(ethanol)
+        self.assertEqual(values.dtype, np.dtype("float32"))
+        self.assertEqual(values.shape, (len(names),))
+        self.assertEqual(values.ndim, 1)
+
+        mols = [
+            lillymol_nb.MolFromSmiles("CCO ethanol"),
+            lillymol_nb.MolFromSmiles("c1ccccc1 benzene"),
+        ]
+        matrix = calc.process_list(mols)
+        self.assertEqual(matrix.dtype, np.dtype("float32"))
+        self.assertEqual(matrix.shape, (2, len(names)))
+        name_to_col = {name: i for i, name in enumerate(names)}
+        self.assertEqual(matrix[0, name_to_col["nrings"]], 0.0)
+        self.assertEqual(matrix[1, name_to_col["nrings"]], 1.0)
+
+        empty = calc.process_list([])
+        self.assertEqual(empty.dtype, np.dtype("float32"))
+        self.assertEqual(empty.shape, (0, len(names)))
+
+        del values, matrix, empty
+        gc.collect()
+
+    def test_molecular_descriptors_compatibility(self):
+        try:
+            import gc
+            import numpy as np
+        except ImportError:
+            self.skipTest("numpy is not available")
+
+        calc = lillymol_nb.MolecularDescriptors()
+        names = calc.names()
+        self.assertGreater(len(names), 0)
+        self.assertEqual(names, calc.feature_names())
+
+        mol = lillymol_nb.MolFromSmiles("CCO ethanol")
+        array = calc.compute_array(mol)
+        self.assertEqual(array.dtype, np.dtype("float32"))
+        self.assertEqual(array.shape, (len(names),))
+
+        values = calc.compute(lillymol_nb.MolFromSmiles("CCO ethanol"))
+        self.assertEqual(set(values), set(names))
+        self.assertEqual(values["nrings"], 0.0)
+
+        matrix = calc.compute_list([
+            lillymol_nb.MolFromSmiles("CCO ethanol"),
+            lillymol_nb.MolFromSmiles("c1ccccc1 benzene"),
+        ])
+        self.assertEqual(matrix.dtype, np.dtype("float32"))
+        self.assertEqual(matrix.shape, (2, len(names)))
+        self.assertEqual(matrix[1, names.index("nrings")], 1.0)
+
+        del array, matrix
+        gc.collect()
+
     def test_jwcats(self):
         charges = _charges_query_dir()
         hbonds = _hbonds_query_dir()
@@ -1802,9 +1957,21 @@ sidechain {
         names = calc.feature_names()
         self.assertGreater(len(names), 0)
         mol = lillymol_nb.MolFromSmiles("CCN(CC)C tertiary_amine")
+        try:
+            import numpy as np
+        except ImportError:
+            self.skipTest("numpy is not available")
+
         values = calc.process(mol)
-        self.assertEqual(len(values), len(names))
-        self.assertTrue(all(isinstance(value, float) for value in values))
+        self.assertEqual(values.dtype, np.dtype("float64"))
+        self.assertEqual(values.shape, (len(names),))
+
+        matrix = calc.process_list([
+            lillymol_nb.MolFromSmiles("CCN(CC)C tertiary_amine"),
+            lillymol_nb.MolFromSmiles("CCO ethanol"),
+        ])
+        self.assertEqual(matrix.dtype, np.dtype("float64"))
+        self.assertEqual(matrix.shape, (2, len(names)))
 
         calc.set_include_hydrophobic_pairs(False)
         self.assertTrue(calc.initialise())

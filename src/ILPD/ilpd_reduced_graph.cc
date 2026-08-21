@@ -37,8 +37,9 @@ Usage(int rc) {
 // clang-format off
 cerr << R"(Transforms Ionisable Lipid molecules into reduced grah forms
 -C <fname>              read paramaters from <fname> - always needed
--S <fname>              write descriptors to <fname>
--F <fname>              write fragmented lipids to <fname>
+-S <fname>              write descriptors to <fname>.
+-F <fname>              write fragmented lipids to <fname>.
+-l                      reduce to largest fragment.
 -v                      verbose output\n";
 )";
 // clang-format on

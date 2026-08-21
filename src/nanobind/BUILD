@@ -57,6 +57,25 @@ py_test(
 )
 
 nanobind_extension(
+    name = "lillymol_gfp_server",
+    srcs = ["lillymol_nb_gfp_server.cc"],
+    dynamic_deps = ["//Molecule_Lib:molecule_lib_shared"],
+    deps = ["//Utilities/GFP_Tools:gfp_server_lib"],
+)
+
+py_test(
+    name = "gfp_http_server_test",
+    srcs = ["gfp_http_server_test.py"],
+    data = ["//pybind:testdata/rand10.gfp"],
+    deps = [
+        ":lillymol_gfp_server",
+        "//Utilities/GFP_Tools:gfp_http_server",
+        "//Utilities/GFP_Tools:nn_request_py_proto",
+    ],
+)
+
+
+nanobind_extension(
     name = "lillymol_nb_bdb",
     srcs = ["lillymol_nb_bdb.cc"],
     deps = [

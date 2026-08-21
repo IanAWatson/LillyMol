@@ -141,7 +141,7 @@ py_library(
     ],
     deps = [
         ":nn_request_py_proto",
-        "//pybind:lillymol_gfp_server",
+        "//nanobind:lillymol_gfp_server",
     ],
 )
 

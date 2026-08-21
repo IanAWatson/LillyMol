@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """HTTP service for GFP near-neighbour searching.
 
-The service wraps the pybind `lillymol_gfp_server.GfpNearNeighbourServer` class.
+The service wraps the `lillymol_gfp_server.GfpNearNeighbourServer` extension class.
 It supports both binary protobuf endpoints and protobuf-JSON endpoints.
 
 Typical use:

@@ -1,0 +1,103 @@
+{
+  "binding": "pybind",
+  "python": "3.13.7 (main, Sep  2 2025, 14:21:46) [Clang 20.1.4 ]",
+  "python_executable": "/home/ian/.local/bin/python3.13",
+  "platform": "Linux-6.8.0-137-generic-x86_64-with-glibc2.39",
+  "smiles_file": null,
+  "molecules": 10,
+  "loops": 20,
+  "results": [
+    {
+      "benchmark": "parse",
+      "items": 10,
+      "loops": 20,
+      "best_s": 0.0002971129724755883,
+      "median_s": 0.0007743760361336172,
+      "mean_s": 0.0007589995511807501,
+      "checksum": 126
+    },
+    {
+      "benchmark": "scalar_properties",
+      "items": 10,
+      "loops": 20,
+      "best_s": 1.0598916560411453e-05,
+      "median_s": 1.545052509754896e-05,
+      "mean_s": 1.8064287723973392e-05,
+      "checksum": 266
+    },
+    {
+      "benchmark": "unique_smiles",
+      "items": 10,
+      "loops": 20,
+      "best_s": 4.446948878467083e-06,
+      "median_s": 5.490437615662813e-06,
+      "mean_s": 1.7072295304387807e-05,
+      "checksum": 223
+    },
+    {
+      "benchmark": "atom_index_access",
+      "items": 10,
+      "loops": 20,
+      "best_s": 6.383901927620173e-05,
+      "median_s": 6.525951903313398e-05,
+      "mean_s": 7.39655108191073e-05,
+      "checksum": 1066
+    },
+    {
+      "benchmark": "atom_iteration",
+      "items": 10,
+      "loops": 20,
+      "best_s": 0.0001806250074878335,
+      "median_s": 0.0001880945055745542,
+      "mean_s": 0.00021247078548185526,
+      "checksum": 1066
+    },
+    {
+      "benchmark": "substructure_count",
+      "items": 10,
+      "loops": 20,
+      "best_s": 0.00010731699876487255,
+      "median_s": 0.00011086097219958901,
+      "mean_s": 0.00012152596609666943,
+      "checksum": 96
+    }
+  ],
+  "skipped": [
+    {
+      "benchmark": "substructure_embeddings",
+      "reason": "SubstructureQuery.substructure_search_match_lists unavailable"
+    },
+    {
+      "benchmark": "linear_fingerprint",
+      "reason": "No module named 'numpy'"
+    },
+    {
+      "benchmark": "linear_fingerprint_numpy",
+      "reason": "NumPy unavailable"
+    },
+    {
+      "benchmark": "ecfp",
+      "reason": "No module named 'numpy'"
+    },
+    {
+      "benchmark": "ecfp_numpy",
+      "reason": "NumPy unavailable"
+    },
+    {
+      "benchmark": "coordinates_list",
+      "reason": "No module named 'numpy'"
+    },
+    {
+      "benchmark": "coordinates_numpy",
+      "reason": "NumPy unavailable"
+    },
+    {
+      "benchmark": "iwdescr",
+      "reason": "NumPy unavailable"
+    },
+    {
+      "benchmark": "iwdescr_list",
+      "reason": "NumPy unavailable"
+    }
+  ]
+}

@@ -1,0 +1,123 @@
+{
+  "binding": "nanobind",
+  "python": "3.13.7 (main, Sep  2 2025, 14:21:46) [Clang 20.1.4 ]",
+  "python_executable": "/home/ian/.local/bin/python3.13",
+  "platform": "Linux-6.8.0-137-generic-x86_64-with-glibc2.39",
+  "smiles_file": "/home/ian/rand10k.smi",
+  "molecules": 10000,
+  "loops": 5,
+  "results": [
+    {
+      "benchmark": "parse",
+      "items": 10000,
+      "loops": 5,
+      "best_s": 0.04597635904792696,
+      "median_s": 0.04752061399631202,
+      "mean_s": 0.04773820077534765,
+      "checksum": 295694
+    },
+    {
+      "benchmark": "scalar_properties",
+      "items": 10000,
+      "loops": 5,
+      "best_s": 0.0028871899703517556,
+      "median_s": 0.0030878970865160227,
+      "mean_s": 0.0049781799782067536,
+      "checksum": 654380
+    },
+    {
+      "benchmark": "unique_smiles",
+      "items": 10000,
+      "loops": 5,
+      "best_s": 0.002362665021792054,
+      "median_s": 0.002632256946526468,
+      "mean_s": 0.08752163718454539,
+      "checksum": 570696
+    },
+    {
+      "benchmark": "atom_index_access",
+      "items": 10000,
+      "loops": 5,
+      "best_s": 0.05950916605070233,
+      "median_s": 0.060718314023688436,
+      "mean_s": 0.06150547380093485,
+      "checksum": 2611989
+    },
+    {
+      "benchmark": "atom_iteration",
+      "items": 10000,
+      "loops": 5,
+      "best_s": 0.10137364803813398,
+      "median_s": 0.10653796698898077,
+      "mean_s": 0.10576262020040303,
+      "checksum": 2611989
+    },
+    {
+      "benchmark": "substructure_count",
+      "items": 10000,
+      "loops": 5,
+      "best_s": 0.1682351310737431,
+      "median_s": 0.17740043404046446,
+      "mean_s": 0.17571767140179873,
+      "checksum": 190764
+    },
+    {
+      "benchmark": "substructure_embeddings",
+      "items": 10000,
+      "loops": 5,
+      "best_s": 0.09796123194973916,
+      "median_s": 0.10404424904845655,
+      "mean_s": 0.10262849619612098,
+      "checksum": 219365
+    },
+    {
+      "benchmark": "linear_fingerprint",
+      "items": 10000,
+      "loops": 5,
+      "best_s": 1.0103514379588887,
+      "median_s": 1.0119574239943177,
+      "mean_s": 1.0138365267775953,
+      "checksum": 20480000
+    },
+    {
+      "benchmark": "ecfp",
+      "items": 10000,
+      "loops": 5,
+      "best_s": 0.22620304895099252,
+      "median_s": 0.2278134679654613,
+      "mean_s": 0.22743756158743053,
+      "checksum": 10240000
+    },
+    {
+      "benchmark": "coordinates_list",
+      "items": 10000,
+      "loops": 5,
+      "best_s": 0.06492285197600722,
+      "median_s": 0.06572850397787988,
+      "mean_s": 0.06621555397287011,
+      "checksum": 887082
+    }
+  ],
+  "skipped": [
+    {
+      "benchmark": "linear_fingerprint_numpy",
+      "reason": "NumPy unavailable"
+    },
+    {
+      "benchmark": "ecfp_numpy",
+      "reason": "NumPy unavailable"
+    },
+    {
+      "benchmark": "coordinates_numpy",
+      "reason": "NumPy unavailable"
+    },
+    {
+      "benchmark": "iwdescr",
+      "reason": "NumPy unavailable"
+    },
+    {
+      "benchmark": "iwdescr_list",
+      "reason": "NumPy unavailable"
+    }
+  ]
+}

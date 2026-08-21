@@ -10,6 +10,12 @@ BindChirality(nb::module_& m) {
       .value("CHI_TETRAHEDRAL_CCW", ChiralType::kChiTetrahedralCcw)
       .value("CHI_OTHER", ChiralType::kChiOther);
 
+  nb::enum_<CahnIngoldPrelog>(m, "CIP")
+      .value("R", CahnIngoldPrelog::R)
+      .value("S", CahnIngoldPrelog::S)
+      .value("Neither", CahnIngoldPrelog::kNeither)
+      .value("Unspecified", CahnIngoldPrelog::kUnspecified);
+
   nb::class_<Chiral_Centre>(m, "Chiral_Centre")
       .def(nb::init<atom_number_t>(), nb::arg("atom"))
       .def("atom", &Chiral_Centre::a)
@@ -43,6 +49,12 @@ BindChirality(nb::module_& m) {
           return static_cast<bool>(::is_actually_chiral(mol, atom));
         },
         nb::arg("mol"), nb::arg("atom"));
+  m.def("is_chiral_implicit_hydrogen",
+        [](int connection) { return IsChiralImplicitHydrogen(connection); },
+        nb::arg("connection"));
+  m.def("is_chiral_lone_pair",
+        [](int connection) { return IsChiralLonePair(connection); },
+        nb::arg("connection"));
 }
 
 }  // namespace lillymol_nb

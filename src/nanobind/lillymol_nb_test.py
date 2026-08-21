@@ -721,6 +721,9 @@ $$$$
         self.assertEqual(mol.aromatic_ring_count(), 1)
 
     def test_chiral_centre_access_and_helpers(self):
+        self.assertNotEqual(lillymol_nb.CIP.R, lillymol_nb.CIP.S)
+        self.assertNotEqual(lillymol_nb.CIP.Neither, lillymol_nb.CIP.Unspecified)
+
         mol = lillymol_nb.MolFromSmiles("F[C@H](Cl)Br chiral")
         self.assertEqual(mol.number_chiral_centres(), 1)
         centre = mol.chiral_centre_at_atom(1)
@@ -729,6 +732,11 @@ $$$$
         self.assertTrue(centre.involves(0))
         self.assertEqual(centre.implicit_hydrogens(), 1)
         self.assertEqual(centre.lone_pairs(), 0)
+        self.assertTrue(lillymol_nb.is_chiral_implicit_hydrogen(centre.top_back()))
+        self.assertFalse(lillymol_nb.is_chiral_lone_pair(centre.top_back()))
+        centre.atom_is_now_lone_pair(0)
+        self.assertTrue(lillymol_nb.is_chiral_lone_pair(centre.top_front()))
+        self.assertFalse(lillymol_nb.is_chiral_implicit_hydrogen(centre.top_front()))
         self.assertIn("<Chiral_Centre atom 1", repr(centre))
         centres = mol.chiral_centres()
         self.assertEqual(len(centres), 1)

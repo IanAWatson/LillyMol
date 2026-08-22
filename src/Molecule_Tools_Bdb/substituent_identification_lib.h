@@ -29,9 +29,9 @@ class SubstituentIdentificationLookup {
   SubstituentIdentificationLookup(const SubstituentIdentificationLookup&) = delete;
   SubstituentIdentificationLookup& operator=(const SubstituentIdentificationLookup&) = delete;
 
-  int AddDatabase(const std::string& dbname);
+  bool AddDatabase(const std::string& dbname);
   void close();
-  int AddQueryFromSmarts(const std::string& smarts);
+  bool AddQueryFromSmarts(const std::string& smarts);
   void set_default_new_molecule_starting_points(int s);
   void set_min_shell_radius(int s);
   void set_only_produce_molecules_at_biggest_radius(int s);

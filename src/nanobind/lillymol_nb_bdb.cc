@@ -110,6 +110,8 @@ NB_MODULE(lillymol_nb_bdb, m) {
       .def(nb::init<>())
       .def("add_database", &SubstituentIdentificationLookup::AddDatabase,
            nb::arg("dbname"))
+      .def("open_database", &SubstituentIdentificationLookup::AddDatabase,
+           nb::arg("dbname"))
       .def("add_query_from_smarts",
            &SubstituentIdentificationLookup::AddQueryFromSmarts,
            nb::arg("smarts"))
@@ -141,6 +143,9 @@ NB_MODULE(lillymol_nb_bdb, m) {
            &SubstituentIdentificationLookup::set_min_examples_needed_for_addition,
            nb::arg("examples"))
       .def("set_max_molecules_per_input_molecule",
+           &SubstituentIdentificationLookup::set_max_molecules_per_input_molecule,
+           nb::arg("max_products"))
+      .def("set_max_matches_per_input_molecule",
            &SubstituentIdentificationLookup::set_max_molecules_per_input_molecule,
            nb::arg("max_products"))
       .def("set_remove_isotopes_from_product",

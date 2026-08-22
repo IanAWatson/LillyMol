@@ -126,7 +126,7 @@ class TestNanobindBdb(unittest.TestCase):
             )
 
             with lillymol_nb_bdb.SubstituentIdentificationLookup() as lookup:
-                self.assertTrue(lookup.add_database(dbname))
+                self.assertTrue(lookup.open_database(dbname))
                 lookup.set_default_new_molecule_starting_points(1)
                 lookup.set_max_substituent_size(2)
 
@@ -145,7 +145,74 @@ class TestNanobindBdb(unittest.TestCase):
                     self.assertTrue(replacement.smiles)
                     self.assertEqual(replacement.molecule.name(), "methane")
 
+    def test_substituent_identification_query_driven_replacement(self):
+        tool = _runfile_path("Molecule_Tools_Bdb/substituent_identification")
+        if tool is None:
+            self.skipTest("substituent_identification not available in runfiles")
 
+        with tempfile.TemporaryDirectory() as tmpdir:
+            input_fname = os.path.join(tmpdir, "phenyl_substituents.smi")
+            dbname = os.path.join(tmpdir, "phenyl_substituents.bdb")
+            with open(input_fname, "w", encoding="utf-8") as writer:
+                writer.write("Clc1ccccc1 chloro\n")
+                writer.write("Nc1ccccc1 nitrogen\n")
+                writer.write("Oc1ccccc1 oxygen\n")
+                writer.write("Sc1ccccc1 sulphur\n")
+
+            subprocess.run(
+                [tool, "-d", dbname, "-B", "-R", "4", "-Y", "dbproto", input_fname],
+                check=True,
+            )
+
+            with lillymol_nb_bdb.SubstituentIdentificationLookup() as lookup:
+                self.assertTrue(lookup.open_database(dbname))
+                self.assertTrue(lookup.add_query_from_smarts("[r]-!@*"))
+                lookup.set_break_molecule_at_first_two_matched_atoms(True)
+
+                phenol = lillymol_nb.MolFromSmiles("Oc1ccccc1 phenol")
+                replacements = lookup.generate_replacements(phenol)
+
+                self.assertEqual(
+                    sorted(replacement.smiles for replacement in replacements),
+                    [
+                        "[1C]1(=CC=CC=C1)[1Cl]",
+                        "[1C]1(=CC=CC=C1)[1NH2]",
+                        "[1C]1(=CC=CC=C1)[1SH]",
+                    ],
+                )
+                self.assertEqual(
+                    sorted(replacement.donor for replacement in replacements),
+                    ["chloro", "nitrogen", "sulphur"],
+                )
+
+            with lillymol_nb_bdb.SubstituentIdentificationLookup() as lookup:
+                self.assertTrue(lookup.open_database(dbname))
+                self.assertTrue(lookup.add_query_from_smarts("[r]-!@*"))
+                lookup.set_break_molecule_at_first_two_matched_atoms(True)
+                lookup.set_max_matches_per_input_molecule(2)
+
+                phenol = lillymol_nb.MolFromSmiles("Oc1ccccc1 phenol")
+                replacements = lookup.generate_replacements(phenol)
+
+                self.assertEqual(len(replacements), 2)
+
+            with lillymol_nb_bdb.SubstituentIdentificationLookup() as lookup:
+                self.assertTrue(lookup.open_database(dbname))
+                self.assertTrue(lookup.add_query_from_smarts("[r]-!@*"))
+                lookup.set_break_molecule_at_first_two_matched_atoms(True)
+                lookup.set_remove_isotopes_from_product(True)
+
+                phenol = lillymol_nb.MolFromSmiles("Oc1ccccc1 phenol")
+                replacements = lookup.generate_replacements(phenol)
+
+                self.assertEqual(
+                    sorted(replacement.smiles for replacement in replacements),
+                    [
+                        "C1(=CC=CC=C1)Cl",
+                        "C1(=CC=CC=C1)N",
+                        "C1(=CC=CC=C1)S",
+                    ],
+                )
 
     def test_selimsteg_with_no_database_open(self):
         """Used to dereference a null Db* and take the process down."""

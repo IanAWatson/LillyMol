@@ -34,7 +34,7 @@ if mol is None:
     raise ValueError("Invalid SMILES")
 
 with SubstituentIdentificationLookup() as lookup:
-    if not lookup.add_database("/path/to/chembl.sbs.bdb"):
+    if not lookup.open_database("/path/to/chembl.sbs.bdb"):
         raise ValueError("Cannot open substituent database")
 
     # Consider atoms with implicit hydrogens as growth points, like the CLI -y
@@ -47,7 +47,7 @@ with SubstituentIdentificationLookup() as lookup:
     lookup.set_max_substituent_size(10)
     lookup.set_max_atoms_in_product(45)
     lookup.set_min_examples_needed_for_addition(3)
-    lookup.set_max_molecules_per_input_molecule(1000)
+    lookup.set_max_matches_per_input_molecule(1000)
 
     products = lookup.generate_replacements(mol)
 
@@ -105,6 +105,9 @@ with other substructure searches.
 
 ## Notes
 
+`add_database(dbname)` is also available as an alias for `open_database(dbname)`
+when multiple databases should be searched.
+
 The Python API intentionally covers the lookup/generation phase first. Database
 construction remains a command-line operation because it is usually a large,
 batch-oriented job and the command-line tool already provides progress reporting
@@ -114,4 +117,5 @@ Some setter names mirror internal command-line concepts. The commonly useful
 ones are `set_min_shell_radius`, `set_min_substituent_size`,
 `set_max_substituent_size`, `set_max_atoms_in_product`,
 `set_min_examples_needed_for_addition`, and
+`set_max_matches_per_input_molecule`, and its alias
 `set_max_molecules_per_input_molecule`.

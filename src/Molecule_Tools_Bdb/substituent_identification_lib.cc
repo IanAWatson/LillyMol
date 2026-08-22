@@ -946,8 +946,8 @@ class SubstituentIdentification {
 
   int InitialiseDefaultAtomTyping();
   void CloseDatabases();
-  int AddDatabaseForLookup(const std::string& dbname);
-  int AddQueryFromSmarts(const std::string& smarts);
+  bool AddDatabaseForLookup(const std::string& dbname);
+  bool AddQueryFromSmarts(const std::string& smarts);
   void set_default_new_molecule_starting_points(int s) {
     _default_new_molecule_starting_points = s;
   }
@@ -1786,11 +1786,11 @@ SubstituentIdentification::_get_matched_atoms_to_process(const Set_of_Atoms* e) 
   return n;
 }
 
-// Return true if we have already made more then _max_molecules_per_input_molecule molecules
+// Return true if we have made the maximum allowed number of molecules.
 // from the current parent.
 int
 SubstituentIdentification::AlreadyMadeEnoughMolecules(const UsedDuringLookups& lookup_data) const {
-  if (lookup_data.molecules_formed_from_current_molecule() > _max_molecules_per_input_molecule) {
+  if (lookup_data.molecules_formed_from_current_molecule() >= _max_molecules_per_input_molecule) {
     return 1;
   }
 
@@ -1941,7 +1941,7 @@ SubstituentIdentification::_look_for_new_substituents(Molecule& m,
     _molecules_hitting_queries++;
   }
 
-  if (lookup_data.molecules_formed_from_current_molecule() >
+  if (lookup_data.molecules_formed_from_current_molecule() >=
         _max_molecules_per_input_molecule) {
     _molecules_producing_too_many_new_molecules++;
     if (_verbose) {
@@ -1993,7 +1993,7 @@ SubstituentIdentification::_look_for_new_substituents(
 
     new_molecules_produced += tmp;
 
-    if (new_molecules_produced > _max_molecules_per_input_molecule) {
+    if (new_molecules_produced >= _max_molecules_per_input_molecule) {
       return new_molecules_produced;
     }
 
@@ -2078,7 +2078,7 @@ SubstituentIdentification::_look_for_new_substituents(
     new_molecules_produced += tmp;
     rc += tmp;
 
-    if (new_molecules_produced > _max_molecules_per_input_molecule) {
+    if (new_molecules_produced >= _max_molecules_per_input_molecule) {
       return rc;
     }
   }
@@ -2112,7 +2112,7 @@ SubstituentIdentification::_look_for_new_substituents(
 
     rc += tmp;
 
-    if (lookup_data.molecules_formed_from_current_molecule() > _max_molecules_per_input_molecule) {
+    if (lookup_data.molecules_formed_from_current_molecule() >= _max_molecules_per_input_molecule) {
       return rc;
     }
   }
@@ -2208,7 +2208,7 @@ SubstituentIdentification::_form_new_molecules(Molecule& m, atom_number_t zatom,
   while (fromdb.nextword(token, i, '|')) {
     rc += _form_new_molecule(m, zatom, fragment_lost, smiles_already_found,
                        rad_and_bit, token, already_processed, output);
-    if (rc > _max_molecules_per_input_molecule) {
+    if (rc >= _max_molecules_per_input_molecule) {
       return rc;
     }
   }
@@ -2266,7 +2266,7 @@ SubstituentIdentification::FormNewMolecules(Molecule& m, atom_number_t zatom,
     // TODO:ianwatson figure this out
     rc += FormNewMoleculeAtAtomWithReplacement(m, zatom, fragment_lost, smiles_already_found,
                 rad_and_bit, replacement, already_processed, output);
-    if (rc > _max_molecules_per_input_molecule) {
+    if (rc >= _max_molecules_per_input_molecule) {
       return rc;
     }
   }
@@ -2294,7 +2294,7 @@ SubstituentIdentification::FormNewMolecules(Molecule& m, atom_number_t zatom,
     // Check for size of product here? Complicated by possible loss of atoms...
     // TODO:ianwatson figure this out, I think it is OK to check here...
     rc += FormNewMoleculeAtAtom(m, zatom, rad_and_bit, lookup_data, replacement, output);
-    if (lookup_data.molecules_formed_from_current_molecule() > _max_molecules_per_input_molecule) {
+    if (lookup_data.molecules_formed_from_current_molecule() >= _max_molecules_per_input_molecule) {
       return rc;
     }
   }
@@ -2653,7 +2653,7 @@ SubstituentIdentification::_matched_pairs_qsar_by_radius(Molecule& m, const atom
 
     new_molecules_produced += tmp;
 
-    if (new_molecules_produced > _max_molecules_per_input_molecule) {
+    if (new_molecules_produced >= _max_molecules_per_input_molecule) {
       return new_molecules_produced;
     }
 
@@ -3597,11 +3597,11 @@ opendb_write(Db& db, const char* dbname) {
   return opendb(db, dbname, DB_BTREE, DB_CREATE, S_IREAD | S_IWRITE | S_IRGRP | S_IROTH);
 }
 
-int
+bool
 SubstituentIdentification::AddDatabaseForLookup(const std::string& dbname) {
   std::unique_ptr<Db> db = std::make_unique<Db>(nullptr, DB_CXX_NO_EXCEPTIONS);
   if (! opendb_read(*db, dbname.c_str())) {
-    return 0;
+    return false;
   }
 
   std::unique_ptr<Db*[]> new_dbs = std::make_unique<Db*[]>(_ndb + 1);
@@ -3617,7 +3617,8 @@ SubstituentIdentification::AddDatabaseForLookup(const std::string& dbname) {
   if (_ndb == 1) {
     const int stored_radius = _get_radius();
     if (stored_radius <= 0) {
-      return 0;
+      CloseDatabases();
+      return false;
     }
     _shell_radius = stored_radius;
   }
@@ -3626,20 +3627,20 @@ SubstituentIdentification::AddDatabaseForLookup(const std::string& dbname) {
     _shell_radius = _min_shell_radius;
   }
 
-  return 1;
+  return true;
 }
 
-int
+bool
 SubstituentIdentification::AddQueryFromSmarts(const std::string& smarts) {
   std::unique_ptr<Substructure_Query> query = std::make_unique<Substructure_Query>();
   if (! query->create_from_smarts(smarts)) {
-    return 0;
+    return false;
   }
 
   query->set_find_one_embedding_per_atom(1);
   _anchor_query << query.release();
 
-  return 1;
+  return true;
 }
 
 
@@ -4441,7 +4442,7 @@ SubstituentIdentificationLookup::SubstituentIdentificationLookup()
 
 SubstituentIdentificationLookup::~SubstituentIdentificationLookup() = default;
 
-int
+bool
 SubstituentIdentificationLookup::AddDatabase(const std::string& dbname) {
   return _impl->AddDatabaseForLookup(dbname);
 }
@@ -4451,7 +4452,7 @@ SubstituentIdentificationLookup::close() {
   _impl->CloseDatabases();
 }
 
-int
+bool
 SubstituentIdentificationLookup::AddQueryFromSmarts(const std::string& smarts) {
   return _impl->AddQueryFromSmarts(smarts);
 }

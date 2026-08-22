@@ -107,6 +107,46 @@ class TestNanobindBdb(unittest.TestCase):
             graph_mask = lillymol_nb_bdb.value(lillymol_nb_bdb.LookupParams.GRAPH)
             self.assertEqual(db.lookup(ethanol, graph_mask), "ethanol")
 
+    def test_substituent_identification_lookup(self):
+        tool = _runfile_path("Molecule_Tools_Bdb/substituent_identification")
+        if tool is None:
+            self.skipTest("substituent_identification not available in runfiles")
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            input_fname = os.path.join(tmpdir, "build.smi")
+            dbname = os.path.join(tmpdir, "substituents.bdb")
+            with open(input_fname, "w", encoding="utf-8") as writer:
+                writer.write("CC ethane\n")
+                writer.write("CO methanol\n")
+                writer.write("CN methylamine\n")
+
+            subprocess.run(
+                [tool, "-d", dbname, "-B", "-R", "2", "-w", "1", "-M", "2", input_fname],
+                check=True,
+            )
+
+            with lillymol_nb_bdb.SubstituentIdentificationLookup() as lookup:
+                self.assertTrue(lookup.add_database(dbname))
+                lookup.set_default_new_molecule_starting_points(1)
+                lookup.set_max_substituent_size(2)
+
+                mol = lillymol_nb.MolFromSmiles("C methane")
+                replacements = lookup.generate_replacements(mol)
+
+                self.assertEqual(len(replacements), 3)
+                self.assertEqual(
+                    sorted(replacement.donor for replacement in replacements),
+                    ["ethane", "methanol", "methylamine"],
+                )
+                for replacement in replacements:
+                    self.assertEqual(replacement.name, "methane")
+                    self.assertEqual(replacement.radius, 1)
+                    self.assertGreaterEqual(replacement.examples, 1)
+                    self.assertTrue(replacement.smiles)
+                    self.assertEqual(replacement.molecule.name(), "methane")
+
+
+
     def test_selimsteg_with_no_database_open(self):
         """Used to dereference a null Db* and take the process down."""
         lookup = lillymol_nb_bdb.Selimsteg()

@@ -329,10 +329,13 @@ cc_binary(
     ],
 )
 
-cc_binary(
-    name = "substituent_identification",
+cc_library(
+    name = "substituent_identification_lib",
     srcs = [
-        "substituent_identification.cc",
+        "substituent_identification_lib.cc",
+    ],
+    hdrs = [
+        "substituent_identification_lib.h",
     ],
     tags = ["berkeleydb"],
     deps = [
@@ -347,6 +350,54 @@ cc_binary(
         "@third_party//:berkeley_static",
         "@com_google_absl//absl/container:flat_hash_set",
         "@com_google_protobuf//:protobuf",
+    ],
+)
+
+cc_library(
+    name = "substituent_identification_lib_shared",
+    srcs = [
+        "substituent_identification_lib.cc",
+    ],
+    hdrs = [
+        "substituent_identification_lib.h",
+    ],
+    tags = ["berkeleydb"],
+    deps = [
+        "//Foundational/iwstring:string_with_commas",
+        ":substituent_identification_cc_proto",
+        "//Foundational/cmdline:iwcmdline",
+        "//Foundational/iwmisc",
+        "//Molecule_Lib:iwmolecule",
+        "//Molecule_Lib:moleculeio",
+        "//Molecule_Tools:mformula",
+        "//Molecule_Tools:smarts_for_atom_subset",
+        "@third_party//:berkeley_shared",
+        "@com_google_absl//absl/container:flat_hash_set",
+        "@com_google_protobuf//:protobuf",
+    ],
+)
+
+cc_binary(
+    name = "substituent_identification",
+    srcs = [
+        "substituent_identification.cc",
+    ],
+    tags = ["berkeleydb"],
+    deps = [
+        ":substituent_identification_lib",
+    ],
+)
+
+cc_test(
+    name = "substituent_identification_lib_test",
+    srcs = [
+        "substituent_identification_lib_test.cc",
+    ],
+    tags = ["berkeleydb"],
+    deps = [
+        ":substituent_identification_lib",
+        "@googletest//:gtest",
+        "@googletest//:gtest_main",
     ],
 )
 

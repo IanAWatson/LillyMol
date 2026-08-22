@@ -26,6 +26,7 @@ check the reference if something does not behave as you expect.
 | [tsubstructure.md](tsubstructure.md) | Substructure searching as the `tsubstructure` tool does it |
 | [structure_database.md](structure_database.md) | Looking molecules up in a structure database |
 | [synthetic_precedent.md](synthetic_precedent.md) | Synthetic precedent from a database of known molecules |
+| [substituent_identification.md](substituent_identification.md) | Python lookup/generation API for databases built by `substituent_identification` |
 | [4-pyridone.py](4-pyridone.py), [reaction_example.py](reaction_example.py) | Worked examples |
 
 ## Installing and verifying
@@ -36,14 +37,14 @@ inside a LillyMol checkout:
 ```
 cd ${LILLYMOL_HOME}/src
 bazel build -c opt //nanobind:all
-./copy_nanobind_shared_libraries.sh ../lib
+./copy_nanobind_shared_libraries.sh ../nanobind_lib
 ```
 
-then run python through the wrapper, which sets `PYTHONPATH` and
+then run python through the nanobind wrapper, which sets `PYTHONPATH` and
 `LD_LIBRARY_PATH` for you:
 
 ```
-${LILLYMOL_HOME}/run_python.sh my_script.py
+${LILLYMOL_HOME}/run_nanobind_python.sh my_script.py
 ```
 
 Build `-c opt`. A default `fastbuild` is enormously slower and is not what any of

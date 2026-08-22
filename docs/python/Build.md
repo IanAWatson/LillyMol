@@ -52,14 +52,14 @@ From the source checkout:
 ```shell
 cd ${LILLYMOL_HOME}/src
 bazel build -c opt //nanobind:all
-./copy_nanobind_shared_libraries.sh ../lib
+./copy_nanobind_shared_libraries.sh ../nanobind_lib
 ```
 
 Then run Python through the top-level wrapper, which sets `PYTHONPATH` and
 `LD_LIBRARY_PATH` for the staged extension modules and LillyMol shared libraries:
 
 ```shell
-${LILLYMOL_HOME}/run_python.sh my_script.py
+${LILLYMOL_HOME}/run_nanobind_python.sh my_script.py
 ```
 
 Use `-c opt` for normal testing and timing. Bazel's default `fastbuild` is much
@@ -75,7 +75,7 @@ does not compile the C++ code.
 ```shell
 cd ${LILLYMOL_HOME}/src
 bazel build -c opt //nanobind:all
-./copy_nanobind_shared_libraries.sh ../lib
+./copy_nanobind_shared_libraries.sh ../nanobind_lib
 
 cd ${LILLYMOL_HOME}/python
 ./scripts/stage_wheel_files.sh

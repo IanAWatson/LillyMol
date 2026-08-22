@@ -13,6 +13,7 @@
 #include "Molecule_Tools_Bdb/iwecfp_database_lookup_lib.h"
 #include "Molecule_Tools_Bdb/selimsteg.h"
 #include "Molecule_Tools_Bdb/structure_database.h"
+#include "Molecule_Tools_Bdb/substituent_identification_lib.h"
 
 namespace nb = nanobind;
 
@@ -91,6 +92,76 @@ NB_MODULE(lillymol_nb_bdb, m) {
            nb::arg("min_examples"),
            "Slurp database entries with at least min_examples examples to memory")
       .def("__repr__", &SyntheticPrecedentDatabasesRepr);
+
+  nb::class_<SubstituentReplacement>(m, "SubstituentReplacement")
+      .def_prop_ro("molecule",
+                   [](const SubstituentReplacement& replacement) {
+                     return replacement.molecule;
+                   })
+      .def_ro("smiles", &SubstituentReplacement::smiles)
+      .def_ro("name", &SubstituentReplacement::name)
+      .def_ro("donor", &SubstituentReplacement::donor)
+      .def_ro("radius", &SubstituentReplacement::radius)
+      .def_ro("examples", &SubstituentReplacement::examples)
+      .def_ro("fragment_lost", &SubstituentReplacement::fragment_lost)
+      .def_ro("fragment_added", &SubstituentReplacement::fragment_added);
+
+  nb::class_<SubstituentIdentificationLookup>(m, "SubstituentIdentificationLookup")
+      .def(nb::init<>())
+      .def("add_database", &SubstituentIdentificationLookup::AddDatabase,
+           nb::arg("dbname"))
+      .def("add_query_from_smarts",
+           &SubstituentIdentificationLookup::AddQueryFromSmarts,
+           nb::arg("smarts"))
+      .def("set_default_new_molecule_starting_points",
+           &SubstituentIdentificationLookup::set_default_new_molecule_starting_points,
+           nb::arg("value"))
+      .def("set_min_shell_radius",
+           &SubstituentIdentificationLookup::set_min_shell_radius,
+           nb::arg("radius"))
+      .def("set_only_produce_molecules_at_biggest_radius",
+           &SubstituentIdentificationLookup::set_only_produce_molecules_at_biggest_radius,
+           nb::arg("value"))
+      .def("set_break_molecule_at_first_two_matched_atoms",
+           &SubstituentIdentificationLookup::set_break_molecule_at_first_two_matched_atoms,
+           nb::arg("value"))
+      .def("set_matched_atoms_to_process",
+           &SubstituentIdentificationLookup::set_matched_atoms_to_process,
+           nb::arg("value"))
+      .def("set_min_substituent_size",
+           &SubstituentIdentificationLookup::set_min_substituent_size,
+           nb::arg("natoms"))
+      .def("set_max_substituent_size",
+           &SubstituentIdentificationLookup::set_max_substituent_size,
+           nb::arg("natoms"))
+      .def("set_max_atoms_in_product",
+           &SubstituentIdentificationLookup::set_max_atoms_in_product,
+           nb::arg("natoms"))
+      .def("set_min_examples_needed_for_addition",
+           &SubstituentIdentificationLookup::set_min_examples_needed_for_addition,
+           nb::arg("examples"))
+      .def("set_max_molecules_per_input_molecule",
+           &SubstituentIdentificationLookup::set_max_molecules_per_input_molecule,
+           nb::arg("max_products"))
+      .def("set_remove_isotopes_from_product",
+           &SubstituentIdentificationLookup::set_remove_isotopes_from_product,
+           nb::arg("value"))
+      .def("set_write_fragments_added",
+           &SubstituentIdentificationLookup::set_write_fragments_added,
+           nb::arg("value"))
+      .def("generate_replacements",
+           nb::overload_cast<Molecule&>(&SubstituentIdentificationLookup::GenerateReplacements),
+           nb::arg("mol"))
+      .def("close", &SubstituentIdentificationLookup::close,
+           "Close all open BerkeleyDB databases. Idempotent")
+      .def("__enter__", [](nb::object self) { return self; })
+      .def("__exit__",
+           [](SubstituentIdentificationLookup& lookup, nb::object, nb::object, nb::object) -> bool {
+             lookup.close();
+             return false;
+           },
+           nb::arg("exc_type").none(), nb::arg("exc_value").none(),
+           nb::arg("traceback").none());
 
   nb::class_<selimsteg::Selimsteg>(m, "Selimsteg")
       .def(nb::init<>())

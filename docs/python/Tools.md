@@ -128,6 +128,19 @@ products = wizard.process(mol)
 See the command-line [medchemwizard documentation](/docs/Molecule_Tools/medchemwizard.md)
 for option details and the full Python method list.
 
+
+## Substituent Identification
+
+`SubstituentIdentificationLookup` exposes the molecule-generation side of the
+command-line [`substituent_identification`](/docs/Molecule_Tools/substituent_identification.md)
+tool. Build the BerkeleyDB database with the command-line tool, then open it from
+Python and call `generate_replacements(mol)` to get `SubstituentReplacement`
+objects containing the generated molecule, product smiles, donor identifier,
+matching radius, support count, and fragments lost/added.
+
+See [Substituent Identification](substituent_identification.md) for the Python
+workflow and field descriptions.
+
 ## Selimsteg
 Selimsteg is an anadrome of getsmiles. At Lilly a variety of selimsteg
 tools are used to fetch the smiles for an identifier, from BerkeleyDB

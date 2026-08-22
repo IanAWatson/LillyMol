@@ -120,6 +120,8 @@ BindSetOfAtomsAndRing(nb::module_& m) {
       .def("largest_number_of_bonds_shared_with_another_ring",
            &Ring::largest_number_of_bonds_shared_with_another_ring)
       .def("strongly_fused_ring_neighbours", &Ring::strongly_fused_ring_neighbours)
+      .def("is_aromatic", [](const Ring& ring) { return static_cast<bool>(ring.is_aromatic()); },
+           "True if the ring is aromatic")
       .def("contains_bond",
            [](const Ring& ring, atom_number_t a1, atom_number_t a2) {
              return static_cast<bool>(ring.contains_bond(a1, a2));

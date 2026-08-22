@@ -1,111 +1,15 @@
-# LillyMol Python
-The LillyMol Python environment provides most core LillyMol functionality to
-python.  We find that using LillyMol Python can be a very effective means of prototyping
-an idea, or doing things where run times are short.
+# LillyMol Python API Reference
 
-## Background
-Python bindings for LillyMol were implemented at Google in 2019 using 
-[Clif](https://google.github.io/clif/clif/python/). While this appeared to work
-well, and Clif was easy to use inside Google, it proved to be very difficult
-outside Google. Instead [pybind11](https://github.com/pybind/pybind11) has been
-used here. It is an amazing template metaprogramming tour-de-force, which
-ultimately seems to work well.
+This document is the API reference for the public LillyMol Python modules. For an
+orientation to the Python interface, performance model, and common workflows, see
+[README.md](README.md). For build and packaging instructions, see
+[Build.md](Build.md).
 
-Unfortunately there do appear to be many instances of needless copies happening
-between C++ and Python. Perhaps these could be lessened via careful inspection,
-but for now, there is no claim that this is as fast as things could be.
-
-## Building and installation
-Your python environment *must* include pybind11. Normally
-```
-pip install pybind11
-```
-will accomplish this.
-
-Normally the python bindings are built as part of the default build,
-the script [build_linux.sh](/src/build_linux.sh), but if
-you wish to compile separately that can be done via
-```
-bazelisk --output_user_root=/local/disk/ian build --cxxopt=-DTODAY="$(date +%Y-%b-%d)" --cxxopt=-DGIT_HASH="$(git rev-parse --short --verify HEAD)" --local_cpu_resources=10 -c opt pybind:all
-```
-This generates several `*.so` files in `bazel-bin/pybind`. In addition,
-LillyMol now has several run-time dependencies, and these also need to be made
-available.
-
-### Local development with `run_python.sh`
-
-For local development, the script `copy_shared_libraries.sh` in the `src`
-directory copies the pybind extension modules and their LillyMol shared-library
-dependencies out of `bazel-bin` and into `${LILLYMOL_HOME}/lib`.
-
-```
-cd ${LILLYMOL_HOME}/src
-bazel build //pybind:all
-./copy_shared_libraries.sh ../lib
-```
-
-Once the shared libraries are copied to `${LILLYMOL_HOME}/lib`, the top-level
-`run_python.sh` script can be used to invoke Python with `PYTHONPATH` and
-`LD_LIBRARY_PATH` set appropriately.
-
-```
-${LILLYMOL_HOME}/run_python.sh my_script.py
-```
-
-This is the simplest workflow while developing LillyMol itself.
-
-### Building a wheel
-
-A wheel can be built from the same Bazel-generated pybind modules. This does not
-compile C++ via setuptools; Bazel still does the C++ build. The wheel machinery
-just packages the prebuilt extension modules and their private LillyMol shared
-libraries.
-
-```
-cd ${LILLYMOL_HOME}/src
-bazel build //pybind:all
-./copy_shared_libraries.sh ../lib
-
-cd ${LILLYMOL_HOME}/python
-./scripts/stage_wheel_files.sh
-python -m pip install build wheel setuptools
-python -m build --wheel
-```
-
-The wheel is written to `${LILLYMOL_HOME}/python/dist`. The staging script
-creates `${LILLYMOL_HOME}/python/prebuilt`, which is generated data and should
-not be committed.
-
-The wheel includes the pybind extension modules, selected generated protobuf
-Python modules, and private LillyMol shared libraries. On Linux the staged shared
-objects are patched with an `$ORIGIN` runpath so installed extension modules can
-find the private shared libraries shipped beside them, without requiring
-`LD_LIBRARY_PATH`.
-
-The wheel can be smoke-tested in a clean target directory with something like
-
-```
-rm -rf /tmp/lillymol_wheel_test
-python -m pip install --no-deps --target /tmp/lillymol_wheel_test \
-  ${LILLYMOL_HOME}/python/dist/lillymol-*.whl
-
-env -u LD_LIBRARY_PATH PYTHONPATH=/tmp/lillymol_wheel_test python - <<'PYTHON_SMOKE_TEST'
-import lillymol
-import lillymol_query
-import lillymol_tools
-m = lillymol.MolFromSmiles("CCO ethanol")
-q = lillymol_query.QueryFromSmarts("[OD1,OD2]")
-assert q in m
-ctx = lillymol_tools.GFPContext.standard()
-fp = ctx.fingerprint(m)
-assert abs(ctx.distance(fp, fp)) < 1.0e-6
-print("LillyMol wheel smoke test ok")
-PYTHON_SMOKE_TEST
-```
-
-See `${LILLYMOL_HOME}/python/README.md` for the wheel staging details.
-
-See `MODULE.bazel` for how we configured the local python and pybind11 installs.
+The current Python bindings are built with nanobind. Earlier LillyMol Python
+bindings used CLIF internally and then pybind11; those are historical details for
+most users. The public module names are `lillymol`, `lillymol_io`,
+`lillymol_tools`, and related helper modules. The temporary `lillymol_nb` name was
+used during migration and should not be used in installed code.
 
 ## Philosophy
 LillyMol has no concept of changeable and unchangeable molecules. Any molecule
@@ -215,7 +119,7 @@ for m in reader:
 ```
 This will print the smiles and name of each molecule. If reading a 
 .sdf file, use `FileType.SDF`. LillyMol has a wide variety of directives
-for reading .sdf files, those need to be made available via Python.
+for reading .sdf files, many of which are now available via python.
 
 Note that there will never be a None molecule returned. If a connection
 table error is encountered, reading will cease. The Reader class has
@@ -515,7 +419,7 @@ The most common methods for a Molecule currently implemented are
 | translate(x, y, z) | Translate atoms |
 | highest_coordinate_dimensionality() | Will be 3 of 3D coordinates available |
 | discern_chirality_from_3d_structure() | Use geometry to discern chiral centres |
-| dihedral_scan(atom, atom, angle, bump_check | return list of coordinate sets |
+| dihedral_scan(a2, a3, angle, bump_check=0.0) | Return a list of flat float32 NumPy coordinate arrays for rotations around the a2-a3 bond |
 | non_sssr_rings() | Number of non Smallest Set of Smallest Rings rings |
 | non_sssr_ring(i) | The i'th non-SSSR ring |
 | invalidate_partial_charges() | Discard any partial charge information stored |
@@ -547,6 +451,41 @@ other atoms in a `Molecule`.
 `chiral_centre_at_atom(atom)` returns the stored `Chiral_Centre` for an atom,
 if one is present. A stored chiral centre records molecular annotation; it does
 not by itself prove that the atom is actually stereogenic.
+
+A LillyMol ChiralCentre object has a central atom, and other atoms called
+`top_front`, `top_back`, `left_down` and `right_down`.
+```
+m = MolFromSmiles("F[C@H](N)O")
+m.number_chiral_centres()
+1
+c = m.chiral_centre_at_atom(1)
+<Chiral_Centre atom 1 tf 0 tb H ld 2 rd 3>
+```
+These attachments can be accessed with `c.top_front()`, `c.top_back()`,
+`c.left_down()` and `c.right_down()`. `c.atoms()` returns the same four values as
+`[top_front, top_back, left_down, right_down]`, and `Chiral_Centre` objects can
+be iterated in that same order. Each value is an atom number for an explicit
+atom. For non-atom attachments it returns one of the module constants
+`CHIRAL_CONNECTION_IS_IMPLICIT_HYDROGEN` or
+`CHIRAL_CONNECTION_IS_LONE_PAIR`. The helper predicates
+`is_chiral_implicit_hydrogen(value)` and `is_chiral_lone_pair(value)` are also
+available when code wants to avoid comparing sentinel values directly.
+
+`chiral_centre_at_atom(atom)` and `chiral_centres()` return copies of the stored
+`Chiral_Centre` objects. This avoids lifetime problems if the parent `Molecule`
+is a temporary. In Python, `Chiral_Centre` is intended as an inspection object;
+operations that change chirality are exposed on `Molecule`, such as
+`invert_chirality_on_atom(atom)`, `remove_chiral_centre_at_atom(atom)`, and
+`remove_all_chiral_centres()`.
+
+```python
+from lillymol import MolFromSmiles, CHIRAL_CONNECTION_IS_IMPLICIT_HYDROGEN
+
+c = MolFromSmiles("F[C@H](Cl)Br").chiral_centre_at_atom(1)
+print(c.top_back() == CHIRAL_CONNECTION_IS_IMPLICIT_HYDROGEN)
+for position, atom in enumerate(c):
+    print(position, atom)
+```
 
 `is_actually_chiral(mol, atom)` performs the more expensive check for whether an
 atom is actually chiral.
@@ -682,7 +621,7 @@ m[0] - m[1]
 ```
 reports sqrt(3). For now... Use `m.distance_between_atoms(atom1, atom2)` to
 reliably obtain the geometric distance between two atoms in a molecule.
-The same result will be obtained by the atom based method `m[atom1].distance(m[atom2]).
+The same result will be obtained by the atom based method `m[atom1].distance(m[atom2])`.
 That latter invocation would be very inefficient, since two `Atom` objects
 would need to be instantiated in Python, whereas the `Molecule` based
 method avoids that conversion entirely.
@@ -718,23 +657,6 @@ Traversing the bond list results in each Bond being examined only once.
 Knowing when to solve a problem by traversing atoms and when to traverse
 bonds can be hard.
 
-Even if you need to scan all atoms and their bonds, there is a more efficient
-way of performing the first loop
-```
-```
-  result = 0
-  for i, atom in enumerate(m):
-    if atom.atomic_number() != 7:
-      continue
-    for other in atom.connections(i):
-    for bond in atom:
-      if bond.is_single_bond():
-        continue
-      other = bond.other(i)
-      if m.atomic_number(other) == 6:
-        result += 1
-```
-
 ## Bond Methods
 Again, the Bond class really does not know much.
 
@@ -757,8 +679,8 @@ And a couple of other things.
 | is_triple_bond() | True if the bond is a triple bond |
 | is_aromatic() | True if the bond is aromatic |
 | nrings() | The number of rings involving this bond |
-| is_directional(() | True if bond is directional |
 | IsInRing() | True if bond is in a ring |
+| is_directional(() | True if bond is directional |
 | GetBeginAtomIdx() | Same as a1() |
 | GetEndAtomIdx() | Same as a2() |
 | GetBondType() | Same as btype() |
@@ -774,14 +696,17 @@ Set_of_Atoms contained duplicate atom numbers.
 | ------ | ----------- |
 | empty() | True of the set is empty |
 | size() | Number of items |
-| set_vector(list, value) | Set list[i] to 'value' for each atom i in the set |
+| set_vector(list, value) | Set list[i] to `value` for each atom i in the set |
+| scatter(list, value) | Alias for `set_vector(list, value)` |
+| increment_vector(list, value) | Increment list[i] by `value` for each atom i in the set |
 | \__len__ | Number of items |
 | \__getitem__ | Access via [i] |
 | \__iter__ | Access atoms via iterators |
 | \__contains__ | Is atom included |
 
-The C++ version contains several gather and scatter type methods. Other methods may
-be added.
+`set_vector`, `scatter`, and `increment_vector` mutate normal Python lists.
+They are useful for turning an embedding into per-atom flags without constructing
+an intermediate molecule-sized array in Python.
 
 ## Ring Methods
 A Molecule may have rings. Ring's are just Set_of_Atoms's that have some

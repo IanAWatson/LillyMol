@@ -1,9 +1,9 @@
 # LillyMol Python
 
-Python bindings for LillyMol, built with [pybind11](https://github.com/pybind/pybind11).
+Python bindings for LillyMol, built with [nanobind](https://github.com/wjakob/nanobind).
 
 These started as a prototyping convenience and have become fast enough to use in
-anger. LillyMol is a C++ cheminformatics toolkit that has always been built around
+real tasks. LillyMol is a C++ cheminformatics toolkit that has always been built around
 speed, and most of that survives the trip into python, because almost every call
 does real work in C++ rather than shuffling python objects. Where we have measured
 against RDKit on the same task, LillyMol python has run 3 to 7 times faster - see
@@ -35,8 +35,8 @@ inside a LillyMol checkout:
 
 ```
 cd ${LILLYMOL_HOME}/src
-bazel build -c opt //pybind:all
-./copy_shared_libraries.sh ../lib
+bazel build -c opt //nanobind:all
+./copy_nanobind_shared_libraries.sh ../lib
 ```
 
 then run python through the wrapper, which sets `PYTHONPATH` and
@@ -201,7 +201,7 @@ for a in range(m.natoms()):
 
 Use `mol.bonds()` when you genuinely want every bond once - iterating atoms and
 then their bonds visits each bond twice. Use `bond_between_atoms(a1, a2)` when you
-need a real `Bond` to ask about ring membership or direction, and
+need a real `Bond` to ask about ring membership, bond type or direction, and
 `bond_type_between_atoms(a1, a2)` when the type is all you want. Both return
 `None` when the atoms are not bonded.
 
@@ -223,8 +223,8 @@ A `Molecule` copy costs about as much as the search you are about to do on it, s
 a call that copies its input has doubled the price before starting. This is not
 hypothetical - it is the largest performance defect we have found in these
 bindings. `TSubstructure`'s batch entry points took a `std::vector<Molecule>`,
-which makes pybind11 copy construct every molecule in the list, and because that
-happens with the GIL held it also cannot overlap between threads. The batch call
+which makes the binding layer copy construct every molecule in the list, and because
+that happens with the GIL held it also cannot overlap between threads. The batch call
 was slower than the python loop it exists to replace, and capped at under 3x on
 32 cores. Changing the signature to `std::vector<Molecule*>` - same python
 signature, callers pass the same list - took it from 99k to 570k molecules per
@@ -235,7 +235,7 @@ parameter of type `std::vector<SomeBoundType>` copies every element, silently, a
 under the GIL. Take `std::vector<SomeBoundType*>` unless you specifically want the
 caller's objects protected from mutation. Two things follow from taking pointers,
 both of which the existing bindings handle explicitly and yours should too:
-pybind11 converts a python `None` to `nullptr`, so an unchecked list containing
+the binding layer converts a python `None` to `nullptr`, so an unchecked list containing
 `None` will dereference it and take the interpreter down; and anything the C++
 code writes to a molecule now lands on the caller's object rather than on a
 discarded copy. The second is usually what you wanted - it is why a batch
@@ -355,13 +355,13 @@ hiding it:
 ## Reference
 
 The API reference is [LillyMolPython.md](LillyMolPython.md). Every method named in
-its tables is checked against the built module by
-[`src/pybind/lillymol_doc_test.py`](/src/pybind/lillymol_doc_test.py), so a
-renamed binding fails a test rather than quietly misleading a reader. Run it with
+its class-method tables is checked against the nanobind module by
+`//nanobind:lillymol_nb_doc_test`, so a renamed binding fails a test rather than
+quietly misleading a reader.
 
-```
+```shell
 cd ${LILLYMOL_HOME}/src
-PYTHONPATH=bazel-bin/pybind python3 pybind/lillymol_doc_test.py
+bazel test -c opt //nanobind:lillymol_nb_doc_test
 ```
 
 That test does not check prose or examples. If you change behaviour, the

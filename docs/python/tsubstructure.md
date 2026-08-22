@@ -158,10 +158,11 @@ The labels are applied to the molecules you passed in - the ethanol, which does 
 match, is untouched.
 
 This did not used to work, and the reason is worth knowing. The binding took a
-`std::vector<Molecule>`, which makes pybind copy every molecule in the list at the
-boundary, so the labels went onto the copies and were discarded - there was no way
-to get the result back. Taking a `std::vector<Molecule*>` instead copies nothing,
-and the same change made the batch `substructure_search` and `num_matches`
+`std::vector<Molecule>`, which makes the binding layer copy every molecule in
+the list at the boundary, so the labels went onto the copies and were discarded -
+there was no way to get the result back. Taking a `std::vector<Molecule*>`
+instead copies nothing, and the same change made the batch `substructure_search`
+and `num_matches`
 substantially faster. See [Performance](#performance).
 
 The other kind of matched atom is where the atoms are labelled by the number
@@ -230,9 +231,10 @@ to be the fastest of the four; it no longer is, and it re-parses each smiles.
 
 An older version of this document reported these as 0.44, 0.40, 0.30 and 0.36
 seconds on 2012 SandyBridge hardware, when the list forms took a
-`std::vector<Molecule>` and pybind therefore copy constructed every molecule at
-the boundary. A Molecule copy is about 5.4 microseconds, comparable to a whole
-search, so the copying dominated and the ordering came out differently. The
+`std::vector<Molecule>` and the binding layer therefore copy constructed every
+molecule at the boundary. A Molecule copy is about 5.4 microseconds,
+comparable to a whole search, so the copying dominated and the ordering came out
+differently. The
 bindings now take `std::vector<Molecule*>`, which copies nothing. Do not restore
 the by value form.
 

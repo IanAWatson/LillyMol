@@ -483,6 +483,10 @@ $$$$
         self.assertEqual(mol.remove_bond_between_atoms(1, 2), 1)
         self.assertIsNone(mol.bond_between_atoms(1, 2))
 
+        mixture = lillymol_nb.MolFromSmiles("C methane")
+        self.assertEqual(mixture.add(lillymol_nb.MolFromSmiles("O water")), 1)
+        self.assertEqual(mixture.number_fragments(), 2)
+
     def test_atom_removal_and_resize(self):
         mol = lillymol_nb.MolFromSmiles("CCO ethanol")
         self.assertEqual(mol.remove_atom(2), 1)
@@ -785,11 +789,29 @@ $$$$
         self.assertTrue(centre.involves(0))
         self.assertEqual(centre.implicit_hydrogens(), 1)
         self.assertEqual(centre.lone_pairs(), 0)
+        self.assertLess(lillymol_nb.CHIRAL_CONNECTION_IS_IMPLICIT_HYDROGEN, 0)
+        self.assertLess(lillymol_nb.CHIRAL_CONNECTION_IS_LONE_PAIR, 0)
+        self.assertNotEqual(lillymol_nb.CHIRAL_CONNECTION_IS_IMPLICIT_HYDROGEN,
+                            lillymol_nb.CHIRAL_CONNECTION_IS_LONE_PAIR)
+        self.assertEqual(centre.top_back(),
+                         lillymol_nb.CHIRAL_CONNECTION_IS_IMPLICIT_HYDROGEN)
+        self.assertEqual(centre.atoms(),
+                         [centre.top_front(), centre.top_back(),
+                          centre.left_down(), centre.right_down()])
+        self.assertEqual(list(centre), centre.atoms())
+        self.assertEqual([item for item in enumerate(centre)],
+                         list(enumerate(centre.atoms())))
+        self.assertEqual(len(centre), 4)
+        self.assertEqual(centre[0], centre.top_front())
+        self.assertEqual(centre[3], centre.right_down())
+        with self.assertRaises(Exception):
+            _ = centre[4]
         self.assertTrue(lillymol_nb.is_chiral_implicit_hydrogen(centre.top_back()))
         self.assertFalse(lillymol_nb.is_chiral_lone_pair(centre.top_back()))
-        centre.atom_is_now_lone_pair(0)
-        self.assertTrue(lillymol_nb.is_chiral_lone_pair(centre.top_front()))
-        self.assertFalse(lillymol_nb.is_chiral_implicit_hydrogen(centre.top_front()))
+        self.assertTrue(
+            lillymol_nb.is_chiral_lone_pair(lillymol_nb.CHIRAL_CONNECTION_IS_LONE_PAIR))
+        self.assertFalse(hasattr(centre, "atom_is_now_lone_pair"))
+        self.assertFalse(hasattr(centre, "implicit_hydrogen_is_now_atom_number"))
         self.assertIn("<Chiral_Centre atom 1", repr(centre))
         centres = mol.chiral_centres()
         self.assertEqual(len(centres), 1)
@@ -1057,6 +1079,8 @@ $$$$
         self.assertEqual(ring.size(), 6)
         self.assertEqual(len(ring), 6)
         self.assertEqual(ring.ring_number(), 0)
+        mol.compute_aromaticity_if_needed()
+        self.assertTrue(ring.is_aromatic())
         self.assertTrue(ring.contains_bond(0, 1))
         self.assertTrue(ring.contains_both(0, 3))
         self.assertFalse(ring.is_fused())
@@ -1422,9 +1446,12 @@ query {
         mol = lillymol_nb.MolFromSmiles("CC#N acetonitrile")
         self.assertEqual(lillymol_nb.hybridization(mol, 0), lillymol_nb.Hybridization.SP3)
         self.assertEqual(lillymol_nb.hybridization(mol, 1), lillymol_nb.Hybridization.SP)
+        self.assertEqual(mol.hybridization(1), lillymol_nb.Hybridization.SP)
         self.assertEqual(lillymol_nb.hybridization_name(lillymol_nb.Hybridization.SP3), "SP3")
         with self.assertRaises(Exception):
             lillymol_nb.hybridization(mol, 99)
+        with self.assertRaises(Exception):
+            mol.hybridization(99)
 
         lillymol_nb.set_auto_create_new_elements(0)
         lillymol_nb.set_atomic_symbols_can_have_arbitrary_length(0)

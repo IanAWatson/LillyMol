@@ -1,24 +1,24 @@
-# Nanobind pilot
+# Nanobind bindings
 
-This directory is an experimental nanobind implementation of LillyMol Python
-bindings. It is intentionally built in parallel with `src/pybind` so the current
-pybind11 bindings remain available while migration issues are explored.
+This directory contains the nanobind implementation of the LillyMol Python
+bindings. It was built in parallel with `src/pybind` during migration, but the
+intended public runtime is a nanobind-backed `lillymol` module. Python code
+should not mix pybind11-bound and nanobind-bound LillyMol objects in one
+process.
 
-The long-term goal is a complete changeover, not a mixed pybind11/nanobind
-runtime where Python code passes C++ objects between binding systems. At
-changeover, the nanobind extension will become the normal `lillymol` Python
-module and the temporary `lillymol_nb` module name will disappear. During the
-pilot, nanobind modules should therefore be designed as if they will eventually
-own the Python-visible LillyMol types. Avoid depending on pybind-bound classes.
+During transition builds the temporary module name is `lillymol_nb`. At
+changeover, that name should disappear and these bindings should install as the
+normal public `lillymol`, `lillymol_io`, `lillymol_tools`, and related modules.
+Avoid adding dependencies on pybind-bound classes.
 
 `Atom`, `Bond`, and `Ring` objects returned from a `Molecule` are borrowed views
 into that molecule. They are valid while the parent molecule remains alive and
 structurally unchanged. Structural mutation of the parent molecule can invalidate
-previously returned child objects; the pilot does not add extra ownership or
+previously returned child objects; the bindings do not add extra ownership or
 copying solely to guard against that case. APIs that return independent objects
 should do so explicitly, as `rings()` does by returning copied rings.
 
-Current pilot module:
+Current development module:
 
 ```shell
 bazel build -c opt //nanobind:lillymol_nb
@@ -28,7 +28,7 @@ bazel test -c opt //nanobind:lillymol_nb_test
 The binding implementation is split by functional area:
 
 - `lillymol_nb.cc` contains only the `NB_MODULE` entry point;
-- `lillymol_nb_internal.h` contains shared declarations for the pilot;
+- `lillymol_nb_internal.h` contains shared declarations for the bindings;
 - `lillymol_nb_common.cc` contains shared helper implementations;
 - `lillymol_nb_io.cc`, `lillymol_nb_molecule.cc`,
   `lillymol_nb_atom_bond.cc`, `lillymol_nb_set_of_atoms.cc`,
@@ -56,7 +56,7 @@ uv venv --python /home/ian/.local/bin/python3.13 /home/ian/lillymol_py313_venv
 uv pip install --python /home/ian/lillymol_py313_venv/bin/python numpy protobuf
 ```
 
-`lillymol_nb` currently validates:
+The nanobind tests currently validate:
 
 - constructing, copying, indexing, and iterating over a `Molecule`;
 - common `Molecule` accessors, RDKit-style aliases, mutators, bond lookup,
@@ -89,16 +89,11 @@ uv pip install --python /home/ian/lillymol_py313_venv/bin/python numpy protobuf
   `MolWriterContext`, with `ReaderContext` and `ContextWriter` retained as
   compatibility aliases;
 - `slurp` and the small global MDL/SDF reader option helpers exposed by the
-  pybind I/O module.
+  Python I/O module.
 
-See `changeover_checklist.md` for the current pybind-to-nanobind gap triage and
-changeover tasks.
+See `changeover_checklist.md` for remaining changeover packaging tasks and
+intentional compatibility decisions.
 
-Still to explore:
-
-- broader query functionality, including proto construction and richer query-file
-  workflows;
-- broader object lifetime and reference return policies for molecule-owned
-  objects, especially if mutable atom or bond operations are added;
-- final packaging work for replacing the pybind11 modules with nanobind modules
-  under the public `lillymol` name.
+Remaining changeover work is mostly packaging and naming: install these modules
+under the public names, keep compatibility aliases where useful, and remove stale
+pybind artifacts from local development paths.

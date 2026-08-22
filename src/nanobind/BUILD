@@ -47,6 +47,12 @@ nanobind_extension(
 )
 
 py_test(
+    name = "lillymol_nb_doc_test",
+    srcs = ["lillymol_nb_doc_test.py"],
+    data = [":lillymol_nb"],
+)
+
+py_test(
     name = "lillymol_nb_test",
     srcs = ["lillymol_nb_test.py"],
     data = [

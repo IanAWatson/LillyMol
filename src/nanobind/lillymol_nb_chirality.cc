@@ -2,8 +2,37 @@
 
 namespace lillymol_nb {
 
+namespace {
+
+std::vector<int>
+ChiralCentreAtoms(const Chiral_Centre& centre) {
+  return {centre.top_front(), centre.top_back(), centre.left_down(), centre.right_down()};
+}
+
+int
+ChiralCentreAtom(const Chiral_Centre& centre, int index) {
+  switch (index) {
+    case 0:
+      return centre.top_front();
+    case 1:
+      return centre.top_back();
+    case 2:
+      return centre.left_down();
+    case 3:
+      return centre.right_down();
+    default:
+      throw std::out_of_range("Chiral_Centre atom index outside [0, 4)");
+  }
+}
+
+}  // namespace
+
 void
 BindChirality(nb::module_& m) {
+  m.attr("CHIRAL_CONNECTION_IS_IMPLICIT_HYDROGEN") =
+      nb::int_(kChiralConnectionIsImplicitHydrogen);
+  m.attr("CHIRAL_CONNECTION_IS_LONE_PAIR") = nb::int_(kChiralConnectionIsLonePair);
+
   nb::enum_<ChiralType>(m, "ChiralType")
       .value("CHI_UNSPECIFIED", ChiralType::kChiUnspecified)
       .value("CHI_TETRAHEDRAL_CW", ChiralType::kChiTetrahedralCw)
@@ -23,6 +52,10 @@ BindChirality(nb::module_& m) {
       .def("top_back", &Chiral_Centre::top_back)
       .def("left_down", &Chiral_Centre::left_down)
       .def("right_down", &Chiral_Centre::right_down)
+      .def("atoms", &ChiralCentreAtoms,
+           "Return [top_front, top_back, left_down, right_down]")
+      .def("__len__", [](const Chiral_Centre&) { return 4; })
+      .def("__getitem__", &ChiralCentreAtom)
       .def("invert", &Chiral_Centre::invert)
       .def("involves",
            [](const Chiral_Centre& centre, atom_number_t atom) {
@@ -31,12 +64,6 @@ BindChirality(nb::module_& m) {
            nb::arg("atom"))
       .def("implicit_hydrogens", &Chiral_Centre::implicit_hydrogen_count)
       .def("lone_pairs", &Chiral_Centre::lone_pair_count)
-      .def("implicit_hydrogen_is_now_atom_number",
-           &Chiral_Centre::implicit_hydrogen_is_now_atom_number)
-      .def("lone_pair_is_now_atom_number", &Chiral_Centre::lone_pair_is_now_atom_number)
-      .def("atom_is_now_implicit_hydrogen", &Chiral_Centre::atom_is_now_implicit_hydrogen)
-      .def("atom_is_now_lone_pair", &Chiral_Centre::atom_is_now_lone_pair)
-      .def("atom_numbers_are_swapped", &Chiral_Centre::atom_numbers_are_swapped)
       .def("__repr__", &ChiralCentreRepr);
 
   m.def("tetrahedral_chirality", &TetrahedralChirality,

@@ -575,6 +575,8 @@ BindMolecule(nb::module_& m) {
              return mol.set_bond_type_between_atoms(a1, a2, ToLillyMolBondType(bond_type));
            },
            nb::arg("a1"), nb::arg("a2"), nb::arg("bond_type"), "Set bond type")
+      .def("add", [](Molecule& mol, const Molecule& other) { return mol.add_molecule(&other); },
+           nb::arg("other"), "Add molecule as a separate fragment")
       .def("assign_bond_numbers_to_bonds", &Molecule::assign_bond_numbers_to_bonds)
       .def("bond_between_atoms",
            [](const Molecule& mol, atom_number_t a1, atom_number_t a2) -> const Bond* {
@@ -645,6 +647,14 @@ BindMolecule(nb::module_& m) {
       .def("is_aromatic",
            [](Molecule& mol, atom_number_t atom) { return static_cast<bool>(mol.IsAromatic(atom)); },
            nb::arg("atom"))
+      .def("hybridization",
+           [](Molecule& mol, atom_number_t atom) {
+             if (!mol.ok_atom_number(atom)) {
+               throw std::invalid_argument("hybridization atom number outside [0, natoms)");
+             }
+             return HybridizationState(mol, atom);
+           },
+           nb::arg("atom"), "RDKit-like hybridization of atom, computed on demand")
       .def("find_kekule_form",
            [](Molecule& mol, std::vector<int>& atoms) { return static_cast<bool>(mol.find_kekule_form(atoms.data())); },
            nb::arg("atoms"), "Find a Kekule form for atoms")

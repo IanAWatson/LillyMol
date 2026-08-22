@@ -1,57 +1,94 @@
-# Python
-If you wish to build the python bindings, you will need a recent version of
-python. Development was done with python3.11 but should work with other versions.
+# Building LillyMol Python
+
+The public LillyMol Python modules are built from the nanobind bindings. During
+local development, build them with Bazel and stage the shared objects into the
+repository `lib` directory used by `run_python.sh`.
 
 ## Required Python Packages
-You will need to install
-```
-pip install pybind11 absl-py protobuf numpy
-apt install python-dev
-```
-Make sure that python-dev and libblas-dev are installed at system level.
 
+Use a recent Python 3. Development has been exercised with Python 3.13, and the
+bindings are expected to work with other supported Python 3 versions.
+
+```shell
+python -m pip install nanobind absl-py protobuf numpy
 ```
-sudo apt install python-dev libblas-dev
+
+At system level, make sure the Python headers and BLAS development libraries are
+installed. Package names vary by distribution; on Debian/Ubuntu systems this is
+typically:
+
+```shell
+sudo apt install python3-dev libblas-dev
 ```
+
+`numpy` is needed for the array-returning fingerprint, descriptor, and coordinate
+helpers. `protobuf` is needed for proto-backed configuration objects and tests.
 
 ## Optional Python Packages
-If you wish to use the xgboost QSAR model building tools in LillyMol,
-```
-pip install xgboost scikit-learn matplotlib and pandas.
-```
 
-If you wish to use the molecular property profile tool in LillyMol, also
-```
-pip install scipy numpy
+If you use the xgboost QSAR model building tools in LillyMol:
+
+```shell
+python -m pip install xgboost scikit-learn matplotlib pandas
 ```
 
-Things seem to work seamlessly in virtualenv and `uv`.
+If you use the molecular property profile tool:
 
-Note that with the default build (below) Python bindings are not built,
-but 'make all' will build python related targets.
-
-## Wheel packaging
-After building the pybind modules, LillyMol can stage those Bazel-built shared
-objects into a Python wheel. The wheel infrastructure lives in
-`${LILLYMOL_HOME}/python`.
-
+```shell
+python -m pip install scipy numpy
 ```
+
+Virtual environments and `uv` both work well. For example:
+
+```shell
+uv venv /path/to/lillymol_venv
+uv pip install --python /path/to/lillymol_venv/bin/python numpy protobuf
+```
+
+## Local Development
+
+From the source checkout:
+
+```shell
 cd ${LILLYMOL_HOME}/src
-bazel build //pybind:all
-./copy_shared_libraries.sh ../lib
+bazel build -c opt //nanobind:all
+./copy_nanobind_shared_libraries.sh ../lib
+```
+
+Then run Python through the top-level wrapper, which sets `PYTHONPATH` and
+`LD_LIBRARY_PATH` for the staged extension modules and LillyMol shared libraries:
+
+```shell
+${LILLYMOL_HOME}/run_python.sh my_script.py
+```
+
+Use `-c opt` for normal testing and timing. Bazel's default `fastbuild` is much
+slower and can produce tiny floating point differences from the optimised command
+line tools.
+
+## Wheel Packaging
+
+The wheel infrastructure lives in `${LILLYMOL_HOME}/python`. It packages
+Bazel-built extension modules and private LillyMol shared libraries; setuptools
+does not compile the C++ code.
+
+```shell
+cd ${LILLYMOL_HOME}/src
+bazel build -c opt //nanobind:all
+./copy_nanobind_shared_libraries.sh ../lib
 
 cd ${LILLYMOL_HOME}/python
 ./scripts/stage_wheel_files.sh
-
 python -m pip install build wheel setuptools
 python -m build --wheel
- OR
-uv install build wheel setuptools
-uv build --wheel
-
 ```
 
-The generated `python/prebuilt`, `python/build`, and `python/dist` directories
-are build artifacts. Commit only the wheel-building infrastructure, not the
-staged binaries or generated wheel.
+The wheel is written to `${LILLYMOL_HOME}/python/dist`. The generated
+`python/prebuilt`, `python/build`, and `python/dist` directories are build
+artifacts. Commit only the wheel-building infrastructure, not staged binaries or
+generated wheels.
 
+The wheel should install modules named `lillymol`, `lillymol_io`,
+`lillymol_tools`, and related compatibility modules. The temporary development
+name `lillymol_nb` is for migration work only and should not appear in installed
+user code after the changeover.

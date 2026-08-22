@@ -35,19 +35,19 @@ porting mandate.
 | Symbol | Area | Status |
 | --- | --- | --- |
 | `construct_from_proto` | Query/proto | Implemented in nanobind by accepting a Python protobuf object, calling `SerializeToString()`, and parsing the C++ proto before `ConstructFromProto`. This is appropriate for configuration/setup use; revisit only if high-volume proto transfer becomes important. |
-| `rxn_from_file` | Reaction convenience | Likely easy wrapper if existing Python code imports it. Triage for compatibility. |
-| `dihedral_scan` | Coordinate/conformer helper | Deferred unless users need this from Python; user explicitly does not want broad conformer-search work. |
+| `rxn_from_file` | Reaction convenience | Not an active pybind API; commented out in pybind source. |
+| `dihedral_scan` | Coordinate/conformer helper | Implemented in nanobind; returns flat float32 NumPy coordinate arrays. |
 | `non_sssr_ring` | Ring detail | Implemented in nanobind. |
 | `non_sssr_rings` | Ring detail | Implemented in nanobind. |
-| `fused_neighbours` | Ring detail | Possibly useful compatibility alias; check nanobind Ring already exposes enough. |
-| `GetNeighbors` | Atom/RDKit alias | Low effort if expected by RDKit-oriented callers. |
-| `set_vector` | Set_of_Atoms mutability | Low priority legacy/container helper. |
-| `scatter` | Set_of_Atoms vector helper | Low priority unless existing scripts use it. |
-| `increment_vector` | Set_of_Atoms vector helper | Low priority unless existing scripts use it. |
-| `clear` | container helpers | Low priority; Python list-like behavior may be enough. |
-| `pop_back` | container helpers | Low priority; Python list-like behavior may be enough. |
-| `compute_Del_Re_partial_charges` | Partial charges | Disabled/commented in pybind source; do not port unless C++ support is confirmed. |
-| `compute_Pullman_partial_charges` | Partial charges | Disabled/commented in pybind source; do not port unless C++ support is confirmed. |
+| `fused_neighbours` | Ring detail | Not an active pybind API; pybind source has this under `DELIBERATELY_NOT_IMPLEMENTED` because copied `Ring` objects lose fused-neighbour pointers. |
+| `GetNeighbors` | Atom/RDKit alias | Not an active pybind API; pybind source comments that `Atom` cannot provide this because it does not know its atom number. |
+| `set_vector` | Set_of_Atoms mutability | Implemented in nanobind as a Python-list mutator. |
+| `scatter` | Set_of_Atoms vector helper | Implemented in nanobind as a Python-list mutator alias for `set_vector`. |
+| `increment_vector` | Set_of_Atoms vector helper | Implemented in nanobind as a Python-list mutator. |
+| `clear` | container helpers | Pybind `IntVector` compatibility method. Nanobind uses normal Python lists instead; port only if direct `IntVector` compatibility is required. |
+| `pop_back` | container helpers | Pybind `IntVector` compatibility method. Nanobind uses normal Python lists instead; port only if direct `IntVector` compatibility is required. |
+| `compute_Del_Re_partial_charges` | Partial charges | Not an active pybind API; commented out in pybind source. |
+| `compute_Pullman_partial_charges` | Partial charges | Not an active pybind API; commented out in pybind source. |
 
 ## Changeover Work Still Needed
 

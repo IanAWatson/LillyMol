@@ -109,6 +109,14 @@ MakeIntNumpyArray1D(size_t n) {
 }
 
 FloatNumpyArray1D
+FloatArrayFromCoordinates(const float* coords, size_t n) {
+  float* data = new float[n];
+  std::copy_n(coords, n, data);
+  nb::capsule owner(data, [](void* p) noexcept { delete[] static_cast<float*>(p); });
+  return FloatNumpyArray1D(data, {n}, owner);
+}
+
+FloatNumpyArray1D
 GetCoordinatesNumpy(const Molecule& mol) {
   const int matoms = mol.natoms();
   FloatNumpyArray1D result = MakeFloatNumpyArray1D(3 * matoms);
@@ -1034,6 +1042,19 @@ BindMolecule(nb::module_& m) {
            nb::arg("coords"), "Set coordinates from [x0, y0, z0, x1, y1, z1, ...]")
       .def("set_coordinates_numpy", &SetCoordinatesNumpy, nb::arg("coords"),
            "Set coordinates from a flat float32 NumPy array")
+      .def("dihedral_scan",
+           [](Molecule& mol, atom_number_t a2, atom_number_t a3, angle_t angle, float bump_check) {
+             std::vector<std::unique_ptr<float[]>> coords = mol.DihedralScan(a2, a3, angle, bump_check);
+             std::vector<FloatNumpyArray1D> result;
+             result.reserve(coords.size());
+             const size_t ncoords = static_cast<size_t>(mol.natoms()) * 3;
+             for (const std::unique_ptr<float[]>& coord : coords) {
+               result.push_back(FloatArrayFromCoordinates(coord.get(), ncoords));
+             }
+             return result;
+           },
+           nb::arg("a2"), nb::arg("a3"), nb::arg("angle"), nb::arg("bump_check") = 0.0f,
+           "Scan around the a2-a3 bond and return flat float32 NumPy coordinate arrays")
       .def("translate",
            [](Molecule& mol, coord_t x, coord_t y, coord_t z) {
              mol.translate_atoms(x, y, z);

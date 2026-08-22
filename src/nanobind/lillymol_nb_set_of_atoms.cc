@@ -19,6 +19,42 @@ BindSetOfAtomsAndRing(nb::module_& m) {
            nb::arg("rhs"))
       .def("size", &Set_of_Atoms::size)
       .def("as_list", &Set_of_Atoms::AsVector)
+      .def("set_vector",
+           [](const Set_of_Atoms& atoms, nb::list values, int value) {
+             const Py_ssize_t n = PyList_Size(values.ptr());
+             for (atom_number_t atom : atoms) {
+               if (atom < 0 || atom >= n) {
+                 throw std::out_of_range("set_vector atom index out of range");
+               }
+               values[atom] = nb::int_(value);
+             }
+           },
+           nb::arg("values"), nb::arg("value"),
+           "Set entries in a Python list for atoms in this embedding")
+      .def("scatter",
+           [](const Set_of_Atoms& atoms, nb::list values, int value) {
+             const Py_ssize_t n = PyList_Size(values.ptr());
+             for (atom_number_t atom : atoms) {
+               if (atom < 0 || atom >= n) {
+                 throw std::out_of_range("scatter atom index out of range");
+               }
+               values[atom] = nb::int_(value);
+             }
+           },
+           nb::arg("values"), nb::arg("value"),
+           "Set entries in a Python list for atoms in this embedding")
+      .def("increment_vector",
+           [](const Set_of_Atoms& atoms, nb::list values, int value) {
+             const Py_ssize_t n = PyList_Size(values.ptr());
+             for (atom_number_t atom : atoms) {
+               if (atom < 0 || atom >= n) {
+                 throw std::out_of_range("increment_vector atom index out of range");
+               }
+               values[atom] = nb::int_(nb::cast<int>(values[atom]) + value);
+             }
+           },
+           nb::arg("values"), nb::arg("value"),
+           "Increment entries in a Python list for atoms in this embedding")
       .def("contains_both",
            [](const Set_of_Atoms& atoms, atom_number_t a1, atom_number_t a2) {
              return atoms.contains_atoms(a1, a2);

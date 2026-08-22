@@ -653,6 +653,23 @@ $$$$
         del array
         gc.collect()
 
+    def test_dihedral_scan(self):
+        try:
+            import numpy as np
+        except ImportError:
+            self.skipTest("numpy is not available")
+
+        mol = lillymol_nb.MolFromSmiles("C{{-2,1,0}}C{{-1,0,0}}C{{0,0,0}}C{{1,1,0}} butane")
+        start = mol.get_coordinates()
+        conformers = mol.dihedral_scan(1, 2, 45.0)
+        self.assertEqual(len(conformers), 7)
+        for coords in conformers:
+            self.assertEqual(coords.dtype, np.dtype("float32"))
+            self.assertEqual(coords.shape, (mol.natoms() * 3,))
+        self.assertEqual(mol.get_coordinates(), start)
+        self.assertFalse(np.allclose(conformers[0], np.asarray(start, dtype=np.float32)))
+        self.assertEqual(mol.dihedral_scan(1, 2, 180.0), [])
+
     def test_coordinate_and_geometry_helpers(self):
         mol = lillymol_nb.MolFromSmiles("CCCO propanol")
         mol.setxyz(0, 0.0, 0.0, 0.0)
@@ -982,6 +999,15 @@ $$$$
         atoms.append(4)
         atoms.extend([5, 6])
         self.assertEqual(atoms.as_list(), [0, 3, 4, 5, 6])
+        values = [0] * 9
+        atoms.set_vector(values, 2)
+        self.assertEqual(values, [2, 0, 0, 2, 2, 2, 2, 0, 0])
+        atoms.scatter(values, 4)
+        self.assertEqual(values, [4, 0, 0, 4, 4, 4, 4, 0, 0])
+        atoms.increment_vector(values, 1)
+        self.assertEqual(values, [5, 0, 0, 5, 5, 5, 5, 0, 0])
+        with self.assertRaises(Exception):
+            atoms.set_vector([0, 0], 1)
         self.assertTrue(atoms.contains_both(3, 5))
         self.assertEqual(atoms.atoms_in_common(lillymol_nb.Set_of_Atoms([5, 9])), 1)
         self.assertEqual(atoms.first_atom_in_common(lillymol_nb.Set_of_Atoms([5, 9])), 5)

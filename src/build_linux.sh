@@ -355,7 +355,7 @@ if [[ -v BUILD_INCHI ]] ; then
   ${bazel} ${bazel_options} build ${tmp_build_options} Molecule_Tools:fileconv
   ${bazel} ${bazel_options} build ${tmp_build_options} Molecule_Tools:unique_molecules
   echo "Inchi BUILD of fileconv and unique molecules, executables in bazel-bin/Molecule_Tools"
-  echo "Copy these files and then rebuild everything else without BUILD_INCHI
+  echo "Copy these files and then rebuild everything else without BUILD_INCHI"
   exit 0
 fi
 

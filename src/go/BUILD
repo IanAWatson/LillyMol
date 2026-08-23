@@ -1,6 +1,6 @@
 load("@gazelle//:def.bzl", "gazelle")
 load("@rules_go//go:def.bzl", "go_binary", "go_library")
-load("//build_deps:install.bzl", "local_install")
+load("//build_defs:install.bzl", "local_install")
 
 gazelle(name = "gazelle")
 

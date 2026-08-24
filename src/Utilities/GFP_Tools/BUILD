@@ -527,7 +527,7 @@ cc_library(
 
 # The former ZeroMQ-based gfp_server target has been removed from the build.
 # The replacement service will use the transport-neutral nn_request.proto schema
-# and expose the search engine through pybind/Python HTTP.
+# and expose the search engine through the Python HTTP binding.
 
 # cc_binary(
 #   name = "gfp_server_grpc",
@@ -1660,7 +1660,7 @@ cc_test(
     timeout = "short",
     srcs = ["gfp_context_test.cc"],
     data = [
-        "//pybind:testdata/rand10.standard.gfp",
+        "testdata/rand10.standard.gfp",
     ],
     deps = [
         ":gfp_context",

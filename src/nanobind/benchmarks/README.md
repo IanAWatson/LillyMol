@@ -1,29 +1,25 @@
 # LillyMol Python Binding Benchmarks
 
-These benchmarks compare the pybind11 and nanobind LillyMol Python bindings on
-small Python-facing workflows. They are timing tools, not pass/fail regression
-tests.
+These benchmarks time small Python-facing LillyMol workflows. They are timing
+tools, not pass/fail regression tests.
 
-Build the bindings first from `src`:
-
-```shell
-bazel build -c opt //pybind:lillymol //pybind:lillymol_fingerprint //pybind:lillymol_tools //pybind:lillymol_query
-bazel build -c opt //nanobind:lillymol_nb
-```
-
-Run pybind:
+The production Python binding is the nanobind-backed `lillymol` module. Build it
+first from `src`:
 
 ```shell
-PYTHONPATH="$(pwd)/bazel-bin/pybind:$(pwd)/bazel-bin" \
-  python3 nanobind/benchmarks/benchmark_lillymol_bindings.py --binding pybind
+bazel build -c opt //nanobind:lillymol
 ```
 
-Run nanobind:
+Run the current binding benchmark:
 
 ```shell
 PYTHONPATH="$(pwd)/bazel-bin/nanobind:$(pwd)/bazel-bin" \
   python3 nanobind/benchmarks/benchmark_lillymol_bindings.py --binding nanobind
 ```
+
+The script still has a `--binding pybind` mode for historical comparisons in
+worktrees where the old pybind targets are intentionally built, but the hard
+changeover no longer builds or tests those targets.
 
 For a useful ChEMBL-derived input set, a few thousand molecules is enough for
 quick iteration and 50k-100k molecules is useful for steadier whole-workflow

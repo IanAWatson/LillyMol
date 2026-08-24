@@ -37,14 +37,14 @@ inside a LillyMol checkout:
 ```
 cd ${LILLYMOL_HOME}/src
 bazel build -c opt //nanobind:all
-./copy_nanobind_shared_libraries.sh ../nanobind_lib
+./copy_shared_libraries.sh ../lib
 ```
 
-then run python through the nanobind wrapper, which sets `PYTHONPATH` and
+then run python through the wrapper, which sets `PYTHONPATH` and
 `LD_LIBRARY_PATH` for you:
 
 ```
-${LILLYMOL_HOME}/run_nanobind_python.sh my_script.py
+${LILLYMOL_HOME}/run_python.sh my_script.py
 ```
 
 Build `-c opt`. A default `fastbuild` is enormously slower and is not what any of
@@ -357,12 +357,12 @@ hiding it:
 
 The API reference is [LillyMolPython.md](LillyMolPython.md). Every method named in
 its class-method tables is checked against the nanobind module by
-`//nanobind:lillymol_nb_doc_test`, so a renamed binding fails a test rather than
+`//nanobind:lillymol_doc_test`, so a renamed binding fails a test rather than
 quietly misleading a reader.
 
 ```shell
 cd ${LILLYMOL_HOME}/src
-bazel test -c opt //nanobind:lillymol_nb_doc_test
+bazel test -c opt //nanobind:lillymol_doc_test
 ```
 
 That test does not check prose or examples. If you change behaviour, the

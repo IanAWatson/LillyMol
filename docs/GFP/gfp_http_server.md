@@ -16,11 +16,11 @@ the same.
 
 ### Server environment
 
-The server is a Python process that calls LillyMol C++ code through pybind. The
+The server is a Python process that calls LillyMol C++ code through the nanobind-backed Python extension. The
 server environment must therefore contain:
 
-- a Python interpreter compatible with the one used to build the pybind extension;
-- the `lillymol_gfp_server` pybind module, usually found via `PYTHONPATH`;
+- a Python interpreter compatible with the one used to build the nanobind extension;
+- the `lillymol_gfp_server` nanobind module, usually found via `PYTHONPATH`;
 - the generated protobuf Python modules, also usually found via `PYTHONPATH`;
 - `fastapi`;
 - `uvicorn`;
@@ -51,7 +51,7 @@ uv pip install fastapi uvicorn protobuf httpx
 The server examples below assume the virtual environment has already been
 activated, so `python` refers to the virtual-environment interpreter.
 
-A standard LillyMol build can copy the pybind shared libraries and generated
+A standard LillyMol build can copy the nanobind shared libraries and generated
 protobuf modules to stable locations with:
 
 ```shell
@@ -76,7 +76,7 @@ parsing the protobuf messages defined in
 [`nn_request.proto`](/src/Utilities/GFP_Tools/nn_request.proto). A Python binary
 protobuf client needs the generated `nn_request_pb2` module and the Python
 `protobuf` package, but still does not need FastAPI, uvicorn, or the LillyMol
-pybind module unless it is also running a server. The `gfp_http_client.sh` wrapper
+Python extension module unless it is also running a server. The `gfp_http_client.sh` wrapper
 sets `PYTHONPATH` so the checked-in client can find those generated protobuf
 modules.
 
@@ -103,12 +103,12 @@ For most use cases, retaining SMILES in the server is the more convenient choice
 
 ## Start the server
 
-Build the pybind module first and copy the runtime Python components to their
+Build the nanobind module first and copy the runtime Python components to their
 stable locations:
 
 ```shell
 cd ${LILLYMOL_HOME}/src
-bazel build //pybind:lillymol_gfp_server //Utilities/GFP_Tools:nn_request_py_proto
+bazel build //nanobind:lillymol_gfp_server //Utilities/GFP_Tools:nn_request_py_proto
 ./copy_shared_libraries.sh ${LILLYMOL_HOME}/lib
 ```
 
@@ -126,7 +126,7 @@ ${LILLYMOL_HOME}/contrib/bin/gfp_http_server.sh \
 When running directly from a Bazel development tree, the equivalent command is:
 
 ```shell
-PYTHONPATH=bazel-bin/pybind:bazel-bin \
+PYTHONPATH=bazel-bin/nanobind:bazel-bin \
   python Utilities/GFP_Tools/gfp_http_server.py \
     --gfp pool.gfp \
     --host 127.0.0.1 \

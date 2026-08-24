@@ -35,7 +35,7 @@ This repository includes [AGENTS.md](AGENTS.md), a short orientation file for
 AI/code agents and new contributors working on LillyMol source, tests, and docs.
 
 ## Python
-LillyMol has a python interface, built via pybind11, and it is no longer just a
+LillyMol has a Python interface, built with nanobind, and it is no longer just a
 prototyping convenience. Where we have measured against RDKit on the same task,
 LillyMol python has run 3 to 7 times faster, because nearly every call does real
 work in C++ rather than moving python objects about.
@@ -45,7 +45,8 @@ searching, reaction enumeration, gfp fingerprints and similarity, chemical
 standardisation, and a growing number of the LillyMol command line tools -
 molecular descriptors, QED, Lipinski, MedchemWizard, unique molecules, and
 lookups against structure and synthetic precedent databases. The `*_test.py`
-files in the pybind directory exercise most of this and can be read as examples.
+files in the `src/nanobind` directory exercise most of this and can be read as
+examples.
 The bindings can also be packaged as a wheel.
 
 Documentation starts at [docs/python](/docs/python/README.md), with the API

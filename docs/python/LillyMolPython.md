@@ -7,9 +7,9 @@ orientation to the Python interface, performance model, and common workflows, se
 
 The current Python bindings are built with nanobind. Earlier LillyMol Python
 bindings used CLIF internally and then pybind11; those are historical details for
-most users. The public module names are `lillymol`, `lillymol_io`,
-`lillymol_tools`, and related helper modules. The temporary `lillymol_nb` name was
-used during migration and should not be used in installed code.
+most users. The primary public module is `lillymol`. Compatibility modules such
+as `lillymol_io`, `lillymol_tools`, and `lillymol_tsubstructure` re-export from
+`lillymol` for older split-module imports.
 
 ## Philosophy
 LillyMol has no concept of changeable and unchangeable molecules. Any molecule

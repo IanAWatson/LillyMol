@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Stage LillyMol pybind extension modules and runtime Python files for wheel
+# Stage LillyMol nanobind extension modules and runtime Python files for wheel
 # building. This script assumes copy_shared_libraries.sh has already populated
 # ${LILLYMOL_HOME}/lib. It does not alter ${LILLYMOL_HOME}/lib or run_python.sh.
 
@@ -21,35 +21,32 @@ fi
 rm -rf "${stage_dir}"
 mkdir -p "${stage_dir}"
 
-pybind_modules=(
+nanobind_modules=(
   lillymol
-  lillymol_atom
-  lillymol_bond
-  lillymol_fingerprint
+  lillymol_bdb
   lillymol_gfp_server
-  lillymol_io
-  lillymol_query
-  lillymol_reaction
-  lillymol_ring
-  lillymol_set_of_atoms
-  lillymol_standardise
-  lillymol_tools
-  lillymol_tsubstructure
 )
 
-for module in "${pybind_modules[@]}" ; do
+for module in "${nanobind_modules[@]}" ; do
   source="${lib_dir}/${module}.so"
   if [[ ! -s "${source}" ]] ; then
-    # Compatibility modules may be newly added and not yet copied to lib.
-    fallback="${src_dir}/bazel-bin/pybind/${module}.so"
+    fallback="${src_dir}/bazel-bin/nanobind/${module}.so"
     if [[ -s "${fallback}" ]] ; then
       source="${fallback}"
     else
-      echo "Missing pybind module ${module}.so in ${lib_dir} and bazel-bin/pybind" >&2
+      echo "Missing nanobind module ${module}.so in ${lib_dir} and bazel-bin/nanobind" >&2
       exit 1
     fi
   fi
   cp -f "${source}" "${stage_dir}/"
+done
+
+# Compatibility modules for older split-module imports are pure Python shims in
+# the nanobind build. They re-export symbols from the canonical lillymol module.
+for shim in "${src_dir}"/nanobind/python_shims/*.py ; do
+  if [[ -s "${shim}" ]] ; then
+    cp -f "${shim}" "${stage_dir}/"
+  fi
 done
 
 # Private shared libraries needed by extension modules. Keep these at wheel top
@@ -67,29 +64,42 @@ copy_python_file() {
   fi
 }
 
+copy_generated_python_file() {
+  local relative_path="$1"
+  local destination="${stage_dir}/${relative_path}"
+
+  if [[ -s "${src_dir}/${relative_path}" ]] ; then
+    copy_python_file "${src_dir}/${relative_path}" "${destination}"
+  elif [[ -s "${src_dir}/bazel-bin/${relative_path}" ]] ; then
+    copy_python_file "${src_dir}/bazel-bin/${relative_path}" "${destination}"
+  fi
+}
+
 # Python protobuf modules used by existing bindings/tests and GFP HTTP helpers.
 for proto in \
   atom_type_ext_pb2.py \
   geometric_constraints_pb2.py \
   mol2graph_pb2.py \
+  molecule_to_query_pb2.py \
   pharmacophore_pb2.py \
   substructure_pb2.py \
   reaction_pb2.py \
   toggle_kekule_form_pb2.py ; do
-  copy_python_file "${src_dir}/Molecule_Lib/${proto}" "${stage_dir}/Molecule_Lib/${proto}"
+  copy_generated_python_file "Molecule_Lib/${proto}"
 done
 
 for proto in \
+  common_names_pb2.py \
   dicer_fragments_pb2.py \
   iwdescr_pb2.py \
   xlogp_pb2.py ; do
-  copy_python_file "${src_dir}/Molecule_Tools/${proto}" "${stage_dir}/Molecule_Tools/${proto}"
+  copy_generated_python_file "Molecule_Tools/${proto}"
 done
 
 for proto in \
   nearneighbours_pb2.py \
   nn_request_pb2.py ; do
-  copy_python_file "${src_dir}/Utilities/GFP_Tools/${proto}" "${stage_dir}/Utilities/GFP_Tools/${proto}"
+  copy_generated_python_file "Utilities/GFP_Tools/${proto}"
 done
 
 copy_python_file "${src_dir}/Utilities/GFP_Tools/gfp_http_server.py" "${stage_dir}/Utilities/GFP_Tools/gfp_http_server.py"
@@ -120,7 +130,7 @@ else
 fi
 
 cat <<EOF
-Staged LillyMol wheel files in ${stage_dir}
+Staged LillyMol nanobind wheel files in ${stage_dir}
 
 Next steps:
   cd ${python_dir}

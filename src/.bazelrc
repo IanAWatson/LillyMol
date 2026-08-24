@@ -50,7 +50,14 @@ build:msan --action_env=MSAN_OPTIONS=poison_in_dtor=1
 # which enables
 # bazel build ... --config=py311
 
-# --- Intel oneDAL / Hardware Optimizations ---
+# --- Local native builds / Hardware Optimizations ---
+# Use this for command-line builds where binaries only need to run on the
+# machine that built them. This enables CPU features such as POPCNT where the
+# local compiler supports them. Do not use this for portable/container builds.
+build:native --copt=-march=native
+build:native --cxxopt=-march=native
+build:native --cxxopt=-mtune=native
+
 # Use this to pass specific SIMD instructions to your C++ compiler
 # build:avx512 --copt=-mavx512f --copt=-mavx512cd
 

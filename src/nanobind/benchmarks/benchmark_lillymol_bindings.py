@@ -58,7 +58,7 @@ def load_binding(name: str) -> Binding:
         query = _import_optional("lillymol_query") or core
         return Binding(name, core, fingerprint, tools, query)
     if name == "nanobind":
-        core = importlib.import_module("lillymol_nb")
+        core = importlib.import_module("lillymol")
         return Binding(name, core, core, core, core)
     raise ValueError(f"Unrecognised binding '{name}'")
 

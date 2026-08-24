@@ -1,15 +1,11 @@
 # Nanobind bindings
 
 This directory contains the nanobind implementation of the LillyMol Python
-bindings. It was built in parallel with `src/pybind` during migration, but the
-intended public runtime is a nanobind-backed `lillymol` module. Python code
-should not mix pybind11-bound and nanobind-bound LillyMol objects in one
-process.
-
-During transition builds the temporary module name is `lillymol_nb`. At
-changeover, that name should disappear and these bindings should install as the
-normal public `lillymol`, `lillymol_io`, `lillymol_tools`, and related modules.
-Avoid adding dependencies on pybind-bound classes.
+bindings. Nanobind is now the production Python binding path. The older
+`src/pybind` tree remains in the repository for reference, but it is no longer
+the active build/test path. Python code should not mix pybind11-bound and
+nanobind-bound LillyMol objects in one process. Avoid adding dependencies on
+pybind-bound classes.
 
 `Atom`, `Bond`, and `Ring` objects returned from a `Molecule` are borrowed views
 into that molecule. They are valid while the parent molecule remains alive and
@@ -18,11 +14,11 @@ previously returned child objects; the bindings do not add extra ownership or
 copying solely to guard against that case. APIs that return independent objects
 should do so explicitly, as `rings()` does by returning copied rings.
 
-Current development module:
+Current module:
 
 ```shell
-bazel build -c opt //nanobind:lillymol_nb
-bazel test -c opt //nanobind:lillymol_nb_test
+bazel build -c opt //nanobind:lillymol
+bazel test -c opt //nanobind:lillymol_test
 ```
 
 The binding implementation is split by functional area:
@@ -34,18 +30,18 @@ The binding implementation is split by functional area:
   `lillymol_nb_atom_bond.cc`, `lillymol_nb_set_of_atoms.cc`,
   `lillymol_nb_substructure.cc`, `lillymol_nb_descriptors.cc`,
   `lillymol_nb_standardise.cc`, and `lillymol_nb_fingerprint.cc` contain the
-  Python-visible bindings.
+  Python-visible bindings. The filenames retain `_nb` for now to keep the
+  changeover diff focused; the installed module name is `lillymol`.
 
-To stage the nanobind modules separately from the pybind modules:
+To stage the Python modules:
 
 ```shell
-./copy_nanobind_shared_libraries.sh
-PYTHONPATH=/path/to/LillyMol/nanobind_lib python3
+./copy_shared_libraries.sh ../lib
+../run_python.sh
 ```
 
-The default destination is the repository-level `nanobind_lib` directory when run
-from `src`. Pass an explicit directory to override it. Keep this directory
-separate from `lib` while both pybind and nanobind builds exist.
+The default destination is the repository-level `lib` directory when run from
+`src`. Pass an explicit directory to override it.
 
 The Python 3.13 interpreter installed by `uv` is externally managed, so install
 extra packages into a virtual environment rather than modifying that base
@@ -94,6 +90,5 @@ The nanobind tests currently validate:
 See `changeover_checklist.md` for remaining changeover packaging tasks and
 intentional compatibility decisions.
 
-Remaining changeover work is mostly packaging and naming: install these modules
-under the public names, keep compatibility aliases where useful, and remove stale
-pybind artifacts from local development paths.
+Remaining cleanup work is mostly deleting obsolete pybind build/test targets and
+optionally renaming the implementation files to drop the `_nb` suffix.

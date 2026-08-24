@@ -52,14 +52,14 @@ From the source checkout:
 ```shell
 cd ${LILLYMOL_HOME}/src
 bazel build -c opt //nanobind:all
-./copy_nanobind_shared_libraries.sh ../nanobind_lib
+./copy_shared_libraries.sh ../lib
 ```
 
 Then run Python through the top-level wrapper, which sets `PYTHONPATH` and
 `LD_LIBRARY_PATH` for the staged extension modules and LillyMol shared libraries:
 
 ```shell
-${LILLYMOL_HOME}/run_nanobind_python.sh my_script.py
+${LILLYMOL_HOME}/run_python.sh my_script.py
 ```
 
 Use `-c opt` for normal testing and timing. Bazel's default `fastbuild` is much
@@ -75,7 +75,7 @@ does not compile the C++ code.
 ```shell
 cd ${LILLYMOL_HOME}/src
 bazel build -c opt //nanobind:all
-./copy_nanobind_shared_libraries.sh ../nanobind_lib
+./copy_shared_libraries.sh ../lib
 
 cd ${LILLYMOL_HOME}/python
 ./scripts/stage_wheel_files.sh
@@ -88,7 +88,7 @@ The wheel is written to `${LILLYMOL_HOME}/python/dist`. The generated
 artifacts. Commit only the wheel-building infrastructure, not staged binaries or
 generated wheels.
 
-The wheel should install modules named `lillymol`, `lillymol_io`,
-`lillymol_tools`, and related compatibility modules. The temporary development
-name `lillymol_nb` is for migration work only and should not appear in installed
-user code after the changeover.
+The wheel should install the nanobind-backed `lillymol` module, the
+`lillymol_bdb` BerkeleyDB helper module when BDB support is built, and small
+compatibility modules such as `lillymol_io` and `lillymol_tools` that re-export
+from `lillymol`.

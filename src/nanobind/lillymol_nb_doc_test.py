@@ -16,14 +16,14 @@ import unittest
 
 sys.path.insert(0, os.path.dirname(__file__))
 
-import lillymol_nb
+import lillymol
 
 HEADING_TO_CLASS = {
-    'Molecule Methods': lillymol_nb.Molecule,
-    'Atom Methods': lillymol_nb.Atom,
-    'Bond Methods': lillymol_nb.Bond,
-    'Set_of_Atoms Methods': lillymol_nb.Set_of_Atoms,
-    'Ring Methods': lillymol_nb.Ring,
+    'Molecule Methods': lillymol.Molecule,
+    'Atom Methods': lillymol.Atom,
+    'Bond Methods': lillymol.Bond,
+    'Set_of_Atoms Methods': lillymol.Set_of_Atoms,
+    'Ring Methods': lillymol.Ring,
 }
 
 _NOT_A_METHOD = re.compile(r'^(Method|-+|m1\s|\\?_)')
@@ -112,8 +112,8 @@ class TestNanobindDocumentedMethodsExist(unittest.TestCase):
         text = inp.read()
       mentioned |= set(re.findall(r'([A-Za-z_][A-Za-z0-9_]*)\s*\(', text))
 
-    for cls in (lillymol_nb.Molecule, lillymol_nb.Atom, lillymol_nb.Bond,
-                lillymol_nb.Set_of_Atoms, lillymol_nb.Ring):
+    for cls in (lillymol.Molecule, lillymol.Atom, lillymol.Bond,
+                lillymol.Set_of_Atoms, lillymol.Ring):
       bound = {a for a in dir(cls) if not a.startswith('_')}
       undocumented = sorted(bound - mentioned)
       suffix = ': ' + ', '.join(undocumented) if undocumented else ''

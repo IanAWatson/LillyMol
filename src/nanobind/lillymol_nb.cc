@@ -4,7 +4,7 @@
 
 namespace nb = nanobind;
 
-NB_MODULE(lillymol_nb, m) {
+NB_MODULE(lillymol, m) {
   lillymol_nb::BindIo(m);
   lillymol_nb::BindAtomBond(m);
   lillymol_nb::BindChirality(m);

@@ -6,7 +6,7 @@ It supports both binary protobuf endpoints and protobuf-JSON endpoints.
 
 Typical use:
 
-  PYTHONPATH=bazel-bin/pybind:bazel-bin \
+  PYTHONPATH=bazel-bin/nanobind:bazel-bin \
     ~/.venv/bin/python Utilities/GFP_Tools/gfp_http_server.py \
       --gfp rand10.gfp --port 8000
 

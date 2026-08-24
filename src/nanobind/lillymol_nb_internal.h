@@ -34,7 +34,7 @@
 #include "Molecule_Tools/alogp.h"
 #include "Molecule_Tools/nvrtspsa.h"
 #include "Molecule_Tools/xlogp.h"
-#include "pybind/tsubstructure.h"
+#include "nanobind/tsubstructure.h"
 
 namespace nb = nanobind;
 

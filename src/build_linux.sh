@@ -272,8 +272,7 @@ if [[ ! -v BUILD_NATIVE ]] ; then
 fi
 
 if [[ ${BUILD_NATIVE} -ne 0 ]] ; then
-  build_options="${build_options} --copt=-march=native"
-  build_options="${build_options} --cxxopt=-march=native --cxxopt=-mtune=native"
+  build_options="${build_options} --config=native"
 fi
 
 if [[ -v BUILD_INCHI ]] ; then
@@ -321,7 +320,7 @@ echo "build_options ${build_options}"
 
 if [[ -v PYTHON_ONLY ]] ; then
     echo "Building Python bindings only"
-    ${bazel} ${bazel_options} build ${build_options} pybind:all
+    ${bazel} ${bazel_options} build ${build_options} //nanobind:lillymol //nanobind:lillymol_gfp_server
     ./copy_shared_libraries.sh $REPO_HOME/lib
     if [[ -v RUN_PYTHON_TESTS ]] ; then
         ./run_python_unit_tests.sh
@@ -437,7 +436,11 @@ fi
 # libraries from LillyMol/lib to your default PYTHONPATH.
 
 if [[ -v BUILD_PYTHON ]] ; then
-    ${bazel} ${bazel_options} build ${build_options} pybind:all
+    python_targets=(//nanobind:lillymol //nanobind:lillymol_gfp_server)
+    if [[ -v BUILD_BDB ]] ; then
+        python_targets+=(//nanobind:lillymol_bdb)
+    fi
+    ${bazel} ${bazel_options} build ${build_options} "${python_targets[@]}"
     ./copy_shared_libraries.sh $REPO_HOME/lib 
 
     ./run_python_unit_tests.sh

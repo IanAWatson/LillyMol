@@ -8,12 +8,16 @@ from setuptools.command.build_ext import build_ext
 
 PREBUILT = Path(__file__).parent / "prebuilt"
 
-PYBIND_MODULES = [
+NANOBIND_MODULES = [
     "lillymol",
+    "lillymol_bdb",
+    "lillymol_gfp_server",
+]
+
+COMPATIBILITY_MODULES = [
     "lillymol_atom",
     "lillymol_bond",
     "lillymol_fingerprint",
-    "lillymol_gfp_server",
     "lillymol_io",
     "lillymol_query",
     "lillymol_reaction",
@@ -63,7 +67,8 @@ class BuildPrebuiltExtensions(build_ext):
 setup(
     packages=find_namespace_packages(where="prebuilt"),
     package_dir={"": "prebuilt"},
-    ext_modules=[PrebuiltExtension(name) for name in PYBIND_MODULES],
+    py_modules=COMPATIBILITY_MODULES,
+    ext_modules=[PrebuiltExtension(name) for name in NANOBIND_MODULES],
     cmdclass={"build_ext": BuildPrebuiltExtensions},
     zip_safe=False,
 )

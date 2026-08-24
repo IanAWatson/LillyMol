@@ -52,7 +52,7 @@ porting mandate.
 ## Changeover Work Still Needed
 
 - Rename/package nanobind so the public module is `lillymol`; remove temporary
-  `lillymol_nb` naming from installed usage.
+  `lillymol` naming from installed usage.
 - Decide whether to keep separate compatibility modules such as
   `lillymol_query`, `lillymol_fingerprint`, and `lillymol_tools`, or provide all
   functionality through `lillymol` with optional import aliases.

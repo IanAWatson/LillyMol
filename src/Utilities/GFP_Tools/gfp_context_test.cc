@@ -91,7 +91,7 @@ std::string
 TestDataFile(const char* fname) {
   const char* test_srcdir = std::getenv("TEST_SRCDIR");
   if (test_srcdir != nullptr) {
-    for (const char* path : {"/_main/pybind/testdata/", "/pybind/testdata/"}) {
+    for (const char* path : {"/_main/Utilities/GFP_Tools/testdata/", "/Utilities/GFP_Tools/testdata/"}) {
       std::string candidate(test_srcdir);
       candidate.append(path);
       candidate.append(fname);
@@ -101,7 +101,7 @@ TestDataFile(const char* fname) {
     }
   }
 
-  std::string candidate("pybind/testdata/");
+  std::string candidate("Utilities/GFP_Tools/testdata/");
   candidate.append(fname);
   return candidate;
 }

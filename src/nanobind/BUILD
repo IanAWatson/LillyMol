@@ -1,10 +1,11 @@
 load("@nanobind_bazel//:build_defs.bzl", "nanobind_extension")
+load("@rules_cc//cc:defs.bzl", "cc_library")
 load("@rules_python//python:defs.bzl", "py_test")
 
 package(default_visibility = ["//visibility:public"])
 
 nanobind_extension(
-    name = "lillymol_nb",
+    name = "lillymol",
     srcs = [
         "lillymol_nb.cc",
         "lillymol_nb_atom_bond.cc",
@@ -28,7 +29,7 @@ nanobind_extension(
         "//Molecule_Lib:iwmfingerprint",
         "//Molecule_Lib:linear_fingerprint",
         "//Molecule_Lib:moleculeio",
-        "//pybind:tsubstructure",
+        ":tsubstructure",
         "//Molecule_Tools:alogp_lib",
         "//Molecule_Tools:dicer_api",
         "//Molecule_Tools:ec_fingerprint_lib",
@@ -46,18 +47,30 @@ nanobind_extension(
     ],
 )
 
-py_test(
-    name = "lillymol_nb_doc_test",
-    srcs = ["lillymol_nb_doc_test.py"],
-    data = [":lillymol_nb"],
+cc_library(
+    name = "tsubstructure",
+    srcs = ["tsubstructure.cc"],
+    hdrs = ["tsubstructure.h"],
+    deps = [
+        "//Molecule_Lib:iwmolecule",
+        "//Molecule_Lib:moleculeio",
+    ],
 )
 
 py_test(
-    name = "lillymol_nb_test",
+    name = "lillymol_doc_test",
+    srcs = ["lillymol_nb_doc_test.py"],
+    main = "lillymol_nb_doc_test.py",
+    data = [":lillymol"],
+)
+
+py_test(
+    name = "lillymol_test",
     srcs = ["lillymol_nb_test.py"],
+    main = "lillymol_nb_test.py",
     data = [
-        ":lillymol_nb",
-        "//pybind:testdata/rand10.standard.gfp",
+        ":lillymol",
+        "testdata/rand10.standard.gfp",
     ],
     deps = [
         "//Molecule_Lib:substructure_py_proto",
@@ -75,7 +88,7 @@ nanobind_extension(
 py_test(
     name = "gfp_http_server_test",
     srcs = ["gfp_http_server_test.py"],
-    data = ["//pybind:testdata/rand10.gfp"],
+    data = ["testdata/rand10.gfp"],
     deps = [
         ":lillymol_gfp_server",
         "//Utilities/GFP_Tools:gfp_http_server",
@@ -85,7 +98,7 @@ py_test(
 
 
 nanobind_extension(
-    name = "lillymol_nb_bdb",
+    name = "lillymol_bdb",
     srcs = ["lillymol_nb_bdb.cc"],
     deps = [
         "//Molecule_Lib:iwmolecule",
@@ -99,11 +112,12 @@ nanobind_extension(
 )
 
 py_test(
-    name = "lillymol_nb_bdb_test",
+    name = "lillymol_bdb_test",
     srcs = ["lillymol_nb_bdb_test.py"],
+    main = "lillymol_nb_bdb_test.py",
     data = [
-        ":lillymol_nb",
-        ":lillymol_nb_bdb",
+        ":lillymol",
+        ":lillymol_bdb",
         "//BerkeleyDB:iwbdb_load",
         "//Molecule_Tools_Bdb:structure_database_load",
         "//Molecule_Tools_Bdb:substituent_identification",

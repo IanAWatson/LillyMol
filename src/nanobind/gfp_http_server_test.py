@@ -33,24 +33,24 @@ except ModuleNotFoundError as err:
 
 
 def _testdata_path() -> str:
-  candidates = ['pybind/testdata/rand10.gfp']
+  candidates = ['nanobind/testdata/rand10.gfp']
   test_srcdir = os.environ.get('TEST_SRCDIR')
   if test_srcdir:
     candidates.extend([
-        os.path.join(test_srcdir, '_main/pybind/testdata/rand10.gfp'),
-        os.path.join(test_srcdir, 'pybind/testdata/rand10.gfp'),
+        os.path.join(test_srcdir, '_main/nanobind/testdata/rand10.gfp'),
+        os.path.join(test_srcdir, 'nanobind/testdata/rand10.gfp'),
     ])
   runfiles_dir = os.environ.get('RUNFILES_DIR')
   if runfiles_dir:
     candidates.extend([
-        os.path.join(runfiles_dir, '_main/pybind/testdata/rand10.gfp'),
-        os.path.join(runfiles_dir, 'pybind/testdata/rand10.gfp'),
+        os.path.join(runfiles_dir, '_main/nanobind/testdata/rand10.gfp'),
+        os.path.join(runfiles_dir, 'nanobind/testdata/rand10.gfp'),
     ])
 
   for candidate in candidates:
     if os.path.exists(candidate):
       return candidate
-  raise FileNotFoundError('Cannot find pybind/testdata/rand10.gfp')
+  raise FileNotFoundError('Cannot find nanobind/testdata/rand10.gfp')
 
 
 

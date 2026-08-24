@@ -24,20 +24,20 @@ def _runfile_path(path):
 
     return None
 
-import lillymol_nb
-import lillymol_nb_bdb
+import lillymol
+import lillymol_bdb
 
 
 class TestNanobindBdb(unittest.TestCase):
 
     def test_import_and_construct(self):
-        self.assertIsNotNone(lillymol_nb_bdb.Selimsteg())
-        precedent = lillymol_nb_bdb.SyntheticPrecedentDatabases()
+        self.assertIsNotNone(lillymol_bdb.Selimsteg())
+        precedent = lillymol_bdb.SyntheticPrecedentDatabases()
         self.assertIn("Synthetic Precedent database", repr(precedent))
         self.assertTrue(precedent.set_max_radius(2))
 
     def test_open_missing_database_fails(self):
-        lookup = lillymol_nb_bdb.Selimsteg()
+        lookup = lillymol_bdb.Selimsteg()
         self.assertFalse(lookup.open_database("/no/such/berkeleydb/file.bdb"))
 
     def test_selimsteg_lookup(self):
@@ -59,7 +59,7 @@ class TestNanobindBdb(unittest.TestCase):
             # where unlinking an open file works, but on NFS the unlink becomes a
             # silly rename to .nfsXXXX and cleanup fails with ENOTEMPTY. The bazel
             # sandbox puts /tmp on NFS here.
-            with lillymol_nb_bdb.Selimsteg() as lookup:
+            with lillymol_bdb.Selimsteg() as lookup:
                 self.assertTrue(lookup.open_database(dbname))
                 self.assertEqual(lookup.get_smiles("mol1"), "CCO")
                 self.assertIsNone(lookup.get_smiles("missing"))
@@ -89,22 +89,22 @@ class TestNanobindBdb(unittest.TestCase):
 
             subprocess.run([loader, "-d", dbstem, input_fname], check=True)
 
-            db = lillymol_nb_bdb.StructureDatabase()
+            db = lillymol_bdb.StructureDatabase()
             self.assertTrue(db.open_read(dbstem))
-            self.assertEqual(lillymol_nb_bdb.value(lillymol_nb_bdb.LookupParams.EXACT), 1)
-            self.assertEqual(lillymol_nb_bdb.value(lillymol_nb_bdb.LookupParams.GRAPH), 8)
+            self.assertEqual(lillymol_bdb.value(lillymol_bdb.LookupParams.EXACT), 1)
+            self.assertEqual(lillymol_bdb.value(lillymol_bdb.LookupParams.GRAPH), 8)
 
-            ethanol = lillymol_nb.MolFromSmiles("CCO query")
+            ethanol = lillymol.MolFromSmiles("CCO query")
             self.assertEqual(db.lookup(ethanol), "ethanol")
 
-            propanol = lillymol_nb.MolFromSmiles("CCCO propanol")
+            propanol = lillymol.MolFromSmiles("CCCO propanol")
             self.assertIsNone(db.lookup(propanol))
 
-            strip_mask = lillymol_nb_bdb.value(lillymol_nb_bdb.LookupParams.STRIP)
-            mixture = lillymol_nb.MolFromSmiles("CCO.O mixture")
+            strip_mask = lillymol_bdb.value(lillymol_bdb.LookupParams.STRIP)
+            mixture = lillymol.MolFromSmiles("CCO.O mixture")
             self.assertEqual(db.lookup(mixture, strip_mask), "ethanol")
 
-            graph_mask = lillymol_nb_bdb.value(lillymol_nb_bdb.LookupParams.GRAPH)
+            graph_mask = lillymol_bdb.value(lillymol_bdb.LookupParams.GRAPH)
             self.assertEqual(db.lookup(ethanol, graph_mask), "ethanol")
 
     def test_substituent_identification_lookup(self):
@@ -125,12 +125,12 @@ class TestNanobindBdb(unittest.TestCase):
                 check=True,
             )
 
-            with lillymol_nb_bdb.SubstituentIdentificationLookup() as lookup:
+            with lillymol_bdb.SubstituentIdentificationLookup() as lookup:
                 self.assertTrue(lookup.open_database(dbname))
                 lookup.set_default_new_molecule_starting_points(1)
                 lookup.set_max_substituent_size(2)
 
-                mol = lillymol_nb.MolFromSmiles("C methane")
+                mol = lillymol.MolFromSmiles("C methane")
                 replacements = lookup.generate_replacements(mol)
 
                 self.assertEqual(len(replacements), 3)
@@ -164,12 +164,12 @@ class TestNanobindBdb(unittest.TestCase):
                 check=True,
             )
 
-            with lillymol_nb_bdb.SubstituentIdentificationLookup() as lookup:
+            with lillymol_bdb.SubstituentIdentificationLookup() as lookup:
                 self.assertTrue(lookup.open_database(dbname))
                 self.assertTrue(lookup.add_query_from_smarts("[r]-!@*"))
                 lookup.set_break_molecule_at_first_two_matched_atoms(True)
 
-                phenol = lillymol_nb.MolFromSmiles("Oc1ccccc1 phenol")
+                phenol = lillymol.MolFromSmiles("Oc1ccccc1 phenol")
                 replacements = lookup.generate_replacements(phenol)
 
                 self.assertEqual(
@@ -185,24 +185,24 @@ class TestNanobindBdb(unittest.TestCase):
                     ["chloro", "nitrogen", "sulphur"],
                 )
 
-            with lillymol_nb_bdb.SubstituentIdentificationLookup() as lookup:
+            with lillymol_bdb.SubstituentIdentificationLookup() as lookup:
                 self.assertTrue(lookup.open_database(dbname))
                 self.assertTrue(lookup.add_query_from_smarts("[r]-!@*"))
                 lookup.set_break_molecule_at_first_two_matched_atoms(True)
                 lookup.set_max_matches_per_input_molecule(2)
 
-                phenol = lillymol_nb.MolFromSmiles("Oc1ccccc1 phenol")
+                phenol = lillymol.MolFromSmiles("Oc1ccccc1 phenol")
                 replacements = lookup.generate_replacements(phenol)
 
                 self.assertEqual(len(replacements), 2)
 
-            with lillymol_nb_bdb.SubstituentIdentificationLookup() as lookup:
+            with lillymol_bdb.SubstituentIdentificationLookup() as lookup:
                 self.assertTrue(lookup.open_database(dbname))
                 self.assertTrue(lookup.add_query_from_smarts("[r]-!@*"))
                 lookup.set_break_molecule_at_first_two_matched_atoms(True)
                 lookup.set_remove_isotopes_from_product(True)
 
-                phenol = lillymol_nb.MolFromSmiles("Oc1ccccc1 phenol")
+                phenol = lillymol.MolFromSmiles("Oc1ccccc1 phenol")
                 replacements = lookup.generate_replacements(phenol)
 
                 self.assertEqual(
@@ -216,7 +216,7 @@ class TestNanobindBdb(unittest.TestCase):
 
     def test_selimsteg_with_no_database_open(self):
         """Used to dereference a null Db* and take the process down."""
-        lookup = lillymol_nb_bdb.Selimsteg()
+        lookup = lillymol_bdb.Selimsteg()
         self.assertIsNone(lookup.get_smiles("anything"))
         self.assertIsNone(lookup.get_molecule("anything"))
         self.assertEqual(lookup.get_molecules(["a", "b"])[0].natoms(), 0)

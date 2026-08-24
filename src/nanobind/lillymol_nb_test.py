@@ -11,7 +11,7 @@ sys.path.insert(0, os.path.dirname(__file__))
 
 from google.protobuf import text_format
 
-import lillymol_nb
+import lillymol
 from Molecule_Lib import substructure_pb2
 from Utilities.GFP_Tools import nearneighbours_pb2
 
@@ -103,7 +103,7 @@ def _medchemwizard_reactions_file():
 
 
 def _methane():
-    mol = lillymol_nb.Molecule()
+    mol = lillymol.Molecule()
     assert mol.build_from_smiles("C methane")
     return mol
 
@@ -185,12 +185,13 @@ def _testdata_file(fname):
         root = os.environ.get(envvar)
         if root:
             candidates.extend([
-                os.path.join(root, "_main", "pybind", "testdata", fname),
-                os.path.join(root, "pybind", "testdata", fname),
+                os.path.join(root, "_main", "nanobind", "testdata", fname),
+                os.path.join(root, "nanobind", "testdata", fname),
             ])
     candidates.extend([
-        os.path.join(os.path.dirname(__file__), "..", "pybind", "testdata", fname),
-        os.path.join(os.path.dirname(__file__), "..", "..", "pybind", "testdata", fname),
+        os.path.join(os.path.dirname(__file__), "testdata", fname),
+        os.path.join(os.path.dirname(__file__), "..", "nanobind", "testdata", fname),
+        os.path.join(os.path.dirname(__file__), "..", "..", "nanobind", "testdata", fname),
     ])
     for candidate in candidates:
         if os.path.exists(candidate):
@@ -236,7 +237,7 @@ N1(C(C#N)C1)C(=O)NCC CHEMBL150159
 class TestNanobindMolecule(LillyMolNanobindTestCase):
 
     def test_build_from_smiles(self):
-        mol = lillymol_nb.Molecule()
+        mol = lillymol.Molecule()
         self.assertTrue(mol.build_from_smiles("CCO ethanol"))
         self.assertEqual(mol.natoms(), 3)
         self.assertEqual(mol.nedges(), 2)
@@ -246,28 +247,28 @@ class TestNanobindMolecule(LillyMolNanobindTestCase):
         self.assertEqual(mol.molecular_formula(), "C2OH6")
 
     def test_mol_from_smiles(self):
-        mol = lillymol_nb.MolFromSmiles("c1ccccc1 benzene")
+        mol = lillymol.MolFromSmiles("c1ccccc1 benzene")
         self.assertIsNotNone(mol)
         self.assertEqual(mol.natoms(), 6)
         self.assertEqual(mol.nrings(), 1)
         self.assertEqual(mol.name(), "benzene")
-        self.assertIsNone(lillymol_nb.MolFromSmiles("["))
+        self.assertIsNone(lillymol.MolFromSmiles("["))
 
     def test_lillymol_from_smiles_and_batch_smiles(self):
-        mol = lillymol_nb.LillyMolFromSmiles("CCO ethanol")
+        mol = lillymol.LillyMolFromSmiles("CCO ethanol")
         self.assertIsNotNone(mol)
         self.assertEqual(mol.name(), "ethanol")
 
-        molecules = lillymol_nb.MolFromSmiles(["C methane", "CC ethane", "["])
+        molecules = lillymol.MolFromSmiles(["C methane", "CC ethane", "["])
         self.assertEqual(len(molecules), 3)
         self.assertEqual(molecules[0].name(), "methane")
         self.assertEqual(molecules[1].natoms(), 2)
         self.assertEqual(molecules[2].natoms(), 0)
 
     def test_molecule_equality(self):
-        mol1 = lillymol_nb.MolFromSmiles("CCO ethanol")
-        mol2 = lillymol_nb.MolFromSmiles("CCO other")
-        mol3 = lillymol_nb.MolFromSmiles("CCN ethylamine")
+        mol1 = lillymol.MolFromSmiles("CCO ethanol")
+        mol2 = lillymol.MolFromSmiles("CCO other")
+        mol3 = lillymol.MolFromSmiles("CCN ethylamine")
         self.assertEqual(mol1, mol2)
         self.assertNotEqual(mol1, mol3)
         mol2.set_atomic_number(2, 7)
@@ -286,7 +287,7 @@ class TestNanobindMolecule(LillyMolNanobindTestCase):
             # cleanup fails with ENOTEMPTY. The bazel sandbox puts /tmp on NFS
             # here, so a leaked reader fails under bazel and passes when run by
             # hand.
-            reader = lillymol_nb.Reader()
+            reader = lillymol.Reader()
             self.assertTrue(reader.open(fname))
             mol = reader.next()
             self.assertIsNotNone(mol)
@@ -300,9 +301,9 @@ class TestNanobindMolecule(LillyMolNanobindTestCase):
             with open(fname, "w") as writer:
                 writer.write(SMILES)
 
-            reader = lillymol_nb.Reader()
+            reader = lillymol.Reader()
             self.assertFalse(reader.open(fname))
-            self.assertTrue(reader.open(fname, lillymol_nb.FileType.SMI))
+            self.assertTrue(reader.open(fname, lillymol.FileType.SMI))
             self.assertEqual(reader.next().name(), "CHEMBL45466")
             reader.close()
 
@@ -312,8 +313,8 @@ class TestNanobindMolecule(LillyMolNanobindTestCase):
             with open(fname, "w") as writer:
                 writer.write(SMILES)
 
-            reader = lillymol_nb.Reader()
-            self.assertTrue(reader.open(fname, lillymol_nb.FileType.SMI))
+            reader = lillymol.Reader()
+            self.assertTrue(reader.open(fname, lillymol.FileType.SMI))
             names = [mol.name() for mol in reader]
             self.assertEqual(len(names), 10)
             self.assertEqual(reader.molecules_read(), 10)
@@ -325,26 +326,26 @@ class TestNanobindMolecule(LillyMolNanobindTestCase):
             with open(fname, "w") as writer:
                 writer.write(SMILES)
 
-            molecules = lillymol_nb.slurp(fname)
+            molecules = lillymol.slurp(fname)
             self.assertIsNotNone(molecules)
             self.assertEqual(len(molecules), 10)
             self.assertEqual(molecules[0].name(), "CHEMBL45466")
             self.assertEqual([mol.name() for mol in molecules[:2]], ["CHEMBL45466", "CHEMBL1200345"])
 
     def test_global_sdf_option_helpers_are_available(self):
-        self.assertTrue(lillymol_nb.set_sdf_identifier("idnumber"))
-        lillymol_nb.set_prepend_sdfid(True)
-        lillymol_nb.set_allsdfid(False)
-        lillymol_nb.set_sdf_tags_to_json(False)
-        lillymol_nb.set_firstsdftag(False)
-        lillymol_nb.set_ignore_bad_m(False)
-        lillymol_nb.set_mdlquiet(False)
-        lillymol_nb.set_allow_deuterium(False)
-        lillymol_nb.set_allow_tritium(False)
+        self.assertTrue(lillymol.set_sdf_identifier("idnumber"))
+        lillymol.set_prepend_sdfid(True)
+        lillymol.set_allsdfid(False)
+        lillymol.set_sdf_tags_to_json(False)
+        lillymol.set_firstsdftag(False)
+        lillymol.set_ignore_bad_m(False)
+        lillymol.set_mdlquiet(False)
+        lillymol.set_allow_deuterium(False)
+        lillymol.set_allow_tritium(False)
 
     def test_context_aliases(self):
-        self.assertIs(lillymol_nb.ReaderContext, lillymol_nb.MolReaderContext)
-        self.assertIs(lillymol_nb.ContextWriter, lillymol_nb.MolWriterContext)
+        self.assertIs(lillymol.ReaderContext, lillymol.MolReaderContext)
+        self.assertIs(lillymol.ContextWriter, lillymol.MolWriterContext)
 
     def test_mol_reader_context(self):
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -352,7 +353,7 @@ class TestNanobindMolecule(LillyMolNanobindTestCase):
             with open(fname, "w") as writer:
                 writer.write(SMILES)
 
-            with lillymol_nb.MolReaderContext(fname, lillymol_nb.FileType.SMI) as reader:
+            with lillymol.MolReaderContext(fname, lillymol.FileType.SMI) as reader:
                 names = [mol.name() for mol in reader]
             self.assertEqual(len(names), 10)
             self.assertEqual(names[0], "CHEMBL45466")
@@ -363,7 +364,7 @@ class TestNanobindMolecule(LillyMolNanobindTestCase):
             with open(fname, "w") as writer:
                 writer.write("CC.O mixture\n")
 
-            with lillymol_nb.MolReaderContext(fname, largest_fragment=True) as reader:
+            with lillymol.MolReaderContext(fname, largest_fragment=True) as reader:
                 mol = reader.next()
                 self.assertIsNotNone(mol)
                 self.assertEqual(mol.natoms(), 2)
@@ -394,8 +395,8 @@ $$$$
             with open(fname, "w") as writer:
                 writer.write(sdf)
 
-            with lillymol_nb.MolReaderContext(
-                    fname, lillymol_nb.FileType.SDF, keep_sdf_tags=True) as reader:
+            with lillymol.MolReaderContext(
+                    fname, lillymol.FileType.SDF, keep_sdf_tags=True) as reader:
                 mol = reader.next()
                 self.assertIsNotNone(mol)
                 self.assertGreater(mol.number_records_text_info(), 0)
@@ -406,35 +407,35 @@ $$$$
     def test_writer_and_context_writer(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             stem = os.path.join(tmpdir, "written")
-            mol = lillymol_nb.MolFromSmiles("CCO ethanol")
-            writer = lillymol_nb.Writer()
-            self.assertTrue(writer.add_output_type(lillymol_nb.FileType.SMI))
+            mol = lillymol.MolFromSmiles("CCO ethanol")
+            writer = lillymol.Writer()
+            self.assertTrue(writer.add_output_type(lillymol.FileType.SMI))
             self.assertTrue(writer.new_stem(stem))
             self.assertTrue(writer.write(mol))
             writer.close()
 
-            reader = lillymol_nb.Reader()
+            reader = lillymol.Reader()
             self.assertTrue(reader.open(stem + ".smi"))
             self.assertEqual(reader.next().name(), "ethanol")
             reader.close()
 
             stem = os.path.join(tmpdir, "context")
-            with lillymol_nb.MolWriterContext(stem, lillymol_nb.FileType.SMI) as writer:
+            with lillymol.MolWriterContext(stem, lillymol.FileType.SMI) as writer:
                 self.assertTrue(writer.write(mol))
 
-            reader = lillymol_nb.Reader()
+            reader = lillymol.Reader()
             self.assertTrue(reader.open(stem + ".smi"))
             self.assertEqual(reader.next().smiles(), "CCO")
             reader.close()
 
     def test_set_name(self):
-        mol = lillymol_nb.Molecule()
+        mol = lillymol.Molecule()
         self.assertTrue(mol.build_from_smiles("C methane"))
         mol.set_name("renamed")
         self.assertEqual(mol.name(), "renamed")
 
     def test_rdkit_style_molecule_access_aliases(self):
-        mol = lillymol_nb.MolFromSmiles("[H]OC ethanol")
+        mol = lillymol.MolFromSmiles("[H]OC ethanol")
         self.assertEqual(mol.GetNumAtoms(), 3)
         self.assertEqual(mol.GetNumHeavyAtoms(), 2)
         self.assertEqual(mol.GetNumBonds(), mol.nedges())
@@ -448,7 +449,7 @@ $$$$
         self.assertEqual(oxygen.atomic_symbol(), "N")
 
     def test_molecule_common_aliases_and_counts(self):
-        mol = lillymol_nb.MolFromSmiles("CCO ethanol")
+        mol = lillymol.MolFromSmiles("CCO ethanol")
         self.assertTrue(mol.ok())
         self.assertFalse(mol.empty())
         self.assertEqual(mol.GetNumAtoms(), 3)
@@ -462,43 +463,43 @@ $$$$
         self.assertEqual(mol.other_atom(1, 1), 2)
 
     def test_programmatic_molecule_building_and_bond_lookup(self):
-        mol = lillymol_nb.Molecule()
+        mol = lillymol.Molecule()
         self.assertTrue(mol.empty())
         c1 = mol.add_atom(6)
         c2 = mol.add_atom(6)
         o = mol.add_atom(8)
         self.assertEqual((c1, c2, o), (0, 1, 2))
         self.assertEqual(mol.natoms(), 3)
-        self.assertEqual(mol.add_bond(0, 1, lillymol_nb.BondType.SINGLE_BOND), 1)
-        self.assertEqual(mol.add_bond(1, 2, lillymol_nb.BondType.DOUBLE_BOND), 1)
+        self.assertEqual(mol.add_bond(0, 1, lillymol.BondType.SINGLE_BOND), 1)
+        self.assertEqual(mol.add_bond(1, 2, lillymol.BondType.DOUBLE_BOND), 1)
         self.assertEqual(mol.nedges(), 2)
         self.assertIsNotNone(mol.bond_between_atoms(0, 1))
         self.assertIsNone(mol.bond_between_atoms(0, 2))
-        self.assertEqual(mol.bond_type_between_atoms(1, 2), lillymol_nb.BondType.DOUBLE_BOND)
+        self.assertEqual(mol.bond_type_between_atoms(1, 2), lillymol.BondType.DOUBLE_BOND)
         self.assertIsNone(mol.bond_type_between_atoms(0, 2))
         mol.assign_bond_numbers_to_bonds()
         self.assertTrue(mol.bond(0).bond_number_assigned())
-        self.assertEqual(mol.set_bond_type_between_atoms(1, 2, lillymol_nb.BondType.SINGLE_BOND), 1)
-        self.assertEqual(mol.bond_type_between_atoms(1, 2), lillymol_nb.BondType.SINGLE_BOND)
+        self.assertEqual(mol.set_bond_type_between_atoms(1, 2, lillymol.BondType.SINGLE_BOND), 1)
+        self.assertEqual(mol.bond_type_between_atoms(1, 2), lillymol.BondType.SINGLE_BOND)
         self.assertEqual(mol.remove_bond_between_atoms(1, 2), 1)
         self.assertIsNone(mol.bond_between_atoms(1, 2))
 
-        mixture = lillymol_nb.MolFromSmiles("C methane")
-        self.assertEqual(mixture.add(lillymol_nb.MolFromSmiles("O water")), 1)
+        mixture = lillymol.MolFromSmiles("C methane")
+        self.assertEqual(mixture.add(lillymol.MolFromSmiles("O water")), 1)
         self.assertEqual(mixture.number_fragments(), 2)
 
     def test_atom_removal_and_resize(self):
-        mol = lillymol_nb.MolFromSmiles("CCO ethanol")
+        mol = lillymol.MolFromSmiles("CCO ethanol")
         self.assertEqual(mol.remove_atom(2), 1)
         self.assertEqual(mol.natoms(), 2)
-        mol = lillymol_nb.MolFromSmiles("CCO ethanol")
+        mol = lillymol.MolFromSmiles("CCO ethanol")
         self.assertEqual(mol.remove_atoms([0, 1, 0], 1), 1)
         self.assertEqual(mol.natoms(), 2)
-        mol = lillymol_nb.MolFromSmiles("CCO ethanol")
-        self.assertEqual(mol.remove_atoms(lillymol_nb.Set_of_Atoms([0, 2])), 2)
+        mol = lillymol.MolFromSmiles("CCO ethanol")
+        self.assertEqual(mol.remove_atoms(lillymol.Set_of_Atoms([0, 2])), 2)
         self.assertEqual(mol.natoms(), 1)
     def test_molecule_convenience_methods(self):
-        mol = lillymol_nb.MolFromSmiles("CCO ethanol")
+        mol = lillymol.MolFromSmiles("CCO ethanol")
         self.assertTrue(mol.organic_only())
         self.assertEqual(mol.non_organic_atom_count(), 0)
         self.assertTrue(mol.is_organic(0))
@@ -531,7 +532,7 @@ $$$$
             mol.renumber_atoms([0, 0, 1])
 
     def test_partial_charge_helpers(self):
-        mol = lillymol_nb.MolFromSmiles("CCO ethanol")
+        mol = lillymol.MolFromSmiles("CCO ethanol")
         charges = mol.gasteiger_partial_charges()
         self.assertEqual(len(charges), mol.natoms())
         self.assertEqual(mol.partial_charge_type(), "GASTEIGER")
@@ -542,8 +543,8 @@ $$$$
         self.assertGreaterEqual(mol.compute_Gasteiger_partial_charges(), 0)
 
     def test_atoms_by_radius_single_starting_atom(self):
-        mol = lillymol_nb.MolFromSmiles("CCCCC pentane")
-        shells = mol.atoms_by_radius(lillymol_nb.Set_of_Atoms([2]), 3)
+        mol = lillymol.MolFromSmiles("CCCCC pentane")
+        shells = mol.atoms_by_radius(lillymol.Set_of_Atoms([2]), 3)
         self.assertEqual(len(shells), 4)
         self.assertCountEqual(shells[0], [2])
         self.assertCountEqual(shells[1], [1, 3])
@@ -551,22 +552,22 @@ $$$$
         self.assertEqual(shells[3], [])
 
     def test_atoms_by_radius_multiple_starting_atoms(self):
-        mol = lillymol_nb.MolFromSmiles("CCCCC pentane")
-        shells = mol.atoms_by_radius(lillymol_nb.Set_of_Atoms([0, 4]), 3)
+        mol = lillymol.MolFromSmiles("CCCCC pentane")
+        shells = mol.atoms_by_radius(lillymol.Set_of_Atoms([0, 4]), 3)
         self.assertCountEqual(shells[0], [0, 4])
         self.assertCountEqual(shells[1], [1, 3])
         self.assertCountEqual(shells[2], [2])
         self.assertEqual(shells[3], [])
 
     def test_atoms_by_radius_validation(self):
-        mol = lillymol_nb.MolFromSmiles("CCC propane")
+        mol = lillymol.MolFromSmiles("CCC propane")
         with self.assertRaises(Exception):
-            mol.atoms_by_radius(lillymol_nb.Set_of_Atoms([3]), 1)
+            mol.atoms_by_radius(lillymol.Set_of_Atoms([3]), 1)
         with self.assertRaises(Exception):
-            mol.atoms_by_radius(lillymol_nb.Set_of_Atoms([0]), -1)
+            mol.atoms_by_radius(lillymol.Set_of_Atoms([0]), -1)
 
     def test_atom_map_number_helpers(self):
-        mol = lillymol_nb.MolFromSmiles("CCO ethanol")
+        mol = lillymol.MolFromSmiles("CCO ethanol")
         self.assertEqual(mol.atom_map_number(1), 0)
         mol.set_atom_map_number(1, 17)
         self.assertEqual(mol.atom_map_number(1), 17)
@@ -576,13 +577,13 @@ $$$$
         self.assertEqual(mol.atom_map_number(1), 0)
 
     def test_molecule_repr_debug_and_addition(self):
-        mol = lillymol_nb.MolFromSmiles("CCO ethanol")
+        mol = lillymol.MolFromSmiles("CCO ethanol")
         self.assertIn("ethanol", repr(mol))
         self.assertIn("3 atoms", repr(mol))
         self.assertEqual(str(mol), "CCO ethanol")
         self.assertIn("Molecule", mol.debug_string())
 
-        methane = lillymol_nb.MolFromSmiles("C methane")
+        methane = lillymol.MolFromSmiles("C methane")
         combined = mol + methane
         self.assertEqual(mol.natoms(), 3)
         self.assertEqual(combined.natoms(), 4)
@@ -590,7 +591,7 @@ $$$$
         self.assertEqual(mol.natoms(), 4)
 
     def test_coordinates_object_and_transforms(self):
-        coords = lillymol_nb.Coordinates(3.0, 4.0, 0.0)
+        coords = lillymol.Coordinates(3.0, 4.0, 0.0)
         self.assertAlmostEqual(coords.x(), 3.0)
         self.assertAlmostEqual(coords.y(), 4.0)
         self.assertAlmostEqual(coords.z(), 0.0)
@@ -601,10 +602,10 @@ $$$$
         coords.setxyz(1.0, 2.0, 3.0)
         coords.set_z(4.0)
         self.assertAlmostEqual(coords.length(), math.sqrt(21.0), delta=1.0e-6)
-        self.assertAlmostEqual(coords.distance(lillymol_nb.Coordinates(1.0, 2.0, 4.0)), 0.0)
-        self.assertAlmostEqual(coords.dot_product(lillymol_nb.Coordinates(0.0, 1.0, 0.0)), 2.0)
+        self.assertAlmostEqual(coords.distance(lillymol.Coordinates(1.0, 2.0, 4.0)), 0.0)
+        self.assertAlmostEqual(coords.dot_product(lillymol.Coordinates(0.0, 1.0, 0.0)), 2.0)
 
-        mol = lillymol_nb.MolFromSmiles("CCC propane")
+        mol = lillymol.MolFromSmiles("CCC propane")
         mol.set_coordinates([0.0, 0.0, 0.0,
                              1.0, 0.0, 0.0,
                              2.0, 0.0, 0.0])
@@ -617,10 +618,10 @@ $$$$
         with self.assertRaises(Exception):
             mol.translate([1, 1], 1, 0.0, 0.0, 1.0)
 
-        ethane = lillymol_nb.MolFromSmiles("CC ethane")
+        ethane = lillymol.MolFromSmiles("CC ethane")
         ethane.set_coordinates([0.0, 0.0, 0.0,
                                 1.0, 0.0, 0.0])
-        ethane.rotate(lillymol_nb.Coordinates(0.0, 0.0, 1.0), math.pi / 2.0)
+        ethane.rotate(lillymol.Coordinates(0.0, 0.0, 1.0), math.pi / 2.0)
         self.assertAlmostEqual(ethane.x(1), 0.0, delta=1.0e-5)
         self.assertAlmostEqual(ethane.y(1), 1.0, delta=1.0e-5)
 
@@ -631,7 +632,7 @@ $$$$
         except ImportError:
             self.skipTest("numpy is not available")
 
-        mol = lillymol_nb.MolFromSmiles("CCC propane")
+        mol = lillymol.MolFromSmiles("CCC propane")
         coords = np.array([0.0, 0.0, 0.0,
                            1.0, 0.0, 0.0,
                            2.0, 0.0, 0.0], dtype=np.float32)
@@ -663,7 +664,7 @@ $$$$
         except ImportError:
             self.skipTest("numpy is not available")
 
-        mol = lillymol_nb.MolFromSmiles("C{{-2,1,0}}C{{-1,0,0}}C{{0,0,0}}C{{1,1,0}} butane")
+        mol = lillymol.MolFromSmiles("C{{-2,1,0}}C{{-1,0,0}}C{{0,0,0}}C{{1,1,0}} butane")
         start = mol.get_coordinates()
         conformers = mol.dihedral_scan(1, 2, 45.0)
         self.assertEqual(len(conformers), 7)
@@ -675,7 +676,7 @@ $$$$
         self.assertEqual(mol.dihedral_scan(1, 2, 180.0), [])
 
     def test_coordinate_and_geometry_helpers(self):
-        mol = lillymol_nb.MolFromSmiles("CCCO propanol")
+        mol = lillymol.MolFromSmiles("CCCO propanol")
         mol.setxyz(0, 0.0, 0.0, 0.0)
         mol.setxyz(1, 1.0, 0.0, 0.0)
         mol.setxyz(2, 1.0, 1.0, 0.0)
@@ -709,39 +710,39 @@ $$$$
         self.assertGreater(mol.bump_check(2.0), 0)
 
     def test_canonical_and_symmetry_helpers(self):
-        mol = lillymol_nb.MolFromSmiles("CCO ethanol")
+        mol = lillymol.MolFromSmiles("CCO ethanol")
         ranks = mol.canonical_ranks()
         self.assertEqual(len(ranks), mol.natoms())
         self.assertEqual(mol.canonical_rank(0), ranks[0])
         classes = [mol.symmetry_class(i) for i in range(mol.natoms())]
         self.assertEqual(mol.number_symmetry_classes(), len(set(classes)))
 
-        ethane = lillymol_nb.MolFromSmiles("CC ethane")
+        ethane = lillymol.MolFromSmiles("CC ethane")
         equivalents = ethane.symmetry_equivalents(0)
         self.assertIn(1, equivalents)
 
     def test_remove_helpers(self):
-        mol = lillymol_nb.MolFromSmiles("[Na]OC sodium_ethoxide")
+        mol = lillymol.MolFromSmiles("[Na]OC sodium_ethoxide")
         self.assertEqual(mol.non_organic_atom_count(), 1)
         self.assertEqual(mol.remove_non_periodic_table_elements(), 0)
 
-        mol = lillymol_nb.MolFromSmiles("CC ethane")
+        mol = lillymol.MolFromSmiles("CC ethane")
         self.assertEqual(mol.AddHs(), 6)
         self.assertEqual(mol.remove_explicit_hydrogens(), 2)
         self.assertEqual(mol.natoms(), 2)
 
-        mol = lillymol_nb.MolFromSmiles("CCO ethanol")
+        mol = lillymol.MolFromSmiles("CCO ethanol")
         self.assertTrue(mol.remove_bonds_to_atom(1))
         self.assertEqual(mol.nedges(), 0)
 
-        mol = lillymol_nb.MolFromSmiles("CCO ethanol")
+        mol = lillymol.MolFromSmiles("CCO ethanol")
         self.assertEqual(mol.remove_edge(0), 1)
         self.assertEqual(mol.nedges(), 1)
         self.assertEqual(mol.chop(1), 2)
         self.assertEqual(mol.natoms(), 2)
 
     def test_charges_isotopes_and_hydrogens(self):
-        mol = lillymol_nb.MolFromSmiles("C[NH3+] methylammonium")
+        mol = lillymol.MolFromSmiles("C[NH3+] methylammonium")
         self.assertTrue(mol.has_formal_charges())
         self.assertEqual(mol.number_formal_charges(), 1)
         self.assertEqual(mol.net_formal_charge(), 1)
@@ -750,13 +751,13 @@ $$$$
         self.assertEqual(mol.formal_charge(1), 0)
         self.assertEqual(mol.net_formal_charge(), 0)
 
-        mol = lillymol_nb.MolFromSmiles("[3CH3]CO labelled")
+        mol = lillymol.MolFromSmiles("[3CH3]CO labelled")
         self.assertEqual(mol.number_isotopic_atoms(), 1)
         self.assertEqual(mol.first_atom_with_isotope(3), 0)
         self.assertEqual(mol.transform_to_non_isotopic_form(), 1)
         self.assertEqual(mol.number_isotopic_atoms(), 0)
 
-        mol = lillymol_nb.MolFromSmiles("CC ethane")
+        mol = lillymol.MolFromSmiles("CC ethane")
         self.assertEqual(mol.implicit_hydrogens(0), 3)
         self.assertEqual(mol.explicit_hydrogens(0), 0)
         self.assertEqual(mol.hcount(0), 3)
@@ -768,7 +769,7 @@ $$$$
         self.assertEqual(mol.natoms(), 2)
 
     def test_ring_aliases_and_aromaticity(self):
-        mol = lillymol_nb.MolFromSmiles("c1ccccc1 benzene")
+        mol = lillymol.MolFromSmiles("c1ccccc1 benzene")
         self.assertTrue(mol.IsInRing(0))
         self.assertTrue(mol.in_ring_of_size(0, 6))
         self.assertTrue(mol.IsAtomInRingOfSize(0, 6))
@@ -778,10 +779,10 @@ $$$$
         self.assertEqual(mol.aromatic_ring_count(), 1)
 
     def test_chiral_centre_access_and_helpers(self):
-        self.assertNotEqual(lillymol_nb.CIP.R, lillymol_nb.CIP.S)
-        self.assertNotEqual(lillymol_nb.CIP.Neither, lillymol_nb.CIP.Unspecified)
+        self.assertNotEqual(lillymol.CIP.R, lillymol.CIP.S)
+        self.assertNotEqual(lillymol.CIP.Neither, lillymol.CIP.Unspecified)
 
-        mol = lillymol_nb.MolFromSmiles("F[C@H](Cl)Br chiral")
+        mol = lillymol.MolFromSmiles("F[C@H](Cl)Br chiral")
         self.assertEqual(mol.number_chiral_centres(), 1)
         centre = mol.chiral_centre_at_atom(1)
         self.assertIsNotNone(centre)
@@ -789,12 +790,12 @@ $$$$
         self.assertTrue(centre.involves(0))
         self.assertEqual(centre.implicit_hydrogens(), 1)
         self.assertEqual(centre.lone_pairs(), 0)
-        self.assertLess(lillymol_nb.CHIRAL_CONNECTION_IS_IMPLICIT_HYDROGEN, 0)
-        self.assertLess(lillymol_nb.CHIRAL_CONNECTION_IS_LONE_PAIR, 0)
-        self.assertNotEqual(lillymol_nb.CHIRAL_CONNECTION_IS_IMPLICIT_HYDROGEN,
-                            lillymol_nb.CHIRAL_CONNECTION_IS_LONE_PAIR)
+        self.assertLess(lillymol.CHIRAL_CONNECTION_IS_IMPLICIT_HYDROGEN, 0)
+        self.assertLess(lillymol.CHIRAL_CONNECTION_IS_LONE_PAIR, 0)
+        self.assertNotEqual(lillymol.CHIRAL_CONNECTION_IS_IMPLICIT_HYDROGEN,
+                            lillymol.CHIRAL_CONNECTION_IS_LONE_PAIR)
         self.assertEqual(centre.top_back(),
-                         lillymol_nb.CHIRAL_CONNECTION_IS_IMPLICIT_HYDROGEN)
+                         lillymol.CHIRAL_CONNECTION_IS_IMPLICIT_HYDROGEN)
         self.assertEqual(centre.atoms(),
                          [centre.top_front(), centre.top_back(),
                           centre.left_down(), centre.right_down()])
@@ -806,55 +807,55 @@ $$$$
         self.assertEqual(centre[3], centre.right_down())
         with self.assertRaises(Exception):
             _ = centre[4]
-        self.assertTrue(lillymol_nb.is_chiral_implicit_hydrogen(centre.top_back()))
-        self.assertFalse(lillymol_nb.is_chiral_lone_pair(centre.top_back()))
+        self.assertTrue(lillymol.is_chiral_implicit_hydrogen(centre.top_back()))
+        self.assertFalse(lillymol.is_chiral_lone_pair(centre.top_back()))
         self.assertTrue(
-            lillymol_nb.is_chiral_lone_pair(lillymol_nb.CHIRAL_CONNECTION_IS_LONE_PAIR))
+            lillymol.is_chiral_lone_pair(lillymol.CHIRAL_CONNECTION_IS_LONE_PAIR))
         self.assertFalse(hasattr(centre, "atom_is_now_lone_pair"))
         self.assertFalse(hasattr(centre, "implicit_hydrogen_is_now_atom_number"))
         self.assertIn("<Chiral_Centre atom 1", repr(centre))
         centres = mol.chiral_centres()
         self.assertEqual(len(centres), 1)
         self.assertEqual(centres[0].atom(), 1)
-        self.assertTrue(lillymol_nb.is_actually_chiral(mol, 1))
-        self.assertFalse(lillymol_nb.is_actually_chiral(mol, 0))
-        tag = lillymol_nb.tetrahedral_chirality(mol, 1)
-        self.assertIn(tag, [lillymol_nb.ChiralType.CHI_TETRAHEDRAL_CW,
-                            lillymol_nb.ChiralType.CHI_TETRAHEDRAL_CCW])
-        self.assertEqual(lillymol_nb.tetrahedral_chirality(mol, 0), None)
-        self.assertEqual(lillymol_nb.tetrahedral_chirality(mol, 1, check_is_chiral=True), tag)
+        self.assertTrue(lillymol.is_actually_chiral(mol, 1))
+        self.assertFalse(lillymol.is_actually_chiral(mol, 0))
+        tag = lillymol.tetrahedral_chirality(mol, 1)
+        self.assertIn(tag, [lillymol.ChiralType.CHI_TETRAHEDRAL_CW,
+                            lillymol.ChiralType.CHI_TETRAHEDRAL_CCW])
+        self.assertEqual(lillymol.tetrahedral_chirality(mol, 0), None)
+        self.assertEqual(lillymol.tetrahedral_chirality(mol, 1, check_is_chiral=True), tag)
         self.assertEqual(mol.invert_chirality_on_atom(1), 1)
-        inverted = lillymol_nb.tetrahedral_chirality(mol, 1)
-        self.assertIn(inverted, [lillymol_nb.ChiralType.CHI_TETRAHEDRAL_CW,
-                                 lillymol_nb.ChiralType.CHI_TETRAHEDRAL_CCW])
+        inverted = lillymol.tetrahedral_chirality(mol, 1)
+        self.assertIn(inverted, [lillymol.ChiralType.CHI_TETRAHEDRAL_CW,
+                                 lillymol.ChiralType.CHI_TETRAHEDRAL_CCW])
         self.assertNotEqual(inverted, tag)
         self.assertEqual(mol.remove_chiral_centre_at_atom(1), 1)
         self.assertEqual(mol.number_chiral_centres(), 0)
         self.assertIsNone(mol.chiral_centre_at_atom(1))
 
     def test_remove_all_chiral_centres(self):
-        mol = lillymol_nb.MolFromSmiles("F[C@H](Cl)Br chiral")
+        mol = lillymol.MolFromSmiles("F[C@H](Cl)Br chiral")
         self.assertEqual(mol.number_chiral_centres(), 1)
         self.assertEqual(mol.remove_all_chiral_centres(), 1)
         self.assertEqual(mol.number_chiral_centres(), 0)
-        self.assertIsNone(lillymol_nb.tetrahedral_chirality(mol, 1))
+        self.assertIsNone(lillymol.tetrahedral_chirality(mol, 1))
 
     def test_atom_scalars_and_vectors(self):
-        mol = lillymol_nb.MolFromSmiles("CCO ethanol")
+        mol = lillymol.MolFromSmiles("CCO ethanol")
         self.assertEqual(mol.atomic_number(0), 6)
         self.assertEqual(mol.atomic_numbers(), [6, 6, 8])
         self.assertEqual(mol.ncon(1), 2)
         self.assertEqual(mol.nbonds(1), 2)
         self.assertEqual(mol.attached_heteroatom_count(1), 1)
         self.assertFalse(mol.is_halogen(0))
-        self.assertTrue(lillymol_nb.MolFromSmiles("Cl chloromethane").is_halogen(0))
+        self.assertTrue(lillymol.MolFromSmiles("Cl chloromethane").is_halogen(0))
         self.assertEqual(mol.isotopes(), [0, 0, 0])
         self.assertEqual(mol.set_isotope(1, 7), 1)
         self.assertEqual(mol.isotope(1), 7)
         self.assertEqual(mol.isotopes(), [0, 7, 0])
         self.assertEqual(mol.set_isotopes([0, 2], 5), 1)
         self.assertEqual(mol.isotopes(), [5, 7, 5])
-        self.assertEqual(mol.set_isotopes(lillymol_nb.Set_of_Atoms([1]), 9), 1)
+        self.assertEqual(mol.set_isotopes(lillymol.Set_of_Atoms([1]), 9), 1)
         self.assertEqual(mol.isotopes(), [5, 9, 5])
         try:
             import numpy as np
@@ -869,7 +870,7 @@ $$$$
         self.assertEqual(mol.isotopes(), [0, 0, 0])
 
     def test_fragments_and_formula(self):
-        mol = lillymol_nb.MolFromSmiles("CC.O mixture")
+        mol = lillymol.MolFromSmiles("CC.O mixture")
         self.assertEqual(mol.number_fragments(), 2)
         self.assertEqual(mol.fragment_membership(0), 0)
         self.assertEqual(mol.get_fragment_membership(), [0, 0, 1])
@@ -879,39 +880,39 @@ $$$$
         self.assertEqual(mol.molecular_formula(), "C2OH8")
         components = mol.create_components()
         self.assertEqual([component.natoms() for component in components], [2, 1])
-        single = lillymol_nb.MolFromSmiles("CC ethane")
+        single = lillymol.MolFromSmiles("CC ethane")
         self.assertIsNone(single.create_components())
 
     def test_fragment_mutators(self):
-        mol = lillymol_nb.MolFromSmiles("CC.O.N mixture")
+        mol = lillymol.MolFromSmiles("CC.O.N mixture")
         self.assertEqual(mol.delete_fragment(1), 1)
         self.assertEqual(mol.number_fragments(), 2)
         self.assertEqual(mol.natoms(), 3)
 
-        mol = lillymol_nb.MolFromSmiles("CC.O.N mixture")
+        mol = lillymol.MolFromSmiles("CC.O.N mixture")
         self.assertEqual(mol.remove_fragment(2), 1)
         self.assertEqual(mol.natoms(), 3)
 
-        mol = lillymol_nb.MolFromSmiles("CC.O.N mixture")
+        mol = lillymol.MolFromSmiles("CC.O.N mixture")
         self.assertEqual(mol.remove_fragment_containing_atom(2), 1)
         self.assertEqual(mol.natoms(), 3)
 
-        mol = lillymol_nb.MolFromSmiles("CC.O mixture")
+        mol = lillymol.MolFromSmiles("CC.O mixture")
         self.assertEqual(mol.reduce_to_largest_fragment(), 1)
         self.assertEqual(mol.unique_smiles(), "CC")
 
-        mol = lillymol_nb.MolFromSmiles("CC.O mixture")
+        mol = lillymol.MolFromSmiles("CC.O mixture")
         self.assertEqual(mol.reduce_to_largest_fragment_carefully(), 1)
         self.assertEqual(mol.natoms(), 2)
 
     def test_molecular_weight(self):
-        mol = lillymol_nb.MolFromSmiles("CCO ethanol")
+        mol = lillymol.MolFromSmiles("CCO ethanol")
         self.assertAlmostEqual(mol.amw(), 46.069, delta=0.001)
-        self.assertAlmostEqual(lillymol_nb.molecular_weight(mol), 46.069, delta=0.001)
+        self.assertAlmostEqual(lillymol.molecular_weight(mol), 46.069, delta=0.001)
         self.assertGreater(mol.exact_mass(), 0.0)
 
     def test_atom_access(self):
-        atom = lillymol_nb.Atom(6)
+        atom = lillymol.Atom(6)
         self.assertEqual(atom.atomic_number(), 6)
         self.assertEqual(atom.atomic_symbol(), "C")
         self.assertEqual(atom.ncon(), 0)
@@ -922,7 +923,7 @@ $$$$
         self.assertEqual(atom.exact_mass(), 12.0)
         self.assertIn("<Atom C", repr(atom))
 
-        mol = lillymol_nb.MolFromSmiles("CCO ethanol")
+        mol = lillymol.MolFromSmiles("CCO ethanol")
         carbon = mol.atom(1)
         self.assertEqual(carbon.atomic_number(), 6)
         self.assertEqual(carbon.atomic_symbol(), "C")
@@ -938,7 +939,7 @@ $$$$
         self.assertTrue(carbon.fully_saturated())
 
     def test_atom_coordinate_distance_helpers(self):
-        mol = lillymol_nb.MolFromSmiles("CCO ethanol")
+        mol = lillymol.MolFromSmiles("CCO ethanol")
         mol.set_coordinates([0.0, 0.0, 0.0,
                              1.0, 0.0, 0.0,
                              1.0, 1.0, 0.0])
@@ -947,12 +948,12 @@ $$$$
         self.assertAlmostEqual(a0.x(), 0.0)
         self.assertAlmostEqual(a1.x(), 1.0)
         self.assertAlmostEqual(a0.distance(a1), 1.0)
-        self.assertAlmostEqual(a0.distance(lillymol_nb.Coordinates(0.0, 1.0, 0.0)), 1.0)
+        self.assertAlmostEqual(a0.distance(lillymol.Coordinates(0.0, 1.0, 0.0)), 1.0)
         self.assertAlmostEqual(a0 - a1, 1.0)
         self.assertIn("<Atom C", str(a0))
 
     def test_atom_view_reflects_parent_mutation(self):
-        mol = lillymol_nb.MolFromSmiles("CCO ethanol")
+        mol = lillymol.MolFromSmiles("CCO ethanol")
         atom = mol.atom(1)
         self.assertEqual(atom.atomic_number(), 6)
         self.assertEqual(atom.atomic_symbol(), "C")
@@ -962,7 +963,7 @@ $$$$
         self.assertEqual(mol.atomic_number(1), 7)
 
     def test_bond_access(self):
-        mol = lillymol_nb.MolFromSmiles("CCO ethanol")
+        mol = lillymol.MolFromSmiles("CCO ethanol")
         self.assertEqual(mol.nedges(), 2)
         bond = mol.bond(0)
         self.assertEqual(bond.a1(), 0)
@@ -980,27 +981,27 @@ $$$$
         self.assertEqual([(b.a1(), b.a2()) for b in bonds], [(0, 1), (1, 2)])
 
     def test_bond_view_reflects_parent_mutation(self):
-        mol = lillymol_nb.MolFromSmiles("CCO ethanol")
+        mol = lillymol.MolFromSmiles("CCO ethanol")
         bond = mol.bond(0)
         self.assertTrue(bond.is_single_bond())
-        self.assertEqual(bond.btype(), lillymol_nb.BondType.SINGLE_BOND)
-        self.assertEqual(mol.set_bond_type_between_atoms(0, 1, lillymol_nb.BondType.DOUBLE_BOND), 1)
+        self.assertEqual(bond.btype(), lillymol.BondType.SINGLE_BOND)
+        self.assertEqual(mol.set_bond_type_between_atoms(0, 1, lillymol.BondType.DOUBLE_BOND), 1)
         self.assertFalse(bond.is_single_bond())
         self.assertTrue(bond.is_double_bond())
-        self.assertEqual(bond.btype(), lillymol_nb.BondType.DOUBLE_BOND)
+        self.assertEqual(bond.btype(), lillymol.BondType.DOUBLE_BOND)
 
     def test_bond_rdkit_style_aliases_and_contains(self):
-        mol = lillymol_nb.MolFromSmiles("CCO ethanol")
+        mol = lillymol.MolFromSmiles("CCO ethanol")
         bond = mol.bond(0)
         self.assertEqual(bond.GetBeginAtomIdx(), 0)
         self.assertEqual(bond.GetEndAtomIdx(), 1)
-        self.assertEqual(bond.GetBondType(), lillymol_nb.BondType.SINGLE_BOND)
+        self.assertEqual(bond.GetBondType(), lillymol.BondType.SINGLE_BOND)
         self.assertIn(0, bond)
         self.assertNotIn(2, bond)
         self.assertIn("<Bond 0-1>", str(bond))
 
     def test_bond_ring_membership(self):
-        mol = lillymol_nb.MolFromSmiles("c1ccccc1 benzene")
+        mol = lillymol.MolFromSmiles("c1ccccc1 benzene")
         bond = mol.bond(0)
         mol.ring_membership()
         self.assertEqual(bond.nrings(), 1)
@@ -1008,7 +1009,7 @@ $$$$
 
 
     def test_set_of_atoms(self):
-        atoms = lillymol_nb.Set_of_Atoms([1, 3])
+        atoms = lillymol.Set_of_Atoms([1, 3])
         self.assertFalse(atoms.empty())
         self.assertEqual(len(atoms), 2)
         self.assertEqual(atoms.size(), 2)
@@ -1031,15 +1032,15 @@ $$$$
         with self.assertRaises(Exception):
             atoms.set_vector([0, 0], 1)
         self.assertTrue(atoms.contains_both(3, 5))
-        self.assertEqual(atoms.atoms_in_common(lillymol_nb.Set_of_Atoms([5, 9])), 1)
-        self.assertEqual(atoms.first_atom_in_common(lillymol_nb.Set_of_Atoms([5, 9])), 5)
-        atoms += lillymol_nb.Set_of_Atoms([7])
+        self.assertEqual(atoms.atoms_in_common(lillymol.Set_of_Atoms([5, 9])), 1)
+        self.assertEqual(atoms.first_atom_in_common(lillymol.Set_of_Atoms([5, 9])), 5)
+        atoms += lillymol.Set_of_Atoms([7])
         atoms += 8
         self.assertEqual(atoms.as_list()[-2:], [7, 8])
-        self.assertEqual(lillymol_nb.Set_of_Atoms([1, 2]), [1, 2])
+        self.assertEqual(lillymol.Set_of_Atoms([1, 2]), [1, 2])
 
     def test_ring_info_helpers(self):
-        mol = lillymol_nb.MolFromSmiles("c1ccccc1 benzene")
+        mol = lillymol.MolFromSmiles("c1ccccc1 benzene")
         ring_info = mol.GetRingInfo()
         self.assertEqual(ring_info.NumRings(), 1)
         self.assertEqual(ring_info.num_rings(), 1)
@@ -1055,7 +1056,7 @@ $$$$
         with self.assertRaises(Exception):
             ring_info.NumBondRings(99)
 
-        fused = lillymol_nb.MolFromSmiles("c1ccc2ccccc2c1 naphthalene")
+        fused = lillymol.MolFromSmiles("c1ccc2ccccc2c1 naphthalene")
         fused_info = fused.ring_info()
         self.assertEqual(fused_info.NumRings(), 2)
         self.assertEqual(len(fused_info.AtomRings()), 2)
@@ -1063,7 +1064,7 @@ $$$$
         self.assertGreaterEqual(fused_info.NumAtomRings(3), 1)
 
     def test_ring_access(self):
-        mol = lillymol_nb.MolFromSmiles("c1ccccc1 benzene")
+        mol = lillymol.MolFromSmiles("c1ccccc1 benzene")
         self.assertEqual(mol.nrings(), 1)
         self.assertEqual(mol.get_ring_membership(), [1, 1, 1, 1, 1, 1])
         self.assertTrue(mol.is_ring_atom(0))
@@ -1092,7 +1093,7 @@ $$$$
         self.assertEqual(len(rings), 1)
         self.assertEqual(rings[0].as_list(), ring.as_list())
 
-        bridged = lillymol_nb.MolFromSmiles("C1CC2CCC1CC2 bridged")
+        bridged = lillymol.MolFromSmiles("C1CC2CCC1CC2 bridged")
         self.assertEqual(bridged.nrings(), 2)
         self.assertEqual(bridged.non_sssr_rings(), 1)
         non_sssr = bridged.non_sssr_ring(0)
@@ -1101,13 +1102,13 @@ $$$$
 
 
     def test_molecule_sequence_and_copy(self):
-        mol = lillymol_nb.MolFromSmiles("CCO ethanol")
+        mol = lillymol.MolFromSmiles("CCO ethanol")
         self.assertEqual(len(mol), 3)
         self.assertEqual(mol[2].atomic_symbol(), "O")
         self.assertEqual([atom.atomic_symbol() for atom in mol], ["C", "C", "O"])
         self.assertEqual([atom.ncon() for atom in mol], [1, 2, 1])
 
-        lillymol_nb.set_copy_name_in_molecule_copy_constructor(True)
+        lillymol.set_copy_name_in_molecule_copy_constructor(True)
         mol_copy = copy.copy(mol)
         self.assertEqual(mol_copy.smiles(), mol.smiles())
         self.assertEqual(mol_copy.name(), "ethanol")
@@ -1115,41 +1116,41 @@ $$$$
         self.assertEqual(mol.name(), "ethanol")
         self.assertEqual(mol_copy.name(), "copy")
 
-        lillymol_nb.set_copy_name_in_molecule_copy_constructor(False)
+        lillymol.set_copy_name_in_molecule_copy_constructor(False)
         unnamed_copy = copy.copy(mol)
         self.assertEqual(unnamed_copy.smiles(), mol.smiles())
         self.assertEqual(unnamed_copy.name(), "")
-        lillymol_nb.set_copy_name_in_molecule_copy_constructor(True)
+        lillymol.set_copy_name_in_molecule_copy_constructor(True)
 
 
     def test_position_3d_moves_second_fragment(self):
-        mol = lillymol_nb.MolFromSmiles("CC.CC two_ethanes")
+        mol = lillymol.MolFromSmiles("CC.CC two_ethanes")
         mol.set_coordinates([0.0, 0.0, 0.0,
                              1.5, 0.3, 0.0,
                              10.0, 0.0, 0.0,
                              11.5, -0.3, 0.0])
 
-        self.assertEqual(lillymol_nb.Position3D(mol, 0, 1.5, 2), 1)
+        self.assertEqual(lillymol.Position3D(mol, 0, 1.5, 2), 1)
         self.assertAlmostEqual(mol.distance_between_atoms(0, 2), 1.5, delta=1.0e-5)
         self.assertFalse(mol.are_bonded(0, 2))
 
     def test_position_3d_handles_single_atom_fragments(self):
-        mol = lillymol_nb.MolFromSmiles("C.C dimethane")
+        mol = lillymol.MolFromSmiles("C.C dimethane")
         mol.set_coordinates([0.0, 0.0, 0.0,
                              10.0, 0.0, 0.0])
 
-        self.assertEqual(lillymol_nb.Position3D(mol, 0, 1.5, 1), 1)
+        self.assertEqual(lillymol.Position3D(mol, 0, 1.5, 1), 1)
         self.assertAlmostEqual(mol.distance_between_atoms(0, 1), 1.5, delta=1.0e-5)
         self.assertFalse(mol.are_bonded(0, 1))
 
     def test_position_3d_rejects_atoms_in_same_fragment(self):
-        mol = lillymol_nb.MolFromSmiles("CC ethane")
+        mol = lillymol.MolFromSmiles("CC ethane")
         mol.set_coordinates([0.0, 0.0, 0.0,
                              1.5, 0.0, 0.0])
-        self.assertEqual(lillymol_nb.Position3D(mol, 0, 1.5, 1), 0)
+        self.assertEqual(lillymol.Position3D(mol, 0, 1.5, 1), 0)
 
     def test_molecule_contains(self):
-        mol = lillymol_nb.MolFromSmiles("CCO ethanol")
+        mol = lillymol.MolFromSmiles("CCO ethanol")
         self.assertIn(6, mol)
         self.assertNotIn(7, mol)
         self.assertIn("C", mol)
@@ -1158,15 +1159,15 @@ $$$$
         with self.assertRaises(Exception):
             "Qq" in mol
 
-        carbon = lillymol_nb.QueryFromSmarts("C")
-        nitrogen = lillymol_nb.QueryFromSmarts("N")
+        carbon = lillymol.QueryFromSmarts("C")
+        nitrogen = lillymol.QueryFromSmarts("N")
         self.assertIn(carbon, mol)
         self.assertNotIn(nitrogen, mol)
 
 
     def test_substructure_query_object(self):
-        mol = lillymol_nb.MolFromSmiles("CCO ethanol")
-        qry = lillymol_nb.SubstructureQuery()
+        mol = lillymol.MolFromSmiles("CCO ethanol")
+        qry = lillymol.SubstructureQuery()
         self.assertTrue(qry.build_from_smarts("C"))
         self.assertEqual(qry.number_elements(), 1)
         self.assertEqual(qry.active(), 1)
@@ -1179,7 +1180,7 @@ $$$$
         self.assertEqual(qry.substructure_search(mol), 1)
 
     def test_substructure_query_from_proto(self):
-        mol = lillymol_nb.MolFromSmiles("Oc1ccccc1 phenol")
+        mol = lillymol.MolFromSmiles("Oc1ccccc1 phenol")
         proto_string = """
 query {
   smarts: "[OD1]-c:c"
@@ -1187,7 +1188,7 @@ query {
 }
 """
         proto = text_format.Parse(proto_string, substructure_pb2.SubstructureQuery())
-        qry = lillymol_nb.SubstructureQuery()
+        qry = lillymol.SubstructureQuery()
         self.assertTrue(qry.construct_from_proto(proto))
         self.assertEqual(qry.substructure_search(mol), 2)
         self.assertIn(qry, mol)
@@ -1196,17 +1197,17 @@ query {
             writer.write(proto_string)
             fname = writer.name
         try:
-            from_file = lillymol_nb.SubstructureQuery()
+            from_file = lillymol.SubstructureQuery()
             self.assertTrue(from_file.read_proto(fname))
             self.assertEqual(from_file.substructure_search(mol), 2)
         finally:
             os.remove(fname)
 
     def test_substructure_results_object(self):
-        mol = lillymol_nb.MolFromSmiles("CCO ethanol")
-        qry = lillymol_nb.QueryFromSmarts("C")
+        mol = lillymol.MolFromSmiles("CCO ethanol")
+        qry = lillymol.QueryFromSmarts("C")
         self.assertIsNotNone(qry)
-        sresults = lillymol_nb.SubstructureResults()
+        sresults = lillymol.SubstructureResults()
         self.assertEqual(qry.substructure_search(mol, sresults), 2)
         self.assertEqual(sresults.number_embeddings(), 2)
         self.assertEqual(len(sresults), 2)
@@ -1219,27 +1220,27 @@ query {
         self.assertEqual(sresults.number_embeddings(), 0)
 
     def test_substructure_free_functions(self):
-        mol = lillymol_nb.MolFromSmiles("CCO ethanol")
-        self.assertTrue(lillymol_nb.HasSubstructMatch(mol, "CO"))
-        self.assertFalse(lillymol_nb.HasSubstructMatch(mol, "N"))
-        self.assertEqual(lillymol_nb.CountSubstructMatches(mol, "C"), 2)
-        self.assertEqual(lillymol_nb.CountSubstructMatches(mol, "C", max_matches_to_find=1), 1)
-        self.assertEqual(lillymol_nb.GetSubstructMatches(mol, "CO"), [[1, 2]])
-        self.assertEqual(lillymol_nb.GetSubstructMatches(mol, "N"), [])
-        self.assertIsNone(lillymol_nb.QueryFromSmarts("["))
+        mol = lillymol.MolFromSmiles("CCO ethanol")
+        self.assertTrue(lillymol.HasSubstructMatch(mol, "CO"))
+        self.assertFalse(lillymol.HasSubstructMatch(mol, "N"))
+        self.assertEqual(lillymol.CountSubstructMatches(mol, "C"), 2)
+        self.assertEqual(lillymol.CountSubstructMatches(mol, "C", max_matches_to_find=1), 1)
+        self.assertEqual(lillymol.GetSubstructMatches(mol, "CO"), [[1, 2]])
+        self.assertEqual(lillymol.GetSubstructMatches(mol, "N"), [])
+        self.assertIsNone(lillymol.QueryFromSmarts("["))
         with self.assertRaises(Exception):
-            lillymol_nb.HasSubstructMatch(mol, "[")
+            lillymol.HasSubstructMatch(mol, "[")
 
 
     def test_element_transformations(self):
-        etrans = lillymol_nb.ElementTransformations()
+        etrans = lillymol.ElementTransformations()
         self.assertFalse(etrans.active())
         self.assertTrue(etrans.add("I=Cl"))
         self.assertTrue(etrans.add("Br=Cl"))
         self.assertTrue(etrans.active())
         self.assertFalse(etrans.add("not a transform"))
 
-        mol = lillymol_nb.MolFromSmiles("ICBr halides")
+        mol = lillymol.MolFromSmiles("ICBr halides")
         self.assertEqual(mol.natoms("I"), 1)
         self.assertEqual(mol.natoms("Br"), 1)
         self.assertEqual(etrans.process(mol), 2)
@@ -1248,8 +1249,8 @@ query {
         self.assertEqual(mol.natoms("Cl"), 2)
 
     def test_standardise(self):
-        mol = lillymol_nb.MolFromSmiles("CC(=O)[O-] acetate")
-        standardise = lillymol_nb.Standardise()
+        mol = lillymol.MolFromSmiles("CC(=O)[O-] acetate")
+        standardise = lillymol.Standardise()
         self.assertEqual(standardise.process(mol), 0)
         self.assertEqual(mol.smiles(), "CC(=O)[O-]")
 
@@ -1262,14 +1263,14 @@ query {
         if charges is None:
             self.skipTest("charge query directory not available")
 
-        charge_assigner = lillymol_nb.ChargeAssigner(charges)
+        charge_assigner = lillymol.ChargeAssigner(charges)
         self.assertTrue(charge_assigner.active())
 
-        mol = lillymol_nb.MolFromSmiles("CC(=O)O acetate")
+        mol = lillymol.MolFromSmiles("CC(=O)O acetate")
         self.assertEqual(charge_assigner.process(mol), 1)
         self.assertEqual(mol.smiles(), "CC(=O)[O-]")
 
-        mol = lillymol_nb.MolFromSmiles("CCN(CC)C tertiary_amine")
+        mol = lillymol.MolFromSmiles("CCN(CC)C tertiary_amine")
         self.assertEqual(charge_assigner.process(mol), 1)
         self.assertEqual(mol.smiles(), "CC[NH+](C)CC")
 
@@ -1278,7 +1279,7 @@ query {
         if hbonds is None:
             self.skipTest("donor/acceptor hbonds query directory not available")
 
-        donor_acceptor = lillymol_nb.DonorAcceptor(hbonds)
+        donor_acceptor = lillymol.DonorAcceptor(hbonds)
         self.assertTrue(donor_acceptor.active())
 
         smiles = [
@@ -1293,22 +1294,22 @@ query {
         ]
 
         for smi, result in zip(smiles, expected):
-            mol = lillymol_nb.MolFromSmiles(smi)
+            mol = lillymol.MolFromSmiles(smi)
             donor_acceptor.process(mol)
             self.assertEqual(mol.unique_smiles(), result)
 
     def test_fingerprint_default_and_tanimoto(self):
-        mol = lillymol_nb.MolFromSmiles("CCO ethanol")
-        bits = lillymol_nb.linear_fingerprint(mol)
+        mol = lillymol.MolFromSmiles("CCO ethanol")
+        bits = lillymol.linear_fingerprint(mol)
         self.assertIsInstance(bits, list)
         self.assertEqual(len(bits), 2048)
         self.assertGreater(sum(bits), 0)
-        self.assertAlmostEqual(lillymol_nb.tanimoto(bits, bits), 1.0)
+        self.assertAlmostEqual(lillymol.tanimoto(bits, bits), 1.0)
 
-        bits2 = lillymol_nb.linear_fingerprint(mol, nbits=512, atype_specification="")
+        bits2 = lillymol.linear_fingerprint(mol, nbits=512, atype_specification="")
         self.assertIsNotNone(bits2)
         self.assertEqual(len(bits2), 512)
-        self.assertIsNone(lillymol_nb.linear_fingerprint(mol, nbits=512, atype_specification="BAD"))
+        self.assertIsNone(lillymol.linear_fingerprint(mol, nbits=512, atype_specification="BAD"))
 
     def test_linear_fingerprint_numpy(self):
         try:
@@ -1317,9 +1318,9 @@ query {
         except ImportError:
             self.skipTest("numpy is not available")
 
-        mol = lillymol_nb.MolFromSmiles("CCO ethanol")
-        bits = lillymol_nb.linear_fingerprint(mol)
-        array = lillymol_nb.linear_fingerprint_numpy(mol)
+        mol = lillymol.MolFromSmiles("CCO ethanol")
+        bits = lillymol.linear_fingerprint(mol)
+        array = lillymol.linear_fingerprint_numpy(mol)
 
         self.assertEqual(array.dtype, np.dtype("uint8"))
         self.assertEqual(array.shape, (2048,))
@@ -1330,22 +1331,22 @@ query {
         gc.collect()
 
     def test_fingerprint_creators(self):
-        mol = lillymol_nb.MolFromSmiles("CN1C=NC2=C1C(=O)N(C(=O)N2C)C caffeine")
-        ecfp = lillymol_nb.ECFingerprintCreator(512)
+        mol = lillymol.MolFromSmiles("CN1C=NC2=C1C(=O)N(C(=O)N2C)C caffeine")
+        ecfp = lillymol.ECFingerprintCreator(512)
         bits = ecfp.fingerprint(mol)
         self.assertIsInstance(bits, list)
         self.assertEqual(len(bits), 512)
         self.assertGreater(sum(bits), 0)
 
-        same_molecule = lillymol_nb.MolFromSmiles("Cn1c(=O)c2c(ncn2C)n(C)c1=O caffeine")
+        same_molecule = lillymol.MolFromSmiles("Cn1c(=O)c2c(ncn2C)n(C)c1=O caffeine")
         self.assertEqual(mol.unique_smiles(), same_molecule.unique_smiles())
         self.assertEqual(bits, ecfp.fingerprint(same_molecule))
 
-        linear = lillymol_nb.LinearFingerprintCreator(256)
+        linear = lillymol.LinearFingerprintCreator(256)
         linear.set_max_length(5)
         self.assertEqual(len(linear.fingerprint(mol)), 256)
 
-        atom_pair = lillymol_nb.AtomPairFingerprintCreator(256)
+        atom_pair = lillymol.AtomPairFingerprintCreator(256)
         atom_pair.set_min_separation(1)
         atom_pair.set_max_separation(5)
         self.assertEqual(len(atom_pair.fingerprint(mol)), 256)
@@ -1357,7 +1358,7 @@ query {
         except ImportError:
             self.skipTest("numpy is not available")
 
-        mol = lillymol_nb.MolFromSmiles("CN1C=NC2=C1C(=O)N(C(=O)N2C)C caffeine")
+        mol = lillymol.MolFromSmiles("CN1C=NC2=C1C(=O)N(C(=O)N2C)C caffeine")
 
         def assert_numpy_fingerprint_matches_list(generator, nbits):
             as_list = generator.fingerprint(mol)
@@ -1368,16 +1369,16 @@ query {
             np.testing.assert_array_equal(array, expected)
             del array
 
-        ecfp = lillymol_nb.ECFingerprintCreator(512)
+        ecfp = lillymol.ECFingerprintCreator(512)
         assert_numpy_fingerprint_matches_list(ecfp, 512)
         ecfp.set_max_radius(1)
         assert_numpy_fingerprint_matches_list(ecfp, 512)
 
-        linear = lillymol_nb.LinearFingerprintCreator(256)
+        linear = lillymol.LinearFingerprintCreator(256)
         linear.set_max_length(5)
         assert_numpy_fingerprint_matches_list(linear, 256)
 
-        atom_pair = lillymol_nb.AtomPairFingerprintCreator(256)
+        atom_pair = lillymol.AtomPairFingerprintCreator(256)
         atom_pair.set_min_separation(1)
         atom_pair.set_max_separation(5)
         assert_numpy_fingerprint_matches_list(atom_pair, 256)
@@ -1385,7 +1386,7 @@ query {
         gc.collect()
 
     def test_recent_molecule_helper_methods(self):
-        benzene = lillymol_nb.MolFromSmiles("c1ccccc1 benzene")
+        benzene = lillymol.MolFromSmiles("c1ccccc1 benzene")
         self.assertEqual(benzene.compute_aromaticity_if_needed(), 1)
         self.assertGreaterEqual(benzene.pi_electrons(0), 0)
         self.assertGreaterEqual(benzene.lone_pair_count(0), 0)
@@ -1396,11 +1397,11 @@ query {
         self.assertEqual(benzene.compute_distance_matrix(), 1)
         self.assertEqual(benzene.revert_all_directional_bonds_to_non_directional(), 0)
 
-        labelled = lillymol_nb.MolFromSmiles("CCO ethanol")
+        labelled = lillymol.MolFromSmiles("CCO ethanol")
         labelled.label_atoms_by_atom_number()
         self.assertEqual(labelled.isotopes(), [0, 1, 2])
 
-        fused = lillymol_nb.MolFromSmiles("C1CCC2(CC1)CCCC2 spiro")
+        fused = lillymol.MolFromSmiles("C1CCC2(CC1)CCCC2 spiro")
         self.assertTrue(any(fused.is_spiro_fused(i) for i in range(fused.natoms())))
         ring_systems = fused.label_atoms_by_ring_system()
         ring_systems_spiro = fused.label_atoms_by_ring_system_including_spiro_fused()
@@ -1416,52 +1417,52 @@ query {
             self.assertEqual(ring_systems_np.shape, (fused.natoms(),))
             np.testing.assert_array_equal(ring_systems_np, np.asarray(ring_systems_spiro, dtype=np.int32))
 
-        sorted_mol = lillymol_nb.MolFromSmiles("OCN sort")
+        sorted_mol = lillymol.MolFromSmiles("OCN sort")
         self.assertEqual(sorted_mol.sort_atoms([2, 1, 0]), 1)
         self.assertEqual(sorted_mol.atomic_numbers(), [8, 6, 7])
         with self.assertRaises(Exception):
             sorted_mol.sort_atoms([1, 2])
 
-        moved = lillymol_nb.MolFromSmiles("OCC move")
+        moved = lillymol.MolFromSmiles("OCC move")
         self.assertEqual(moved.move_to_end_of_connection_table(8), 1)
         self.assertEqual(moved.atomic_numbers()[-1], 8)
 
-        scaffold_source = lillymol_nb.MolFromSmiles("CCc1ccccc1C(=O)O scaffold")
+        scaffold_source = lillymol.MolFromSmiles("CCc1ccccc1C(=O)O scaffold")
         scaffold = scaffold_source.scaffold()
         self.assertLess(scaffold.natoms(), scaffold_source.natoms())
         self.assertGreater(scaffold_source.to_scaffold(), 0)
         self.assertEqual(scaffold_source.unique_smiles(), scaffold.unique_smiles())
 
-        graph = lillymol_nb.MolFromSmiles("CCO graph")
+        graph = lillymol.MolFromSmiles("CCO graph")
         self.assertEqual(graph.change_to_graph_form(), 1)
-        graph2 = lillymol_nb.MolFromSmiles("CCO graph")
-        mol2graph = lillymol_nb.Mol2Graph()
+        graph2 = lillymol.MolFromSmiles("CCO graph")
+        mol2graph = lillymol.Mol2Graph()
         mol2graph.turn_on_most_useful_options()
         self.assertEqual(graph2.to_graph(mol2graph), 1)
 
     def test_element_and_hybridization_helpers(self):
-        self.assertEqual(lillymol_nb.count_atoms_in_smiles("CCO"), 3)
-        self.assertEqual(lillymol_nb.count_atoms_in_smiles("c1ccccc1"), 6)
+        self.assertEqual(lillymol.count_atoms_in_smiles("CCO"), 3)
+        self.assertEqual(lillymol.count_atoms_in_smiles("c1ccccc1"), 6)
 
-        mol = lillymol_nb.MolFromSmiles("CC#N acetonitrile")
-        self.assertEqual(lillymol_nb.hybridization(mol, 0), lillymol_nb.Hybridization.SP3)
-        self.assertEqual(lillymol_nb.hybridization(mol, 1), lillymol_nb.Hybridization.SP)
-        self.assertEqual(mol.hybridization(1), lillymol_nb.Hybridization.SP)
-        self.assertEqual(lillymol_nb.hybridization_name(lillymol_nb.Hybridization.SP3), "SP3")
+        mol = lillymol.MolFromSmiles("CC#N acetonitrile")
+        self.assertEqual(lillymol.hybridization(mol, 0), lillymol.Hybridization.SP3)
+        self.assertEqual(lillymol.hybridization(mol, 1), lillymol.Hybridization.SP)
+        self.assertEqual(mol.hybridization(1), lillymol.Hybridization.SP)
+        self.assertEqual(lillymol.hybridization_name(lillymol.Hybridization.SP3), "SP3")
         with self.assertRaises(Exception):
-            lillymol_nb.hybridization(mol, 99)
+            lillymol.hybridization(mol, 99)
         with self.assertRaises(Exception):
             mol.hybridization(99)
 
-        lillymol_nb.set_auto_create_new_elements(0)
-        lillymol_nb.set_atomic_symbols_can_have_arbitrary_length(0)
-        lillymol_nb.set_display_strange_chemistry_messages(1)
-        lillymol_nb.set_display_smiles_interpretation_error_messages(1)
-        self.assertIn(lillymol_nb.interpret_D_as_deuterium(), [0, 1])
-        self.assertIn(lillymol_nb.interpret_T_as_deuterium(), [0, 1])
+        lillymol.set_auto_create_new_elements(0)
+        lillymol.set_atomic_symbols_can_have_arbitrary_length(0)
+        lillymol.set_display_strange_chemistry_messages(1)
+        lillymol.set_display_smiles_interpretation_error_messages(1)
+        self.assertIn(lillymol.interpret_D_as_deuterium(), [0, 1])
+        self.assertIn(lillymol.interpret_T_as_deuterium(), [0, 1])
 
     def test_mformula_build_counts_and_fingerprint(self):
-        formula = lillymol_nb.MFormula()
+        formula = lillymol.MFormula()
         self.assertFalse(formula.initialised())
         self.assertEqual(formula.build_from_smiles("CCO"), 3)
         self.assertTrue(formula.initialised())
@@ -1472,10 +1473,10 @@ query {
         self.assertEqual(len(formula.fixed_counted_fingerprint()), 18)
 
     def test_mformula_build_from_molecule_and_subset(self):
-        ethanol = lillymol_nb.MolFromSmiles("CCO ethanol")
-        ethoxy = lillymol_nb.MolFromSmiles("CCOC ethoxy")
-        formula = lillymol_nb.MFormula()
-        larger = lillymol_nb.MFormula()
+        ethanol = lillymol.MolFromSmiles("CCO ethanol")
+        ethoxy = lillymol.MolFromSmiles("CCOC ethoxy")
+        formula = lillymol.MFormula()
+        larger = lillymol.MFormula()
 
         self.assertEqual(formula.build(ethanol), 1)
         self.assertEqual(larger.build(ethoxy), 1)
@@ -1488,20 +1489,20 @@ query {
         self.assertGreater(larger.diff(formula), 0)
 
     def test_mformula_build_from_selected_atoms(self):
-        mol = lillymol_nb.MolFromSmiles("CCO ethanol")
-        formula = lillymol_nb.MFormula()
-        self.assertEqual(formula.build(mol, lillymol_nb.Set_of_Atoms([1, 2])), 1)
+        mol = lillymol.MolFromSmiles("CCO ethanol")
+        formula = lillymol.MFormula()
+        self.assertEqual(formula.build(mol, lillymol.Set_of_Atoms([1, 2])), 1)
         self.assertEqual(formula.carbon(), 1)
         self.assertEqual(formula.oxygen(), 1)
 
     def test_atom_typing_specification(self):
-        mol = lillymol_nb.MolFromSmiles("CCO ethanol")
-        atom_typing = lillymol_nb.AtomTypingSpecification("UST:Y")
+        mol = lillymol.MolFromSmiles("CCO ethanol")
+        atom_typing = lillymol.AtomTypingSpecification("UST:Y")
         self.assertTrue(atom_typing.active())
 
         types = atom_typing.assign_atom_types(mol)
         self.assertEqual(len(types), mol.natoms())
-        self.assertEqual(types, lillymol_nb.assign_atom_types(mol, "UST:Y"))
+        self.assertEqual(types, lillymol.assign_atom_types(mol, "UST:Y"))
         self.assertEqual(types[0], types[1])
         self.assertNotEqual(types[1], types[2])
         self.assertTrue(all(isinstance(value, int) for value in types))
@@ -1509,38 +1510,38 @@ query {
             atom_typing.string_representation()
         self.assertTrue(atom_typing.append_to_tag("FP").startswith("FP"))
 
-        atomic_number_typing = lillymol_nb.AtomTypingSpecification("z")
+        atomic_number_typing = lillymol.AtomTypingSpecification("z")
         self.assertEqual(atomic_number_typing.string_representation(), "z")
 
-        empty = lillymol_nb.AtomTypingSpecification()
+        empty = lillymol.AtomTypingSpecification()
         self.assertFalse(empty.active())
         self.assertTrue(empty.build("UST:AY"))
         self.assertTrue(empty.active())
         with self.assertRaises(Exception):
-            lillymol_nb.AtomTypingSpecification("BAD")
+            lillymol.AtomTypingSpecification("BAD")
 
     def test_alogp_class(self):
-        mol = lillymol_nb.MolFromSmiles("CCO ethanol")
-        calc = lillymol_nb.ALogP()
-        self.assertAlmostEqual(calc.logp(mol), lillymol_nb.alogp(mol), delta=1.0e-6)
+        mol = lillymol.MolFromSmiles("CCO ethanol")
+        calc = lillymol.ALogP()
+        self.assertAlmostEqual(calc.logp(mol), lillymol.alogp(mol), delta=1.0e-6)
         calc.set_rdkit_phoshoric_acid_hydrogen(True)
         calc.set_use_alcohol_for_acid(True)
         self.assertIsNotNone(calc.logp(mol))
 
     def test_tpsa_class(self):
-        mol = lillymol_nb.MolFromSmiles("CCO ethanol")
-        tpsa = lillymol_nb.TPSA()
+        mol = lillymol.MolFromSmiles("CCO ethanol")
+        tpsa = lillymol.TPSA()
         value = tpsa.compute(mol)
         self.assertIsNotNone(value)
         self.assertIsInstance(value, float)
         self.assertGreater(value, 0.0)
-        self.assertAlmostEqual(value, lillymol_nb.tpsa(mol), delta=1.0e-6)
+        self.assertAlmostEqual(value, lillymol.tpsa(mol), delta=1.0e-6)
 
     def test_tpsa_empty_molecule_returns_none(self):
-        self.assertIsNone(lillymol_nb.TPSA().compute(lillymol_nb.Molecule()))
+        self.assertIsNone(lillymol.TPSA().compute(lillymol.Molecule()))
 
     def test_tpsa_options_and_rdkit_compatibility(self):
-        tpsa = lillymol_nb.TPSA()
+        tpsa = lillymol.TPSA()
         tpsa.set_display_psa_unclassified_atom_messages(0)
         tpsa.set_return_zero_for_unclassified_atoms(0)
         tpsa.set_non_zero_contribution_for_SD2(1)
@@ -1554,14 +1555,14 @@ query {
         self.assertEqual(tpsa.zero_for_all_sulphur_atoms(), 1)
         self.assertEqual(tpsa.zero_for_all_phosphorus_atoms(), 1)
         self.assertEqual(tpsa.convert_to_charge_separated(), 1)
-        self.assertIsNotNone(tpsa.compute(lillymol_nb.MolFromSmiles("CCO ethanol")))
+        self.assertIsNotNone(tpsa.compute(lillymol.MolFromSmiles("CCO ethanol")))
 
     def _medchemwizard(self):
         reactions = _medchemwizard_reactions_file()
         if reactions is None:
             self.skipTest("Cannot locate MedchemWizard REACTIONS data")
 
-        wizard = lillymol_nb.MedchemWizard()
+        wizard = lillymol.MedchemWizard()
         wizard.read_reactions(reactions)
         wizard.set_max_atoms(3)
         wizard.set_append_names(True)
@@ -1572,7 +1573,7 @@ query {
         if "LILLYMOL_HOME" not in os.environ:
             self.skipTest("LILLYMOL_HOME not set")
 
-        wizard = lillymol_nb.MedchemWizard()
+        wizard = lillymol.MedchemWizard()
         wizard.initialise_from_environment()
         self.assertGreater(wizard.number_reactions(), 0)
 
@@ -1585,7 +1586,7 @@ query {
 
         self.assertGreater(len(products), 0)
         self.assertEqual(mol.smiles(), initial_smiles)
-        self.assertTrue(all(isinstance(product, lillymol_nb.Molecule)
+        self.assertTrue(all(isinstance(product, lillymol.Molecule)
                             for product in products))
         self.assertTrue(all(product.natoms() <= 3 for product in products))
 
@@ -1616,33 +1617,33 @@ query {
         self.assertGreater(len(wizard.process(_methane())), 0)
 
     def test_dicer_default_and_break_cc(self):
-        dicer = lillymol_nb.Dicer()
-        mol = lillymol_nb.MolFromSmiles("CCCC butane")
+        dicer = lillymol.Dicer()
+        mol = lillymol.MolFromSmiles("CCCC butane")
         self.assertEqual(dicer.dice(mol), {})
 
         dicer.set_break_cc_bonds(True)
         self.assertEqual(dicer.dice(mol), {"CC": 2, "CCC": 2, "C": 2})
 
     def test_dicer_join_point_labels_and_size_limits(self):
-        dicer = lillymol_nb.Dicer()
+        dicer = lillymol.Dicer()
         dicer.set_label_join_points(8)
-        mol = lillymol_nb.MolFromSmiles("CCO ethanol")
+        mol = lillymol.MolFromSmiles("CCO ethanol")
         self.assertEqual(dicer.dice(mol), {"[8CH3]C": 1, "[8OH2]": 1})
 
-        dicer = lillymol_nb.Dicer()
+        dicer = lillymol.Dicer()
         dicer.set_label_join_points(8)
         dicer.set_min_fragment_size(2)
         self.assertEqual(dicer.dice(mol), {"[8CH3]C": 1})
 
-        dicer = lillymol_nb.Dicer()
+        dicer = lillymol.Dicer()
         dicer.set_label_join_points(8)
         dicer.set_max_fragment_size(1)
         self.assertEqual(dicer.dice(mol), {"[8OH2]": 1})
 
     def test_dicer_increment_join_points_and_global_counts(self):
-        dicer = lillymol_nb.Dicer()
+        dicer = lillymol.Dicer()
         dicer.set_increment_isotope_for_join_points(100)
-        mol = lillymol_nb.MolFromSmiles("CC[23CH2]NCC")
+        mol = lillymol.MolFromSmiles("CC[23CH2]NCC")
         self.assertEqual(dicer.dice(mol), {
             "[100CH3]C": 1,
             "[100NH2]CC": 1,
@@ -1650,22 +1651,22 @@ query {
             "[123CH3]CC": 1,
         })
 
-        dicer = lillymol_nb.Dicer()
+        dicer = lillymol.Dicer()
         dicer.set_accumulate_global_fragment_count(True)
         dicer.set_break_cc_bonds(True)
-        self.assertEqual(dicer.dice(lillymol_nb.MolFromSmiles("CC ethane")), {"C": 2})
+        self.assertEqual(dicer.dice(lillymol.MolFromSmiles("CC ethane")), {"C": 2})
         self.assertEqual(dicer.get_global_fragment_count(), {"C": 1})
-        self.assertEqual(dicer.dice(lillymol_nb.MolFromSmiles("CC ethane")), {"C": 2})
+        self.assertEqual(dicer.dice(lillymol.MolFromSmiles("CC ethane")), {"C": 2})
         self.assertEqual(dicer.get_global_fragment_count(), {"C": 2})
 
     def test_dicer_break_bond_smarts(self):
-        dicer = lillymol_nb.Dicer()
+        dicer = lillymol.Dicer()
         dicer.set_label_join_points(8)
         dicer.set_break_cc_bonds(True)
         dicer.set_max_bonds_to_break(3)
         self.assertTrue(dicer.add_bond_break_smarts("C-F"))
         self.assertFalse(dicer.add_bond_break_smarts("["))
-        mol = lillymol_nb.MolFromSmiles("CC(F)(F)F trifluoroethane")
+        mol = lillymol.MolFromSmiles("CC(F)(F)F trifluoroethane")
         self.assertEqual(dicer.dice(mol), {
             "[8FH]": 15,
             "[8CH3]C": 6,
@@ -1678,12 +1679,12 @@ query {
         if replacement_file is None:
             self.skipTest("ring replacement test data not available")
 
-        replacement = lillymol_nb.RingReplacement()
+        replacement = lillymol.RingReplacement()
         self.assertTrue(replacement.set_ring_atom_smarts("[#7]"))
         self.assertGreater(replacement.read_replacement_rings(replacement_file), 0)
         self.assertGreater(replacement.number_replacement_rings(), 0)
 
-        mol = lillymol_nb.MolFromSmiles("Oc1ccc(OC)cc1")
+        mol = lillymol.MolFromSmiles("Oc1ccc(OC)cc1")
         self.assertEqual(replacement.process(mol), [])
 
     def test_ring_replacement_products(self):
@@ -1691,14 +1692,14 @@ query {
         if replacement_file is None:
             self.skipTest("ring replacement test data not available")
 
-        replacement = lillymol_nb.RingReplacement()
+        replacement = lillymol.RingReplacement()
         self.assertTrue(replacement.set_ring_atom_smarts("[1c]"))
         self.assertGreater(replacement.read_replacement_rings(replacement_file), 0)
 
-        mol = lillymol_nb.MolFromSmiles("O[1c]1cc[1c](OC)cc1")
+        mol = lillymol.MolFromSmiles("O[1c]1cc[1c](OC)cc1")
         products = replacement.process(mol)
         self.assertEqual(len(products), 12)
-        self.assertTrue(all(isinstance(product, lillymol_nb.Molecule)
+        self.assertTrue(all(isinstance(product, lillymol.Molecule)
                             for product in products))
         self.assertTrue(all(product.number_isotopic_atoms() == 2
                             for product in products))
@@ -1708,13 +1709,13 @@ query {
         if replacement_file is None:
             self.skipTest("ring replacement test data not available")
 
-        replacement = lillymol_nb.RingReplacement()
+        replacement = lillymol.RingReplacement()
         self.assertTrue(replacement.set_ring_atom_smarts("c"))
         replacement.set_unique_molecules_only(True)
         replacement.set_min_support_requirement(100)
         self.assertGreater(replacement.read_replacement_rings(replacement_file), 0)
 
-        mol = lillymol_nb.MolFromSmiles("Oc1ccc(OC)cc1 start")
+        mol = lillymol.MolFromSmiles("Oc1ccc(OC)cc1 start")
         self.assertEqual(len(replacement.process(mol)), 7)
         self.assertEqual(replacement.process(mol), [])
         replacement.clear_unique_molecule_cache()
@@ -1725,27 +1726,27 @@ query {
         if replacement_file is None:
             self.skipTest("ring replacement test data not available")
 
-        replacement = lillymol_nb.RingReplacement()
+        replacement = lillymol.RingReplacement()
         self.assertTrue(replacement.set_ring_atom_smarts("[1c]"))
         replacement.set_remove_isotopes(True)
         self.assertGreater(replacement.read_replacement_rings(replacement_file), 0)
 
-        mol = lillymol_nb.MolFromSmiles("O[1c]1cc[1c](OC)cc1")
+        mol = lillymol.MolFromSmiles("O[1c]1cc[1c](OC)cc1")
         products = replacement.process(mol)
         self.assertEqual(len(products), 12)
         self.assertTrue(all(product.number_isotopic_atoms() == 0
                             for product in products))
 
     def test_reaction_rdkit_cookbook_smirks(self):
-        core = lillymol_nb.MolFromSmiles("*c1c(C)cccc1O")
-        sidechain = lillymol_nb.MolFromSmiles("CN*")
+        core = lillymol.MolFromSmiles("*c1c(C)cccc1O")
+        sidechain = lillymol.MolFromSmiles("CN*")
 
-        lillymol_nb.set_smirks_lost_atom_means_remove_frgment(1)
+        lillymol.set_smirks_lost_atom_means_remove_frgment(1)
 
-        reaction = lillymol_nb.Reaction()
+        reaction = lillymol.Reaction()
         self.assertTrue(reaction.construct_from_smirks(
             "[c:1][#0:3].[#0:4][*:2]>>[*:1]-[*:2]"))
-        smc = lillymol_nb.SidechainMatchConditions()
+        smc = lillymol.SidechainMatchConditions()
         self.assertTrue(reaction.add_sidechain_reagent(0, sidechain, smc))
         self.assertEqual(reaction.number_sidechains(), 1)
         self.assertEqual(reaction.number_sidechains_with_reagents(), 1)
@@ -1758,9 +1759,9 @@ query {
 
     def test_reaction_textproto_multiple_reagents(self):
         reagents = [
-            lillymol_nb.MolFromSmiles("O-C(=O)c1ccc(Cl)cc1 scaffold"),
-            lillymol_nb.MolFromSmiles("Nc1ccc(S)cc1 R1"),
-            lillymol_nb.MolFromSmiles("C R2"),
+            lillymol.MolFromSmiles("O-C(=O)c1ccc(Cl)cc1 scaffold"),
+            lillymol.MolFromSmiles("Nc1ccc(S)cc1 R1"),
+            lillymol.MolFromSmiles("C R2"),
         ]
         reaction_textproto = """scaffold {
   id: 0
@@ -1789,7 +1790,7 @@ sidechain {
   }
 }
 """
-        reaction = lillymol_nb.Reaction()
+        reaction = lillymol.Reaction()
         self.assertTrue(reaction.construct_from_textproto(reaction_textproto))
         self.assertEqual(reaction.number_sidechains(), 2)
 
@@ -1798,30 +1799,30 @@ sidechain {
         self.assertEqual(product.unique_smiles(), "O=C(Nc1ccc(C)cc1)c1ccccc1")
 
     def test_reaction_iterator_and_reagent_names(self):
-        core = lillymol_nb.MolFromSmiles("*c1ccccc1 scaffold")
-        sidechain = lillymol_nb.MolFromSmiles("CN* methylamine")
+        core = lillymol.MolFromSmiles("*c1ccccc1 scaffold")
+        sidechain = lillymol.MolFromSmiles("CN* methylamine")
 
-        reaction = lillymol_nb.Reaction()
+        reaction = lillymol.Reaction()
         self.assertTrue(reaction.construct_from_smirks(
             "[c:1][#0:3].[#0:4][*:2]>>[*:1]-[*:2]"))
-        smc = lillymol_nb.SidechainMatchConditions()
+        smc = lillymol.SidechainMatchConditions()
         self.assertTrue(reaction.add_sidechain_reagent(0, sidechain, smc))
 
-        iterator = lillymol_nb.ReactionIterator(reaction)
+        iterator = lillymol.ReactionIterator(reaction)
         self.assertTrue(iterator.active())
         self.assertEqual(iterator.reagent(0), 0)
         self.assertEqual(reaction.reagent_names(iterator), ["methylamine"])
 
         matches = reaction.substructure_search_matches(core)
         self.assertIsNotNone(matches)
-        product = reaction.perform_reaction(core, lillymol_nb.Set_of_Atoms(matches[0]), iterator)
+        product = reaction.perform_reaction(core, lillymol.Set_of_Atoms(matches[0]), iterator)
         self.assertIsNotNone(product)
         self.assertEqual(product.unique_smiles(), "CNc1ccccc1")
 
     def test_gfp_list_read_and_distance(self):
         fname = _write_text_file(CARBON_GFP, suffix=".gfp")
         try:
-            gfp = lillymol_nb.GFPList.from_file(fname)
+            gfp = lillymol.GFPList.from_file(fname)
             self.assertEqual(len(gfp), 2)
             self.assertEqual(gfp.size(), 2)
             self.assertEqual(gfp.tags(), ["FCTS<"])
@@ -1836,7 +1837,7 @@ sidechain {
     def test_gfp_nearest_neighbours(self):
         fname = _write_text_file(CARBON_GFP, suffix=".gfp")
         try:
-            gfp = lillymol_nb.GFPList.from_file(fname)
+            gfp = lillymol.GFPList.from_file(fname)
             hits = gfp.nearest_neighbours(0, 1)
             self.assertEqual(len(hits), 1)
             self.assertEqual(hits[0].index, 1)
@@ -1851,7 +1852,7 @@ sidechain {
             os.remove(fname)
 
     def test_gfp_standard_golden_distances(self):
-        gfp = lillymol_nb.GFPList.from_file(_testdata_file("rand10.standard.gfp"))
+        gfp = lillymol.GFPList.from_file(_testdata_file("rand10.standard.gfp"))
         self.assertGreater(len(gfp), 3)
         self.assertEqual(gfp.id(0), "CHEMBL3460651")
         self.assertEqual(gfp.id(1), "CHEMBL3460651.a")
@@ -1863,15 +1864,15 @@ sidechain {
         self.assertAlmostEqual(gfp.distance(0, 3), 0.499, delta=0.001)
 
     def test_gfp_generator_specs_match_standard_context(self):
-        standard = lillymol_nb.GFPContext.standard()
-        from_specs = lillymol_nb.GFPContext.from_specs([
-            lillymol_nb.GFP.iw(),
-            lillymol_nb.GFP.maccs(),
-            lillymol_nb.GFP.mpr(),
+        standard = lillymol.GFPContext.standard()
+        from_specs = lillymol.GFPContext.from_specs([
+            lillymol.GFP.iw(),
+            lillymol.GFP.maccs(),
+            lillymol.GFP.mpr(),
         ])
 
         self.assertEqual(from_specs.tags(), standard.tags())
-        mol = lillymol_nb.MolFromSmiles("CCO ethanol")
+        mol = lillymol.MolFromSmiles("CCO ethanol")
         fp_standard = standard.fingerprint(mol)
         fp_from_specs = from_specs.fingerprint(mol)
         self.assertEqual(fp_standard.context_hash(), fp_from_specs.context_hash())
@@ -1879,18 +1880,18 @@ sidechain {
                                0.0, places=6)
 
     def test_gfp_standard_list_add_and_query_fingerprint(self):
-        gfp = lillymol_nb.GFPList.standard()
+        gfp = lillymol.GFPList.standard()
         self.assertEqual(gfp.tags(), ["FPIW<", "FPMK<", "FPMK2<", "MPR<"])
 
         for smiles in ["CC ethane", "CCC propane", "CCCC butane"]:
-            gfp.add(lillymol_nb.MolFromSmiles(smiles))
+            gfp.add(lillymol.MolFromSmiles(smiles))
 
         self.assertEqual(len(gfp), 3)
         self.assertEqual(gfp.id(0), "ethane")
         self.assertAlmostEqual(gfp.distance(0, 0), 0.0, places=6)
 
-        query = lillymol_nb.MolFromSmiles("CCC query")
-        fp = lillymol_nb.GFPContext.standard().fingerprint(query)
+        query = lillymol.MolFromSmiles("CCC query")
+        fp = lillymol.GFPContext.standard().fingerprint(query)
         self.assertAlmostEqual(gfp.distance(fp, 1), 0.0, places=6)
 
         hits = gfp.nearest_neighbours(fp, 2)
@@ -1898,28 +1899,28 @@ sidechain {
         self.assertAlmostEqual(hits[0].distance, 0.0, places=6)
 
     def test_gfp_generator_specs_and_errors(self):
-        self.assertEqual(lillymol_nb.GFP.maccs(level2=False).components(), ["FPMK<"])
-        self.assertEqual(lillymol_nb.GFP.formula().components(), ["FCFML<"])
-        self.assertEqual(lillymol_nb.GFP.atom_pair(min_separation=0, max_separation=2,
+        self.assertEqual(lillymol.GFP.maccs(level2=False).components(), ["FPMK<"])
+        self.assertEqual(lillymol.GFP.formula().components(), ["FCFML<"])
+        self.assertEqual(lillymol.GFP.atom_pair(min_separation=0, max_separation=2,
                                                    include_out_of_range=True).components(),
                          ["NCAPT0M2USTY<"])
-        self.assertEqual(lillymol_nb.GFP.ec(radius=3, atom_type="UST:AY").components(),
+        self.assertEqual(lillymol.GFP.ec(radius=3, atom_type="UST:AY").components(),
                          ["NCEC3USTAY<"])
-        self.assertEqual(lillymol_nb.GFP.spinach(label_join_points=True).components(),
+        self.assertEqual(lillymol.GFP.spinach(label_join_points=True).components(),
                          ["FPSPINI<"])
-        self.assertEqual(lillymol_nb.GFP.scaffold(label_join_points=True).components(),
+        self.assertEqual(lillymol.GFP.scaffold(label_join_points=True).components(),
                          ["FPSCAFI<"])
-        substructure = lillymol_nb.GFP.substructure("c1ccccc1", radius=1)
+        substructure = lillymol.GFP.substructure("c1ccccc1", radius=1)
         self.assertTrue(substructure.components()[0].startswith("FPSUB1USTARY"))
 
         with self.assertRaises(ValueError):
-            lillymol_nb.GFP.alogp(replicates=0)
+            lillymol.GFP.alogp(replicates=0)
         with self.assertRaises(ValueError):
-            lillymol_nb.GFP.atom_pair(min_separation=4, max_separation=3)
+            lillymol.GFP.atom_pair(min_separation=4, max_separation=3)
         with self.assertRaises(ValueError):
-            lillymol_nb.GFP.substructure("C", no_match="skip")
+            lillymol.GFP.substructure("C", no_match="skip")
         with self.assertRaises(RuntimeError):
-            lillymol_nb.GFPContext.from_specs([lillymol_nb.GFP.iw(), lillymol_nb.GFP.iw()])
+            lillymol.GFPContext.from_specs([lillymol.GFP.iw(), lillymol.GFP.iw()])
 
     def _run_truncated_distance_matrix_storage_case(self, storage):
         fname = _write_tfdatarecord([
@@ -1929,7 +1930,7 @@ sidechain {
             _nearneighbours("D", []),
         ])
         try:
-            dm = lillymol_nb.TruncatedDistanceMatrix(fname, storage=storage)
+            dm = lillymol.TruncatedDistanceMatrix(fname, storage=storage)
             self.assertEqual(len(dm), 4)
             self.assertEqual(dm.size(), 4)
             self.assertEqual(dm.number_distances(), 2)
@@ -1960,11 +1961,11 @@ sidechain {
 
     def test_truncated_distance_matrix_row_sparse(self):
         self._run_truncated_distance_matrix_storage_case(
-            lillymol_nb.TruncatedDistanceMatrixStorage.ROW_SPARSE)
+            lillymol.TruncatedDistanceMatrixStorage.ROW_SPARSE)
 
     def test_truncated_distance_matrix_row_hash(self):
         self._run_truncated_distance_matrix_storage_case(
-            lillymol_nb.TruncatedDistanceMatrixStorage.ROW_HASH)
+            lillymol.TruncatedDistanceMatrixStorage.ROW_HASH)
 
     def test_truncated_distance_matrix_indexed_proto(self):
         fname = _write_tfdatarecord([
@@ -1974,10 +1975,10 @@ sidechain {
             _nearneighbours_indices("D", []),
         ])
         try:
-            dm = lillymol_nb.TruncatedDistanceMatrix(
+            dm = lillymol.TruncatedDistanceMatrix(
                 fname,
-                storage=lillymol_nb.TruncatedDistanceMatrixStorage.ROW_SPARSE,
-                proto_type=lillymol_nb.TruncatedDistanceMatrixProto.NEARNEIGHBOURS_INDICES)
+                storage=lillymol.TruncatedDistanceMatrixStorage.ROW_SPARSE,
+                proto_type=lillymol.TruncatedDistanceMatrixProto.NEARNEIGHBOURS_INDICES)
             self.assertEqual(dm.size(), 4)
             self.assertEqual(dm.number_distances(), 2)
             self.assertEqual(dm.name(1), "B")
@@ -1991,7 +1992,7 @@ sidechain {
             _nearneighbours("B", [("A", 11.0 / 255.0)]),
         ])
         try:
-            dm = lillymol_nb.TruncatedDistanceMatrix(fname)
+            dm = lillymol.TruncatedDistanceMatrix(fname)
             self.assertEqual(dm.number_distances(), 1)
             self.assertEqual(dm.duplicate_distances_differing_by_one(), 1)
             self.assertAlmostEqual(dm.distance(0, 1), 10.0 / 255.0, places=6)
@@ -2005,32 +2006,32 @@ sidechain {
         ])
         try:
             with self.assertRaises(RuntimeError):
-                lillymol_nb.TruncatedDistanceMatrix(fname)
+                lillymol.TruncatedDistanceMatrix(fname)
         finally:
             os.remove(fname)
 
     def test_unique_molecules(self):
-        unique = lillymol_nb.UniqueMolecules()
-        self.assertTrue(unique.is_unique(lillymol_nb.MolFromSmiles("C methane")))
-        self.assertFalse(unique.is_unique(lillymol_nb.MolFromSmiles("C methane_again")))
+        unique = lillymol.UniqueMolecules()
+        self.assertTrue(unique.is_unique(lillymol.MolFromSmiles("C methane")))
+        self.assertFalse(unique.is_unique(lillymol.MolFromSmiles("C methane_again")))
 
-        chiral = lillymol_nb.UniqueMolecules()
-        self.assertTrue(chiral.is_unique(lillymol_nb.MolFromSmiles("C(O)[C@@H](N)C")))
-        self.assertTrue(chiral.is_unique(lillymol_nb.MolFromSmiles("C(O)[C@H](N)C")))
+        chiral = lillymol.UniqueMolecules()
+        self.assertTrue(chiral.is_unique(lillymol.MolFromSmiles("C(O)[C@@H](N)C")))
+        self.assertTrue(chiral.is_unique(lillymol.MolFromSmiles("C(O)[C@H](N)C")))
 
-        achiral = lillymol_nb.UniqueMolecules()
+        achiral = lillymol.UniqueMolecules()
         achiral.set_include_chiral_info(False)
-        self.assertTrue(achiral.is_unique(lillymol_nb.MolFromSmiles("C(O)[C@@H](N)C")))
-        self.assertFalse(achiral.is_unique(lillymol_nb.MolFromSmiles("C(O)[C@H](N)C")))
+        self.assertTrue(achiral.is_unique(lillymol.MolFromSmiles("C(O)[C@@H](N)C")))
+        self.assertFalse(achiral.is_unique(lillymol.MolFromSmiles("C(O)[C@H](N)C")))
 
-        fragments = lillymol_nb.UniqueMolecules()
+        fragments = lillymol.UniqueMolecules()
         fragments.set_strip_to_largest_fragment(True)
-        self.assertTrue(fragments.is_unique(lillymol_nb.MolFromSmiles("CC.C")))
-        self.assertFalse(fragments.is_unique(lillymol_nb.MolFromSmiles("CC.O")))
+        self.assertTrue(fragments.is_unique(lillymol.MolFromSmiles("CC.C")))
+        self.assertFalse(fragments.is_unique(lillymol.MolFromSmiles("CC.O")))
 
-        isotopes = lillymol_nb.UniqueMolecules()
+        isotopes = lillymol.UniqueMolecules()
         isotopes.set_consider_isotopes(False)
-        mol = lillymol_nb.MolFromSmiles("C methane")
+        mol = lillymol.MolFromSmiles("C methane")
         self.assertTrue(isotopes.is_unique(mol))
         mol.set_isotope(0, 1)
         self.assertFalse(isotopes.is_unique(mol))
@@ -2048,10 +2049,10 @@ sidechain {
         if query_dir is None:
             self.skipTest("QED query directory not available")
 
-        mol = lillymol_nb.MolFromSmiles("CC(=O)Oc1ccccc1C(=O)O aspirin")
+        mol = lillymol.MolFromSmiles("CC(=O)Oc1ccccc1C(=O)O aspirin")
         initial_smiles = mol.smiles()
 
-        calc = lillymol_nb.QED(initialise_from_environment=False)
+        calc = lillymol.QED(initialise_from_environment=False)
         self.assertTrue(calc.initialise_from_directory(query_dir))
         value = calc.qed(mol)
         self.assertIsNotNone(value)
@@ -2059,7 +2060,7 @@ sidechain {
         self.assertLessEqual(value, 1.0)
         self.assertEqual(mol.smiles(), initial_smiles)
 
-        calc_from_dir = lillymol_nb.QED(query_dir)
+        calc_from_dir = lillymol.QED(query_dir)
         self.assertAlmostEqual(calc_from_dir.score(mol), value, delta=1.0e-6)
 
     def test_iwdescr_numpy(self):
@@ -2069,21 +2070,21 @@ sidechain {
         except ImportError:
             self.skipTest("numpy is not available")
 
-        calc = lillymol_nb.IWDescr()
+        calc = lillymol.IWDescr()
         names = calc.feature_names()
         self.assertGreater(len(names), 0)
         self.assertEqual(names, calc.names())
         self.assertEqual(len(names), calc.number_descriptors())
 
-        ethanol = lillymol_nb.MolFromSmiles("CCO ethanol")
+        ethanol = lillymol.MolFromSmiles("CCO ethanol")
         values = calc.process(ethanol)
         self.assertEqual(values.dtype, np.dtype("float32"))
         self.assertEqual(values.shape, (len(names),))
         self.assertEqual(values.ndim, 1)
 
         mols = [
-            lillymol_nb.MolFromSmiles("CCO ethanol"),
-            lillymol_nb.MolFromSmiles("c1ccccc1 benzene"),
+            lillymol.MolFromSmiles("CCO ethanol"),
+            lillymol.MolFromSmiles("c1ccccc1 benzene"),
         ]
         matrix = calc.process_list(mols)
         self.assertEqual(matrix.dtype, np.dtype("float32"))
@@ -2106,23 +2107,23 @@ sidechain {
         except ImportError:
             self.skipTest("numpy is not available")
 
-        calc = lillymol_nb.MolecularDescriptors()
+        calc = lillymol.MolecularDescriptors()
         names = calc.names()
         self.assertGreater(len(names), 0)
         self.assertEqual(names, calc.feature_names())
 
-        mol = lillymol_nb.MolFromSmiles("CCO ethanol")
+        mol = lillymol.MolFromSmiles("CCO ethanol")
         array = calc.compute_array(mol)
         self.assertEqual(array.dtype, np.dtype("float32"))
         self.assertEqual(array.shape, (len(names),))
 
-        values = calc.compute(lillymol_nb.MolFromSmiles("CCO ethanol"))
+        values = calc.compute(lillymol.MolFromSmiles("CCO ethanol"))
         self.assertEqual(set(values), set(names))
         self.assertEqual(values["nrings"], 0.0)
 
         matrix = calc.compute_list([
-            lillymol_nb.MolFromSmiles("CCO ethanol"),
-            lillymol_nb.MolFromSmiles("c1ccccc1 benzene"),
+            lillymol.MolFromSmiles("CCO ethanol"),
+            lillymol.MolFromSmiles("c1ccccc1 benzene"),
         ])
         self.assertEqual(matrix.dtype, np.dtype("float32"))
         self.assertEqual(matrix.shape, (2, len(names)))
@@ -2137,14 +2138,14 @@ sidechain {
         if charges is None or hbonds is None:
             self.skipTest("JWCats query directories not available")
 
-        calc = lillymol_nb.JWCats(initialise_default_assigners=False)
+        calc = lillymol.JWCats(initialise_default_assigners=False)
         self.assertTrue(calc.build_assigners(charges, hbonds))
         self.assertTrue(calc.initialise())
         self.assertTrue(calc.initialised())
 
         names = calc.feature_names()
         self.assertGreater(len(names), 0)
-        mol = lillymol_nb.MolFromSmiles("CCN(CC)C tertiary_amine")
+        mol = lillymol.MolFromSmiles("CCN(CC)C tertiary_amine")
         try:
             import numpy as np
         except ImportError:
@@ -2155,8 +2156,8 @@ sidechain {
         self.assertEqual(values.shape, (len(names),))
 
         matrix = calc.process_list([
-            lillymol_nb.MolFromSmiles("CCN(CC)C tertiary_amine"),
-            lillymol_nb.MolFromSmiles("CCO ethanol"),
+            lillymol.MolFromSmiles("CCN(CC)C tertiary_amine"),
+            lillymol.MolFromSmiles("CCO ethanol"),
         ])
         self.assertEqual(matrix.dtype, np.dtype("float64"))
         self.assertEqual(matrix.shape, (2, len(names)))
@@ -2166,135 +2167,135 @@ sidechain {
         self.assertLess(len(calc.feature_names()), len(names))
 
     def test_rotatable_bonds(self):
-        rotbond_calc = lillymol_nb.RotatableBonds()
-        rotbond_calc.set_calculation_type(lillymol_nb.EXPENSIVE)
+        rotbond_calc = lillymol.RotatableBonds()
+        rotbond_calc.set_calculation_type(lillymol.EXPENSIVE)
 
-        mol = lillymol_nb.MolFromSmiles("CC ethane")
+        mol = lillymol.MolFromSmiles("CC ethane")
         self.assertEqual(rotbond_calc.rotatable_bonds(mol), 0)
-        mol = lillymol_nb.MolFromSmiles("CCC propane")
+        mol = lillymol.MolFromSmiles("CCC propane")
         self.assertEqual(rotbond_calc.rotatable_bonds(mol), 0)
-        mol = lillymol_nb.MolFromSmiles("CC(F)(F)F trifluoroethane")
+        mol = lillymol.MolFromSmiles("CC(F)(F)F trifluoroethane")
         self.assertEqual(rotbond_calc.rotatable_bonds(mol), 0)
-        mol = lillymol_nb.MolFromSmiles("CCCC butane")
+        mol = lillymol.MolFromSmiles("CCCC butane")
         self.assertEqual(rotbond_calc.rotatable_bonds(mol), 1)
         self.assertEqual(rotbond_calc.rotatable_bond_atoms(mol), [(1, 2)])
-        mol = lillymol_nb.MolFromSmiles("C1CC1C methylcyclopropane")
+        mol = lillymol.MolFromSmiles("C1CC1C methylcyclopropane")
         self.assertEqual(rotbond_calc.rotatable_bonds(mol), 0)
         self.assertEqual(rotbond_calc.rotatable_bond_atoms(mol), [])
 
     def test_rotatable_bond_calculation_type(self):
-        mol = lillymol_nb.MolFromSmiles("CC(=O)NCC amide")
-        rotbond_calc = lillymol_nb.RotatableBonds()
-        rotbond_calc.set_calculation_type(lillymol_nb.RotBond.QUICK)
+        mol = lillymol.MolFromSmiles("CC(=O)NCC amide")
+        rotbond_calc = lillymol.RotatableBonds()
+        rotbond_calc.set_calculation_type(lillymol.RotBond.QUICK)
         self.assertEqual(rotbond_calc.rotatable_bond_atoms(mol), [(1, 3), (3, 4)])
-        rotbond_calc.set_calculation_type(lillymol_nb.RotBond.EXPENSIVE)
+        rotbond_calc.set_calculation_type(lillymol.RotBond.EXPENSIVE)
         self.assertEqual(rotbond_calc.rotatable_bond_atoms(mol), [(3, 4)])
 
     def test_descriptor_helpers(self):
-        mol = lillymol_nb.MolFromSmiles("CCO ethanol")
-        self.assertIsNotNone(lillymol_nb.alogp(mol))
-        self.assertIsNotNone(lillymol_nb.xlogp(mol))
-        self.assertIsNotNone(lillymol_nb.tpsa(mol))
-        self.assertEqual(lillymol_nb.HbaHbd(mol), (1, 1))
-        self.assertEqual(lillymol_nb.NumHAcceptors(mol), mol.lipinski_num_h_acceptors())
-        self.assertEqual(lillymol_nb.NumHDonors(mol), mol.lipinski_num_h_donors())
-        self.assertEqual(lillymol_nb.RDKitNumHAcceptors(mol), mol.rdkit_num_h_acceptors())
-        self.assertEqual(lillymol_nb.RDKitNumHDonors(mol), mol.rdkit_num_h_donors())
-        self.assertAlmostEqual(lillymol_nb.fraction_csp3(mol), 1.0)
+        mol = lillymol.MolFromSmiles("CCO ethanol")
+        self.assertIsNotNone(lillymol.alogp(mol))
+        self.assertIsNotNone(lillymol.xlogp(mol))
+        self.assertIsNotNone(lillymol.tpsa(mol))
+        self.assertEqual(lillymol.HbaHbd(mol), (1, 1))
+        self.assertEqual(lillymol.NumHAcceptors(mol), mol.lipinski_num_h_acceptors())
+        self.assertEqual(lillymol.NumHDonors(mol), mol.lipinski_num_h_donors())
+        self.assertEqual(lillymol.RDKitNumHAcceptors(mol), mol.rdkit_num_h_acceptors())
+        self.assertEqual(lillymol.RDKitNumHDonors(mol), mol.rdkit_num_h_donors())
+        self.assertAlmostEqual(lillymol.fraction_csp3(mol), 1.0)
 
-        benzene = lillymol_nb.MolFromSmiles("c1ccccc1 benzene")
-        self.assertAlmostEqual(lillymol_nb.fraction_csp3(benzene), 0.0)
-        water = lillymol_nb.MolFromSmiles("O water")
-        self.assertAlmostEqual(lillymol_nb.fraction_csp3(water), 0.0)
+        benzene = lillymol.MolFromSmiles("c1ccccc1 benzene")
+        self.assertAlmostEqual(lillymol.fraction_csp3(benzene), 0.0)
+        water = lillymol.MolFromSmiles("O water")
+        self.assertAlmostEqual(lillymol.fraction_csp3(water), 0.0)
 
 
 class TestNanobindTSubstructure(LillyMolNanobindTestCase):
 
     def test_no_queries(self):
-        ts = lillymol_nb.TSubstructure()
+        ts = lillymol.TSubstructure()
         self.assertFalse(ts.substructure_search("C methane"))
 
     def test_single_query_single_molecule(self):
-        ts = lillymol_nb.TSubstructure()
+        ts = lillymol.TSubstructure()
         self.assertTrue(ts.add_query_from_smarts("C carbon"))
-        mol = lillymol_nb.MolFromSmiles("CC")
+        mol = lillymol.MolFromSmiles("CC")
         self.assertTrue(ts.substructure_search(mol))
         self.assertEqual(ts.num_matches(mol), [2])
         self.assertEqual(ts.number_queries(), 1)
         self.assertEqual(ts.query_names(), ["carbon"])
 
     def test_multiple_query_single_molecule(self):
-        ts = lillymol_nb.TSubstructure()
+        ts = lillymol.TSubstructure()
         self.assertTrue(ts.add_query_from_smarts("C carbon"))
         self.assertTrue(ts.add_query_from_smarts("N nitrogen"))
-        mol = lillymol_nb.MolFromSmiles("CC")
+        mol = lillymol.MolFromSmiles("CC")
         self.assertEqual(ts.num_matches(mol), [2, 0])
 
     def test_batch_substructure_search_molecules(self):
-        ts = lillymol_nb.TSubstructure()
+        ts = lillymol.TSubstructure()
         self.assertTrue(ts.add_query_from_smarts("C carbon"))
         smiles = ["C methane", "CC ethane", "CCC propane", "C1CC1 cyclopropane", "c1ccccc1 benzene"]
-        mols = [lillymol_nb.MolFromSmiles(smi) for smi in smiles]
+        mols = [lillymol.MolFromSmiles(smi) for smi in smiles]
         self.assertEqual(ts.substructure_search(mols), [True, True, True, True, False])
 
     def test_batch_substructure_search_smiles(self):
-        ts = lillymol_nb.TSubstructure()
+        ts = lillymol.TSubstructure()
         self.assertTrue(ts.add_query_from_smarts("N nitrogen"))
         smiles = ["C methane", "N nitrogen", "CN methylamine"]
         self.assertEqual(ts.substructure_search(smiles), [False, True, True])
 
     def test_batch_num_matches_molecules(self):
-        ts = lillymol_nb.TSubstructure()
+        ts = lillymol.TSubstructure()
         self.assertTrue(ts.add_query_from_smarts("C carbon"))
         self.assertTrue(ts.add_query_from_smarts("N nitrogen"))
         smiles = ["C methane", "CC ethane", "N nitrogen", "O oxygen", "CN CN"]
-        mols = [lillymol_nb.MolFromSmiles(smi) for smi in smiles]
+        mols = [lillymol.MolFromSmiles(smi) for smi in smiles]
         self.assertEqual(ts.num_matches(mols), [[1, 0], [2, 0], [0, 1], [0, 0], [1, 1]])
 
     def test_must_match_all_queries(self):
-        ts = lillymol_nb.TSubstructure()
+        ts = lillymol.TSubstructure()
         self.assertTrue(ts.add_query_from_smarts("C carbon"))
         self.assertTrue(ts.add_query_from_smarts("N nitrogen"))
-        mol = lillymol_nb.MolFromSmiles("C")
+        mol = lillymol.MolFromSmiles("C")
         self.assertTrue(ts.substructure_search(mol))
         ts.must_match_all_queries = True
         self.assertFalse(ts.substructure_search(mol))
 
     def test_unique_embeddings_only(self):
-        ts = lillymol_nb.TSubstructure()
-        mol = lillymol_nb.MolFromSmiles("CC(C)(C)c1c(C(C)(C)C)c(C(C)(C)C)c(C(C)(C)C)c(C(C)(C)C)c1C(C)(C)C")
+        ts = lillymol.TSubstructure()
+        mol = lillymol.MolFromSmiles("CC(C)(C)c1c(C(C)(C)C)c(C(C)(C)C)c(C(C)(C)C)c(C(C)(C)C)c1C(C)(C)C")
         self.assertTrue(ts.add_query_from_smarts("CC(C)(C)c1c(C(C)(C)C)c(C(C)(C)C)c(C(C)(C)C)c(C(C)(C)C)c1C(C)(C)C"))
         self.assertEqual(ts.num_matches(mol), [559872])
         ts.set_unique_embeddings_only(True)
         self.assertEqual(ts.num_matches(mol), [1])
 
     def test_max_matches_to_find(self):
-        ts = lillymol_nb.TSubstructure()
-        mol = lillymol_nb.MolFromSmiles("c1ccccc1")
+        ts = lillymol.TSubstructure()
+        mol = lillymol.MolFromSmiles("c1ccccc1")
         self.assertTrue(ts.add_query_from_smarts("c1ccccc1"))
         self.assertEqual(ts.num_matches(mol), [12])
         ts.set_max_matches_to_find(5)
         self.assertEqual(ts.num_matches(mol), [5])
 
     def test_reduce_to_largest_fragment(self):
-        ts = lillymol_nb.TSubstructure()
-        mol = lillymol_nb.MolFromSmiles("CC.C")
+        ts = lillymol.TSubstructure()
+        mol = lillymol.MolFromSmiles("CC.C")
         self.assertTrue(ts.add_query_from_smarts("C"))
         self.assertEqual(ts.num_matches(mol), [3])
         ts.set_reduce_to_largest_fragment(True)
         self.assertEqual(ts.num_matches(mol), [2])
 
     def test_make_implicit_hydrogens_explicit(self):
-        ts = lillymol_nb.TSubstructure()
-        mol = lillymol_nb.MolFromSmiles("CC")
+        ts = lillymol.TSubstructure()
+        mol = lillymol.MolFromSmiles("CC")
         self.assertTrue(ts.add_query_from_smarts("[#1]-C"))
         self.assertEqual(ts.num_matches(mol), [0])
         ts.set_make_implicit_hydrogens_explicit(True)
         self.assertEqual(ts.num_matches(mol), [6])
 
     def test_label_matched_atoms(self):
-        ts = lillymol_nb.TSubstructure()
-        mol = lillymol_nb.MolFromSmiles("Cc1ccccc1")
+        ts = lillymol.TSubstructure()
+        mol = lillymol.MolFromSmiles("Cc1ccccc1")
         self.assertTrue(ts.add_query_from_smarts("C"))
         self.assertTrue(ts.add_query_from_smarts("c"))
         ts.isotope = 4
@@ -2302,10 +2303,10 @@ class TestNanobindTSubstructure(LillyMolNanobindTestCase):
         self.assertEqual(mol.unique_smiles(), "[4CH3][4c]1[4cH][4cH][4cH][4cH][4cH]1")
 
     def test_matched_atoms(self):
-        ts = lillymol_nb.TSubstructure()
+        ts = lillymol.TSubstructure()
         self.assertTrue(ts.add_query_from_smarts("C"))
         self.assertTrue(ts.add_query_from_smarts("N"))
-        mol = lillymol_nb.MolFromSmiles("CC")
+        mol = lillymol.MolFromSmiles("CC")
         self.assertEqual(ts.matched_atoms(mol), [[0, 1], []])
 
 

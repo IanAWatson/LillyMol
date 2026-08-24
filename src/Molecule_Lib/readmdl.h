@@ -416,11 +416,12 @@ template <typename T>
 int
 Molecule::_read_molecule_mdl_trailing_records(
     T& input, int return_on_m_end,
-    MDL_File_Supporting_Material& mdlfos)  // non const because of rx match
-{
+    MDL_File_Supporting_Material& mdlfos) {  // non const because of rx match
   if (MdlReadExtraTextInfo(mdlfos)) {
     _ensure_text_info().resize(10);
   }
+
+  // std::cerr << "After reading connection table '" << _molecule_name << " _text_info " << _text_info << '\n';
 
   // Aprop atom_properties[MAX_PAIRS];
 
@@ -442,11 +443,11 @@ Molecule::_read_molecule_mdl_trailing_records(
 
   if (mdlfos.name_to_json() && ! _molecule_name.empty()) {
     IWString tmp;
-    tmp << "{ \"name\": " << _molecule_name << '"';
+    tmp << "{ \"name\": \"" << _molecule_name << '"';
     _molecule_name = tmp;
     json_open_brace_written = 1;
   } else if (mdlfos.name_to_json() || mdlfos.sdf_tags_to_json()) {
-    _molecule_name << '{';
+    _molecule_name.append_with_spacer("{", ' ');
     json_open_brace_written = 1;
   }
 
@@ -505,10 +506,19 @@ Molecule::_read_molecule_mdl_trailing_records(
       continue;
     }
 
+    if (buffer.starts_with("M  CFW")) {
+      continue;
+    }
+
     if ("M  END" == buffer) {
       if (return_on_m_end) {
         return 1;
       }
+      continue;
+    }
+
+    // In order to avoid having to keep track of all possible M directives, skip everything.
+    if (buffer.starts_with("M  ")) {
       continue;
     }
 

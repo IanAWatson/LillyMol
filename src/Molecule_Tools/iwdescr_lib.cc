@@ -1,7 +1,3 @@
-// Pass 64 IWDescr API skeleton.
-//
-// This pass continues from pass 45 and migrates distance-matrix descriptors
-// into IWDescrImpl.
 // IWDescr owns descriptor selection, descriptor storage, assigners, and
 // calculation-only parameters. iwdescr_main owns tests, filters, descriptor
 // range scaling/output policy, output modes, preprocessing, and all I/O.
@@ -40,7 +36,6 @@
 #include "Molecule_Tools/xlogp.h"
 
 #include "Molecule_Tools/iwdescr_internal.h"
-
 
 namespace {
 
@@ -6278,10 +6273,21 @@ compute_shortest_distance_from_longest_path(Molecule& m, const int* dm,
   return;
 }
 
+// There are molecules for which enumerating all paths between two most separated
+// atoms blows up. Imagine a long series of para substituted rings. At each ring
+// there is a choice of which way to go, so it explodes as 2^N. If we detect that
+// problem, we abort the calculation.
+static constexpr uint32_t kMaxVisited = 16384;  // an arbitrary choice, 2^14
+
 static void
 do_compute_distances_from_longest_path_descriptors(
     Molecule& m, const int* dm, atom_number_t astart, atom_number_t astop, int* in_path,
-    int* shortest_distance_from_longest_path) {
+    int* shortest_distance_from_longest_path,
+    uint32_t& visited) {
+  if (visited > kMaxVisited) {
+    return;
+  }
+
   in_path[astart] = 1;
 
   const int matoms = m.natoms();
@@ -6297,11 +6303,15 @@ do_compute_distances_from_longest_path_descriptors(
     if (j == astop) {
       compute_shortest_distance_from_longest_path(m, dm, in_path,
                                                   shortest_distance_from_longest_path);
+      ++visited;
+      if (visited > kMaxVisited) {
+        return;
+      }
     } else if (in_path[j]) {  // no doubling back
       ;
     } else if (current_distance - 1 == dm[j * matoms + astop]) {
       do_compute_distances_from_longest_path_descriptors(
-          m, dm, j, astop, in_path, shortest_distance_from_longest_path);
+          m, dm, j, astop, in_path, shortest_distance_from_longest_path, visited);
     }
   }
 
@@ -6348,6 +6358,37 @@ IWDescr::IWDescrImpl::ComputeAtomDistributionAlongLongestPath(Molecule& m, const
   return 1;
 }
 
+// `longest_path_atom` will be set for all atoms on any of the longest
+// paths. For each atom that is NOT on longest path atom, compute
+// the shortest distance to an atom that is on a longest path.
+// `shortest_distance_from_longest_path[i]` comes in initialised
+// to `matoms`.
+void
+MaxDistLongestPaths(const Molecule& m,
+                    const int* dm,
+                    const int* longest_path_atom,
+                    int* shortest_distance_from_longest_path) {
+  const int matoms = m.natoms();
+  // Loop over all atoms not on a longest path.
+  for (int i = 0; i < matoms; ++i) {
+    if (longest_path_atom[i]) {
+      continue;
+    }
+
+    // Examine distances from `i` to all atoms on the longest path.
+    for (int j = 0; j < matoms; ++j) {
+      if (! longest_path_atom[j]) {
+        continue;
+      }
+
+      const int d = dm[i * matoms + j];
+      if (d < shortest_distance_from_longest_path[i]) {
+        shortest_distance_from_longest_path[i] = d;
+      }
+    }
+  }
+}
+
 int
 IWDescr::IWDescrImpl::ComputeDistancesFromLongestPathInstance(Molecule& m, const int* dm,
                                                    atom_number_t a1, atom_number_t a2,
@@ -6357,13 +6398,24 @@ IWDescr::IWDescrImpl::ComputeDistancesFromLongestPathInstance(Molecule& m, const
   int matoms = m.natoms();
 
   std::fill_n(in_path, matoms, 0);
+  in_path[a1] = 1;
   in_path[a2] = 1;
+
   int* shortest_distance_from_longest_path = new_int(matoms, matoms);
   std::unique_ptr<int[]> free_sdlp(shortest_distance_from_longest_path);
 
-  shortest_distance_from_longest_path[a2] = 0;
+  uint32_t visited = 0;
   do_compute_distances_from_longest_path_descriptors(m, dm, a1, a2, in_path,
-                                                     shortest_distance_from_longest_path);
+                shortest_distance_from_longest_path, visited);
+
+  // If we have detected a combinatorial blow-up switch to a different computation.
+  // Note that it does not compute the same values, but a reasonable approximation.
+  if (visited >= kMaxVisited) {
+    Set_of_Atoms longest_path_atoms;
+    m.AllAtomsBetween(a1, a2, longest_path_atoms);
+    longest_path_atoms.set_vector(in_path, 1);
+    MaxDistLongestPaths(m, dm, in_path, shortest_distance_from_longest_path);
+  }
 
   Accumulator_Int<int> acc;
   for (int i = 0; i < matoms; i++) {

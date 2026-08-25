@@ -45,7 +45,8 @@ rm -f \
   "${destdir}/lillymol_nb.so" \
   "${destdir}/lillymol_nb.abi3.so" \
   "${destdir}/lillymol_nb_bdb.so" \
-  "${destdir}/lillymol_nb_bdb.abi3.so"
+  "${destdir}/lillymol_nb_bdb.abi3.so" \
+  "${destdir}/lillymol.so.soabi"
 
 copy_if_newer() {
   local source=$1
@@ -104,6 +105,8 @@ cd "${here}"
 copy_if_newer "bazel-bin/nanobind/lillymol.so"
 copy_optional_glob "bazel-bin/nanobind/lillymol_bdb.so"
 copy_optional_glob "bazel-bin/nanobind/lillymol_gfp_server.so"
+
+copy_if_newer "bazel-bin/nanobind/lillymol.so.soabi"
 
 copy_optional_glob "bazel-bin/Molecule_Lib/lib*.so"
 copy_optional_glob "bazel-bin/Molecule_Tools/lib*.so"

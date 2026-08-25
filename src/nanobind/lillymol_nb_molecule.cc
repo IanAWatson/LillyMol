@@ -256,7 +256,7 @@ AtomsByRadius(const Molecule& mol, const Set_of_Atoms& starting_atoms, int max_r
   std::queue<atom_number_t> to_process;
 
   for (atom_number_t atom : starting_atoms) {
-    if (atom < 0 || atom >= matoms) {
+    if (atom < 0 || atom >= matoms) [[unlikely]] {
       throw std::invalid_argument("starting atom is outside the molecule");
     }
     if (distance[atom] >= 0) {
@@ -382,7 +382,8 @@ BindMolecule(nb::module_& m) {
            [](const Molecule& mol, atomic_number_t atomic_number) {
              return mol.natoms(atomic_number);
            },
-           nb::arg("atomic_number"))
+           nb::arg("atomic_number"),
+           "number of atoms with the specified atomic number")
       .def("natoms",
            [](const Molecule& mol, const std::string& symbol) {
              const_IWSubstring tmp(symbol);
@@ -392,7 +393,8 @@ BindMolecule(nb::module_& m) {
              }
              return mol.natoms(element);
            },
-           nb::arg("symbol"))
+           nb::arg("symbol"),
+           "Number of atoms of type atomic symbol")
       .def("GetNumAtoms", [](const Molecule& mol) { return mol.natoms(); })
       .def("GetNumHeavyAtoms",
            [](const Molecule& mol) { return mol.natoms() - mol.natoms(1); },

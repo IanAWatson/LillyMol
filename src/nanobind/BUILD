@@ -4,6 +4,13 @@ load("@rules_python//python:defs.bzl", "py_test")
 
 package(default_visibility = ["//visibility:public"])
 
+genrule(
+    name = "lillymol_soabi",
+    outs = ["lillymol.so.soabi"],
+    cmd = "$(PYTHON3) -c \"import sysconfig; print(sysconfig.get_config_var('SOABI'))\" > $@",
+    toolchains = ["@rules_python//python:current_py_toolchain"],
+)
+
 nanobind_extension(
     name = "lillymol",
     srcs = [

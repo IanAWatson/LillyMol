@@ -136,4 +136,9 @@ Next steps:
   cd ${python_dir}
   python -m pip install build wheel setuptools
   python -m build --wheel
+
+  or
+
+  uv pip install build wheel setuptools
+  uv build --wheel
 EOF

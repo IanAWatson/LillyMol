@@ -35,10 +35,12 @@ class TestNanobindBdb(unittest.TestCase):
         precedent = lillymol_bdb.SyntheticPrecedentDatabases()
         self.assertIn("Synthetic Precedent database", repr(precedent))
         self.assertTrue(precedent.set_max_radius(2))
+        precedent.close()
 
     def test_open_missing_database_fails(self):
         lookup = lillymol_bdb.Selimsteg()
         self.assertFalse(lookup.open_database("/no/such/berkeleydb/file.bdb"))
+        lookup.close()
 
     def test_selimsteg_lookup(self):
         loader = _runfile_path("BerkeleyDB/iwbdb_load")
@@ -75,6 +77,8 @@ class TestNanobindBdb(unittest.TestCase):
                 self.assertEqual(mols[1].natoms(), 0)
                 self.assertEqual(mols[2].unique_smiles(), "c1ccccc1")
 
+                lookup.close()
+
     def test_structure_database_lookup(self):
         loader = _runfile_path("Molecule_Tools_Bdb/structure_database_load")
         if loader is None:
@@ -106,6 +110,8 @@ class TestNanobindBdb(unittest.TestCase):
 
             graph_mask = lillymol_bdb.value(lillymol_bdb.LookupParams.GRAPH)
             self.assertEqual(db.lookup(ethanol, graph_mask), "ethanol")
+
+            db.close()
 
     def test_substituent_identification_lookup(self):
         tool = _runfile_path("Molecule_Tools_Bdb/substituent_identification")
@@ -144,6 +150,7 @@ class TestNanobindBdb(unittest.TestCase):
                     self.assertGreaterEqual(replacement.examples, 1)
                     self.assertTrue(replacement.smiles)
                     self.assertEqual(replacement.molecule.name(), "methane")
+                lookup.close()
 
     def test_substituent_identification_query_driven_replacement(self):
         tool = _runfile_path("Molecule_Tools_Bdb/substituent_identification")
@@ -184,6 +191,7 @@ class TestNanobindBdb(unittest.TestCase):
                     sorted(replacement.donor for replacement in replacements),
                     ["chloro", "nitrogen", "sulphur"],
                 )
+                lookup.close()
 
             with lillymol_bdb.SubstituentIdentificationLookup() as lookup:
                 self.assertTrue(lookup.open_database(dbname))
@@ -195,6 +203,7 @@ class TestNanobindBdb(unittest.TestCase):
                 replacements = lookup.generate_replacements(phenol)
 
                 self.assertEqual(len(replacements), 2)
+                lookup.close()
 
             with lillymol_bdb.SubstituentIdentificationLookup() as lookup:
                 self.assertTrue(lookup.open_database(dbname))
@@ -213,6 +222,7 @@ class TestNanobindBdb(unittest.TestCase):
                         "C1(=CC=CC=C1)S",
                     ],
                 )
+                lookup.close()
 
     def test_selimsteg_with_no_database_open(self):
         """Used to dereference a null Db* and take the process down."""

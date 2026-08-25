@@ -76,7 +76,8 @@ NB_MODULE(lillymol_bdb, m) {
            },
            nb::arg("mol"), "Lookup exact molecule matches")
       .def("lookup", &StructureDatabaseLookup, nb::arg("mol"), nb::arg("params"),
-           "Lookup molecule with a bit mask of LookupParams values");
+           "Lookup molecule with a bit mask of LookupParams values")
+      .def("close", &structure_database::StructureDatabase::close, "Close db");
 
   nb::class_<iwecfp_database_lookup::SP_Set_of_Databases>(
       m, "SyntheticPrecedentDatabases")
@@ -91,6 +92,7 @@ NB_MODULE(lillymol_bdb, m) {
       .def("slurp", &iwecfp_database_lookup::SP_Set_of_Databases::slurp,
            nb::arg("min_examples"),
            "Slurp database entries with at least min_examples examples to memory")
+      .def("close", &iwecfp_database_lookup::SP_Set_of_Databases::close, "close db")
       .def("__repr__", &SyntheticPrecedentDatabasesRepr);
 
   nb::class_<SubstituentReplacement>(m, "SubstituentReplacement")

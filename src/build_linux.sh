@@ -276,7 +276,7 @@ if [[ ${BUILD_NATIVE} -ne 0 ]] ; then
 fi
 
 if [[ -v BUILD_INCHI ]] ; then
-  # might need to also set BUILD_INCHI as a shell variable.
+  # Note that this config also sets the variable BUILD_INCHI 
   build_options+=' --config=inchi'
 fi
 

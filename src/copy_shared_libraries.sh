@@ -40,6 +40,8 @@ rm -f \
   "${destdir}/lillymol.abi3.so" \
   "${destdir}/lillymol_bdb.so" \
   "${destdir}/lillymol_bdb.abi3.so" \
+  "${destdir}/lillymol_gfp_server.so" \
+  "${destdir}/lillymol_gfp_server.abi3.so" \
   "${destdir}/lillymol_nb.so" \
   "${destdir}/lillymol_nb.abi3.so" \
   "${destdir}/lillymol_nb_bdb.so" \
@@ -99,7 +101,9 @@ copy_python_proto_if_newer() {
 
 cd "${here}"
 
-copy_required_glob "bazel-bin/nanobind/*.so"
+copy_if_newer "bazel-bin/nanobind/lillymol.so"
+copy_optional_glob "bazel-bin/nanobind/lillymol_bdb.so"
+copy_optional_glob "bazel-bin/nanobind/lillymol_gfp_server.so"
 
 copy_optional_glob "bazel-bin/Molecule_Lib/lib*.so"
 copy_optional_glob "bazel-bin/Molecule_Tools/lib*.so"

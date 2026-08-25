@@ -82,6 +82,8 @@ struct ReaderOptions {
   bool all_sdf_tags = false;
   bool first_sdf_tag = false;
   bool prepend_sdfid = true;
+
+  bool mdlquiet = false;
 };
 
 struct ReaderContext {
@@ -96,7 +98,8 @@ struct ReaderContext {
   void SetPreprocessing(bool reduce_to_largest_fragment, bool remove_chirality,
                         bool remove_cis_trans_bonds, bool remove_isotopes);
   bool SetSdfOptions(const std::string& sdf_identifier, bool sdf_tags_to_json,
-                     bool all_sdf_tags, bool first_sdf_tag, bool prepend_sdfid);
+                     bool all_sdf_tags, bool first_sdf_tag, bool prepend_sdfid,
+                     bool mdlquiet);
   void ResetSdfOptions();
   std::optional<Molecule> Next();
 };

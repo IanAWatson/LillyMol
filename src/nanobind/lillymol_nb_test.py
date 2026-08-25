@@ -370,6 +370,34 @@ class TestNanobindMolecule(LillyMolNanobindTestCase):
                 self.assertEqual(mol.natoms(), 2)
                 self.assertIsNone(reader.next())
 
+    def test_mol_reader_context_accepts_mdlquiet_keyword(self):
+        sdf = """ethanol
+  LillyMol          2D
+
+  3  2  0  0  0  0            999 V2000
+    0.0000    0.0000    0.0000 C   0  0  0  0  0  0  0  0  0  0  0  0
+    1.5000    0.0000    0.0000 C   0  0  0  0  0  0  0  0  0  0  0  0
+    3.0000    0.0000    0.0000 O   0  0  0  0  0  0  0  0  0  0  0  0
+  1  2  1  0  0  0  0
+  2  3  1  0  0  0  0
+M  IGNORED
+M  END
+$$$$
+"""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            fname = os.path.join(tmpdir, "input.sdf")
+            with open(fname, "w") as writer:
+                writer.write(sdf)
+
+            with lillymol.MolReaderContext(fname, keep_sdf_tags=True, mdlquiet=True) as reader:
+                self.assertEqual(reader.next().name(), "ethanol")
+
+            options = lillymol.ReaderOptions()
+            options.keep_sdf_tags = True
+            options.mdlquiet = True
+            with lillymol.MolReaderContext(fname, options=options) as reader:
+                self.assertEqual(reader.next().natoms(), 3)
+
     def test_retained_sdf_text_info_and_tags(self):
         sdf = """ethanol
   LillyMol          2D

@@ -34,9 +34,10 @@ ReaderContext::SetPreprocessing(bool reduce_to_largest_fragment, bool remove_chi
 
 bool
 ReaderContext::SetSdfOptions(const std::string& sdf_identifier, bool sdf_tags_to_json,
-                             bool all_sdf_tags, bool first_sdf_tag, bool prepend_sdfid) {
+                             bool all_sdf_tags, bool first_sdf_tag, bool prepend_sdfid,
+                             bool mdlquiet) {
   if (sdf_identifier.empty() && !sdf_tags_to_json && !all_sdf_tags && !first_sdf_tag &&
-      prepend_sdfid) {
+      prepend_sdfid && !mdlquiet) {
     return true;
   }
 
@@ -55,6 +56,9 @@ ReaderContext::SetSdfOptions(const std::string& sdf_identifier, bool sdf_tags_to
   mdlfos.set_fetch_all_sdf_identifiers(all_sdf_tags);
   mdlfos.set_take_first_tag_as_name(first_sdf_tag);
   mdlfos.set_prepend_sdfid(prepend_sdfid);
+  if (mdlquiet) {
+    mdlfos.set_report_unrecognised_records(false);
+  }
 
   return true;
 }
@@ -70,7 +74,7 @@ ReaderContext::ApplyOptions(const ReaderOptions& options) {
   }
   return SetSdfOptions(options.sdf_identifier, options.sdf_tags_to_json,
                        options.all_sdf_tags, options.first_sdf_tag,
-                       options.prepend_sdfid);
+                       options.prepend_sdfid, options.mdlquiet);
 }
 
 void

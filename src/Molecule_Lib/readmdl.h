@@ -517,11 +517,6 @@ Molecule::_read_molecule_mdl_trailing_records(
       continue;
     }
 
-    // In order to avoid having to keep track of all possible M directives, skip everything.
-    if (buffer.starts_with("M  ")) {
-      continue;
-    }
-
     // No JSON considerations here...
     if (0 == extreg_found && mdlfos.name_in_m_tag().length() && buffer.nwords() > 2 &&
         buffer.starts_with("M ") && buffer.contains(mdlfos.name_in_m_tag())) {

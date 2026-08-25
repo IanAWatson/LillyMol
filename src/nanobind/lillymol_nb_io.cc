@@ -53,7 +53,8 @@ BindIo(nb::module_& m) {
       .def_rw("sdf_tags_to_json", &ReaderOptions::sdf_tags_to_json)
       .def_rw("all_sdf_tags", &ReaderOptions::all_sdf_tags)
       .def_rw("first_sdf_tag", &ReaderOptions::first_sdf_tag)
-      .def_rw("prepend_sdfid", &ReaderOptions::prepend_sdfid);
+      .def_rw("prepend_sdfid", &ReaderOptions::prepend_sdfid)
+      .def_rw("mdlquiet", &ReaderOptions::mdlquiet);
 
   nb::class_<MoleculePreprocessing>(m, "MoleculePreprocessing")
       .def("__init__", [](MoleculePreprocessing* preprocessing, bool largest_fragment,
@@ -180,7 +181,7 @@ BindIo(nb::module_& m) {
                           bool remove_cis_trans_bonds, bool remove_isotopes,
                           bool keep_sdf_tags, const std::string& sdf_identifier,
                           bool sdf_tags_to_json, bool all_sdf_tags, bool first_sdf_tag,
-                          bool prepend_sdfid) {
+                          bool prepend_sdfid, bool mdlquiet) {
              new (context) ReaderContext(fname, file_type);
              context->SetPreprocessing(largest_fragment, remove_chirality,
                                        remove_cis_trans_bonds, remove_isotopes);
@@ -190,7 +191,7 @@ BindIo(nb::module_& m) {
                    .set_read_extra_text_info(keep_sdf_tags);
              }
              if (!context->SetSdfOptions(sdf_identifier, sdf_tags_to_json, all_sdf_tags,
-                                         first_sdf_tag, prepend_sdfid)) {
+                                         first_sdf_tag, prepend_sdfid, mdlquiet)) {
                throw std::invalid_argument("Invalid sdf_identifier regular expression");
              }
            },
@@ -204,13 +205,14 @@ BindIo(nb::module_& m) {
            nb::arg("sdf_tags_to_json") = false,
            nb::arg("all_sdf_tags") = false,
            nb::arg("first_sdf_tag") = false,
-           nb::arg("prepend_sdfid") = true)
+           nb::arg("prepend_sdfid") = true,
+           nb::arg("mdlquiet") = false)
       .def("__init__", [](ReaderContext* context, const std::string& fname,
                           bool largest_fragment, bool remove_chirality,
                           bool remove_cis_trans_bonds, bool remove_isotopes,
                           bool keep_sdf_tags, const std::string& sdf_identifier,
                           bool sdf_tags_to_json, bool all_sdf_tags, bool first_sdf_tag,
-                          bool prepend_sdfid) {
+                          bool prepend_sdfid, bool mdlquiet) {
              new (context) ReaderContext(fname);
              context->SetPreprocessing(largest_fragment, remove_chirality,
                                        remove_cis_trans_bonds, remove_isotopes);
@@ -220,7 +222,7 @@ BindIo(nb::module_& m) {
                    .set_read_extra_text_info(keep_sdf_tags);
              }
              if (!context->SetSdfOptions(sdf_identifier, sdf_tags_to_json, all_sdf_tags,
-                                         first_sdf_tag, prepend_sdfid)) {
+                                         first_sdf_tag, prepend_sdfid, mdlquiet)) {
                throw std::invalid_argument("Invalid sdf_identifier regular expression");
              }
            },
@@ -234,7 +236,8 @@ BindIo(nb::module_& m) {
            nb::arg("sdf_tags_to_json") = false,
            nb::arg("all_sdf_tags") = false,
            nb::arg("first_sdf_tag") = false,
-           nb::arg("prepend_sdfid") = true)
+           nb::arg("prepend_sdfid") = true,
+           nb::arg("mdlquiet") = false)
       .def("__enter__", [](ReaderContext& context) -> ReaderContext& {
         return context;
       }, nb::rv_policy::reference_internal)
@@ -269,9 +272,10 @@ BindIo(nb::module_& m) {
       })
       .def("set_sdf_options", [](ReaderContext& context, const std::string& sdf_identifier,
                                  bool sdf_tags_to_json, bool all_sdf_tags,
-                                 bool first_sdf_tag, bool prepend_sdfid) {
+                                 bool first_sdf_tag, bool prepend_sdfid,
+                                 bool mdlquiet) {
         if (!context.SetSdfOptions(sdf_identifier, sdf_tags_to_json, all_sdf_tags,
-                                   first_sdf_tag, prepend_sdfid)) {
+                                   first_sdf_tag, prepend_sdfid, mdlquiet)) {
           throw std::invalid_argument("Invalid sdf_identifier regular expression");
         }
       }, nb::kw_only(),
@@ -279,7 +283,8 @@ BindIo(nb::module_& m) {
          nb::arg("sdf_tags_to_json") = false,
          nb::arg("all_sdf_tags") = false,
          nb::arg("first_sdf_tag") = false,
-         nb::arg("prepend_sdfid") = true)
+         nb::arg("prepend_sdfid") = true,
+         nb::arg("mdlquiet") = false)
       .def("reset_sdf_options", &ReaderContext::ResetSdfOptions)
       .def("set_ignore_connection_table_errors", [](ReaderContext& context, int value) {
         if (context.reader) {

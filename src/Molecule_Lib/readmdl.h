@@ -506,7 +506,10 @@ Molecule::_read_molecule_mdl_trailing_records(
       continue;
     }
 
+    // ChemFinder extension that we do not process.
     if (buffer.starts_with("M  CFW")) {
+      std::cerr << "Molecule::_read_molecule_mdl_trailing_records:ignoring ChemFinder "
+                << buffer << '\n';
       continue;
     }
 

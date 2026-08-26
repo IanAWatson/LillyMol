@@ -70,7 +70,20 @@ Usage(int rc) {
 Consumes the output from mol2SAFE, and the -L file is also from mol2SAFE.
 
 mol2SAFE ... -I 1 -c -M 15 -z -S library.textproto file.smi > file.safe.smi
-safe_generate ... -L library.textproto -C generate.config file.safe.smi > new_molecules.smi
+safe_generate -n 1000 -b 1000 -e 0 -L library.textproto -C generate.config file.safe.smi > new_molecules.smi
+
+A possible config file might look like
+
+max_atoms_in_fragment: 10
+extra_atoms: 2
+fewer_atoms: 2
+extra_rings: 1
+max_formula_difference: 4
+max_distance_difference: 2
+
+See the proto definition file for all options recognised.
+
+The following options are recognised.
 
  -C <fname>             safe_generate textproto configuration file.
  -a <ncon>              maximum value for number of connections processed - applied to library.
@@ -972,7 +985,6 @@ Options::Initialise(Command_Line& cl) {
   if (cl.option_present('L')) {
     IWString fname;
     for (int i = 0; cl.value('L', fname, i); ++i) {
-      cerr << "Reading '" << fname << "'\n";
       if (!ReadLibrary(fname)) {
         cerr << "Options::Initialise:cannot read library file '" << fname << "'\n";
         return 0;

@@ -592,8 +592,8 @@ DicerFragmentsCollate::WriteDicerData(const IWString& usmi, const DicerData& dic
     output << dicer_data.smiles;
   }
 
-  output << " smi: " << usmi;
-  output << " par: " << dicer_data.par;
+  output << " smi: \"" << usmi << '"';
+  output << " par: \"" << dicer_data.par << '"';
   output << " n: " << dicer_data.n;
   output << " nat: " << dicer_data.natoms;
   output << '\n';

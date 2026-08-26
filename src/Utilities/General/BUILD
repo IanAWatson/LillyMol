@@ -398,6 +398,7 @@ cc_binary(
         "//Foundational/iwstring",
         "//Molecule_Tools:dicer_fragments_cc_proto",
         "@com_google_absl//absl/container:flat_hash_map",
+        "@com_google_protobuf//:protobuf",
         "@com_google_absl//absl/log:initialize",
     ],
 )

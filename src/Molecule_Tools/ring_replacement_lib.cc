@@ -937,7 +937,7 @@ RingReplacement::ReadFileOfReplacementRings(const IWString& dirname,
                         iwstring_data_source& input) {
   IWString buffer;
   while (input.next_record(buffer)) {
-    if (buffer.starts_with("#")) {
+    if (buffer.starts_with("#") || buffer.empty()) {
       continue;
     }
 

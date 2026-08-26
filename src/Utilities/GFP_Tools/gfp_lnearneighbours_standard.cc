@@ -588,7 +588,7 @@ UpdateCounters(const Needle& needle, extending_resizable_array<int>& neighbours,
 
 static int
 nearneighbours(int argc, char** argv) {
-  Command_Line cl(argc, argv, "vn:p:t:T:r:V:hB:N:m:zkx:");
+  Command_Line cl(argc, argv, "vn:p:t:T:r:V:hB:N:m:zkx:S:");
 
   if (cl.unrecognised_options_encountered()) {
     if (cl.option_present('F') || cl.option_present('P')) {

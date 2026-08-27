@@ -97,7 +97,7 @@ LabelExitAtomWithAttachmentCount(Molecule& m, int attachment_count, isotope_t is
   }
 
   ADD_FAILURE() << "No ring atom with requested attachment count found";
-  return kInvalidAtomNUmber;
+  return kInvalidAtomNumber;
 }
 
 TEST(RingSystemShape, TerminalBenzeneIsNotApplicable) {
@@ -203,12 +203,12 @@ TEST(RingAtomBranchPointCount, IsotopeFilterOnlyCountsLabelledRingAtoms) {
   EXPECT_EQ(RingAtomBranchPointCount(m), 1);
 
   const atom_number_t terminal_attachment = LabelExitAtomWithAttachmentCount(m, 1, 3);
-  ASSERT_NE(terminal_attachment, kInvalidAtomNUmber);
+  ASSERT_NE(terminal_attachment, kInvalidAtomNumber);
   EXPECT_EQ(RingAtomBranchPointCount(m, 3), 0);
 
   m.set_isotope(terminal_attachment, 0);
   const atom_number_t branched_attachment = LabelExitAtomWithAttachmentCount(m, 2, 3);
-  ASSERT_NE(branched_attachment, kInvalidAtomNUmber);
+  ASSERT_NE(branched_attachment, kInvalidAtomNumber);
   EXPECT_EQ(RingAtomBranchPointCount(m, 3), 1);
 }
 

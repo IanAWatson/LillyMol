@@ -1,6 +1,8 @@
 #include "Molecule_Tools/ring_system_shape.h"
 
+#include <algorithm>
 #include <memory>
+#include <vector>
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
@@ -14,14 +16,15 @@ using ring_system_shape::RingSystemShape;
 using ring_system_shape::RingSystemShapeClass;
 
 RingSystemShape
-AnalyseFirstRingSystem(Molecule& m) {
+AnalyseFirstRingSystem(Molecule& m, isotope_t only_process_isotope = 0) {
   std::unique_ptr<int[]> ring_system_membership = std::make_unique<int[]>(m.natoms());
   const int number_ring_systems =
       m.label_atoms_by_ring_system_including_spiro_fused(ring_system_membership.get());
   EXPECT_GT(number_ring_systems, 0);
 
   RingSystemShape result;
-  EXPECT_TRUE(AnalyseRingSystemShape(m, ring_system_membership.get(), 1, result));
+  EXPECT_TRUE(AnalyseRingSystemShape(m, ring_system_membership.get(), 1,
+                                     only_process_isotope, result));
   return result;
 }
 
@@ -34,11 +37,12 @@ NonRingBranchPointCount(Molecule& m) {
 }
 
 int
-RingAtomBranchPointCount(Molecule& m) {
+RingAtomBranchPointCount(Molecule& m, isotope_t only_process_isotope = 0) {
   std::unique_ptr<int[]> ring_system_membership = std::make_unique<int[]>(m.natoms());
   m.label_atoms_by_ring_system_including_spiro_fused(ring_system_membership.get());
 
-  return ring_system_shape::RingAtomBranchPointCount(m, ring_system_membership.get());
+  return ring_system_shape::RingAtomBranchPointCount(m, ring_system_membership.get(),
+                                                        only_process_isotope);
 }
 
 const ring_system_shape::RingSystemSpan*
@@ -51,6 +55,49 @@ FindRingSystemSpan(const RingSystemShape& shape, atom_number_t from) {
   }
 
   return nullptr;
+}
+
+void
+LabelRodLikeExitPair(Molecule& m, isotope_t isotope) {
+  RingSystemShape shape = AnalyseFirstRingSystem(m);
+
+  for (const ring_system_shape::RingSystemSpan& span1 : shape.ring_system_spans) {
+    for (const atom_number_t atom2 : span1.farthest_atoms) {
+      const ring_system_shape::RingSystemSpan* span2 = FindRingSystemSpan(shape, atom2);
+      if (span2 == nullptr) {
+        continue;
+      }
+      if (std::find(span2->farthest_atoms.begin(), span2->farthest_atoms.end(),
+                    span1.from) == span2->farthest_atoms.end()) {
+        continue;
+      }
+
+      m.set_isotope(span1.from, isotope);
+      m.set_isotope(atom2, isotope);
+      return;
+    }
+  }
+
+  ADD_FAILURE() << "No rod-like exit pair found";
+}
+
+atom_number_t
+LabelExitAtomWithAttachmentCount(Molecule& m, int attachment_count, isotope_t isotope) {
+  RingSystemShape shape = AnalyseFirstRingSystem(m);
+  std::vector<int> attachment_count_by_atom(m.natoms(), 0);
+  for (const ring_system_shape::RingSystemAttachment& attachment : shape.attachments) {
+    ++attachment_count_by_atom[attachment.ring_atom];
+  }
+
+  for (int i = 0; i < m.natoms(); ++i) {
+    if (attachment_count_by_atom[i] == attachment_count) {
+      m.set_isotope(i, isotope);
+      return i;
+    }
+  }
+
+  ADD_FAILURE() << "No ring atom with requested attachment count found";
+  return kInvalidAtomNUmber;
 }
 
 TEST(RingSystemShape, TerminalBenzeneIsNotApplicable) {
@@ -131,6 +178,38 @@ TEST(RingSystemShape, TrisubstitutedBenzeneIsMultiSubstituted) {
   EXPECT_EQ(shape.shape_class, RingSystemShapeClass::kMultiSubstituted);
   EXPECT_EQ(shape.attachments.size(), 3u);
   EXPECT_EQ(shape.ring_system_spans.size(), 3u);
+}
+
+TEST(RingSystemShape, IsotopeFilterSelectsLabelledRodLikeExitPair) {
+  Molecule m;
+  ASSERT_TRUE(m.build_from_smiles("Cc1ccc(C)c(C)c1"));
+
+  const RingSystemShape unfiltered = AnalyseFirstRingSystem(m);
+  ASSERT_EQ(unfiltered.shape_class, RingSystemShapeClass::kMultiSubstituted);
+  ASSERT_EQ(unfiltered.attachments.size(), 3u);
+
+  LabelRodLikeExitPair(m, 7);
+  const RingSystemShape filtered = AnalyseFirstRingSystem(m, 7);
+
+  EXPECT_EQ(filtered.shape_class, RingSystemShapeClass::kRodLike);
+  EXPECT_EQ(filtered.attachments.size(), 2u);
+  EXPECT_EQ(filtered.ring_system_spans.size(), 2u);
+  EXPECT_EQ(filtered.rod_deficit, 0);
+}
+
+TEST(RingAtomBranchPointCount, IsotopeFilterOnlyCountsLabelledRingAtoms) {
+  Molecule m;
+  ASSERT_TRUE(m.build_from_smiles("C1(CC)(CCC)CCC(C)CC1"));
+  EXPECT_EQ(RingAtomBranchPointCount(m), 1);
+
+  const atom_number_t terminal_attachment = LabelExitAtomWithAttachmentCount(m, 1, 3);
+  ASSERT_NE(terminal_attachment, kInvalidAtomNUmber);
+  EXPECT_EQ(RingAtomBranchPointCount(m, 3), 0);
+
+  m.set_isotope(terminal_attachment, 0);
+  const atom_number_t branched_attachment = LabelExitAtomWithAttachmentCount(m, 2, 3);
+  ASSERT_NE(branched_attachment, kInvalidAtomNUmber);
+  EXPECT_EQ(RingAtomBranchPointCount(m, 3), 1);
 }
 
 TEST(RingSystemShape, MultipleSubstituentsOnOneRingAtomCountAsOneExitPoint) {

@@ -50,6 +50,12 @@ struct RingSystemShape {
 bool AnalyseRingSystemShape(const Molecule& m, const int* ring_system_membership,
                             int ring_system_id, RingSystemShape& result);
 
+// Isotope-aware variant. When `only_process_isotope` is positive, only ring
+// atoms with that isotope can define exit vectors.
+bool AnalyseRingSystemShape(const Molecule& m, const int* ring_system_membership,
+                            int ring_system_id, isotope_t only_process_isotope,
+                            RingSystemShape& result);
+
 // Counts non-ring atoms that appear to be substantial branch points. Atoms in
 // any ring system are skipped first. Terminal single-atom decorations and
 // terminal multiply bonded atoms, like carbonyl oxygen, are not considered
@@ -61,6 +67,11 @@ int NonRingBranchPointCount(const Molecule& m, const int* ring_system_membership
 // a higher-level shape descriptor useful for deciding whether a molecule is
 // globally rod-like.
 int RingAtomBranchPointCount(const Molecule& m, const int* ring_system_membership);
+
+// Isotope-aware variant. When `only_process_isotope` is positive, only ring
+// atoms with that isotope can contribute ring-atom branch points.
+int RingAtomBranchPointCount(const Molecule& m, const int* ring_system_membership,
+                             isotope_t only_process_isotope);
 
 }  // namespace ring_system_shape
 

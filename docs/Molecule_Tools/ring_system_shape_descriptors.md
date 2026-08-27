@@ -16,6 +16,9 @@ system are as far apart as possible within that ring system. For example, a
 para-disubstituted benzene is rod-like, while ortho- and meta-disubstituted
 benzenes have a rod deficit.
 
+If only selected ring atoms should contribute exit vectors, label those atoms
+with an isotope and use `-I <iso>`.
+
 The molecular-level decision also excludes substantial branching outside ring
 systems and branching at ring atoms.
 
@@ -64,7 +67,7 @@ tab-separated output.
 | `nringsys_multisub` | Ring systems with more than two meaningful exit points. |
 | `nringsys_invalid` | Ring systems that could not be analysed. |
 | `non_ring_branch_count` | Count of substantial branch points outside ring systems. |
-| `ring_atom_branch_count` | Count of ring atoms with two or more substantial outside connections. |
+| `ring_atom_branch_count` | Count of ring atoms with two or more substantial outside connections. With `-I`, only labelled ring atoms are counted. |
 | `rodlike_molecule` | Final molecule-level rod-like classification, `1` or `0`. |
 | `rod_deficit_min` | Minimum deficit among applicable non-terminal ring systems. |
 | `rod_deficit_max` | Maximum deficit among applicable non-terminal ring systems. |
@@ -96,6 +99,12 @@ selection.
 For each ring system, the tool identifies meaningful exit points: ring-system
 atoms bonded to atoms outside that ring system. Terminal exocyclic multiply
 bonded atoms, such as carbonyl oxygens, are ignored as exit points.
+
+With `-I <iso>`, only ring atoms with isotope `<iso>` are eligible to define
+exit points. Substituents attached to unlabelled ring atoms, or to ring atoms
+with a different isotope, are ignored for ring-system geometry. The total ring
+system count is unchanged; a ring system with no labelled exit-vector atoms is
+therefore treated as terminal for the shape classification.
 
 For a ring system with exactly two exit points, the tool asks whether each exit
 point is among the farthest atoms from the other exit point when distances are
@@ -131,6 +140,25 @@ considered branch points.
 connections. This catches cases such as an aliphatic ring atom bearing two
 larger substituents. The ring-system geometry may still be optimal, but the
 molecule is not considered rod-like.
+
+When `-I <iso>` is specified, `ring_atom_branch_count` is also restricted to
+ring atoms with isotope `<iso>`. `non_ring_branch_count` is not isotope-filtered.
+
+## Isotope-restricted exit vectors
+
+Use `-I <iso>` when only a subset of ring atoms should be considered as possible
+exit-vector atoms.
+
+```shell
+ring_system_shape_descriptors -I 1 input.smi > shape.txt
+```
+
+This is useful when upstream processing has labelled the ring or ring-system
+atoms of interest. If every relevant ring atom has isotope `1`, the calculation
+is restricted to those labelled ring systems. If only selected ring atoms have
+isotope `1`, the isotope acts as a precise inclusion mask for exit vectors and
+ring-atom branch points. Unlabelled ring systems are still counted in `nringsys`,
+but they contribute no labelled exit vectors.
 
 ## Ignoring terminal ring decorations
 
@@ -187,6 +215,7 @@ Common LillyMol molecule input options are supported:
 | `-c` | Remove chirality. |
 | `-A ...` | Aromaticity options. |
 | `-E ...` | Element options. |
+| `-I <iso>` | Only ring atoms with isotope `<iso>` can define exit vectors or ring-atom branch points. |
 | `-o <sep>` | Output separator. Recognised names include `tab` and `space`. |
 | `-v` | Verbose progress and summary reporting. |
 

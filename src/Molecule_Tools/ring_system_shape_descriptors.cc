@@ -48,9 +48,10 @@ Output columns are:
 
 Options:
  -x           ignore terminal single-atom ring substituents when larger substituents exist
+ -I <iso>     only consider exit vectors from ring atoms with isotope <iso>
  -R <fname>   write rod-like molecules as smiles and identifier
  -N <fname>   write non-rod-like molecules as smiles and identifier
- -s           write a smiles file rather than a descrptor file
+ -s           write a smiles file rather than a descriptor file
  -o <sep>     output separator, recognised names include tab and space
  -i <type>    input type
  -g ...       chemical standardisation
@@ -133,6 +134,8 @@ class Options {
 
   int _remove_terminal_single_atom_substituents = 0;
 
+  isotope_t _only_process_isotope = 0;
+
   IWString_and_File_Descriptor _stream_for_rodlike;
   IWString_and_File_Descriptor _stream_for_non_rodlike;
 
@@ -202,7 +205,20 @@ Options::Initialise(Command_Line& cl) {
   if (cl.option_present('x')) {
     _remove_terminal_single_atom_substituents = 1;
     if (_verbose) {
-      cerr << "Terminal single atom substuents removed\n";
+      cerr << "Terminal single atom substituents removed\n";
+    }
+  }
+
+  if (cl.option_present('I')) {
+    int isotope;
+    if (!cl.value('I', isotope) || isotope <= 0) {
+      cerr << "The -I option requires a positive isotope value\n";
+      return 0;
+    }
+    _only_process_isotope = isotope;
+    if (_verbose) {
+      cerr << "Only considering ring atoms with isotope " << _only_process_isotope
+           << " as exit-vector atoms\n";
     }
   }
 
@@ -359,7 +375,8 @@ Options::Report(std::ostream& output) const {
 
 RingSystemShapeDescriptors
 ComputeRingSystemShapeDescriptors(Molecule& m, int non_ring_branch_count,
-                                  int ring_atom_branch_count) {
+                                  int ring_atom_branch_count,
+                                  isotope_t only_process_isotope) {
   RingSystemShapeDescriptors result;
   result.non_ring_branch_count = non_ring_branch_count;
   result.ring_atom_branch_count = ring_atom_branch_count;
@@ -381,7 +398,7 @@ ComputeRingSystemShapeDescriptors(Molecule& m, int non_ring_branch_count,
        ++ring_system_id) {
     RingSystemShape ring_system_shape;
     if (!AnalyseRingSystemShape(m, ring_system_membership.get(), ring_system_id,
-                                ring_system_shape)) {
+                                only_process_isotope, ring_system_shape)) {
       ++result.invalid;
       continue;
     }
@@ -463,14 +480,16 @@ Options::Process(Molecule& m, IWString_and_File_Descriptor& output) {
   const int non_ring_branch_count =
       NonRingBranchPointCount(m, ring_system_membership.get());
   const int ring_atom_branch_count =
-      RingAtomBranchPointCount(m, ring_system_membership.get());
+      RingAtomBranchPointCount(m, ring_system_membership.get(),
+                               _only_process_isotope);
 
   if (_remove_terminal_single_atom_substituents) {
     RemoveTerminalSingleAtomSubstituents(m);
   }
 
   const RingSystemShapeDescriptors descriptors =
-      ComputeRingSystemShapeDescriptors(m, non_ring_branch_count, ring_atom_branch_count);
+      ComputeRingSystemShapeDescriptors(m, non_ring_branch_count, ring_atom_branch_count,
+                                        _only_process_isotope);
 
   _total_ring_systems += descriptors.number_ring_systems;
   if (descriptors.RodLikeMolecule()) {
@@ -553,7 +572,7 @@ RingSystemShapeDescriptors(Options& options, const char* fname, FileType input_t
 
 int
 RingSystemShapeDescriptors(int argc, char** argv) {
-  Command_Line cl(argc, argv, "vE:A:lcg:i:o:xR:N:s");
+  Command_Line cl(argc, argv, "vE:A:lcg:i:o:xR:N:sI:");
 
   if (cl.unrecognised_options_encountered()) {
     cerr << "Unrecognised options encountered\n";

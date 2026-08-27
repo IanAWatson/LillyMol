@@ -49,12 +49,15 @@ IsTerminalExocyclicMultipleBond(const Molecule& m, const Bond& bond,
 
 std::vector<RingSystemAttachment>
 IdentifyAttachments(const Molecule& m, const int* ring_system_membership,
-                    int ring_system_id) {
+                    int ring_system_id, isotope_t only_process_isotope) {
   std::vector<RingSystemAttachment> result;
 
   const int matoms = m.natoms();
   for (int i = 0; i < matoms; ++i) {
     if (ring_system_membership[i] != ring_system_id) {
+      continue;
+    }
+    if (only_process_isotope > 0 && m.isotope(i) != only_process_isotope) {
       continue;
     }
 
@@ -301,6 +304,12 @@ NonRingBranchPointCount(const Molecule& m, const int* ring_system_membership) {
 
 int
 RingAtomBranchPointCount(const Molecule& m, const int* ring_system_membership) {
+  return RingAtomBranchPointCount(m, ring_system_membership, 0);
+}
+
+int
+RingAtomBranchPointCount(const Molecule& m, const int* ring_system_membership,
+                         isotope_t only_process_isotope) {
   if (ring_system_membership == nullptr) {
     return 0;
   }
@@ -309,6 +318,9 @@ RingAtomBranchPointCount(const Molecule& m, const int* ring_system_membership) {
   const int matoms = m.natoms();
   for (int i = 0; i < matoms; ++i) {
     if (ring_system_membership[i] <= 0) {
+      continue;
+    }
+    if (only_process_isotope > 0 && m.isotope(i) != only_process_isotope) {
       continue;
     }
 
@@ -346,6 +358,13 @@ RingAtomBranchPointCount(const Molecule& m, const int* ring_system_membership) {
 bool
 AnalyseRingSystemShape(const Molecule& m, const int* ring_system_membership,
                        int ring_system_id, RingSystemShape& result) {
+  return AnalyseRingSystemShape(m, ring_system_membership, ring_system_id, 0, result);
+}
+
+bool
+AnalyseRingSystemShape(const Molecule& m, const int* ring_system_membership,
+                       int ring_system_id, isotope_t only_process_isotope,
+                       RingSystemShape& result) {
   result = RingSystemShape();
 
   if (ring_system_membership == nullptr || ring_system_id <= 0) {
@@ -358,7 +377,8 @@ AnalyseRingSystemShape(const Molecule& m, const int* ring_system_membership,
     return false;
   }
 
-  result.attachments = IdentifyAttachments(m, ring_system_membership, ring_system_id);
+  result.attachments = IdentifyAttachments(m, ring_system_membership, ring_system_id,
+                                          only_process_isotope);
   const Set_of_Atoms exit_points = UniqueAttachmentRingAtoms(result.attachments);
 
   BfsWorkspace workspace(m.natoms());

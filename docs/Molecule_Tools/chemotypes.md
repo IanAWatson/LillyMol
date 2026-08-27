@@ -82,6 +82,12 @@ query atom order used to make deterministic choices in ambiguous cases. If a
 molecule has more adjacent systems than requested, only the best ranked systems
 are included.
 
+Use `-Y larger` to prefer the same-distance candidate whose candidate side
+contains more atoms. The size includes linker atoms from the seed ring system to
+the candidate ring system and the atoms reachable through the bond entering that
+candidate ring system. Distance remains the primary ranking criterion;
+`-Y larger` only resolves same-distance choices.
+
 Use `-t` with `-n` to include all systems tied at the cutoff distance:
 
 ```shell
@@ -292,6 +298,7 @@ single-ring molecules should simply be skipped.
 | `-s <smarts>` | SMARTS defining the chemotype seed. May be repeated. |
 | `-n <n>` | Include `n` directly adjacent ring systems. Default `0`. |
 | `-t` | With `-n`, include all adjacent ring systems tied at the cutoff distance. |
+| `-Y larger` | When selecting adjacent ring systems with `-n`, prefer the same-distance candidate whose candidate side contains more atoms. Synonyms: `largest`, `size`. |
 | `-D <dist>` | Maximum bond distance to an adjacent ring system. |
 | `-r <n>` | Minimum number of rings required for processing. |
 | `-u` | Include one-hop atoms attached to retained ring atoms. |

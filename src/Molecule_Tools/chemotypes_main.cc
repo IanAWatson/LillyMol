@@ -173,6 +173,19 @@ ParseDashJQualifier(const const_IWSubstring& qualifier,
   return 0;
 }
 
+
+int
+ParseDashYQualifier(const const_IWSubstring& qualifier,
+                    chemotypes::ChemotypeOptions& options) {
+  if (qualifier == "larger" || qualifier == "largest" || qualifier == "size") {
+    options.prefer_larger_adjacent_ring_system = true;
+    return 1;
+  }
+
+  cerr << "Unrecognised -Y qualifier '" << qualifier << "'\n";
+  return 0;
+}
+
 void
 Usage(int rc) {
 // clang-format off
@@ -202,6 +215,8 @@ Options:
                 A trailing digit sets the EC radius, default 3.
  -J EXPAND=<n>  expand selected fingerprint atoms by <n> bonds.
  -J INVERT      fingerprint atoms outside the chemotype; OUTSIDE is a synonym.
+ -Y larger      prefer larger same-distance adjacent ring-system candidates.
+                Synonyms: largest, size.
  -H def         append a deterministic fixed-width alphanumeric hash of the chemotype.
  -H xref=<fname> also write hash, unique smiles, first parent, and count cross-reference.
  -H width=<n>   hash width, default 26, max 26.
@@ -377,6 +392,16 @@ Options::Initialise(Command_Line& cl) {
     }
   }
 
+
+  if (cl.option_present('Y')) {
+    const_IWSubstring y;
+    for (int i = 0; cl.value('Y', y, i); ++i) {
+      if (! ParseDashYQualifier(y, _chemotype_options)) {
+        return 0;
+      }
+    }
+  }
+
   if (cl.option_present('f')) {
     _function_as_tdt_filter = 1;
     if (! fingerprinting_active()) {
@@ -544,6 +569,9 @@ Options::Initialise(Command_Line& cl) {
     }
     if (_chemotype_options.include_tied_adjacent_ring_systems) {
       cerr << "Will include adjacent ring systems tied at the -n cutoff distance\n";
+    }
+    if (_chemotype_options.prefer_larger_adjacent_ring_system) {
+      cerr << "Will prefer larger adjacent ring systems among same-distance candidates\n";
     }
     if (_chemotype_options.choose_first_embedding) {
       cerr << "Will use the first query embedding if multiple ring systems match\n";
@@ -1139,7 +1167,7 @@ Chemotypes(Options& options, const char* fname, FileType input_type,
 
 int
 Chemotypes(int argc, char** argv) {
-  Command_Line cl(argc, argv, "vE:A:g:clfi:o:S:F:U:H:q:s:n:r:D:P:I:up:xtz:J:");
+  Command_Line cl(argc, argv, "vE:A:g:clfi:o:S:F:U:H:q:s:n:r:D:P:I:up:xtz:J:Y:");
 
   if (cl.unrecognised_options_encountered()) {
     cerr << "Unrecognised options encountered\n";

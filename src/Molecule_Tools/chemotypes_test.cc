@@ -560,6 +560,55 @@ TEST(Chemotypes, RingBeyondInterveningRingIsNotDirectlyAdjacent) {
   EXPECT_NE(adjacent[0].ring_system, terminal_ring_system);
 }
 
+
+TEST(Chemotypes, LargerAdjacentRingPreferenceUsesAtomsDownTheCandidateBond) {
+  Molecule m;
+  ASSERT_TRUE(m.build_from_smiles("c1ccccc1C(CC1CC1)CC1CC1C"));
+
+  int number_ring_systems;
+  std::unique_ptr<int[]> ring_system = RingSystemMembership(m, number_ring_systems);
+  ASSERT_EQ(number_ring_systems, 3);
+
+  const int seed_ring_system = ring_system[0];
+  Set_of_Atoms embedding({0});
+  const std::vector<chemotypes::AdjacentRingSystem> adjacent =
+      chemotypes::DirectlyAdjacentRingSystems(m, ring_system.get(), seed_ring_system,
+                                              embedding, 0,
+                                              true);  // prefer larger adjacent ring system.
+
+  ASSERT_EQ(adjacent.size(), 2u);
+  EXPECT_EQ(adjacent[0].distance, adjacent[1].distance);
+  EXPECT_GT(adjacent[0].atoms_down_the_bond, adjacent[1].atoms_down_the_bond);
+}
+
+TEST(Chemotypes, LargerAdjacentRingPreferenceIsIndependentOfInputOrder) {
+  Molecule e3b;
+  ASSERT_TRUE(e3b.build_from_smiles("c1ccccc1C(CC1CC1)CC1CC1C"));
+  Molecule e3c;
+  ASSERT_TRUE(e3c.build_from_smiles("c1ccccc1C(CC1CC1C)CC1CC1"));
+
+  int number_ring_systems1;
+  std::unique_ptr<int[]> ring_system1 = RingSystemMembership(e3b, number_ring_systems1);
+  ASSERT_EQ(number_ring_systems1, 3);
+  int number_ring_systems2;
+  std::unique_ptr<int[]> ring_system2 = RingSystemMembership(e3c, number_ring_systems2);
+  ASSERT_EQ(number_ring_systems2, 3);
+
+  Set_of_Atoms embedding({0});
+  const std::vector<chemotypes::AdjacentRingSystem> adjacent1 =
+      chemotypes::DirectlyAdjacentRingSystems(e3b, ring_system1.get(), ring_system1[0],
+                                              embedding, 0, true);
+  const std::vector<chemotypes::AdjacentRingSystem> adjacent2 =
+      chemotypes::DirectlyAdjacentRingSystems(e3c, ring_system2.get(), ring_system2[0],
+                                              embedding, 0, true);
+
+  ASSERT_EQ(adjacent1.size(), 2u);
+  ASSERT_EQ(adjacent2.size(), 2u);
+  EXPECT_EQ(adjacent1[0].atoms_down_the_bond, adjacent2[0].atoms_down_the_bond);
+  EXPECT_GT(adjacent1[0].atoms_down_the_bond, adjacent1[1].atoms_down_the_bond);
+  EXPECT_GT(adjacent2[0].atoms_down_the_bond, adjacent2[1].atoms_down_the_bond);
+}
+
 TEST(Chemotypes, QueryAtomOrderBreaksEquivalentAdjacentRingChoices) {
   Molecule m;
   ASSERT_TRUE(m.build_from_smiles("c1cc(-c2ccccc2)ccc1-c1ccccc1"));

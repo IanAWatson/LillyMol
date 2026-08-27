@@ -35,6 +35,7 @@ struct ChemotypeOptions {
   int include_attached_atoms = 0;
   int ignore_singly_connected_attached_atoms = 0;
   int include_tied_adjacent_ring_systems = 0;
+  bool prefer_larger_adjacent_ring_system = false;
   bool choose_first_embedding = false;
   isotope_t isotope_for_exit_points = 0;
 };
@@ -75,6 +76,9 @@ struct AdjacentRingSystem {
   atom_number_t candidate_atom = kInvalidAtomNumber;
   int matched_atom_rank = 0;
   int distance_from_matched_atom = 0;
+  atom_number_t first_outside_atom = kInvalidAtomNumber;
+  atom_number_t atom_before_candidate = kInvalidAtomNumber;
+  int atoms_down_the_bond = 0;
 
   // Distances from seed_atom to matched atoms in embedding order. This lets
   // callers make deterministic choices in symmetric cases by query atom order.
@@ -87,10 +91,15 @@ struct AdjacentRingSystem {
 // systems beyond an intervening ring system are not adjacent.
 //
 // The returned systems are sorted by chemical closeness, then by the order of
-// atoms in `embedding` so query atom order controls ambiguous choices.
+// atoms in `embedding` so query atom order controls ambiguous choices. If
+// `prefer_larger_adjacent_ring_system` is true, same-distance candidates are
+// ordered by the number of atoms on the candidate side, including linker atoms
+// from the seed ring system to the candidate and atoms down the bond entering
+// the candidate ring system, before deterministic query/atom order tie-breakers.
 std::vector<AdjacentRingSystem> DirectlyAdjacentRingSystems(
     Molecule& m, const int* ring_system, int seed_ring_system,
-    const Set_of_Atoms& embedding, int max_distance = 0);
+    const Set_of_Atoms& embedding, int max_distance = 0,
+    bool prefer_larger_adjacent_ring_system = false);
 
 
 // Return an atom mask for the chemotype core. The mask includes all atoms in

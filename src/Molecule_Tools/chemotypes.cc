@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <limits>
+#include <optional>
 #include <queue>
 #include <utility>
 #include <vector>
@@ -79,9 +80,14 @@ FirstMatchedAtomPriority(const std::vector<int>& distances) {
 }
 
 bool
-Precedes(const AdjacentRingSystem& lhs, const AdjacentRingSystem& rhs) {
+Precedes(const AdjacentRingSystem& lhs, const AdjacentRingSystem& rhs,
+         bool prefer_larger_adjacent_ring_system) {
   if (lhs.distance != rhs.distance) {
     return lhs.distance < rhs.distance;
+  }
+  if (prefer_larger_adjacent_ring_system &&
+      lhs.atoms_down_the_bond != rhs.atoms_down_the_bond) {
+    return lhs.atoms_down_the_bond > rhs.atoms_down_the_bond;
   }
   if (lhs.matched_atom_rank != rhs.matched_atom_rank) {
     return lhs.matched_atom_rank < rhs.matched_atom_rank;
@@ -130,13 +136,14 @@ ResizeAdjacentRingSystems(std::vector<AdjacentRingSystem>& adjacent, int request
 }
 
 void
-MaybeUpdate(std::vector<AdjacentRingSystem>& result, const AdjacentRingSystem& candidate) {
+MaybeUpdate(std::vector<AdjacentRingSystem>& result, const AdjacentRingSystem& candidate,
+            bool prefer_larger_adjacent_ring_system) {
   for (AdjacentRingSystem& existing : result) {
     if (existing.ring_system != candidate.ring_system) {
       continue;
     }
 
-    if (Precedes(candidate, existing)) {
+    if (Precedes(candidate, existing, prefer_larger_adjacent_ring_system)) {
       existing = candidate;
     }
     return;
@@ -148,7 +155,9 @@ MaybeUpdate(std::vector<AdjacentRingSystem>& result, const AdjacentRingSystem& c
 void
 RecordCandidate(Molecule& m, const int* ring_system, int seed_ring_system,
                 const Set_of_Atoms& embedding, atom_number_t seed_atom,
-                atom_number_t candidate_atom, int distance,
+                atom_number_t candidate_atom, atom_number_t first_outside_atom,
+                atom_number_t atom_before_candidate, int distance,
+                bool prefer_larger_adjacent_ring_system,
                 std::vector<AdjacentRingSystem>& result) {
   std::vector<int> distances = EmbeddingDistances(m, ring_system, seed_ring_system,
                                                   embedding, seed_atom);
@@ -160,20 +169,31 @@ RecordCandidate(Molecule& m, const int* ring_system, int seed_ring_system,
   candidate.distance = distance;
   candidate.seed_atom = seed_atom;
   candidate.candidate_atom = candidate_atom;
+  candidate.first_outside_atom = first_outside_atom;
+  candidate.atom_before_candidate = atom_before_candidate;
+  if (atom_before_candidate != kInvalidAtomNumber) {
+    std::vector<int> down_the_bond(m.natoms(), 0);
+    const std::optional<int> atoms_down_the_bond =
+        m.DownTheBond(atom_before_candidate, candidate_atom, down_the_bond.data());
+    if (atoms_down_the_bond) {
+      candidate.atoms_down_the_bond = *atoms_down_the_bond + distance - 1;
+    }
+  }
   candidate.matched_atom_rank = matched_atom_rank;
   candidate.distance_from_matched_atom = distance_from_matched_atom;
   candidate.distances_from_matched_atoms = std::move(distances);
 
-  MaybeUpdate(result, candidate);
+  MaybeUpdate(result, candidate, prefer_larger_adjacent_ring_system);
 }
 
 void
 FindAdjacentFromSeedAtom(Molecule& m, const int* ring_system, int seed_ring_system,
                          const Set_of_Atoms& embedding, atom_number_t seed_atom,
-                         int max_distance,
+                         int max_distance, bool prefer_larger_adjacent_ring_system,
                          std::vector<AdjacentRingSystem>& result) {
   const int matoms = m.natoms();
   std::vector<int> distance(matoms, -1);
+  std::vector<atom_number_t> first_outside_atom(matoms, kInvalidAtomNumber);
   std::queue<atom_number_t> to_process;
 
   for (const Bond* bond : m[seed_atom]) {
@@ -184,11 +204,13 @@ FindAdjacentFromSeedAtom(Molecule& m, const int* ring_system, int seed_ring_syst
 
     if (ring_system[other] > 0) {
       RecordCandidate(m, ring_system, seed_ring_system, embedding, seed_atom,
-                      other, 1, result);
+                      other, other, seed_atom, 1,
+                      prefer_larger_adjacent_ring_system, result);
       continue;
     }
 
     distance[other] = 1;
+    first_outside_atom[other] = other;
     to_process.push(other);
   }
 
@@ -209,7 +231,8 @@ FindAdjacentFromSeedAtom(Molecule& m, const int* ring_system, int seed_ring_syst
 
       if (ring_system[other] > 0) {
         RecordCandidate(m, ring_system, seed_ring_system, embedding, seed_atom,
-                        other, next_distance, result);
+                        other, first_outside_atom[atom], atom, next_distance,
+                        prefer_larger_adjacent_ring_system, result);
         continue;
       }
 
@@ -218,6 +241,7 @@ FindAdjacentFromSeedAtom(Molecule& m, const int* ring_system, int seed_ring_syst
       }
 
       distance[other] = next_distance;
+      first_outside_atom[other] = first_outside_atom[atom];
       to_process.push(other);
     }
   }
@@ -532,7 +556,8 @@ FirstChemotypeQueryMatch(Molecule& m, resizable_array_p<Substructure_Query>& que
 
 std::vector<AdjacentRingSystem>
 DirectlyAdjacentRingSystems(Molecule& m, const int* ring_system, int seed_ring_system,
-                            const Set_of_Atoms& embedding, int max_distance) {
+                            const Set_of_Atoms& embedding, int max_distance,
+                            bool prefer_larger_adjacent_ring_system) {
   std::vector<AdjacentRingSystem> result;
   if (seed_ring_system <= 0) {
     return result;
@@ -544,10 +569,14 @@ DirectlyAdjacentRingSystems(Molecule& m, const int* ring_system, int seed_ring_s
       continue;
     }
     FindAdjacentFromSeedAtom(m, ring_system, seed_ring_system, embedding, atom,
-                             max_distance, result);
+                             max_distance, prefer_larger_adjacent_ring_system, result);
   }
 
-  std::sort(result.begin(), result.end(), Precedes);
+  std::sort(result.begin(), result.end(),
+            [prefer_larger_adjacent_ring_system](const AdjacentRingSystem& lhs,
+                                                 const AdjacentRingSystem& rhs) {
+              return Precedes(lhs, rhs, prefer_larger_adjacent_ring_system);
+            });
   return result;
 }
 
@@ -575,7 +604,7 @@ ChemotypeAtomMask(Molecule& m, const ChemotypeQueryMatch& match,
 
   std::vector<AdjacentRingSystem> adjacent = DirectlyAdjacentRingSystems(
       m, match.ring_system.data(), match.seed_ring_system, match.embedding,
-      options.max_distance);
+      options.max_distance, options.prefer_larger_adjacent_ring_system);
 
   const int adjacent_ring_systems_to_include =
       std::max(0, options.adjacent_ring_systems_to_include);

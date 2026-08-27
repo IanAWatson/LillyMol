@@ -1092,11 +1092,14 @@ cc_binary(
     ],
     deps = [
         ":distance_scaling",
+        ":nearneighbours_cc_proto",
         ":smiles_id_dist",
+        "//Foundational/data_source:iwtfdata_record",
         "//Foundational/histogram:iwhistogram",
         "//Foundational/iwmisc",
         "//Molecule_Lib:iwmolecule",
         "//Molecule_Lib:moleculeio",
+        "@com_google_protobuf//:protobuf",
     ],
 )
 

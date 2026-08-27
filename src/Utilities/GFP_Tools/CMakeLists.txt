@@ -294,6 +294,7 @@ set(nplotnn_srcs
 )
 set(nplotnn_libs
   smiles_id_dist
+  gfp_proto_lib
   moleculeio
   iwmolecule
   tfdatarecord

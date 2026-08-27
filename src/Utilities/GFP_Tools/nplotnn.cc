@@ -5,12 +5,14 @@
 #include <fstream>
 #include <iostream>
 #include <limits>
+#include <optional>
 #include <random>
 
 #define RESIZABLE_ARRAY_IMPLEMENTATION
 #include "Foundational/accumulator/accumulator.h"
 #include "Foundational/cmdline/cmdline.h"
 #include "Foundational/data_source/iwstring_data_source.h"
+#include "Foundational/data_source/tfdatarecord.h"
 #include "Foundational/histogram/iwhistogram.h"
 #include "Foundational/iwmisc/iwdigits.h"
 #include "Foundational/iwstring/iw_stl_hash_map.h"
@@ -20,6 +22,12 @@
 #include "Molecule_Lib/smiles.h"
 #include "distance_scaling.h"
 #include "smiles_id_dist.h"
+
+#ifdef BUILD_BAZEL
+#include "Utilities/GFP_Tools/nearneighbours.pb.h"
+#else
+#include "nearneighbours.pb.h"
+#endif
 
 using std::cerr;
 
@@ -113,6 +121,8 @@ static Distance_Scaling distance_scaling;
 
 static int distances_present_in_input = 1;
 
+static int input_is_tfdata = 0;
+
 // Used for tabular output.
 static char output_separator = ' ';
 
@@ -200,6 +210,7 @@ display_dash_x_options(std::ostream & os)
 {
 // clang-format off
   os << " -X nonnum          suppress printing of neighbour number with each neighbour\n";
+  os << " -X tfdata          input is TFDataRecord serialised nnbr::NearNeighbours protos\n";
   os << " -X tcol=<col>      just write column <col> from the target molecules\n";
   os << " -X ncol=<col>      just write column <col> from the neighbour molecules\n";
   os << " -X ftn             take the first token of both target and neighbour molecules\n";
@@ -1611,9 +1622,131 @@ plotnn(iwstring_data_source &input,
 }
 
 static int
+process_proto_neighbours(const nnbr::NearNeighbours& proto,
+                       const IW_STL_Hash_Map_String& append_to_id,
+                       IWString_and_File_Descriptor& output) {
+  IWString smiles(proto.smiles());
+  IWString id(proto.name());
+
+  if (id.empty()) {
+    cerr << "process_proto_neighbours:proto has no name\n";
+    cerr << proto.ShortDebugString() << '\n';
+    return 0;
+  }
+
+  if (smiles_tag.length() && smiles.empty()) {
+    cerr << "process_proto_neighbours:proto for '" << id << "' has no smiles\n";
+    return 0;
+  }
+
+  if (target_column_to_write >= 0) {
+    reduce_to_token(id, target_column_to_write);
+  } else if (take_first_token_of_name_field) {
+    id.truncate_at_first(' ');
+  }
+
+  resizable_array_p<Smiles_ID_Dist_UID> neighbours;
+  neighbours.resize(proto.nbr_size());
+
+  for (const nnbr::Nbr& nbr : proto.nbr()) {
+    IWString nsmiles(nbr.smi());
+    IWString nid(nbr.id());
+
+    if (nid.empty()) {
+      cerr << "process_proto_neighbours:neighbour of '" << id << "' has no id\n";
+      cerr << nbr.ShortDebugString() << '\n';
+      return 0;
+    }
+
+    if (smiles_tag.length() && nsmiles.empty()) {
+      cerr << "process_proto_neighbours:neighbour '" << nid << "' of '" << id
+           << "' has no smiles\n";
+      return 0;
+    }
+
+    if (take_first_token_of_name_field) {
+      nid.truncate_at_first(' ');
+    }
+
+    if (neighbour_columns_to_write.size() > 0) {
+      reduce_to_token(nid, neighbour_columns_to_write);
+    }
+
+    const float distance = nbr.dist();
+    if (distances_present_in_input &&
+        (distance < 0.0f || distance > max_possible_distance)) {
+      cerr << "process_proto_neighbours:invalid distance " << distance << " for '"
+           << nid << "' of '" << id << "'\n";
+      return 0;
+    }
+
+    create_neighbour_item(id, neighbours, nsmiles, nid, distance, 1.0f);
+  }
+
+  if (from_gfp_spread) {
+    if (neighbours.empty()) {
+      cerr << "Output from spread, but no neighbours, ignored\n";
+    } else {
+      spread_distances << neighbours[0]->distance();
+    }
+  }
+
+  if (neighbours_per_structure > 0 &&
+      neighbours_per_structure < neighbours.number_elements()) {
+    if (choose_neighbours_at_random) {
+      random_subset(neighbours, neighbours_per_structure);
+    } else if (biased_subset) {
+      do_biased_subset(neighbours, neighbours_per_structure);
+    } else {
+      neighbours.resize(neighbours_per_structure);
+    }
+  }
+
+  if (check_distance_ordering) {
+    do_check_distance_ordering(neighbours);
+  }
+
+  return process_molecule(smiles, id, neighbours, append_to_id, output);
+}
+
+static int
+plotnn_tfdata(const char* fname,
+              const IW_STL_Hash_Map_String& append_to_id,
+              IWString_and_File_Descriptor& output) {
+  iw_tf_data_record::TFDataReader reader(fname);
+  if (! reader.good()) {
+    cerr << "plotnn_tfdata:cannot open '" << fname << "'\n";
+    return 0;
+  }
+
+  while (true) {
+    std::optional<nnbr::NearNeighbours> maybe_proto =
+        reader.ReadProto<nnbr::NearNeighbours>();
+    if (maybe_proto) {
+    } else if (reader.eof()) {
+      return 1;
+    } else {
+      cerr << "plotnn_tfdata:error reading TFDataRecord input '" << fname << "'\n";
+      return 0;
+    }
+
+    if (! process_proto_neighbours(*maybe_proto, append_to_id, output)) {
+      cerr << "plotnn_tfdata:cannot process proto from '" << fname << "'\n";
+      return 0;
+    }
+
+    output.write_if_buffer_holds_more_than(IW_FLUSH_BUFFER);
+  }
+}
+
+static int
 plotnn(const char *fname, 
        const IW_STL_Hash_Map_String& append_to_id,
        IWString_and_File_Descriptor &output) {
+  if (input_is_tfdata) {
+    return plotnn_tfdata(fname, append_to_id, output);
+  }
+
   iwstring_data_source input(fname);
 
   if (!input.ok()) {
@@ -2268,6 +2401,12 @@ plotnn(int argc, char **argv) {
         if (verbose) {
           cerr << "No neighbour numbers with each neighbour\n";
         }
+      } else if ("tfdata" == x) {
+        input_is_tfdata = 1;
+
+        if (verbose) {
+          cerr << "Input is TFDataRecord serialised nnbr::NearNeighbours protos\n";
+        }
       } else if (x.starts_with("tcol=")) {
         x.remove_leading_chars(5);
         if (!x.numeric_value(target_column_to_write) || target_column_to_write < 1) {
@@ -2561,6 +2700,21 @@ plotnn(int argc, char **argv) {
         display_dash_x_options(cerr);
         return 4;
       }
+    }
+  }
+
+  if (input_is_tfdata) {
+    if (from_gfp_leader) {
+      cerr << "The -L option is not compatible with -X tfdata\n";
+      return 3;
+    }
+    if (! distances_present_in_input) {
+      cerr << "The -X nodist option is not compatible with -X tfdata\n";
+      return 3;
+    }
+    if (scale_tag.length()) {
+      cerr << "The -X SCALE option is not compatible with -X tfdata\n";
+      return 3;
     }
   }
 

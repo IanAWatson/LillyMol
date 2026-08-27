@@ -16,7 +16,7 @@ RUN apt-get update && \
 RUN npm install -g @bazel/bazelisk && \
     npm cache clean --force
 
-RUN pip install pandas scipy absl-py pybind11 protobuf
+RUN pip install pandas scipy absl-py nanobind protobuf
 
 COPY . ./LillyMol
 
@@ -43,7 +43,7 @@ RUN apt-get update && \
 
 RUN gem install google-protobuf -v 3.21.12
 
-RUN pip install pandas scipy absl-py pybind11 protobuf
+RUN pip install pandas scipy absl-py nanobind protobuf
 
 COPY --from=build /LillyMol /LillyMol
 

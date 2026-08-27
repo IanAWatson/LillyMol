@@ -320,7 +320,7 @@ echo "build_options ${build_options}"
 
 if [[ -v PYTHON_ONLY ]] ; then
     echo "Building Python bindings only"
-    ${bazel} ${bazel_options} build ${build_options} //nanobind:lillymol //nanobind:lillymol_gfp_server
+    ${bazel} ${bazel_options} build ${build_options} //nanobind:lillymol //nanobind:lillymol_gfp_server //nanobind::lillymol_soabi
     ./copy_shared_libraries.sh $REPO_HOME/lib
     if [[ -v RUN_PYTHON_TESTS ]] ; then
         ./run_python_unit_tests.sh

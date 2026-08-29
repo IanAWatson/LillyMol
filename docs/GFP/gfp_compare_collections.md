@@ -1,57 +1,40 @@
 # Approximate Similarity Between Collections
 
-A common task is to assess the similarity between two collections. For example
-one may wish to compare a virtual library with a corporate collection of a 
-public collection like Chembl.
+`gfp_compare_collections` estimates the distribution of fingerprint distances
+between two collections. It is intended for cases where the aggregate distance
+profile is useful, but exhaustive pairwise output from tools such as
+`gfp_lnearneighbours` would be too large or too slow to inspect directly.
 
-Clearly this could be done with gfp_lnearneighbours, but comparing a 1 Million member library
-with a 2M molecule library such as Chembl will be time consuming.
+A typical use case is comparing a large virtual library with a reference
+collection such as Chembl. The reference collection is loaded once via `-p`; the
+query collection is read as one fingerprint stream from the command line, which
+may be `-` for standard input. The query stream should be randomised if it was
+created by enumeration, otherwise early samples may not represent the full
+library.
 
-If what we are mostly interested in is the aggregate nature of the comparison, rather
-than detailed pair-wise comparisons, we investigate a sampling strategy.
+The reference collection must already be fingerprinted:
 
-If we are to take random samples from the virtual library, and compare those randomly selected
-molecules with Chembl, how quickly do those randomly selected molecules approximate the
-actual distribution?
-
-The tool gfp_compare_collections can do these calculations.
-
-The reference collection, Chembl in this case, must be fingerprinted.
-
-```
+```shell
 gfp_make.sh chembl.smi > chembl.gfp
 ```
-For this experiment we start with 1000 acids + 1000 amines from Enamine. This generates
-a 1M member virtual library - trxn takes about 10 seconds. It is very important that
-the resulting smiles file be randomised - see below.
 
-As the tool reads the fingerprints of the virtual library, every `-n` fingerprints it
-writes a file containing the distribution of distances. We can then compare how the
-shape of that distribution evolves as more and more molecules are sampled from the
-virtual library. How many molecules need to be evaluated in order to get a reasonable
-approximation to the complete distribution.
+Then stream a randomised query collection through `gfp_make.sh`:
 
-## HowTo
-```
+```shell
 shuf virtual.smi | gfp_make.sh - | \
-        gfp_compare_collections -h 8 -a 0.001 -f 200 -n 200 -S STEM -p chembl.gfp -
+  gfp_compare_collections -h 8 -a 0.001 -f 200 -n 200 -S STEM -p chembl.gfp -
 ```
-It is very important that the virtual library be randomised. This is because if it
-has been enumerated, the molecules appearing sequentially will definitely not be randomised.
 
-Note too that we never form the shuffled file, and fingerprints are only generated within
-the pipeline.
+This avoids creating an intermediate shuffled fingerprint file. The tool accepts
+exactly one query fingerprint input file or stream.
 
-The following options are recognised.
+## Output
 
-### -S \<stem\>
-Every \<-n\> fingerprints read, a CSV file is written. This file contains the distribution
-of number of distances vs the distance. For example the value associated with distance
-0.20 will be the number of distances in the range 0.200 to 0.201 - the range is
-divided into 1000 buckets.
+`-S <stem>` is required. Each sampling point writes a CSV file named
+`<stem>0.csv`, `<stem>1.csv`, and so on. The file contains the current
+normalised distribution of retained distances:
 
-A portion of that file might look like
-```
+```text
 Dist,Fraction
 0.199,4.679843e-08
 0.2,4.480701e-08
@@ -60,48 +43,79 @@ Dist,Fraction
 0.203,5.177699e-08
 0.204,5.72534e-08
 ```
-Plot both the first sample, taken after 400 fingerprints have been processed and another
-sample after 1600 fingerprints are processed.
+
+The distance range is divided into 1001 buckets from 0.000 through 1.000. The
+`Fraction` value is the fraction of all retained pairwise distances that fell in
+that bucket. Distances larger than `-T` are skipped before the distribution is
+normalised.
+
 ![compare_collections](Images/compare_collections.png)
 
-Subsequent plots show little difference from the above. We see that the distribution
-has essentially converged after a quite small number of molecules have been compared.
+In the example that generated this plot, the first sample was taken after 400
+query fingerprints and another after 1600. Subsequent plots showed little
+change, suggesting that the aggregate distribution had converged after a small
+sample of the query collection.
 
-### Convergence.
-Every `-n` fingerprints read, the tool checks the current distribution of distances
-with what it was on the previous check. If the differences are within the convergence
-criterion specified, processing stops.
+## Required Options
 
-It is hard to know whether an absolute or relative tolerance would be most meaningful.
-The `-a` option specifies an absolute tolernace. All bucketised distance count differences
-must be less than this value in order for the distribution to be considered converged.
+### `-p <fname>`
 
-On the other hand, the relative convergence criterion compares the difference with
-the mean of the current and previous distribution and all differences must be within
-this value.
+Fingerprint file for the reference collection. This is commonly a corporate
+collection, Chembl, or another large background set. If `-s` is not supplied,
+the tool first counts the number of fingerprints in this file.
 
-The absolute tolerance is attractive because it will quickly identify that the major
-parts of the distribution have converged. But it will really not be checking those
-regions with very low prevalences - see the numbers in the output above. On the
-other hand the relative tolerance criterion ensures that the entire distribution
-has stabilised. But in very low prevalence areas, that will likely not impact any
-overall measures of the distribution.
-### -h \<nthreads\>
-The tool can run across multiple processors with OMP. This is beneficial. For example
-comparing 2400 vrtual molecules against Chembl takes 272 seconds running single
-threaded. Running 8 way parallel this is complete in 92 seconds, a speedup of about
-3 - not wonderful, but worth doing.
+### `-S <stem>`
 
-As each query fingerprint is processed, different parts of the haystack are
-processed via different threads.
+Output stem for the sampled distribution files. Files are written as
+`<stem>0.csv`, `<stem>1.csv`, etc.
 
-### -b \<batch\>
-Further efficiencies can be gained by processing multiple query fingerprints
-at once. ChatGPT pointed out that if multiple fingerprints are processed at
-once, the overhead of thread creation is them amortized across multiple
-fingerprints. The default is 100 fingerprints per batch.
+## Sampling And Convergence
+
+The first check happens after `-f <number>` query fingerprints. If `-f` is not
+specified, the first check happens after 1000 query fingerprints. After each
+check, the next check is scheduled `-n <number>` query fingerprints later. The
+`-n` default is 1000.
+
+At the first check there is no previous distribution, so the current distribution
+is written and processing continues. Later checks compare the current
+normalised distribution with the previous sampled distribution. If the selected
+convergence criterion is satisfied, processing stops and the final distribution
+is written.
+
+Only one convergence criterion can be specified. If neither is specified, the
+default is relative tolerance `0.01`.
+
+### `-a <tol>`
+
+Absolute tolerance. The distribution is converged when the absolute difference
+in every bucket fraction is no greater than `<tol>`.
+
+### `-r <tol>`
+
+Relative tolerance. For buckets that differ, the absolute difference is divided
+by the mean of the current and previous bucket fractions. The distribution is
+converged only when every bucket is within `<tol>`. Buckets that were previously
+zero and become non-zero prevent convergence at that check.
+
+### `-T <dist>`
+
+Maximum distance considered. Distances larger than `<dist>` are ignored. This is
+useful when the short-distance part of the distribution is most important and
+most cross-collection pairs are distant.
+
+## Performance Options
+
+### `-h <nthreads>`
+
+Use OpenMP with `<nthreads>` threads. Each batch of query fingerprints is
+compared against the reference collection in parallel.
+
+### `-b <batch>`
+
+Number of query fingerprints processed per batch. Batching amortizes OpenMP
+threading overhead across multiple query fingerprints. The default is 10.
 
 ## Summary
-It does appear that a very small number of randomly selected molecules can
-adequately define the overall distribution of distances between a reference
-collection and another.
+
+For randomly ordered query streams, a relatively small sample can often define
+the overall distance distribution well enough for collection-level comparison.

@@ -1,4 +1,5 @@
-// Compare two collections.
+// Compare two collections via fingerprint distances.
+// Stop when the distribution of distances converges.
 
 #include <stdlib.h>
 
@@ -36,13 +37,14 @@ Usage(int rc) {
   cerr << R"(Compares a set of fingerprints against another, sampling the profile of distances until converged.
  -p <fname>     fingerprint file of the comparison set - likely Chembl or some other reference set.
  -s <n>         number of items in the -p file. This tool will count if not specified.
+ -T <dist>      upper distance threshold - ignore distances larger than <dist>.
  -n <number>    check convergence and write an output file every <number> fingerprints (default 1000).
- -f <number>    first time to check for convergence. If not specified it will be the -n value.
-                Convgence as assessed either by absoluate (-a) or relative (-r) tolerange.
+ -f <number>    first time to check for convergence. If not specified it will be 1000.
+                Convergence is assessed either by absolute (-a) or relative (-r) tolerance.
                 A comparison is made between the previous distribution and the current values.
  -r <tol>       Relative tolerance. Converged if every bucketised part of the distribution is within <tol>.
- -a <tol>       Absolute tolerance. Converged if every difference is less than <tol>.
- -S <stem>      output files are written as <stem>_n.csv.
+ -a <tol>       Absolute tolerance. Converged if every fractional difference is less than <tol>.
+ -S <stem>      output files are written as <stem>0.csv, <stem>1.csv...
  -b <size>      batch size. Query fingerprints are processed in groups - default 10.
  -h <threads>   number of OMP threads to use.
  -v             verbose output
@@ -51,7 +53,7 @@ Usage(int rc) {
   exit(rc);
 }
 
-constexpr uint32_t kNBins = 1001;
+constexpr int kNBins = 1001;
 
 class Options {
   private:
@@ -200,7 +202,7 @@ Options::Initialise(Command_Line& cl) {
 
   if (cl.option_present('r')) {
     if (! cl.value('r', _relative_tolerance) || _relative_tolerance <= 0.0) {
-      cerr << "The absoluate tolerance convergence criterion (-r) must be a non negative value\n";
+      cerr << "The relative tolerance convergence criterion (-r) must be a positive value\n";
       return 0;
     }
     if (_verbose) {
@@ -608,6 +610,16 @@ Main(int argc, char** argv) {
     Usage(1);
   }
 
+  if (cl.empty()) {
+    cerr << "Must specify input file as command line argument\n";
+    Usage(1);
+  }
+
+  if (cl.number_elements() > 1) {
+    cerr << "Only one input query fingerprint file can be specified\n";
+    Usage(1);
+  }
+
 #ifdef USE_OMP
   if (cl.option_present('h')) {
     int h;
@@ -627,22 +639,9 @@ Main(int argc, char** argv) {
     Usage(1);
   }
 
-  if (cl.empty()) {
-    cerr << "Must specify input file as command line argument\n";
-    Usage(1);
-  }
-
-  for (const char* fname : cl) {
-    int converged = 0;
-    if (! options.Process(fname, converged)) {
-      cerr << "Error processing '" << fname << "'\n";
-      return 1;
-    }
-
-    if (converged) {
-      break;
-    }
-    cerr << "Error processing '" << fname << "'\n";
+  int converged = 0;
+  if (! options.Process(cl[0], converged)) {
+    cerr << "Error processing '" << cl[0] << "'\n";
     return 1;
   }
 

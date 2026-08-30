@@ -1416,6 +1416,7 @@ cc_library(
         "dyfp.cc",
         "fixed_size_counted_fingerprint_uchar.cc",
         "gfp.cc",
+        "molecular_property_ratio.cc",
         "multi_conformer.cc",
         "nndata.cc",
         "sparse_collection.cc",
@@ -1429,6 +1430,7 @@ cc_library(
         "fixed_size_counted_fingerprint.h",
         "gfp.h",
         "leader.h",
+        "molecular_property_ratio.h",
         "multi_conformer.h",
         "nndata.h",
         "sparse_collection.h",
@@ -1605,6 +1607,18 @@ cc_binary(
     deps = [
         ":gfp",
         "//Foundational/iwmisc:sparse_fp_creator",
+        "@benchmark",
+    ],
+)
+
+cc_binary(
+    name = "mpr_similarity_benchmark",
+    srcs = [
+        "mpr_similarity_benchmark.cc",
+    ],
+    deps = [
+        ":gfp",
+        "//Foundational/data_source:iwstring_data_source",
         "@benchmark",
     ],
 )

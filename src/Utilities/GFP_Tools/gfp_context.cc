@@ -32,6 +32,7 @@
 #include "Molecule_Tools/ring_substitution.h"
 #include "Molecule_Tools/xlogp.h"
 #include "Utilities/GFP_Tools/dyfp.h"
+#include "Utilities/GFP_Tools/molecular_property_ratio.h"
 
 namespace gfp_context {
 namespace {
@@ -1394,7 +1395,7 @@ MolecularProperties::operator=(const MolecularProperties& rhs) {
     return *this;
   }
 
-  _property = new int[_nproperties];
+  _property = new uint8_t[_nproperties];
   std::copy(rhs._property, rhs._property + _nproperties, _property);
 
   return *this;
@@ -1438,7 +1439,7 @@ MolecularProperties::Build(const const_IWSubstring& buffer) {
   if (_nproperties != nproperties) {
     delete[] _property;
     _nproperties = nproperties;
-    _property = new int[_nproperties];
+    _property = new uint8_t[_nproperties];
   }
 
   const unsigned char* bits = fp.bits();
@@ -1458,10 +1459,18 @@ MolecularProperties::BuildFromArray(const int* properties, int nproperties) {
   if (_nproperties != nproperties) {
     delete[] _property;
     _nproperties = nproperties;
-    _property = new int[_nproperties];
+    _property = new uint8_t[_nproperties];
   }
 
-  std::copy(properties, properties + _nproperties, _property);
+  for (int i = 0; i < _nproperties; ++i) {
+    if (properties[i] < 0 || properties[i] > 255) {
+      std::cerr << "MolecularProperties::BuildFromArray:property " << i
+                << " out of range " << properties[i] << '\n';
+      return 0;
+    }
+    _property[i] = static_cast<uint8_t>(properties[i]);
+  }
+
   return 1;
 }
 
@@ -1471,22 +1480,8 @@ MolecularProperties::Similarity(const MolecularProperties& rhs) const {
     return 0.0f;
   }
 
-  float result = 0.0f;
-  for (int i = 0; i < _nproperties; ++i) {
-    const int lhs = _property[i];
-    const int rhs_value = rhs._property[i];
-    if (lhs == rhs_value) {
-      result += 1.0f;
-    } else if (lhs == 0 || rhs_value == 0) {
-      result += 0.5f;
-    } else if (lhs < rhs_value) {
-      result += static_cast<float>(lhs) / static_cast<float>(rhs_value);
-    } else {
-      result += static_cast<float>(rhs_value) / static_cast<float>(lhs);
-    }
-  }
-
-  return result / static_cast<float>(_nproperties);
+  return gfp_internal::molecular_property_ratio_table().similarity(_property, rhs._property,
+                                                          _nproperties);
 }
 
 int

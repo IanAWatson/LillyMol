@@ -122,7 +122,6 @@ Molecular_Properties<T>::build_from_contiguous_storage (const void * p,
 extern int set_number_integer_molecular_properties (int);
 extern int set_number_continuous_molecular_properties (int);
 extern int number_integer_molecular_properites();
-extern int initialise_properties_ratios();
 
 class Molecular_Properties_Integer : public Molecular_Properties<int>
 {

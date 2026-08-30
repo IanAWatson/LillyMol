@@ -6561,7 +6561,6 @@ random_molecular_permutations(int argc, char** argv) {
       usage(1);
     }
 
-    initialise_properties_ratios();
 
     if (!set_of_target_molecules.build(fname.null_terminated_chars())) {
       cerr << "Cannot build set of target molecules '" << fname << "'\n";

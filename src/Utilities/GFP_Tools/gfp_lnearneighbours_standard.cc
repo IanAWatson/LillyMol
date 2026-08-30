@@ -605,7 +605,6 @@ nearneighbours(int argc, char** argv) {
 
   // initialise_string_distances();
 
-  initialise_properties_ratios();
 
   set_default_iwstring_float_concatenation_precision(4);
 

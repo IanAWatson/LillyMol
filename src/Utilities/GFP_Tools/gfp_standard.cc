@@ -13,8 +13,7 @@
 #include "Foundational/iwbits/iwbits.h"
 #include "Foundational/iwmisc/misc.h"
 #include "gfp_standard.h"
-
-extern float *precomputed_ratio;
+#include "molecular_property_ratio.h"
 
 using std::cerr;
 
@@ -42,7 +41,25 @@ GFP_Standard::DebugPrint(std::ostream& output) const {
 
 void
 GFP_Standard::build_molecular_properties(const Molecular_Properties_Integer &mpr) {
-  copy_vector(_molecular_properties, mpr.rawdata(), 8);
+  build_molecular_properties(mpr.rawdata(), 8);
+}
+
+void
+GFP_Standard::build_molecular_properties(const int* properties, int nproperties) {
+  if (nproperties != 8) {
+    cerr << "GFP_Standard::build_molecular_properties:expected 8 properties, got "
+         << nproperties << '\n';
+    abort();
+  }
+
+  for (int i = 0; i < 8; ++i) {
+    if (properties[i] < 0 || properties[i] > 255) {
+      cerr << "GFP_Standard::build_molecular_properties:property " << i
+           << " out of range " << properties[i] << '\n';
+      abort();
+    }
+    _molecular_properties[i] = static_cast<uint8_t>(properties[i]);
+  }
 }
 
 static const unsigned int max_uint = std::numeric_limits<unsigned int>::max();
@@ -246,11 +263,8 @@ GFP_Standard::tanimoto(const GFP_Standard &rhs) const {
   float rc = static_cast<float>(0.0);
 
   int ndiv = 1;
-  for (int i = 0; i < 8; ++i) {
-    const int j = _molecular_properties[i] * 256 + rhs._molecular_properties[i];
-    rc += precomputed_ratio[j];
-    
-  }
+  rc += gfp_internal::molecular_property_ratio_table().similarity(_molecular_properties,
+                                                         rhs._molecular_properties, 8);
 
 #ifdef DEBUG_GFP_STANDARD_TANIMOTO
   cerr << "Properties " << rc << " _nset_iw " << _nset_iw << ' ' << rhs._nset_iw <<
@@ -305,14 +319,10 @@ GFP_Standard::tanimoto_distance_2(GFP_Standard const &fp1, GFP_Standard const &f
   float rc1 = static_cast<float>(0.0);
   float rc2 = static_cast<float>(0.0);
 
-  int j;
-  for (int i = 0; i < 8; i++) {
-    j = _molecular_properties[i] * 256 + fp1._molecular_properties[i];
-    rc1 += precomputed_ratio[j];
-
-    j = _molecular_properties[i] * 256 + fp2._molecular_properties[i];
-    rc2 += precomputed_ratio[j];
-  }
+  rc1 += gfp_internal::molecular_property_ratio_table().similarity(_molecular_properties,
+                                                           fp1._molecular_properties, 8);
+  rc2 += gfp_internal::molecular_property_ratio_table().similarity(_molecular_properties,
+                                                           fp2._molecular_properties, 8);
 
   int ndiv1 = 1;
   int ndiv2 = 1;
@@ -369,10 +379,8 @@ GFP_Standard::tanimoto_distance_if_less(const GFP_Standard &rhs,
 
   float rc = static_cast<float>(0.0);
 
-  for (int i = 0; i < 8; ++i) {
-    const int j = _molecular_properties[i] * 256 + rhs._molecular_properties[i];
-    rc += precomputed_ratio[j];
-  }
+  rc += gfp_internal::molecular_property_ratio_table().similarity(_molecular_properties,
+                                                         rhs._molecular_properties, 8);
 
   if ((rc + 3.0f) / 4.0f < similarity_needed) {
     return std::nullopt;

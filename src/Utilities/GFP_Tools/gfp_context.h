@@ -2,6 +2,7 @@
 #define UTILITIES_GFP_TOOLS_GFP_CONTEXT_H_
 
 #include <cstdint>
+#include <cstdint>
 #include <memory>
 #include <string>
 #include <vector>
@@ -183,7 +184,7 @@ struct NearestNeighbour {
 class MolecularProperties {
  private:
   int _nproperties = 0;
-  int* _property = nullptr;
+  uint8_t* _property = nullptr;
 
  public:
   MolecularProperties() = default;
@@ -203,7 +204,7 @@ class MolecularProperties {
     return _nproperties;
   }
 
-  const int*
+  const uint8_t*
   properties() const {
     return _property;
   }

@@ -145,7 +145,9 @@ GfpNearNeighbourServer::SmilesToGfp(const std::string& smiles, GFP_Standard& gfp
   _mk.set_level_2_fingerprint(tmp);
   gfp.build_mk2(tmp, _mk.nbits());
 
-  _mpr(m, gfp.molecular_properties());
+  int molecular_properties[8];
+  _mpr(m, molecular_properties);
+  gfp.build_molecular_properties(molecular_properties, 8);
 
   return 1;
 }

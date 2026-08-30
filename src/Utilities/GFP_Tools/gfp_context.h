@@ -2,7 +2,6 @@
 #define UTILITIES_GFP_TOOLS_GFP_CONTEXT_H_
 
 #include <cstdint>
-#include <cstdint>
 #include <memory>
 #include <string>
 #include <vector>

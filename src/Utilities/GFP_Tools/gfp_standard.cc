@@ -41,7 +41,18 @@ GFP_Standard::DebugPrint(std::ostream& output) const {
 
 void
 GFP_Standard::build_molecular_properties(const Molecular_Properties_Integer &mpr) {
-  build_molecular_properties(mpr.rawdata(), 8);
+  build_molecular_properties(mpr.rawdata(), mpr.nproperties());
+}
+
+void
+GFP_Standard::build_molecular_properties(const uint8_t* properties, int nproperties) {
+  if (nproperties != 8) {
+    cerr << "GFP_Standard::build_molecular_properties:expected 8 properties, got "
+         << nproperties << '\n';
+    abort();
+  }
+
+  memcpy(_molecular_properties, properties, 8 * sizeof(uint8_t));
 }
 
 void

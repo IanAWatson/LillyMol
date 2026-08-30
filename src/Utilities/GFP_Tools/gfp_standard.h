@@ -34,6 +34,7 @@ class GFP_Standard
   public:
     void build_molecular_properties (const Molecular_Properties_Integer &);
     void build_molecular_properties (const int* properties, int nproperties);
+    void build_molecular_properties (const uint8_t* properties, int nproperties);
     void build_iw  (IWDYFP &);
     void build_mk  (IWDYFP &);   // only non const because it calls nset()
     void build_mk2 (IWDYFP &);

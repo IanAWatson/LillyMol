@@ -634,6 +634,11 @@ int
 set_number_integer_molecular_properties(int n) {
   assert(n > 0);
 
+  if (n != 8) {
+    cerr << "set_number_integer_molecular_properties:only 8 supported, got " << n << '\n';
+    return 0;
+  }
+
   file_scope_number_integer_molecular_properties = n;
 
   return 1;
@@ -730,20 +735,41 @@ Molecular_Properties_Continuous::construct_from_descriptor_record(
 }
 
 Molecular_Properties_Integer::Molecular_Properties_Integer() {
-  if (0 == file_scope_number_integer_molecular_properties) {
-    _nproperties = 0;
-    _property = nullptr;
-  } else {
-    _nproperties = file_scope_number_integer_molecular_properties;
-    _property = new int[_nproperties];
+  if (file_scope_number_integer_molecular_properties > 0) {
+    assert(file_scope_number_integer_molecular_properties == kMaxProperties);
+    _nproperties = kMaxProperties;
+  }
+}
 
-    if (nullptr == _property) {
-      cerr << "Molecular_Properties_Integer:: cannot allocate " << _nproperties
-           << " properties\n";
-    }
+void*
+Molecular_Properties_Integer::copy_to_contiguous_storage(void* p) const {
+  memcpy(p, this, sizeof(*this));
+  p = reinterpret_cast<unsigned char*>(p) + sizeof(*this);
+
+  return p;
+}
+
+void*
+Molecular_Properties_Integer::copy_to_contiguous_storage_gpu(void* p) const {
+  memcpy(p, &_nproperties, sizeof(int));
+  p = reinterpret_cast<unsigned char*>(p) + sizeof(int);
+
+  if (_nproperties > 0) {
+    memcpy(p, _property, _nproperties * sizeof(uint8_t));
+    p = reinterpret_cast<unsigned char*>(p) + _nproperties * sizeof(uint8_t);
   }
 
-  return;
+  return p;
+}
+
+const void*
+Molecular_Properties_Integer::build_from_contiguous_storage(const void* p,
+                                                            int /*allocate_array*/) {
+  memcpy(this, p, sizeof(*this));
+  p = reinterpret_cast<const unsigned char*>(p) + sizeof(*this);
+
+  assert(_nproperties >= 0 && _nproperties <= kMaxProperties);
+  return p;
 }
 
 int
@@ -757,47 +783,71 @@ Molecular_Properties_Integer::construct_from_tdt_fp_record(
     return 0;
   }
 
-  if (0 == _nproperties) {
-    _nproperties = fp.nbits() / IW_BITS_PER_BYTE;
-
-    set_number_integer_molecular_properties(_nproperties);
-  } else {
-    assert(fp.nbits() / IW_BITS_PER_BYTE == _nproperties);
+  const int nproperties = fp.nbits() / IW_BITS_PER_BYTE;
+  if (nproperties != kMaxProperties) {
+    cerr << "Molecular_Properties_Integer::construct_from_tdt_fp_record:expected "
+         << kMaxProperties << " properties, got " << nproperties << '\n';
+    return 0;
   }
 
-  if (nullptr == _property) {
-    _property = new int[_nproperties];
+  if (fp.nbits() % IW_BITS_PER_BYTE) {
+    cerr << "Molecular_Properties_Integer::construct_from_tdt_fp_record:invalid bit count "
+         << fp.nbits() << '\n';
+    return 0;
   }
 
-  // const unsigned char * b = static_cast<const unsigned char *> (fp.bits());
-  const unsigned char* b = (const unsigned char*)fp.bits();
+  _nproperties = kMaxProperties;
+  set_number_integer_molecular_properties(_nproperties);
 
-  for (int i = 0; i < _nproperties; i++) {
-    _property[i] = static_cast<int>(b[i]);
-  }
+  const unsigned char* b = reinterpret_cast<const unsigned char*>(fp.bits());
+  memcpy(_property, b, _nproperties * sizeof(uint8_t));
 
   return 1;
 }
 
 int
 Molecular_Properties_Integer::natoms() const {
-  assert(nullptr != _property);
+  assert(active());
 
   return static_cast<int>(_property[0]);
 }
 
 int
 Molecular_Properties_Integer::nrings() const {
-  assert(nullptr != _property);
+  assert(active());
 
   return static_cast<int>(_property[1]);
 }
 
 int
 Molecular_Properties_Integer::aromatic_atoms() const {
-  assert(nullptr != _property);
+  assert(active());
 
   return static_cast<int>(_property[4]);
+}
+
+int
+Molecular_Properties_Integer::sum() const {
+  int result = 0;
+  for (int i = 0; i < _nproperties; ++i) {
+    result += _property[i];
+  }
+
+  return result;
+}
+
+void
+Molecular_Properties_Integer::create_subset(const int* s) {
+  int ndx = 0;
+
+  for (int i = 0; i < _nproperties; i++) {
+    if (s[i] > 0) {
+      _property[ndx] = _property[i];
+      ndx++;
+    }
+  }
+
+  _nproperties = ndx;
 }
 
 template <typename T>
@@ -827,7 +877,6 @@ Molecular_Properties<T>::operator=(const Molecular_Properties<T>& rhs) {
   return *this;
 }
 
-template class Molecular_Properties<int>;
 template class Molecular_Properties<float>;
 
 similarity_type_t
@@ -838,18 +887,13 @@ Molecular_Properties_Integer::similarity(const Molecular_Properties_Integer& rhs
     return dice_coefficient(rhs);
   }
 
-  const gfp_internal::MolecularPropertyRatioTable& ratio_table =
-      gfp_internal::molecular_property_ratio_table();
-
-  similarity_type_t rc = static_cast<similarity_type_t>(0.0);
-  for (int i = 0; i < file_scope_number_integer_molecular_properties; i++) {
-    assert(_property[i] >= 0 && _property[i] <= 255);
-    assert(rhs._property[i] >= 0 && rhs._property[i] <= 255);
-    rc += ratio_table.ratio(static_cast<uint8_t>(_property[i]),
-                            static_cast<uint8_t>(rhs._property[i]));
+  if (_nproperties != rhs._nproperties || _nproperties == 0) {
+    return 0.0f;
   }
 
-  return rc / static_cast<similarity_type_t>(file_scope_number_integer_molecular_properties);
+  return gfp_internal::molecular_property_ratio_table().similarity(_property,
+                                                                   rhs._property,
+                                                                   _nproperties);
 }
 
 similarity_type_t
@@ -859,7 +903,11 @@ Molecular_Properties_Integer::dice_coefficient(
   int na = 0;
   int nb = 0;
 
-  for (int i = 0; i < file_scope_number_integer_molecular_properties; i++) {
+  if (_nproperties != rhs._nproperties || _nproperties == 0) {
+    return 0.0f;
+  }
+
+  for (int i = 0; i < _nproperties; i++) {
     if (_property[i] > rhs._property[i]) {
       bits_in_common += rhs._property[i];
     } else {
@@ -867,7 +915,7 @@ Molecular_Properties_Integer::dice_coefficient(
     }
 
     na += _property[i];
-    na += rhs._property[i];
+    nb += rhs._property[i];
   }
 
   return static_cast<float>(bits_in_common) /
@@ -1272,9 +1320,7 @@ IW_General_Fingerprint::tanimoto(IW_General_Fingerprint& rhs) {
   }
 
 #ifdef FB_ENTROPY_WEIGHTED_FPS
-  const int* p1 = _molecular_properties_integer.rawdata();
-  const int* p2 = rhs._molecular_properties_integer.rawdata();
-  result = result + _property_weight_integer * ffbwfw.tanimoto(p1, p2);
+  static_assert(false, "FB_ENTROPY_WEIGHTED_FPS needs uint8_t Molecular_Properties_Integer support");
 #else
   if (_molecular_properties_integer.active()) {
     result = result + _property_weight_integer * _molecular_properties_integer.similarity(
@@ -3874,53 +3920,6 @@ const IWString&
 sparse_fingerprint_tag(int i) {
   return _sparse_fingerprint_tag[i];
 }
-
-#ifdef FB_ENTROPY_WEIGHTED_FPS
-
-int
-IW_General_Fingerprint::convert_01_fingerprint_to_integer_molecular_properties() {
-  if (1 != bit_fingerprints_in_file) {
-    cerr << "IW_General_Fingerprint::convert_01_fingerprint_to_integer_molecular_"
-            "properties:must be one, and only one 01 fingerprint in the input, "
-         << bit_fingerprints_in_file << " impossible\n";
-    assert(nullptr == "Cannot continue");
-  }
-
-  if (_property_weight_integer <= 0.0) {
-    _property_weight_integer = 1.0;
-    _fingerprint_weight[0] = 0.0;
-  }
-
-  assert(!_molecular_properties_integer.active());
-
-  if (!_molecular_properties_integer.construct_from_bit_vector(_fingerprint[0])) {
-    cerr << "IW_General_Fingerprint::convert_01_fingerprint_to_integer_molecular_"
-            "properties:error '"
-         << _id << "'\n";
-    return 0;
-  }
-
-  number_fingerprints_to_use_in_computations = 0;
-
-  return 1;
-}
-
-int
-Molecular_Properties_Integer::construct_from_bit_vector(const IWDYFP& fp) {
-  assert(nullptr == _property);
-
-  _nproperties = fp.nbits();
-
-  assert(_nproperties > 0);
-
-  _property = new int[_nproperties];
-
-  fp.set_vector(_property);
-
-  return 1;
-}
-
-#endif
 
 int
 IW_General_Fingerprint::fixed_fingerprints_as_hex(IWString& s) const {

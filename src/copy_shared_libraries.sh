@@ -53,6 +53,10 @@ copy_if_newer() {
   local libname
   libname=$(basename "${source}")
 
+  if [[ ! -e "${source}" ]] ; then
+    return
+  fi
+
   if [[ ! -s "${destdir}/${libname}" || "${source}" -nt "${destdir}/${libname}" ]] ; then
     echo "Copying ${source}"
     cp -f "${source}" "${destdir}"

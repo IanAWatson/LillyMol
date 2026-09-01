@@ -410,13 +410,24 @@ spread_with_weights(F* fingerprints, const int pool_size, const float* weight,
                     Selected_Item* selected_item) {
   int s;
 
+  // Everywhere else in this function distances[] holds *weighted* values - see
+  // the update in the selection loop below. The -A seed distances arrive
+  // unweighted, so scale them once here and the seed is then on the same footing
+  // as every subsequent update. Done before the branch so that -S rand -A gets
+  // weighted seeds too.
+  if (previously_selected_file_specified) {
+    for (int i = 0; i < pool_size; ++i) {
+      distances[i] *= weight[i];
+    }
+  }
+
   if (choose_first_point_randomly) {
     s = RandomPoolMember(pool_size);
   } else if (previously_selected_file_specified) {
-    s = 1;
+    s = 0;
     float dmax = distances[0];
     for (int i = 1; i < pool_size; i++) {
-      if (weight[i] * distances[i] > dmax) {
+      if (distances[i] > dmax) {
         dmax = distances[i];
         s = i;
       }
@@ -439,13 +450,23 @@ spread_with_weights(F* fingerprints, const int pool_size, const float* weight,
     //  iw_write_array(distances, pool_size, "initial distances", cerr);
   }
 
+  int items_written = 0;
+
   for (int items_selected = 0; items_selected < nsel; items_selected++) {
     //  cerr << " s = " << s << '\n';
     //  iw_write_array(spread_order, pool_size, "selected", cerr);
 
+    // nearest_previously_selected[] is initialised to -1, and with -A in effect
+    // the first selection has no in-pool neighbour, so it stays -1. Indexing
+    // fingerprints[-1] would be out of bounds; pass -1 through instead and let
+    // the writer emit '*' for the neighbour, as it already does for that case.
+    const int nps = nearest_previously_selected[s];
+
     set_selected_item(selected_item[items_selected], fingerprints[s].initial_ndx(),
-                      fingerprints[nearest_previously_selected[s]].initial_ndx(),
+                      nps >= 0 ? fingerprints[nps].initial_ndx() : -1,
                       distances[s]);
+
+    items_written = items_selected + 1;
 
     selected[s] = 1;
 
@@ -497,7 +518,9 @@ spread_with_weights(F* fingerprints, const int pool_size, const float* weight,
     }
   }
 
-  return 1;
+  // The caller writes selected_item[0 .. return value); the loop above can stop
+  // early, and the untouched tail of the array is uninitialised.
+  return items_written;
 }
 
 template <typename T>
@@ -1170,6 +1193,8 @@ do_previously_selected(iwstring_data_source& input) {
     my_report_progress.set_report_every(report_progress.report_every());
   }
 
+  int fingerprints_read = 0;
+
   while (tdt.next(input)) {
     IW_General_Fingerprint gfp;
 
@@ -1181,9 +1206,23 @@ do_previously_selected(iwstring_data_source& input) {
 
     do_previously_selected(gfp);
 
+    ++fingerprints_read;
+
     if (my_report_progress()) {
       cerr << "Processed " << my_report_progress.times_called() << " previously selected fingerprints\n";
     }
+  }
+
+  // A file that yields no fingerprints - empty, or not TDT at all - leaves every
+  // initial distance at 1.0, which is indistinguishable from -A never having been
+  // specified. Fail rather than silently ignore the option.
+  if (fingerprints_read == 0) {
+    cerr << "do_previously_selected:no fingerprints read\n";
+    return 0;
+  }
+
+  if (verbose) {
+    cerr << "Read " << fingerprints_read << " previously selected fingerprints\n";
   }
 
   return 1;
@@ -1528,7 +1567,7 @@ gfp_spread_standard(int argc, char** argv) {
 
     if (!do_previously_selected(fname)) {
       cerr << "Cannot process previously selected file '" << fname << "'\n";
-      return 0;
+      return 3;
     }
 
     if (verbose) {
@@ -1609,9 +1648,24 @@ gfp_spread_standard(int argc, char** argv) {
 
   IWString_and_File_Descriptor output(1);
 
+  // Must be set before either spread is run: spread4 writes as it selects, via
+  // WriteSelected, which consults brief_output.
+  if (cl.option_present('b')) {
+    brief_output = 1;
+
+    if (verbose) {
+      cerr << "Brief output\n";
+    }
+  }
+
   cerr.flush();
+
+  // spread4 writes each selection as it makes it. spread_with_weights instead
+  // fills selected_item[] and leaves the writing to the block below.
+  int items_selected = 0;
   if (scaling_factor_specified) {
-    spread_with_weights(fingerprints, pool_size, weight, selected_item);
+    items_selected =
+        spread_with_weights(fingerprints, pool_size, weight, selected_item);
   } else {
     spread4(fingerprints, pool_size, output);
   }
@@ -1628,25 +1682,21 @@ gfp_spread_standard(int argc, char** argv) {
     cerr << "Writing results\n";
   }
 
-  if (cl.option_present('b')) {
-    brief_output = 1;
-
-    if (verbose) {
-      cerr << "Brief output\n";
-    }
-  }
-
-  return 0;
-
-  if (brief_output) {
-    for (int i = 0; i < nsel; ++i) {
+  // Only the weighted path defers its output. Bounded by items_selected rather
+  // than nsel: the spread can stop early and the rest of the array is
+  // uninitialised. (An unconditional `return 0` used to sit here, which meant
+  // -p produced no output at all.)
+  if (!scaling_factor_specified) {
+    // spread4 has already written everything.
+  } else if (brief_output) {
+    for (int i = 0; i < items_selected; ++i) {
       const Selected_Item& s = selected_item[i];
 
       output << smiles[s._sel] << ' ' << pcn[s._sel] << ' ' << s._dist << '\n';
       output.write_if_buffer_holds_more_than(4096);
     }
   } else {
-    for (int i = 0; i < nsel; ++i) {
+    for (int i = 0; i < items_selected; ++i) {
       const Selected_Item& s = selected_item[i];
 
       const int id = s._sel;

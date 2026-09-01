@@ -132,8 +132,9 @@ be correct. That said, it would not be hard to add an option to return
 a None molecule in the event of an otherwise ignored error.
 
 Note that in LillyMol a molecule with an invalid valence is a valid molecule.
-If you don't want molecules with valence errors, use the valence_ok() method
-to check each molecule and skip those having an invalid valence.
+If you don't want molecules with valence errors, use `skip_invalid_valence=True`
+in `MolReaderContext`, or call `valence_ok()` yourself when more detailed control
+is needed.
 
 A more pythonic way of reading structures is available as
 ```
@@ -159,6 +160,34 @@ with MolReaderContext('/path/to/file.smi', largest_fragment=True,
 The preprocessing keyword options are `largest_fragment`, `remove_chirality`,
 `remove_cis_trans_bonds`, and `remove_isotopes`. They default to `False`, so a
 plain `MolReaderContext(fname)` preserves the input molecule as before.
+
+`MolReaderContext` can also skip molecules that are syntactically readable but
+not wanted in a downstream workflow:
+
+```python
+with MolReaderContext('/path/to/file.smi',
+                      skip_invalid_valence=True,
+                      skip_non_organic=True,
+                      skip_non_periodic_table_elements=True) as reader:
+  for mol in reader:
+    ...
+
+  print(reader.skipped_invalid_valence())
+  print(reader.skipped_non_organic())
+  print(reader.skipped_non_periodic_table_elements())
+  print(reader.molecules_skipped())
+```
+
+Preprocessing is applied before the skip tests, matching tools such as
+`fileconv`. For example, `largest_fragment=True` can remove a metal counterion
+before `skip_non_organic=True` is checked. If more than one skip condition
+matches a molecule after preprocessing, it is counted against the first matching
+condition in this order: invalid valence, non-organic atoms,
+non-periodic-table elements. The
+`skip_non_periodic_table_elements` option temporarily enables LillyMol's
+process-global auto-creation of element symbols and arbitrary-length atomic
+symbols while the reader is active, so tokens such as `[Qq]` can be read and then
+rejected by the filter.
 
 SDF naming can also be controlled from `MolReaderContext`. By default LillyMol uses
 the first SDF header line as the molecule name. To use a specific SD data tag as
@@ -213,7 +242,9 @@ with MolReaderContext('/path/to/second.sdf', options=options) as reader:
 `ReaderOptions` has the same fields as the keyword arguments: `largest_fragment`,
 `remove_chirality`, `remove_cis_trans_bonds`, `remove_isotopes`,
 `keep_sdf_tags`, `sdf_identifier`, `sdf_tags_to_json`, `all_sdf_tags`,
-`first_sdf_tag`, and `prepend_sdfid`. The fields are mutable, and an existing
+`first_sdf_tag`, `prepend_sdfid`, `mdlquiet`, `skip_invalid_valence`,
+`skip_non_organic`, and `skip_non_periodic_table_elements`. The fields are
+mutable, and an existing
 `MolReaderContext` can be updated with `reader.apply_options(options)`.
 
 `MolReaderContext` stores these SDF naming options on the reader, so separate

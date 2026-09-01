@@ -84,14 +84,18 @@ with lillymol_io.MolReaderContext('/path/to/file.smi') as reader:
         print(mol.name(), mol.natoms())
 ```
 
-`MolReaderContext` can also apply common preprocessing as molecules are read:
+`MolReaderContext` can also apply common preprocessing and skipping as molecules
+are read:
 
 ```python
 with lillymol_io.MolReaderContext('/path/to/file.smi', largest_fragment=True,
                                remove_chirality=True,
-                               remove_isotopes=True) as reader:
+                               remove_isotopes=True,
+                               skip_invalid_valence=True,
+                               skip_non_organic=True) as reader:
     for mol in reader:
         ...
+    print(reader.molecules_skipped())
 ```
 
 For explicit reuse, `lillymol_io.MoleculePreprocessing` offers the same operations
@@ -118,8 +122,8 @@ with lillymol_io.MolReaderContext('/path/to/file.sdf',
 
 There is no `None` molecule from a reader. A connection table error stops the read
 unless you have raised the allowed error count. Note also that in LillyMol a
-molecule with a bad valence is still a valid molecule - call `valence_ok()` if you
-care.
+molecule with a bad valence is still a valid molecule; use
+`skip_invalid_valence=True` or call `valence_ok()` if you care.
 
 `ReaderContext` remains available as a compatibility alias for `MolReaderContext`.
 `ContextWriter` remains available as a compatibility alias for `MolWriterContext`.

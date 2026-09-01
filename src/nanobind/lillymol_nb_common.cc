@@ -21,6 +21,7 @@ ReaderContext::ReaderContext(const std::string& fname) {
 
 ReaderContext::~ReaderContext() {
   ResetSdfOptions();
+  RestoreElementCreationFlags();
 }
 
 void
@@ -30,6 +31,69 @@ ReaderContext::SetPreprocessing(bool reduce_to_largest_fragment, bool remove_chi
   preprocessing.set_remove_chirality(remove_chirality);
   preprocessing.set_remove_cis_trans_bonds(remove_cis_trans_bonds);
   preprocessing.set_remove_isotopes(remove_isotopes);
+}
+
+void
+ReaderContext::EnableNonPeriodicTableElementReading() {
+  if (!element_creation_flags_saved) {
+    saved_auto_create_new_elements = auto_create_new_elements();
+    saved_atomic_symbols_can_have_arbitrary_length =
+        atomic_symbols_can_have_arbitrary_length();
+    element_creation_flags_saved = true;
+  }
+
+  set_auto_create_new_elements(1);
+  set_atomic_symbols_can_have_arbitrary_length(1);
+}
+
+void
+ReaderContext::RestoreElementCreationFlags() {
+  if (!element_creation_flags_saved) {
+    return;
+  }
+
+  set_auto_create_new_elements(saved_auto_create_new_elements);
+  set_atomic_symbols_can_have_arbitrary_length(
+      saved_atomic_symbols_can_have_arbitrary_length);
+  element_creation_flags_saved = false;
+}
+
+void
+ReaderContext::SetSkipOptions(bool invalid_valence, bool non_organic,
+                              bool non_periodic_table_elements) {
+  skip_invalid_valence = invalid_valence;
+  skip_non_organic = non_organic;
+  skip_non_periodic_table_elements = non_periodic_table_elements;
+  if (skip_non_periodic_table_elements) {
+    EnableNonPeriodicTableElementReading();
+  } else {
+    RestoreElementCreationFlags();
+  }
+}
+
+bool
+ReaderContext::ShouldSkip(Molecule& mol) {
+  if (skip_invalid_valence && !mol.valence_ok()) {
+    ++skipped_invalid_valence;
+    return true;
+  }
+
+  if (skip_non_organic && !mol.organic_only()) {
+    ++skipped_non_organic;
+    return true;
+  }
+
+  if (skip_non_periodic_table_elements) {
+    const int matoms = mol.natoms();
+    for (int i = 0; i < matoms; ++i) {
+      if (!mol.elementi(i)->is_in_periodic_table()) {
+        ++skipped_non_periodic_table_elements;
+        return true;
+      }
+    }
+  }
+
+  return false;
 }
 
 bool
@@ -67,6 +131,8 @@ bool
 ReaderContext::ApplyOptions(const ReaderOptions& options) {
   SetPreprocessing(options.largest_fragment, options.remove_chirality,
                    options.remove_cis_trans_bonds, options.remove_isotopes);
+  SetSkipOptions(options.skip_invalid_valence, options.skip_non_organic,
+                 options.skip_non_periodic_table_elements);
   if (reader) {
     reader->mutable_molecule_read_options()
         .mdl_file_supporting_material()
@@ -90,16 +156,22 @@ ReaderContext::Next() {
     return std::nullopt;
   }
 
-  std::unique_ptr<Molecule> mol(reader->next_molecule());
-  if (!mol) {
-    return std::nullopt;
-  }
+  while (true) {
+    std::unique_ptr<Molecule> mol(reader->next_molecule());
+    if (!mol) {
+      return std::nullopt;
+    }
 
-  if (preprocessing.active()) {
-    preprocessing.Process(*mol);
-  }
+    if (preprocessing.active()) {
+      preprocessing.Process(*mol);
+    }
 
-  return std::move(*mol);
+    if (ShouldSkip(*mol)) {
+      continue;
+    }
+
+    return std::move(*mol);
+  }
 }
 
 ContextWriter::ContextWriter(const std::string& fname) {

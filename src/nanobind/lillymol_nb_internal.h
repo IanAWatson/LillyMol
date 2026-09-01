@@ -84,11 +84,26 @@ struct ReaderOptions {
   bool prepend_sdfid = true;
 
   bool mdlquiet = false;
+
+  bool skip_invalid_valence = false;
+  bool skip_non_organic = false;
+  bool skip_non_periodic_table_elements = false;
 };
 
 struct ReaderContext {
   std::unique_ptr<data_source_and_type<Molecule>> reader;
   MoleculePreprocessing preprocessing;
+
+  bool skip_invalid_valence = false;
+  bool skip_non_organic = false;
+  bool skip_non_periodic_table_elements = false;
+  uint64_t skipped_invalid_valence = 0;
+  uint64_t skipped_non_organic = 0;
+  uint64_t skipped_non_periodic_table_elements = 0;
+
+  bool element_creation_flags_saved = false;
+  int saved_auto_create_new_elements = 0;
+  int saved_atomic_symbols_can_have_arbitrary_length = 0;
 
   ReaderContext(const std::string& fname, FileType file_type);
   explicit ReaderContext(const std::string& fname);
@@ -97,6 +112,11 @@ struct ReaderContext {
   bool ApplyOptions(const ReaderOptions& options);
   void SetPreprocessing(bool reduce_to_largest_fragment, bool remove_chirality,
                         bool remove_cis_trans_bonds, bool remove_isotopes);
+  void SetSkipOptions(bool invalid_valence, bool non_organic,
+                      bool non_periodic_table_elements);
+  bool ShouldSkip(Molecule& mol);
+  void EnableNonPeriodicTableElementReading();
+  void RestoreElementCreationFlags();
   bool SetSdfOptions(const std::string& sdf_identifier, bool sdf_tags_to_json,
                      bool all_sdf_tags, bool first_sdf_tag, bool prepend_sdfid,
                      bool mdlquiet);

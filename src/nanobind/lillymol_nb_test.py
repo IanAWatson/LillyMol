@@ -370,6 +370,60 @@ class TestNanobindMolecule(LillyMolNanobindTestCase):
                 self.assertEqual(mol.natoms(), 2)
                 self.assertIsNone(reader.next())
 
+    def test_mol_reader_context_skip_invalid_valence(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            fname = os.path.join(tmpdir, "input.smi")
+            with open(fname, "w") as writer:
+                writer.write("CC good\nC=[SH]-C bad\nCCC also_good\n")
+
+            with lillymol.MolReaderContext(fname, skip_invalid_valence=True) as reader:
+                self.assertEqual([mol.name() for mol in reader], ["good", "also_good"])
+                self.assertEqual(reader.skipped_invalid_valence(), 1)
+                self.assertEqual(reader.molecules_skipped(), 1)
+
+    def test_mol_reader_context_skip_non_organic(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            fname = os.path.join(tmpdir, "input.smi")
+            with open(fname, "w") as writer:
+                writer.write("CC ethane\nCC[Na] sodium\nCCC propane\n")
+
+            options = lillymol.ReaderOptions(skip_non_organic=True)
+            with lillymol.MolReaderContext(fname, options=options) as reader:
+                self.assertEqual([mol.name() for mol in reader], ["ethane", "propane"])
+                self.assertEqual(reader.skipped_non_organic(), 1)
+                self.assertEqual(reader.molecules_skipped(), 1)
+
+    def test_mol_reader_context_preprocesses_before_skip_non_organic(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            fname = os.path.join(tmpdir, "input.smi")
+            with open(fname, "w") as writer:
+                writer.write("CC.[Na+] sodium_counterion\nCC[Na] covalent_sodium\n")
+
+            with lillymol.MolReaderContext(fname, largest_fragment=True,
+                                           skip_non_organic=True) as reader:
+                molecules = list(reader)
+                self.assertEqual([mol.name() for mol in molecules], ["sodium_counterion"])
+                self.assertEqual(molecules[0].smiles(), "CC")
+                self.assertEqual(reader.skipped_non_organic(), 1)
+                self.assertEqual(reader.molecules_skipped(), 1)
+
+    def test_mol_reader_context_skip_non_periodic_table_elements(self):
+        lillymol.set_auto_create_new_elements(False)
+        lillymol.set_atomic_symbols_can_have_arbitrary_length(False)
+        with tempfile.TemporaryDirectory() as tmpdir:
+            fname = os.path.join(tmpdir, "input.smi")
+            with open(fname, "w") as writer:
+                writer.write("CC ethane\nC[Zz] nonperiodic\nCCC propane\n")
+
+            with lillymol.MolReaderContext(
+                    fname, skip_non_periodic_table_elements=True) as reader:
+                self.assertEqual([mol.name() for mol in reader], ["ethane", "propane"])
+                self.assertEqual(reader.skipped_non_periodic_table_elements(), 1)
+                self.assertEqual(reader.molecules_skipped(), 1)
+
+        lillymol.set_auto_create_new_elements(False)
+        lillymol.set_atomic_symbols_can_have_arbitrary_length(False)
+
     def test_mol_reader_context_accepts_mdlquiet_keyword(self):
         sdf = """ethanol
   LillyMol          2D

@@ -20,7 +20,9 @@ BindIo(nb::module_& m) {
                           bool remove_chirality, bool remove_cis_trans_bonds,
                           bool remove_isotopes, bool keep_sdf_tags,
                           const std::string& sdf_identifier, bool sdf_tags_to_json,
-                          bool all_sdf_tags, bool first_sdf_tag, bool prepend_sdfid) {
+                          bool all_sdf_tags, bool first_sdf_tag, bool prepend_sdfid,
+                          bool skip_invalid_valence, bool skip_non_organic,
+                          bool skip_non_periodic_table_elements) {
              new (options) ReaderOptions();
              options->largest_fragment = largest_fragment;
              options->remove_chirality = remove_chirality;
@@ -32,6 +34,9 @@ BindIo(nb::module_& m) {
              options->all_sdf_tags = all_sdf_tags;
              options->first_sdf_tag = first_sdf_tag;
              options->prepend_sdfid = prepend_sdfid;
+             options->skip_invalid_valence = skip_invalid_valence;
+             options->skip_non_organic = skip_non_organic;
+             options->skip_non_periodic_table_elements = skip_non_periodic_table_elements;
            },
            nb::kw_only(),
            nb::arg("largest_fragment") = false,
@@ -43,7 +48,10 @@ BindIo(nb::module_& m) {
            nb::arg("sdf_tags_to_json") = false,
            nb::arg("all_sdf_tags") = false,
            nb::arg("first_sdf_tag") = false,
-           nb::arg("prepend_sdfid") = true)
+           nb::arg("prepend_sdfid") = true,
+           nb::arg("skip_invalid_valence") = false,
+           nb::arg("skip_non_organic") = false,
+           nb::arg("skip_non_periodic_table_elements") = false)
       .def_rw("largest_fragment", &ReaderOptions::largest_fragment)
       .def_rw("remove_chirality", &ReaderOptions::remove_chirality)
       .def_rw("remove_cis_trans_bonds", &ReaderOptions::remove_cis_trans_bonds)
@@ -54,7 +62,11 @@ BindIo(nb::module_& m) {
       .def_rw("all_sdf_tags", &ReaderOptions::all_sdf_tags)
       .def_rw("first_sdf_tag", &ReaderOptions::first_sdf_tag)
       .def_rw("prepend_sdfid", &ReaderOptions::prepend_sdfid)
-      .def_rw("mdlquiet", &ReaderOptions::mdlquiet);
+      .def_rw("mdlquiet", &ReaderOptions::mdlquiet)
+      .def_rw("skip_invalid_valence", &ReaderOptions::skip_invalid_valence)
+      .def_rw("skip_non_organic", &ReaderOptions::skip_non_organic)
+      .def_rw("skip_non_periodic_table_elements",
+              &ReaderOptions::skip_non_periodic_table_elements);
 
   nb::class_<MoleculePreprocessing>(m, "MoleculePreprocessing")
       .def("__init__", [](MoleculePreprocessing* preprocessing, bool largest_fragment,
@@ -181,10 +193,14 @@ BindIo(nb::module_& m) {
                           bool remove_cis_trans_bonds, bool remove_isotopes,
                           bool keep_sdf_tags, const std::string& sdf_identifier,
                           bool sdf_tags_to_json, bool all_sdf_tags, bool first_sdf_tag,
-                          bool prepend_sdfid, bool mdlquiet) {
+                          bool prepend_sdfid, bool mdlquiet,
+                          bool skip_invalid_valence, bool skip_non_organic,
+                          bool skip_non_periodic_table_elements) {
              new (context) ReaderContext(fname, file_type);
              context->SetPreprocessing(largest_fragment, remove_chirality,
                                        remove_cis_trans_bonds, remove_isotopes);
+             context->SetSkipOptions(skip_invalid_valence, skip_non_organic,
+                                     skip_non_periodic_table_elements);
              if (context->reader) {
                context->reader->mutable_molecule_read_options()
                    .mdl_file_supporting_material()
@@ -206,16 +222,23 @@ BindIo(nb::module_& m) {
            nb::arg("all_sdf_tags") = false,
            nb::arg("first_sdf_tag") = false,
            nb::arg("prepend_sdfid") = true,
-           nb::arg("mdlquiet") = false)
+           nb::arg("mdlquiet") = false,
+           nb::arg("skip_invalid_valence") = false,
+           nb::arg("skip_non_organic") = false,
+           nb::arg("skip_non_periodic_table_elements") = false)
       .def("__init__", [](ReaderContext* context, const std::string& fname,
                           bool largest_fragment, bool remove_chirality,
                           bool remove_cis_trans_bonds, bool remove_isotopes,
                           bool keep_sdf_tags, const std::string& sdf_identifier,
                           bool sdf_tags_to_json, bool all_sdf_tags, bool first_sdf_tag,
-                          bool prepend_sdfid, bool mdlquiet) {
+                          bool prepend_sdfid, bool mdlquiet,
+                          bool skip_invalid_valence, bool skip_non_organic,
+                          bool skip_non_periodic_table_elements) {
              new (context) ReaderContext(fname);
              context->SetPreprocessing(largest_fragment, remove_chirality,
                                        remove_cis_trans_bonds, remove_isotopes);
+             context->SetSkipOptions(skip_invalid_valence, skip_non_organic,
+                                     skip_non_periodic_table_elements);
              if (context->reader) {
                context->reader->mutable_molecule_read_options()
                    .mdl_file_supporting_material()
@@ -237,7 +260,10 @@ BindIo(nb::module_& m) {
            nb::arg("all_sdf_tags") = false,
            nb::arg("first_sdf_tag") = false,
            nb::arg("prepend_sdfid") = true,
-           nb::arg("mdlquiet") = false)
+           nb::arg("mdlquiet") = false,
+           nb::arg("skip_invalid_valence") = false,
+           nb::arg("skip_non_organic") = false,
+           nb::arg("skip_non_periodic_table_elements") = false)
       .def("__enter__", [](ReaderContext& context) -> ReaderContext& {
         return context;
       }, nb::rv_policy::reference_internal)
@@ -269,6 +295,28 @@ BindIo(nb::module_& m) {
          nb::arg("remove_isotopes") = false)
       .def("preprocessing_active", [](const ReaderContext& context) {
         return context.preprocessing.active();
+      })
+      .def("set_skip_options", [](ReaderContext& context, bool skip_invalid_valence,
+                                   bool skip_non_organic,
+                                   bool skip_non_periodic_table_elements) {
+        context.SetSkipOptions(skip_invalid_valence, skip_non_organic,
+                               skip_non_periodic_table_elements);
+      }, nb::kw_only(),
+         nb::arg("skip_invalid_valence") = false,
+         nb::arg("skip_non_organic") = false,
+         nb::arg("skip_non_periodic_table_elements") = false)
+      .def("skipped_invalid_valence", [](const ReaderContext& context) {
+        return context.skipped_invalid_valence;
+      })
+      .def("skipped_non_organic", [](const ReaderContext& context) {
+        return context.skipped_non_organic;
+      })
+      .def("skipped_non_periodic_table_elements", [](const ReaderContext& context) {
+        return context.skipped_non_periodic_table_elements;
+      })
+      .def("molecules_skipped", [](const ReaderContext& context) {
+        return context.skipped_invalid_valence + context.skipped_non_organic +
+               context.skipped_non_periodic_table_elements;
       })
       .def("set_sdf_options", [](ReaderContext& context, const std::string& sdf_identifier,
                                  bool sdf_tags_to_json, bool all_sdf_tags,
@@ -305,12 +353,14 @@ BindIo(nb::module_& m) {
           context.reader->do_close();
         }
         context.ResetSdfOptions();
+        context.RestoreElementCreationFlags();
       })
       .def("__exit__", [](ReaderContext& context, nb::args) {
         if (context.reader) {
           context.reader->do_close();
         }
         context.ResetSdfOptions();
+        context.RestoreElementCreationFlags();
       });
 
   m.attr("ReaderContext") = m.attr("MolReaderContext");

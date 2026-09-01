@@ -436,11 +436,12 @@ fi
 # libraries from LillyMol/lib to your default PYTHONPATH.
 
 if [[ -v BUILD_PYTHON ]] ; then
-    python_targets=(//nanobind:lillymol //nanobind:lillymol_gfp_server)
+    python_targets=(//nanobind:lillymol //nanobind:lillymol_gfp_server //nanobind:lillymol_soabi)
     if [[ -v BUILD_BDB ]] ; then
         python_targets+=(//nanobind:lillymol_bdb)
     fi
     ${bazel} ${bazel_options} build ${build_options} "${python_targets[@]}"
+    ${bazel} ${bazel_options} test ${build_options} //nanobind::all
     ./copy_shared_libraries.sh $REPO_HOME/lib 
 
     ./run_python_unit_tests.sh

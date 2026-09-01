@@ -47,12 +47,16 @@ def docs_directory():
   home = os.environ.get('LILLYMOL_HOME')
   if home:
     candidates.append(os.path.join(home, 'docs', 'python'))
+  else:
+    raise FileNotFoundError("No LILLYMOL_HOME")
 
+  print(candidates)
   for candidate in candidates:
+    print(f"Checking documentation in {candidate}")
     if os.path.isdir(candidate):
       return candidate
 
-  raise FileNotFoundError('Cannot find docs/python; set LILLYMOL_HOME to the repository root')
+  raise FileNotFoundError(f'Cannot find docs/python; set LILLYMOL_HOME ${LILLYMOL_HOME} to the repository root')
 
 
 def documented_methods(directory):

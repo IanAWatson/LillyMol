@@ -116,6 +116,8 @@ MedchemWizard::MedchemWizard() {
 
 int
 MedchemWizard::ReadReactions(const char* fname) {
+  set_warn_no_query_in_reaction_object(0);
+
   iwstring_data_source input(fname);
 
   if (!input.good()) {

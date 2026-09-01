@@ -1822,6 +1822,7 @@ extern void set_reaction_transfer_text_info_to_products (int);
 extern int set_stream_for_sidechains_not_matching_query (const const_IWSubstring & fname);
 extern void set_warn_duplicate_atom_deletion(int s);
 extern void set_warn_non_bonded_breaks(int s);
+extern void set_warn_no_query_in_reaction_object(int s);
 
 extern int
 determine_atom_number (const Set_of_Atoms & scaffold_embedding,

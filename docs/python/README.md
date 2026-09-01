@@ -22,7 +22,7 @@ check the reference if something does not behave as you expect.
 | [LillyMolPython.md](LillyMolPython.md) | The API reference - Molecule, Atom, Bond, Set_of_Atoms and Ring methods, substructure searching, reactions, GFP |
 | [Tools.md](Tools.md) | LillyMol command line tools exposed to python - QED, Lipinski, MedchemWizard, unique molecules, Position3D |
 | [descriptors.md](descriptors.md) | Molecular descriptors, singly and in batches, numpy and pandas forms |
-| [fingerprints.md](fingerprints.md) | Legacy fingerprint helpers and background; prefer `GFPContext`/`GFPList` in `LillyMolPython.md` for new code |
+| [fingerprints.md](fingerprints.md) | GFP quickstart, similarity background, and legacy counted fingerprint helpers |
 | [tsubstructure.md](tsubstructure.md) | Substructure searching as the `tsubstructure` tool does it |
 | [structure_database.md](structure_database.md) | Looking molecules up in a structure database |
 | [synthetic_precedent.md](synthetic_precedent.md) | Synthetic precedent from a database of known molecules |

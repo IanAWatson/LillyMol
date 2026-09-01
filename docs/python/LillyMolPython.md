@@ -958,15 +958,15 @@ embeddings without recomputing the inner shells for each radius.
 
 ## GFP fingerprint files and similarity search
 
-`lillymol_tools.GFPList` provides read/search access to LillyMol GFP
-fingerprints. It can read precomputed `.gfp`/TDT fingerprint files, and it can
-also generate the standard LillyMol GFP fingerprint directly from Python
-`Molecule` objects.
+`GFPList` provides read/search access to LillyMol GFP fingerprints. It can read
+precomputed `.gfp`/TDT fingerprint files, and it can also generate the standard
+LillyMol GFP fingerprint directly from Python `Molecule` objects. For a shorter
+orientation, see the [GFP quickstart](fingerprints.md#gfp-quickstart).
 
 ### Reading an existing GFP file
 
 ```python
-from lillymol_tools import GFPList
+from lillymol import GFPList
 
 gfp = GFPList.from_file("collection.gfp")
 
@@ -998,7 +998,7 @@ Use a `GFPContext` when you want standalone query fingerprints:
 
 ```python
 from lillymol import Molecule
-from lillymol_tools import GFPContext
+from lillymol import GFPContext
 
 ctx = GFPContext.standard()
 
@@ -1014,7 +1014,7 @@ specifications. This is the extension point for adding more fingerprint
 generators while keeping the context schema explicit.
 
 ```python
-from lillymol_tools import GFP, GFPContext
+from lillymol import GFP, GFPContext
 
 ctx = GFPContext.from_specs([
     GFP.iw(),
@@ -1109,7 +1109,7 @@ without changing the input molecule.
 For example:
 
 ```python
-from lillymol_tools import GFP, GFPContext
+from lillymol import GFP, GFPContext
 
 ctx = GFPContext.from_specs([
     GFP.spinach(label_join_points=True),
@@ -1122,7 +1122,7 @@ Python molecules:
 
 ```python
 from lillymol import Molecule
-from lillymol_tools import GFPContext, GFPList
+from lillymol import GFPContext, GFPList
 
 gfp = GFPList.standard()
 
@@ -1147,29 +1147,52 @@ convenient. Set `store_metadata=True` if the `GFPList` should retain smiles and
 ids for later `smiles(index)` and `id(index)` calls.
 
 ```python
-molecules = []
-for smiles in ["CC ethane", "CCC propane", "CCCC butane"]:
-  mol = Molecule()
-  mol.build_from_smiles(smiles)
-  molecules.append(mol)
+from lillymol import GFPContext, GFPList, MolFromSmiles
 
-gfp = GFPList.standard_from_molecules(molecules)
+molecules = MolFromSmiles([
+    "CC ethane",
+    "CCC propane",
+    "CCCC butane",
+])
 
-# Later additions can also be batched. This also defaults to not storing
-# smiles/id metadata.
-gfp.add_molecules(more_molecules)
+gfp = GFPList.standard_from_molecules(molecules, store_metadata=True)
+
+# Later additions can also be batched. This defaults to not storing smiles/id
+# metadata unless store_metadata=True is supplied.
+gfp.add_molecules(more_molecules, store_metadata=True)
 ```
+
+When an explicit context is useful, construct the list from that context and add
+molecules in one batch:
+
+```python
+ctx = GFPContext.standard()
+gfp = GFPList(ctx)
+gfp.add_molecules(molecules, store_metadata=True)
+```
+
+If the input is a list of SMILES strings from another toolkit and no identifiers
+are needed, use `add_smiles()`:
+
+```python
+gfp = GFPList.standard()
+gfp.add_smiles(["CC", "CCC", "CCCC"])
+```
+
+`add_smiles()` never stores smiles/id metadata. Use `MolFromSmiles()` plus
+`add_molecules(..., store_metadata=True)` when ids should be retained.
 
 A `GFPList` either stores metadata for every entry or for none. Mixing the two
 modes is rejected. Lists read from `.gfp` files and lists built with
 `GFPList.add(mol)` store metadata. Batch construction defaults to no metadata.
 
-Fingerprint generation follows the standard GFP preprocessing used by the
-existing C++ GFP server path. The input Python molecule is copied before that
-preprocessing, so calling `fingerprint()`, `GFPList.add()`, or
-`GFPList.add_molecules()` does not alter the Python `Molecule` object. If
-molecules have already been standardised and preprocessed, this step can be
-skipped:
+Batch construction and `add_molecules()` pass pointers to the existing Python
+`Molecule` objects into C++ rather than copying the molecules into a temporary
+`std::vector<Molecule>`. This matters for large collections. Fingerprint
+generation follows the standard GFP preprocessing used by the existing C++ GFP
+server path, and may update normal LillyMol cached/perceived state on the input
+molecule. It should not make destructive structural changes. If molecules have
+already been standardised and preprocessed, this step can be skipped:
 
 ```python
 ctx = GFPContext.standard(preprocess=False)

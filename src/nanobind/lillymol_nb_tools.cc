@@ -4,9 +4,11 @@
 
 #include <cmath>
 #include <memory>
+#include <vector>
 
 #include <nanobind/stl/shared_ptr.h>
 #include <nanobind/stl/unordered_map.h>
+#include <nanobind/stl/vector.h>
 
 #include "Molecule_Lib/mol2graph.h"
 #include "Molecule_Tools/dicer_api.h"
@@ -153,16 +155,6 @@ CheckCompatibleFingerprint(const gfp_context::GFPList& gfp,
   }
 }
 
-std::vector<Molecule*>
-MoleculePointerVector(std::vector<Molecule>& molecules) {
-  std::vector<Molecule*> result;
-  result.reserve(molecules.size());
-  for (Molecule& molecule : molecules) {
-    result.push_back(&molecule);
-  }
-  return result;
-}
-
 std::vector<std::string>
 GFPGeneratorSpecComponents(const gfp_context::GFPGeneratorSpec& spec) {
   std::vector<std::string> result;
@@ -231,11 +223,10 @@ StandardGFPList(bool preprocess) {
 }
 
 std::shared_ptr<gfp_context::GFPList>
-StandardGFPListFromMolecules(std::vector<Molecule>& molecules, bool preprocess,
+StandardGFPListFromMolecules(const std::vector<Molecule*>& molecules, bool preprocess,
                              bool store_metadata) {
-  std::vector<Molecule*> molecule_ptrs = MoleculePointerVector(molecules);
   auto result = gfp_context::GFPList::StandardFromMolecules(
-      molecule_ptrs, preprocess, store_metadata);
+      molecules, preprocess, store_metadata);
   if (result == nullptr) {
     throw std::runtime_error("Cannot build standard GFP list from molecules");
   }
@@ -280,11 +271,32 @@ GFPListAdd(gfp_context::GFPList& gfp, Molecule& mol) {
 }
 
 void
-GFPListAddMolecules(gfp_context::GFPList& gfp, std::vector<Molecule>& molecules,
+GFPListAddMolecules(gfp_context::GFPList& gfp, const std::vector<Molecule*>& molecules,
                     bool store_metadata) {
-  std::vector<Molecule*> molecule_ptrs = MoleculePointerVector(molecules);
-  if (!gfp.AddMolecules(molecule_ptrs, store_metadata)) {
+  if (!gfp.AddMolecules(molecules, store_metadata)) {
     throw std::runtime_error("Cannot add molecules to GFPList");
+  }
+}
+
+void
+GFPListAddSmiles(gfp_context::GFPList& gfp, const std::vector<std::string>& smiles) {
+  std::vector<std::unique_ptr<Molecule>> molecules;
+  molecules.reserve(smiles.size());
+  std::vector<Molecule*> molecule_ptrs;
+  molecule_ptrs.reserve(smiles.size());
+
+  for (size_t i = 0; i < smiles.size(); ++i) {
+    auto molecule = std::make_unique<Molecule>();
+    if (!molecule->build_from_smiles(smiles[i])) {
+      throw std::runtime_error("Cannot parse smiles at index " + std::to_string(i) +
+                               ": '" + smiles[i] + "'");
+    }
+    molecule_ptrs.push_back(molecule.get());
+    molecules.push_back(std::move(molecule));
+  }
+
+  if (!gfp.AddMolecules(molecule_ptrs, false)) {
+    throw std::runtime_error("Cannot add smiles to GFPList");
   }
 }
 
@@ -578,6 +590,8 @@ BindTools(nb::module_& m) {
       .def("add", &GFPListAdd, nb::arg("mol"))
       .def("add_molecules", &GFPListAddMolecules, nb::arg("molecules"),
            nb::arg("store_metadata") = false)
+      .def("add_smiles", &GFPListAddSmiles, nb::arg("smiles"),
+           "Add fingerprints generated from a list of SMILES strings without storing metadata")
       .def("distance", &GFPListDistanceIndices, nb::arg("i"), nb::arg("j"))
       .def("distance", &GFPListDistanceFingerprint, nb::arg("fp"), nb::arg("j"))
       .def("nearest_neighbours", &GFPListNearestNeighboursIndex,

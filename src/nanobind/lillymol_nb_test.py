@@ -1929,6 +1929,78 @@ sidechain {
         self.assertEqual(hits[0].index, 1)
         self.assertAlmostEqual(hits[0].distance, 0.0, places=6)
 
+    def test_gfp_programmatic_standard_list_matches_stored_file_distances(self):
+        stored = lillymol.GFPList.from_file(_testdata_file("rand10.standard.gfp"))
+        molecules = [lillymol.MolFromSmiles(stored.smiles(i))
+                     for i in range(len(stored))]
+        generated = lillymol.GFPList.standard_from_molecules(molecules)
+
+        self.assertEqual(len(generated), len(stored))
+        self.assertFalse(generated.metadata_stored())
+        with self.assertRaises(RuntimeError):
+            generated.id(0)
+        with self.assertRaises(RuntimeError):
+            generated.smiles(0)
+
+        for i in range(len(stored)):
+            for j in range(len(stored)):
+                self.assertAlmostEqual(generated.distance(i, j),
+                                       stored.distance(i, j),
+                                       places=6,
+                                       msg=f"{i},{j}")
+
+    def test_gfp_standard_from_molecules_can_store_metadata(self):
+        molecules = [lillymol.MolFromSmiles("CC ethane"),
+                     lillymol.MolFromSmiles("CCC propane"),
+                     lillymol.MolFromSmiles("CCCC butane")]
+        gfp = lillymol.GFPList.standard_from_molecules(molecules, store_metadata=True)
+
+        self.assertEqual(len(gfp), 3)
+        self.assertTrue(gfp.metadata_stored())
+        self.assertEqual(gfp.id(0), "ethane")
+        self.assertEqual(gfp.smiles(1), "CCC")
+        self.assertAlmostEqual(gfp.distance(1, 1), 0.0, places=6)
+
+    def test_gfp_add_molecules_can_store_metadata(self):
+        molecules = [lillymol.MolFromSmiles("CC ethane"),
+                     lillymol.MolFromSmiles("CCC propane")]
+        gfp = lillymol.GFPList.standard()
+        gfp.add_molecules(molecules, store_metadata=True)
+
+        self.assertEqual(len(gfp), 2)
+        self.assertEqual(gfp.id(1), "propane")
+        self.assertEqual(gfp.smiles(0), "CC")
+
+    def test_gfp_add_smiles_matches_add_molecules_without_metadata(self):
+        smiles = ["CC", "CCC", "CCCC"]
+        from_smiles = lillymol.GFPList.standard()
+        from_smiles.add_smiles(smiles)
+
+        molecules = [lillymol.MolFromSmiles(smi) for smi in smiles]
+        from_molecules = lillymol.GFPList.standard_from_molecules(molecules)
+
+        self.assertEqual(len(from_smiles), len(smiles))
+        self.assertFalse(from_smiles.metadata_stored())
+        with self.assertRaises(RuntimeError):
+            from_smiles.id(0)
+
+        for i in range(len(smiles)):
+            for j in range(len(smiles)):
+                self.assertAlmostEqual(from_smiles.distance(i, j),
+                                       from_molecules.distance(i, j),
+                                       places=6)
+
+    def test_gfp_add_smiles_rejects_bad_smiles(self):
+        gfp = lillymol.GFPList.standard()
+        with self.assertRaisesRegex(RuntimeError, "index 1"):
+            gfp.add_smiles(["CC", "["])
+
+    def test_gfp_add_smiles_rejects_existing_metadata_mode(self):
+        gfp = lillymol.GFPList.standard()
+        gfp.add(lillymol.MolFromSmiles("CC ethane"))
+        with self.assertRaises(RuntimeError):
+            gfp.add_smiles(["CCC"])
+
     def test_gfp_generator_specs_and_errors(self):
         self.assertEqual(lillymol.GFP.maccs(level2=False).components(), ["FPMK<"])
         self.assertEqual(lillymol.GFP.formula().components(), ["FCFML<"])

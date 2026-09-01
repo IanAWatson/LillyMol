@@ -8,6 +8,7 @@ cc_library(
     alwayslink = 1,
     srcs = [
         "bits_in_common.c",
+        "bits_in_common_avx.cc",
         "du_bin2ascii.cc",
         "fastprint.cc",
         "fixed_bit_vector.cc",

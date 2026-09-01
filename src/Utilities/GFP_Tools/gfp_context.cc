@@ -1463,12 +1463,16 @@ MolecularProperties::BuildFromArray(const int* properties, int nproperties) {
   }
 
   for (int i = 0; i < _nproperties; ++i) {
-    if (properties[i] < 0 || properties[i] > 255) {
-      std::cerr << "MolecularProperties::BuildFromArray:property " << i
-                << " out of range " << properties[i] << '\n';
-      return 0;
+    int value = properties[i];
+    if (value < 0) {
+      cerr << "MolecularProperties::BuildFromArray:negative value " << value <<
+              " set to zero\n";
+      value = 0;
+    } else if (value > 255) {
+      // No warning for saturation - large molecules..
+      value = 255;
     }
-    _property[i] = static_cast<uint8_t>(properties[i]);
+    _property[i] = static_cast<uint8_t>(value);
   }
 
   return 1;

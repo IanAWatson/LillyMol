@@ -28,7 +28,7 @@
     },
 
     {
-      "_comment": [
+      "comment": [
         "An isotopic label in LillyMol is usually arbitrary - 37C is a labelled",
         "carbon, not a real isotope. w_amw uses set_ignore_isotopes, so the",
         "label must not change the weight. Every labelled molecule here must",

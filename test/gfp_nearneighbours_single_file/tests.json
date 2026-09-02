@@ -3,9 +3,23 @@
   "test": [
 
     {
+      "comment": [
+        "-T was 0.2, which put the pair PBCHM28130395 / PBCHM67649930 exactly on",
+        "the threshold, so whether it was kept depended on floating point",
+        "rounding. --config=native enables FMA, which drops an intermediate",
+        "rounding and put that distance a hair under 0.2, while a build without",
+        "it landed on or above. build_linux.sh defaults BUILD_NATIVE=1, so the",
+        "documented build failed this test while a non-native build passed.",
+        "0.21 has the same problem, on PBCHM67673781 / PBCHM100210717, as do",
+        "0.2 and 0.225. 0.205 was checked to give byte identical output from",
+        "both an --config=native and a plain -c opt build.",
+        "NOTE: out/Darwin/stdout still corresponds to -T 0.2 and needs to be",
+        "regenerated on a Mac. It cannot be derived from the Linux output - the",
+        "two differ in how small floats are formatted (0.0854 vs 8.54e-02)."
+      ],
       "name": "case_1",
       "args": [
-        "-p -z -T 0.2 -F FPDSC,w=0.2 -F NCSELW,nc,w=0.8 -V a=0.3 -V b=1.7 -j 3 ${LILLYMOL_HOME}/data/pubchem.gfp"
+        "-p -z -T 0.205 -F FPDSC,w=0.2 -F NCSELW,nc,w=0.8 -V a=0.3 -V b=1.7 -j 3 ${LILLYMOL_HOME}/data/pubchem.gfp"
       ]
     }
 

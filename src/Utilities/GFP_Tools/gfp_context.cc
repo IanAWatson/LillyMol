@@ -36,6 +36,7 @@
 
 namespace gfp_context {
 namespace {
+using std::cerr;
 
 constexpr char kSmilesTag[] = "$SMI<";
 constexpr char kIdentifierTag[] = "PCN<";

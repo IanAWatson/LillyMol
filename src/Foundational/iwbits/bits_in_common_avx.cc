@@ -20,15 +20,13 @@ intersection_popcount_avx512(const uint64_t* a,
                              const uint64_t* b,
                              std::size_t n_words) {
     std::size_t i = 0;
-    __m512i vtotal = 0;
-
-    alignas(64) uint64_t lanes[8];
+    __m512i vtotal = _mm512_setzero_si512();
 
     for (; i + 8 <= n_words; i += 8) {
         __m512i va = _mm512_loadu_si512(reinterpret_cast<const __m512i*>(a + i));
         __m512i vb = _mm512_loadu_si512(reinterpret_cast<const __m512i*>(b + i));
         __m512i vand = _mm512_and_si512(va, vb);
-        vtotal = _mm512_add_epi64(vtotal, _mm512_popcnt_epi64(vand);
+        vtotal = _mm512_add_epi64(vtotal, _mm512_popcnt_epi64(vand));
     }
     uint64_t total = _mm512_reduce_add_epi64(vtotal);
 

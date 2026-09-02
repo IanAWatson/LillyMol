@@ -1,5 +1,6 @@
 # builder stage
-FROM python:3.11.8 AS build
+ARG PYTHON_VERSION='3.12'
+FROM python:${PYTHON_VERSION}-trixie AS build
 
 RUN apt-get update && \
     apt-get upgrade -y && \
@@ -26,7 +27,8 @@ ENV LILLYMOL_HOME=/LillyMol \
     BUILD_DIR=Linux \
     BUILD_BDB=1 \
     BUILD_PYTHON=1 \
-    BUILD_GO=1
+    BUILD_GO=1 \
+    PYTHON_VERSION=${PYTHON_VERSION}
 
 RUN ./build_linux.sh
 
@@ -34,7 +36,8 @@ RUN ./build_linux.sh
 RUN ./uninstall.sh
 
 # final stage
-FROM python:3.11.8-slim AS final
+ARG PYTHON_VERSION='3.12'
+FROM python:${PYTHON_VERSION}-slim-trixie AS final
 
 RUN apt-get update && \
     apt-get upgrade -y && \

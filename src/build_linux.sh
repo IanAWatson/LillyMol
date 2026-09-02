@@ -239,25 +239,9 @@ else
     inside_lilly=0
 fi
 
-# Options that are used by all bazelisk invocations.
-
-# bazel will not work on an NFS mounted file system. So if you are on an NFS
-# file system, you must specify a value for --output_user_root that is
-# locally mounted.
-# Note that the bazel cache can get quite large, 1-2GB.
-
-# If inside Lilly, some local scratch storage
-if [[ ${inside_lilly} -eq 1 && -d '/node/scratch' ]] ; then
-    bazel_options="--output_user_root=/node/scratch/${USER}/bazel"
-elif [[ $(df -TP ${HOME}) =~ 'nfs' ]] ; then
-    echo "Your HOME dir is an NFS mounted file system. bazel will not work."
-    echo "Will attempt to use /tmp/ for bazel cache, that will need to be changed."
-    bazel_options="--output_user_root=/tmp/bazel_${USER}"
-    bazel_options="--output_user_root=/projects/bazel_${USER}"
-else
-    # Even if outside Lilly, you may still need to set this
-    bazel_options=""
-fi
+# The script returns --output_user_root=<dir> if a suitable
+# directory can be found
+bazel_options=$(./output_user_root.sh)
 
 build_options="--cxxopt=-DGIT_HASH=\"$(git rev-parse --short --verify HEAD)\" --cxxopt=-DTODAY=\"$(date +%Y-%b-%d)\" --jobs=${THREADS} -c opt"
 

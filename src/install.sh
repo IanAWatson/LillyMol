@@ -7,6 +7,10 @@
 # be the destination. All other arguments are passed to the `bazel query`
 # command.
 
+# The script returns --output_user_root=<dir> if a suitable
+# directory can be found
+bazel_options=$(./output_user_root.sh)
+
 files_not_present=0
 files_copied=0
 already_copied=0
@@ -44,14 +48,7 @@ else
   except='except (//Obsolete:all union //Duplicates:all)'
 fi
 
-# If inside Lilly locate the user's root area.
-if [[ -d "/node/scratch/${USER}" ]] ; then
-  output_user_root="--output_user_root=/node/scratch/${USER}"
-else
-  output_user_root="--output_user_root=/tmp/bazel_${USER}"
-fi
-
-targets=$(bazelisk ${output_user_root} query "$@" "kind(cc_binary, //...:all ${except} ) union kind(go_binary, //...:all ${except} )")
+targets=$(bazelisk ${bazel_options} query "$@" "kind(cc_binary, //...:all ${except} ) union kind(go_binary, //...:all ${except} )")
 echo "Targets are"
 echo ${targets}
 echo "Installing"

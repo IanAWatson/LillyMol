@@ -373,6 +373,9 @@ replacement.set_ring_atom_smarts("c")
 replacement.set_min_support_requirement(100)
 replacement.set_unique_molecules_only(True)
 replacement.set_remove_isotopes(True)
+# Optional: broaden replacement to substitution patterns not observed in the
+# replacement collection. This is the Python equivalent of command-line -d.
+replacement.set_preserve_connectivity(False)
 
 number_read = replacement.read_replacement_rings("rings_6a.smi")
 if number_read == 0:
@@ -393,6 +396,15 @@ Configuration that filters replacement records, especially
 collection per `RingReplacement` object. `number_replacement_rings()` reports how
 many records were retained from that collection.
 
+By default, `set_preserve_connectivity(True)` requires replacement records to
+preserve an observed substitution pattern. Calling
+`set_preserve_connectivity(False)` is equivalent to command-line `-d`: it admits
+records marked `conn: false`, broadening the generated structures and potentially
+producing less plausible substitution patterns. This setting determines which
+records are retained while the replacement collection is read, so it must be set
+before `read_replacement_rings()`. Calling it after the collection has been read
+raises `RuntimeError`.
+
 `process` returns a Python list of generated `Molecule` objects. The parent
 molecule is **not** included, and an empty list means that no product was
 generated. A generated product can still be structurally identical to the parent
@@ -412,6 +424,8 @@ The following controls are currently exposed:
 - `set_min_support_requirement(count)` sets the minimum precedent count.
 - `set_max_formula_difference(value)` limits formula divergence.
 - `set_remove_isotopes(value)` controls removal of attachment labels.
+- `set_preserve_connectivity(value)` controls whether replacement records must
+  preserve an observed substitution pattern; call it before reading rings.
 - `read_replacement_rings(filename)` reads the replacement collection.
 - `number_replacement_rings()` reports the retained collection size.
 - `process(molecule)` generates and returns products.

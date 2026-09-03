@@ -814,6 +814,11 @@ BindTools(nb::module_& m) {
       .def("set_remove_isotopes",
            &ring_replacement::RingReplacement::set_remove_isotopes,
            nb::arg("value"), "Control whether isotopic labels are removed from products")
+      .def("set_preserve_connectivity",
+           &ring_replacement::RingReplacement::set_preserve_connectivity,
+           nb::arg("value"),
+           "Control whether replacement rings must preserve connectivity; set before "
+           "reading replacement rings")
       .def("read_replacement_rings",
            [](ring_replacement::RingReplacement& replacement,
               const std::string& fname) -> uint32_t {

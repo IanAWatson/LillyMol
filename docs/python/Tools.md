@@ -128,6 +128,17 @@ products = wizard.process(mol)
 See the command-line [medchemwizard documentation](/docs/Molecule_Tools/medchemwizard.md)
 for option details and the full Python method list.
 
+## Ring Replacement
+
+`RingReplacement` generates scaffold-hopping analogues from Python using
+replacement-ring collections produced by `ring_extraction`. It exposes controls
+for selecting parent rings, filtering candidates by support or formula
+difference, suppressing duplicate products, removing isotopic attachment labels,
+and allowing replacement patterns that do not preserve observed connectivity.
+
+See the [ring replacement Python documentation](/docs/Molecule_Tools/ring_replacement.md#python)
+for a complete example, method list, replacement-file requirements, and the
+broader chemistry implications of disabling connectivity preservation.
 
 ## Substituent Identification
 

@@ -154,6 +154,7 @@ class RingReplacement {
     void set_remove_isotopes(bool s) {
       _remove_isotopes = s;
     }
+    void set_preserve_connectivity(bool s);
     // This is what does the work.
     std::vector<Molecule> Process(Molecule& m);
     // end python related.

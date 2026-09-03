@@ -4,6 +4,7 @@
 #include <filesystem>
 #include <memory>
 #include <optional>
+#include <stdexcept>
 #include <string>
 #include <vector>
 
@@ -1453,6 +1454,16 @@ RingReplacement::set_min_support_requirement(uint32_t s) {
 void
 RingReplacement::set_max_formula_difference(uint32_t s) {
   _max_formula_difference = s;
+}
+
+void
+RingReplacement::set_preserve_connectivity(bool s) {
+  if (_rings != nullptr) {
+    throw std::runtime_error(
+        "RingReplacement::set_preserve_connectivity: replacement rings already read");
+  }
+
+  _preserve_connectivity = s;
 }
 
 uint32_t

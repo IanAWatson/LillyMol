@@ -77,6 +77,7 @@ py_test(
     main = "lillymol_nb_test.py",
     data = [
         ":lillymol",
+        "testdata/ring_replacement_connectivity.textproto",
         "testdata/rand10.standard.gfp",
     ],
     deps = [

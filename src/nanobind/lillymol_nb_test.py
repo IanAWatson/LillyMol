@@ -1822,6 +1822,20 @@ query {
         self.assertTrue(all(product.number_isotopic_atoms() == 0
                             for product in products))
 
+    def test_ring_replacement_preserve_connectivity(self):
+        replacement_file = os.path.join(
+            os.path.dirname(__file__), "testdata",
+            "ring_replacement_connectivity.textproto")
+
+        replacement = lillymol.RingReplacement()
+        self.assertEqual(replacement.read_replacement_rings(replacement_file), 1)
+        with self.assertRaises(RuntimeError):
+            replacement.set_preserve_connectivity(False)
+
+        replacement = lillymol.RingReplacement()
+        replacement.set_preserve_connectivity(False)
+        self.assertEqual(replacement.read_replacement_rings(replacement_file), 2)
+
     def test_reaction_rdkit_cookbook_smirks(self):
         core = lillymol.MolFromSmiles("*c1c(C)cccc1O")
         sidechain = lillymol.MolFromSmiles("CN*")

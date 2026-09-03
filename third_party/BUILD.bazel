@@ -63,6 +63,18 @@ cc_library(
     visibility = ["//visibility:public"],
 )
 
+cc_library(
+    name = "coordgen",
+    srcs = ["lib/libcoordgen.a"],
+    defines = ["STATIC_COORDGEN"],
+    hdrs = glob(
+        ["include/coordgen/**"],
+        allow_empty = True,
+    ),
+    strip_include_prefix = "include",
+    visibility = ["//visibility:public"],
+)
+
 #cc_library(
 #    name = "python",
 #    hdrs = glob(

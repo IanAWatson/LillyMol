@@ -224,6 +224,29 @@ if [[ -v BUILD_LIGHTGBM ]] ; then
   BUILD_LIGHTGBM=1
 fi
 
+# Optional 2D coordinate generation support. Build a static library so future
+# LillyMol targets can link it without adding a runtime shared-library dependency.
+if [[ -v BUILD_SCHRODINGER_2D ]] ; then
+  must_build=0
+  if [[ ! -d 'coordgenlibs' ]] ; then
+    git clone https://github.com/schrodinger/coordgenlibs.git
+    must_build=1
+  fi
+  if [[ ${must_build} -eq 1 || ! -s "${third_party}/lib/libcoordgen.a" ]] ; then
+    cmake -S coordgenlibs -B coordgenlibs/build \
+      -DCMAKE_BUILD_TYPE=Release \
+      -DCMAKE_INSTALL_PREFIX=${third_party} \
+      -DCMAKE_POSITION_INDEPENDENT_CODE=ON \
+      -DCOORDGEN_BUILD_EXAMPLE=OFF \
+      -DCOORDGEN_BUILD_SHARED_LIBS=OFF \
+      -DCOORDGEN_BUILD_TESTS=OFF \
+      -DCOORDGEN_RIGOROUS_BUILD=OFF \
+      -DCOORDGEN_USE_MAEPARSER=OFF
+    cmake --build coordgenlibs/build --parallel ${THREADS}
+    cmake --install coordgenlibs/build
+  fi
+fi
+
 # Step 3: build LillyMol executables
 echo "Builds and installs LillyMol executables"
 echo ""

@@ -56,20 +56,23 @@ cc_library(
 cc_library(
     name = "iwpvalue",
     srcs = [
-        "dq1da.c",
-        "idamax.c",
         "iwpvalue.cc",
-        "machcon.c",
-        "uni.c",
-        "xerror.c",
     ],
     hdrs = [
         "iwpvalue.h",
     ],
-    deps = [
-        "@third_party//:f2c",
-    ],
     visibility = ["//visibility:public"],
+)
+
+cc_test(
+    name = "iwpvalue_test",
+    srcs = [
+        "iwpvalue_test.cc",
+    ],
+    deps = [
+        ":iwpvalue",
+        "@googletest//:gtest_main",
+    ],
 )
 
 cc_library(

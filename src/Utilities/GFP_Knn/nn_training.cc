@@ -820,7 +820,7 @@ bsquared_comparitor_careful (const void * pb1, const void * pb2)
 
 //#define USE_FULL_PVALUE_COMPUTATION
 #ifdef USE_FULL_PVALUE_COMPUTATION
-  double p = iwpvalue (n, fabs (t));
+  double p = iwpvalue (n - 1, fabs (t));
 //cerr << "P value for " << n << " " << fabs (t) << " " << p << endl;
 //cerr << "Ave " << acc.average () << " variance " << acc.variance () << " n = " << n << endl;
 
@@ -830,7 +830,7 @@ bsquared_comparitor_careful (const void * pb1, const void * pb2)
   if (p <= pvalue_threshold)    // they are different at this level
     return average_bsquared_comparitor (pb1, pb2);
 #else
-  if (fabs (t) <= tvalue_threshold)
+  if (fabs (t) > tvalue_threshold)
     return average_bsquared_comparitor (pb1, pb2);
 #endif
 
@@ -3590,7 +3590,7 @@ determine_tvalue_threshold (int n,
                             double pvalue_threshold)
 {
   double right = 8.0;
-  double rp = iwpvalue (n, right);
+  double rp = iwpvalue (n - 1, right);
 
   if (rp > pvalue_threshold)
   {
@@ -3600,7 +3600,7 @@ determine_tvalue_threshold (int n,
   }
 
   double left = 0.01;
-  // double lp = iwpvalue (n, left);
+  // double lp = iwpvalue (n - 1, left);
   //cerr << " lp " << lp << " threshold " << pvalue_threshold << " rp " << rp << '\n';
   //assert (lp >= pvalue_threshold && pvalue_threshold >= rp);
 
@@ -3608,14 +3608,14 @@ determine_tvalue_threshold (int n,
   {
     double xmid = (left + right) * 0.5;
 
-    double xp = iwpvalue (n, xmid);
+    double xp = iwpvalue (n - 1, xmid);
 
     if (verbose > 2)
-      cerr << " X = " << xp << " P " << xp << '\n';
+      cerr << " T = " << xmid << " P " << xp << '\n';
 
     if (fabs (xp - pvalue_threshold) < 0.00001)
     {
-      tvalue_threshold = xp;
+      tvalue_threshold = xmid;
       if (verbose)
         cerr << "For N = " << n << " P = " << pvalue_threshold << " T threshold " << tvalue_threshold << '\n';
 
@@ -4016,8 +4016,16 @@ Cross_Validation_Conditions::construct_from_command_line (Command_Line & cl,
 //    use_the_categories_for_sampling ();
   }
 
-  if (_do_paired_t_test)  
-    determine_tvalue_threshold (_number_splits, pvalue_threshold);
+  if (_do_paired_t_test)
+  {
+    if (_number_splits < 2)
+    {
+      cerr << "Paired T test requested, but at least 2 splits are required\n";
+      return 0;
+    }
+    if (! determine_tvalue_threshold (_number_splits, pvalue_threshold))
+      return 0;
+  }
 
   if (0 == _reorder_equidistant_neighbours)
     _reorder_equidistant_neighbours = _number_splits + 1; // so the modulus test above never happens

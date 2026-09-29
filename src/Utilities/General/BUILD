@@ -767,18 +767,13 @@ cc_binary(
     name = "prediction_bias",
     srcs = [
         "prediction_bias.cc",
-        "sgefa.c",
-        "sgesl.c",
-    ],
-    linkopts = [
-        "-lblas",
     ],
     deps = [
         "//Foundational/accumulator",
         "//Foundational/cmdline:iwcmdline",
         "//Foundational/data_source:iwstring_data_source",
         "//Foundational/iwmisc",
-        "@third_party//:f2c",
+        "@com_gitlab_libeigen_eigen//:eigen",
     ],
 )
 

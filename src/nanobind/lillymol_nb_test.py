@@ -1194,17 +1194,21 @@ $$$$
         self.assertEqual([atom.ncon() for atom in mol], [1, 2, 1])
 
         lillymol.set_copy_name_in_molecule_copy_constructor(True)
-        mol_copy = copy.copy(mol)
-        self.assertEqual(mol_copy.smiles(), mol.smiles())
-        self.assertEqual(mol_copy.name(), "ethanol")
-        mol_copy.set_name("copy")
-        self.assertEqual(mol.name(), "ethanol")
-        self.assertEqual(mol_copy.name(), "copy")
+        copies = [lillymol.Molecule(mol), mol.copy(), copy.copy(mol)]
+        for mol_copy in copies:
+            self.assertEqual(mol_copy.smiles(), mol.smiles())
+            self.assertEqual(mol_copy.name(), "ethanol")
+            mol_copy.set_name("copy")
+            mol_copy.add_atom(6)
+            self.assertEqual(mol.name(), "ethanol")
+            self.assertEqual(mol.natoms(), 3)
+            self.assertEqual(mol_copy.name(), "copy")
+            self.assertEqual(mol_copy.natoms(), 4)
 
         lillymol.set_copy_name_in_molecule_copy_constructor(False)
-        unnamed_copy = copy.copy(mol)
-        self.assertEqual(unnamed_copy.smiles(), mol.smiles())
-        self.assertEqual(unnamed_copy.name(), "")
+        for unnamed_copy in (lillymol.Molecule(mol), mol.copy(), copy.copy(mol)):
+            self.assertEqual(unnamed_copy.smiles(), mol.smiles())
+            self.assertEqual(unnamed_copy.name(), "")
         lillymol.set_copy_name_in_molecule_copy_constructor(True)
 
 

@@ -370,6 +370,9 @@ BindMolecule(nb::module_& m) {
 
   nb::class_<Molecule>(m, "Molecule")
       .def(nb::init<>())
+      .def(nb::init<const Molecule&>(), nb::arg("other"))
+      .def("copy", [](const Molecule& mol) { return Molecule(mol); },
+           "Return an independent copy of the molecule")
       .def("build_from_smiles",
            [](Molecule& mol, const std::string& smiles) {
              return mol.build_from_smiles(smiles);

@@ -163,6 +163,10 @@ static int work_like_recap = 0;
 
 static int write_diced_molecules = 1;
 
+// Write the original atom on the removed side of each cut, with coordinates,
+// to per-molecule DicedMolecule protos.
+static int write_attachment_geometry = 0;
+
 static Accumulator_Base<clock_t, unsigned long> time_acc;
 
 static int collect_time_statistics = 0;
@@ -648,6 +652,7 @@ reset_variables() {
   add_new_strings_to_hash = 1;
   accumulate_starting_parent_information = 0;
   work_like_recap = 0;
+  write_attachment_geometry = 0;
   collect_time_statistics = 0;
   record_presence_and_absence_only = 0;
   isotope_for_join_points = 0;
@@ -987,6 +992,19 @@ class Dicer_Arguments {
 
   ff_map _fragments_found_this_molecule;
 
+  struct AttachmentGeometry {
+    uint32_t atom;
+    IWString external_smiles;
+    dicer_data::AttachmentGeometry::BondType bond_type;
+  };
+
+  struct FragmentGeometry {
+    IWString usmi;
+    std::vector<AttachmentGeometry> attachment;
+  };
+
+  std::unordered_map<uint32_t, FragmentGeometry> _fragment_geometry;
+
   //  We need a fragment membership array for every recursion depth.
   //  We just allocate a single array and hand out slices of it
 
@@ -1073,6 +1091,7 @@ class Dicer_Arguments {
                                                               const int* xref) const;
   int _is_smallest_fragment(const IW_Bits_Base& b) const;
   void _add_new_smiles_to_global_hashes(const IWString& smiles);
+  void CaptureAttachmentGeometry(Molecule& fragment, const IWString& smiles);
 
   int WriteAsProto(Molecule& n, int breakable_bonds, DicerFragmentOutput& output) const;
 
@@ -2419,11 +2438,90 @@ Dicer_Arguments::contains_fragment(Molecule& m) {
     do_check_for_lost_chirality(m);
   }
 
-  if (fragments_indexed_by_unique_smiles) {
-    return MaybeAddToHash(m.unique_smiles());
-  } else {
-    return MaybeAddToHash(m.smiles());
+  const IWString& smiles =
+      fragments_indexed_by_unique_smiles ? m.unique_smiles() : m.smiles();
+  const int rc = MaybeAddToHash(smiles);
+  if (write_attachment_geometry) {
+    CaptureAttachmentGeometry(m, smiles);
   }
+  return rc;
+}
+
+static dicer_data::AttachmentGeometry::BondType
+ProtoBondType(const Bond& bond) {
+  if (bond.is_aromatic()) {
+    return dicer_data::AttachmentGeometry::BOND_AROMATIC;
+  } else if (bond.is_triple_bond()) {
+    return dicer_data::AttachmentGeometry::BOND_TRIPLE;
+  } else if (bond.is_double_bond()) {
+    return dicer_data::AttachmentGeometry::BOND_DOUBLE;
+  } else if (bond.is_single_bond()) {
+    return dicer_data::AttachmentGeometry::BOND_SINGLE;
+  }
+  return dicer_data::AttachmentGeometry::BOND_UNSPECIFIED;
+}
+
+void
+Dicer_Arguments::CaptureAttachmentGeometry(Molecule& fragment, const IWString& smiles) {
+  const auto iter = smiles_to_id.find(smiles);
+  if (iter == smiles_to_id.end() ||
+      _fragment_geometry.find(iter->second) != _fragment_geometry.end()) {
+    return;
+  }
+
+  FragmentGeometry geometry;
+
+  // Generate a topology-only key while leaving the coordinate-bearing fragment
+  // smiles and the process-wide smiles setting unchanged.
+  Molecule topology(fragment);
+  const int include_coordinates = lillymol::include_coordinates_with_smiles();
+  lillymol::set_include_coordinates_with_smiles(0);
+  geometry.usmi = topology.unique_smiles();
+  lillymol::set_include_coordinates_with_smiles(include_coordinates);
+
+  const resizable_array<atom_number_t>& atom_order = topology.atom_order_in_smiles();
+  std::vector<uint32_t> canonical_atom(fragment.natoms());
+  for (int i = 0; i < atom_order.number_elements(); ++i) {
+    canonical_atom[atom_order[i]] = i;
+  }
+
+  std::vector<int> parent_to_fragment(_atoms_in_molecule, -1);
+  for (int i = 0; i < fragment.natoms(); ++i) {
+    if (const std::optional<atom_number_t> parent = InitialAtomNumber(fragment.atomi(i));
+        parent && *parent < _atoms_in_molecule) {
+      parent_to_fragment[*parent] = i;
+    }
+  }
+
+  for (int parent_atom = 0; parent_atom < _atoms_in_molecule; ++parent_atom) {
+    const int fragment_atom = parent_to_fragment[parent_atom];
+    if (fragment_atom < 0) {
+      continue;
+    }
+    for (const Bond* bond : _current_molecule->atom(parent_atom)) {
+      const atom_number_t external_atom = bond->other(parent_atom);
+      if (parent_to_fragment[external_atom] >= 0) {
+        continue;
+      }
+
+      Molecule external;
+      // The pointer constructor copies atom attributes but not its parent bonds.
+      external.add(new Atom(_current_molecule->atomi(external_atom)));
+      if (atom_typing_specification.active() && _atom_type != nullptr) {
+        external.set_isotope(0, _atom_type[external_atom]);
+      } else {
+        external.set_isotope(0, 0);
+      }
+      geometry.attachment.push_back(AttachmentGeometry{
+          canonical_atom[fragment_atom], external.smiles(), ProtoBondType(*bond)});
+    }
+  }
+
+  std::sort(geometry.attachment.begin(), geometry.attachment.end(),
+            [](const AttachmentGeometry& lhs, const AttachmentGeometry& rhs) {
+              return lhs.atom < rhs.atom;
+            });
+  _fragment_geometry.emplace(iter->second, std::move(geometry));
 }
 
 int
@@ -2623,6 +2721,20 @@ Dicer_Arguments::ToProto(Molecule& m, int breakable_bonds,
     frag->set_nat(lillymol::count_atoms_in_smiles(*s));
     frag->set_n(count);
     frag->set_id(fragment_number);
+    if (write_attachment_geometry) {
+      const auto iter = _fragment_geometry.find(fragment_number);
+      if (iter == _fragment_geometry.end()) {
+        continue;
+      }
+      frag->set_usmi(iter->second.usmi.data(), iter->second.usmi.length());
+      for (const AttachmentGeometry& geometry : iter->second.attachment) {
+        dicer_data::AttachmentGeometry* attachment = frag->add_attachment();
+        attachment->set_atom(geometry.atom);
+        attachment->set_ext(geometry.external_smiles.data(),
+                            geometry.external_smiles.length());
+        attachment->set_btype(geometry.bond_type);
+      }
+    }
   }
 
   return 1;
@@ -7106,6 +7218,15 @@ add_parent_atom_count_to_global_array(const IWString& mname, int matoms,
 
 static int
 dicer(Molecule& m, DicerFragmentOutput& output) {
+  if (write_attachment_geometry) {
+    if (m.highest_coordinate_dimensionality() < 3) {
+      cerr << "Attachment geometry requested (-I geom), but molecule '" << m.name()
+           << "' does not have 3D coordinates\n";
+      return 0;
+    }
+    lillymol::set_include_coordinates_with_smiles(1);
+  }
+
   static bool first_call = true;
   if (first_call) {
     if (m.highest_coordinate_dimensionality() > 1) {
@@ -7553,6 +7674,7 @@ display_dash_i_options(int rc) {
  -I atype         the atom typing specified by the -P option '-P UST:AY -I atype'.
                     note that the atom types are computed for the starting molecule.
  -I fragatype     atom typing is computed on the fragments.
+ -I geom          include 3D attachment geometry in per-molecule proto output.
 )";
   // clang-format on
 
@@ -7844,6 +7966,11 @@ dicer(int argc, char** argv) {
         apply_atom_types_to_fragments = 1;
         if (verbose) {
           cerr << "Atom types generated on fragments - enables context matching\n";
+        }
+      } else if (i == "geom") {
+        write_attachment_geometry = 1;
+        if (verbose) {
+          cerr << "Will write attachment geometry to per-molecule protos\n";
         }
       } else if ("help" == i) {
         display_dash_i_options(0);
@@ -8350,6 +8477,11 @@ dicer(int argc, char** argv) {
   if (write_fragments_as_binary_protos && !cl.option_present('S')) {
     cerr
         << "When writing serialized protos, must specify output file via the -S option\n";
+    return 1;
+  }
+
+  if (write_attachment_geometry && !output.output_is_proto()) {
+    cerr << "The -I geom directive requires -B proto or -B serialized_proto\n";
     return 1;
   }
 

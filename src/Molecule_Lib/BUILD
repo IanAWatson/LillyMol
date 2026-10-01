@@ -913,6 +913,20 @@ cc_test(
 )
 
 cc_test(
+    name = "mdl_wedge_chirality_test",
+    timeout = "short",
+    srcs = [
+        "mdl_wedge_chirality_test.cc",
+    ],
+    deps = [
+        ":iwmolecule",
+        ":moleculeio",
+        ":substructure_cc_proto",
+        "@googletest//:gtest_main",
+    ],
+)
+
+cc_test(
     name = "molecule_each_index_test",
     timeout = "short",
     srcs = [

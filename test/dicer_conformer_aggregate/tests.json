@@ -1,0 +1,12 @@
+{
+  "executable": "dicer_conformer_aggregate",
+  "test": [
+    {
+      "name": "deduplicate_rigid_transform",
+      "args": [ "#{indir}/in.textproto" ],
+      "difftool": "diff",
+      "difftool_options": "-w",
+      "comment": [ "rigidly transformed linker geometries collapse to one conformer" ]
+    }
+  ]
+}

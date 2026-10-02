@@ -6554,7 +6554,7 @@ Reaction_Stereo_Centre::process(Molecule& result, const Set_of_Atoms* scaffold_e
 }
 
 Reaction_Wedge_Bond::Reaction_Wedge_Bond()
-    : Pair_of_Atoms(INVALID_ATOM_NUMBER, INVALID_ATOM_NUMBER) {
+    : Pair_of_Atoms(kInvalidAtomNumber, kInvalidAtomNumber) {
   _direction = 0;
 
   return;
@@ -6849,7 +6849,7 @@ Reaction_Site::_do_restore_saved_chiral_centre(Molecule& result,
 
   int i = 0;
   atom_number_t j;
-  while (INVALID_ATOM_NUMBER != (j = c->next_atom(i))) {
+  while (kInvalidAtomNumber != (j = c->next_atom(i))) {
     atoms_in_chiral_centre++;
 
     if (!a->is_bonded_to(j)) {  // ZATOM still bonded to atom J in RESULT, no change
@@ -6940,7 +6940,7 @@ Reaction_Site::_do_restore_saved_chiral_centre(Molecule& result,
   // If there is an implicit Hydrogen on the chiral centre, we can have one atom that
   // isn't specified as a replacement
 
-  // atom_number_t possible_implicit_hydrogen = INVALID_ATOM_NUMBER;
+  // atom_number_t possible_implicit_hydrogen = kInvalidAtomNumber;
 
   // Identify the replacements
 

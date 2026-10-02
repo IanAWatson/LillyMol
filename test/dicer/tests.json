@@ -92,6 +92,13 @@
           "comment": [ "3D attachment geometry is emitted in canonical fragment atom order" ]
         },
         {
+          "name": "attachment_geometry_atom_type",
+          "args": [ "-i smi -B proto -s CC -I 1 -I geom -P UST:Z #{indir}/in.smi" ],
+          "difftool": "diff",
+          "difftool_options": "-w",
+          "comment": [ "attachment geometry explicitly records parent atom types and their specification" ]
+        },
+        {
           "name": "attachment_geometry_requires_proto",
           "args": [ "-i smi -s CC -I 1 -I geom #{indir}/in.smi" ],
           "difftool": "diff",

@@ -493,6 +493,7 @@ static int read_bonds_to_be_broken_from_bbrk_file = 0;
 static int check_for_lost_chirality = 0;
 
 static Atom_Typing_Specification atom_typing_specification;
+static IWString atom_typing_specification_string;
 
 // When -C fragatype writes hydrogen complementary fragments, this is the
 // synthetic hydrogen fragment token, for example [3001H].
@@ -996,6 +997,7 @@ class Dicer_Arguments {
     uint32_t atom;
     IWString external_smiles;
     dicer_data::AttachmentGeometry::BondType bond_type;
+    std::optional<uint32_t> external_atom_type;
   };
 
   struct FragmentGeometry {
@@ -2507,13 +2509,16 @@ Dicer_Arguments::CaptureAttachmentGeometry(Molecule& fragment, const IWString& s
       Molecule external;
       // The pointer constructor copies atom attributes but not its parent bonds.
       external.add(new Atom(_current_molecule->atomi(external_atom)));
+      std::optional<uint32_t> external_atom_type;
       if (atom_typing_specification.active() && _atom_type != nullptr) {
-        external.set_isotope(0, _atom_type[external_atom]);
+        external_atom_type = _atom_type[external_atom];
+        external.set_isotope(0, *external_atom_type);
       } else {
         external.set_isotope(0, 0);
       }
       geometry.attachment.push_back(AttachmentGeometry{
-          canonical_atom[fragment_atom], external.smiles(), ProtoBondType(*bond)});
+          canonical_atom[fragment_atom], external.smiles(), ProtoBondType(*bond),
+          external_atom_type});
     }
   }
 
@@ -2712,6 +2717,11 @@ Dicer_Arguments::ToProto(Molecule& m, int breakable_bonds,
   }
   proto.set_natoms(m.natoms());
   proto.set_nbonds(breakable_bonds);
+  if (atom_typing_specification.active() &&
+      atom_typing_specification_string.length()) {
+    proto.set_atom_typing(atom_typing_specification_string.data(),
+                          atom_typing_specification_string.length());
+  }
 
   for (const auto& [fragment_number, count] : _fragments_found_this_molecule) {
     const IWString* s = id_to_smiles[fragment_number];
@@ -2733,6 +2743,9 @@ Dicer_Arguments::ToProto(Molecule& m, int breakable_bonds,
         attachment->set_ext(geometry.external_smiles.data(),
                             geometry.external_smiles.length());
         attachment->set_btype(geometry.bond_type);
+        if (geometry.external_atom_type) {
+          attachment->set_external_atom_type(*geometry.external_atom_type);
+        }
       }
     }
   }
@@ -8299,6 +8312,7 @@ dicer(int argc, char** argv) {
           cerr << "Invalid atom typing specification '" << b << "'\n";
           return 2;
         }
+        atom_typing_specification_string = b;
       } else if (b.starts_with("MAXAL=")) {
         b.remove_leading_chars(6);
         if (!b.numeric_value(max_atoms_lost_from_parent) ||
@@ -8492,6 +8506,7 @@ dicer(int argc, char** argv) {
       cerr << "Cannot initialise atom typing '" << p << "'\n";
       return 1;
     }
+    atom_typing_specification_string = p;
   }
 
   if (cl.option_present('a')) {

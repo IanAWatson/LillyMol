@@ -73,6 +73,10 @@ message AttachmentGeometry {
     BOND_AROMATIC = 4;
   }
   BondType btype = 3;
+
+  // Atom type of the atom on the removed side of the cut. Present only when
+  // atom typing was active while dicer processed the parent molecule.
+  optional uint32 external_atom_type = 4;
 }
 
 // For each pair of fragments, the number of atoms in common.
@@ -93,6 +97,10 @@ message DicedMolecule {
   repeated DicerFragment fragment = 5;
 
   repeated FragmentOverlap overlap = 6;
+
+  // Atom typing specification used to populate
+  // AttachmentGeometry.external_atom_type.
+  optional string atom_typing = 7;
 }
 
 // Deliberately shortened names to help textproto representations.

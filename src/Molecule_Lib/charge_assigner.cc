@@ -523,7 +523,7 @@ atom_with_numeric_value(const Query_Atoms_Matched& qami, const Set_of_Atoms* e) 
 
   cerr << "No matched atom has a numeric value\n";
 
-  return INVALID_ATOM_NUMBER;
+  return kInvalidAtomNumber;
 }
 
 /*
@@ -559,7 +559,7 @@ Charge_Assigner::_remove_lower_preference_hits(Molecule& m,
     cerr << " i = " << i << " atom " << ai << '\n';
 #endif
 
-    if (INVALID_ATOM_NUMBER == ai) {  // huh
+    if (kInvalidAtomNumber == ai) {  // huh
       continue;
     }
 
@@ -581,7 +581,7 @@ Charge_Assigner::_remove_lower_preference_hits(Molecule& m,
 
       atom_number_t aj = atom_with_numeric_value(*qamj, sresults.embedding(j));
 
-      if (INVALID_ATOM_NUMBER == aj) {
+      if (kInvalidAtomNumber == aj) {
         continue;
       }
 

@@ -520,7 +520,7 @@ class Make_Implicit_Hydrogens_Explicit {
   Make_Implicit_Hydrogens_Explicit();
 
   void reset() {
-    _a = INVALID_ATOM_NUMBER;
+    _a = kInvalidAtomNumber;
   }
 
   isotope_t isotope() const {
@@ -886,9 +886,9 @@ class __attribute__((visibility("default"))) Molecule : protected resizable_arra
   // ownership of `a`.
   // Setting partial_molecule sidesteps invalidation steps
   // and may be more efficient while building molecules.
-  int add(Atom* a, int partial_molecule = 0);
+  atom_number_t add(Atom* a, int partial_molecule = 0);
 
-  int add(const Element*);
+  atom_number_t add(const Element*);
   // If `new_size` is smaller than `natoms` atoms are removed.
   // If larger than `natoms` space is allocated to make sure `new_size`
   // atoms can be allocated.
@@ -1112,7 +1112,7 @@ class __attribute__((visibility("default"))) Molecule : protected resizable_arra
   //  of SSSR rings computed by Euler's formula.
   //
   int nrings();                   // number of rings in molecule
-  int nrings_no_compute() const;  // number of rings in molecule without performing ring
+  std::optional<int> nrings_no_compute() const;  // number of rings in molecule without performing ring
                                   // perception (assumes has already been performed)
   int number_sssr_rings();
 
@@ -1433,7 +1433,7 @@ class __attribute__((visibility("default"))) Molecule : protected resizable_arra
 
   int attached_heteroatom_count(atom_number_t) const;
   int multiple_bond_to_heteroatom(atom_number_t,
-                                  atom_number_t = INVALID_ATOM_NUMBER) const;
+                                  atom_number_t = kInvalidAtomNumber) const;
   int multiple_bond_to_heteroatom(atom_number_t, const int*) const;
   int doubly_bonded_oxygen_count(atom_number_t) const;
 
@@ -1495,7 +1495,7 @@ class __attribute__((visibility("default"))) Molecule : protected resizable_arra
   //  When setting a bond length the option parameter is the identity of the atom to move
 
   int set_bond_length(atom_number_t, atom_number_t, distance_t,
-                      atom_number_t = INVALID_ATOM_NUMBER);
+                      atom_number_t = kInvalidAtomNumber);
 
   // By examining the geometry of the connected atoms, does this atom appear to be
   // planar. Returns 1 if the atom looks planar sp2, 0 if not, and -1 if it is hard to

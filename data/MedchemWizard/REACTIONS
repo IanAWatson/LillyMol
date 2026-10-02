@@ -302,3 +302,4 @@ PROTO:ring_orientation_swap.rxn
 PROTO:gem_dimethyl_to_cyclopropane.rxn
 PROTO:cyclopropane_to_gem_dimethyl.rxn
 PROTO:remove_ch2.rxn
+PROTO:ester_to_oxazole.rxn

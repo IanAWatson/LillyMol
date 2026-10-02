@@ -301,7 +301,7 @@ Substructure_Results::add_embedding(Set_of_Atoms * e,
     return 1;
 
   if (_remove_invalid_atom_numbers_from_new_embeddings)
-    e->remove_all(INVALID_ATOM_NUMBER);
+    e->remove_all(kInvalidAtomNumber);
 
   _embedding.add(e);
 

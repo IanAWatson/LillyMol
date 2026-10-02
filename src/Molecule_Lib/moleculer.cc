@@ -474,18 +474,18 @@ Molecule::_compute_number_sssr_rings_by_eulers_formula() {
   return _number_sssr_rings;
 }
 
-int
+std::optional<int>
 Molecule::nrings_no_compute() const {
   if (_nrings >= 0) {  // already computed
     return _nrings;
   } else {
-    return NOT_COMPUTED;  // not computed
+    return std::nullopt;  // not computed
   }
 }
 
 int
 Molecule::nrings() {
-  if (nrings_no_compute() >= 0) {  // already computed
+  if (_nrings >= 0) { // already computed
     return _nrings;
   }
 
@@ -790,7 +790,7 @@ const Ring*
 Molecule::ringi_no_compute(int i) const {
   assert(ok());
 
-  if (nrings_no_compute() <= 0) {
+  if (_nrings <= 0) {  // not computed
     return nullptr;
   }
 
@@ -1686,7 +1686,7 @@ Molecule::_easy_case_two_rings(int fused_sys_id, int* tmp) {
   other_ring.set_is_fused(1);
   other_ring.set_fragment_membership(r1->fragment_membership());
 
-  atom_number_t first_2 = INVALID_ATOM_NUMBER;
+  atom_number_t first_2 = kInvalidAtomNumber;
 
   for (int i = 0; i < _number_elements; i++) {
     if (1 != tmp[i]) {
@@ -1706,7 +1706,7 @@ Molecule::_easy_case_two_rings(int fused_sys_id, int* tmp) {
       break;
     }
 
-    if (INVALID_ATOM_NUMBER != first_2) {
+    if (kInvalidAtomNumber != first_2) {
       break;
     }
   }
@@ -1718,7 +1718,7 @@ Molecule::_easy_case_two_rings(int fused_sys_id, int* tmp) {
   // Build up the rest of the tmp[] == 1 ring in bonded order
 
   atom_number_t start_atom = other_ring[0];
-  atom_number_t second_2 = INVALID_ATOM_NUMBER;
+  atom_number_t second_2 = kInvalidAtomNumber;
   while (1) {
 #ifdef DEBUG_EASY_CASE_TWO_RINGS
     cerr << "start atom is " << start_atom << endl;
@@ -1728,7 +1728,7 @@ Molecule::_easy_case_two_rings(int fused_sys_id, int* tmp) {
     const Atom* a = _things[start_atom];
     int acon = a->ncon();
     int found_connection_with_tmp1 = 0;  // is the ring continuing
-    atom_number_t connected_atom_with_tmp2 = INVALID_ATOM_NUMBER;
+    atom_number_t connected_atom_with_tmp2 = kInvalidAtomNumber;
     for (int i = 0; i < acon; i++) {
       atom_number_t j = a->other(start_atom, i);
       if (0 == tmp[j]) {
@@ -2210,7 +2210,7 @@ Molecule::sssr_rings() {
 atom_number_t
 FirstLowConnectedAtom(const Molecule& m) {
   const int natoms = m.natoms();
-  atom_number_t a_doubly_bonded = INVALID_ATOM_NUMBER;
+  atom_number_t a_doubly_bonded = kInvalidAtomNumber;
   for (int i = 0; i < natoms; ++i) {
     const Atom* a = m.atomi(i);
     if (a->ncon() == 1) {
@@ -2221,24 +2221,24 @@ FirstLowConnectedAtom(const Molecule& m) {
     }
   }
 
-  if (a_doubly_bonded != INVALID_ATOM_NUMBER) {
+  if (a_doubly_bonded != kInvalidAtomNumber) {
     return a_doubly_bonded;
   }
 
   if (natoms == 0) {
-    return INVALID_ATOM_NUMBER;
+    return kInvalidAtomNumber;
   }
 
   return 0;
 }
 
 // A variant of the above that checks an already processed array.
-// If it cannot find any unvisited atoms, it will return INVALID_ATOM_NUMBER.
+// If it cannot find any unvisited atoms, it will return kInvalidAtomNumber.
 atom_number_t
 FirstLowConnectedAtom(const Molecule& m, const int* visited) {
   const int natoms = m.natoms();
-  atom_number_t a_doubly_bonded_atom = INVALID_ATOM_NUMBER;
-  atom_number_t an_unvisited_atom = INVALID_ATOM_NUMBER;
+  atom_number_t a_doubly_bonded_atom = kInvalidAtomNumber;
+  atom_number_t an_unvisited_atom = kInvalidAtomNumber;
   for (int i = 0; i < natoms; ++i) {
     if (visited[i]) {
       continue;
@@ -2253,7 +2253,7 @@ FirstLowConnectedAtom(const Molecule& m, const int* visited) {
     }
   }
 
-  if (a_doubly_bonded_atom != INVALID_ATOM_NUMBER) {
+  if (a_doubly_bonded_atom != kInvalidAtomNumber) {
     return a_doubly_bonded_atom;
   }
 
@@ -2501,12 +2501,12 @@ Molecule::_compute_ring_bond_count() {
   atom_number_t starting_atom = 0;
   int counter_start = 1;
   do {
-    RingFinder(*this, INVALID_ATOM_NUMBER, starting_atom, data, counter_start);
+    RingFinder(*this, kInvalidAtomNumber, starting_atom, data, counter_start);
     counter_start += _update_fragment_information(data.visited, fragment_number,
                                                   data.visited[starting_atom]);
     fragment_number++;
     starting_atom = FirstUnvisited(data.visited, _number_elements);
-  } while (starting_atom != INVALID_ATOM_NUMBER);
+  } while (starting_atom != kInvalidAtomNumber);
 
   _fragment_information.set_number_fragments(fragment_number);
 

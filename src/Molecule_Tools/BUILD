@@ -114,6 +114,22 @@ proto_library(
     ],
 )
 
+proto_library(
+    name = "dicer_conformers_proto",
+    srcs = ["dicer_conformers.proto"],
+)
+
+cc_proto_library(
+    name = "dicer_conformers_cc_proto",
+    visibility = ["//visibility:public"],
+    deps = [":dicer_conformers_proto"],
+)
+
+py_proto_library(
+    name = "dicer_conformers_py_proto",
+    deps = [":dicer_conformers_proto"],
+)
+
 cc_proto_library(
     name = "dicer_fragments_cc_proto",
     visibility = [
@@ -679,6 +695,22 @@ cc_binary(
         "//Molecule_Lib:substructure_cc_proto",
         "@com_google_protobuf//:protobuf",
         "@xxhash",
+    ],
+)
+
+cc_binary(
+    name = "dicer_conformer_aggregate",
+    srcs = ["dicer_conformer_aggregate.cc"],
+    deps = [
+        ":dicer_conformers_cc_proto",
+        ":dicer_fragments_cc_proto",
+        "//Foundational/cmdline_v2",
+        "//Foundational/data_source:iwtfdata_record",
+        "//Foundational/iwstring",
+        "//Molecule_Lib:iwmolecule",
+        "//Molecule_Lib:moleculeio",
+        "@com_google_protobuf//:protobuf",
+        "@com_gitlab_libeigen_eigen//:eigen",
     ],
 )
 

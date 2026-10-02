@@ -536,8 +536,12 @@ atom removed by the cut; and `btype`, the original bond type. Records are
 ordered by `atom`. More than one record may have the same `atom` when multiple
 bonds were removed from that atom.
 
-If a `-P` atom-typing specification is active, the isotope on the atom in
-`ext` is its atom type in the parent molecule. Without atom typing, dicer does
+If atom typing is active, each attachment also contains
+`external_atom_type`, the type of the removed atom in the parent molecule, and
+the enclosing `DicedMolecule` contains `atom_typing`, the atom typing
+specification supplied to dicer. The isotope on the atom in `ext` continues to
+contain the same atom type for compatibility with existing consumers. Without
+atom typing, `external_atom_type` and `atom_typing` are absent and dicer does
 not add an isotope to `ext`. Existing isotopes in the fragment and the chosen
 join-point labelling mode remain present in both `smi` and `usmi`.
 

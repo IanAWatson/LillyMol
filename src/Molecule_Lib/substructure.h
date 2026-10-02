@@ -1574,11 +1574,11 @@ class Substructure_Environment : public resizable_array_p<Substructure_Atom>
 
     int construct_from_msi_object(const msi_object & msi,
                                extending_resizable_array<Substructure_Atom *> & completed,
-                               atom_number_t possible_parent = INVALID_ATOM_NUMBER,
+                               atom_number_t possible_parent = kInvalidAtomNumber,
                                bond_type_t possible_parent_bond_type = INVALID_BOND_TYPE);
     int construct_from_proto(const SubstructureSearch::SubstructureEnvironment& proto,
                                extending_resizable_array<Substructure_Atom *> & completed,
-                               atom_number_t possible_parent = INVALID_ATOM_NUMBER,
+                               atom_number_t possible_parent = kInvalidAtomNumber,
                                bond_type_t possible_parent_bond_type = INVALID_BOND_TYPE);
 
     int write_msi(std::ostream & os, int & object_id, int indentation);
@@ -2489,7 +2489,7 @@ class Substructure_Results
     extending_resizable_array<int> _hits_per_fragment;
 
 //  When we have atoms that are excluded from embeddings, we can get embeddings that
-//  contain INVALID_ATOM_NUMBER. We can optionally remove those as we get the embeddings
+//  contain kInvalidAtomNumber. We can optionally remove those as we get the embeddings
 
     int _remove_invalid_atom_numbers_from_new_embeddings;
 

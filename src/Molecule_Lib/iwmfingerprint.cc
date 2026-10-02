@@ -2021,7 +2021,7 @@ MFingerprint::build (atom_number_t astart, int * bvector, int * auxiliary_bvecto
 
   _path[0] = astart;
 
-  return _build(INVALID_ATOM_NUMBER, bvector, auxiliary_bvector, include_these_atoms);
+  return _build(kInvalidAtomNumber, bvector, auxiliary_bvector, include_these_atoms);
 }
 
 int
@@ -2211,7 +2211,7 @@ MFingerprint::generate_bits(const Set_of_Atoms & s,
     _bond[i] = bonds[i];
   }
 
-  _set_bit(bvector, auxiliary_bvector, INVALID_ATOM_NUMBER);   // this last arg could be problematic, watch...
+  _set_bit(bvector, auxiliary_bvector, kInvalidAtomNumber);   // this last arg could be problematic, watch...
 
   return 1;
 }

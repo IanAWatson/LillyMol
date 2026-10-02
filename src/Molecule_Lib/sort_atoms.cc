@@ -51,7 +51,7 @@ template <typename T>
 Atom_and_Info<T>::Atom_and_Info() {
   _atom = nullptr;
 
-  _initial_atom_number = INVALID_ATOM_NUMBER;
+  _initial_atom_number = kInvalidAtomNumber;
 
   _property = {};
 

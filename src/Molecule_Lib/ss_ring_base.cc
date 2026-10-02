@@ -13,8 +13,7 @@
 
 using std::cerr;
 
-Substructure_Ring_Base::Substructure_Ring_Base()
-{
+Substructure_Ring_Base::Substructure_Ring_Base() {
   _match_as_match_or_rejection = 1;
 
   _all_hits_in_same_fragment = 0;
@@ -24,7 +23,7 @@ Substructure_Ring_Base::Substructure_Ring_Base()
   _is_heteroatom = new_int(HIGHEST_ATOMIC_NUMBER + 1, 1);
   _is_heteroatom[6] = 0;
 
-//  Should we include Hydrogen?
+  //  Should we include Hydrogen?
 
   _environment_can_match_in_ring_atoms = 0;
 
@@ -39,24 +38,24 @@ Substructure_Ring_Base::Substructure_Ring_Base()
   return;
 }
 
-Substructure_Ring_Base::~Substructure_Ring_Base()
-{
-  if (nullptr != _is_heteroatom)
-    delete [] _is_heteroatom;
+Substructure_Ring_Base::~Substructure_Ring_Base() {
+  if (nullptr != _is_heteroatom) {
+    delete[] _is_heteroatom;
+  }
 
   return;
 }
 
 int
-Substructure_Ring_Base::SetEnvMatchGlobalId(Molecule_to_Match& target, 
-                        const Query_Atoms_Matched& matched_query_atoms,
-                        std::unique_ptr<int[]>& matched_by_global_specs) {
-  if (! matched_by_global_specs) {
+Substructure_Ring_Base::SetEnvMatchGlobalId(
+    Molecule_to_Match& target, const Query_Atoms_Matched& matched_query_atoms,
+    std::unique_ptr<int[]>& matched_by_global_specs) {
+  if (!matched_by_global_specs) {
     matched_by_global_specs.reset(new_int(target.natoms()));
   }
 
   for (const Substructure_Atom* a : matched_query_atoms) {
-    if (! a->include_in_embedding()) {
+    if (!a->include_in_embedding()) {
       continue;
     }
     atom_number_t matched = a->atom_number_matched();
@@ -70,19 +69,19 @@ Substructure_Ring_Base::SetEnvMatchGlobalId(Molecule_to_Match& target,
   return 1;
 }
 
-//#define DEBUG_ENVIRONMENT_MATCHES
+// #define DEBUG_ENVIRONMENT_MATCHES
 
 int
-Substructure_Ring_Base::_environment_matches4(Molecule_to_Match & target,
-                                             Query_Atoms_Matched & matched_query_atoms,
-                                             int * previously_matched_atoms,
-                                             std::unique_ptr<int[]>& matched_by_global_specs) {
+Substructure_Ring_Base::_environment_matches4(
+    Molecule_to_Match& target, Query_Atoms_Matched& matched_query_atoms,
+    int* previously_matched_atoms, std::unique_ptr<int[]>& matched_by_global_specs) {
   int rc = 0;
 
   int atom_to_process = 0;
 
 #ifdef DEBUG_ENVIRONMENT_MATCHES
-  cerr << "Processing " << matched_query_atoms.number_elements() << " environment children\n";
+  cerr << "Processing " << matched_query_atoms.number_elements()
+       << " environment children\n";
 #endif
 
   while (atom_to_process >= 0) {
@@ -90,12 +89,15 @@ Substructure_Ring_Base::_environment_matches4(Molecule_to_Match & target,
     cerr << "Processing child " << atom_to_process << '\n';
 #endif
 
-    Substructure_Atom * a = const_cast<Substructure_Atom *>(matched_query_atoms[atom_to_process]);
+    Substructure_Atom* a =
+        const_cast<Substructure_Atom*>(matched_query_atoms[atom_to_process]);
 #ifdef DEBUG_ENVIRONMENT_MATCHES
-    cerr << "Matched " << a->is_matched() << " anchor " << a->anchor()->atom_number() << " Children= " << a->number_children() << '\n';
+    cerr << "Matched " << a->is_matched() << " anchor " << a->anchor()->atom_number()
+         << " Children= " << a->number_children() << '\n';
 #endif
 
-    if (! a->move_to_next_match_from_current_anchor(previously_matched_atoms, matched_query_atoms)) {
+    if (!a->move_to_next_match_from_current_anchor(previously_matched_atoms,
+                                                   matched_query_atoms)) {
 #ifdef DEBUG_ENVIRONMENT_MATCHES
       cerr << "Move to next failed for query environment atom " << a->unique_id() << '\n';
 #endif
@@ -106,15 +108,15 @@ Substructure_Ring_Base::_environment_matches4(Molecule_to_Match & target,
       if (atom_to_process < 0) {
         return rc;
       }
-    }
-    else
-    {
+    } else {
 #ifdef DEBUG_ENVIRONMENT_MATCHES
-      cerr << "Move to next match succeeded " << a->unique_id() << "(" << a->atom_number_matched() <<
-              "), or = " << a->or_id() << " atom to process = " << atom_to_process << " matched = " << matched_query_atoms.size() << '\n';
+      cerr << "Move to next match succeeded " << a->unique_id() << "("
+           << a->atom_number_matched() << "), or = " << a->or_id()
+           << " atom to process = " << atom_to_process
+           << " matched = " << matched_query_atoms.size() << '\n';
 #endif
 
-      a->add_your_children(matched_query_atoms);   // does nothing if already added
+      a->add_your_children(matched_query_atoms);  // does nothing if already added
 
       atom_to_process++;
 
@@ -124,8 +126,9 @@ Substructure_Ring_Base::_environment_matches4(Molecule_to_Match & target,
           SetEnvMatchGlobalId(target, matched_query_atoms, matched_by_global_specs);
         }
         rc++;
-        // break from while (atom_to_process >= 0) loop, we are only interested in one embedding per start atom
-        // If _environment_sets_global_id is set, then we should continue and label all matches. 
+        // break from while (atom_to_process >= 0) loop, we are only interested in one
+        // embedding per start atom If _environment_sets_global_id is set, then we should
+        // continue and label all matches.
         if (_environment_sets_global_id) {
           atom_to_process--;
           a->release_hold(previously_matched_atoms);
@@ -154,21 +157,21 @@ Substructure_Ring_Base::_environment_matches4(Molecule_to_Match & target,
 */
 
 int
-Substructure_Ring_Base::_environment_matches3(Molecule_to_Match & target,
-                                              Substructure_Atom & root_atom,
-                                              const int * ring,
-                                              int * already_matched,
-                                              std::unique_ptr<int[]>& matched_by_global_specs) {
+Substructure_Ring_Base::_environment_matches3(
+    Molecule_to_Match& target, Substructure_Atom& root_atom, const int* ring,
+    int* already_matched, std::unique_ptr<int[]>& matched_by_global_specs) {
 #ifdef DEBUG_ENVIRONMENT_MATCHES
-  cerr << "Start environment match, root atom has " << root_atom.attributes_specified() << " attributes specified\n";
+  cerr << "Start environment match, root atom has " << root_atom.attributes_specified()
+       << " attributes specified\n";
 #endif
 
-  Query_Atoms_Matched qam;    // scope here just for efficiency
-  qam.resize(20);            // 20 seems pretty large
+  Query_Atoms_Matched qam;  // scope here just for efficiency
+  qam.resize(20);           // 20 seems pretty large
 
   const int matoms = target.natoms();
 
-  int * copy_ring = new int[matoms]; std::unique_ptr<int[]> free_copy_ring(copy_ring);
+  int* copy_ring = new int[matoms];
+  std::unique_ptr<int[]> free_copy_ring(copy_ring);
   copy_vector(copy_ring, ring, matoms);
 
   int nhits = 0;
@@ -182,17 +185,17 @@ Substructure_Ring_Base::_environment_matches3(Molecule_to_Match & target,
   }
 
   for (int i = 0; i < matoms; i++) {
-    if (0 == copy_ring[i]) {     // not in the ring or already matched
+    if (0 == copy_ring[i]) {  // not in the ring or already matched
       continue;
     }
 
-    Target_Atom & a = target[i];
+    Target_Atom& a = target[i];
 
     copy_vector(already_matched, copy_ring, matoms);
 
-    already_matched[i] = 0;    // the matches() function needs it this way
+    already_matched[i] = 0;  // the matches() function needs it this way
 
-    if (! root_atom.matches(a, already_matched)) {
+    if (!root_atom.matches(a, already_matched)) {
       continue;
     }
 
@@ -202,13 +205,13 @@ Substructure_Ring_Base::_environment_matches3(Molecule_to_Match & target,
       qam.resize_keep_storage(0);
     }
 
-    if (0 == root_atom.add_your_children(qam)) {    // root atom only, no children
+    if (0 == root_atom.add_your_children(qam)) {  // root atom only, no children
 #ifdef DEBUG_ENVIRONMENT_SEARCH
       cerr << "Root atom hit, nhits = " << (nhits + 1) << '\n';
 #endif
 
       if (_environment_sets_global_id) {
-        if (! root_atom.include_in_embedding()) {
+        if (!root_atom.include_in_embedding()) {
           continue;
         }
         atom_number_t matched = root_atom.atom_number_matched();
@@ -228,7 +231,8 @@ Substructure_Ring_Base::_environment_matches3(Molecule_to_Match & target,
       already_matched[i] = set_flag;
     }
 
-    int tmp = _environment_matches4(target, qam, already_matched, matched_by_global_specs);
+    int tmp =
+        _environment_matches4(target, qam, already_matched, matched_by_global_specs);
 
 #ifdef DEBUG_ENVIRONMENT_SEARCH
     cerr << "At atom " << i << " matches = " << tmp << '\n';
@@ -264,23 +268,25 @@ Substructure_Ring_Base::_environment_matches3(Molecule_to_Match & target,
   multiple environments are present
 */
 
-//#define DEBUG_L1_ENVIRONMENT_MATCHES
+// #define DEBUG_L1_ENVIRONMENT_MATCHES
 
 int
-Substructure_Ring_Base::_environment_matches2(Molecule_to_Match & target,
-                                              int * ring,
-                                              int * already_matched,
-                                              std::unique_ptr<int[]>& matched_by_global_specs) {
+Substructure_Ring_Base::_environment_matches2(
+    Molecule_to_Match& target, int* ring, int* already_matched,
+    std::unique_ptr<int[]>& matched_by_global_specs) {
   int ne = _environment_atom.number_elements();
 #ifdef DEBUG_L1_ENVIRONMENT_MATCHES
-  cerr << "Substructure_Ring_Base::_environment_matches: have " << ne << " components to match\n";
+  cerr << "Substructure_Ring_Base::_environment_matches: have " << ne
+       << " components to match\n";
 #endif
 
   for (int i = 0; i < ne; i++) {
-    // should check to see if this result is actually needed by _environment_logexp. risky, maybe TODO...
-    Substructure_Atom * r = _environment_atom[i];
+    // should check to see if this result is actually needed by _environment_logexp.
+    // risky, maybe TODO...
+    Substructure_Atom* r = _environment_atom[i];
 
-    int nhits = _environment_matches3(target, *r, ring, already_matched, matched_by_global_specs);
+    int nhits =
+        _environment_matches3(target, *r, ring, already_matched, matched_by_global_specs);
 
 #ifdef DEBUG_L1_ENVIRONMENT_MATCHES
     cerr << "Result for component " << i << " is " << nhits << '\n';
@@ -291,8 +297,9 @@ Substructure_Ring_Base::_environment_matches2(Molecule_to_Match & target,
     }
 
 #ifdef DEBUG_L1_ENVIRONMENT_MATCHES
-    if (_environment_numerical_requirement[i]->is_set())
+    if (_environment_numerical_requirement[i]->is_set()) {
       cerr << "After filtering by numerical requirement result is " << nhits << '\n';
+    }
 #endif
 
     _environment_logexp.set_result(i, nhits);
@@ -319,11 +326,12 @@ Substructure_Ring_Base::_environment_matches2(Molecule_to_Match & target,
 */
 
 int
-Substructure_Ring_Base::_environment_matchesx(Molecule_to_Match & target,
-                                             int * ring,
-                                             std::unique_ptr<int[]>& matched_by_global_specs) {
+Substructure_Ring_Base::_environment_matchesx(
+    Molecule_to_Match& target, int* ring,
+    std::unique_ptr<int[]>& matched_by_global_specs) {
 #ifdef DEBUG_L1_ENVIRONMENT_MATCHES
-  cerr << "Starting _environment_matches, have " << _environment_atom.size() << " components\n";
+  cerr << "Starting _environment_matches, have " << _environment_atom.size()
+       << " components\n";
 #endif
 
   _environment_logexp.reset();
@@ -332,7 +340,8 @@ Substructure_Ring_Base::_environment_matchesx(Molecule_to_Match & target,
     return 1;
   }
 
-  int * already_matched = new int[target.natoms()]; std::unique_ptr<int[]> free_already_matched(already_matched);
+  int* already_matched = new int[target.natoms()];
+  std::unique_ptr<int[]> free_already_matched(already_matched);
 
   return _environment_matches2(target, ring, already_matched, matched_by_global_specs);
 }
@@ -343,61 +352,63 @@ Substructure_Ring_Base::_environment_matchesx(Molecule_to_Match & target,
 */
 
 static int
-is_operator_character(char c)
-{
-  if ('&' == c)
+is_operator_character(char c) {
+  if ('&' == c) {
     return 1;
+  }
 
-  if ('|' == c)
+  if ('|' == c) {
     return 1;
+  }
 
-  if ('^' == c)
+  if ('^' == c) {
     return 1;
+  }
 
-  if (';' == c)
+  if (';' == c) {
     return 1;
-   
+  }
+
   return 0;
 }
 
 static int
-is_logexp_operator(const const_IWSubstring & s,
-                   int offset,
-                   int & zop)
-{
-  if (s.matches_at_position(offset, "&&"))
+is_logexp_operator(const const_IWSubstring& s, int offset, int& zop) {
+  if (s.matches_at_position(offset, "&&")) {
     zop = IW_LOGEXP_AND;
-  else if (s.matches_at_position(offset, "||"))
+  } else if (s.matches_at_position(offset, "||")) {
     zop = IW_LOGEXP_OR;
-  else if (s.matches_at_position(offset, "^^"))
+  } else if (s.matches_at_position(offset, "^^")) {
     zop = IW_LOGEXP_XOR;
-  else if (s.matches_at_position(offset, ";;"))
+  } else if (s.matches_at_position(offset, ";;")) {
     zop = IW_LOGEXP_LOW_PRIORITY_AND;
-  else
+  } else {
     return 0;
+  }
 
   return 1;
 }
 
 static int
-count_components(const const_IWSubstring & renv)
-{
+count_components(const const_IWSubstring& renv) {
   int nchars = renv.length();
 
-  if (0 == nchars)
+  if (0 == nchars) {
     return 0;
+  }
 
-  nchars--;     // so we can always check the next character
+  nchars--;  // so we can always check the next character
 
   int rc = 1;
 
-  for (int i = 0; i < nchars; i++)
-  {
-    if (renv[i + 1] != renv[i])
+  for (int i = 0; i < nchars; i++) {
+    if (renv[i + 1] != renv[i]) {
       continue;
+    }
 
-    if (is_operator_character(renv[i]))
+    if (is_operator_character(renv[i])) {
       rc++;
+    }
   }
 
   return rc;
@@ -408,23 +419,20 @@ count_components(const const_IWSubstring & renv)
 */
 
 static int
-get_next_token(const const_IWSubstring & renv,
-               int & renv_ndx,
-               int & zop,
-               IWString & token)
-{
+get_next_token(const const_IWSubstring& renv, int& renv_ndx, int& zop, IWString& token) {
   zop = 0;
   token.resize_keep_storage(0);
 
-  if (is_logexp_operator(renv, renv_ndx, zop))
+  if (is_logexp_operator(renv, renv_ndx, zop)) {
     renv_ndx += 2;
+  }
 
-  while (renv_ndx < renv.length())
-  {
+  while (renv_ndx < renv.length()) {
     int notused;
 
-    if (is_logexp_operator(renv, renv_ndx, notused))
+    if (is_logexp_operator(renv, renv_ndx, notused)) {
       return token.length();
+    }
 
     token.add(renv[renv_ndx]);
     renv_ndx++;
@@ -438,18 +446,16 @@ get_next_token(const const_IWSubstring & renv,
 */
 
 static int
-consume_digits(IWString & s,
-               int & c)
-{
+consume_digits(IWString& s, int& c) {
   c = 0;
 
-  while (s.length())
-  {
+  while (s.length()) {
     char c0 = s[0];
-    
+
     int tmp = c0 - '0';
-    if (tmp < 0 || tmp > 9)
+    if (tmp < 0 || tmp > 9) {
       return s.length();
+    }
 
     c = c * 10 + tmp;
     s.remove_leading_chars(1);
@@ -459,66 +465,64 @@ consume_digits(IWString & s,
 }
 
 static int
-discern_leading_numerical_qualifier(Min_Max_Specifier<int> & m,
-                                    IWString & token)
-{
+discern_leading_numerical_qualifier(Min_Max_Specifier<int>& m, IWString& token) {
   char c0 = token[0];
 
   int relational = 0;
 
-  if ('<' == c0)
-  {
+  if ('<' == c0) {
     relational = -1;
     token.remove_leading_chars(1);
-  }
-  else if ('>' == c0)
-  {
+  } else if ('>' == c0) {
     relational = 1;
     token.remove_leading_chars(1);
-  }
-  else if (isdigit(c0))
+  } else if (isdigit(c0))
     ;
-  else
+  else {
     return 1;
+  }
 
   int c;
-  if (! consume_digits(token, c))
-  {
+  if (!consume_digits(token, c)) {
     cerr << "discern_leading_numerical_qualifier: invalid numeric specifier\n";
     return 0;
   }
 
-  if (0 == relational)
+  if (0 == relational) {
     m.add(c);
-  else if (relational < 0)
+  } else if (relational < 0) {
     m.set_max(c - 1);
-  else if (relational > 0)
+  } else if (relational > 0) {
     m.set_min(c + 1);
-    
+  }
+
   return 1;
 }
 
-// The ring environment is built from Substructure_Atoms, and is not a full Substructure_Query
-// and so certain functionality is not present. For now, the only one being checked
-// is the ... directive, there may be others.
+// The ring environment is built from Substructure_Atoms, and is not a full
+// Substructure_Query and so certain functionality is not present. For now, the only one
+// being checked is the ... directive, there may be others.
 int
-Substructure_Ring_Base::_construct_environment(const const_IWSubstring & renv)
-{
+Substructure_Ring_Base::_construct_environment(const const_IWSubstring& renv) {
   if (renv.contains("...{")) {
-    cerr << "Substructure_Ring_Base::_construct_environment:cannot contain no matched atoms directive '" << renv << "'\n";
+    cerr << "Substructure_Ring_Base::_construct_environment:cannot contain no matched "
+            "atoms directive '"
+         << renv << "'\n";
     return 0;
   }
 
   int ne = count_components(renv);
 
   if (0 == ne) {
-    cerr << "Substructure_Ring_Base::_construct_environment: no components in '" << renv << "'\n";
+    cerr << "Substructure_Ring_Base::_construct_environment: no components in '" << renv
+         << "'\n";
     return 0;
   }
 
-  if (renv.ends_with('&') || renv.ends_with('|') || renv.ends_with('^') || renv.ends_with(';'))
-  {
-    cerr << "Substructure_Ring_Base::_construct_environment: invalid environment '" << renv << "'\n";
+  if (renv.ends_with('&') || renv.ends_with('|') || renv.ends_with('^') ||
+      renv.ends_with(';')) {
+    cerr << "Substructure_Ring_Base::_construct_environment: invalid environment '"
+         << renv << "'\n";
     return 0;
   }
 
@@ -527,44 +531,47 @@ Substructure_Ring_Base::_construct_environment(const const_IWSubstring & renv)
 
   int renv_ndx = 0;
 
-  for (int i = 0; i < ne; i++)
-  {
+  for (int i = 0; i < ne; i++) {
     int zop;
     IWString token;
-    if (! get_next_token(renv, renv_ndx, zop, token)) {
-      cerr << "Substructure_Atom::_construct_environment: invalid specification, renv_ndx = " << renv_ndx << '\n';
+    if (!get_next_token(renv, renv_ndx, zop, token)) {
+      cerr << "Substructure_Atom::_construct_environment: invalid specification, "
+              "renv_ndx = "
+           << renv_ndx << '\n';
       return 0;
     }
 
-//#define DEBUG_BUILD_ENV
+// #define DEBUG_BUILD_ENV
 #ifdef DEBUG_BUILD_ENV
     cerr << "i = " << i << " zop '" << zop << "' and smarts '" << token << "'\n";
 #endif
 
     if (0 == i && 0 != zop) {
-      cerr << "Substructure_Ring_Base::_construct_environment: first token cannot have an operator\n";
+      cerr << "Substructure_Ring_Base::_construct_environment: first token cannot have "
+              "an operator\n";
       return 0;
     }
 
-    assert (0 == i || 0 != zop);
+    assert(0 == i || 0 != zop);
 
-    Min_Max_Specifier<int> * mms = new Min_Max_Specifier<int>;
+    Min_Max_Specifier<int>* mms = new Min_Max_Specifier<int>;
 
-    if (! discern_leading_numerical_qualifier(*mms, token)) {
+    if (!discern_leading_numerical_qualifier(*mms, token)) {
       cerr << "Cannot discern leading numerical qualifier\n";
       return 0;
     }
 
     const_IWSubstring smarts(token);
 
-    Substructure_Atom * a = new Substructure_Atom;
+    Substructure_Atom* a = new Substructure_Atom;
 
-    if (! a->parse_smarts_specifier(smarts)) {
-      cerr << "Substructure_Ring_Base::_construct_environment: invalid smarts '" << token << "'\n";
+    if (!a->parse_smarts_specifier(smarts)) {
+      cerr << "Substructure_Ring_Base::_construct_environment: invalid smarts '" << token
+           << "'\n";
       return 0;
     }
 
-    a->count_attributes_specified();    // needed to initialise some things
+    a->count_attributes_specified();  // needed to initialise some things
 
     _environment_numerical_requirement.add(mms);
     _environment_atom.add(a);
@@ -572,8 +579,10 @@ Substructure_Ring_Base::_construct_environment(const const_IWSubstring & renv)
     if (1 == _environment_atom.number_elements()) {  // no operator for the first one
       ;
     } else if (zop) {
-      if (! _environment_logexp.add_operator(zop)) {
-        cerr << "Substructure_Ring_Base::_construct_environment: huh, operator not recognised '" << zop << "'\n";
+      if (!_environment_logexp.add_operator(zop)) {
+        cerr << "Substructure_Ring_Base::_construct_environment: huh, operator not "
+                "recognised '"
+             << zop << "'\n";
         return 0;
       }
     } else {
@@ -582,7 +591,8 @@ Substructure_Ring_Base::_construct_environment(const const_IWSubstring & renv)
   }
 
 #ifdef DEBUG_BUILD_ENV
-  cerr << "Substructure_Ring_Base::_construct_environment: after building, have " << _environment_atom.size() << " components\n";
+  cerr << "Substructure_Ring_Base::_construct_environment: after building, have "
+       << _environment_atom.size() << " components\n";
   _environment_logexp.debug_print(cerr);
 #endif
 
@@ -592,8 +602,7 @@ Substructure_Ring_Base::_construct_environment(const const_IWSubstring & renv)
 // Add =C and =N atoms that are attached to the ring system defined by
 // `in_system[_set_global_id]`.
 int
-Substructure_Ring_Base::ExtendToCarbonyl(const Molecule& m,
-        int * in_system) const {
+Substructure_Ring_Base::ExtendToCarbonyl(const Molecule& m, int* in_system) const {
   const int matoms = m.natoms();
 
   int rc = 0;
@@ -601,12 +610,12 @@ Substructure_Ring_Base::ExtendToCarbonyl(const Molecule& m,
     if (in_system[i] != _set_global_id) {
       continue;
     }
-    const Atom * a = m.atomi(i);
+    const Atom* a = m.atomi(i);
     if (a->ncon() == 2) {
       continue;
     }
     const Atom& atom = m.atom(i);
-    for (const Bond * b : atom) {
+    for (const Bond* b : atom) {
       if (b->is_single_bond()) {
         continue;
       }
@@ -643,9 +652,7 @@ Substructure_Ring_Base::ExtendToCarbonyl(const Molecule& m,
 static constexpr int kOkForRingClosure = 72997;
 
 int
-IdentifySubstituent(const Molecule& m,
-                    atom_number_t zatom,
-                    atom_number_t previous_atom,
+IdentifySubstituent(const Molecule& m, atom_number_t zatom, atom_number_t previous_atom,
                     int* in_substituent) {
   in_substituent[zatom] = 2;
   int rc = 1;
@@ -677,9 +684,7 @@ IdentifySubstituent(const Molecule& m,
 
 #ifdef NO_LONGER_USED_SDASDASD
 int
-IdentifySubstituent(const Molecule& m,
-                    atom_number_t zatom,
-                    int* in_substituent) {
+IdentifySubstituent(const Molecule& m, atom_number_t zatom, int* in_substituent) {
   int rc = 0;
   const Atom& a = m.atom(zatom);
   for (const Bond* b : a) {
@@ -699,10 +704,7 @@ IdentifySubstituent(const Molecule& m,
 #endif
 
 void
-TranslateNumbers(int * storage,
-                 int n,
-                 int from,
-                 int to) {
+TranslateNumbers(int* storage, int n, int from, int to) {
   for (int i = 0; i < n; ++i) {
     if (storage[i] == from) {
       storage[i] = to;
@@ -720,9 +722,7 @@ Substituent::Substituent() {
 // for all atoms for which storage[i] == flag, set the global_id
 // attribute for the corresponding atom in `target`.
 void
-Substituent::SetTargetGlobalIds(int * storage,
-                                int flag,
-                                Molecule_to_Match& target) const {
+Substituent::SetTargetGlobalIds(int* storage, int flag, Molecule_to_Match& target) const {
   const int matoms = target.natoms();
   for (int i = 0; i < matoms; ++i) {
     if (storage[i] != flag) {
@@ -734,10 +734,8 @@ Substituent::SetTargetGlobalIds(int * storage,
 
 void
 Substituent::FillMatchedAtomsArray(std::unique_ptr<int[]>& matched_by_global_specs,
-                        const int matoms,
-                        const int * storage,
-                        int flag) const {
-  if (! matched_by_global_specs) {
+                                   const int matoms, const int* storage, int flag) const {
+  if (!matched_by_global_specs) {
     matched_by_global_specs.reset(new_int(matoms));
   }
 
@@ -754,9 +752,7 @@ Substituent::FillMatchedAtomsArray(std::unique_ptr<int[]>& matched_by_global_spe
 // the atoms in `destination` so they cannot match.
 // Returns the number of atoms suppressed.
 int
-InvalidateOtherAtoms(const int* subset,
-               int flag,
-               Molecule_to_Match& destination) {
+InvalidateOtherAtoms(const int* subset, int flag, Molecule_to_Match& destination) {
   const int matoms = destination.natoms();
   int rc = 0;
   for (int i = 0; i < matoms; ++i) {
@@ -779,13 +775,12 @@ InvalidateOtherAtoms(const int* subset,
 // numbers from `target`. Then, before a search, `target` will be poisoned
 // and atoms not to be searched will be set to an unreaslistic atomic number.
 int
-Substituent::Matches(Molecule_to_Match& target, const int * ring_atoms,
-                     int * storage,
+Substituent::Matches(Molecule_to_Match& target, const int* ring_atoms, int* storage,
                      std::unique_ptr<int[]>& matched_by_global_specs,
                      int* used_sidechain) {
   int rc = MatchesInner(target, ring_atoms, storage, used_sidechain);
   if (_match_as_match_or_rejection == 0) {
-    rc = ! rc;
+    rc = !rc;
   }
 
 #ifdef DEBUG_SUBSTITUENT_MATCHES
@@ -794,7 +789,7 @@ Substituent::Matches(Molecule_to_Match& target, const int * ring_atoms,
     cerr << " storage[" << i << "] " << storage[i] << '\n';
   }
 #endif
-  if (! rc) {
+  if (!rc) {
     return 0;
   }
 
@@ -828,8 +823,8 @@ Substituent::Matches(Molecule_to_Match& target, const int * ring_atoms,
 // Once a valid substituent has been identified, the value will be
 // adjusted to 3.
 int
-Substituent::MatchesInner(Molecule_to_Match& target, const int * ring_atoms,
-                          int * storage, int* used_sidechain) {
+Substituent::MatchesInner(Molecule_to_Match& target, const int* ring_atoms, int* storage,
+                          int* used_sidechain) {
   // A slightly risky cast, should be OK.
   Molecule& m = const_cast<Molecule&>(*target.molecule());
   const int matoms = m.natoms();
@@ -877,7 +872,8 @@ Substituent::MatchesInner(Molecule_to_Match& target, const int * ring_atoms,
       const int atoms_in_substituent = IdentifySubstituent(m, o, i, storage);
       storage[i] = 1;
 #ifdef DEBUG_SUBSTITUENT_MATCHES
-      cerr << "from atom " << i << " to " << o << " find " << atoms_in_substituent << " atoms_in_substituent\n";
+      cerr << "from atom " << i << " to " << o << " find " << atoms_in_substituent
+           << " atoms_in_substituent\n";
 #endif
       ++substituents_found;
 
@@ -887,31 +883,31 @@ Substituent::MatchesInner(Molecule_to_Match& target, const int * ring_atoms,
 
       ++substituents_this_atom;
 
-      if (! _natoms.is_set()) {
+      if (!_natoms.is_set()) {
       } else if (_natoms.matches(atoms_in_substituent)) {
       } else {
         continue;
       }
 
-      if (! _nrings.is_set()) {
+      if (!_nrings.is_set()) {
       } else if (OkNrings(m, storage, 2)) {
       } else {
         continue;
       }
 
-      if (! _length.is_set()) {
+      if (!_length.is_set()) {
       } else if (OkLength(m, storage, i, 2)) {
       } else {
         continue;
       }
 
-      if (! _heteroatom_count.is_set()) {
+      if (!_heteroatom_count.is_set()) {
       } else if (OkHeteratomCount(m, storage, i, 2)) {
       } else {
         continue;
       }
-      
-      if (! _unsaturation_count.is_set()) {
+
+      if (!_unsaturation_count.is_set()) {
       } else if (OkUnsaturation(m, storage, i, 2)) {
       } else {
         continue;
@@ -924,12 +920,13 @@ Substituent::MatchesInner(Molecule_to_Match& target, const int * ring_atoms,
         if (got_rejected_match) {
           continue;
         }
-        if (_required.size() > 0 && ! got_required_match) {
+        if (_required.size() > 0 && !got_required_match) {
           continue;
         }
       }
 
-      TranslateNumbers(storage, matoms, 2, 3);  // Mark as having a successful substituent match.
+      TranslateNumbers(storage, matoms, 2,
+                       3);  // Mark as having a successful substituent match.
       if (used_sidechain != nullptr) {
         used_sidechain[o] = 1;
       }
@@ -940,7 +937,7 @@ Substituent::MatchesInner(Molecule_to_Match& target, const int * ring_atoms,
       // explicit hits_needed claims the first sidechain that satisfies it.
       // If hits_needed is specified, preserve the existing behaviour of
       // counting all matching sidechains for this Substituent.
-      if (used_sidechain != nullptr && ! _hits_needed.is_set()) {
+      if (used_sidechain != nullptr && !_hits_needed.is_set()) {
         return matches_found;
       }
     }
@@ -954,7 +951,8 @@ Substituent::MatchesInner(Molecule_to_Match& target, const int * ring_atoms,
   }
 
 #ifdef DEBUG_SUBSTITUENT_MATCHES
-  cerr << "Examined " << substituents_found << " substituent, found " << matches_found << " matches\n";
+  cerr << "Examined " << substituents_found << " substituent, found " << matches_found
+       << " matches\n";
 #endif
   if (substituents_found == 0) {
     return 0;
@@ -967,11 +965,12 @@ Substituent::MatchesInner(Molecule_to_Match& target, const int * ring_atoms,
   return matches_found;
 }
 
-//#define DEBUG_OKNRINGS
+// #define DEBUG_OKNRINGS
 int
 Substituent::OkNrings(Molecule& m, const int* storage, int flag) const {
 #ifdef DEBUG_OKNRINGS
-  cerr << "Substituent::OkNrings:checking " << m.nrings() << " rings, flag " << flag << '\n';
+  cerr << "Substituent::OkNrings:checking " << m.nrings() << " rings, flag " << flag
+       << '\n';
   for (int i = 0; i < m.natoms(); ++i) {
     cerr << " atom " << i << " storage " << storage[i] << '\n';
   }
@@ -988,14 +987,16 @@ Substituent::OkNrings(Molecule& m, const int* storage, int flag) const {
   }
 
 #ifdef DEBUG_OKNRINGS
-  cerr << "rings_in_substituent " << rings_in_substituent << " matches " << _nrings.matches(rings_in_substituent) << '\n';
+  cerr << "rings_in_substituent " << rings_in_substituent << " matches "
+       << _nrings.matches(rings_in_substituent) << '\n';
 #endif
 
   return _nrings.matches(rings_in_substituent);
 }
 
 int
-Substituent::OkLength(Molecule& m, const int* storage, atom_number_t anchor, int flag) const {
+Substituent::OkLength(Molecule& m, const int* storage, atom_number_t anchor,
+                      int flag) const {
   const int matoms = m.natoms();
   int longest_length = 0;
   for (int i = 0; i < matoms; ++i) {
@@ -1012,21 +1013,23 @@ Substituent::OkLength(Molecule& m, const int* storage, atom_number_t anchor, int
   }
 
 #ifdef DEBUG_OKLENGTH
-  cerr << longest_length << " longest_length, matches? " << _length.matches(longest_length) << '\n';
+  cerr << longest_length << " longest_length, matches? "
+       << _length.matches(longest_length) << '\n';
 #endif
   return _length.matches(longest_length);
 }
 
 int
-Substituent::OkHeteratomCount(const Molecule& m, const int* storage,
-                atom_number_t anchor, int flag) const {
+Substituent::OkHeteratomCount(const Molecule& m, const int* storage, atom_number_t anchor,
+                              int flag) const {
   assert(_heteroatom_count.is_set());
 
   const int matoms = m.natoms();
   int h = 0;
   for (int i = 0; i < matoms; ++i) {
 #ifdef DEBUG_OKLENGTH
-    cerr << i << " " << m.smarts_equivalent_for_atom(i) << " storage " << storage[i] << '\n';
+    cerr << i << " " << m.smarts_equivalent_for_atom(i) << " storage " << storage[i]
+         << '\n';
 #endif
     if (storage[i] != flag) {
       continue;
@@ -1044,15 +1047,16 @@ Substituent::OkHeteratomCount(const Molecule& m, const int* storage,
 }
 
 int
-Substituent::OkUnsaturation(Molecule& m, const int* storage,
-                atom_number_t anchor, int flag) const {
+Substituent::OkUnsaturation(Molecule& m, const int* storage, atom_number_t anchor,
+                            int flag) const {
   assert(_unsaturation_count.is_set());
 
   const int matoms = m.natoms();
   int rc = 0;
   for (int i = 0; i < matoms; ++i) {
 #ifdef DEBUG_OKLENGTH
-    cerr << i << " " << m.smarts_equivalent_for_atom(i) << " storage " << storage[i] << '\n';
+    cerr << i << " " << m.smarts_equivalent_for_atom(i) << " storage " << storage[i]
+         << '\n';
 #endif
     if (storage[i] != flag) {
       continue;
@@ -1068,15 +1072,15 @@ Substituent::OkUnsaturation(Molecule& m, const int* storage,
   }
 
 #ifdef DEBUG_OKLENGTH
-  cerr << "Count " << rc << " heteratoms, match " << _heteroatom_count.matches(rc) << '\n';
+  cerr << "Count " << rc << " heteratoms, match " << _heteroatom_count.matches(rc)
+       << '\n';
 #endif
 
   return _unsaturation_count.matches(rc);
 }
 
 int
-AllMatchedAtomsInStorage(const Substructure_Results& sresults,
-                         const int* storage,
+AllMatchedAtomsInStorage(const Substructure_Results& sresults, const int* storage,
                          int flag) {
   for (const Set_of_Atoms* e : sresults.embeddings()) {
     if (e->all_members_set_in_array(storage, flag)) {
@@ -1089,12 +1093,10 @@ AllMatchedAtomsInStorage(const Substructure_Results& sresults,
 
 // Return true if all atoms in `embedding` have their value
 // in `storage` == `flag`.
-// Could use std::find_if_not, but I find this clearer and 
+// Could use std::find_if_not, but I find this clearer and
 // more compact.
 bool
-AllAtomsMatchFlag(const Set_of_Atoms& embedding,
-                  const int* storage,
-                  int flag) {
+AllAtomsMatchFlag(const Set_of_Atoms& embedding, const int* storage, int flag) {
   for (atom_number_t a : embedding) {
     if (storage[a] != flag) {
       return false;
@@ -1108,9 +1110,8 @@ AllAtomsMatchFlag(const Set_of_Atoms& embedding,
 // Among the embeddings in `sresults` is there one that hits just
 // atoms for which storage[i] == flag
 int
-AnEmbeddingAllInRegion(const Substructure_Results& sresults,
-                         const int* storage,
-                         int flag) {
+AnEmbeddingAllInRegion(const Substructure_Results& sresults, const int* storage,
+                       int flag) {
   for (const Set_of_Atoms* e : sresults.embeddings()) {
     if (AllAtomsMatchFlag(*e, storage, flag)) {
       return 1;
@@ -1120,7 +1121,7 @@ AnEmbeddingAllInRegion(const Substructure_Results& sresults,
   return 0;
 }
 
-//#define DEBUG_RUNQUERIES
+// #define DEBUG_RUNQUERIES
 
 // There is a lot to NOT like with how I am doing these subset queries.
 // The most logical way of doing this would be to use the whole molecule
@@ -1130,20 +1131,19 @@ AnEmbeddingAllInRegion(const Substructure_Results& sresults,
 // but it might match a substituent (or inter-ring region). So, we have
 // this less than satisfactory subsetting.
 int
-Substituent::RunQueries(Molecule_to_Match& target,
-                       const int * storage,
-                       int flag,
-                       int& got_required_match,
-                       int& got_rejected_match) {
+Substituent::RunQueries(Molecule_to_Match& target, const int* storage, int flag,
+                        int& got_required_match, int& got_rejected_match) {
   if (_required.empty() && _disqualifying.empty()) {
     return 1;
   }
 
 #ifdef DEBUG_RUNQUERIES
-  cerr << "Substituent::RunQueries: checking " << _required.size() << " required and " << _disqualifying.size() << " disqualifying queries\n";
+  cerr << "Substituent::RunQueries: checking " << _required.size() << " required and "
+       << _disqualifying.size() << " disqualifying queries\n";
   for (int i = 0; i < target.natoms(); ++i) {
     if (flag == storage[i]) {
-      cerr << i << ' ' << target.molecule()->smarts_equivalent_for_atom(i) << " being searched\n";
+      cerr << i << ' ' << target.molecule()->smarts_equivalent_for_atom(i)
+           << " being searched\n";
     }
   }
 #endif
@@ -1157,7 +1157,7 @@ Substituent::RunQueries(Molecule_to_Match& target,
       if (!qry->substructure_search(subset_target, sresults)) {
         continue;
       }
-      if (! AllMatchedAtomsInStorage(sresults, storage, flag)) {
+      if (!AllMatchedAtomsInStorage(sresults, storage, flag)) {
         continue;
       }
       ++got_required_match;
@@ -1183,34 +1183,34 @@ InterRingAtoms::InterRingAtoms() {
 }
 
 int
-InterRingAtoms::Matches(Molecule_to_Match& target,
-                        const int region_number,
+InterRingAtoms::Matches(Molecule_to_Match& target, const int region_number,
                         InterRingRegionData& data,
                         std::unique_ptr<int[]>& matched_by_global_specs) {
 #ifdef DEBUG_INTER_RING_ATOMS_MATCHES
   cerr << "InterRingAtoms::Matches check region number " << region_number << '\n';
   for (int i = 0; i < target.natoms(); ++i) {
-    cerr << " atom " << i << " region " << data.region[i]  << '\n';
+    cerr << " atom " << i << " region " << data.region[i] << '\n';
   }
-  cerr << "atoms_in_region " << data.atoms_in_region << " ring_connections " << data.ring_connections << '\n';
+  cerr << "atoms_in_region " << data.atoms_in_region << " ring_connections "
+       << data.ring_connections << '\n';
 #endif
 
-  if (_natoms.is_set() && ! _natoms.matches(data.atoms_in_region)) {
+  if (_natoms.is_set() && !_natoms.matches(data.atoms_in_region)) {
     return 0;
   }
 
-  if (_ring_connections.is_set() && 
-      ! _ring_connections.matches(data.ring_connections.number_elements())) {
+  if (_ring_connections.is_set() &&
+      !_ring_connections.matches(data.ring_connections.number_elements())) {
     return 0;
   }
 
   if (_required_length.size() > 0) {
-    if (! OkRequiredLengths(*target.molecule(), data, region_number)) {
+    if (!OkRequiredLengths(*target.molecule(), data, region_number)) {
       return 0;
     }
   }
 
-  if (_length.is_set() && ! OkLengths(*target.molecule(), data, region_number)) {
+  if (_length.is_set() && !OkLengths(*target.molecule(), data, region_number)) {
     return 0;
   }
 
@@ -1222,8 +1222,7 @@ InterRingAtoms::Matches(Molecule_to_Match& target,
 // in `ring_connections`.
 // Returns result.size();
 int
-GetInterRingLengths(Molecule& m,
-                    const Set_of_Atoms& ring_connections,
+GetInterRingLengths(Molecule& m, const Set_of_Atoms& ring_connections,
                     std::vector<int>& result) {
   const int n = ring_connections.number_elements();
   if (n == 2) {
@@ -1245,9 +1244,8 @@ GetInterRingLengths(Molecule& m,
 // For the required distances to match, there must be an exact and
 // full match between what is in _required_length and what is found.
 int
-InterRingAtoms::OkRequiredLengths(Molecule& m,
-                          InterRingRegionData& data,
-                          int region_number) {
+InterRingAtoms::OkRequiredLengths(Molecule& m, InterRingRegionData& data,
+                                  int region_number) {
   if (_required_length.empty()) {
     return 1;
   }
@@ -1255,7 +1253,8 @@ InterRingAtoms::OkRequiredLengths(Molecule& m,
   std::vector<int> distances;
   const int number_distances = GetInterRingLengths(m, data.ring_connections, distances);
 #ifdef DEBUG_INTER_RING_ATOMS_OK_REQUIRED_LENGTHS
-  cerr << "From " << data.ring_connections << " get " << number_distances << " distances, cmp " << _required_length.size() << " dist";
+  cerr << "From " << data.ring_connections << " get " << number_distances
+       << " distances, cmp " << _required_length.size() << " dist";
   for (int d : distances) {
     cerr << ' ' << d;
   }
@@ -1279,14 +1278,13 @@ InterRingAtoms::OkRequiredLengths(Molecule& m,
 }
 
 int
-InterRingAtoms::OkLengths(Molecule& m,
-                          InterRingRegionData& data,
-                          int region_number) {
+InterRingAtoms::OkLengths(Molecule& m, InterRingRegionData& data, int region_number) {
   const int n = data.ring_connections.number_elements();
 
   // Handle the common case of a linker.
   if (n == 2) {
-    return _length.matches(m.bonds_between(data.ring_connections[0], data.ring_connections[1]));
+    return _length.matches(
+        m.bonds_between(data.ring_connections[0], data.ring_connections[1]));
   }
 
   std::vector<int> distances;
@@ -1303,7 +1301,7 @@ InterRingAtoms::OkLengths(Molecule& m,
 int
 InterRingAtoms::MatchesNhits(int nhits) const {
   // Not set, means any number of occurrences is a match.
-  if (! _hits_needed.is_set()) {
+  if (!_hits_needed.is_set()) {
     return nhits > 0;
   }
 
@@ -1316,9 +1314,8 @@ InterRingAtoms::MatchesNhits(int nhits) const {
 // This function sets up a Molecule_to_Match for the subset of atoms
 // to be searched, which includes the ring atoms.
 int
-InterRingAtoms::RunQueries(Molecule_to_Match& target,
-                          InterRingRegionData& data,
-                          int region_number) {
+InterRingAtoms::RunQueries(Molecule_to_Match& target, InterRingRegionData& data,
+                           int region_number) {
   if (_required.empty() && _disqualifying.empty()) {
     return 1;
   }
@@ -1345,8 +1342,7 @@ InterRingAtoms::RunQueries(Molecule_to_Match& target,
 // Remove if this becomes a performance issue.
 int
 InterRingAtoms::RunQueriesInner(Molecule_to_Match& subset_target,
-                          InterRingRegionData& data,
-                          int region_number) {
+                                InterRingRegionData& data, int region_number) {
   if (!_required.empty()) {
     bool got_match = false;
     for (Substructure_Query* qry : _required) {
@@ -1356,13 +1352,13 @@ InterRingAtoms::RunQueriesInner(Molecule_to_Match& subset_target,
       if (!qry->substructure_search(subset_target, sresults)) {
         continue;
       }
-      if (! AllMatchedAtomsInStorage(sresults, data.region, region_number)) {
+      if (!AllMatchedAtomsInStorage(sresults, data.region, region_number)) {
         continue;
       }
       got_match = true;
       break;
     }
-    if (! got_match) {
+    if (!got_match) {
       return 0;
     }
   }

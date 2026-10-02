@@ -40,6 +40,8 @@ rm -f \
   "${destdir}/lillymol.abi3.so" \
   "${destdir}/lillymol_bdb.so" \
   "${destdir}/lillymol_bdb.abi3.so" \
+  "${destdir}/lillymol_depict.so" \
+  "${destdir}/lillymol_depict.abi3.so" \
   "${destdir}/lillymol_gfp_server.so" \
   "${destdir}/lillymol_gfp_server.abi3.so" \
   "${destdir}/lillymol_nb.so" \
@@ -108,6 +110,7 @@ cd "${here}"
 
 copy_if_newer "bazel-bin/nanobind/lillymol.so"
 copy_optional_glob "bazel-bin/nanobind/lillymol_bdb.so"
+copy_optional_glob "bazel-bin/nanobind/lillymol_depict.so"
 copy_optional_glob "bazel-bin/nanobind/lillymol_gfp_server.so"
 
 copy_if_newer "bazel-bin/nanobind/lillymol.so.soabi"

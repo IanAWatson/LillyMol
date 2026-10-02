@@ -328,7 +328,11 @@ echo "build_options ${build_options}"
 
 if [[ -v PYTHON_ONLY ]] ; then
     echo "Building Python bindings only"
-    ${bazel} ${bazel_options} build ${build_options} //nanobind:lillymol //nanobind:lillymol_gfp_server //nanobind::lillymol_soabi
+    python_only_targets=(//nanobind:lillymol //nanobind:lillymol_gfp_server //nanobind:lillymol_soabi)
+    if [[ -v BUILD_SCHRODINGER_2D ]] ; then
+        python_only_targets+=(//nanobind:lillymol_depict)
+    fi
+    ${bazel} ${bazel_options} build ${build_options} "${python_only_targets[@]}"
     ./copy_shared_libraries.sh $REPO_HOME/lib
     if [[ -v RUN_PYTHON_TESTS ]] ; then
         ./run_python_unit_tests.sh
@@ -457,8 +461,14 @@ if [[ -v BUILD_PYTHON ]] ; then
     if [[ -v BUILD_BDB ]] ; then
         python_targets+=(//nanobind:lillymol_bdb)
     fi
+    if [[ -v BUILD_SCHRODINGER_2D ]] ; then
+        python_targets+=(//nanobind:lillymol_depict)
+    fi
     ${bazel} ${bazel_options} build ${build_options} "${python_targets[@]}"
     ${bazel} ${bazel_options} test ${build_options} //nanobind::all
+    if [[ -v BUILD_SCHRODINGER_2D ]] ; then
+        ${bazel} ${bazel_options} test ${build_options} //nanobind:lillymol_nb_depict_test
+    fi
     ./copy_shared_libraries.sh $REPO_HOME/lib 
 
     ./run_python_unit_tests.sh

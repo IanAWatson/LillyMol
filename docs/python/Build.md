@@ -66,6 +66,27 @@ Use `-c opt` for normal testing and timing. Bazel's default `fastbuild` is much
 slower and can produce tiny floating point differences from the optimised command
 line tools.
 
+### Optional 2D depiction module
+
+The `lillymol_depict` module depends on Schrodinger's coordgen library. Build it
+through the normal build script by setting both Python and depiction support:
+
+```shell
+BUILD_PYTHON=1 BUILD_SCHRODINGER_2D=1 ./build_linux.sh
+```
+
+For an existing coordgen installation in `third_party`, the focused Bazel build
+and test are:
+
+```shell
+bazel build -c opt //nanobind:lillymol_depict
+bazel test -c opt //nanobind:lillymol_nb_depict_test
+./copy_shared_libraries.sh ../lib
+```
+
+The main `lillymol` extension does not link coordgen and remains available when
+depiction support is not built.
+
 ## Wheel Packaging
 
 The wheel infrastructure lives in `${LILLYMOL_HOME}/python`. It packages

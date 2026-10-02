@@ -87,22 +87,23 @@ BondOrder(const Bond& b) {
   return 1;
 }
 
-// One double bond whose cis/trans configuration the molecule states, written the
-// way coordgen needs to hear it: the double bond a3==a4, one substituent on each
-// end, and whether those two substituents belong on the same side.
-//
-//    a1        a5          a1
-//      \      /              \
-//       a3==a4                a3==a4
-//                                   \
-//                                    a5
-//        cis                        trans
+/* One double bond whose cis/trans configuration the molecule states, written the
+   way coordgen needs to hear it: the double bond a3==a4, one substituent on each
+   end, and whether those two substituents belong on the same side.
+
+      a1        a5          a1
+        \      /              \
+         a3==a4                a3==a4
+                                     \
+                                      a5
+          cis                        trans
+*/
 struct CisTransConstraint {
   int bond_index = -1;  // into Molecule::bondi(), the double bond itself
-  atom_number_t a1 = INVALID_ATOM_NUMBER;
-  atom_number_t a3 = INVALID_ATOM_NUMBER;
-  atom_number_t a4 = INVALID_ATOM_NUMBER;
-  atom_number_t a5 = INVALID_ATOM_NUMBER;
+  atom_number_t a1 = kInvalidAtomNumber;
+  atom_number_t a3 = kInvalidAtomNumber;
+  atom_number_t a4 = kInvalidAtomNumber;
+  atom_number_t a5 = kInvalidAtomNumber;
   bool cis = false;
 };
 
@@ -147,17 +148,17 @@ CollectCisTransConstraints(const Molecule& m,
     const atom_number_t a3 = b->a1();
     const atom_number_t a4 = b->a2();
 
-    atom_number_t a1 = INVALID_ATOM_NUMBER;
-    atom_number_t a5 = INVALID_ATOM_NUMBER;
+    atom_number_t a1 = kInvalidAtomNumber;
+    atom_number_t a5 = kInvalidAtomNumber;
     int d1 = 0;
     int d5 = 0;
 
-    for (int j = 0; j < m.ncon(a3); ++j) {
-      const atom_number_t o = m.other(a3, j);
+    for (const Bond* b : m[a3]) {
+      const atom_number_t o = b->other(a3);
       if (o == a4) {
         continue;
       }
-      const int d = DirectionalSense(a3, *m.bond_between_atoms(a3, o));
+      const int d = DirectionalSense(a3, *b);
       if (d != 0) {
         a1 = o;
         d1 = d;
@@ -165,12 +166,12 @@ CollectCisTransConstraints(const Molecule& m,
       }
     }
 
-    for (int j = 0; j < m.ncon(a4); ++j) {
-      const atom_number_t o = m.other(a4, j);
+    for (const Bond* b : m[a4]) {
+      const atom_number_t o = b->other(a4);
       if (o == a3) {
         continue;
       }
-      const int d = DirectionalSense(a4, *m.bond_between_atoms(a4, o));
+      const int d = DirectionalSense(a4, *b);
       if (d != 0) {
         a5 = o;
         d5 = d;

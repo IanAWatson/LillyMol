@@ -53,6 +53,10 @@ if [[ -s "${libdir}/lillymol_bdb.so" ]] ; then
   tests+=("${here}/nanobind/lillymol_nb_bdb_test.py")
 fi
 
+if [[ -s "${libdir}/lillymol_depict.so" ]] ; then
+  tests+=("${here}/nanobind/lillymol_nb_depict_test.py")
+fi
+
 declare -i failures=0
 for file in "${tests[@]}" ; do
   ${run_python} ${file}

@@ -93,6 +93,31 @@ nanobind_extension(
     deps = ["//Utilities/GFP_Tools:gfp_server_lib"],
 )
 
+# Optional because //Depict:coords_2d depends on the separately installed
+# coordgen library. build_linux.sh selects this target when
+# BUILD_SCHRODINGER_2D is set.
+nanobind_extension(
+    name = "lillymol_depict",
+    srcs = ["lillymol_nb_depict.cc"],
+    dynamic_deps = ["//Molecule_Lib:molecule_lib_shared"],
+    deps = [
+        "//Depict:coords_2d",
+        "//Depict:wedge_2d",
+        "//Molecule_Lib:iwmolecule",
+    ],
+    tags = ["manual"],
+)
+
+py_test(
+    name = "lillymol_nb_depict_test",
+    srcs = ["lillymol_nb_depict_test.py"],
+    data = [
+        ":lillymol",
+        ":lillymol_depict",
+    ],
+    tags = ["manual"],
+)
+
 py_test(
     name = "gfp_http_server_test",
     srcs = ["gfp_http_server_test.py"],

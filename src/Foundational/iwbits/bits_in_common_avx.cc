@@ -1,6 +1,13 @@
 #include <cstdint>
 #include <cstddef>
+
+// immintrin.h is x86 only - on other architectures it is a hard #error, not an
+// empty header. The AVX512 functions below are already guarded, so this file
+// contributes nothing off x86 and the include must be skipped too. Without this
+// the whole library fails to compile on arm64, Apple silicon included.
+#if defined(__x86_64__) || defined(__i386__) || defined(_M_X64) || defined(_M_IX86)
 #include <immintrin.h>
+#endif
 
 #if __has_include(<bit>)
   #include <bit>

@@ -236,6 +236,7 @@ if [[ -v BUILD_SCHRODINGER_2D ]] ; then
     cmake -S coordgenlibs -B coordgenlibs/build \
       -DCMAKE_BUILD_TYPE=Release \
       -DCMAKE_INSTALL_PREFIX=${third_party} \
+      -DCMAKE_INSTALL_LIBDIR=lib \
       -DCMAKE_POSITION_INDEPENDENT_CODE=ON \
       -DCOORDGEN_BUILD_EXAMPLE=OFF \
       -DCOORDGEN_BUILD_SHARED_LIBS=OFF \
@@ -345,6 +346,12 @@ ${bazel} ${bazel_options} test ${build_options} Foundational/...:all
 
 ${bazel} ${bazel_options} test ${build_options} Molecule_Lib:all
 ${bazel} ${bazel_options} test ${build_options} Molecule_Tools:all
+
+# Depiction links the coordgen library, which is only built above when asked for.
+if [[ -v BUILD_SCHRODINGER_2D ]] ; then
+    ${bazel} ${bazel_options} test ${build_options} Depict:all
+fi
+
 ${bazel} ${bazel_options} test ${build_options} Utilities/...:all
 
 # Currently no tests in these.
@@ -368,6 +375,9 @@ fi
 if [[ ! -v BUILD_LIBRARY_ONLY ]] ; then
     echo "Building tools"
     ${bazel} ${bazel_options} build ${build_options} Molecule_Tools:all
+    if [[ -v BUILD_SCHRODINGER_2D ]] ; then
+        ${bazel} ${bazel_options} build ${build_options} Depict:all
+    fi
     ${bazel} ${bazel_options} build ${build_options} Obsolete:all
     ${bazel} ${bazel_options} build ${build_options} Obsolete/Descriptor_Similarity:all
     ${bazel} ${bazel_options} build ${build_options} Foundational/iw_tdt:all

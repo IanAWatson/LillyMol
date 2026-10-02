@@ -2667,7 +2667,7 @@ Substructure_Atom::create_from_molecule(
   if (_parent) {
     parent_atom_number = _parent->unique_id();
   } else {
-    parent_atom_number = INVALID_ATOM_NUMBER;
+    parent_atom_number = kInvalidAtomNumber;
   }
 
   _unique_id = my_atom_number;
@@ -2679,7 +2679,7 @@ Substructure_Atom::create_from_molecule(
 
 #ifdef DEBUG_CREATE_FROM_MOLECULE
   cerr << "create from molecule atom " << my_atom_number << " unique id " << _unique_id;
-  if (INVALID_ATOM_NUMBER != parent_atom_number) {
+  if (kInvalidAtomNumber != parent_atom_number) {
     cerr << ". Parent " << parent_atom_number;
   }
   cerr << endl;
@@ -3032,7 +3032,7 @@ Substructure_Atom::create_from_molecule(
   // Because of cyclic structures, we need to be very careful how we build the query.
   // Add the bond to the parent first
 
-  if (INVALID_ATOM_NUMBER != parent_atom_number) {
+  if (kInvalidAtomNumber != parent_atom_number) {
     Substructure_Bond *sb = new Substructure_Bond;
 
     const Bond *b = m.bond_between_atoms(my_atom_number, parent_atom_number);
@@ -3546,7 +3546,7 @@ first_isotopically_labelled_atom_in_fragment(Molecule &m, int f) {
     }
   }
 
-  return INVALID_ATOM_NUMBER;
+  return kInvalidAtomNumber;
 }
 
 static atom_number_t
@@ -3576,7 +3576,7 @@ first_allowed_atom_in_fragment(
     return i;
   }
 
-  return INVALID_ATOM_NUMBER;
+  return kInvalidAtomNumber;
 }
 
 int
@@ -3668,7 +3668,7 @@ Single_Substructure_Query::_create_from_molecule(MDL_Molecule &m,
     for (int i = 0; i < nf; i++) {
       atom_number_t astart = first_isotopically_labelled_atom_in_fragment(m, i);
 
-      if (INVALID_ATOM_NUMBER == astart) {
+      if (kInvalidAtomNumber == astart) {
         continue;
       }
 
@@ -3693,7 +3693,7 @@ Single_Substructure_Query::_create_from_molecule(MDL_Molecule &m,
 #endif
     for (int i = 0; i < nf; ++i) {
       atom_number_t astart;
-      while (INVALID_ATOM_NUMBER !=
+      while (kInvalidAtomNumber !=
              (astart = first_allowed_atom_in_fragment(m, i, tmp, include_these_atoms))) {
         Substructure_Atom *r = new Substructure_Atom;
 
@@ -4419,7 +4419,7 @@ Substructure_Environment::construct_from_msi_object(
     return 0;
   }
 
-  if (INVALID_ATOM_NUMBER != possible_parent) {
+  if (kInvalidAtomNumber != possible_parent) {
     _add_possible_parent(possible_parent, possible_parent_bond_type, completed);
   }
 

@@ -11,11 +11,11 @@
 class Molecule;
 class Bond;
 
-#define CHIRAL_CONNECTION_IS_IMPLICIT_HYDROGEN (INVALID_ATOM_NUMBER - 4)
-#define CHIRAL_CONNECTION_IS_LONE_PAIR         (INVALID_ATOM_NUMBER - 5)
+#define CHIRAL_CONNECTION_IS_IMPLICIT_HYDROGEN (kInvalidAtomNumber - 4)
+#define CHIRAL_CONNECTION_IS_LONE_PAIR         (kInvalidAtomNumber - 5)
 
-inline constexpr int kChiralConnectionIsImplicitHydrogen = (INVALID_ATOM_NUMBER - 4);
-inline constexpr int kChiralConnectionIsLonePair = (INVALID_ATOM_NUMBER - 5);
+inline constexpr int kChiralConnectionIsImplicitHydrogen = (kInvalidAtomNumber - 4);
+inline constexpr int kChiralConnectionIsLonePair = (kInvalidAtomNumber - 5);
 
 enum class ChiralPoint {
   kTopFront,

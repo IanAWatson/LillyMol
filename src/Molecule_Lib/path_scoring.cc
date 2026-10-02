@@ -518,8 +518,8 @@ straight_bond(const Coordinates& ab, const Coordinates& bc, const Coordinates& c
 static int
 identify_attached_atoms(const Atom* a, atom_number_t zatom, atom_number_t& a1,
                         atom_number_t& a2) {
-  a1 = INVALID_ATOM_NUMBER;
-  a2 = INVALID_ATOM_NUMBER;
+  a1 = kInvalidAtomNumber;
+  a2 = kInvalidAtomNumber;
 
   int acon = a->ncon();
   for (int i = 0; i < acon; i++) {
@@ -531,7 +531,7 @@ identify_attached_atoms(const Atom* a, atom_number_t zatom, atom_number_t& a1,
 
     atom_number_t j = b->other(zatom);
 
-    if (INVALID_ATOM_NUMBER == a1) {
+    if (kInvalidAtomNumber == a1) {
       a1 = j;
     } else {
       a2 = j;
@@ -539,7 +539,7 @@ identify_attached_atoms(const Atom* a, atom_number_t zatom, atom_number_t& a1,
     }
   }
 
-  return (INVALID_ATOM_NUMBER != a1);
+  return (kInvalidAtomNumber != a1);
 }
 
 /*
@@ -614,8 +614,8 @@ identify_attached_atoms (const Atom * a,
                          atom_number_t & a2,
                          int & a2_direction)
 {
-  a1 = INVALID_ATOM_NUMBER;
-  a2 = INVALID_ATOM_NUMBER;
+  a1 = kInvalidAtomNumber;
+  a2 = kInvalidAtomNumber;
 
   a2_direction = 0;    // a1_direction will always be set
 
@@ -629,7 +629,7 @@ identify_attached_atoms (const Atom * a,
 
     atom_number_t j = b->other(zatom);
 
-    if (INVALID_ATOM_NUMBER == a1)
+    if (kInvalidAtomNumber == a1)
     {
       a1 = j;
       set_directionality(*b, zatom, a1_direction);
@@ -642,7 +642,7 @@ identify_attached_atoms (const Atom * a,
     }
   }
 
-  return (INVALID_ATOM_NUMBER != a1);
+  return (kInvalidAtomNumber != a1);
 }*/
 
 /*
@@ -668,8 +668,8 @@ Molecule::identify_ez_atoms(atom_number_t a3, atom_number_t a4, atom_number_t& a
                             atom_number_t& arhs) const {
   assert(ok_2_atoms(a3, a4));
 
-  alhs = INVALID_ATOM_NUMBER;
-  arhs = INVALID_ATOM_NUMBER;
+  alhs = kInvalidAtomNumber;
+  arhs = kInvalidAtomNumber;
 
   const Atom* aa3 = _things[a3];
   const Atom* aa4 = _things[a4];
@@ -697,30 +697,30 @@ Molecule::identify_ez_atoms(atom_number_t a3, atom_number_t a4, atom_number_t& a
     return 0;
   }
 
-  assert(INVALID_ATOM_NUMBER != a1);
+  assert(kInvalidAtomNumber != a1);
 
   atom_number_t a5, a6;
   if (!identify_attached_atoms(aa4, a4, a5, a6)) {
     return 0;
   }
 
-  assert(INVALID_ATOM_NUMBER != a5);
+  assert(kInvalidAtomNumber != a5);
 
-  arhs = alhs = INVALID_ATOM_NUMBER;
+  arhs = alhs = kInvalidAtomNumber;
 
   // Handle the cases of just one bond off the end
 
-  if (INVALID_ATOM_NUMBER == a2) {
+  if (kInvalidAtomNumber == a2) {
     alhs = a1;
   }
-  if (INVALID_ATOM_NUMBER == a6) {
+  if (kInvalidAtomNumber == a6) {
     arhs = a5;
   }
 
   // If both atoms are already known, we must have a double bond that has
   // just one substituent at each end *-*=*-*
 
-  if (INVALID_ATOM_NUMBER != alhs && INVALID_ATOM_NUMBER != arhs) {
+  if (kInvalidAtomNumber != alhs && kInvalidAtomNumber != arhs) {
     return 1;
   }
 
@@ -728,7 +728,7 @@ Molecule::identify_ez_atoms(atom_number_t a3, atom_number_t a4, atom_number_t& a
   std::unique_ptr<int[]> free_already_done(already_done);
 
   already_done[a1] = 1;
-  if (INVALID_ATOM_NUMBER != a2) {
+  if (kInvalidAtomNumber != a2) {
     already_done[a2] = 1;
   }
 
@@ -736,7 +736,7 @@ Molecule::identify_ez_atoms(atom_number_t a3, atom_number_t a4, atom_number_t& a
   already_done[a4] = 1;
 
   already_done[a5] = 1;
-  if (INVALID_ATOM_NUMBER != a6) {
+  if (kInvalidAtomNumber != a6) {
     already_done[a6] = 1;
   }
 
@@ -744,7 +744,7 @@ Molecule::identify_ez_atoms(atom_number_t a3, atom_number_t a4, atom_number_t& a
 
   int rc = 1;
 
-  if (INVALID_ATOM_NUMBER == alhs)  // 2 substituents, need to resolve
+  if (kInvalidAtomNumber == alhs)  // 2 substituents, need to resolve
   {
     Path_Scoring ps[2];
     ps[0].initialise(a1, _things[a1]);
@@ -768,7 +768,7 @@ Molecule::identify_ez_atoms(atom_number_t a3, atom_number_t a4, atom_number_t& a
 
   if (0 == rc) {  // lhs not resolved, no point scoring the other end
     ;
-  } else if (INVALID_ATOM_NUMBER == arhs) {
+  } else if (kInvalidAtomNumber == arhs) {
     Path_Scoring ps[2];
 
     ps[0].initialise(a5, _things[a5]);
@@ -1027,7 +1027,7 @@ resolved(resizable_array_p<Path_Scoring>& ps, int& stopped) {
 
 static int
 discern_directionality(atom_number_t a1, atom_number_t a2, const Bond& b) {
-  if (INVALID_ATOM_NUMBER == a2) {
+  if (kInvalidAtomNumber == a2) {
     return 0;
   }
 
@@ -1108,7 +1108,7 @@ Molecule::_discern_cis_trans_bond_from_depiction(Bond* b) {
   atom_number_t a2;
   int a2_direction;
   if (nullptr == b32) {
-    a2 = INVALID_ATOM_NUMBER;
+    a2 = kInvalidAtomNumber;
     a2_direction = 0;
   } else {
     a2 = b32->other(a3);
@@ -1121,7 +1121,7 @@ Molecule::_discern_cis_trans_bond_from_depiction(Bond* b) {
   atom_number_t a6;
   int a6_direction;
   if (nullptr == b46) {
-    a6 = INVALID_ATOM_NUMBER;
+    a6 = kInvalidAtomNumber;
     a6_direction = 0;
   } else {
     a6 = b46->other(a4);
@@ -1130,7 +1130,7 @@ Molecule::_discern_cis_trans_bond_from_depiction(Bond* b) {
 
   // Look for any inconsistent directionality specification
 
-  if (INVALID_ATOM_NUMBER == a2) {  // just one connection, nothing to check
+  if (kInvalidAtomNumber == a2) {  // just one connection, nothing to check
     ;
   } else if (0 == a1_direction && 0 == a2_direction) {  // neither bond directional, great
     ;
@@ -1142,7 +1142,7 @@ Molecule::_discern_cis_trans_bond_from_depiction(Bond* b) {
     return 0;
   }
 
-  if (INVALID_ATOM_NUMBER == a6) {  // just one connection, nothing to check
+  if (kInvalidAtomNumber == a6) {  // just one connection, nothing to check
     ;
   } else if (0 == a5_direction && 0 == a6_direction) {  // neither bond directional, great
     ;
@@ -1196,7 +1196,7 @@ Molecule::_discern_cis_trans_bond_from_depiction(Bond* b) {
     return 0;
   }
 
-  if (INVALID_ATOM_NUMBER == a2 || 0 == a5_direction || 0 == a2_direction) {
+  if (kInvalidAtomNumber == a2 || 0 == a5_direction || 0 == a2_direction) {
     ;
   } else if (a2_direction == a5_direction) {
     cerr << "Molecule::_discern_cis_trans_bond_from_depiction:inconsistent 2,5 "
@@ -1206,7 +1206,7 @@ Molecule::_discern_cis_trans_bond_from_depiction(Bond* b) {
     return 0;
   }
 
-  if (INVALID_ATOM_NUMBER == a2 || INVALID_ATOM_NUMBER == a6 || 0 == a2_direction ||
+  if (kInvalidAtomNumber == a2 || kInvalidAtomNumber == a6 || 0 == a2_direction ||
       0 == a6_direction) {
     ;
   } else if (a2_direction != a6_direction) {
@@ -1217,7 +1217,7 @@ Molecule::_discern_cis_trans_bond_from_depiction(Bond* b) {
     return 0;
   }
 
-  if (INVALID_ATOM_NUMBER == a6 || 0 == a1_direction || 0 == a6_direction) {
+  if (kInvalidAtomNumber == a6 || 0 == a1_direction || 0 == a6_direction) {
     ;
   } else if (a6_direction == a1_direction) {
     cerr << "Molecule::_discern_cis_trans_bond_from_depiction:inconsistent "
@@ -1363,19 +1363,19 @@ Molecule::_discern_cis_trans_bond_from_depiction(Bond* b) {
     return 0;
   }
 
-  if (INVALID_ATOM_NUMBER != a2) {
+  if (kInvalidAtomNumber != a2) {
     if (!_extend_cis_trans_system(a2)) {
       return 0;
     }
   }
 
-  if (INVALID_ATOM_NUMBER != a5) {
+  if (kInvalidAtomNumber != a5) {
     if (!_extend_cis_trans_system(a5)) {
       return 0;
     }
   }
 
-  if (INVALID_ATOM_NUMBER != a6) {
+  if (kInvalidAtomNumber != a6) {
     if (!_extend_cis_trans_system(a6)) {
       return 0;
     }

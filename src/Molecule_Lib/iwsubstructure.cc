@@ -1587,7 +1587,7 @@ Single_Substructure_Query::_find_next_root_atom_embedding(
 // Must respect each atom's include_in_embedding attribute, as well as our own
 // _respect_initial_atom_numbering.
 // If an atom is not included, that position in `new_embedding` will be
-// INVALID_ATOM_NUMBER.
+// kInvalidAtomNumber.
 std::unique_ptr<Set_of_Atoms>
 Single_Substructure_Query::_make_new_embedding(
     const Query_Atoms_Matched& matched_atoms) const {
@@ -1596,7 +1596,7 @@ Single_Substructure_Query::_make_new_embedding(
 
   if (_respect_initial_atom_numbering) {
     assert(_highest_initial_atom_number >= 0);
-    new_embedding->extend(_highest_initial_atom_number + 1, INVALID_ATOM_NUMBER);
+    new_embedding->extend(_highest_initial_atom_number + 1, kInvalidAtomNumber);
   } else {
     new_embedding->resize(number_matched_atoms);
   }
@@ -2017,7 +2017,7 @@ Single_Substructure_Query::_substructure_search(
   Substructure_Atom* root_atom = _root_atoms[_iroot];
 
   int jstart, jstop;
-  if (INVALID_ATOM_NUMBER != target_molecule.start_matching_at()) {
+  if (kInvalidAtomNumber != target_molecule.start_matching_at()) {
     jstart = target_molecule.start_matching_at();
     jstop = jstart + 1;
   } else if (!root_atom->determine_start_stop(target_molecule, jstart, jstop)) {

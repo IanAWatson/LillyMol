@@ -92,8 +92,8 @@ Bond::Bond(const Molecule* m, atom_number_t a1, atom_number_t a2, bond_type_t bt
 Bond::Bond() {
   _default_values();
 
-  _a1 = INVALID_ATOM_NUMBER;
-  _a2 = INVALID_ATOM_NUMBER;
+  _a1 = kInvalidAtomNumber;
+  _a2 = kInvalidAtomNumber;
   _btype = INVALID_BOND_TYPE;
 
   return;
@@ -102,14 +102,14 @@ Bond::Bond() {
 Bond::~Bond() {
   assert(ok());
 
-  _a1 = INVALID_ATOM_NUMBER;
+  _a1 = kInvalidAtomNumber;
 }
 
 int
 Bond::ok() const {
   // return 1;    // remove checking for VDOM
 
-  if (INVALID_ATOM_NUMBER == _a1 || INVALID_ATOM_NUMBER == _a2 || !OK_BOND_TYPE(_btype)) {
+  if (kInvalidAtomNumber == _a1 || kInvalidAtomNumber == _a2 || !OK_BOND_TYPE(_btype)) {
     return 0;
   }
 

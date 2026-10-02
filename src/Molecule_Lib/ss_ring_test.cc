@@ -13,7 +13,7 @@ namespace {
 struct Data {
   IWString smiles;
   std::string proto;
-  int nhits;
+  uint32_t nhits;
 };
 
 class TestRingSys: public testing::TestWithParam<Data> {
@@ -639,7 +639,7 @@ TEST_P(TestRingSysCarbonyl, TestMatches) {
   ASSERT_TRUE(google::protobuf::TextFormat::ParseFromString(params.proto, &_proto));
   ASSERT_TRUE(_query.ConstructFromProto(_proto));
   // std::cerr << "Testing " << params.smiles << ' ' << params.proto << "\n expecting " << params.nhits << '\n';
-  ASSERT_GT(_query.substructure_search(&_mol, _sresults), 0);
+  ASSERT_GT(_query.substructure_search(&_mol, _sresults), 0u);
   EXPECT_EQ(_sresults.embedding(0)->size(), params.nhits);
 }
 // Note that only tests that generate matches can be tested here.

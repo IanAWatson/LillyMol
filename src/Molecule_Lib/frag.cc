@@ -460,7 +460,7 @@ Molecule::split_off_fragments(const atom_number_t zatom, Molecule& frags) {
   int* tmp = new_int(_number_elements);
   std::unique_ptr<int[]> free_tmp(tmp);
 
-  identify_side_of_bond(tmp, zatom, 1, INVALID_ATOM_NUMBER);
+  identify_side_of_bond(tmp, zatom, 1, kInvalidAtomNumber);
 
   const int initial_natoms = _number_elements;
 
@@ -501,7 +501,7 @@ Molecule::excise_fragment(const atom_number_t zatom, Molecule& frag) {
   std::unique_ptr<int[]> free_tmp(tmp);
 
   // just doing a cheap fragment membership. tmp = 1 means being removed
-  identify_side_of_bond(tmp, zatom, 1, INVALID_ATOM_NUMBER);
+  identify_side_of_bond(tmp, zatom, 1, kInvalidAtomNumber);
 
   const int initial_natoms = _number_elements;
 
@@ -1297,7 +1297,7 @@ Molecule::first_atom_in_fragment(int f) {
   cerr << "Molecule::first_atom_in_fragment:no atom found in fragment " << f
        << "\n";  // how could this happen
 
-  return INVALID_ATOM_NUMBER;
+  return kInvalidAtomNumber;
 }
 
 int

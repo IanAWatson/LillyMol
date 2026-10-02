@@ -57,10 +57,10 @@ class Molecule_Data_for_Standardisation {
 Possible_Lactim_Lactam::Possible_Lactim_Lactam(atom_number_t o, atom_number_t c,
                                                atom_number_t n)
     : _oxygen(o), _carbon(c), _nitrogen(n) {
-  _second_nitrogen = INVALID_ATOM_NUMBER;
+  _second_nitrogen = kInvalidAtomNumber;
   _total_nitrogen_attachments = 0;
   _shared_nitrogen_group = 0;
-  _alpha_nitrogen = INVALID_ATOM_NUMBER;
+  _alpha_nitrogen = kInvalidAtomNumber;
 
   _is_ring = 0;
   _fused_system_size = 0;
@@ -86,7 +86,7 @@ Possible_Lactim_Lactam::shares_nitrogen_with(const Possible_Lactim_Lactam& rhs) 
     return 1;
   }
 
-  if (INVALID_ATOM_NUMBER == _second_nitrogen) {
+  if (kInvalidAtomNumber == _second_nitrogen) {
     return 0;
   }
 
@@ -159,7 +159,7 @@ int
 Possible_Lactim_Lactam::hcount(Molecule& m) const {
   int rc = m.hcount(_nitrogen);
 
-  if (INVALID_ATOM_NUMBER != _second_nitrogen) {
+  if (kInvalidAtomNumber != _second_nitrogen) {
     rc += m.hcount(_second_nitrogen);
   }
 
@@ -194,7 +194,7 @@ Possible_Lactim_Lactam::add_unique_nitrogens(Set_of_Atoms& unique_nitrogens) con
     rc = 1;
   }
 
-  if (INVALID_ATOM_NUMBER == _second_nitrogen) {
+  if (kInvalidAtomNumber == _second_nitrogen) {
     return rc;
   }
 
@@ -211,7 +211,7 @@ Possible_Lactim_Lactam::add_unique_nitrogens(Set_of_Atoms& unique_nitrogens) con
 
 int
 Possible_Lactim_Lactam::reperceive(Molecule& m) {
-  if (INVALID_ATOM_NUMBER == _second_nitrogen) {  // no change possible
+  if (kInvalidAtomNumber == _second_nitrogen) {  // no change possible
     return 0;
   }
 
@@ -1172,7 +1172,7 @@ Chemical_Standardisation::_do_transform_nitro(
     int singly_bonded_oxygen = 0;
     int singly_bonded_oxygen_with_neg_charge = 0;
     int doubly_bonded_oxygen = 0;
-    atom_number_t negative_oxygen = INVALID_ATOM_NUMBER;
+    atom_number_t negative_oxygen = kInvalidAtomNumber;
 
     for (int j = 0; j < ncon[nitrogen]; j++) {
       const Bond* b = an->item(j);
@@ -1568,7 +1568,7 @@ Chemical_Standardisation::_do_transform_n_charge_sep(
     //  beware cases like C12=CC=CC=C1[N-][N+H2][N-]2 p10, don't change them
 
     int negative_nitrogens_attached = 0;  // multiple N- attached to one N+
-    int negative_nitrogen = INVALID_ATOM_NUMBER;
+    int negative_nitrogen = kInvalidAtomNumber;
 
     for (int j = 0; j < ncon[n1]; j++) {
       const Bond* b = a1->item(j);
@@ -1637,8 +1637,8 @@ static int
 two_negatively_charged_connections(atom_number_t zatom, const Atom& a,
                                    const Atom* const* atoms, atom_number_t& n1,
                                    atom_number_t& n2) {
-  n1 = INVALID_ATOM_NUMBER;
-  n2 = INVALID_ATOM_NUMBER;
+  n1 = kInvalidAtomNumber;
+  n2 = kInvalidAtomNumber;
 
   for (int i = 0; i < a.ncon(); i++) {
     const Bond* b = a.item(i);
@@ -1652,14 +1652,14 @@ two_negatively_charged_connections(atom_number_t zatom, const Atom& a,
       continue;
     }
 
-    if (INVALID_ATOM_NUMBER == n1) {
+    if (kInvalidAtomNumber == n1) {
       n1 = n;
     } else {
       n2 = n;
     }
   }
 
-  if (INVALID_ATOM_NUMBER == n1 || INVALID_ATOM_NUMBER == n2) {
+  if (kInvalidAtomNumber == n1 || kInvalidAtomNumber == n2) {
     return 0;
   }
 
@@ -1701,11 +1701,11 @@ Chemical_Standardisation::_do_transform_plus_minus(
     atom_number_t n1, n2;
     (void)two_negatively_charged_connections(i, *ai, atoms, n1, n2);
 
-    if (INVALID_ATOM_NUMBER == n1) {  // no negatively charged neighbours
+    if (kInvalidAtomNumber == n1) {  // no negatively charged neighbours
       continue;
     }
 
-    if (INVALID_ATOM_NUMBER == n2) {  // only N1 is a negatively charged neighbour
+    if (kInvalidAtomNumber == n2) {  // only N1 is a negatively charged neighbour
       if (ok_to_change_charge_separated_pair(m, i, n1)) {
         continue;
       }
@@ -1865,8 +1865,8 @@ Chemical_Standardisation::_do_protonate_phosphorous_acids(
     //  Find a negatively charged Oxygen or Sulphur, and a doubly bonded O or S - let's
     //  hope we don't see too many P~S bonds, ugly!
 
-    atom_number_t negatively_charged_OS = INVALID_ATOM_NUMBER;
-    atom_number_t doubly_bonded_OS = INVALID_ATOM_NUMBER;
+    atom_number_t negatively_charged_OS = kInvalidAtomNumber;
+    atom_number_t doubly_bonded_OS = kInvalidAtomNumber;
 
     for (int j = 0; j < ncon[i]; j++) {
       const Bond* b = ai->item(j);
@@ -1895,8 +1895,8 @@ Chemical_Standardisation::_do_protonate_phosphorous_acids(
       }
     }
 
-    if (INVALID_ATOM_NUMBER == doubly_bonded_OS ||
-        INVALID_ATOM_NUMBER == negatively_charged_OS) {
+    if (kInvalidAtomNumber == doubly_bonded_OS ||
+        kInvalidAtomNumber == negatively_charged_OS) {
       continue;
     }
 
@@ -2448,7 +2448,7 @@ Chemical_Standardisation::_do_transform_amines(
     //  If all hydrogens are explicit, we must find one to remove. Check also for
     //  adjacent N- which do not get processed
 
-    atom_number_t explicit_hydrogen_to_remove = INVALID_ATOM_NUMBER;
+    atom_number_t explicit_hydrogen_to_remove = kInvalidAtomNumber;
     int found_negative_nitrogen = 0;
 
     for (int j = 0; j < ncon[i]; j++) {
@@ -2467,7 +2467,7 @@ Chemical_Standardisation::_do_transform_amines(
 
     if (implicit_hydrogens)
       ;
-    else if (INVALID_ATOM_NUMBER == explicit_hydrogen_to_remove) {  // should not happen
+    else if (kInvalidAtomNumber == explicit_hydrogen_to_remove) {  // should not happen
       continue;
     } else {
       atoms_to_be_removed.add_if_not_already_present(explicit_hydrogen_to_remove);
@@ -2945,9 +2945,9 @@ collect_attached_nitrogen_atoms(
     Molecule& m, const atom_number_t c, atom_number_t& first_nh, atom_number_t& second_nh,
     atom_number_t& doubly_bonded_n,
     const IWStandard_Current_Molecule& current_molecule_data) {
-  first_nh = INVALID_ATOM_NUMBER;
-  second_nh = INVALID_ATOM_NUMBER;
-  doubly_bonded_n = INVALID_ATOM_NUMBER;
+  first_nh = kInvalidAtomNumber;
+  second_nh = kInvalidAtomNumber;
+  doubly_bonded_n = kInvalidAtomNumber;
 
   const Atom* ac = m.atomi(c);
 
@@ -2968,7 +2968,7 @@ collect_attached_nitrogen_atoms(
     }
 
     if (b->is_single_bond() && m.hcount(n)) {
-      if (INVALID_ATOM_NUMBER == first_nh) {
+      if (kInvalidAtomNumber == first_nh) {
         first_nh = n;
       } else {
         second_nh = n;
@@ -2978,7 +2978,7 @@ collect_attached_nitrogen_atoms(
     }
   }
 
-  if (INVALID_ATOM_NUMBER == second_nh || INVALID_ATOM_NUMBER == doubly_bonded_n) {
+  if (kInvalidAtomNumber == second_nh || kInvalidAtomNumber == doubly_bonded_n) {
     return 0;
   }
 
@@ -3381,7 +3381,7 @@ atom_is_connected_to(const Molecule& m, const atom_number_t zatom,
     }
   }
 
-  return INVALID_ATOM_NUMBER;
+  return kInvalidAtomNumber;
 }
 
 /*
@@ -3413,7 +3413,7 @@ attached_to_aromatic_carbonyl(const Molecule& m, const atom_number_t n,
 
   const atom_number_t oxygen = atom_is_connected_to(m, carbonyl, 8, DOUBLE_BOND);
 
-  if (INVALID_ATOM_NUMBER == oxygen) {
+  if (kInvalidAtomNumber == oxygen) {
     return 0;
   }
 
@@ -3618,7 +3618,7 @@ Chemical_Standardisation::_do_explicit_hydrogens_last(Molecule& m) {
   // Since other standardisations may have removed Hydrogen atoms, we count
   // the number still present
 
-  atom_number_t last_non_hydrogen_atom = INVALID_ATOM_NUMBER;
+  atom_number_t last_non_hydrogen_atom = kInvalidAtomNumber;
 
   Set_of_Atoms eh;
   for (int i = 0; i < matoms; i++) {
@@ -3633,7 +3633,7 @@ Chemical_Standardisation::_do_explicit_hydrogens_last(Molecule& m) {
     return 0;
   }
 
-  if (INVALID_ATOM_NUMBER ==
+  if (kInvalidAtomNumber ==
       last_non_hydrogen_atom) {  // Huh, a molecule with just Hydrogen atoms
     return 0;
   }
@@ -4759,10 +4759,10 @@ Chemical_Standardisation::_do_nv5_to_charge_separated(
       continue;
     }
 
-    atom_number_t doubly_bonded_singly_connected = INVALID_ATOM_NUMBER;
-    atom_number_t triply_connected_n = INVALID_ATOM_NUMBER;
+    atom_number_t doubly_bonded_singly_connected = kInvalidAtomNumber;
+    atom_number_t triply_connected_n = kInvalidAtomNumber;
     bond_type_t bond_to_be_placed = SINGLE_BOND;
-    atom_number_t double_bonded_2_connected_n = INVALID_ATOM_NUMBER;
+    atom_number_t double_bonded_2_connected_n = kInvalidAtomNumber;
 
     for (const Bond* b : *a) {
       if (b->is_single_bond()) {
@@ -4815,11 +4815,11 @@ Chemical_Standardisation::_do_nv5_to_charge_separated(
   const Atom& a = m[zatom];
 
   int nbonds = 0;
-  atom_number_t doubly_bonded_singly_connected = INVALID_ATOM_NUMBER;
-  // atom_number_t triply_connected_n = INVALID_ATOM_NUMBER;
+  atom_number_t doubly_bonded_singly_connected = kInvalidAtomNumber;
+  // atom_number_t triply_connected_n = kInvalidAtomNumber;
   bond_type_t bond_to_be_placed = SINGLE_BOND;
-  atom_number_t double_bonded_2_connected_n = INVALID_ATOM_NUMBER;
-  atom_number_t to_get_negative_charge = INVALID_ATOM_NUMBER;
+  atom_number_t double_bonded_2_connected_n = kInvalidAtomNumber;
+  atom_number_t to_get_negative_charge = kInvalidAtomNumber;
 
   for (const Bond* b : a) {
     if (b->is_single_bond()) {
@@ -5324,8 +5324,8 @@ place_123_triazole_bonds(Molecule& m, atom_number_t a1, atom_number_t a2,
   // Now this gets messy. We do not know which of the atoms above are the fused carbon
   // atoms
 
-  atom_number_t c1 = INVALID_ATOM_NUMBER;
-  atom_number_t c2 = INVALID_ATOM_NUMBER;
+  atom_number_t c1 = kInvalidAtomNumber;
+  atom_number_t c2 = kInvalidAtomNumber;
 
   for (int i = 0; i < 5; ++i) {
     const atom_number_t j = r[i];
@@ -5333,14 +5333,14 @@ place_123_triazole_bonds(Molecule& m, atom_number_t a1, atom_number_t a2,
       continue;
     }
 
-    if (INVALID_ATOM_NUMBER == c1) {
+    if (kInvalidAtomNumber == c1) {
       c1 = j;
     } else {
       c2 = j;
     }
   }
 
-  if (INVALID_ATOM_NUMBER == c2) {  // should not happen
+  if (kInvalidAtomNumber == c2) {  // should not happen
     return 0;
   }
 
@@ -5394,7 +5394,7 @@ static atom_number_t
 identify_extra_ring_atom(const Atom* a, atom_number_t zatom, atom_number_t avoid1,
                          atom_number_t avoid2) {
   if (a->ncon() < 3) {
-    return INVALID_ATOM_NUMBER;
+    return kInvalidAtomNumber;
   }
 
   for (int i = 0; i < 3; i++) {
@@ -5411,7 +5411,7 @@ identify_extra_ring_atom(const Atom* a, atom_number_t zatom, atom_number_t avoid
     return j;
   }
 
-  return INVALID_ATOM_NUMBER;  // not sure how this could happen
+  return kInvalidAtomNumber;  // not sure how this could happen
 }
 
 /*
@@ -5487,7 +5487,7 @@ Chemical_Standardisation::_do_123_triazole(
   atom_number_t cc4 = identify_extra_ring_atom(atoms[c4], c4, n3, c5);
   atom_number_t cc5 = identify_extra_ring_atom(atoms[c5], c5, n1, c4);
 
-  if (INVALID_ATOM_NUMBER == cc4) {  // substituted at c5
+  if (kInvalidAtomNumber == cc4) {  // substituted at c5
     double electron_donating_power = compute_electron_donating_power(m, cc5, c5, atoms);
     if (electron_donating_power > 0.0) {  // put H on N1
       return place_123_triazole_bonds(m, n1, n2, n3, c4, c5, atoms, r, is_fused);
@@ -5496,7 +5496,7 @@ Chemical_Standardisation::_do_123_triazole(
     }
   }
 
-  if (INVALID_ATOM_NUMBER == cc5) {  // sustituted at c4
+  if (kInvalidAtomNumber == cc5) {  // sustituted at c4
     double electron_donating_power = compute_electron_donating_power(m, cc4, c4, atoms);
     if (electron_donating_power > 0) {  // put H on N3
       return place_123_triazole_bonds(m, n3, c4, c5, n1, n2, atoms, r, is_fused);
@@ -6420,7 +6420,7 @@ Chemical_Standardisation::_do_charged_imidazole(
     int tmp = nd3;
     c1 = r.next_after_wrap(tmp, +1);
   } else {
-    c1 = INVALID_ATOM_NUMBER;  // pyrazole
+    c1 = kInvalidAtomNumber;  // pyrazole
   }
 
 #ifdef DEBUG_DO_CHARGED_IMIDAZOLE
@@ -6428,7 +6428,7 @@ Chemical_Standardisation::_do_charged_imidazole(
        << current_molecule_data.ring_membership()[c1] << '\n';
 #endif
   // Do we really need to check the connectivity of c1
-  if (c1 == INVALID_ATOM_NUMBER)
+  if (c1 == kInvalidAtomNumber)
     ;
   else if (z[c1] != 6 || ncon[c1] != 2) {
     return 0;
@@ -6479,7 +6479,7 @@ Chemical_Standardisation::_do_charged_imidazole(
 #ifdef DEBUG_DO_CHARGED_IMIDAZOLE
       cerr << "Swapping " << nplus << " " << nd3 << " c1 " << c1 << '\n';
 #endif
-      if (c1 == INVALID_ATOM_NUMBER) {
+      if (c1 == kInvalidAtomNumber) {
         if (!_swap_charged_pyrazole(m, ring_number, current_molecule_data, nplus, nd3)) {
           return 0;
         }
@@ -6584,13 +6584,13 @@ OtherC(const Molecule& m, atom_number_t zatom, atom_number_t exclude) {
     }
 
     if (m.atomic_number(o) != 6) {
-      return INVALID_ATOM_NUMBER;
+      return kInvalidAtomNumber;
     }
 
     return o;
   }
 
-  return INVALID_ATOM_NUMBER;
+  return kInvalidAtomNumber;
 }
 
 int
@@ -6601,8 +6601,8 @@ Chemical_Standardisation::_do_imidazole_exocyclic_nh(
   const int* ncon = current_molecule_data.ncon();
 
   // cerr << "nh " << nh << " carbon " << carbon << '\n';
-  atom_number_t nh0 = INVALID_ATOM_NUMBER;
-  atom_number_t nh1 = INVALID_ATOM_NUMBER;
+  atom_number_t nh0 = kInvalidAtomNumber;
+  atom_number_t nh1 = kInvalidAtomNumber;
   for (const Bond* b : m[carbon]) {
     atom_number_t o = b->other(carbon);
     if (o == nh) {
@@ -6618,7 +6618,7 @@ Chemical_Standardisation::_do_imidazole_exocyclic_nh(
       return 0;
     }
 
-    if (nh0 == INVALID_ATOM_NUMBER) {
+    if (nh0 == kInvalidAtomNumber) {
       nh0 = o;
     } else {
       nh1 = o;
@@ -6626,17 +6626,17 @@ Chemical_Standardisation::_do_imidazole_exocyclic_nh(
   }
 
   // cerr << "Found " << nh0 << " and " << nh1 << "'\n";
-  if (nh1 == INVALID_ATOM_NUMBER) {
+  if (nh1 == kInvalidAtomNumber) {
     return 0;
   }
 
   // Now we need to identify the two carbon atoms in the ring. c1-nh0-c2-c3-nh1
   atom_number_t c2 = OtherC(m, nh0, carbon);
-  if (c2 == INVALID_ATOM_NUMBER) {
+  if (c2 == kInvalidAtomNumber) {
     return 0;
   }
   atom_number_t c3 = OtherC(m, nh1, carbon);
-  if (c3 == INVALID_ATOM_NUMBER) {
+  if (c3 == kInvalidAtomNumber) {
     return 0;
   }
 
@@ -6850,7 +6850,7 @@ Chemical_Standardisation::_do_tetrazole(
 
   int c = -1;  // index of the Carbon atom
 
-  atom_number_t nitrogen_with_one_hydrogen = INVALID_ATOM_NUMBER;
+  atom_number_t nitrogen_with_one_hydrogen = kInvalidAtomNumber;
   int nitrogens_with_no_implicit_hydrogens = 0;
 
   for (int i = 0; i < 5; i++) {
@@ -6865,7 +6865,7 @@ Chemical_Standardisation::_do_tetrazole(
 
     if (7 == z[j] && 2 == ncon[j]) {
       if (-1 == aj->formal_charge()) {
-        if (INVALID_ATOM_NUMBER != nitrogen_with_one_hydrogen) {
+        if (kInvalidAtomNumber != nitrogen_with_one_hydrogen) {
           return 0;
         }
 
@@ -6879,7 +6879,7 @@ Chemical_Standardisation::_do_tetrazole(
         continue;
       }
 
-      if (INVALID_ATOM_NUMBER != nitrogen_with_one_hydrogen) {
+      if (kInvalidAtomNumber != nitrogen_with_one_hydrogen) {
         return 0;
       }
 
@@ -7570,29 +7570,29 @@ Chemical_Standardisation::_do_transform_misdrawn_sulfonamide(
   const atomic_number_t* z = current_molecule_data.atomic_number();
   const int* ncon = current_molecule_data.ncon();
 
-  atom_number_t doubly_bonded_oxygen = INVALID_ATOM_NUMBER;
-  atom_number_t singly_bonded_oxygen = INVALID_ATOM_NUMBER;
-  atom_number_t doubly_bonded_nitrogen = INVALID_ATOM_NUMBER;
+  atom_number_t doubly_bonded_oxygen = kInvalidAtomNumber;
+  atom_number_t singly_bonded_oxygen = kInvalidAtomNumber;
+  atom_number_t doubly_bonded_nitrogen = kInvalidAtomNumber;
 
   const Atom* a = current_molecule_data.atoms()[s];
 
   for (const Bond* b : *a) {
     const atom_number_t x = b->other(s);
 
-    if (b->is_double_bond() && z[x] == 8 && doubly_bonded_oxygen == INVALID_ATOM_NUMBER) {
+    if (b->is_double_bond() && z[x] == 8 && doubly_bonded_oxygen == kInvalidAtomNumber) {
       doubly_bonded_oxygen = x;
     } else if (b->is_double_bond() && z[x] == 7 &&
-               doubly_bonded_nitrogen == INVALID_ATOM_NUMBER) {
+               doubly_bonded_nitrogen == kInvalidAtomNumber) {
       doubly_bonded_nitrogen = x;
     } else if (b->is_single_bond() && z[x] == 8 && ncon[x] == 1 &&
-               singly_bonded_oxygen == INVALID_ATOM_NUMBER) {
+               singly_bonded_oxygen == kInvalidAtomNumber) {
       singly_bonded_oxygen = x;
     }
   }
 
-  if (doubly_bonded_oxygen == INVALID_ATOM_NUMBER ||
-      doubly_bonded_nitrogen == INVALID_ATOM_NUMBER ||
-      singly_bonded_oxygen == INVALID_ATOM_NUMBER) {
+  if (doubly_bonded_oxygen == kInvalidAtomNumber ||
+      doubly_bonded_nitrogen == kInvalidAtomNumber ||
+      singly_bonded_oxygen == kInvalidAtomNumber) {
     return 0;
   }
 
@@ -8083,7 +8083,7 @@ Chemical_Standardisation::__do_transform_ring_lactim(
         continue;
       }
 
-      if (INVALID_ATOM_NUMBER != pk->alpha_nitrogen()) {
+      if (kInvalidAtomNumber != pk->alpha_nitrogen()) {
         continue;
       }
 
@@ -8110,7 +8110,7 @@ Chemical_Standardisation::__do_transform_ring_lactim(
         continue;
       }
 
-      if (INVALID_ATOM_NUMBER != pk->alpha_nitrogen()) {
+      if (kInvalidAtomNumber != pk->alpha_nitrogen()) {
         continue;
       }
 
@@ -8143,7 +8143,7 @@ Chemical_Standardisation::__do_transform_ring_lactim(
 
     Possible_Lactim_Lactam* p = possible_lactam[i];
 
-    if (INVALID_ATOM_NUMBER != p->second_nitrogen()) {
+    if (kInvalidAtomNumber != p->second_nitrogen()) {
       continue;
     }
 
@@ -8225,7 +8225,7 @@ Chemical_Standardisation::__do_transform_ring_lactim(
 
     Possible_Lactim_Lactam* p = possible_lactam[i];
 
-    if (INVALID_ATOM_NUMBER == p->second_nitrogen()) {
+    if (kInvalidAtomNumber == p->second_nitrogen()) {
       continue;
     }
 
@@ -8570,7 +8570,7 @@ Chemical_Standardisation::_do_transform_non_ring_lactim(
       continue;
     }
 
-    if (INVALID_ATOM_NUMBER != p->second_nitrogen()) {
+    if (kInvalidAtomNumber != p->second_nitrogen()) {
       continue;
     }
 
@@ -8586,7 +8586,7 @@ Chemical_Standardisation::_do_transform_non_ring_lactim(
       continue;
     }
 
-    if (INVALID_ATOM_NUMBER == p->second_nitrogen()) {
+    if (kInvalidAtomNumber == p->second_nitrogen()) {
       continue;
     }
 
@@ -8764,7 +8764,7 @@ Chemical_Standardisation::_do_transform_pyrazolone(
   int ndx_exocyclic_oxygen = -1;  // the carbon atom with the oxygen
   int ndx_n1 = -1;
   int ndx_n2 = -1;
-  atom_number_t exocyclic_oxygen = INVALID_ATOM_NUMBER;
+  atom_number_t exocyclic_oxygen = kInvalidAtomNumber;
 
   for (int i = 0; i < 5; ++i) {
     const atom_number_t j = r[i];
@@ -9340,7 +9340,7 @@ Possible_Lactim_Lactam::discern_alpha_nitrogen(Molecule& m) {
     return 1;
   }
 
-  if (INVALID_ATOM_NUMBER == _second_nitrogen) {
+  if (kInvalidAtomNumber == _second_nitrogen) {
     return 0;
   }
 
@@ -9574,8 +9574,8 @@ IWStandard_Current_Molecule::initialise(Molecule& m) {
     _ring_is_aromatic = nullptr;
   }
 
-  atom_number_t first_singly_connected_oxygen = INVALID_ATOM_NUMBER;
-  atom_number_t first_singly_connected_sulphur = INVALID_ATOM_NUMBER;
+  atom_number_t first_singly_connected_oxygen = kInvalidAtomNumber;
+  atom_number_t first_singly_connected_sulphur = kInvalidAtomNumber;
 
   for (int i = 0; i < _matoms; i++) {
     Atom* ai = const_cast<Atom*>(_atom[i]);
@@ -9610,7 +9610,7 @@ IWStandard_Current_Molecule::initialise(Molecule& m) {
       if (ai->formal_charge() < 0) {
         _ominus++;
       }
-      if (INVALID_ATOM_NUMBER == first_singly_connected_oxygen && 1 == _ncon[i]) {
+      if (kInvalidAtomNumber == first_singly_connected_oxygen && 1 == _ncon[i]) {
         first_singly_connected_oxygen = i;
       }
     } else if (16 == z) {
@@ -9623,7 +9623,7 @@ IWStandard_Current_Molecule::initialise(Molecule& m) {
         _splus++;
       }
 
-      if (INVALID_ATOM_NUMBER == first_singly_connected_sulphur && 1 == _ncon[i]) {
+      if (kInvalidAtomNumber == first_singly_connected_sulphur && 1 == _ncon[i]) {
         first_singly_connected_sulphur = i;
       }
     } else if (15 == z) {
@@ -9700,14 +9700,14 @@ IWStandard_Current_Molecule::initialise(Molecule& m) {
 
   // Only one remaining is lactam lactim
 
-  if ((INVALID_ATOM_NUMBER == first_singly_connected_oxygen &&
-       INVALID_ATOM_NUMBER == first_singly_connected_sulphur) ||
+  if ((kInvalidAtomNumber == first_singly_connected_oxygen &&
+       kInvalidAtomNumber == first_singly_connected_sulphur) ||
       0 == _nitrogens) {
     return 1;
   }
 
   int istart = first_singly_connected_oxygen;
-  if (INVALID_ATOM_NUMBER == first_singly_connected_oxygen) {
+  if (kInvalidAtomNumber == first_singly_connected_oxygen) {
     istart = first_singly_connected_sulphur;
   } else if (first_singly_connected_sulphur >= 0 &&
              first_singly_connected_sulphur < first_singly_connected_oxygen) {
@@ -10067,7 +10067,7 @@ Chemical_Standardisation::_do_amino_thiazole(
   int n = -1;
 
   int c_exo_n = -1;                             // the carbon with a =N outside the ring
-  atom_number_t n_exo_c = INVALID_ATOM_NUMBER;  // the =N atom
+  atom_number_t n_exo_c = kInvalidAtomNumber;  // the =N atom
 
   assert(5 == r.number_elements());
 
@@ -10120,7 +10120,7 @@ Chemical_Standardisation::_do_amino_thiazole(
         continue;
       }
 
-      if (INVALID_ATOM_NUMBER != n_exo_c) {
+      if (kInvalidAtomNumber != n_exo_c) {
         return 0;
       }
 
@@ -10129,7 +10129,7 @@ Chemical_Standardisation::_do_amino_thiazole(
     }
   }
 
-  if (INVALID_ATOM_NUMBER == n_exo_c || s < 0 || n < 0) {
+  if (kInvalidAtomNumber == n_exo_c || s < 0 || n < 0) {
     return 0;
   }
 
@@ -10559,8 +10559,8 @@ accumulate_possible_enol_form(const Molecule& m,
   const Atom* carbon = m.atomi(c);
   assert(carbon->ncon() == 3);
 
-  atom_number_t singly_bonded_carbon = INVALID_ATOM_NUMBER;
-  atom_number_t doubly_bonded_carbon = INVALID_ATOM_NUMBER;
+  atom_number_t singly_bonded_carbon = kInvalidAtomNumber;
+  atom_number_t doubly_bonded_carbon = kInvalidAtomNumber;
   Set_of_Atoms attached_carbons(2);
   for (int i = 0; i < 3; ++i) {
     const Bond* b = carbon->item(i);
@@ -10583,8 +10583,8 @@ accumulate_possible_enol_form(const Molecule& m,
     }
   }
 
-  if (INVALID_ATOM_NUMBER == doubly_bonded_carbon ||
-      INVALID_ATOM_NUMBER == singly_bonded_carbon) {
+  if (kInvalidAtomNumber == doubly_bonded_carbon ||
+      kInvalidAtomNumber == singly_bonded_carbon) {
     return 0;
   }
 
@@ -10860,7 +10860,7 @@ Chemical_Standardisation::_do_transform_to_4_pyridone(
 
   int n_index = -1;
   int oh_index = -1;
-  atom_number_t oh = INVALID_ATOM_NUMBER;
+  atom_number_t oh = kInvalidAtomNumber;
 
   for (int i = 0; i < 6; ++i) {
     const Atom& atom = m[ring[i]];
@@ -10900,7 +10900,7 @@ Chemical_Standardisation::_do_transform_to_4_pyridone(
       if (m.ncon(o) != 1) {
         continue;
       }
-      if (oh != INVALID_ATOM_NUMBER) {
+      if (oh != kInvalidAtomNumber) {
         return 0;
       }
       oh_index = i;
@@ -10944,8 +10944,8 @@ Chemical_Standardisation::_do_transform_to_4_pyridone(Molecule& m,
 int
 GetNitrogens(Molecule& m, atom_number_t carbon, atom_number_t sulphur,
              atom_number_t& nsingle, atom_number_t& ndouble) {
-  nsingle = INVALID_ATOM_NUMBER;
-  ndouble = INVALID_ATOM_NUMBER;
+  nsingle = kInvalidAtomNumber;
+  ndouble = kInvalidAtomNumber;
 
   for (const Bond* b : m[carbon]) {
     atom_number_t j = b->other(carbon);
@@ -10958,19 +10958,19 @@ GetNitrogens(Molecule& m, atom_number_t carbon, atom_number_t sulphur,
     }
 
     if (b->is_single_bond()) {
-      if (nsingle != INVALID_ATOM_NUMBER) {
+      if (nsingle != kInvalidAtomNumber) {
         return 0;
       }
       nsingle = j;
     } else {
-      if (ndouble != INVALID_ATOM_NUMBER) {
+      if (ndouble != kInvalidAtomNumber) {
         return 0;
       }
       ndouble = j;
     }
   }
 
-  if (nsingle == INVALID_ATOM_NUMBER || ndouble == INVALID_ATOM_NUMBER) {
+  if (nsingle == kInvalidAtomNumber || ndouble == kInvalidAtomNumber) {
     return 0;
   }
 
@@ -11122,7 +11122,7 @@ Chemical_Standardisation::_do_transform_124_triazine(
 
   // Exoclcyic atoms. These will only be set for the carbon atoms
   atom_number_t to_carbon[6];
-  std::fill_n(to_carbon, 6, INVALID_ATOM_NUMBER);
+  std::fill_n(to_carbon, 6, kInvalidAtomNumber);
 
   // the atomic numbers of the atoms in `ring`
   std::array<atomic_number_t, 6> zring;
@@ -11167,7 +11167,7 @@ Chemical_Standardisation::_do_transform_124_triazine(
   // There must be precisely two exocyclic O,S atoms.
   int os_count = 0;
   for (int i = 0; i < 6; ++i) {
-    if (to_carbon[i] != INVALID_ATOM_NUMBER) {
+    if (to_carbon[i] != kInvalidAtomNumber) {
       // cerr << " ATom " << to_carbon[i] << " attached to ring atom " << i << '\n';
       ++os_count;
     }
@@ -11292,7 +11292,7 @@ Chemical_Standardisation::_do_transform_124_triazine(Molecule& m, atom_number_t 
   // Guard against problems with things like
   // N12C(=O)[C@H]([C@@]1([H])CCC(=C2C([O-])=O)SC1=NC(O)=C(O)N=N1)NC(=O)C(=NOCCF)C1=CSC(=N1)N
   // CHEMBL418504
-  if (o1 == INVALID_ATOM_NUMBER || o2 == INVALID_ATOM_NUMBER) {
+  if (o1 == kInvalidAtomNumber || o2 == kInvalidAtomNumber) {
     // cerr << "Case like CHEMBL418504 -> " << m.name() << '\n';
     return 0;
   }
@@ -11317,8 +11317,8 @@ GetAdjacentNC(Molecule& m, IWStandard_Current_Molecule& current_molecule_data,
   const int* ncon = current_molecule_data.ncon();
   const int* ring_membership = current_molecule_data.ring_membership();
 
-  nitrogen = INVALID_ATOM_NUMBER;
-  carbon = INVALID_ATOM_NUMBER;
+  nitrogen = kInvalidAtomNumber;
+  carbon = kInvalidAtomNumber;
   for (const Bond* b : m[zatom]) {
     atom_number_t j = b->other(zatom);
     if (j == ignore) {
@@ -11331,7 +11331,7 @@ GetAdjacentNC(Molecule& m, IWStandard_Current_Molecule& current_molecule_data,
       if (ncon[j] != 3 || ring_membership[j] != 2) {
         return 0;
       }
-      if (carbon == INVALID_ATOM_NUMBER) {
+      if (carbon == kInvalidAtomNumber) {
         carbon = j;
       } else {
         return 0;
@@ -11340,7 +11340,7 @@ GetAdjacentNC(Molecule& m, IWStandard_Current_Molecule& current_molecule_data,
       if (ncon[j] != 2) {
         return 0;
       }
-      if (nitrogen == INVALID_ATOM_NUMBER) {
+      if (nitrogen == kInvalidAtomNumber) {
         nitrogen = j;
       } else {
         return 0;
@@ -11348,7 +11348,7 @@ GetAdjacentNC(Molecule& m, IWStandard_Current_Molecule& current_molecule_data,
     }
   }
 
-  if (nitrogen == INVALID_ATOM_NUMBER || carbon == INVALID_ATOM_NUMBER) {
+  if (nitrogen == kInvalidAtomNumber || carbon == kInvalidAtomNumber) {
     return 0;
   }
 

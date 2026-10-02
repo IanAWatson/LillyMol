@@ -1947,7 +1947,7 @@ Substructure_Environment::construct_from_proto(const SubstructureSearch::Substru
     return 0;
   }
 
-  if (INVALID_ATOM_NUMBER != possible_parent)
+  if (kInvalidAtomNumber != possible_parent)
     _add_possible_parent(possible_parent, possible_parent_bond_type, completed);
 
   if (_possible_parents.empty()) {
@@ -2104,8 +2104,8 @@ template void transfer_to_our_array(resizable_array_p<Bond> &, const resizable_a
 template void transfer_to_our_array(resizable_array_p<Link_Atom> &, const resizable_array<Link_Atom *> &);
 
 SeparatedAtoms::SeparatedAtoms() {
-  _a1 = INVALID_ATOM_NUMBER;
-  _a2 = INVALID_ATOM_NUMBER;
+  _a1 = kInvalidAtomNumber;
+  _a2 = kInvalidAtomNumber;
 }
 
 int
@@ -3580,7 +3580,7 @@ Single_Substructure_Query::_build_chirality_specification_from_proto(const Subst
 
   // Top front.
 
-  auto atom_or = proto.top_front();
+//auto atom_or = proto.top_front();
 
   if (! proto.has_top_front()) {
     ++unspecified;
@@ -3911,7 +3911,7 @@ Substructure_Chiral_Centre::BuildProto(SubstructureSearch::SubstructureChiralCen
   } else if (_top_front != nullptr) {
     tf = _top_front->initial_atom_number();
   } else {
-    tf = INVALID_ATOM_NUMBER;
+    tf = kInvalidAtomNumber;
     ++unspecified;
   }
 
@@ -3929,11 +3929,11 @@ Substructure_Chiral_Centre::BuildProto(SubstructureSearch::SubstructureChiralCen
   } else if (_top_back != nullptr) {
     tb = _top_back->initial_atom_number();
   } else {
-    tb = INVALID_ATOM_NUMBER;
+    tb = kInvalidAtomNumber;
     ++unspecified;
   }
 
-  if (tb == INVALID_ATOM_NUMBER) {
+  if (tb == kInvalidAtomNumber) {
   } else if (tb == CHIRAL_CONNECTION_IS_IMPLICIT_HYDROGEN) {
     proto.mutable_top_back()->set_h_or_lp(SubstructureSearch::AtomNumberHydrogenLonePair::HYDROGEN);
   } else if (tb == CHIRAL_CONNECTION_IS_LONE_PAIR) {
@@ -3948,11 +3948,11 @@ Substructure_Chiral_Centre::BuildProto(SubstructureSearch::SubstructureChiralCen
   } else if (_left_down != nullptr) {
     ld = _left_down->initial_atom_number();
   } else {
-    ld = INVALID_ATOM_NUMBER;
+    ld = kInvalidAtomNumber;
     ++unspecified;
   }
 
-  if (ld == INVALID_ATOM_NUMBER) {
+  if (ld == kInvalidAtomNumber) {
   } else if (ld == CHIRAL_CONNECTION_IS_IMPLICIT_HYDROGEN) {
     proto.mutable_left_down()->set_h_or_lp(SubstructureSearch::AtomNumberHydrogenLonePair::HYDROGEN);
   } else if (ld == CHIRAL_CONNECTION_IS_LONE_PAIR) {
@@ -3967,11 +3967,11 @@ Substructure_Chiral_Centre::BuildProto(SubstructureSearch::SubstructureChiralCen
   } else if (_right_down != nullptr) {
     rd = _right_down->initial_atom_number();
   } else {
-    rd = INVALID_ATOM_NUMBER;
+    rd = kInvalidAtomNumber;
     ++unspecified;
   }
 
-  if (rd == INVALID_ATOM_NUMBER) {
+  if (rd == kInvalidAtomNumber) {
   } else if (rd == CHIRAL_CONNECTION_IS_IMPLICIT_HYDROGEN) {
     proto.mutable_right_down()->set_h_or_lp(SubstructureSearch::AtomNumberHydrogenLonePair::HYDROGEN);
   } else if (rd == CHIRAL_CONNECTION_IS_LONE_PAIR) {

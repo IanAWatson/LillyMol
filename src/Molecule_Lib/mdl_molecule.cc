@@ -856,7 +856,7 @@ MDL_Molecule::remove_atoms (const int * to_remove)
   {
     if (to_remove[i])
     {
-      atom_cross_reference[i] = INVALID_ATOM_NUMBER;
+      atom_cross_reference[i] = kInvalidAtomNumber;
       continue;
     }
 

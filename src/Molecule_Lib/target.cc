@@ -1239,11 +1239,11 @@ Molecule_to_Match::_initialise_molecule(Molecule* m) {
 
   m->atoms((const Atom**)_atom);  // fetch the atoms
 
-  //_first = new_int(HIGHEST_ATOMIC_NUMBER + 1, INVALID_ATOM_NUMBER);
-  //_last  = new_int(HIGHEST_ATOMIC_NUMBER + 1, INVALID_ATOM_NUMBER);
+  //_first = new_int(HIGHEST_ATOMIC_NUMBER + 1, kInvalidAtomNumber);
+  //_last  = new_int(HIGHEST_ATOMIC_NUMBER + 1, kInvalidAtomNumber);
 
   std::fill_n(_first, HIGHEST_ATOMIC_NUMBER + 1,
-              INVALID_ATOM_NUMBER);  // no need to initialis last
+              kInvalidAtomNumber);  // no need to initialis last
 
   if (initialise_element_counts) {
     std::fill_n(_count, HIGHEST_ATOMIC_NUMBER + 1, 0);
@@ -1264,7 +1264,7 @@ Molecule_to_Match::_initialise_molecule(Molecule* m) {
 
       atomic_number_t z = a->atomic_number();
 
-      if (INVALID_ATOM_NUMBER == _first[z]) {
+      if (kInvalidAtomNumber == _first[z]) {
         _first[z] = i;
       }
       _last[z] = i;
@@ -1282,7 +1282,7 @@ Molecule_to_Match::_initialise_molecule(Molecule* m) {
 
       atomic_number_t z = a->atomic_number();
 
-      if (INVALID_ATOM_NUMBER == _first[z]) {
+      if (kInvalidAtomNumber == _first[z]) {
         _first[z] = i;
       }
       _last[z] = i;
@@ -1291,7 +1291,7 @@ Molecule_to_Match::_initialise_molecule(Molecule* m) {
 
   _spinach_or_between_rings = nullptr;
 
-  _start_matching_at = INVALID_ATOM_NUMBER;
+  _start_matching_at = kInvalidAtomNumber;
 
   _fingerprint = nullptr;
 
@@ -1322,7 +1322,7 @@ Molecule_to_Match::Molecule_to_Match() {
 
   _natoms = -1;
 
-  _start_matching_at = INVALID_ATOM_NUMBER;
+  _start_matching_at = kInvalidAtomNumber;
 
   return;
 }
@@ -1684,7 +1684,7 @@ Molecule_to_Match::heteroatom_count() const {
 
 int
 Molecule_to_Match::atoms_with_atomic_number(atomic_number_t z) const {
-  if (INVALID_ATOM_NUMBER == _first[z]) {
+  if (kInvalidAtomNumber == _first[z]) {
     return 0;
   }
 

@@ -2369,7 +2369,7 @@ IsSulfonamide(const Molecule& m,
   }
 
   int doubly_bonded_oxygen = 0;
-  atom_number_t nitrogen = INVALID_ATOM_NUMBER;
+  atom_number_t nitrogen = kInvalidAtomNumber;
   for (const Bond* b : sulphur) {
     const atom_number_t nbr = b->other(zatom);
 
@@ -2381,7 +2381,7 @@ IsSulfonamide(const Molecule& m,
   }
 
   if (doubly_bonded_oxygen < 2 ||
-      nitrogen == INVALID_ATOM_NUMBER) {
+      nitrogen == kInvalidAtomNumber) {
     return 0;
   }
 

@@ -474,18 +474,18 @@ Molecule::_compute_number_sssr_rings_by_eulers_formula() {
   return _number_sssr_rings;
 }
 
-int
+std::optional<int>
 Molecule::nrings_no_compute() const {
   if (_nrings >= 0) {  // already computed
     return _nrings;
   } else {
-    return NOT_COMPUTED;  // not computed
+    return std::nullopt;  // not computed
   }
 }
 
 int
 Molecule::nrings() {
-  if (nrings_no_compute() >= 0) {  // already computed
+  if (_nrings >= 0) { // already computed
     return _nrings;
   }
 
@@ -790,7 +790,7 @@ const Ring*
 Molecule::ringi_no_compute(int i) const {
   assert(ok());
 
-  if (nrings_no_compute() <= 0) {
+  if (_nrings <= 0) {  // not computed
     return nullptr;
   }
 

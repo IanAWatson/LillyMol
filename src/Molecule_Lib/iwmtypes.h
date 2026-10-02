@@ -367,6 +367,6 @@ enum class CahnIngoldPrelog {
 
 #define ATOM_TYPE_SYBYL "SYBYL"
 
-#define NOT_COMPUTED -117
+// #define NOT_COMPUTED -117
 
 #endif  // MOLECULE_LIB_IWMTYPES_H_

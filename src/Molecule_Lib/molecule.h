@@ -1112,7 +1112,7 @@ class __attribute__((visibility("default"))) Molecule : protected resizable_arra
   //  of SSSR rings computed by Euler's formula.
   //
   int nrings();                   // number of rings in molecule
-  int nrings_no_compute() const;  // number of rings in molecule without performing ring
+  std::optional<int> nrings_no_compute() const;  // number of rings in molecule without performing ring
                                   // perception (assumes has already been performed)
   int number_sssr_rings();
 

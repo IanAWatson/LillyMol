@@ -640,7 +640,7 @@ TEST(TestFsid, TestFsid) {
     fsid[f] += 1;
   }
 
-  EXPECT_EQ(fsid.size(), 5);
+  EXPECT_EQ(fsid.size(), 5u);
 }
 
 TEST(TestNameConcat, TestNameConcat1) {

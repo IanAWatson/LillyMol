@@ -202,7 +202,7 @@ distance_filter(GFP_Standard& fp, iwminid<similarity_type_t, int>& mindist) {
 #endif
     //  cerr << "Dist " << t << '\n';
 
-    if (t > static_cast<similarity_type_t>(0.0))
+    if (t > static_cast<similarity_type_t>(0.0)) [[ likely ]]
       ;
     else if (ignore_zero_distances) {
       continue;
@@ -368,14 +368,19 @@ To avoid fingerprints another list
 For each fingerprint in unknown.gfp, check distance to everything in avoid.gfp. If there is at least 1 (-n 1)
 distance that is 0.1 or lower, the molecule is discarded - add a -U option to save the discards.
 
+To retain molecules that are close to an existing collection
+
+  gfp_distance_filter_standard -f -p want.gfp -T 0.1 -N 1 unknown.gfp > close.smi
+
+Molecules in unknown only pass if they have at least 1 neighbour in want.gfp that is
+closer than 0.1.
+
  -p <file>        specify file against which input is to be compared.
  -s <number>      specify max pool size.
  -t <dis>         lower distance threshold.
  -n <n>           reject molecules that violate lower threshold <n> times or more.
  -T <dis>         upper distance threshold.
- -N <n>           reject molecules that violate upper threshold <n> times or more.
-          To pass the thresholds, a distance must be >= lower && <= upper.
-                  must be less <= pool size.
+ -N <n>           to pass, a molecule must have at least <n> neighbours that are <= the -T value.
  -f               write smiles as output.
  -U <file>        write molecules that fail the filter to <file>.
  -D <tag>         add distance to output (forces closest distance determination).

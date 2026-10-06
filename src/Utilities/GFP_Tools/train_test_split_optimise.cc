@@ -60,6 +60,7 @@ train_test_split_opt -f 0.85 -n 1 -S OPT -o 2000000 -r 20000 -x 20000 -h 8 file.
  -f <train_fraction> fraction of data in the train split
  -n <nsplit>         number of splits needed.
  -S <stem>           write splits to <stem>, <stem>R<n> and <stem>E<n>.
+ -c                  optimise for closness between train and test - the easiest possible split.
  -X                  also write cross split summary stats - expensive to compute.
  -C <fname>          weighted samples. A mapping from ID to number of instances.
  -A <fname>          activity file with header and id/activity columns. Repeat for multiple profiles.
@@ -329,6 +330,9 @@ class Optimise {
     // If running for a fixed time per split, the -t option.
     uint32_t _seconds;
 
+    // Are we optimising for separation between train and test or closeness
+    bool _optimise_for_separation;
+
     // For each pair of items where we know a distance, store that.
     // Key will be i * _number_needles + j where i > j.
     std::unordered_map<uint64_t, uint32_t> _distance;
@@ -438,6 +442,8 @@ Optimise::Optimise() {
 
   _max_distance = 0;
 
+  _optimise_for_separation = true;
+
   _number_needles = 0;
   _needle = nullptr;
 
@@ -495,6 +501,13 @@ Optimise::Initialise(const Command_Line& cl) {
 
     if (_verbose) {
       cerr << "Will place " << _fraction_train << " of items in the training set\n";
+    }
+  }
+
+  if (cl.option_present('c')) {
+    _optimise_for_separation = false;
+    if (_verbose) {
+      cerr << "Will optimise for closeness between train and test\n";
     }
   }
 
@@ -1245,23 +1258,31 @@ Optimise::MakeSplit(int split) {
 
       cerr << split << ' ' << j << " score " << new_score << " cmp " << starting_score <<
       " accepted " << steps_accepted << " delta " << accepted_this_period <<
-      " distance_delta " << delta << " combined_delta " << combined_delta << ' ' <<
-      iwmisc::Fraction<float>(steps_accepted, j) <<
+      " distance_delta " << delta;
+      if (_activity.active()) {
+        cerr << " combined_delta " << combined_delta;
+      }
+      cerr << ' ' << iwmisc::Fraction<float>(steps_accepted, j) <<
       " last successful " << last_successful_switch << '\n';
       MaybeReportActivityDistribution(cerr);
     }
 
-    // No improvement in the active objective, revert.
-    if (combined_delta <= 0)  [[ likely ]] {
-      _needle[i1].invert_train();
-      _needle[i2].invert_train();
-    } else { // Better combined objective, accept.
+    bool accept_change = false;
+    if (_optimise_for_separation && combined_delta > 0) {
+      accept_change = true;
+    } else if (! _optimise_for_separation && combined_delta < 0) {
+      accept_change = true;
+    }
+    if (accept_change) {
       score = new_score;
       if (_activity.active()) {
         _activity.ApplySwap(out_of_train, into_train);
       }
       ++steps_accepted;
       last_successful_switch = j;
+    } else {
+      _needle[i1].invert_train();
+      _needle[i2].invert_train();
     }
 
 #ifdef DEBUG_SWAP_ITEMS
@@ -1525,7 +1546,7 @@ Optimise::Report(std::ostream& output) const {
 
 int
 Main(int argc, char** argv) {
-  Command_Line cl(argc, argv, "vf:S:n:o:r:T:s:t:x:C:h:XA:Y:Z:");
+  Command_Line cl(argc, argv, "vf:S:n:o:r:T:s:t:x:C:h:XA:Y:Z:c");
   if (cl.unrecognised_options_encountered()) {
     cerr << "unrecognised_options_encountered\n";
     Usage(1);

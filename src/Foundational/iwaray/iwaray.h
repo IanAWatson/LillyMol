@@ -3,6 +3,7 @@
 
 //#include <tbb/scalable_allocator.h>
 
+#include <cstdint>
 #include <iostream>
 #include <initializer_list>
 #include <span>
@@ -68,7 +69,7 @@ class resizable_array_base
     inline int number_elements  () const { return _number_elements; }
     inline unsigned int size    () const { return _number_elements; }
     inline int elements_allocated () const { return _elements_allocated;}
-    inline int capacity () const { return _elements_allocated;}
+    inline uint32_t capacity () const { return _elements_allocated;}
 
     bool empty() const { return 0 == _number_elements;}
 

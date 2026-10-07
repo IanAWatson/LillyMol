@@ -1892,19 +1892,19 @@ TEST(TestKMG, TestAll) {
   IWString foo = "42";
   uint64_t i;
   ASSERT_TRUE(foo.NumericValueKMG(i));
-  EXPECT_EQ(i, 42);
+  EXPECT_EQ(i, static_cast<uint64_t>(42));
 
   foo = "42k";
   ASSERT_TRUE(foo.NumericValueKMG(i));
-  EXPECT_EQ(i, 42000);
+  EXPECT_EQ(i, static_cast<uint64_t>(42000));
 
   foo = "42M";
   ASSERT_TRUE(foo.NumericValueKMG(i));
-  EXPECT_EQ(i, 42000000);
+  EXPECT_EQ(i, static_cast<uint64_t>(42000000));
 
   foo = "42G";
   ASSERT_TRUE(foo.NumericValueKMG(i));
-  EXPECT_EQ(i, 42000000000);
+  EXPECT_EQ(i, static_cast<uint64_t>(42000000000));
 }
 
 

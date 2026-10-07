@@ -239,7 +239,7 @@ TEST(TestFixedBitVector, TestAllHex) {
       } else {
         EXPECT_FALSE(foo.is_set(0));
       }
-      EXPECT_EQ(16 * i + j, foo.bits()[0]);
+      EXPECT_EQ(static_cast<uint32_t>(16 * i + j), foo.bits()[0]);
     }
   }
 }

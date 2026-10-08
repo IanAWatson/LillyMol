@@ -7,10 +7,20 @@ cc_library(
     ],
     hdrs = [
         "cmdline.h",
+        "argv_permutation.h",
     ],
     visibility = ["//visibility:public"],
     deps = [
         "//Foundational/iwmisc:iwconfig",
         "//Foundational/iwstring",
+    ],
+)
+
+cc_test(
+    name = "argv_permutation_test",
+    srcs = ["argv_permutation_test.cc"],
+    deps = [
+        ":iwcmdline",
+        "@googletest//:gtest_main",
     ],
 )

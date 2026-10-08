@@ -23,6 +23,10 @@ using std::endl;
 
 #include "cmdline.h"
 
+#if defined(__APPLE__)
+#include "argv_permutation.h"
+#endif
+
 #define CL_MAGIC 97531
 #define OV_MAGIC 97532
 
@@ -104,6 +108,13 @@ Command_Line::Command_Line(int argc, char ** argv, const char * options)
 
 #endif
 
+#if defined(__APPLE__)
+  // BSD getopt stops at the first operand. Match GNU's default ordering before
+  // parsing, then reset BSD's internal state for repeated Command_Line objects.
+  const int parse_argc = cmdline_internal::PermuteArguments(argc, argv, options);
+  optreset = 1;
+#endif
+
   optarg = nullptr;
 
 #if defined(_WIN32) || defined(NEED_EXTERN_OPT)
@@ -119,9 +130,12 @@ Command_Line::Command_Line(int argc, char ** argv, const char * options)
   _unrecognised_options_encountered = 0;
 
   int o;
+#if !defined(__APPLE__)
+  const int parse_argc = argc;
+#endif
 
 
-  while ((o = getopt(argc, argv, options)) != EOF)
+  while ((o = getopt(parse_argc, argv, options)) != EOF)
   {
     if ('?' == o)
     {

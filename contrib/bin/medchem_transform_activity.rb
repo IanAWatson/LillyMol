@@ -9,8 +9,13 @@ require 'optparse'
 require 'shellwords'
 require 'tmpdir'
 
+# Group activity changes by transformation, keeping measured and model-predicted
+# changes separate. Run mode generates and looks up transformed molecules first;
+# analyse mode consumes the same intermediate files without invoking those tools.
 Stats = Struct.new(:n, :min, :max, :mean, :median, keyword_init: true)
 
+# Retain individual changes so the median can be calculated alongside the mean.
+# Empty groups have a count of zero and no numerical summary values.
 class Values
   def initialize
     @values = []
@@ -59,6 +64,8 @@ end
 def run_pipeline(commands, verbose:)
   warn commands.map { |cmd| quote_command(cmd) }.join(' | ') if verbose
 
+  # Check every process: a successful database lookup must not hide a failure
+  # in the upstream molecule generator.
   wait_threads = Open3.pipeline_start(*commands)
   wait_threads.each_with_index do |thread, ndx|
     status = thread.value
@@ -145,6 +152,8 @@ def read_activity(fname, ids = nil)
 
   die "#{fname}: no activity values read" if activity.empty?
 
+  # Run mode supplies the input molecule ids and requires activity for each.
+  # Additional activity records are allowed, including database lookup matches.
   if ids
     ids.each_key do |id|
       die "#{fname}: missing activity for smiles id '#{id}'" unless activity.key?(id)
@@ -158,6 +167,7 @@ end
 def extract_reaction_name(fname)
   contents = File.read(fname)
 
+  # Reaction names can come from either textproto or legacy MSI reaction files.
   if (match = contents.match(/^\s*name:\s*"([^"]+)"/))
     return match[1]
   end
@@ -202,6 +212,10 @@ def read_reaction_file_map(fname)
   mapping
 end
 
+# Database matches contain: smiles starting_id transformation found_id.
+# Compare the matched molecule's measured activity with the starting molecule's
+# measured activity. Positive deltas mean the numerical activity increased;
+# whether that is desirable depends on the activity scale supplied by the user.
 def accumulate_found(fname, activity, observed)
   each_non_blank_line(fname) do |line, line_number|
     tokens = line.split
@@ -218,6 +232,8 @@ end
 # Optional predicted-value input. The first non-blank line is a header.
 # Subsequent records contain:
 #   starting_id transformation predicted_activity
+# Predictions are absolute activities for transformed molecules. Subtract the
+# starting molecule's measured activity to put them on the observed delta scale.
 def accumulate_predictions(fname, activity, predicted)
   skip_header = true
   each_non_blank_line(fname) do |line, line_number|
@@ -240,25 +256,26 @@ end
 
 
 def command_from_template(command, input, output)
-  argv = Shellwords.split(command)
-  die 'Empty model command' if argv.empty?
+  die 'Empty model command' if command.strip.empty?
 
+  # Preserve shell syntax such as pipes and stdout redirection. Escape inserted
+  # filenames, replacing any quotes around a standalone placeholder as well.
+  # Example: score_model {input} > {output}
   used_input = false
   used_output = false
-  argv = argv.map do |token|
-    updated = token.gsub('{input}') do
-      used_input = true
-      input
-    end
-    updated.gsub('{output}') do
-      used_output = true
-      output
-    end
+  command = command.gsub(/'\{input\}'|"\{input\}"|\{input\}/) do
+    used_input = true
+    Shellwords.escape(input)
+  end
+  command = command.gsub(/'\{output\}'|"\{output\}"|\{output\}/) do
+    used_output = true
+    Shellwords.escape(output)
   end
 
-  argv << input unless used_input
-  argv << output unless used_output
-  argv
+  # Templates without placeholders retain the positional input/output convention.
+  command += " #{Shellwords.escape(input)}" unless used_input
+  command += " #{Shellwords.escape(output)}" unless used_output
+  ['sh', '-c', command]
 end
 
 def format_stat(value)
@@ -274,6 +291,8 @@ def write_table(output, observed, predicted)
     predicted_n predicted_min predicted_max predicted_mean predicted_median
   ].join(' ')
 
+  # Include transformations seen in either source. The missing source gets an
+  # empty group, displayed as count 0 and dots for unavailable statistics.
   transformations = (observed.keys + predicted.keys).uniq.sort
   transformations.each do |transformation|
     observed_stats = observed[transformation].stats
@@ -297,6 +316,7 @@ end
 
 
 def summary_json(stats)
+  # Omit absent statistics rather than writing nulls in the profile JSON.
   result = { 'n' => stats.n }
   result['min'] = stats.min unless stats.min.nil?
   result['max'] = stats.max unless stats.max.nil?
@@ -314,6 +334,8 @@ def activity_effect(property, source, stats)
 end
 
 def transformation_profiles(observed, predicted, reaction_files)
+  # Resolve display names back to REACTIONS entries so each exported profile
+  # identifies the reaction file as well as its observed and predicted effects.
   transformations = (observed.keys + predicted.keys).uniq.sort
   transformations.map do |transformation|
     reaction_file = reaction_files[transformation]
@@ -358,6 +380,9 @@ def usage(parser, mode = nil)
 
     If the activity file name ends in .csv, it is parsed as CSV.
     Otherwise it is parsed as whitespace separated text.
+
+    The --model-command option might be something like
+      --model-command 'xgbd_evaluate.sh -mdir /path/to/model {input} > {output}'
   USAGE
   exit 1
 end
@@ -390,7 +415,7 @@ def add_common_options(opts, options)
   opts.on('--predictions FILE', 'Existing predictions: id transformation predicted_activity') do |value|
     options[:predictions] = value
   end
-  opts.on('--model-command COMMAND', 'Command that converts notfound.smi to id/transform predictions') do |value|
+  opts.on('--model-command COMMAND', 'Shell command producing predictions; use unquoted {input}/{output} placeholders') do |value|
     options[:model_command] = value
   end
   opts.on('--buildsmidb EXE', 'buildsmidb executable, default buildsmidb_bdb') do |value|
@@ -429,6 +454,9 @@ def parse_command_line(argv)
 end
 
 def generate_transformed_molecules(smiles, options)
+  # Index the starting molecules, then stream wizard products into the lookup.
+  # Lookup writes matching products to found and unmatched products to notfound;
+  # the latter are candidates for model scoring.
   run_command(
     [options.fetch(:buildsmidb), '-d', options.fetch(:database), '-g', 'all', '-l', '-c', smiles],
     verbose: options.fetch(:verbose)
@@ -445,6 +473,7 @@ end
 def analyse_transformations(options, activity_ids = nil)
   activity = read_activity(options.fetch(:activity), activity_ids)
 
+  # Each transformation accumulates its own samples in each activity source.
   observed = Hash.new { |hash, key| hash[key] = Values.new }
   predicted = Hash.new { |hash, key| hash[key] = Values.new }
 
@@ -476,6 +505,8 @@ def run_mode(options, argv, parser)
   smiles = argv.fetch(0)
   ids = read_smiles_ids(smiles)
 
+  # Allocate temporary paths only for intermediate files the caller did not name.
+  # Explicitly named files survive cleanup; --keep also retains temporary files.
   tmpdir = nil
   unless options[:found] && options[:notfound] && (options[:predictions] || !options[:model_command])
     tmpdir = Dir.mktmpdir('medchem_transform_activity')
@@ -487,6 +518,8 @@ def run_mode(options, argv, parser)
   begin
     generate_transformed_molecules(smiles, options)
 
+    # The model must write a header followed by the three-column prediction
+    # records consumed by accumulate_predictions before analysis starts.
     if options[:model_command]
       model = command_from_template(options.fetch(:model_command), options.fetch(:notfound),
                                     options.fetch(:predictions))

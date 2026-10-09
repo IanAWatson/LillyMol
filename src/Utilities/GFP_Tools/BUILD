@@ -1699,3 +1699,13 @@ cc_test(
         "@googletest//:gtest_main",
     ],
 )
+
+cc_test(
+    name = "gfp_standard_test",
+    size = "small",
+    srcs = ["gfp_standard_test.cc"],
+    deps = [
+        ":gfp_standard",
+        "@googletest//:gtest_main",
+    ],
+)

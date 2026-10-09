@@ -19,9 +19,11 @@ class GFP_Standard
 {
   private:
     uint8_t _molecular_properties[8];
-    unsigned char _iw[256];
-    unsigned char _mk[32];
-    unsigned char _mk2[32];
+    // Word storage guarantees alignment in individual objects, arrays, and
+    // derived spread items, and permits direct word reads without alias casts.
+    uint64_t _iw[32];
+    uint64_t _mk[4];
+    uint64_t _mk2[4];
 
     int _nset_mk;
     int _nset_mk2;

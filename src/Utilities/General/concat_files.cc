@@ -1382,6 +1382,8 @@ concat_files(int argc, char** argv) {
     usage(1);
   }
 
+  DisplayDashHelpIfRequested(cl, 'J', DisplayDashJOptions);
+
   verbose = cl.option_count('v');
 
   if (cl.option_present('z')) {

@@ -586,6 +586,17 @@ cc_binary(
 )
 
 cc_binary(
+    name = "bridgehead_atoms",
+    srcs = [
+        "bridgehead_atoms.cc",
+    ],
+    deps = [
+        "//Molecule_Lib:iwmolecule",
+        "//Molecule_Lib:moleculeio",
+    ],
+)
+
+cc_binary(
     name = "bump_check",
     srcs = [
         "bump_check.cc",

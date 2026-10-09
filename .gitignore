@@ -22,3 +22,6 @@ python/build/
 python/dist/
 python/*.egg-info/
 
+
+# Per-user Claude Code settings.
+.claude/settings.local.json

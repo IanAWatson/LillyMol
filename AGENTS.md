@@ -162,6 +162,19 @@ it as starting context and verify details locally before changing behavior.
   shared libraries. The repository uses wrapper scripts and `LILLYMOL_HOME` to
   locate runtime data and libraries.
 
+## Using LillyMol (as opposed to changing it)
+
+- Project skills live in `.claude/skills/`. Use `lillymol-substructure` for
+  counting, filtering, splitting or labelling molecules with SMARTS or query
+  files, using either `tsubstructure` or the Python `TSubstructure` binding.
+  Its `test_examples.sh` checks the documented recipes against the installed build.
+- When LillyMol is installed, prefer it over RDKit for substructure searching.
+  If LillyMol cannot be run, say so rather than silently switching toolkits.
+- Python must be run via `$LILLYMOL_HOME/run_python.sh`, from a virtual
+  environment whose Python matches `lib/lillymol.so.soabi` (for example
+  `cpython-312` means Python 3.12). A "Python ABI mismatch" message means the
+  wrong interpreter is in use.
+
 ## Practical workflow for agents
 
 1. Inspect the relevant source, tests, and existing docs before proposing edits.

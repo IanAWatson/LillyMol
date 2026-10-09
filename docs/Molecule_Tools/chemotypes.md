@@ -115,14 +115,30 @@ atoms.
 The default output contains only the retained chemotype core and does not encode
 how that core was attached to the rest of the parent molecule.
 
-Use `-I <iso>` to label retained ring atoms that have an external attachment:
+Use `-I <iso>` to label retained atoms at bonds crossing the final chemotype
+boundary:
 
 ```shell
 chemotypes -s '[N]' -I 99 -i smi input.smi > labelled.smi
 ```
 
-This labels the ring atom exit point with the fixed isotope value. `-I` cannot
-be used with atom typing.
+This labels the retained endpoint of every removed bond with the fixed isotope
+value, including cuts beyond atoms retained by `-u`. `-I` cannot be used with
+atom typing.
+
+Use `-C <stem>` to also write the complement to a separate file:
+
+```shell
+chemotypes -s '[N]' -I 99 -C complement -i smi input.smi > chemotypes.smi
+```
+
+The complement contains exactly the excluded atoms. Both endpoints of each cut
+bond receive isotope 99, so the attachment atoms are marked in both outputs.
+The complement uses the `-o` output types (SMILES by default), preserves the
+parent name, and keeps disconnected pieces together in one molecule record.
+No record is written for an empty complement. `-C` requires a separate file
+stem and cannot be used with fingerprint output. A fixed isotope marks sites;
+it does not uniquely pair multiple connections.
 
 Use `-u` to retain one-hop atoms attached to retained ring atoms without
 applying atom-type labels:
@@ -303,7 +319,8 @@ single-ring molecules should simply be skipped.
 | `-r <n>` | Minimum number of rings required for processing. |
 | `-u` | Include one-hop atoms attached to retained ring atoms. |
 | `-x` | With `-u`, ignore singly connected attached atoms. |
-| `-I <iso>` | Label retained ring exit-point atoms with isotope `iso`. Incompatible with `-P`. |
+| `-C <stem>` | Write excluded atoms to a separate output stem using the `-o` types. |
+| `-I <iso>` | Label retained boundary atoms, and complement endpoints, with isotope `iso`. Incompatible with `-P`. |
 | `-P <atype>` | Atom typing specification for retained non-terminal attachment atoms; also controls fingerprint atom types when `-J` is active. |
 | `-J FP<tag>` | Write a fixed-width linear fingerprint of the chemotype atom set. |
 | `-J NC<tag>` | Write a non-colliding counted EC fingerprint of the chemotype atom set; trailing digits set the EC radius. |

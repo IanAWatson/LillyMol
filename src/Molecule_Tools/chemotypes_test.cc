@@ -649,3 +649,82 @@ TEST(Chemotypes, InvalidSeedRingSystemReturnsEmptyResult) {
 }
 
 }  // namespace
+
+TEST(Chemotypes, ComplementLabelsBothEndpointsBeyondRetainedAttachment) {
+  Molecule m;
+  ASSERT_TRUE(m.build_from_smiles("CCN1CCCCC1"));
+  m.set_name("parent");
+  resizable_array_p<Substructure_Query> queries;
+  AddSmarts(queries, "[N]");
+  chemotypes::ChemotypeOptions options;
+  options.include_attached_atoms = 1;
+  options.isotope_for_exit_points = 99;
+  chemotypes::ChemotypeScratch scratch;
+  chemotypes::ChemotypeQueryMatch match;
+  Molecule complement;
+  ASSERT_EQ(chemotypes::ReduceToChemotype(m, queries, options, scratch, match,
+                                        nullptr, &complement),
+            chemotypes::ChemotypeQueryMatchStatus::kMatched);
+  ASSERT_EQ(m.natoms(), 7);
+  ASSERT_EQ(complement.natoms(), 1);
+  EXPECT_EQ(complement.name(), "parent");
+  EXPECT_EQ(complement.isotope(0), 99);
+  int labelled = 0;
+  for (int i = 0; i < m.natoms(); ++i) {
+    if (m.isotope(i) == 99) {
+      ++labelled;
+      EXPECT_EQ(m.atomic_number(i), 6);
+      EXPECT_FALSE(m.is_ring_atom(i));
+    }
+  }
+  EXPECT_EQ(labelled, 1);
+}
+
+TEST(Chemotypes, ComplementDisconnectedPiecesAndEmptyComplement) {
+  for (const char* smiles : {"CN1CCC(C)CC1", "N1CCCCC1"}) {
+    Molecule m;
+    ASSERT_TRUE(m.build_from_smiles(smiles));
+    const int original_atoms = m.natoms();
+    resizable_array_p<Substructure_Query> queries;
+    AddSmarts(queries, "[N]");
+    chemotypes::ChemotypeOptions options;
+    options.isotope_for_exit_points = 99;
+    chemotypes::ChemotypeScratch scratch;
+    chemotypes::ChemotypeQueryMatch match;
+    Molecule complement;
+    ASSERT_EQ(chemotypes::ReduceToChemotype(m, queries, options, scratch, match,
+                                          nullptr, &complement),
+              chemotypes::ChemotypeQueryMatchStatus::kMatched);
+    EXPECT_EQ(m.natoms() + complement.natoms(), original_atoms);
+    int labelled = 0;
+    for (int i = 0; i < m.natoms(); ++i) {
+      labelled += m.isotope(i) == 99;
+    }
+    EXPECT_EQ(labelled, original_atoms - 6);
+    for (int i = 0; i < complement.natoms(); ++i) {
+      EXPECT_EQ(complement.isotope(i), 99);
+    }
+    if (! complement.empty()) {
+      EXPECT_EQ(complement.number_fragments(), 2);
+    }
+  }
+}
+
+TEST(Chemotypes, FixedExitIsotopeWithoutComplementOutput) {
+  Molecule m;
+  ASSERT_TRUE(m.build_from_smiles("CCN1CCCCC1"));
+  resizable_array_p<Substructure_Query> queries;
+  AddSmarts(queries, "[N]");
+  chemotypes::ChemotypeOptions options;
+  options.include_attached_atoms = 1;
+  options.isotope_for_exit_points = 99;
+  chemotypes::ChemotypeScratch scratch;
+  chemotypes::ChemotypeQueryMatch match;
+  ASSERT_EQ(chemotypes::ReduceToChemotype(m, queries, options, scratch, match),
+            chemotypes::ChemotypeQueryMatchStatus::kMatched);
+  int labelled = 0;
+  for (int i = 0; i < m.natoms(); ++i) {
+    labelled += m.isotope(i) == 99;
+  }
+  EXPECT_EQ(labelled, 1);
+}

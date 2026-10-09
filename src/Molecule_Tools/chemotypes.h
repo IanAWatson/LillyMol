@@ -121,11 +121,14 @@ std::vector<int> ChemotypeAtomMask(Molecule& m, const ChemotypeQueryMatch& match
 // Find the first matching query, build the chemotype atom mask, optionally
 // label terminal attachment atoms by atom type, and remove atoms outside the
 // mask from `m`. Atom typing, when specified, is applied before any atoms are
-// removed so full-molecule context is available.
+// removed so full-molecule context is available. If supplied, complement receives
+// the excluded atoms with the parent name; it is empty on a failed match or when
+// all atoms are retained. Fixed exit isotopes label both endpoints of each cut.
 ChemotypeQueryMatchStatus ReduceToChemotype(
     Molecule& m, resizable_array_p<Substructure_Query>& queries,
     const ChemotypeOptions& options, ChemotypeScratch& scratch,
-    ChemotypeQueryMatch& match, Atom_Typing_Specification* atom_typing = nullptr);
+    ChemotypeQueryMatch& match, Atom_Typing_Specification* atom_typing = nullptr,
+    Molecule* complement = nullptr);
 
 }  // namespace chemotypes
 

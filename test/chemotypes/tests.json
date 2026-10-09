@@ -88,6 +88,18 @@
       "args": [
         "-s '[N]' -z i -i smi -H xref=xref.txt #{indir}/input.smi"
       ]
+    },
+    {
+      "name": "complement",
+      "args": [
+        "-s '[N]' -I 99 -C complement  -i smi #{indir}/input.smi"
+      ]
+    },
+    {
+      "name": "complement_attached",
+      "args": [
+        "-s '[N]' -I 99 -C complement -u -i smi #{indir}/input.smi"
+      ]
     }
   ]
 }

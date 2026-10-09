@@ -372,23 +372,23 @@ AddAttachedAtoms(Molecule& m, const std::vector<int>& ring_system,
 
 void
 ApplyExitPointIsotopes(Molecule& m, const std::vector<int>& keep,
-                       const std::vector<int>& ring_system,
                        isotope_t isotope) {
   if (isotope == 0) {
     return;
   }
 
+  // Label both original endpoints before extracting either subset. The final
+  // mask includes optional attachment atoms, so cuts need not occur at rings.
   const int matoms = m.natoms();
   for (atom_number_t atom = 0; atom < matoms; ++atom) {
-    if (! keep[atom] || ring_system[atom] == 0) {
+    if (! keep[atom]) {
       continue;
     }
-
     for (const Bond* bond : m[atom]) {
       const atom_number_t other = bond->other(atom);
       if (! keep[other]) {
         m.set_isotope(atom, isotope);
-        break;
+        m.set_isotope(other, isotope);
       }
     }
   }
@@ -663,7 +663,10 @@ ChemotypeQueryMatchStatus
 ReduceToChemotype(Molecule& m, resizable_array_p<Substructure_Query>& queries,
                   const ChemotypeOptions& options, ChemotypeScratch& scratch,
                   ChemotypeQueryMatch& match,
-                  Atom_Typing_Specification* atom_typing) {
+                  Atom_Typing_Specification* atom_typing, Molecule* complement) {
+  if (complement != nullptr) {
+    *complement = Molecule();
+  }
   if (atom_typing != nullptr && ! ApplyAtomTypeIsotopes(m, *atom_typing)) {
     return ChemotypeQueryMatchStatus::kAtomTypingFailed;
   }
@@ -678,9 +681,16 @@ ReduceToChemotype(Molecule& m, resizable_array_p<Substructure_Query>& queries,
   if (atom_typing != nullptr) {
     UnsetIsotopesAddAdjacent(m, keep);
   } else if (options.isotope_for_exit_points != 0) {
-    ApplyExitPointIsotopes(m, keep, match.ring_system, options.isotope_for_exit_points);
+    ApplyExitPointIsotopes(m, keep, options.isotope_for_exit_points);
   }
 
+  if (complement != nullptr) {
+    *complement = m;
+    std::vector<int> outside(keep.size());
+    std::transform(keep.begin(), keep.end(), outside.begin(),
+                   [](int value) { return value == kChemotypeNotKept; });
+    complement->remove_atoms(outside.data(), 0);
+  }
   m.remove_atoms(keep.data(), 0);
   return ChemotypeQueryMatchStatus::kMatched;
 }

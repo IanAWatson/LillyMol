@@ -209,7 +209,8 @@ Options:
  -x             ignore singly connected attached atoms with -u.
  -t             with -n, include all adjacent ring systems tied at the cutoff distance.
  -P <atype>     atom typing specification; non-terminal attachment atoms become labelled.
- -I <iso>       label retained ring exit-point atoms with isotope <iso>; incompatible with -P.
+ -I <iso>       label both endpoints of chemotype boundary bonds with isotope <iso>; incompatible with -P.
+ -C <stem>      write excluded atoms to a separate output stem; uses -o types.
  -J FP<tag>     generate fixed-width linear fingerprint of chemotype atoms.
  -J NC<tag>     generate non-colliding EC fingerprint of chemotype atoms.
                 A trailing digit sets the EC radius, default 3.
@@ -251,6 +252,9 @@ class Options {
   int _min_rings = 0;
   int _ignore_molecules_not_matching_query = 0;
   int _write_parent = 0;
+  Molecule_Output_Object _complement_output;
+  bool _write_complement = false;
+  uint64_t _complements_written = 0;
   IWString _parent_annotation;
   IWString _summary_fname;
   int _hash_chemotypes = 0;
@@ -413,9 +417,28 @@ Options::Initialise(Command_Line& cl) {
   if (fingerprinting_active() &&
       (cl.option_present('o') || cl.option_present('S') || cl.option_present('p') ||
        cl.option_present('F') || cl.option_present('U') || cl.option_present('I') ||
-       cl.option_present('H'))) {
+       cl.option_present('H') || cl.option_present('C'))) {
     cerr << "Fingerprint generation (-J) cannot be combined with molecule or summary output options\n";
     return 0;
+  }
+
+  if (cl.option_present('C')) {
+    IWString stem = cl.string_value('C');
+    if (stem == "-" || (cl.option_present('S') && stem == cl.string_value('S'))) {
+      cerr << "Complement output must use a separate file stem\n";
+      return 0;
+    }
+    if (! cl.option_present('o')) {
+      _complement_output.add_output_type(FILE_TYPE_SMI);
+    } else if (! _complement_output.determine_output_types(cl, 'o')) {
+      return 0;
+    }
+    if (_complement_output.would_overwrite_input_files(cl, stem) ||
+        ! _complement_output.new_stem(stem)) {
+      cerr << "Cannot open complement output stem '" << stem << "'\n";
+      return 0;
+    }
+    _write_complement = true;
   }
 
   if (cl.option_present('p')) {
@@ -580,7 +603,7 @@ Options::Initialise(Command_Line& cl) {
       cerr << "Will label non-terminal attachment atoms with atom types\n";
     }
     if (_chemotype_options.isotope_for_exit_points != 0) {
-      cerr << "Will label retained ring exit point atoms with isotope "
+      cerr << "Will label chemotype boundary atoms with isotope "
            << _chemotype_options.isotope_for_exit_points << '\n';
     }
   }
@@ -789,12 +812,20 @@ Options::Process(Molecule& m, Molecule_Output_Object& output) {
     parent = std::make_unique<Molecule>(m);
   }
 
+  Molecule complement;
   chemotypes::ChemotypeQueryMatch match;
   const chemotypes::ChemotypeQueryMatchStatus status = chemotypes::ReduceToChemotype(
-      m, _queries, _chemotype_options, _scratch, match, _atom_typing_ptr);
+      m, _queries, _chemotype_options, _scratch, match, _atom_typing_ptr,
+      _write_complement ? &complement : nullptr);
 
   switch (status) {
     case chemotypes::ChemotypeQueryMatchStatus::kMatched: {
+      if (_write_complement && ! complement.empty()) {
+        if (! _complement_output.write(complement)) {
+          return 0;
+        }
+        ++_complements_written;
+      }
       if (parent) {
         if (! _parent_annotation.empty()) {
           parent->append_to_name(_parent_annotation);
@@ -1004,6 +1035,9 @@ Options::Report(std::ostream& output) const {
   } else {
     output << "Wrote " << _molecules_written << " chemotypes\n";
   }
+  if (_write_complement) {
+    output << "Wrote " << _complements_written << " complements\n";
+  }
   if (_parent_molecules_written) {
     output << "Wrote " << _parent_molecules_written << " parent molecules\n";
   }
@@ -1167,7 +1201,7 @@ Chemotypes(Options& options, const char* fname, FileType input_type,
 
 int
 Chemotypes(int argc, char** argv) {
-  Command_Line cl(argc, argv, "vE:A:g:clfi:o:S:F:U:H:q:s:n:r:D:P:I:up:xtz:J:Y:");
+  Command_Line cl(argc, argv, "vE:A:g:clfi:o:S:F:U:H:q:s:n:r:D:P:I:C:up:xtz:J:Y:");
 
   if (cl.unrecognised_options_encountered()) {
     cerr << "Unrecognised options encountered\n";

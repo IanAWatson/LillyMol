@@ -105,6 +105,12 @@ TEST(ArgvPermutation, MissingValueIsReported) {
   opterr = 0;
   EXPECT_EQ(getopt(argc, argv, ":s:"), ':');
   EXPECT_EQ(getopt(argc, argv, ":s:"), -1);
+#if defined(__APPLE__)
+  EXPECT_EQ(optind, 3);
+#else
   EXPECT_EQ(optind, 2);
-  EXPECT_STREQ(argv[optind], "a.smi");
+#endif
+  // The operand is outside the reduced parsing range. BSD getopt can advance
+  // optind beyond that range when reporting a missing value.
+  EXPECT_STREQ(argv[argc], "a.smi");
 }

@@ -1820,7 +1820,7 @@ tsubstructure(const char* input_fname, const FileType input_type,
   data_source_and_type<Molecule> input(input_type, input_fname);
   if (!input.good()) {
     cerr << "Cannot open '" << input_fname << "'\n";
-    return 1;
+    return 0;
   }
 
   if (verbose) {

@@ -72,7 +72,11 @@ swap_elements (T & t1, T & t2,
   t2 = *tmp;
 #else
 #pragma GCC diagnostic push
+#if defined(__clang__)
+#pragma clang diagnostic ignored "-Wnontrivial-memaccess"
+#elif defined(__GNUC__)
 #pragma GCC diagnostic ignored "-Wclass-memaccess"
+#endif
   ::memcpy (reinterpret_cast<char*>(tmp), reinterpret_cast<char*>(&t1), sizeof (T));
   ::memcpy (reinterpret_cast<char*>(&t1), reinterpret_cast<char*>(&t2), sizeof (T));
   ::memcpy (reinterpret_cast<char*>(&t2), reinterpret_cast<char*>(tmp), sizeof (T));

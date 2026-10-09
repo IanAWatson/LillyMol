@@ -270,7 +270,9 @@ may depend on the default. On a sample of 200,000 molecules, about thirty of the
 Kekule double bonds, and several of the charge assigner and medchem rule queries are written
 in the Kekule form. Others, such as the boronic acid, coumarin, `hydrazide_cyclic` and `imidazole_basic`
 queries, have been written so that they give the same answer in every mode. Check the queries that you
-rely on before changing the setting. In Python this is
+rely on before changing the setting. The script `contrib/bin/kekule_query_audit.sh` runs a set of query files
+over a set of molecules in both modes and lists the queries that differ, see the
+[contrib/bin](/contrib/bin/AAREADME.md#kekule_query_auditsh) notes. In Python this is
 `set_aromatic_bonds_lose_kekule_identity()`, see
 [tsubstructure (python)](../python/tsubstructure.md#aromatic-bonds-and-kekule-forms).
 

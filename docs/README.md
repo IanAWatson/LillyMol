@@ -435,6 +435,10 @@ dimesions.
 ## maccskeys
 Descriptor and fingerprint generator.
 
+## make_2d_coordinates
+Generate 2D coordinates for depiction, writing a molfile that other software can
+draw [make_2d_coordinates](/docs/Depict/make_2d_coordinates.md).
+
 ## make_descriptors.sh
 A descriptor generator [make_descriptors](Molecule_Tools/make_descriptors.md).
 

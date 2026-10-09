@@ -1,8 +1,9 @@
 # tsubstructure
 
-`tsubstructure` is the command line substructure searching tool. It reads
-queries and a file of molecules, and reports which molecules match. It can also
-write the matching and non matching molecules, label the atoms that matched, and
+`tsubstructure` is a command line substructure searching tool. It reads
+queries and one or more files of molecules, and reports which molecules match. It can also
+write the matching and non matching molecules, label the atoms that matched,
+generate fingerprints or descriptors, and
 produce per query counts. Most substructure searching in LillyMol starts here.
 
 This page describes the options that are used day to day, with examples that
@@ -155,6 +156,9 @@ The counts are numbers of embeddings, see [What counts as a match](#what-counts-
 | `-G <file>` | the atom numbers that matched in each molecule, numbered from zero, `acetonitrile (1 2)` |
 | `-J <tag>` | Daylight style fingerprints in TDT form, with `-y <nbits>` setting the size |
 | `-a` | a table of per query match counts, see [Per query results](#per-query-results) |
+
+Note that with fingerprint output, if the tag starts with 'FP', the output will be a fixed
+width, binary fingerprint. If the tag starts with 'NC' it will be a sparse, counted fingerprint.
 
 ## What counts as a match
 
@@ -341,8 +345,6 @@ of writing.
 * **Exit status does not signal a match.** The exit status is 0 whenever the run completes, whether or not any
   molecule matched. The non zero values are for errors, such as an invalid SMARTS or `-g`
   qualifier (61), a query file that cannot be read (6), or no input file (8).
-  A missing *input* file prints an error on stderr but still exits with 0, so scripts that need
-  to know should look at the line reporting how many molecules were read.
 * **Matches are counted as embeddings.** See [What counts as a match](#what-counts-as-a-match).
 * **A single bond matches inside aromatic rings.** See
   [Aromatic bonds and Kekule forms](#aromatic-bonds-and-kekule-forms).
@@ -399,6 +401,6 @@ Commonly used `-M` qualifiers, others are in `-M help`
 
 ## Searching large files in parallel
 
-A search is fast. One simple query took about two seconds on 100k molecules, including reading
-them, and larger files can be split and searched in parallel with `dopattern.sh`, see the
-[common tasks](../CommonTasks.md) page.
+A search can be fast. A simple query may take about two seconds on 100k molecules, including reading
+them. Larger files can be split and searched in parallel with `dopattern.sh`, or
+tsubstructure_parallel.sh. See the [common tasks](../CommonTasks.md) page.

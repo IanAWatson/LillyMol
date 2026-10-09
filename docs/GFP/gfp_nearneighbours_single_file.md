@@ -87,7 +87,7 @@ changes the TFDataRecord proto type.
  -N <tag>         write number neighbours as <tag>
  -A <TAG>         write average neighbour distance to <TAG>
  -p               write all pair-wise distances in 3 column form
- -j <precision>   output precision for distances
+ -j <digits>      decimal places for text distances (default 4)
  -y               allow arbitrary distances
  -R <number>      report progress every <number> items processed
  -S <fname>       write nnbr::NearNeighbours TFDataRecord serialized protos to <fname>
@@ -122,3 +122,11 @@ scaling for this workload.
 
 The TBB source is generated for a fixed set of worker counts. The Ruby generator
 is [gfp_nearneighbours_single_file_tbb.rb](/src/Utilities/GFP_Tools/gfp_nearneighbours_single_file_tbb.rb).
+
+Text distances use `Fraction_as_String`, as in the TBB implementation, to
+produce consistent formatting on Linux and Mac. This applies to `DIST<...>`
+records, three-column `-p` output, and average-distance tags from `-A`.
+The default is four decimal places; `-j` selects the number of decimal places
+(at least two), and trailing zeros are removed. For example, `-j 3` writes
+`0.0854` as `0.085`, rather than retaining three significant digits. Binary
+TFDataRecord distances retain their original floating-point values.

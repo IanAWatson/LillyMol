@@ -269,7 +269,9 @@ write_average_neighbour_distance(IW_GFP_D_ID** neighbours, int number_neighbours
     acc.extra(n->distance());
   }
 
-  output << tag_for_average_distance << acc.average_if_available_minval_if_not() << ">\n";
+  output << tag_for_average_distance;
+  fraction_as_string.append_number(output, acc.average_if_available_minval_if_not());
+  output << ">\n";
 
   return output.good();
 }
@@ -347,7 +349,7 @@ write_neighbour_list(const IW_GFP_D_ID& target, IW_GFP_D_ID** neighbours,
     similarity_type_t d = n->distance();
 
     output << distance_tag;
-    output.append_number(d, 3);
+    fraction_as_string.append_number(output, d);
     output << ">\n";
 
     UpdateGlobalStatistics(i, d);
@@ -528,7 +530,9 @@ three_column_output_all_pairs(IWString_and_File_Descriptor& output) {
         continue;
       }
 
-      output << fpi.id() << ' ' << pool[j].id() << ' ' << d << '\n';
+      output << fpi.id() << ' ' << pool[j].id() << ' ';
+      fraction_as_string.append_number(output, d);
+      output << '\n';
       output.write_if_buffer_holds_more_than(32768);
     }
   }
@@ -707,7 +711,7 @@ Usage <options> <input_file>\n";
  -N <tag>         write number neighbours as <tag>
  -A <TAG>         write average neighbour distance to <TAG>
  -p               write all pair-wise distances in 3 column form
- -j <precision>   output precision for distances
+ -j <digits>      decimal places for text distances (default 4)
  -y               allow arbitrary distances
  -R <number>      report progress every <number> items processed
  -S <fname>       write nnbr::NearNeighbours TFDataRecord serialized protos to <fname>
@@ -1033,6 +1037,8 @@ nearneighbours(int argc, char** argv) {
     histogram_nearnest_neighbour_distances.initialise(0.0, 1.0, 0.01);
   }
 
+  // Match the TBB tool's lookup-based, platform-stable distance formatting.
+  int distance_precision = 4;
   if (cl.option_present('j')) {
     int j;
     if (!cl.value('j', j) || j < 2) {
@@ -1040,11 +1046,17 @@ nearneighbours(int argc, char** argv) {
       usage(3);
     }
 
+    distance_precision = j;
     set_default_iwstring_float_concatenation_precision(j);
 
     if (verbose) {
       cerr << "Default float concatenation precision " << j << '\n';
     }
+  }
+
+  if (!fraction_as_string.initialise(0.0f, 1.0f, distance_precision)) {
+    cerr << "Cannot initialise distance formatting\n";
+    return 1;
   }
 
   int rc = 0;

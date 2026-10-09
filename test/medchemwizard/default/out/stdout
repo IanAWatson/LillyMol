@@ -11805,6 +11805,7 @@ ClC(=O)OC(C)S(=O)C CHEMBL3183406 Simple_H_Replacement.add_sulfone
 ClC(=O)OCCS(=O)C CHEMBL3183406 Simple_H_Replacement.add_sulfone
 ClC(=O)OC(C)C(C)(C)C CHEMBL3183406 Simple_H_Replacement.add_t-butyl
 ClC(=O)OCCC(C)(C)C CHEMBL3183406 Simple_H_Replacement.add_t-butyl
+ClC1=NC=C(C)O1 CHEMBL3183406 ester2oxazole
 C(C)(OP(O)=O)C1=NC=CC=C1 CHEMBL2251448 Aryl_group_addition.add_2-pyridyl
 C(CC1=NC=CC=C1)OP(O)=O CHEMBL2251448 Aryl_group_addition.add_2-pyridyl
 C(C)OP(O)(=O)C1=NC=CC=C1 CHEMBL2251448 Aryl_group_addition.add_2-pyridyl

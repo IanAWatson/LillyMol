@@ -1851,8 +1851,11 @@ open_match_or_non_match_stream(Command_Line& cl, const char* match_or_non_match,
 
   const char* s = suffix_for_file_type(otype);
 
-  if (fname.ends_with(s)) {
-    fname.chop(::strlen(s));
+  // The suffix is only a suffix if it follows a period. Without that check, a stem
+  // such as out_smi would be shortened to out_.
+  const int slen = ::strlen(s);
+  if (fname.ends_with(s) && fname.length() > slen && fname[fname.length() - slen - 1] == '.') {
+    fname.chop(slen);
   }
 
   if (verbose) {
@@ -2635,8 +2638,8 @@ tsubstructure(int argc, char** argv) {
         }
       } else if (m.starts_with("minat=")) {
         m.remove_leading_chars(6);
-        if (!m.numeric_value(max_atom_count) || max_atom_count < 1) {
-          cerr << "Invalid maxat= qualifier '" << m << "'\n";
+        if (!m.numeric_value(min_atom_count) || min_atom_count < 1) {
+          cerr << "Invalid minat= qualifier '" << m << "'\n";
           usage(3);
         }
       } else if ("owdmm" == m) {

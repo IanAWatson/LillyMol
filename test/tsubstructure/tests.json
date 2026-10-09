@@ -680,6 +680,41 @@
       "args": [
         "-s C -m out -m NONMX #{indir}/in.smi"
       ]
+    },
+
+    {
+      "name": "minat",
+      "args": [
+        "-s C#N -M minat=9 -m out #{indir}/in.smi"
+      ]
+    },
+
+    {
+      "name": "maxat",
+      "args": [
+        "-s C#N -M maxat=9 -m out #{indir}/in.smi"
+      ]
+    },
+
+    {
+      "name": "minat_maxat",
+      "args": [
+        "-s C#N -M minat=5 -M maxat=10 -m out #{indir}/in.smi"
+      ]
+    },
+
+    {
+      "name": "stem_ends_in_smi",
+      "args": [
+        "-s C#N -m out_smi #{indir}/in.smi"
+      ]
+    },
+
+    {
+      "name": "stem_with_dot_smi",
+      "args": [
+        "-s C#N -m out.smi #{indir}/in.smi"
+      ]
     }
   ]
 

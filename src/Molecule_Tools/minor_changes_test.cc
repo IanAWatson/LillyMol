@@ -109,7 +109,7 @@ TEST_P(TestMinorChangesP, Tests) {
   ASSERT_TRUE(TextFormat::ParseFromString(params.proto, &_proto));
   // std::cerr << "Starting with " << params.smiles << '\n';
   _options.SetConfig(_proto);
-  EXPECT_EQ(_options.Process(_mol, _results), params.expected.size()) << params.smiles 
+  EXPECT_EQ(_options.Process(_mol, _results), static_cast<int>(params.expected.size())) << params.smiles 
         << " proto " << params.proto;
   if (params.expected.empty()) {
     return;

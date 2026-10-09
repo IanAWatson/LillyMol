@@ -14,7 +14,7 @@ TEST(TestFragmentMolecule, TestNoBreakCC) {
   fragment_molecule::MoleculeFragmenter fragmenter;
   resizable_array<int> bonds;
   EXPECT_EQ(fragmenter.IdentifyBreakableBonds(m, bonds), 0);
-  EXPECT_EQ(bonds.size(), 0)u;
+  EXPECT_EQ(bonds.size(), 0u);
 }
 
 TEST(TestFragmentMolecule, TestBreakCC) {

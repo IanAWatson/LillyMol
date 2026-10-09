@@ -1,4 +1,6 @@
 # RuleClass nuisance
+# Oct 2026. Bonds in aromatic rings are written as 'bond' (any type) so that the query gives the same
+# answer whether or not aromatic bonds keep their Kekule forms (tsubstructure -M nokekule).
 # SubClass misc
 
 # Feb 2004. Change to demerit
@@ -29,13 +31,13 @@
   (2 Query_Atom
     (A I atomic_number 8)
     (A I ncon 2)
-    (A I single_bond 1)
+    (A I bond 1)
   )
   (3 Query_Atom
     (A I atomic_number 6)
     (A I min_nrings 2)
     (A I aromatic 1)
-    (A I single_bond 2)
+    (A I bond 2)
   )
   (4 Query_Atom
     (A I atomic_number 6)
@@ -66,11 +68,11 @@
   (9 Query_Atom
     (A I atomic_number 6)
     (A I aromatic 1)
-    (A I single_bond 8)
+    (A I bond 8)
   )
   (10 Query_Atom
     (A I atomic_number 6)
-    (A I double_bond 9)
-    (A I single_bond 1)
+    (A I bond 9)
+    (A I bond 1)
   )
 )

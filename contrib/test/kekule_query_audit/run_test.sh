@@ -31,6 +31,10 @@ printf '(0 Query\n  (A C smarts "a-!@a")\n)\n' > $tmp/queries/independent.qry
 printf 'name: "dependent"\nquery {\n  smarts: "a-a"\n}\n' > $tmp/queries/dependent_proto.txtproto
 printf '(0 Query\n  (A C smarts "C(")\n)\n'   > $tmp/queries/broken.qry
 printf 'dependent.qry\n' > $tmp/queries/a_list
+# not a substructure query: should be ignored when the directory is searched
+printf 'name: "not a query"\n' > $tmp/queries/config.textproto
+# a textproto query with the .textproto suffix, which is used when it is named
+printf 'name: "named"\nquery {\n  smarts: "a-a"\n}\n' > $tmp/named.textproto
 
 run() { python3 $audit "$@" 2>$tmp/stderr; }
 
@@ -66,5 +70,11 @@ run --head 2 --jobs 2 $tmp/molecules.smi $tmp/queries/dependent.qry >/dev/null
 grep -q "2 molecules" $tmp/stderr; check "--head limits the molecules" $?
 run --every 2 --jobs 2 $tmp/molecules.smi $tmp/queries/dependent.qry >/dev/null
 grep -q "3 molecules" $tmp/stderr; check "--every samples the molecules" $?
+
+out=$(run --all --jobs 2 $tmp/molecules.smi $tmp/queries)
+echo "$out" | grep -q "config.textproto"; [[ $? -ne 0 ]]; check "a .textproto file in a directory is not taken as a query" $?
+
+out=$(run --jobs 2 $tmp/molecules.smi $tmp/named.textproto)
+[[ "$(echo "$out" | grep -F named.textproto)" == *$'\tCOUNT_DIFF\t4\t2\t-2'* ]]; check "a .textproto file named on the command line is used" $?
 
 exit $fail

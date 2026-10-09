@@ -65,7 +65,13 @@ MATCH_RE = re.compile(r"(\d+) molecules read, (\d+) molecules match")
 # Mode name and the tsubstructure arguments that select it. The default mode must be first.
 MODES = [("default", []), ("nokekule", ["-M", "nokekule"]), ("fkekule", ["-M", "fkekule"])]
 
+# How a query file is given to tsubstructure, by suffix.
 QUERY_SUFFIXES = {".qry": "", ".txtproto": "PROTO:", ".textproto": "PROTO:"}
+
+# Suffixes looked for when a directory is searched. Other .textproto files, such as
+# data/queries/pharmacophore/pharmacophore.textproto, are not substructure queries.
+# A .textproto file is used if it is named on the command line.
+DIRECTORY_SUFFIXES = {".qry", ".txtproto"}
 
 
 def find_tsubstructure(explicit):
@@ -83,7 +89,11 @@ def find_tsubstructure(explicit):
 
 
 def find_queries(paths):
-  """All query files in the files and directories given, in a stable order."""
+  """All query files in the files and directories given, in a stable order.
+
+  A directory is searched for .qry and .txtproto files. A file named on the command
+  line is used whatever its suffix.
+  """
   queries = []
   for p in paths:
     p = Path(p)
@@ -91,7 +101,7 @@ def find_queries(paths):
       for root, dirs, files in os.walk(p):
         dirs[:] = sorted(d for d in dirs if not d.startswith("."))
         for f in sorted(files):
-          if Path(f).suffix in QUERY_SUFFIXES and not f.startswith("."):
+          if Path(f).suffix in DIRECTORY_SUFFIXES and not f.startswith("."):
             queries.append(Path(root) / f)
     elif p.is_file():
       queries.append(p)

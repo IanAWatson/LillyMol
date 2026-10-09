@@ -4,10 +4,9 @@
     {
       "name": "case_1",
       "args": [
-           "-h 4 ${LILLYMOL_HOME}/data/pubchem_example.gfp"
+        "-h 4 ${LILLYMOL_HOME}/data/pubchem_example.gfp"
       ]
     },
-
     {
       "comment": [
         "Regression: -A (previously selected fingerprints) was read but never",
@@ -23,7 +22,6 @@
         "-h 1 -A #{datadir}/prior.gfp #{datadir}/pool.gfp"
       ]
     },
-
     {
       "comment": [
         "Regression: a -A file yielding no fingerprints used to be reported as",
@@ -41,7 +39,6 @@
         ]
       }
     },
-
     {
       "comment": [
         "Regression: with -p (distance scaling factors) the tool selects via",
@@ -55,7 +52,6 @@
         "-h 1 -p FILE=#{datadir}/weights_uniform.txt #{datadir}/pool.gfp"
       ]
     },
-
     {
       "comment": [
         "-p together with -A. Exercises two further faults in that path: the",
@@ -70,7 +66,6 @@
         "-h 1 -A #{datadir}/prior.gfp -p FILE=#{datadir}/weights_uniform.txt #{datadir}/pool.gfp"
       ]
     },
-
     {
       "comment": [
         "Non-uniform weights must steer the first selection under -A: the pick",
@@ -84,7 +79,6 @@
         "-h 1 -A #{datadir}/prior.gfp -p FILE=#{datadir}/weights_skewed.txt #{datadir}/pool.gfp"
       ]
     },
-
     {
       "comment": [
         "Regression: -b was parsed after the spread had already run and written",
@@ -95,8 +89,24 @@
       "args": [
         "-h 1 -b #{datadir}/pool.gfp"
       ]
+    },
+    {
+      "name": "weights_skewed_brief",
+      "args": [
+        "-h 1 -b -A #{datadir}/prior.gfp -p FILE=#{datadir}/weights_skewed.txt #{datadir}/pool.gfp"
+      ],
+      "comment": [
+        "Weighted brief output uses the same four-decimal distance formatting as TDT output."
+      ]
+    },
+    {
+      "name": "weights_above_one",
+      "args": [
+        "-h 1 -A #{datadir}/prior.gfp -p FILE=#{indir}/weights.txt #{datadir}/pool.gfp"
+      ],
+      "comment": [
+        "Weights and weighted distances above one use stable fallback formatting."
+      ]
     }
-
   ]
-
 }

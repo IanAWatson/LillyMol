@@ -317,7 +317,9 @@ do_output(const F* pool, const int isel, const int nsn, const float d,
   const int ini = pool[isel].initial_ndx();
 
   if (brief_output) {
-    output << smiles[ini] << ' ' << pcn[ini] << ' ' << d << "\n";
+    output << smiles[ini] << ' ' << pcn[ini] << ' ';
+    fraction_as_string.append_number(output, d);
+    output << '\n';
   } else {
     output << smiles_tag << smiles[isel] << ">\n";
     output << identifier_tag << pcn[isel] << ">\n";
@@ -327,7 +329,9 @@ do_output(const F* pool, const int isel, const int nsn, const float d,
 
       output << smiles_tag << smiles[n] << ">\n";
       output << identifier_tag << pcn[n] << ">\n";
-      output << distance_tag << d << ">\n";
+      output << distance_tag;
+      fraction_as_string.append_number(output, d);
+      output << ">\n";
     } else {
       output << smiles_tag << "*>\n";
       output << identifier_tag << "*>\n";
@@ -603,7 +607,9 @@ template <typename T>
 int
 WriteSelectedBrief(const T* pool, int selected, IWString_and_File_Descriptor& output) {
   const T& sel = pool[selected];
-  output << sel.smiles(smiles) << ' ' << sel.pcn(pcn) << ' ' << sel.distance() << '\n';
+  output << sel.smiles(smiles) << ' ' << sel.pcn(pcn) << ' ';
+  fraction_as_string.append_number(output, sel.distance());
+  output << '\n';
   output.write_if_buffer_holds_more_than(4096);
   return 1;
 }
@@ -624,11 +630,15 @@ WriteSelected(T* pool, int selected, IWString_and_File_Descriptor& output) {
     int ndx = sel.nearest_previously_selected();
     output << smiles_tag << smiles[ndx] << ">\n";
     output << identifier_tag << pcn[ndx] << ">\n";
-    output << distance_tag << sel.distance() << ">\n";
+    output << distance_tag;
+    fraction_as_string.append_number(output, sel.distance());
+    output << ">\n";
   } else {
     output << smiles_tag << "*>\n";
     output << identifier_tag << "*>\n";
-    output << distance_tag << sel.distance() << ">\n";
+    output << distance_tag;
+    fraction_as_string.append_number(output, sel.distance());
+    output << ">\n";
   }
 
   output << "|\n";
@@ -1642,9 +1652,12 @@ gfp_spread_standard(int argc, char** argv) {
     }
   }
 
-  fraction_as_string.initialise(0.0, 1.0, 4);
-  fraction_as_string.set_leading_string("DIST<");
-  fraction_as_string.append_to_each_stored_string(">\n");
+  // Share raw numeric strings across DIST, SCALE, and brief output. Values
+  // outside [0, 1] use Fraction_as_String's stable formatting fallback.
+  if (!fraction_as_string.initialise(0.0f, 1.0f, 4)) {
+    cerr << "Cannot initialise distance and scale formatting\n";
+    return 1;
+  }
 
   IWString_and_File_Descriptor output(1);
 
@@ -1692,7 +1705,9 @@ gfp_spread_standard(int argc, char** argv) {
     for (int i = 0; i < items_selected; ++i) {
       const Selected_Item& s = selected_item[i];
 
-      output << smiles[s._sel] << ' ' << pcn[s._sel] << ' ' << s._dist << '\n';
+      output << smiles[s._sel] << ' ' << pcn[s._sel] << ' ';
+      fraction_as_string.append_number(output, s._dist);
+      output << '\n';
       output.write_if_buffer_holds_more_than(4096);
     }
   } else {
@@ -1707,14 +1722,20 @@ gfp_spread_standard(int argc, char** argv) {
       if (nsn >= 0) {
         output << smiles_tag << smiles[nsn] << ">\n";
         output << identifier_tag << pcn[nsn] << ">\n";
-        output << scale_tag << weight[id] << ">\n";
-        output << distance_tag << s._dist << ">\n";
+        output << scale_tag;
+        fraction_as_string.append_number(output, weight[id]);
+        output << ">\n";
+        output << distance_tag;
+        fraction_as_string.append_number(output, s._dist);
+        output << ">\n";
       } else {
         output << smiles_tag << "*>\n";
         output << identifier_tag << "*>\n";
         output << scale_tag << "*>\n";
         if (s._dist > 0.0f) {
-          output << distance_tag << s._dist << ">\n";
+          output << distance_tag;
+          fraction_as_string.append_number(output, s._dist);
+          output << ">\n";
         } else {
           output << distance_tag << "1>\n";
         }

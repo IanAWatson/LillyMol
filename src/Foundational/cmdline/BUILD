@@ -24,3 +24,13 @@ cc_test(
         "@googletest//:gtest_main",
     ],
 )
+
+cc_test(
+    name = "cmdline_test",
+    size = "small",
+    srcs = ["cmdline_test.cc"],
+    deps = [
+        ":iwcmdline",
+        "@googletest//:gtest_main",
+    ],
+)

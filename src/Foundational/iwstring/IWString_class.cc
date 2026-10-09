@@ -895,6 +895,10 @@ const_IWSubstring::find(const const_IWSubstring& needle) const {
 template <typename T>
 int
 string_class_is_unsigned_int_4(const char* s, int nchars, T& result) {
+  if (nchars == 0) {
+    return 0;
+  }
+
   if (nchars < 10)
     ;
   else if (nchars > 10) {
@@ -941,6 +945,10 @@ string_class_is_unsigned_int_4(const char* s, int nchars, T& result) {
 template <typename T>
 int
 string_class_is_unsigned_int_8(const char* s, int nchars, T& result) {
+  if (nchars == 0) {
+    return 0;
+  }
+
   if (nchars > 20) {
     return 0;
   }

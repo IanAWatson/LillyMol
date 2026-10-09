@@ -1908,4 +1908,55 @@ TEST(TestKMG, TestAll) {
 }
 
 
+// Exercise every public unsigned conversion overload for owning strings and
+// substring views. Failure on empty input must not overwrite the caller's value.
+template <typename T>
+class UnsignedNumericConversion : public testing::Test {};
+using UnsignedNumericTypes = testing::Types<unsigned char, unsigned short,
+    unsigned int, unsigned long, unsigned long long>;
+TYPED_TEST_SUITE(UnsignedNumericConversion, UnsignedNumericTypes);
+
+TYPED_TEST(UnsignedNumericConversion, RejectsDefaultConstructedStrings) {
+  const IWString owned;
+  const const_IWSubstring view;
+  TypeParam value = 17;
+  EXPECT_EQ(owned.numeric_value(value), 0);
+  EXPECT_EQ(value, static_cast<TypeParam>(17));
+  EXPECT_EQ(view.numeric_value(value), 0);
+  EXPECT_EQ(value, static_cast<TypeParam>(17));
+}
+
+TYPED_TEST(UnsignedNumericConversion, RejectsExplicitEmptyStrings) {
+  const IWString owned("");
+  const const_IWSubstring view("");
+  TypeParam value = 17;
+  EXPECT_EQ(owned.numeric_value(value), 0);
+  EXPECT_EQ(value, static_cast<TypeParam>(17));
+  EXPECT_EQ(view.numeric_value(value), 0);
+  EXPECT_EQ(value, static_cast<TypeParam>(17));
+}
+
+TYPED_TEST(UnsignedNumericConversion, RejectsViewEmptiedByRemovingCharacters) {
+  IWString owned("42");
+  const_IWSubstring view(owned);
+  view.remove_leading_chars(view.length());
+  TypeParam value = 17;
+  EXPECT_EQ(view.numeric_value(value), 0);
+  EXPECT_EQ(value, static_cast<TypeParam>(17));
+}
+
+TYPED_TEST(UnsignedNumericConversion, AcceptsZeroAndNonzeroDigits) {
+  for (const char* text : {"0", "42"}) {
+    const IWString owned(text);
+    const const_IWSubstring view(text);
+    TypeParam value = 17;
+    const TypeParam expected = text[0] == '0' ? 0 : 42;
+    ASSERT_NE(owned.numeric_value(value), 0);
+    EXPECT_EQ(value, expected);
+    value = 17;
+    ASSERT_NE(view.numeric_value(value), 0);
+    EXPECT_EQ(value, expected);
+  }
+}
+
 }  // namespace

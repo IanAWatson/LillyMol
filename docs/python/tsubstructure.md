@@ -187,6 +187,79 @@ way of identifying functional groups. Note however that `TSubstructure` does
 not support any concept of exclusive matching - use `substituent_model` for
 that.
 
+## Aromatic Bonds and Kekule Forms
+Inside an aromatic ring, LillyMol keeps the underlying Kekule bonds as well as the
+aromatic perception. By default a bond in a query can therefore match an aromatic
+bond in either way. The consequence that surprises people is that a single bond
+in a query matches the Kekule single bonds *inside* aromatic rings.
+```
+from lillymol import *
+
+ts = TSubstructure()
+ts.add_query_from_smarts("a-a")
+benzene = MolFromSmiles("c1ccccc1 benzene")
+biphenyl = MolFromSmiles("c1ccccc1-c1ccccc1 biphenyl")
+
+print(ts.substructure_search([benzene, biphenyl]))     # [True, True]
+```
+`a-a` matches benzene, because its ring bonds have a Kekule single form. In many
+other toolkits, RDKit among them, `a-a` would only match two aromatic atoms joined by a
+single bond that is not part of an aromatic ring, which is what is usually meant. That
+meaning is available by turning the Kekule matching off
+```
+set_aromatic_bonds_lose_kekule_identity(1)
+print(ts.substructure_search([benzene, biphenyl]))     # [False, True]
+```
+The function takes one of three values
+
+| Mode | Behaviour |
+| ---- | --------- |
+| `0` | The default. An aromatic bond matches aromatic query bonds, and also single and double query bonds via its Kekule form |
+| `1` | An aromatic bond matches only aromatic query bonds. `a-a` is two aromatic atoms joined by a non aromatic bond |
+| `2` | Like `1`, but some aromatic rings keep their Kekule forms (see below) |
+
+and `aromatic_bonds_lose_kekule_identity()` returns the current value. Any other
+value raises `ValueError`. These are the same three behaviours as `-M kekule`,
+`-M nokekule` and `-M fkekule` in [tsubstructure](../Molecule_Tools/tsubstructure.md).
+
+Mode `2` is more intricate. The rings it treats as having no Kekule form are decided
+by the library and not by the query. Searching `a-a` against a set of molecules
+```
+mols = [MolFromSmiles(smi) for smi in ["c1ccccc1 benzene", "c1ccc2ccccc2c1 naphthalene",
+        "c1cc[nH]c1 pyrrole", "c1ccoc1 furan", "O=c1cccc[nH]1 pyridone",
+        "c1ccccc1-c1ccccc1 biphenyl", "c1ccc(cc1)-c1ccc[nH]1 phenylpyrrole"]]
+ts = TSubstructure()
+ts.add_query_from_smarts("a-a")
+for mode in (0, 1, 2):
+  set_aromatic_bonds_lose_kekule_identity(mode)
+  hits = ts.substructure_search(mols)
+  print(mode, [mol.name() for mol, hit in zip(mols, hits) if hit])
+```
+prints
+```
+0 ['benzene', 'naphthalene', 'pyrrole', 'furan', 'pyridone', 'biphenyl', 'phenylpyrrole']
+1 ['biphenyl', 'phenylpyrrole']
+2 ['naphthalene', 'pyrrole', 'furan', 'pyridone', 'biphenyl', 'phenylpyrrole']
+```
+so in mode `2` only benzene loses its Kekule single bonds. If the goal is to find a bond
+between two aromatic systems, use mode `1`, or write the query so that it does not depend
+on the mode: `a-!@a` (a single bond that is not in a ring) gives the same answer in
+all three modes.
+
+Three things to know, because the setting is not an attribute of a `TSubstructure`
+
+* **It is process wide.** Every `TSubstructure` in the process, in every thread, uses
+  the current value. Set it once, before starting any threads that search.
+* **It is applied when a search is done**, and when queries are built from molecules, so
+  queries that were added before the call are affected by it. Set it before searching.
+* **Creating an `IWDescr` or `MolecularDescriptors` object resets it to `0`.** If
+  you use descriptors and substructure searching in the same program, set the mode
+  after the descriptor objects have been created.
+
+Queries that depend on the mode are not unusual in older query files. If you change the
+mode, check the queries you rely on, because they may have been written with the
+default in mind.
+
 ## Performance
 As a test of performance, load 70 queries from the Lilly Medchem Rules
 ```

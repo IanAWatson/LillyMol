@@ -358,6 +358,10 @@ hiding it:
   searches, forcing ring and aromaticity perception on it. Two threads searching
   one shared `Molecule` is a data race, which rules out the natural-looking
   "one molecule, many queries in parallel" pattern.
+- **Settings that are process wide are shared by every thread.** The way aromatic
+  bonds match query bonds, `set_aromatic_bonds_lose_kekule_identity`, is one of them.
+  Set it once, before the threads start searching. See
+  [Aromatic Bonds and Kekule Forms](tsubstructure.md#aromatic-bonds-and-kekule-forms).
 
 ## Reference
 

@@ -32,6 +32,38 @@ This is the most common query form used. LillyMol's implementation of SMARTS
 is generally compatible with other implementations. It contains several useful
 extensions to SMARTS.
 
+### Bonds in aromatic rings
+
+There is one difference from other toolkits that matters in everyday use. LillyMol
+keeps the underlying Kekule bonds of an aromatic ring, as well as the aromatic
+perception, and by default a query bond can match either. A single bond
+`-` in a query therefore also matches the Kekule single bonds *inside* aromatic
+rings. Searching these three molecules
+
+```
+c1ccccc1 benzene
+c1ccccc1-c1ccccc1 biphenyl
+CS(=O)(=O)N sulfonamide
+```
+with `tsubstructure -s 'a-a'` matches benzene and biphenyl, where RDKit matches
+only biphenyl. What is usually meant is two aromatic atoms joined by a bond that is not
+in a ring, which can be written so that it means the same in every toolkit
+and every mode
+
+```
+tsubstructure -s 'a-!@a' file.smi
+```
+The same applies to `c-c`, `a=a` and any other query that puts a single or double bond
+between aromatic atoms. The aromatic bond `:` is not affected.
+
+The behaviour can be changed. `tsubstructure -M nokekule` makes aromatic bonds match only
+aromatic query bonds, so that `-s 'a-a'` matches the biaryl and not benzene. From Python
+it is `set_aromatic_bonds_lose_kekule_identity(1)`. See
+[Aromatic bonds and Kekule forms](../Molecule_Tools/tsubstructure.md#aromatic-bonds-and-kekule-forms)
+for the three modes. Queries written for the default behaviour can depend on it,
+for example the query files that ship in `data/queries`, so check any query
+that you use with the setting changed.
+
 ## Extensions
 
 ### Numeric Qualifiers

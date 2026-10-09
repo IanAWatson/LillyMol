@@ -2436,6 +2436,42 @@ class TestNanobindTSubstructure(LillyMolNanobindTestCase):
         ts.must_match_all_queries = True
         self.assertFalse(ts.substructure_search(mol))
 
+    def test_aromatic_bonds_kekule_identity(self):
+        # The mode is process wide, so put back whatever it was.
+        original = lillymol.aromatic_bonds_lose_kekule_identity()
+        self.addCleanup(lillymol.set_aromatic_bonds_lose_kekule_identity, original)
+
+        ts = lillymol.TSubstructure()
+        self.assertTrue(ts.add_query_from_smarts("a-a biaryl"))
+        benzene = lillymol.MolFromSmiles("c1ccccc1 benzene")
+        biphenyl = lillymol.MolFromSmiles("c1ccccc1-c1ccccc1 biphenyl")
+
+        # 0: aromatic bonds still match their Kekule single bonds, so a-a is in benzene.
+        lillymol.set_aromatic_bonds_lose_kekule_identity(0)
+        self.assertEqual(lillymol.aromatic_bonds_lose_kekule_identity(), 0)
+        self.assertEqual(ts.substructure_search([benzene, biphenyl]), [True, True])
+
+        # 1 and 2: a-a is only a single bond between two aromatic atoms.
+        for mode in (1, 2):
+            lillymol.set_aromatic_bonds_lose_kekule_identity(mode)
+            self.assertEqual(lillymol.aromatic_bonds_lose_kekule_identity(), mode)
+            self.assertEqual(ts.substructure_search([benzene, biphenyl]), [False, True])
+
+        # The non ring single bond form means the same in every mode.
+        ts2 = lillymol.TSubstructure()
+        self.assertTrue(ts2.add_query_from_smarts("a-!@a biaryl"))
+        for mode in (0, 1, 2):
+            lillymol.set_aromatic_bonds_lose_kekule_identity(mode)
+            self.assertEqual(ts2.substructure_search([benzene, biphenyl]), [False, True])
+
+    def test_aromatic_bonds_kekule_identity_invalid_mode(self):
+        original = lillymol.aromatic_bonds_lose_kekule_identity()
+        self.addCleanup(lillymol.set_aromatic_bonds_lose_kekule_identity, original)
+        for mode in (-1, 3):
+            with self.assertRaises(ValueError):
+                lillymol.set_aromatic_bonds_lose_kekule_identity(mode)
+        self.assertEqual(lillymol.aromatic_bonds_lose_kekule_identity(), original)
+
     def test_unique_embeddings_only(self):
         ts = lillymol.TSubstructure()
         mol = lillymol.MolFromSmiles("CC(C)(C)c1c(C(C)(C)C)c(C(C)(C)C)c(C(C)(C)C)c(C(C)(C)C)c1C(C)(C)C")

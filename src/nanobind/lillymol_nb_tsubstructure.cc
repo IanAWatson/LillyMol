@@ -1,3 +1,4 @@
+#include "Molecule_Lib/target.h"
 #include "nanobind/lillymol_nb_internal.h"
 
 namespace lillymol_nb {
@@ -6,6 +7,38 @@ using pybind_substructure::TSubstructure;
 
 void
 BindTSubstructure(nb::module_& m) {
+  // How aromatic bonds in a molecule are matched by bonds in a query. This is
+  // process wide state in the C++ library, not a property of a TSubstructure, and
+  // it is the same setting as -M kekule, -M nokekule and -M fkekule in the
+  // tsubstructure command line tool.
+  //
+  // The range is checked here because the C++ setter takes any int, and only
+  // 0, 1 and 2 have defined meanings.
+  m.def("set_aromatic_bonds_lose_kekule_identity",
+        [](int mode) {
+          if (mode < 0 || mode > 2) {
+            throw nb::value_error(
+                "set_aromatic_bonds_lose_kekule_identity:mode must be 0, 1 or 2");
+          }
+          set_aromatic_bonds_lose_kekule_identity(mode);
+        },
+        nb::arg("mode"),
+        "Set how aromatic bonds match the bonds in substructure queries. "
+        "0 (the default): an aromatic bond matches an aromatic query bond, and also "
+        "its Kekule single or double form, so 'a-a' matches the bonds inside a "
+        "benzene ring. "
+        "1: an aromatic bond matches only aromatic query bonds, so 'a-a' means two "
+        "aromatic atoms joined by a non aromatic single bond. "
+        "2: as 1, but aromatic rings that have no alternative Kekule form keep their "
+        "Kekule bond types. "
+        "This is process wide, not per TSubstructure. It is applied when a search is "
+        "done, and when queries are built from molecules, so set it before either. "
+        "Creating an iwdescr descriptor calculator resets it to 0.");
+  m.def("aromatic_bonds_lose_kekule_identity",
+        []() { return aromatic_bonds_lose_kekule_identity(); },
+        "The current value of the aromatic bond matching mode. See "
+        "set_aromatic_bonds_lose_kekule_identity.");
+
   nb::class_<TSubstructure>(m, "TSubstructure")
       .def(nb::init<>())
       .def("read_queries", &TSubstructure::ReadQueries, nb::arg("directive"))

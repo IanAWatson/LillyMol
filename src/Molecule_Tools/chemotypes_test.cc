@@ -668,7 +668,7 @@ TEST(Chemotypes, ComplementLabelsBothEndpointsBeyondRetainedAttachment) {
   ASSERT_EQ(m.natoms(), 7);
   ASSERT_EQ(complement.natoms(), 1);
   EXPECT_EQ(complement.name(), "parent");
-  EXPECT_EQ(complement.isotope(0), 99);
+  EXPECT_EQ(complement.isotope(0), static_cast<isotope_t>(99));
   int labelled = 0;
   for (int i = 0; i < m.natoms(); ++i) {
     if (m.isotope(i) == 99) {
@@ -702,7 +702,7 @@ TEST(Chemotypes, ComplementDisconnectedPiecesAndEmptyComplement) {
     }
     EXPECT_EQ(labelled, original_atoms - 6);
     for (int i = 0; i < complement.natoms(); ++i) {
-      EXPECT_EQ(complement.isotope(i), 99);
+      EXPECT_EQ(complement.isotope(i), static_cast<isotope_t>(99));
     }
     if (! complement.empty()) {
       EXPECT_EQ(complement.number_fragments(), 2);

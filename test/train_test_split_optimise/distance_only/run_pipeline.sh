@@ -16,7 +16,7 @@ gfp_nearneighbours="$installed_bin/gfp_nearneighbours_single_file"
 "$repo/contrib/bin/gfp_make.sh" "$indir/ttopt.smi" > ttopt.gfp
 "$gfp_nearneighbours" -n 7 -S ttopt.nn ttopt.gfp
 
-args=(-Z seed=12345 -f 0.5 -n 1 -S SPLIT -o 20000)
+args=(-Z seed=12345 -f 0.5 -n 1 -S SPLIT -o 20000 -h 4)
 if [[ "$mode" == "activity" ]]; then
   args+=(-A "$indir/activity.txt:buckets=2" -Y 10)
 fi

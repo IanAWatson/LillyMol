@@ -2025,13 +2025,9 @@ profile_fingerprint(int f, const activity_type_t *activity,
     return 0;
   }
 
-  int count5 = 0;
   for (int i = 0; i < pool_size; i++) {
     const IWDYFP &fp = pool[i].item(f);
     for (int j = 0; j < nbits; j++) {
-      if (fp.is_set(j) && j == 5) {
-        ++count5;
-      }
       if (fp.is_set(j)) {
         acc_set[j].extra(activity[i]);
       } else {

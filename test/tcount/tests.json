@@ -2,6 +2,10 @@
   "executable": "tcount",
   "test": [
     {
+      "name": "exit_status",
+      "shell_script": {"script_name": "run.rb"}
+    },
+    {
       "name": "case_1",
       "args": [
            "-n 9 -d tab #{indir}/input.txt"

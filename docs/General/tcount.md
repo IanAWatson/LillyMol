@@ -35,3 +35,14 @@ For reasons that are not clear, tcount can also be faster than wc on large files
 I think it might be related to shell variable LANG, but not sure.
 
 Like most LillyMol tools it cannot deal with complex quoted tabular files.
+
+## Exit status
+
+`tcount` returns zero after examining its inputs, even when a file is
+non-rectangular. Options such as `-g`, `-r`, and `-b` do not turn column-count
+differences into a failing exit status.
+
+Missing input files, fatal read errors, failed end-of-file offset operations
+(`-e`), and failures to open requested output files return a nonzero status.
+When processing multiple inputs, an input-file failure does not prevent later
+files from being examined, but the final exit status remains nonzero.

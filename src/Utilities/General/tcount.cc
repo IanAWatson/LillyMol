@@ -473,7 +473,7 @@ tcount(iwstring_data_source &input) {
 static int
 tcount(const char *fname) {
   iwstring_data_source input(fname);
-  if (!input.ok()) {
+  if (!input.good()) {
     cerr << "Cannot open '" << fname << "'\n";
     return 1;
   }
@@ -490,23 +490,28 @@ tcount(const char *fname) {
     if (fs < offset_from_eof) {
       cerr << "Requested offset from EOF " << offset_from_eof << " larger than file "
            << fs << '\n';
-      return 0;
+      return 1;
     }
 
     const auto tmp = fs - offset_from_eof;
     if (!input.seekg(tmp)) {
       cerr << "Yipes, cannot seek to offset " << tmp << "\n";
-      return 0;
+      return 1;
     }
 
     const_IWSubstring notused;
     if (!input.next_record(notused)) {
       cerr << "Yipes, could not read record from offset " << tmp << '\n';
-      return 0;
+      return 1;
     }
   }
 
-  int rc = tcount(input);
+  // Column-count differences are diagnostic, not fatal errors.
+  (void)tcount(input);
+  if (!input.good()) {
+    cerr << "Error reading '" << fname << "'\n";
+    return 1;
+  }
 
   if (human_readable_output) {
     cerr << iwstring::with_commas(input.lines_read());
@@ -524,7 +529,7 @@ tcount(const char *fname) {
   }
   cerr << '\n';
 
-  return rc;
+  return 0;
 }
 
 static int
@@ -754,7 +759,7 @@ tcount(int argc, char **argv) {
     }
   }
 
-  if (0 == cl.number_elements()) {
+  if (cl.empty()) {
     usage(1);
   }
 
@@ -776,8 +781,10 @@ tcount(int argc, char **argv) {
   }
 
   int rc = 0;
-  for (int i = 0; i < cl.number_elements(); i++) {
-    rc += tcount(cl[i]);
+  for (const char* fname: cl) {
+    if (tcount(fname) != 0) {
+      rc = 1;  // Keep processing other files, but never lose an earlier error.
+    }
   }
 
   if (report_non_rectangular_files) {
@@ -789,7 +796,7 @@ tcount(int argc, char **argv) {
          << cl.size() << " files\n";
   }
 
-  return 0;
+  return rc;
 }
 
 int

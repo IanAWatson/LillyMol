@@ -17,6 +17,7 @@ struct SubstituentReplacement {
   uint32_t examples = 0;
   std::string fragment_lost;
   std::string fragment_added;
+  std::string context_smarts;
 };
 
 class SubstituentIdentification;
@@ -30,6 +31,8 @@ class SubstituentIdentificationLookup {
   SubstituentIdentificationLookup& operator=(const SubstituentIdentificationLookup&) = delete;
 
   bool AddDatabase(const std::string& dbname);
+  // Optional donor bit-to-SMARTS database, opened read-only.
+  bool OpenContextSmartsDatabase(const std::string& dbname);
   void close();
   bool AddQueryFromSmarts(const std::string& smarts);
   void set_default_new_molecule_starting_points(int s);

@@ -9,6 +9,8 @@
 #include <unistd.h>
 
 #include "gtest/gtest.h"
+#include "Molecule_Lib/substructure.h"
+#include "Molecule_Lib/target.h"
 
 
 namespace {
@@ -109,4 +111,49 @@ TEST(SubstituentIdentificationLookup, ReadsCliBuiltDatabase) {
   }
   std::sort(donors.begin(), donors.end());
   EXPECT_EQ(donors, (std::vector<std::string>{"ethane", "methanol", "methylamine"}));
+}
+
+TEST(SubstituentIdentificationLookup, DonorContextSmartsMatchesProducts) {
+  const std::string tmpdir = MakeTempDir();
+  ASSERT_FALSE(tmpdir.empty());
+  const std::string input = tmpdir + "/build.smi";
+  const std::string dbname = tmpdir + "/subs.bdb";
+  const std::string context = tmpdir + "/context.bdb";
+  WriteTextFile(input, "CCC propane\nCCO ethanol\nCCN ethylamine\n");
+  std::vector<std::string> args = {"substituent_identification", "-d", dbname,
+      "-B", "-R", "2", "-w", "1", "-M", "2", "-Y", "bit2smt=" + context, input};
+  std::vector<char*> argv;
+  for (std::string& arg : args) {
+    argv.push_back(arg.data());
+  }
+  ASSERT_EQ(SubstituentIdentificationMain(argv.size(), argv.data()), 0);
+  SubstituentIdentificationLookup lookup;
+  ASSERT_TRUE(lookup.AddDatabase(dbname));
+  lookup.set_default_new_molecule_starting_points(1);
+  lookup.set_max_substituent_size(2);
+  lookup.set_min_shell_radius(1);
+  ASSERT_FALSE(lookup.OpenContextSmartsDatabase(tmpdir + "/missing.bdb"));
+  ASSERT_TRUE(lookup.OpenContextSmartsDatabase(context));
+  Molecule mol;
+  ASSERT_TRUE(mol.build_from_smiles("CC ethane"));
+  auto replacements = lookup.GenerateReplacements(mol);
+  ASSERT_GE(replacements.size(), 3u);
+  for (SubstituentReplacement& replacement : replacements) {
+    ASSERT_FALSE(replacement.context_smarts.empty());
+    Substructure_Query query;
+    ASSERT_TRUE(query.create_from_smarts(replacement.context_smarts.c_str()));
+    EXPECT_GE(std::count(replacement.context_smarts.begin(), replacement.context_smarts.end(), '['), 2);
+    Molecule_to_Match target(&replacement.molecule);
+    Substructure_Results matches;
+    EXPECT_GT(query.substructure_search(target, matches), 0)
+        << replacement.context_smarts << " in " << replacement.smiles;
+  }
+  // Failed replacement opens preserve the original read-only handle.
+  ASSERT_FALSE(lookup.OpenContextSmartsDatabase(tmpdir + "/missing.bdb"));
+  ASSERT_TRUE(mol.build_from_smiles("CC ethane"));
+  replacements = lookup.GenerateReplacements(mol);
+  ASSERT_GE(replacements.size(), 3u);
+  EXPECT_FALSE(replacements.front().context_smarts.empty());
+  lookup.close();
+  lookup.close();
 }

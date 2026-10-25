@@ -109,7 +109,8 @@ NB_MODULE(lillymol_bdb, m) {
       .def_ro("radius", &SubstituentReplacement::radius)
       .def_ro("examples", &SubstituentReplacement::examples)
       .def_ro("fragment_lost", &SubstituentReplacement::fragment_lost)
-      .def_ro("fragment_added", &SubstituentReplacement::fragment_added);
+      .def_ro("fragment_added", &SubstituentReplacement::fragment_added)
+      .def_ro("context_smarts", &SubstituentReplacement::context_smarts);
 
   nb::class_<SubstituentIdentificationLookup>(m, "SubstituentIdentificationLookup")
       .def(nb::init<>())
@@ -117,6 +118,8 @@ NB_MODULE(lillymol_bdb, m) {
            nb::arg("dbname"))
       .def("open_database", &SubstituentIdentificationLookup::AddDatabase,
            nb::arg("dbname"))
+      .def("open_context_smarts_database",
+           &SubstituentIdentificationLookup::OpenContextSmartsDatabase, nb::arg("dbname"))
       .def("add_query_from_smarts",
            &SubstituentIdentificationLookup::AddQueryFromSmarts,
            nb::arg("smarts"))

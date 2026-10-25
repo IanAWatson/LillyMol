@@ -48,4 +48,7 @@ message Result {
   optional uint32 rad = 5;
 
   optional string frag = 6;
+
+  // Donor-derived matching context at the selected bit/radius.
+  optional string context_smarts = 7;
 }

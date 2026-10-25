@@ -1544,3 +1544,16 @@ again substructure searching is with `[#{Ala}D1]~[#{Gly}D2]...`.
 ### interpret_D_as_deuterium, interpret_T_as_deuterium
 Elements `D` and `T` are interpreted as Hydrogen isotopes.
 
+
+## Substituent replacement context SMARTS
+
+The optional BerkeleyDB-dependent `lillymol_bdb.SubstituentIdentificationLookup`
+can return donor-derived matching context alongside generated replacements.
+Call `open_context_smarts_database("context.bdb")` after opening the substituent
+database, then read each result's `context_smarts` property. The database is
+opened read-only and is closed with the lookup object. An empty string means no
+context database was selected or no entry exists for the matched bit.
+
+See [substituent identification](../Molecule_Tools/substituent_identification.md#showing-the-donor-matching-context)
+for database-building and generation examples. Context annotations are independent
+of the lost/added fragment fields.

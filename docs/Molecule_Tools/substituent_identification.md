@@ -245,3 +245,55 @@ You can control that limit via `-Y maxgen=n` if needed.
 This tool again points to the fact that generating large numbers of
 quite reasonable molecules can be quite straightforward.  The more
 difficult task will be the evaluation of such molecules.
+
+## Showing the donor matching context
+
+The optional bit-to-SMARTS database can annotate generated products with the
+structural context that supported a replacement. Use `-Y bit2smt=<dbname>` in
+both phases. During a build (`-B`) it writes the database; during generation it
+opens the existing database read-only:
+
+```shell
+substituent_identification -B -d substituents.bdb -R 2 -w 1 -M 2 \
+  -Y bit2smt=context.bdb donors.smi
+substituent_identification -d substituents.bdb -s 'C' -r 1 -M 2 \
+  -Y bit2smt=context.bdb targets.smi
+```
+
+For each product, the tool retrieves the SMARTS for the bit selected at the
+reported radius and appends `CONTEXT=<smarts>` to text output. The SMARTS is the
+saved donor-derived environment, returned verbatim, rather than a new query
+generated from the product. Its first query atom is the attachment anchor;
+matching the query against the product identifies the conserved context. Coarse
+atom typing or symmetry can allow more than one embedding.
+
+This annotation is independent of `-Y write_frag`, which writes the lost and
+added fragment SMILES as `lost%added` in ordinary text output. Both can be used
+together. With `-Y textproto` or `-Y smitextproto`, the context is written in the
+optional `context_smarts` field.
+
+Use a bit-SMARTS database corresponding to the substituent database and its atom
+typing. Existing database formats are unchanged. If a bit has no SMARTS entry,
+the product is still emitted without the annotation. An absent database file or
+a database read error is an error; generation never creates the SMARTS database.
+Without this option, output is unchanged.
+
+In the BerkeleyDB-dependent Python module:
+
+```python
+from lillymol_bdb import SubstituentIdentificationLookup
+
+with SubstituentIdentificationLookup() as lookup:
+    if not lookup.open_database("substituents.bdb"):
+        raise RuntimeError("Cannot open substituent database")
+    if not lookup.open_context_smarts_database("context.bdb"):
+        raise RuntimeError("Cannot open context database")
+    lookup.set_default_new_molecule_starting_points(1)
+    for replacement in lookup.generate_replacements(mol):
+        print(replacement.smiles, replacement.context_smarts)
+```
+
+The C++ interface uses `OpenContextSmartsDatabase` and
+`SubstituentReplacement::context_smarts`. The string is empty when annotations
+are disabled or the selected bit is absent. Closing the lookup releases the
+context database as well as the substituent databases.

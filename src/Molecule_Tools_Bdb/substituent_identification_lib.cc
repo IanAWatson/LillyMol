@@ -700,6 +700,9 @@ class SubstituentIdentification {
   // The -K option. This database holds a mapping from bit numbers
   // to smarts that match at each radius.
   std::unique_ptr<Db> _bit_database;
+  std::unique_ptr<Db> _context_database;
+  bool _context_read_failed = false;
+  std::string ContextSmarts(uint32_t bit);
   // If we are writing a bit database we need an atom typing to use.
   uint32_t _atype;
 
@@ -800,7 +803,7 @@ class SubstituentIdentification {
                   Molecule& frag, atom_number_t fragment_attachment_point,
                   bond_type_t bt) const;
   SubstituentReplacement MakeReplacementProductData(
-      const ReplacementProduct& product) const;
+      const ReplacementProduct& product);
   void EmitProduct(const ReplacementProduct& product,
                    IWString_and_File_Descriptor& output);
   int WriteProduct(const SubstituentReplacement& product,
@@ -947,6 +950,7 @@ class SubstituentIdentification {
   int InitialiseDefaultAtomTyping();
   void CloseDatabases();
   bool AddDatabaseForLookup(const std::string& dbname);
+  bool OpenContextSmartsDatabase(const std::string& dbname);
   bool AddQueryFromSmarts(const std::string& smarts);
   void set_default_new_molecule_starting_points(int s) {
     _default_new_molecule_starting_points = s;
@@ -1099,6 +1103,8 @@ SubstituentIdentification::~SubstituentIdentification() {
 
 void
 SubstituentIdentification::CloseDatabases() {
+  _context_database.reset();
+  _context_read_failed = false;
   if (nullptr == _dbs) {
     return;
   }
@@ -1173,9 +1179,9 @@ Options used during addition/replacement
  -v            verbose output
 
 Suggested usage for Building a database:
-identify_substituents -d /path/to/db.bdb -B -R 5 -w 10 -M 12 -v -Y dbproto collection.smi
-And then for lookups:
-identify_substituents -d /path/to/db.bdb  -M 4 -s '[cD3x2]!@*' -k -r 2  file.smi > new.smi
+substituent_identification -d /path/to/db.bdb -B -R 5 -w 10 -M 12 -v -Y dbproto collection.smi
+And then for lookups, restricted to aromatic anchor points:
+substituent_identification -d /path/to/db.bdb  -M 4 -s '[cD3x2]!@*' -k -r 2  file.smi > new.smi
 which looks up max 4 atoms substituents, that are identical to radius 2 contexts.
 )";
   // clang-format on
@@ -2220,6 +2226,7 @@ SubstituentIdentification::_form_new_molecules(Molecule& m, atom_number_t zatom,
 int
 SubstituentIdentification::GenerateReplacements(
     Molecule& m, std::vector<SubstituentReplacement>& results) {
+  _context_read_failed = false;
   UsedDuringLookups lookup_data;
   lookup_data.PrepareForNewMolecule();
 
@@ -2232,6 +2239,10 @@ SubstituentIdentification::GenerateReplacements(
 
   _write_parent_molecule = write_parent_molecule;
   _collected_replacements = nullptr;
+  if (_context_read_failed) {
+    results.clear();
+    return 0;
+  }
 
   return rc;
 }
@@ -2430,7 +2441,7 @@ SubstituentIdentification::FormNewMoleculeAtAtomWithReplacement(Molecule& m, ato
 
 SubstituentReplacement
 SubstituentIdentification::MakeReplacementProductData(
-    const ReplacementProduct& product) const {
+    const ReplacementProduct& product) {
   SubstituentReplacement result;
   result.molecule = product.product;
   result.smiles = product.product.smiles().AsString();
@@ -2440,6 +2451,7 @@ SubstituentIdentification::MakeReplacementProductData(
   result.examples = product.replacement.n();
   result.fragment_lost = product.fragment_lost.AsString();
   result.fragment_added = product.fragment_added.AsString();
+  result.context_smarts = ContextSmarts(product.rad_and_bit.b);
 
   return result;
 }
@@ -2448,6 +2460,9 @@ void
 SubstituentIdentification::EmitProduct(const ReplacementProduct& product,
                                        IWString_and_File_Descriptor& output) {
   SubstituentReplacement replacement = MakeReplacementProductData(product);
+  if (_context_read_failed) {
+    return;
+  }
 
   if (_collected_replacements != nullptr) {
     _collected_replacements->push_back(std::move(replacement));
@@ -2469,6 +2484,9 @@ SubstituentIdentification::WriteProduct(const SubstituentReplacement& product,
     result.set_donor(product.donor);
     result.set_rad(product.radius);
     result.set_n(product.examples);
+    if (!product.context_smarts.empty()) {
+      result.set_context_smarts(product.context_smarts);
+    }
     if (_write_fragments_added) {
       result.set_frag(product.fragment_lost);
     }
@@ -2497,6 +2515,9 @@ SubstituentIdentification::WriteProduct(const SubstituentReplacement& product,
 
   if (_write_fragments_added) {
     output << ' ' << product.fragment_lost << '%' << product.fragment_added;
+  }
+  if (!product.context_smarts.empty()) {
+    output << " CONTEXT=" << product.context_smarts;
   }
 
   output << '\n';
@@ -3016,6 +3037,13 @@ SubstituentIdentification::_form_new_molecule(Molecule& m, atom_number_t zatom,
       m.set_isotope(initial_matoms + fragment_attachment_point, 0);
     }
 
+    const std::string context = ContextSmarts(rad_and_bit.b);
+    if (_context_read_failed) {
+      m.resize(initial_matoms);
+      m.set_isotope(zatom, 0);
+      return 0;
+    }
+
     output << m.smiles() << ' ' << m.name() << " %% ";
 
     output << token << ":R" << rad_and_bit.radius << " B" << rad_and_bit.b;
@@ -3024,6 +3052,9 @@ SubstituentIdentification::_form_new_molecule(Molecule& m, atom_number_t zatom,
       //    output << ' ' << smiles_of_fragment_lost << '%' <<
       //    rad_and_bit.radius << '%' << smiles;
       output << ' ' << fragment_lost.smiles << '%' << smiles;
+    }
+    if (!context.empty()) {
+      output << " CONTEXT=" << context;
     }
 
     output << '\n';
@@ -3501,7 +3532,7 @@ SubstituentIdentification::_process_molecules(data_source_and_type<Molecule>& in
       rc = _build_database(*m, output);
     }
 
-    if (0 == rc) {
+    if (0 == rc || _context_read_failed) {
       return 0;
     }
 
@@ -3743,7 +3774,7 @@ DisplayDashYOptions(int rc) {
  -Y smitextproto   write smiles + substituent_identification::Result textproto as output.
  -Y matchedpairs   during lookup, identify local matched pairs.
  -Y allHmatch      all -H queries must match. By default, a product is OK if any of the -H queries match.
- -Y bit2smt=<dbname> write a database of bit->smarts, for each bit number, a smarts.
+ -Y bit2smt=<dbname> build: write bit->SMARTS; generation: read donor context SMARTS.
 )";
 
   ::exit(rc);
@@ -3795,6 +3826,41 @@ SubstituentIdentification::OpenBitSmartsDatabase(const const_IWSubstring& dbname
   return 1;
 }
 
+
+bool
+SubstituentIdentification::OpenContextSmartsDatabase(const std::string& dbname) {
+  auto database = std::make_unique<Db>(nullptr, DB_CXX_NO_EXCEPTIONS);
+  if (const int rc = database->open(nullptr, dbname.c_str(), nullptr, DB_UNKNOWN,
+                                     DB_RDONLY, 0); rc != 0) {
+    database->err(rc, "Cannot open context SMARTS database");
+    return false;
+  }
+  _context_database = std::move(database);
+  _context_read_failed = false;
+  return true;
+}
+
+std::string
+SubstituentIdentification::ContextSmarts(uint32_t bit) {
+  if (!_context_database) {
+    return {};
+  }
+  Dbt key(&bit, sizeof(bit));
+  Dbt value;
+  const int rc = _context_database->get(nullptr, &key, &value, 0);
+  if (rc == DB_NOTFOUND) {
+    return {};
+  }
+  if (rc != 0) {
+    _context_database->err(rc, "Cannot read context SMARTS");
+    _context_read_failed = true;
+    return {};
+  }
+  if (value.get_size() == 0) {
+    return {};
+  }
+  return std::string(static_cast<const char*>(value.get_data()), value.get_size());
+}
 
 int
 SubstituentIdentification::operator()(int argc, char** argv) {
@@ -4212,12 +4278,15 @@ SubstituentIdentification::operator()(int argc, char** argv) {
         _write_bit_meanings = 1;
       } else if (y.starts_with("bit2smt=")) {
         y.remove_leading_chars(8);
-        if (! OpenBitSmartsDatabase(y)) {
+        const bool opened = cl.option_present('B')
+            ? OpenBitSmartsDatabase(y)
+            : OpenContextSmartsDatabase(y.AsString());
+        if (!opened) {
           cerr << "Cannot open bitnum->smarts database '" << y << "'\n";
-          return 0;
+          return 1;
         }
         if (_verbose) {
-          cerr << "Will write mappings of bitnum->smarts to '" << y << "'\n";
+          cerr << (cl.option_present('B') ? "Will write bit SMARTS to '" : "Will read context SMARTS from '") << y << "'\n";
         }
       } else if (y == "help") {
         DisplayDashYOptions(0);
@@ -4445,6 +4514,11 @@ SubstituentIdentificationLookup::~SubstituentIdentificationLookup() = default;
 bool
 SubstituentIdentificationLookup::AddDatabase(const std::string& dbname) {
   return _impl->AddDatabaseForLookup(dbname);
+}
+
+bool
+SubstituentIdentificationLookup::OpenContextSmartsDatabase(const std::string& dbname) {
+  return _impl->OpenContextSmartsDatabase(dbname);
 }
 
 void

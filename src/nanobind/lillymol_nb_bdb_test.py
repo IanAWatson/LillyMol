@@ -221,6 +221,65 @@ class TestNanobindBdb(unittest.TestCase):
                     self.assertEqual(replacement.molecule.name(), "methane")
                 lookup.close()
 
+    def test_substituent_context_smarts(self):
+        tool = _runfile_path("Molecule_Tools_Bdb/substituent_identification")
+        self.assertIsNotNone(tool)
+        with tempfile.TemporaryDirectory() as tmpdir:
+            source = os.path.join(tmpdir, "build.smi")
+            target = os.path.join(tmpdir, "query.smi")
+            database = os.path.join(tmpdir, "subs.bdb")
+            context = os.path.join(tmpdir, "context.bdb")
+            with open(source, "w", encoding="utf-8") as writer:
+                writer.write("CCC propane\nCCO ethanol\nCCN ethylamine\n")
+            with open(target, "w", encoding="utf-8") as writer:
+                writer.write("CC ethane\n")
+            subprocess.run([tool, "-B", "-d", database, "-R", "2", "-w", "1",
+                            "-M", "2", "-Y", "bit2smt=" + context, source], check=True)
+            with open(context, "rb") as reader:
+                database_before = reader.read()
+            with lillymol_bdb.SubstituentIdentificationLookup() as lookup:
+                self.assertTrue(lookup.open_database(database))
+                self.assertTrue(lookup.open_context_smarts_database(context))
+                lookup.set_default_new_molecule_starting_points(1)
+                lookup.set_min_shell_radius(1)
+                lookup.set_max_substituent_size(2)
+                for remove_isotopes in (False, True):
+                    lookup.set_remove_isotopes_from_product(remove_isotopes)
+                    results = lookup.generate_replacements(lillymol.MolFromSmiles("CC ethane"))
+                    self.assertGreaterEqual(len(results), 3)
+                    for result in results:
+                        self.assertTrue(result.context_smarts)
+                        query = lillymol.SubstructureQuery()
+                        self.assertTrue(query.build_from_smarts(result.context_smarts))
+                        self.assertGreater(query.substructure_search(result.molecule), 0)
+            command = [tool, "-d", database, "-s", "C", "-r", "1", "-M", "2"]
+            plain = subprocess.run([*command, target], text=True, capture_output=True, check=True).stdout
+            self.assertNotIn("CONTEXT=", plain)
+            annotated = subprocess.run([*command, "-Y", "bit2smt=" + context, target],
+                                       text=True, capture_output=True, check=True).stdout
+            self.assertIn(" CONTEXT=", annotated)
+            self.assertEqual(len(plain.splitlines()), len(annotated.splitlines()))
+            proto = subprocess.run([*command, "-Y", "bit2smt=" + context,
+                                    "-Y", "textproto", "-Y", "write_frag", target],
+                                   text=True, capture_output=True, check=True).stdout
+            self.assertIn('context_smarts: "', proto)
+            self.assertIn('frag: "', proto)
+            # Valid database with no matching binary bit keys: annotations are optional.
+            unrelated = os.path.join(tmpdir, "unrelated.bdb")
+            text = os.path.join(tmpdir, "unrelated.txt")
+            with open(text, "w", encoding="utf-8") as writer:
+                writer.write("unrelated value\n")
+            subprocess.run([_runfile_path("BerkeleyDB/iwbdb_load"), "-d", unrelated, text], check=True)
+            missing = subprocess.run([*command, "-Y", "bit2smt=" + unrelated, target],
+                                     text=True, capture_output=True, check=True).stdout
+            self.assertEqual(missing, plain)
+            failure = subprocess.run([*command, "-Y", "bit2smt=" + os.path.join(tmpdir, "missing.bdb"), target],
+                                     text=True, capture_output=True)
+            self.assertNotEqual(failure.returncode, 0)
+            self.assertFalse(os.path.exists(os.path.join(tmpdir, "missing.bdb")))
+            with open(context, "rb") as reader:
+                self.assertEqual(reader.read(), database_before)
+
     def test_substituent_identification_query_driven_replacement(self):
         tool = _runfile_path("Molecule_Tools_Bdb/substituent_identification")
         if tool is None:

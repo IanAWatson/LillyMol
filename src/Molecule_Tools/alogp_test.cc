@@ -293,7 +293,8 @@ TEST_P(TestForFastScoring, TestMolecules) {
 
   ASSERT_TRUE(_mol.build_from_smiles(params.smiles)) << "bad smiles " << params.smiles;
 
-  std::optional<double> a = _alogp.LogP(_mol);
+  const auto a = _alogp.LogP(_mol);
+  ASSERT_TRUE(a.has_value()) << params.smiles;
   _alogp.FillForFastScoring(_mol, _for_fast_scoring);
 
   float afast = _alogp.LogP(_mol, _for_fast_scoring);

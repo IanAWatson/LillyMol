@@ -1,0 +1,417 @@
+[
+  {
+    "name": "acid",
+    "positive": "CC(=O)O",
+    "negative": "CC(=O)OC"
+  },
+  {
+    "name": "cyano",
+    "positive": "CC#N",
+    "negative": "CCN"
+  },
+  {
+    "name": "ester",
+    "positive": "CC(=O)OC",
+    "negative": "CC(=O)O"
+  },
+  {
+    "name": "amide",
+    "positive": "CC(=O)NC",
+    "negative": "CC(=O)OC"
+  },
+  {
+    "name": "primary_amide",
+    "positive": "CC(=O)N",
+    "negative": "CC(=O)NC"
+  },
+  {
+    "name": "secondary_amide",
+    "positive": "CC(=O)NC",
+    "negative": "CC(=O)N(C)C"
+  },
+  {
+    "name": "tertiary_amide",
+    "positive": "CC(=O)N(C)C",
+    "negative": "CC(=O)NC"
+  },
+  {
+    "name": "lactam",
+    "positive": "O=C1NCCC1",
+    "negative": "CC(=O)N"
+  },
+  {
+    "name": "carbamate",
+    "positive": "CNC(=O)OC",
+    "negative": "CC(=O)NC"
+  },
+  {
+    "name": "urea",
+    "positive": "CNC(=O)NC",
+    "negative": "CC(=O)NC"
+  },
+  {
+    "name": "imide",
+    "positive": "CC(=O)NC(=O)C",
+    "negative": "CC(=O)NC"
+  },
+  {
+    "name": "primary_amine",
+    "positive": "CCN",
+    "negative": "CC(=O)N"
+  },
+  {
+    "name": "secondary_amine",
+    "positive": "CCNCC",
+    "negative": "CC(=O)NC"
+  },
+  {
+    "name": "tertiary_amine",
+    "positive": "CN(C)C",
+    "negative": "CC(=O)N(C)C"
+  },
+  {
+    "name": "aniline",
+    "positive": "Nc1ccccc1",
+    "negative": "NC1CCCCC1"
+  },
+  {
+    "name": "cyclic_amine",
+    "positive": "N1CCCCC1",
+    "negative": "O=C1NCCC1"
+  },
+  {
+    "name": "amidine",
+    "positive": "CC(=N)N",
+    "negative": "CC(=O)N"
+  },
+  {
+    "name": "guanidine",
+    "positive": "NC(=N)N",
+    "negative": "CC(=N)N"
+  },
+  {
+    "name": "quaternary_ammonium",
+    "positive": "C[N+](C)(C)C",
+    "negative": "CN(C)C"
+  },
+  {
+    "name": "nitro",
+    "positive": "CN(=O)=O",
+    "negative": "CN=O"
+  },
+  {
+    "name": "aromatic_nh",
+    "positive": "c1cc[nH]c1",
+    "negative": "c1ccncc1"
+  },
+  {
+    "name": "aromatic_nitrogen",
+    "positive": "c1ccncc1",
+    "negative": "c1cc[nH]c1"
+  },
+  {
+    "name": "alcohol",
+    "positive": "CCO",
+    "negative": "Oc1ccccc1"
+  },
+  {
+    "name": "phenol",
+    "positive": "Oc1ccccc1",
+    "negative": "CCO"
+  },
+  {
+    "name": "catechol",
+    "positive": "Oc1ccccc1O",
+    "negative": "Oc1ccc(O)cc1"
+  },
+  {
+    "name": "ether",
+    "positive": "CCOCC",
+    "negative": "CC(=O)OC"
+  },
+  {
+    "name": "aryl_ether",
+    "positive": "COc1ccccc1",
+    "negative": "Oc1ccccc1"
+  },
+  {
+    "name": "aldehyde",
+    "positive": "CC=O",
+    "negative": "CC(=O)C"
+  },
+  {
+    "name": "ketone",
+    "positive": "CC(=O)C",
+    "negative": "CC=O"
+  },
+  {
+    "name": "sulfoxide",
+    "positive": "CS(=O)C",
+    "negative": "CSC"
+  },
+  {
+    "name": "sulfone",
+    "positive": "CS(=O)(=O)C",
+    "negative": "CS(=O)(=O)N"
+  },
+  {
+    "name": "sulfonamide",
+    "positive": "CS(=O)(=O)N",
+    "negative": "CS(=O)(=O)C"
+  },
+  {
+    "name": "thiol",
+    "positive": "CCS",
+    "negative": "CSC"
+  },
+  {
+    "name": "thioether",
+    "positive": "CSC",
+    "negative": "CS(=O)C"
+  },
+  {
+    "name": "cf3",
+    "positive": "FC(F)(F)c1ccccc1",
+    "negative": "FC(F)F"
+  },
+  {
+    "name": "heavy_halogen",
+    "positive": "CCBr",
+    "negative": "CCF"
+  },
+  {
+    "name": "fluorine_not_cf3",
+    "positive": "FC(F)c1ccccc1",
+    "negative": "FC(F)(F)c1ccccc1"
+  },
+  {
+    "name": "aryl_fluoride",
+    "positive": "Fc1ccccc1",
+    "negative": "CCF"
+  },
+  {
+    "name": "difluoromethyl",
+    "positive": "CC(F)F",
+    "negative": "CC(F)(F)F"
+  },
+  {
+    "name": "methoxy",
+    "positive": "COc1ccccc1",
+    "negative": "CC(=O)OC"
+  },
+  {
+    "name": "aromatic_methyl",
+    "positive": "Cc1ccccc1",
+    "negative": "CCc1ccccc1"
+  },
+  {
+    "name": "cyclopropyl",
+    "positive": "CC1CC1",
+    "negative": "CC1CCC1"
+  },
+  {
+    "name": "cyclobutyl",
+    "positive": "CC1CCC1",
+    "negative": "CC1CCCC1"
+  },
+  {
+    "name": "cyclopentyl",
+    "positive": "CC1CCCC1",
+    "negative": "CC1CCCCC1"
+  },
+  {
+    "name": "cyclohexyl",
+    "positive": "CC1CCCCC1",
+    "negative": "CC1CCCC1"
+  },
+  {
+    "name": "azetidine",
+    "positive": "CN1CCC1",
+    "negative": "CN1CCCC1"
+  },
+  {
+    "name": "pyrrolidine",
+    "positive": "CN1CCCC1",
+    "negative": "CN1CCCCC1"
+  },
+  {
+    "name": "piperidine",
+    "positive": "CN1CCCCC1",
+    "negative": "CN1CCNCC1"
+  },
+  {
+    "name": "piperazine",
+    "positive": "CN1CCNCC1",
+    "negative": "CN1CCCCC1"
+  },
+  {
+    "name": "morpholine",
+    "positive": "CN1CCOCC1",
+    "negative": "CN1CCNCC1"
+  },
+  {
+    "name": "oxetane",
+    "positive": "CC1COC1",
+    "negative": "CC1CCOC1"
+  },
+  {
+    "name": "tetrahydrofuran",
+    "positive": "CC1CCOC1",
+    "negative": "CC1COC1"
+  },
+  {
+    "name": "pyridine",
+    "positive": "Cc1ccncc1",
+    "negative": "c1ccccc1"
+  },
+  {
+    "name": "pyrimidine",
+    "positive": "c1cncnc1",
+    "negative": "n1ccncc1"
+  },
+  {
+    "name": "pyrazine",
+    "positive": "n1ccncc1",
+    "negative": "n1ncccc1"
+  },
+  {
+    "name": "pyridazine",
+    "positive": "n1ncccc1",
+    "negative": "n1ccncc1"
+  },
+  {
+    "name": "imidazole",
+    "positive": "c1ncc[nH]1",
+    "negative": "c1cc[nH]c1"
+  },
+  {
+    "name": "pyrazole",
+    "positive": "c1cn[nH]c1",
+    "negative": "c1cc[nH]c1"
+  },
+  {
+    "name": "triazole",
+    "positive": "c1n[nH]nc1",
+    "negative": "c1cn[nH]c1"
+  },
+  {
+    "name": "oxazole",
+    "positive": "c1ocnc1",
+    "negative": "c1ccoc1"
+  },
+  {
+    "name": "thiazole",
+    "positive": "c1scnc1",
+    "negative": "c1ccsc1"
+  },
+  {
+    "name": "furan",
+    "positive": "c1ccoc1",
+    "negative": "C1CCOC1"
+  },
+  {
+    "name": "thiophene",
+    "positive": "c1ccsc1",
+    "negative": "C1CCSC1"
+  },
+  {
+    "name": "non_fused_phenyl",
+    "positive": "Oc1ccccc1",
+    "negative": "c1ccc2ccccc2c1"
+  },
+  {
+    "name": "spiro_centre",
+    "positive": "C1CCC2(CC1)CCCC2",
+    "negative": "C1CCC2CCCCC2C1"
+  },
+  {
+    "name": "terminal_aromatic_system",
+    "positive": "c1ccccc1-c1ccccc1",
+    "negative": "Oc1ccccc1"
+  },
+  {
+    "name": "internal_aromatic_system",
+    "positive": "c1ccc(-c2ccccc2)cc1-c1ccccc1",
+    "negative": "c1ccccc1-c1ccccc1"
+  },
+  {
+    "name": "standalone_aromatic_system",
+    "positive": "CCOc1ccccc1",
+    "negative": "c1ccccc1-c1ccccc1"
+  },
+  {
+    "name": "fused_aromatic_aromatic_2",
+    "positive": "c1ccc2ccccc2c1",
+    "negative": "c1ccc2cc3ccccc3cc2c1"
+  },
+  {
+    "name": "fused_aromatic_aliphatic_2",
+    "positive": "c1ccc2CCCCc2c1",
+    "negative": "c1ccc2ccccc2c1"
+  },
+  {
+    "name": "bridged_ring_system",
+    "positive": "C1CC2CCC1C2",
+    "negative": "C1CCC2CCCCC2C1"
+  },
+  {
+    "name": "biaryl_bond",
+    "positive": "c1ccccc1-c1ccccc1",
+    "negative": "c1ccccc1"
+  },
+  {
+    "name": "diaryl_ether",
+    "positive": "c1ccccc1Oc1ccccc1",
+    "negative": "COc1ccccc1"
+  },
+  {
+    "name": "diaryl_methylene",
+    "positive": "c1ccccc1Cc1ccccc1",
+    "negative": "c1ccccc1CCc1ccccc1"
+  },
+  {
+    "name": "diaryl_ethylene",
+    "positive": "c1ccccc1CCc1ccccc1",
+    "negative": "c1ccccc1Cc1ccccc1"
+  },
+  {
+    "name": "alkene",
+    "positive": "CC=CC",
+    "negative": "c1ccccc1"
+  },
+  {
+    "name": "alkyne",
+    "positive": "CC#CC",
+    "negative": "CC#N"
+  },
+  {
+    "name": "epoxide",
+    "positive": "CC1CO1",
+    "negative": "C1COC1"
+  },
+  {
+    "name": "aziridine",
+    "positive": "CN1CC1",
+    "negative": "CN1CCC1"
+  },
+  {
+    "name": "michael_acceptor",
+    "positive": "C=CC(=O)N",
+    "negative": "CCC(=O)N"
+  },
+  {
+    "name": "hydroxylamine",
+    "positive": "CNO",
+    "negative": "CNC"
+  },
+  {
+    "name": "hydrazine",
+    "positive": "CNN",
+    "negative": "CN=NC"
+  },
+  {
+    "name": "disulfide",
+    "positive": "CSSC",
+    "negative": "CSC"
+  }
+]

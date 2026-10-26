@@ -19,7 +19,7 @@ new_local_repository = use_repo_rule("@bazel_tools//tools/build_defs/repo:local.
 bazel_dep(name = "abseil-cpp", version = "20260817.0", repo_name="com_google_absl")
 bazel_dep(name = "bazel_skylib", version = "1.9.2")
 bazel_dep(name = "caseyduquettesc_rules_python_pytest", version = "1.1.1", repo_name = "rules_python_pytest")
-bazel_dep(name = "eigen", version = "5.0.1.bcr.1", repo_name="com_gitlab_libeigen_eigen")
+bazel_dep(name = "eigen", version = "5.0.1.bcr.2", repo_name="com_gitlab_libeigen_eigen")
 bazel_dep(name = "gazelle", version = "0.54.0")
 
 # Not being used.

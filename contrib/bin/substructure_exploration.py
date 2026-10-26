@@ -18,8 +18,8 @@ from google.protobuf import text_format
 
 from substructure_exploration_pb2 import SubstructureExploration
 
-from lillymol import Molecule
-from lillymol_io import ReaderContext
+from lillymol import Molecule, Standardise
+from lillymol_io import MolReaderContext
 from lillymol_query import SubstructureQuery
 
 
@@ -96,6 +96,10 @@ def build_queries(config: SubstructureExploration) -> list[QuerySpec]:
             source = proto.smarts
             if not qry.build_from_smarts(source):
                 die(f"Query {ndx}: invalid SMARTS '{source}'")
+        elif source_type == 'query':
+            source = text_format.MessageToString(proto.query, as_one_line=True)
+            if not qry.construct_from_proto(proto.query):
+                die(f"Query {ndx}: cannot construct inline SubstructureQuery")
         elif source_type == 'fname':
             source = proto.fname
             if source.endswith('.qry'):
@@ -105,11 +109,12 @@ def build_queries(config: SubstructureExploration) -> list[QuerySpec]:
             if not ok:
                 die(f"Query {ndx}: cannot read query file '{source}'")
         else:
-            die(f"Query {ndx}: no smarts or fname specified")
+            die(f"Query {ndx}: no smarts, fname or inline query specified")
 
         if not proto.HasField('name') or not proto.name:
             die(f"Query {ndx}: every query must have a name")
 
+        qry.set_find_unique_embeddings_only(True)
         result.append(QuerySpec(
             name=proto.name,
             source=source,
@@ -177,12 +182,16 @@ def add_activity_record(activity: dict[str, float], identifier: str, value: str,
         die(f"{fname}:{line_number}: invalid activity '{value}'")
 
 
-def read_molecules(path: str, activity: dict[str, float], okmissing_activity: bool) -> tuple[list[MoleculeRecord], int]:
+def read_molecules(path: str, activity: dict[str, float], okmissing_activity: bool, standardize: bool = True) -> tuple[list[MoleculeRecord], int]:
     result: list[MoleculeRecord] = []
     missing_activity = 0
     seen: set[str] = set()
 
-    with ReaderContext(path) as reader:
+    standardiser = Standardise()
+    if standardize:
+        standardiser.activate_all()
+
+    with MolReaderContext(path) as reader:
         for mol in reader:
             identifier = str(mol.name()).split()[0]
             if not identifier:
@@ -196,6 +205,9 @@ def read_molecules(path: str, activity: dict[str, float], okmissing_activity: bo
                     die(f"{path}: missing activity for '{identifier}'")
                 missing_activity += 1
                 continue
+
+            if standardize:
+                standardiser.process(mol)
 
             result.append(MoleculeRecord(
                 smiles=str(mol.smiles()),
@@ -342,7 +354,7 @@ def analyse(args: argparse.Namespace) -> dict[str, object]:
         )
 
     activity = read_activity(args.activity)
-    molecules, missing_activity = read_molecules(args.smiles, activity, args.okmissing_activity)
+    molecules, missing_activity = read_molecules(args.smiles, activity, args.okmissing_activity, args.standardize)
     bins = common_bins([m.activity for m in molecules], args.bins)
     edges = bins['edges']
     count_buckets = parse_count_buckets(args.count_buckets)
@@ -416,6 +428,7 @@ def analyse(args: argparse.Namespace) -> dict[str, object]:
             'smiles': args.smiles,
             'activity': args.activity,
             'config': args.config,
+            'standardize': args.standardize,
             'molecules_read_with_activity': len(molecules),
             'molecules_missing_activity': missing_activity,
             'queries': len(queries),
@@ -684,7 +697,10 @@ def command_html(args: argparse.Namespace) -> int:
 
 
 def add_analyse_args(parser: argparse.ArgumentParser) -> None:
-    parser.add_argument('--config', required=True, help='SubstructureExploration textproto')
+    default_config = Path(__file__).resolve().parents[1] / 'data' / 'substructure_exploration.textproto'
+    parser.add_argument('--config', default=str(default_config), help='SubstructureExploration textproto; default curated catalogue')
+    parser.add_argument('--standardize', action=argparse.BooleanOptionalAction, default=True,
+                        help='Apply all LillyMol chemical standardisations before matching (default enabled)')
     parser.add_argument('-A', '--activity', required=True, help='Activity file with header, id/activity columns')
     parser.add_argument('-o', '--output', default='-', help='Output JSON file, or - for stdout')
     parser.add_argument('--html', help='Optional HTML report written from the same analysis')

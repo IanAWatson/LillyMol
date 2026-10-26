@@ -1,0 +1,515 @@
+# Medicinal-chemistry SAR features. Molecules are chemically standardised before
+# matching; features may overlap (for example lactam/amide and carbamate/ester).
+# ncon and charge_assigner metadata are deliberately not used.
+# CF3 means a carbon bonded to three F atoms and one non-F atom, not CF4.
+# F outside CF3 includes aryl F, alkyl F and F in CF2/CHF2 groups.
+# Ring topology uses non-spinach connections, not the total substituent count.
+# Entries marked presence-only return at most one embedding, irrespective of
+# the number of qualifying systems. Other counts use unique matched atom sets.
+
+# Functional groups
+query {
+  name: "acid"
+  smarts: "[OD1H]-C=O"
+}
+query {
+  name: "cyano"
+  smarts: "N#C"
+}
+query {
+  name: "ester"
+  smarts: "[CX3](=O)-[OX2]-[#6]"
+}
+query {
+  name: "amide"
+  smarts: "[CX3](=O)-[NX3]"
+}
+query {
+  name: "primary_amide"
+  smarts: "C(=O)-[NH2]"
+}
+query {
+  name: "secondary_amide"
+  smarts: "C(=O)-[NH1]"
+}
+query {
+  name: "tertiary_amide"
+  smarts: "C(=O)-[NH0]"
+}
+query {
+  name: "lactam"
+  smarts: "[CR](=O)-[NR]"
+}
+query {
+  name: "carbamate"
+  smarts: "N-C(=O)-O-[#6]"
+}
+query {
+  name: "urea"
+  smarts: "N-C(=O)-N"
+}
+query {
+  name: "imide"
+  smarts: "C(=O)-N-C(=O)"
+}
+query {
+  name: "primary_amine"
+  query {
+    query {
+      # Atom 0 is the nitrogen; only this atom is returned in the embedding.
+      smarts: "[ND1H2+0]"
+      # Reject amide-like nitrogens: carbonyl, thiocarbonyl, amidine,
+      # sulfonyl and phosphoryl groups attached by a single bond.
+      environment_no_match {
+        attachment { attachment_point: 0 btype: SS_SINGLE_BOND }
+        smarts: "[C,S,P]=[O,S,N]"
+      }
+      # Reject nitrogen attached directly to a cyano carbon.
+      environment_no_match {
+        attachment { attachment_point: 0 btype: SS_SINGLE_BOND }
+        smarts: "C#N"
+      }
+      # Reject nitrogen attached directly to these heteroatoms,
+      # including hydrazines and hydroxylamines.
+      environment_no_match {
+        attachment { attachment_point: 0 btype: SS_SINGLE_BOND }
+        smarts: "[N,O,S,P]"
+      }
+    }
+  }
+}
+query {
+  name: "secondary_amine"
+  query {
+    query {
+      # Atom 0 is the nitrogen; only this atom is returned in the embedding.
+      smarts: "[ND2H1+0]"
+      # Reject amide-like nitrogens: carbonyl, thiocarbonyl, amidine,
+      # sulfonyl and phosphoryl groups attached by a single bond.
+      environment_no_match {
+        attachment { attachment_point: 0 btype: SS_SINGLE_BOND }
+        smarts: "[C,S,P]=[O,S,N]"
+      }
+      # Reject nitrogen attached directly to a cyano carbon.
+      environment_no_match {
+        attachment { attachment_point: 0 btype: SS_SINGLE_BOND }
+        smarts: "C#N"
+      }
+      # Reject nitrogen attached directly to these heteroatoms,
+      # including hydrazines and hydroxylamines.
+      environment_no_match {
+        attachment { attachment_point: 0 btype: SS_SINGLE_BOND }
+        smarts: "[N,O,S,P]"
+      }
+    }
+  }
+}
+query {
+  name: "tertiary_amine"
+  query {
+    query {
+      # Atom 0 is the nitrogen; only this atom is returned in the embedding.
+      smarts: "[ND3H0+0]"
+      # Reject amide-like nitrogens: carbonyl, thiocarbonyl, amidine,
+      # sulfonyl and phosphoryl groups attached by a single bond.
+      environment_no_match {
+        attachment { attachment_point: 0 btype: SS_SINGLE_BOND }
+        smarts: "[C,S,P]=[O,S,N]"
+      }
+      # Reject nitrogen attached directly to a cyano carbon.
+      environment_no_match {
+        attachment { attachment_point: 0 btype: SS_SINGLE_BOND }
+        smarts: "C#N"
+      }
+      # Reject nitrogen attached directly to these heteroatoms,
+      # including hydrazines and hydroxylamines.
+      environment_no_match {
+        attachment { attachment_point: 0 btype: SS_SINGLE_BOND }
+        smarts: "[N,O,S,P]"
+      }
+    }
+  }
+}
+query {
+  name: "aniline"
+  smarts: "c-[ND1H2+0]"
+}
+query {
+  name: "cyclic_amine"
+  query {
+    query {
+      # Atom 0 is the nitrogen; only this atom is returned in the embedding.
+      smarts: "[NRX3+0]"
+      # Reject amide-like nitrogens: carbonyl, thiocarbonyl, amidine,
+      # sulfonyl and phosphoryl groups attached by a single bond.
+      environment_no_match {
+        attachment { attachment_point: 0 btype: SS_SINGLE_BOND }
+        smarts: "[C,S,P]=[O,S,N]"
+      }
+      # Reject nitrogen attached directly to a cyano carbon.
+      environment_no_match {
+        attachment { attachment_point: 0 btype: SS_SINGLE_BOND }
+        smarts: "C#N"
+      }
+      # Reject nitrogen attached directly to these heteroatoms,
+      # including hydrazines and hydroxylamines.
+      environment_no_match {
+        attachment { attachment_point: 0 btype: SS_SINGLE_BOND }
+        smarts: "[N,O,S,P]"
+      }
+    }
+  }
+}
+query {
+  name: "amidine"
+  smarts: "C(=N)-N"
+}
+query {
+  name: "guanidine"
+  smarts: "N-C(=N)-N"
+}
+query {
+  name: "quaternary_ammonium"
+  smarts: "[N+D4]"
+}
+query {
+  name: "nitro"
+  smarts: "[#6]-N(=O)=O"
+}
+query {
+  name: "aromatic_nh"
+  smarts: "[nH]"
+}
+query {
+  name: "aromatic_nitrogen"
+  smarts: "[nH0+0]"
+}
+query {
+  name: "alcohol"
+  smarts: "[OH]-[CX4]"
+}
+query {
+  name: "phenol"
+  smarts: "[OH]-c"
+}
+query {
+  name: "catechol"
+  smarts: "[OH]-c1c([OH])cccc1"
+}
+query {
+  name: "ether"
+  smarts: "[#6]-[OX2;!$(O-C=O)]-[#6]"
+}
+query {
+  name: "aryl_ether"
+  smarts: "a-[OX2;!$(O-C=O)]-[#6]"
+}
+query {
+  name: "aldehyde"
+  smarts: "[CH1](=O)-[#6]"
+}
+query {
+  name: "ketone"
+  smarts: "[#6]-C(=O)-[#6]"
+}
+query {
+  name: "sulfoxide"
+  smarts: "[#6]-S(=O)-[#6]"
+}
+query {
+  name: "sulfone"
+  smarts: "[#6]-S(=O)(=O)-[#6]"
+}
+query {
+  name: "sulfonamide"
+  smarts: "S(=O)(=O)-N"
+}
+query {
+  name: "thiol"
+  smarts: "[SD1H]"
+}
+query {
+  name: "thioether"
+  smarts: "[#6]-[SX2]-[#6]"
+}
+
+# Common substituents
+query {
+  name: "cf3"
+  smarts: "[CD4;!$(C(F)(F)(F)F)](F)(F)F"
+}
+query {
+  name: "heavy_halogen"
+  smarts: "[Cl,Br,I]"
+}
+query {
+  name: "fluorine_not_cf3"
+  smarts: "[F;!$(F-[CD4](F)(F)[!F])]"
+}
+query {
+  name: "aryl_fluoride"
+  smarts: "c-F"
+}
+query {
+  name: "difluoromethyl"
+  smarts: "[CH1](F)F"
+}
+query {
+  name: "methoxy"
+  smarts: "[CD1H3]-[OD2]-[c,CX4]"
+}
+query {
+  name: "aromatic_methyl"
+  smarts: "c-[CH3]"
+}
+
+# Unfused saturated rings
+query {
+  name: "cyclopropyl"
+  smarts: "[C/IWfss1]1CC1"
+}
+query {
+  name: "cyclobutyl"
+  smarts: "[C/IWfss1]1CCC1"
+}
+query {
+  name: "cyclopentyl"
+  smarts: "[C/IWfss1]1CCCC1"
+}
+query {
+  name: "cyclohexyl"
+  smarts: "[C/IWfss1]1CCCCC1"
+}
+query {
+  name: "azetidine"
+  smarts: "[N/IWfss1]1CCC1"
+}
+query {
+  name: "pyrrolidine"
+  smarts: "[N/IWfss1]1CCCC1"
+}
+query {
+  name: "piperidine"
+  smarts: "[N/IWfss1]1CCCCC1"
+}
+query {
+  name: "piperazine"
+  smarts: "[N/IWfss1]1CCNCC1"
+}
+query {
+  name: "morpholine"
+  smarts: "[N/IWfss1]1CCOCC1"
+}
+query {
+  name: "oxetane"
+  smarts: "[O/IWfss1]1CCC1"
+}
+query {
+  name: "tetrahydrofuran"
+  smarts: "[O/IWfss1]1CCCC1"
+}
+
+# Unfused aromatic heterocycles
+query {
+  name: "pyridine"
+  smarts: "[n/IWfss1]1ccccc1"
+}
+query {
+  name: "pyrimidine"
+  smarts: "[n/IWfss1]1cnccc1"
+}
+query {
+  name: "pyrazine"
+  smarts: "[n/IWfss1]1ccncc1"
+}
+query {
+  name: "pyridazine"
+  smarts: "[n/IWfss1]1ncccc1"
+}
+query {
+  name: "imidazole"
+  smarts: "[n/IWfss1]1cc[nH,n]c1"
+}
+query {
+  name: "pyrazole"
+  smarts: "[n/IWfss1]1[nH,n]ccc1"
+}
+query {
+  name: "triazole"
+  smarts: "[n/IWfss1]1[nH,n]ncc1"
+}
+query {
+  name: "oxazole"
+  smarts: "[o/IWfss1]1cncc1"
+}
+query {
+  name: "thiazole"
+  smarts: "[s/IWfss1]1cncc1"
+}
+query {
+  name: "furan"
+  smarts: "[o/IWfss1]1cccc1"
+}
+query {
+  name: "thiophene"
+  smarts: "[s/IWfss1]1cccc1"
+}
+
+# Ring topology
+query {
+  name: "non_fused_phenyl"
+  smarts: "[/IWfss1c]1ccccc1"
+}
+query {
+  name: "spiro_centre"
+  smarts: "[/IWspiro]"
+}
+# Presence-only ring-system predicate; count is 0 or 1. Highlighted atom belongs to the matching system.
+query {
+  name: "terminal_aromatic_system"
+  query {
+    query {
+      ring_system_specifier {
+        base { set_global_id: 1 }
+        number_non_spinach_groups: 1
+        min_aromatic_ring_count: 1
+        non_aromatic_ring_count: 0
+      }
+      smarts: "[/IWgid1]"
+      max_matches_to_find: 1
+    }
+  }
+}
+# Presence-only ring-system predicate; count is 0 or 1. Highlighted atom belongs to the matching system.
+query {
+  name: "internal_aromatic_system"
+  query {
+    query {
+      ring_system_specifier {
+        base { set_global_id: 1 }
+        min_number_non_spinach_groups: 2
+        min_aromatic_ring_count: 1
+        non_aromatic_ring_count: 0
+      }
+      smarts: "[/IWgid1]"
+      max_matches_to_find: 1
+    }
+  }
+}
+# Presence-only ring-system predicate; count is 0 or 1. Highlighted atom belongs to the matching system.
+query {
+  name: "standalone_aromatic_system"
+  query {
+    query {
+      ring_system_specifier {
+        base { set_global_id: 1 }
+        number_non_spinach_groups: 0
+        min_aromatic_ring_count: 1
+        non_aromatic_ring_count: 0
+      }
+      smarts: "[/IWgid1]"
+      max_matches_to_find: 1
+    }
+  }
+}
+# Presence-only ring-system predicate; count is 0 or 1. Highlighted atom belongs to the matching system.
+query {
+  name: "fused_aromatic_aromatic_2"
+  query {
+    query {
+      ring_system_specifier {
+        base { set_global_id: 1 }
+
+        rings_in_system: 2
+        aromatic_ring_count: 2
+        non_aromatic_ring_count: 0
+      }
+      smarts: "[/IWgid1]"
+      max_matches_to_find: 1
+    }
+  }
+}
+# Presence-only ring-system predicate; count is 0 or 1. Highlighted atom belongs to the matching system.
+query {
+  name: "fused_aromatic_aliphatic_2"
+  query {
+    query {
+      ring_system_specifier {
+        base { set_global_id: 1 }
+
+        rings_in_system: 2
+        aromatic_ring_count: 1
+        non_aromatic_ring_count: 1
+      }
+      smarts: "[/IWgid1]"
+      max_matches_to_find: 1
+    }
+  }
+}
+# Presence-only ring-system predicate; count is 0 or 1. Highlighted atom belongs to the matching system.
+query {
+  name: "bridged_ring_system"
+  query {
+    query {
+      ring_system_specifier {
+        base { set_global_id: 1 }
+        min_strongly_fused_ring_count: 1
+
+      }
+      smarts: "[/IWgid1]"
+      max_matches_to_find: 1
+    }
+  }
+}
+
+# Linkers and unsaturation
+query {
+  name: "biaryl_bond"
+  smarts: "a-!@a"
+}
+query {
+  name: "diaryl_ether"
+  smarts: "a-O-a"
+}
+query {
+  name: "diaryl_methylene"
+  smarts: "a-[CH2]-a"
+}
+query {
+  name: "diaryl_ethylene"
+  smarts: "a-[CH2]-[CH2]-a"
+}
+query {
+  name: "alkene"
+  smarts: "C=C"
+}
+query {
+  name: "alkyne"
+  smarts: "C#C"
+}
+
+# Potentially reactive motifs
+query {
+  name: "epoxide"
+  smarts: "[O]1CC1"
+}
+query {
+  name: "aziridine"
+  smarts: "[N]1CC1"
+}
+query {
+  name: "michael_acceptor"
+  smarts: "C=C-[C,S](=O)"
+}
+query {
+  name: "hydroxylamine"
+  smarts: "N-[OH]"
+}
+query {
+  name: "hydrazine"
+  smarts: "N-N"
+}
+query {
+  name: "disulfide"
+  smarts: "S-S"
+}

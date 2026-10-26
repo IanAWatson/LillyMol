@@ -2,10 +2,13 @@ syntax = "proto3";
 
 package substructure_exploration;
 
+import "Molecule_Lib/substructure.proto";
+
 message Query {
   oneof query_spec {
     string smarts = 1;
     string fname = 2;
+    SubstructureSearch.SubstructureQuery query = 6;
   }
   // This will over-ride anything in the smarts or query file.
   optional string name = 3;

@@ -1,0 +1,3 @@
+query {
+  smarts: "O-C=O acid"
+}

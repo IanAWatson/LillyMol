@@ -177,7 +177,14 @@ template class resizable_array_p<Stream_for_Columns>;
 template class resizable_array_base<Stream_for_Columns *>;
 
 static void
-usage(int rc, int showDelimiterOptions = 0) {
+DisplayDelimiterOptions() {
+  cerr << "  -d <delim>        delimiter is any character, or a token word(e.g. "
+            "'tab'). see '-d help' for a list (default ' ')\n";
+  ::exit(0);
+}
+
+static void
+usage(int rc) {
 // clang-format off
 #if defined(GIT_HASH) && defined(TODAY)
   cerr << __FILE__ << " compiled " << TODAY << " git hash " << GIT_HASH << '\n';
@@ -185,7 +192,8 @@ usage(int rc, int showDelimiterOptions = 0) {
   cerr << __FILE__ << " compiled " << __DATE__ << " " << __TIME__ << '\n';
 #endif
 // clang-format on
-  cerr << "Usage: " << prog_name << " <options> <fname1> <fname2> ...\n";
+// clang-format off
+  cerr << "Counts tokens per line. Designed for identifying tabular and non-tabular files\n";
   cerr << "  -n <number>       process only the first <number> records from each file\n";
   cerr << "  -e <offset>       start processing <offset> bytes before EOF\n";
   cerr << "  -r                report different token count from previous record\n";
@@ -198,10 +206,6 @@ usage(int rc, int showDelimiterOptions = 0) {
   cerr << "  -C <fname>        write a descriptor file of 'line.number tcount'\n";
   cerr << "  -b                abort on different token count from previous record\n";
   cerr << "  -w                write reported records to stderr\n";
-  if (!showDelimiterOptions) {
-    cerr << "  -d <delim>        delimiter is any character, or a token word(e.g. "
-            "'tab'). see '-d help' for a list (default ' ')\n";
-  }
   cerr << "  -c <delim>        record delimiter (default \\n, use ^m for DOS)\n";
   cerr << "  -u                consecutive delimiters mean empty words in between\n";
   cerr << "  -g                report non rectangular files\n";
@@ -209,12 +213,8 @@ usage(int rc, int showDelimiterOptions = 0) {
   cerr << "  -k                data may contain backslashed token separators\n";
   cerr << "  -h                human readable output, 1000000 written as 1,000,000\n";
   cerr << "  -v                verbose output\n";
-  if (showDelimiterOptions) {
-    cerr << "  -d <delim>        delimiter is any character, or one of these token "
-            "words:\n";
-    IWString optionVal = "-d";
-    char_name_to_char_usage("-d");
-  }
+// clang-format on
+
   exit(rc);
 }
 
@@ -547,7 +547,7 @@ tcount(int argc, char **argv) {
     cl.value('d', tmp);
     tmp.to_lowercase();
     if (tmp == "help") {
-      usage(1, 1);
+      DisplayDelimiterOptions();
     }
     if (!char_name_to_char(tmp)) {
       cerr << "Sorry, the delimiter character can be one character only, or one of a "
@@ -556,8 +556,6 @@ tcount(int argc, char **argv) {
     }
 
     token_delimiter = tmp[0];
-    //  if (' ' != token_delimiter)
-    //    consecutive_delimiters_mean_empty_words_between = 1;
   }
 
   if (cl.option_present('c')) {

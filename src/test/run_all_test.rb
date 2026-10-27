@@ -17,8 +17,8 @@ require_relative 'lillymol_tests_pb'
 
 unless ENV.key?('LILLYMOL_HOME')
   $stderr << "Shell variable \${LILLYMOL_HOME} should be defined, taking default\n"
-  pn = Pathname.new(File.expand_path(File.path(__FILE__)))
-  ENV['LILLYMOL_HOME'] = pn.parent.parent.to_s
+  pn = Pathname.new(File.realpath(__FILE__))
+  ENV['LILLYMOL_HOME'] = pn.parent.parent.parent.to_s
 end
 
 unless ENV.key?('BUILD_DIR')
@@ -634,7 +634,7 @@ def main
   tools_failing = {}
   failure_count = 0
 
-  pn = Pathname.new(File.expand_path(__FILE__))
+  pn = Pathname.new(File.realpath(__FILE__))
   test_dir = pn.parent
   Dir.mktmpdir { |dir| 
     options.tmpdir = dir

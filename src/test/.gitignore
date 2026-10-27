@@ -1,0 +1,3 @@
+# Generated and staged by //test:generated_protos and copy_test_protos.sh.
+/lillymol_tests_pb2.py
+/lillymol_tests_pb.rb

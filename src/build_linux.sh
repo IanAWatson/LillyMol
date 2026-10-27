@@ -326,6 +326,11 @@ fi
 
 echo "build_options ${build_options}"
 
+# The regression-test schema is generated with Bazel's protobuf compiler on
+# every platform, including Python-only builds. Stage both language bindings.
+${bazel} ${bazel_options} build ${build_options} //test:generated_protos || exit 1
+./copy_test_protos.sh || exit 1
+
 if [[ -v PYTHON_ONLY ]] ; then
     echo "Building Python bindings only"
     python_only_targets=(//nanobind:lillymol //nanobind:lillymol_gfp_server //nanobind:lillymol_soabi)
@@ -432,13 +437,6 @@ fi
 
 # Deal with compressed files and hidden file names
 LILLYMOL_HOME=${REPO_HOME} ./uncompress_and_install.sh
-
-# The ruby bindings used by test/run_all_test.rb are needed on every platform,
-# not just Macos. Generating them here keeps them matched to the local protoc.
-# Note the form of the generated file matters: protoc older than about 3.25
-# emits a DescriptorPool DSL that the google-protobuf 4.x gem no longer
-# supports, so a file generated long ago will fail to load.
-(cd ${REPO_HOME}/test && protoc --ruby_out=. --proto_path=. lillymol_tests.proto)
 
 # If Macos compile some protos.
 # There are a great many other protos that could be compiled for the platform.

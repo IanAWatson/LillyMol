@@ -5,8 +5,4 @@ scaffold {
   match_conditions {
     one_embedding_per_start_atom: true
   }
-  isotope {
-    atom: 1
-    isotope: 1
-  }
 }

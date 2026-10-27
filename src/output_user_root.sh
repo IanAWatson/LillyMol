@@ -4,6 +4,12 @@
 # Diagnostic messages must go to stderr because callers capture stdout and pass
 # it directly to bazel.
 
+# If a shell variable is set, use it.
+if [[ -v OUTPUT_USER_ROOT ]] ; then
+  echo "--output_user_root=${OUTPUT_USER_ROOT}"
+  exit
+fi
+
 declare -i inside_lilly
 if [[ $(hostname -d 2>/dev/null) =~ 'lilly.com' ]] ; then
     inside_lilly=1

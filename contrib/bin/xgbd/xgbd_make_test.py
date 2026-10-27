@@ -12,7 +12,7 @@ import numpy as np
 import pandas as pd
 from absl.testing import flagsaver
 from xgbd import xgbd_make as make
-from xgbd import class_label_translation_pb2, xgboost_model_pb2
+from lillymol_protos import class_label_translation_pb2, xgboost_model_pb2
 
 if not make.FLAGS.is_parsed():
   make.FLAGS(["test"])

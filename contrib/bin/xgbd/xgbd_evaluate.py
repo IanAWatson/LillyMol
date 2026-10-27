@@ -4,11 +4,11 @@ import os
 import re
 
 import pandas as pd
-import xgboost_model_pb2
+from lillymol_protos import xgboost_model_pb2
 from absl import app, flags, logging
 from google.protobuf import text_format
 from xgboost import XGBClassifier, XGBRegressor
-from xgbd import class_label_translation_pb2
+from lillymol_protos import class_label_translation_pb2
 
 FLAGS = flags.FLAGS
 
@@ -52,7 +52,7 @@ def get_model(mdir: str)->tuple:
 
   return proto, model, proto.response
 
-def read_class_label_translation(mdir:string)->bool:
+def read_class_label_translation(mdir: str) -> class_label_translation_pb2.ClassLabelTranslation:
   """Read the ClassLabelTransation proto in `mdir`.
   """
   fname = os.path.join(mdir, 'class_label_translation.dat')
@@ -64,7 +64,7 @@ def read_class_label_translation(mdir:string)->bool:
 
   return proto
 
-def to_class(labels:List[string], value):
+def to_class(labels: list[str], value):
   """Given a list of class labels and a model prediction, return the label for that score.
   """
   if value <= 0.5:
@@ -121,7 +121,7 @@ def main(argv):
     return 1
 
 
-  return xgboost_evaluate(FLAGS.mdir, argv[1])
+  return 0 if xgboost_evaluate(FLAGS.mdir, argv[1]) else 1
 
 if __name__ == '__main__':
   app.run(main)

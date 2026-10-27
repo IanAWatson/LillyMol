@@ -5,11 +5,11 @@ import sys
 
 import joblib
 import pandas as pd
-import random_forest_model_pb2
+from lillymol_protos import random_forest_model_pb2
 from absl import app, flags, logging
 from google.protobuf import text_format
 
-from xgbd.linear_scaling_pb2 import LinearScalingData
+from lillymol_protos.linear_scaling_pb2 import LinearScalingData
 
 FLAGS = flags.FLAGS
 

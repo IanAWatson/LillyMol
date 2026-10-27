@@ -7,7 +7,7 @@ import subprocess
 import joblib
 import numpy as np
 import pandas as pd
-import random_forest_model_pb2
+from lillymol_protos import random_forest_model_pb2
 from absl import app, flags, logging
 from google.protobuf import text_format
 from sklearn.ensemble import RandomForestClassifier, RandomForestRegressor

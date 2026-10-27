@@ -6,7 +6,8 @@ require 'set'
 require 'google/protobuf'
 
 require_relative('../lib/iwcmdline')
-require_relative('xgboost_model_pb')
+lillymol_home = ENV.fetch('LILLYMOL_HOME') { File.expand_path('../../..', __dir__) }
+require File.join(lillymol_home, 'lib/lillymol_protos/xgboost_model_pb')
 
 def usage
 msg = <<-END

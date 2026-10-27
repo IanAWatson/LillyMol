@@ -1,9 +1,5 @@
 #!/usr/bin/env bash
 
-if [[ ! -v LILLYMOL_HOME ]] ; then
-  export LILLYMOL_HOME=$(dirname $0)/../..
-fi
-
-script_dir=$(dirname $0)
-export PYTHONPATH=${script_dir}:${PYTHONPATH}
-exec python ${script_dir}/xgbd/xgbd_make.py "$@"
+source "$(dirname -- "${BASH_SOURCE[0]}")/lib/model_environment.sh" || exit 1
+check_model_protos || exit 1
+exec "${PYTHON:-python}" "${model_bin_dir}/xgbd/xgbd_make.py" "$@"

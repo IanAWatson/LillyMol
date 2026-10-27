@@ -15,8 +15,8 @@ from sklearn.model_selection import KFold
 from sklearn.metrics import mean_squared_error
 from xgboost import XGBClassifier, XGBRegressor, plot_importance
 from xgboost.core import XGBoostError
-from xgbd import xgboost_model_pb2
-from xgbd import class_label_translation_pb2
+from lillymol_protos import xgboost_model_pb2
+from lillymol_protos import class_label_translation_pb2
 
 FLAGS = flags.FLAGS
 

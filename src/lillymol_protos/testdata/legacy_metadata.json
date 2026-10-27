@@ -1,0 +1,26 @@
+[
+  {
+    "module": "xgboost_model_pb2",
+    "message": "XGBoostModel",
+    "binary_hex": "0a035847421207706f74656e63791a0d0dcdcc4c3e280388010498010720002a060a02663110012a060a0266301000",
+    "textproto": "model_type: \"XGB\"\nresponse: \"potency\"\nparameters {\n  eta: 0.2\n  max_depth: 3\n  tree_method: HIST\n  n_estimators: 7\n}\nclassification: false\nname_to_col {\n  key: \"f0\"\n}\nname_to_col {\n  key: \"f1\"\n  value: 1\n}\n"
+  },
+  {
+    "module": "random_forest_model_pb2",
+    "message": "RandomForestModel",
+    "binary_hex": "0a0252461207706f74656e63791a040805100320002a060a02663110012a060a0266301000",
+    "textproto": "model_type: \"RF\"\nresponse: \"potency\"\nparameters {\n  n_estimators: 5\n  max_depth: 3\n}\nclassification: false\nname_to_col {\n  key: \"f0\"\n}\nname_to_col {\n  key: \"f1\"\n  value: 1\n}\n"
+  },
+  {
+    "module": "class_label_translation_pb2",
+    "message": "ClassLabelTranslation",
+    "binary_hex": "0a0c0a08696e61637469766510000a0a0a066163746976651001",
+    "textproto": "to_numeric {\n  key: \"active\"\n  value: 1\n}\nto_numeric {\n  key: \"inactive\"\n}\n"
+  },
+  {
+    "module": "linear_scaling_pb2",
+    "message": "LinearScalingData",
+    "binary_hex": "09000000000000004011000000000000f8bf",
+    "textproto": "slope: 2.0\nintercept: -1.5\n"
+  }
+]

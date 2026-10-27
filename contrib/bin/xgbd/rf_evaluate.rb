@@ -3,13 +3,14 @@
 # Evaluate an RF model from either smiles or a descriptor file.
 
 require 'set'
+require 'shellwords'
 require 'google/protobuf'
 
 lillymol_home = ENV['LILLYMOL_HOME']
 raise 'LILLYMOL_HOME not defined' unless lillymol_home
 
 require "#{lillymol_home}/contrib/bin/lib/iwcmdline"
-require "#{lillymol_home}/contrib/bin/xgbd/random_forest_model_pb"
+require "#{lillymol_home}/lib/lillymol_protos/random_forest_model_pb"
 
 def usage
 msg = <<-END
@@ -83,10 +84,10 @@ def rf_evaluate_smiles(fname, mdir, proto, cl)
 end
 
 def rf_evaluate_descriptors(fname, mdir, proto, cl)
-  cmd = "python #{__dir__}/rf_evaluate.py --mdir #{mdir} #{fname}"
+  cmd = [ENV.fetch('PYTHON', 'python'), File.join(__dir__, 'rf_evaluate.py'), '--mdir', mdir, fname]
 
-  $stderr << "Executing #{cmd}\n" if cl.option_present('v')
-  system(cmd)
+  $stderr << "Executing #{cmd.shelljoin}\n" if cl.option_present('v')
+  system(*cmd)
 end
 
 def main

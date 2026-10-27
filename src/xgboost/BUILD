@@ -97,3 +97,41 @@ cc_binary(
         "@third_party//:xgboost",
     ],
 )
+
+# Python script bindings have their own import path; C++ includes stay unchanged.
+proto_library(
+    name = "xgboost_model_script_proto",
+    srcs = ["xgboost_model.proto"],
+    import_prefix = "lillymol_protos",
+    strip_import_prefix = "/xgboost",
+)
+
+py_proto_library(
+    name = "xgboost_model_script_py_proto",
+    deps = [":xgboost_model_script_proto"],
+    visibility = ["//visibility:public"],
+)
+
+# Python script bindings have their own import path; C++ includes stay unchanged.
+proto_library(
+    name = "random_forest_model_script_proto",
+    srcs = ["random_forest_model.proto"],
+    import_prefix = "lillymol_protos",
+    strip_import_prefix = "/xgboost",
+)
+
+py_proto_library(
+    name = "random_forest_model_script_py_proto",
+    deps = [":random_forest_model_script_proto"],
+    visibility = ["//visibility:public"],
+)
+
+genrule(
+    name = "model_ruby_protos",
+    srcs = ["xgboost_model.proto", "random_forest_model.proto"],
+    outs = ["xgboost_model_pb.rb", "random_forest_model_pb.rb"],
+    cmd = "$(execpath @com_google_protobuf//:protoc) " +
+          "--proto_path=xgboost --ruby_out=$(@D) $(SRCS)",
+    tools = ["@com_google_protobuf//:protoc"],
+    visibility = ["//visibility:public"],
+)

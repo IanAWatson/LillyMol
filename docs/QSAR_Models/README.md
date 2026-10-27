@@ -52,6 +52,54 @@ In the [contrib/bin/xgbd](../../contrib/bin/xgbd) directory there
 are tools that enable building and scoring an XGBoost model built on molecular
 descriptors.
 
+### Python environment and generated protos
+
+The model wrappers use the active Python environment, or the interpreter named
+by `PYTHON`. They do not use `run_python.sh` or require LillyMol's compiled
+Python bindings. Install the modelling packages needed by the scripts in that
+environment, including XGBoost, pandas, scikit-learn, absl-py and protobuf.
+Optuna is required only when using `--optuna`.
+
+Generated Python and Ruby model protos are installed under
+`$LILLYMOL_HOME/lib/lillymol_protos`. The normal build and `PYTHON_ONLY` build
+both generate and stage them. To prepare just these protos, run from `src`:
+
+```shell
+bazel build //lillymol_protos:generated_protos
+./copy_script_protos.sh
+```
+
+The wrappers add `lib` to `PYTHONPATH` and check that the Python protobuf runtime
+can load the generated modules before building or evaluating a Python model.
+Bazel controls the generator version through `MODULE.bazel`; the installed
+Python runtime must support that generated code. A mismatch produces a message
+identifying the interpreter and the incompatible versions, followed by a
+`/path/to/python -m pip install --upgrade protobuf` command using that exact
+interpreter. It also offers the uv equivalent:
+`uv pip install --python /path/to/python --upgrade protobuf`. Both commands
+target the environment that failed. Missing protobuf installations receive
+the same advice. Staging the modules does not install or upgrade packages
+in your environment.
+
+Python code uses these imports:
+
+```python
+from lillymol_protos import xgboost_model_pb2
+from lillymol_protos import random_forest_model_pb2
+from lillymol_protos import class_label_translation_pb2
+from lillymol_protos.linear_scaling_pb2 import LinearScalingData
+```
+
+For direct Python invocations, add `$LILLYMOL_HOME/lib` to `PYTHONPATH` yourself.
+The script modules under `xgbd` additionally need `$LILLYMOL_HOME/contrib/bin`
+on that path. The shell wrappers handle both automatically. `xgbd_evaluate.sh`
+uses Ruby and the C++ evaluator and does not require a Python interpreter.
+`rf_evaluate.sh` uses Ruby followed by the selected Python interpreter.
+
+The authoritative schemas remain in `src/xgboost` and `src/Utilities/General`.
+Generated copies and the stale duplicate schema under `contrib/bin/xgbd` have
+been removed. Existing binary and text model metadata retain their wire format.
+
 ### Model Building
 The first step is to build a model. A minimal model, using a quick-to-compute
 set of descriptors and taking all default XGBoost parameters, can be done via

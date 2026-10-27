@@ -326,10 +326,11 @@ fi
 
 echo "build_options ${build_options}"
 
-# The regression-test schema is generated with Bazel's protobuf compiler on
-# every platform, including Python-only builds. Stage both language bindings.
-${bazel} ${bazel_options} build ${build_options} //test:generated_protos || exit 1
+# Generate test and standalone-script protos with Bazel on every platform,
+# including Python-only builds. Stage both Python and Ruby bindings.
+${bazel} ${bazel_options} build ${build_options} //test:generated_protos //lillymol_protos:generated_protos || exit 1
 ./copy_test_protos.sh || exit 1
+./copy_script_protos.sh || exit 1
 
 if [[ -v PYTHON_ONLY ]] ; then
     echo "Building Python bindings only"
@@ -437,18 +438,6 @@ fi
 
 # Deal with compressed files and hidden file names
 LILLYMOL_HOME=${REPO_HOME} ./uncompress_and_install.sh
-
-# If Macos compile some protos.
-# There are a great many other protos that could be compiled for the platform.
-# bazel query 'kind("proto_library", ...:all)'
-
-if [[ $(uname) == 'Darwin' ]] ; then
-  if [[ -v BUILD_XGBOOST ]] ; then
-    (cd ${REPO_HOME}/src && protoc --python_out=. xgboost/xgboost_model.proto && cp xgboost/xgboost_model_pb2.py ${REPO_HOME}/contrib/bin/xgbd )
-    (cd ${REPO_HOME}/src && protoc --python_out=. xgboost/random_forest_model.proto && cp xgboost/random_forest_model_pb2.py ${REPO_HOME}/contrib/bin/xgbd )
-    (cd ${REPO_HOME}/src && protoc --python_out=. Utilities/General/linear_scaling.proto && cp Utilities/General/linear_scaling_pb2.py ${REPO_HOME}/contrib/bin/xgbd )
-  fi
-fi
 
 # Python if requested, build, install and test.
 # Note that PYTHONPATH will need to be adjusted, or copy the shared

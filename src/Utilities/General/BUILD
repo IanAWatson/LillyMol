@@ -1048,3 +1048,31 @@ cc_test(
         "@googletest//:gtest_main",
     ],
 )
+
+# Python script bindings have their own import path; C++ includes stay unchanged.
+proto_library(
+    name = "class_label_translation_script_proto",
+    srcs = ["class_label_translation.proto"],
+    import_prefix = "lillymol_protos",
+    strip_import_prefix = "/Utilities/General",
+)
+
+py_proto_library(
+    name = "class_label_translation_script_py_proto",
+    deps = [":class_label_translation_script_proto"],
+    visibility = ["//visibility:public"],
+)
+
+# Python script bindings have their own import path; C++ includes stay unchanged.
+proto_library(
+    name = "linear_scaling_script_proto",
+    srcs = ["linear_scaling.proto"],
+    import_prefix = "lillymol_protos",
+    strip_import_prefix = "/Utilities/General",
+)
+
+py_proto_library(
+    name = "linear_scaling_script_py_proto",
+    deps = [":linear_scaling_script_proto"],
+    visibility = ["//visibility:public"],
+)

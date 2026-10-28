@@ -257,20 +257,6 @@ py_proto_library(
 )
 
 cc_library(
-    name = "coordinate_box",
-    srcs = [
-        "coordinate_box.cc",
-    ],
-    hdrs = [
-        "coordinate_box.h",
-    ],
-    deps = [
-        ":space_vector",
-        "//Foundational/iwstring",
-    ],
-)
-
-cc_library(
     name = "iwmolecule",
     srcs = [
         "ISIS_Atom_List.cc",
@@ -288,7 +274,6 @@ cc_library(
         "charge_calculation.cc",
         "chiral_centre.cc",
         "cis_trans_bond.cc",
-        "coordinate_box.cc",
         "coordinates.cc",
         "count_atoms_in_smiles.cc",
         "csubstructure.cc",
@@ -376,7 +361,6 @@ cc_library(
         "chiral_centre.h",
         "cis_trans_bond.h",
         "collection_template.h",
-        "coordinate_box.h",
         "coordinates.h",
         "create_components.h",
         "dihedral.h",
@@ -816,18 +800,6 @@ cc_test(
         ":iwmolecule",
         ":moleculeio",
         "//Foundational/iwmisc:sparse_fp_creator",
-        "@googletest//:gtest_main",
-    ],
-)
-
-cc_test(
-    name = "coordinate_box_test",
-    timeout = "short",
-    srcs = [
-        "coordinate_box_test.cc",
-    ],
-    deps = [
-        ":coordinate_box",
         "@googletest//:gtest_main",
     ],
 )

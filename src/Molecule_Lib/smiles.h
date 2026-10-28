@@ -66,7 +66,6 @@ namespace lillymol {
 void set_include_coordinates_with_smiles(int);
 int include_coordinates_with_smiles();
 }
-extern void set_append_coordinate_box_after_each_atom(int);
 
 extern void set_smiles_native_ordering(int);
 

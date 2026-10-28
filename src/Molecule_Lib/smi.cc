@@ -18,7 +18,6 @@
 
 #include "aromatic.h"
 #include "chiral_centre.h"
-#include "coordinate_box.h"
 #include "element.h"
 #include "misc2.h"
 #include "molecule.h"
@@ -1458,24 +1457,6 @@ Molecule::read_molecule_tdt_ds(iwstring_data_source& input) {
   }
 }
 
-int
-ParseBoxedCoordinates(const_IWSubstring c,  // Local copy.
-                      Coordinates& coords) {
-  assert(c.starts_with('B'));
-  c += 1;  // SKip over 'B'.
-  coordinate_box::LayerPosition layer_position;
-  const int consumed = coordinate_box::FromString(c, layer_position);
-  if (consumed != c.length()) {
-    return 0;
-  }
-
-  coordinate_box::ConcentricBox box;
-
-  coords = box.CellToCoordinates<float>(layer_position);
-
-  return c.length() + 1;
-}
-
 static int
 parse_coordinates(const char* smiles, int characters_to_process, int characters_processed,
                   Coordinates& coords) {
@@ -1504,12 +1485,7 @@ parse_coordinates(const char* smiles, int characters_to_process, int characters_
 
   const_IWSubstring c(smiles, close_brace_pos);
 
-  if (c[0] == 'B') {
-    if (!ParseBoxedCoordinates(c, coords)) {
-      cerr << "parse_coordinates::Cannot parse boxed coordinates '" << c << "'\n";
-      return 0;
-    }
-  } else if (!coords.read(c, ',')) {
+  if (!coords.read(c, ',')) {
     cerr << "parse_coordinates: cannot parse coordinates '" << c << "'\n";
     return 0;
   }

@@ -58,7 +58,6 @@ set(srcs
   ${CMAKE_CURRENT_SOURCE_DIR}/cif.cc
   ${CMAKE_CURRENT_SOURCE_DIR}/cis_trans_bond.cc
   ${CMAKE_CURRENT_SOURCE_DIR}/coordinates.cc
-  ${CMAKE_CURRENT_SOURCE_DIR}/coordinate_box.cc
   ${CMAKE_CURRENT_SOURCE_DIR}/count_atoms_in_smiles.cc
   ${CMAKE_CURRENT_SOURCE_DIR}/csubstructure.cc
   ${CMAKE_CURRENT_SOURCE_DIR}/dihedral.cc
@@ -236,16 +235,6 @@ set(atom_test_libs
 )
 add_executable(atom_test ${atom_test_srcs})
 target_link_libraries(atom_test LINK_PUBLIC ${atom_test_libs})
-
-# coordinate_box_test
-set(coordinate_box_test_srcs
-  coordinate_box_test.cc
-)
-set(coordinate_box_test_libs
-  ${libs_for_tests}
-)
-add_executable(coordinate_box_test ${coordinate_box_test_srcs})
-target_link_libraries(coordinate_box_test LINK_PUBLIC ${coordinate_box_test_libs})
 
 # geometric_constraints_test
 set(geometric_constraints_test_srcs

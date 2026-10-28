@@ -14,7 +14,6 @@
 
 #include "aromatic.h"
 #include "chiral_centre.h"
-#include "coordinate_box.h"
 #include "misc2.h"
 #include "molecule.h"
 #include "pearlman.h"
@@ -130,13 +129,6 @@ include_coordinates_with_smiles() {
 }
 
 }  // namespace lillymol
-
-static int append_coordinate_box_after_each_atom = 0;
-
-void
-set_append_coordinate_box_after_each_atom(int s) {
-  append_coordinate_box_after_each_atom = s;
-}
 
 static int _write_smiles_with_smarts_atoms = 0;
 
@@ -310,11 +302,6 @@ process_standard_smiles_options(Command_Line& cl, int verbose, const char sflag)
       if (verbose) {
         cerr << "Will add coordinates to each atom in a smiles\n";
       }
-    } else if ("cbox" == tmp) {
-      set_append_coordinate_box_after_each_atom(1);
-      if (verbose) {
-        cerr << "Will add boxed coordinates to each atom in a smiles\n";
-      }
     } else if ("random" == tmp) {
       random_number_seed_t tmp = set_smiles_random_number_seed_random();
       if (verbose) {
@@ -440,15 +427,6 @@ Molecule::_process_directional_bond_for_smiles(IWString& smiles, const Bond* b,
 #endif
 
   return 1;
-}
-
-static void
-do_append_coordinate_box(const Atom& a, IWString& smiles) {
-  coordinate_box::ConcentricBox box;
-  const coordinate_box::LayerPosition layer_position = box.Position(a);
-  smiles += "{{B";
-  smiles << layer_position;
-  smiles += "}}";
 }
 
 static void
@@ -770,8 +748,6 @@ Molecule::_process_atom_for_smiles(Smiles_Formation_Info& sfi, const int* zorder
 
   if (lillymol::include_coordinates_with_smiles()) {
     do_append_coordinates(smiles, a);
-  } else if (append_coordinate_box_after_each_atom) {
-    do_append_coordinate_box(a, smiles);
   }
 
   // cerr << "After addition, length " << smiles.length() << '\n';
@@ -870,8 +846,6 @@ Molecule::_process_atom_for_smiles(Smiles_Formation_Info& sfi, IWString& smiles)
 
   if (lillymol::include_coordinates_with_smiles()) {
     do_append_coordinates(smiles, a);
-  } else if (append_coordinate_box_after_each_atom) {
-    do_append_coordinate_box(a, smiles);
   }
 
   return rc;
@@ -1026,7 +1000,6 @@ reset_smiles_support_file_scope_variables() {
   _write_single_bonds_in_smiles = 0;
   include_hcount_in_smiles = 1;
   file_scope_display_unusual_hcount_warning_messages = 1;
-  append_coordinate_box_after_each_atom = 0;
   sflag = 'K';
 
   return;

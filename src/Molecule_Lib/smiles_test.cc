@@ -3,13 +3,10 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
-#include "coordinate_box.h"
+#include "molecule.h"
 #include "smiles.h"
 
 namespace {
-
-using testing::ElementsAre;
-using testing::FloatNear;
 
 // For tests that need an input smiles and an expected output.
 struct SmilesAndExpected {
@@ -105,70 +102,36 @@ INSTANTIATE_TEST_SUITE_P(TestAddHToIsotopes, TestAddHToIsotopes, testing::Values
 ));
 
 
-class TestBoxedCoordinates : public testing::Test {
-    void SetUp() {
-      set_append_coordinate_box_after_each_atom(1);
-    }
-    void TearDown() {
-      set_append_coordinate_box_after_each_atom(0);
-    }
+// Ordinary coordinate SMILES remain supported after retiring boxed coordinates.
+class TestSmilesCoordinates : public testing::Test {
+ protected:
+  void SetUp() override {
+    lillymol::set_include_coordinates_with_smiles(1);
+  }
+  void TearDown() override {
+    lillymol::set_include_coordinates_with_smiles(0);
+  }
 };
 
-TEST_F(TestBoxedCoordinates, TestBoxedCoordinates0) {
-  const_IWSubstring smiles("C{{B0:0}}");
-  Molecule m;
-  ASSERT_TRUE(m.build_from_smiles(smiles));
-  EXPECT_EQ(m.x(0), 0.0f);
-  EXPECT_EQ(m.y(0), 0.0f);
-  EXPECT_EQ(m.z(0), 0.0f);
-}
+TEST_F(TestSmilesCoordinates, RoundTripCoordinates) {
+  Molecule molecule;
+  ASSERT_TRUE(molecule.build_from_smiles(
+      "C{{1.25,-2.5,3}}[NH3+]{{-4,5.5,-6.25}}"));
+  ASSERT_EQ(molecule.natoms(), 2);
+  EXPECT_FLOAT_EQ(molecule.x(0), 1.25f);
+  EXPECT_FLOAT_EQ(molecule.y(0), -2.5f);
+  EXPECT_FLOAT_EQ(molecule.z(0), 3.0f);
+  EXPECT_FLOAT_EQ(molecule.x(1), -4.0f);
+  EXPECT_FLOAT_EQ(molecule.y(1), 5.5f);
+  EXPECT_FLOAT_EQ(molecule.z(1), -6.25f);
 
-TEST_F(TestBoxedCoordinates, TestBoxedCoordinates1) {
-  Coordinates coords(1.0f, 2.0f, 0.5f);
-  coordinate_box::ConcentricBox box;
-  const coordinate_box::LayerPosition layer_position = box.Position(coords);
-
-  IWString smiles("CC");
-  smiles << "{{B" << layer_position << "}}";
-
-  constexpr float kAbsDiff = 0.001;
-
-  Molecule m;
-  ASSERT_TRUE(m.build_from_smiles(smiles));
-  EXPECT_THAT(m.atom(1).ToResizableArray(), 
-              ElementsAre(FloatNear(coords.x(), kAbsDiff),
-              FloatNear(coords.y(), kAbsDiff),
-              FloatNear(coords.z(), kAbsDiff)));
-}
-
-TEST_F(TestBoxedCoordinates, TestBoxedCoordinates2) {
-  constexpr int matoms = 10;
-  std::vector<Coordinates> coords(matoms);
-  for (int i = 0; i < matoms; ++i) {
-    coords[i].setxyz(i, 2 * i, i + 8);
-  }
-
-  coordinate_box::ConcentricBox box;
-
-  IWString smiles;
-  for (int i = 0; i < matoms; ++i) {
-    smiles << 'C';
-    const coordinate_box::LayerPosition layer_position = box.Position(coords[i]);
-    smiles << "{{B" << layer_position << "}}";
-  }
-
-  Molecule m;
-  ASSERT_TRUE(m.build_from_smiles(smiles));
-
-  constexpr float kAbsDiff = 0.001;
-
-  ASSERT_EQ(m.natoms(), matoms);
-
-  for (int i = 0; i < matoms; ++i) {
-    EXPECT_THAT(m.atom(i).ToResizableArray(),
-                ElementsAre(FloatNear(coords[i].x(), kAbsDiff),
-                            FloatNear(coords[i].y(), kAbsDiff),
-                            FloatNear(coords[i].z(), kAbsDiff)));
+  Molecule roundtrip;
+  ASSERT_TRUE(roundtrip.build_from_smiles(molecule.smiles()));
+  ASSERT_EQ(roundtrip.natoms(), molecule.natoms());
+  for (int i = 0; i < molecule.natoms(); ++i) {
+    EXPECT_FLOAT_EQ(roundtrip.x(i), molecule.x(i));
+    EXPECT_FLOAT_EQ(roundtrip.y(i), molecule.y(i));
+    EXPECT_FLOAT_EQ(roundtrip.z(i), molecule.z(i));
   }
 }
 

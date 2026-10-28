@@ -75,12 +75,14 @@ SidechainName(const IWReaction& reaction, int sidechain_number, int reagent_numb
   return reagent->name().AsString();
 }
 
-bool
+int
 AddSidechainReagents(IWReaction& reaction, int sidechain, const char* fname,
                      const Sidechain_Match_Conditions& smc,
                      std::optional<FileType> file_type) {
-  return reaction.add_sidechain_reagents(
+  const int before = reaction.sidechain(sidechain)->number_reagents();
+  const int total = reaction.add_sidechain_reagents(
       sidechain, fname, file_type.value_or(FILE_TYPE_INVALID), smc);
+  return total == 0 ? 0 : total - before;
 }
 
 bool
@@ -400,7 +402,7 @@ BindReaction(nb::module_& m) {
       .def("add_sidechain_reagents", &AddSidechainReagents, nb::arg("sidechain"),
            nb::arg("fname"), nb::arg("match_conditions"), nb::kw_only(),
            nb::arg("file_type") = nb::none(),
-           "Add reagents from a file; infer type from filename unless file_type is supplied")
+           "Return the number of reagents added, or 0 on failure; infer type from filename unless file_type is supplied")
       .def("add_sidechain_reagent", &AddSidechainReagent, nb::arg("sidechain"),
            nb::arg("mol"), nb::arg("match_conditions"),
            "Add a reagent molecule to a sidechain")

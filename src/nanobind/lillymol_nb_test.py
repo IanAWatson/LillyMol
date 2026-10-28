@@ -1970,10 +1970,13 @@ sidechain {
                         "[c:1][#0:3].[#0:4][*:2]>>[*:1]-[*:2]"))
                     conditions = lillymol.SidechainMatchConditions()
                     kwargs = {"file_type": lillymol.FileType.SMI} if explicit else {}
-                    self.assertTrue(reaction.add_sidechain_reagents(
-                        0, fname, conditions, **kwargs))
+                    self.assertEqual(reaction.add_sidechain_reagents(
+                        0, fname, conditions, **kwargs), 2)
                     self.assertEqual(reaction.sidechain_name(0, 0), "methylamine")
                     self.assertEqual(reaction.sidechain_name(0, 1), "ethylamine")
+                    self.assertEqual(reaction.add_sidechain_reagents(
+                        0, fname, conditions, **kwargs), 2)
+                    self.assertEqual(reaction.sidechain_name(0, 3), "ethylamine")
 
             fname = os.path.join(directory, "reagents.unknown")
             with open(fname, "w") as output:
@@ -1981,7 +1984,9 @@ sidechain {
             reaction = lillymol.Reaction()
             self.assertTrue(reaction.construct_from_smirks(
                 "[c:1][#0:3].[#0:4][*:2]>>[*:1]-[*:2]"))
-            self.assertFalse(reaction.add_sidechain_reagents(0, fname, conditions))
+            count = reaction.add_sidechain_reagents(0, fname, conditions)
+            self.assertIs(type(count), int)
+            self.assertEqual(count, 0)
             with self.assertRaises(TypeError):
                 reaction.add_sidechain_reagents(0, fname, conditions, lillymol.FileType.SMI)
 

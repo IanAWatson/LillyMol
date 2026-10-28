@@ -1393,7 +1393,9 @@ infers the input format from the filename by default. Override it with the
 keyword-only `file_type` argument when the suffix does not identify the format,
 for example `rxn.add_sidechain_reagents(0, 'reagents.dat', conditions,
 file_type=FileType.SMI)`. An explicit type takes precedence over the suffix.
-The method returns `False` if the format cannot be inferred or loading fails.
+The method returns the number of reagents added by this call, excluding any
+reagents already loaded. It returns `0` if the format cannot be inferred or
+loading fails.
 
 The reaction object was designed to be able to rapidly enumerate large combinatorial
 libraries. For this reason, it stores precomputed sets of sidechain reagents, which can

@@ -29,7 +29,9 @@ in full, including the assertions exercised by their Bazel tests.
 
 ## Constructing a reaction
 
-`Reaction.read(fname)` reads a reaction **textproto** file. It returns `True` on
+`Reaction.read(fname)` and `Reaction.read_proto(fname)` read a reaction
+**textproto** file. Both use the reaction reader, rather than the inherited
+substructure-query reader. Each returns `True` on
 success and `False` on failure. `construct_from_textproto(text)` accepts the
 textproto as a string; `construct_from_smirks(text)` accepts SMIRKS. Both return
 booleans. Check construction before using the reaction.
@@ -333,6 +335,7 @@ This table summarizes the entry points used in the examples. Always check
 | Method | Result and behavior |
 | --- | --- |
 | `read(fname)` | `bool`; read a textproto reaction file. |
+| `read_proto(fname)` | `bool`; alias for the reaction-specific `read(fname)`. |
 | `construct_from_textproto(text)` | `bool`; construct from a textproto string. |
 | `construct_from_smirks(text)` | `bool`; construct from SMIRKS. |
 | `name()` | Reaction name/comment. |

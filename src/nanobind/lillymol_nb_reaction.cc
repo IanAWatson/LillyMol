@@ -385,6 +385,9 @@ BindReaction(nb::module_& m) {
       .def("read", [](IWReaction& reaction, const std::string& fname) -> bool {
              return ReadReaction(fname, reaction);
            }, nb::arg("fname"), "Read textproto reaction")
+      .def("read_proto", [](IWReaction& reaction, const std::string& fname) -> bool {
+             return ReadReaction(fname, reaction);
+           }, nb::arg("fname"), "Read textproto reaction")
       .def("construct_from_smirks", &ConstructReactionFromSmirks, nb::arg("smirks"),
            "Build from SMIRKS")
       .def("construct_from_textproto", &ConstructReactionFromTextProto,

@@ -1885,6 +1885,33 @@ query {
         replacement.set_preserve_connectivity(False)
         self.assertEqual(replacement.read_replacement_rings(replacement_file), 2)
 
+    def test_reaction_read_proto(self):
+        textproto = '''name: "Amide coupling"
+scaffold {
+  smarts: "[C](=[O])-[OH]"
+  remove_atom: 2
+}
+sidechain {
+  smarts: "[ND1H2]"
+  join { a1: 0 a2: 0 btype: SS_SINGLE_BOND }
+}
+'''
+        with tempfile.TemporaryDirectory() as directory:
+            fname = os.path.join(directory, "reaction.textproto")
+            with open(fname, "w") as output:
+                output.write(textproto)
+            reaction = lillymol.Reaction()
+            self.assertTrue(reaction.read_proto(fname))
+            self.assertEqual(reaction.name(), "Amide coupling")
+            self.assertEqual(reaction.number_sidechains(), 1)
+            product = reaction.perform_reaction([
+                lillymol.MolFromSmiles("CC(=O)O"), lillymol.MolFromSmiles("CN")])
+            self.assertIsNotNone(product)
+            self.assertEqual(product.unique_smiles(),
+                             lillymol.MolFromSmiles("CC(=O)NC").unique_smiles())
+            self.assertFalse(lillymol.Reaction().read_proto(
+                os.path.join(directory, "missing.textproto")))
+
     def test_reaction_repr(self):
         reaction = lillymol.Reaction()
         self.assertEqual(repr(reaction), "Reaction(sidechains=0)")

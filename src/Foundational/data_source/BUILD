@@ -119,3 +119,13 @@ cc_test(
         "@googletest//:gtest_main",
     ],
 )
+
+cc_test(
+    name = "tfdatarecord_test",
+    size = "small",
+    srcs = ["tfdatarecord_test.cc"],
+    deps = [
+        ":iwtfdata_record",
+        "@googletest//:gtest_main",
+    ],
+)

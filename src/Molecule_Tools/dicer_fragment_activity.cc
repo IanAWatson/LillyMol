@@ -1,571 +1,673 @@
-// Read output from dicer and associate the fragments with activity values.
+// Associate dicer fragments with activity, without interpreting molecular structures.
 
+#include <algorithm>
+#include <cmath>
+#include <filesystem>
+#include <fstream>
+#include <iomanip>
 #include <iostream>
-#include <optional>
+#include <numeric>
 #include <string>
+#include <vector>
 
-#include "google/protobuf/io/zero_copy_stream_impl_lite.h"
+#include "google/protobuf/struct.pb.h"
 #include "google/protobuf/text_format.h"
+#include "google/protobuf/util/json_util.h"
 
 #include "Foundational/accumulator/accumulator.h"
 #include "Foundational/cmdline_v2/cmdline_v2.h"
 #include "Foundational/data_source/iwstring_data_source.h"
 #include "Foundational/data_source/tfdatarecord.h"
-#include "Foundational/iwmisc/misc.h"
 
+#include "absl/container/flat_hash_map.h"
+#include "absl/container/flat_hash_set.h"
+#include "absl/strings/string_view.h"
 #ifdef BUILD_BAZEL
 #include "Molecule_Tools/dicer_fragments.pb.h"
 #else
 #include "dicer_fragments.pb.h"
 #endif
-#include "absl/container/flat_hash_map.h"
-#include "absl/strings/string_view.h"
 
 namespace dicer_fragment_activity {
-
-using iw_tf_data_record::TFDataReader;
+using google::protobuf::Struct;
+using google::protobuf::Value;
 using std::cerr;
 
 void
 Usage(int rc) {
-// clang-format off
-#if defined(GIT_HASH) && defined(TODAY)
-  cerr << __FILE__ << " compiled " << TODAY << " git hash " << GIT_HASH << '\n';
-#else
-  cerr << __FILE__ << " compiled " << __DATE__ << " " << __TIME__ << '\n';
-#endif
-  // clang-format on
-  // clang-format off
-  cerr << R"(Associates dicer fragments with activity.
-First run dicer, with either the '-B textproto' or '-B serialized_proto' options. This
-will contain the diced molecules.
-Using serialized_proto is dramatically faster.
-This tool reads the fragment data and an activity file and for each fragment, reports the
-average activity of the molecules containing the fragment.
+  cerr << R"(Associate per-molecule dicer output with an activity file.
 
-A typical use might be
+  dicer -k 3 -I 1 -B serialized_proto -S diced.dat molecules.smi
+  dicer_fragment_activity -A activity.txt -tfdata -support 10 diced.dat
+  dicer_fragment_activity -A activity.txt -tfdata -support 10 -json report.json diced.dat
 
-dicer -k 3 -B nbamide -B brcb -I 1 -B serialized_proto -S diced.dat -v file.smi
-dicer_fragment_activity -A file.activity -tfdata -support 10 diced.dat > file.txt
+ -A <fname>              id/activity file with a header
+ -tfdata                 read TFDataRecord serialized DicedMolecule protos
+                         default: one DicedMolecule textproto per line (-B proto)
+ -support <n>            minimum number of molecules containing a fragment
+ -C <natoms>             maximum fragment atom count
+ -json <fname>           write a structured activity report instead of the table
+                         use '-' for JSON on stdout
+ -unmatched_support <n>  minimum absent-group size for JSON (default 1)
+ -bins <n>               common histogram bins for JSON (default 20)
+ -examples <n>           parent examples retained in JSON (default 3; 0 allowed)
+ -v                      report population and fragment counts
 
-The resulting tabular file can be imported into data visualisation environments.
+The population is the unique molecules actually read, including those with no
+fragments. Repeated molecule ids and duplicate activity ids are errors. Each
+fragment counts once per molecule; fragment occurrence counts are not weights.
 
-The output might look like
-
-Frag Parent Natoms N fraction Minval Ave Maxval Diff
-smiles1 name1 11 59 0.0004928207 0 28.32882 87.1 -12.68904
-smiles2 name1 13 22 0.0001837637 0 14.43561 49.6 -26.58226
-smiles3 name1 6 49 0.0004092918 0 65.80041 100 24.78254
-smiles4 name1 16 25 0.0002088223 0 47.8084 96.6 6.790536
-
-Frag: the unique smiles of the fragment
-Parent: the name of the first molecule containing this fragment
-Natoms: number of atoms in the fragment
-N: number of molecules containing this fragment
-Fraction: N expressed as a fraction
-Minval: minimum activity of molecules containing this fragment
-Ave: average activity of molecules containing this fragment
-Maxval: max activity of molecules containing this fragment
-Diff: the difference between Ave and the average for all molecules.
-
-The most interesting fragments are those with high values, positive or negative
-for Diff. Hopefully also with a large N value, but that will seldom be the case.
-
- -A <fname>             activity file (id and activity, with a header)
- -tfdata                dicer output generated with '-B serialized_proto'
- -support <n>           discard fragments unles they have at least <n> examples.
- -C <natoms>            discard fragments with more than <natoms> atoms.
- -v                     verbose output.
+The default table retains columns Frag Parent Natoms N Fraction Minval Ave
+Maxval Diff. Diff is matched mean minus the processed population mean. JSON
+also reports matched-minus-unmatched mean and median differences.
 )";
-
-  // clang-format on
-
   ::exit(rc);
 }
 
-// Information about each fragment encountered.
-// We do not record the smiles since this will be kept in a hash
-// and the key will be the smiles.
-class Fragment {
- private:
-  // An accumulation of the activity values associated with this fragment.
+struct Activity {
+  double _value;
+  bool _seen = false;
+};
+
+struct Parent {
+  std::string _id;
+  std::string _smiles;
+  double _activity;
+};
+
+struct Fragment {
   Accumulator<double> _activity;
-
-  // The molecule in which this was first observed.
   std::string _parent;
-
-  // Number of atoms in fragment - copied from proto.
-  uint32_t _natoms;
-
- public:
-  void
-  set_parent(const std::string& s) {
-    _parent = s;
-  }
-
-  void
-  set_natoms(uint32_t s) {
-    _natoms = s;
-  }
-
-  uint32_t natoms() const {
-    return _natoms;
-  }
-
-  uint32_t
-  times_encountered() const {
-    return _activity.n();
-  }
-
-  void
-  Extra(double a) {
-    _activity.extra(a);
-  }
-
-  int WriteResult(const std::string& smiles, uint32_t nmolecules, double mean_activity,
-                  IWString_and_File_Descriptor& output) const;
+  uint32_t _natoms = 0;
+  // Populated only for JSON. Initially parent indices, later activity ranks.
+  std::vector<uint32_t> _members;
 };
 
-int
-Fragment::WriteResult(const std::string& smiles, uint32_t nmolecules,
-                      double mean_activity, IWString_and_File_Descriptor& output) const {
-  static constexpr char kSep = ' ';
-
-  float ave = _activity.average();
-
-  output << smiles << kSep;
-  append_first_token_of_name(_parent, output);
-  output << kSep << _natoms << kSep << _activity.n() << kSep
-         << iwmisc::Fraction<float>(_activity.n(), nmolecules) << kSep
-         << _activity.minval() << kSep << ave << kSep << _activity.maxval() << kSep
-         << static_cast<float>(ave - mean_activity) << '\n';
-
-  return 1;
-}
-
-class Options {
- private:
-  int _verbose;
-
-  int _input_is_textproto = 1;
-
-  // Only report fragments that occur this many times or more.
-  uint32_t _support = 0;
-  uint32_t _suppressed_by_support_requirement = 0;
-
-  char _input_separator;
-
-  uint32_t _max_atoms = 0;
-  uint32_t _suppressed_by_max_atoms = 0;
-
-  // this is derived from the activity values read. We do not
-  // determine it ourself, it is passed via set_mean_activity.
-  double _mean_activity;
-
- public:
-  Options();
-
-  int Initialise(Command_Line_v2& cl);
-
-  int ReadActivity(const char* fname, absl::flat_hash_map<std::string, double>& activity);
-  int ReadActivity(iwstring_data_source& input,
-                   absl::flat_hash_map<std::string, double>& activity);
-  int ReadACtivityRecord(const const_IWSubstring& buffer,
-                         absl::flat_hash_map<std::string, double>& activity);
-
-  int
-  input_is_textproto() const {
-    return _input_is_textproto;
-  }
-
-  void
-  set_mean_activity(double s) {
-    _mean_activity = s;
-  }
-
-  int WriteResult(const std::string& smiles, uint32_t nmolecules,
-                  const Fragment& fragment, IWString_and_File_Descriptor& output);
-
-  int Report(std::ostream& output) const;
-};
-
-Options::Options() {
-  _verbose = 0;
-  _input_is_textproto = 1;
-  _input_separator = ' ';
-  _support = 0;
-  _suppressed_by_support_requirement = 0;
-  _max_atoms = 0;
-  _suppressed_by_max_atoms = 0;
-  _mean_activity = 0.0;
-}
-
-int
-Options::Initialise(Command_Line_v2& cl) {
-  _verbose = cl.option_count('v');
-
-  if (cl.option_present("tfdata")) {
-    _input_is_textproto = 0;
-    if (_verbose) {
-      cerr << "Will read input as TFDataRecord\n";
-    }
-  }
-
-  if (cl.option_present("support")) {
-    cl.value("support", _support);
-    if (_verbose) {
-      cerr << "Will only write fragments that are found in " << _support
-           << " or more molecules\n";
-    }
-  }
-
-  if (cl.option_present('C')) {
-    if (! cl.value('C', _max_atoms) || _max_atoms < 1) {
-      cerr << "Invalid max atoms directive (-C)\n";
-      return 0;
-    }
-    if (_verbose) {
-      cerr << "Will ignore fragments with more than " << _max_atoms << " atoms\n";
-    }
-  }
-
-  return 1;
-}
-
-int
-Options::ReadActivity(const char* fname,
-                      absl::flat_hash_map<std::string, double>& activity) {
-  iwstring_data_source input(fname);
-  if (!input.good()) {
-    cerr << "Options:ReadActivityAsTextProto:cannot open '" << fname << "'\n";
-    return 0;
-  }
-
-  return ReadActivity(input, activity);
-}
-
-int
-Options::ReadActivity(iwstring_data_source& input,
-                      absl::flat_hash_map<std::string, double>& activity) {
-  const_IWSubstring buffer;
-  if (!input.next_record(buffer)) {
-    cerr << "Options::ReadACtivity:cannot read header\n";
-    return 0;
-  }
-
-  while (input.next_record(buffer)) {
-    if (!ReadACtivityRecord(buffer, activity)) {
-      cerr << "Options::ReadACtivity:invalid input\n";
-      cerr << buffer << '\n';
-      return 0;
-    }
-  }
-
-  return activity.size();
-}
-
-int
-Options::ReadACtivityRecord(const const_IWSubstring& buffer,
-                            absl::flat_hash_map<std::string, double>& activity) {
-  const_IWSubstring token;
-  int i = 0;
-  if (!buffer.nextword(token, i, _input_separator)) {
-    cerr << "Options::ReadACtivityRecord:cannot get id\n";
-    return 0;
-  }
-
-  std::string id(token.AsString());
-
-  if (!buffer.nextword(token, i, _input_separator)) {
-    cerr << "Options::ReadACtivityRecord:cannot get activity\n";
-    return 0;
-  }
-
-  double a;
-  if (!token.numeric_value(a)) {
-    cerr << "Options::ReadACtivityRecord:invalid activity value '" << token << "'\n";
-    return 0;
-  }
-
-  activity[id] = a;
-
-  return 1;
-}
-
-// for a given fragment, while smiles is `smiles`, write the results.
-// In order to know prevalence of a fragment, the total number of
-// molecules is needed, `nmolecules`.
-int
-Options::WriteResult(const std::string& smiles, uint32_t nmolecules,
-                     const Fragment& fragment, IWString_and_File_Descriptor& output) {
-  if (_support > 0 && fragment.times_encountered() < _support) {
-    ++_suppressed_by_support_requirement;
-    return 1;
-  }
-
-  if (_max_atoms > 0 && fragment.natoms() > _max_atoms) {
-    ++_suppressed_by_max_atoms;
-    return 1;
-  }
-
-  return fragment.WriteResult(smiles, nmolecules, _mean_activity, output);
-}
-
-int
-Options::Report(std::ostream& output) const {
-  if (_support > 0) {
-    output << _suppressed_by_support_requirement << " fragments suppressed by "
-           << _support << " support requirement\n";
-  }
-  if (_max_atoms > 0) {
-    output << _suppressed_by_max_atoms << " fragments suppressed by "
-           << _max_atoms << " max atoms requirement\n";
-  }
-
-  return 1;
-}
-
-int
-AddToFragments(const dicer_data::DicedMolecule& parent,
-               const dicer_data::DicerFragment& fragment, double activity,
-               absl::flat_hash_map<std::string, Fragment>& fragment_data) {
-  auto iter = fragment_data.find(fragment.smi());
-  if (iter == fragment_data.end()) {
-    Fragment f;
-    f.set_parent(parent.name());
-    f.set_natoms(fragment.nat());
-    f.Extra(activity);
-    fragment_data.emplace(fragment.smi(), std::move(f));
+void
+Number(Struct& object, const std::string& name, double value) {
+  Value& field = (*object.mutable_fields())[name];
+  if (std::isfinite(value)) {
+    field.set_number_value(value);
   } else {
-    iter->second.Extra(activity);
+    field.set_null_value(google::protobuf::NULL_VALUE);
   }
-
-  return 1;
 }
 
-// Look for `name` in `activity`.
-// If found, return the iter.
-// If not found, see if there is a space in `name` and try the first token.
-std::optional<const absl::flat_hash_map<std::string, double>::const_iterator>
-FindActivity(const std::string& name,
-              const absl::flat_hash_map<std::string, double>& activity) {
-  const auto iter = activity.find(name);
-  if (iter != activity.end()) {
-    return iter;
-  }
-
-  size_t space = name.find(' ');
-  if (space == std::string::npos) {
-    return std::nullopt;
-  }
-
-  std::string tmp(name);
-  tmp.resize(space);
-  const auto iter2 = activity.find(tmp);
-  if (iter2 != activity.end()) {
-    return iter2;
-  }
-
-  return std::nullopt;
+void
+String(Struct& object, const std::string& name, const std::string& value) {
+  (*object.mutable_fields())[name].set_string_value(value);
 }
 
-int
-ReadDicerData(const dicer_data::DicedMolecule& proto,
-              const absl::flat_hash_map<std::string, double>& activity,
-              absl::flat_hash_map<std::string, Fragment>& fragment_data) {
-  std::optional<const absl::flat_hash_map<std::string, double>::const_iterator> iter = FindActivity(proto.name(), activity);
-  if (! iter) {
-    cerr << "ReadDicerData:no activity for '" << proto.name() << "'\n";
-    return 0;
-   }
+Struct&
+Object(Struct& object, const std::string& name) {
+  return *(*object.mutable_fields())[name].mutable_struct_value();
+}
 
+template <typename T>
+void
+Array(Struct& object, const std::string& name, const std::vector<T>& values) {
+  auto* list = (*object.mutable_fields())[name].mutable_list_value();
+  for (const auto value : values) {
+    list->add_values()->set_number_value(value);
+  }
+}
+
+// Quantiles use linear interpolation at (n - 1) * percentile, matching the
+// dictionary-feature analysis. value_at accesses either a group or its implicit
+// complement; no vector containing all absent molecules is needed.
+template <typename Getter>
+Struct
+Summary(uint32_t n, long double sum, Getter value_at) {
+  Struct result;
+  Number(result, "n", n);
+  if (n == 0) {
+    for (const char* key : {"min", "q1", "median", "mean", "q3", "max"}) {
+      (*result.mutable_fields())[key].set_null_value(google::protobuf::NULL_VALUE);
+    }
+    return result;
+  }
+  auto quantile = [&](double fraction) {
+    const double pos = (n - 1) * fraction;
+    const uint32_t lower = std::floor(pos);
+    const uint32_t upper = std::ceil(pos);
+    const long double weight = pos - lower;
+    return static_cast<double>((1 - weight) * value_at(lower) + weight * value_at(upper));
+  };
+  Number(result, "min", value_at(0));
+  Number(result, "q1", quantile(0.25));
+  Number(result, "median", quantile(0.5));
+  Number(result, "mean", sum / n);
+  Number(result, "q3", quantile(0.75));
+  Number(result, "max", value_at(n - 1));
+  return result;
+}
+
+bool
+WriteObject(std::ostream& output, const Struct& object) {
+  std::string json;
+  const auto status = google::protobuf::util::MessageToJsonString(object, &json);
+  if (!status.ok()) {
+    cerr << "Cannot encode activity report: " << status.ToString() << '\n';
+    return false;
+  }
+  output << json;
+  return output.good();
+}
+
+class Analysis {
+ private:
+  bool _verbose = false;
+  bool _tfdata = false;
+  uint32_t _support = 0;
+  int _max_atoms = 0;
+  uint32_t _unmatched_support = 1;
+  int _bins = 20;
+  int _examples = 3;
+  std::string _activity_fname;
+  std::string _json_fname;
+  absl::flat_hash_map<std::string, Activity> _activities;
+  absl::flat_hash_map<std::string, Fragment> _fragments;
+  Accumulator<double> _population;
+  std::vector<Parent> _parents;
+  std::vector<uint32_t> _order;
+  std::vector<uint32_t> _ranks;
+  std::vector<double> _values;
+  std::vector<double> _edges;
+  std::vector<uint32_t> _histogram;
+  long double _sum = 0;
+
+  using Entry = absl::flat_hash_map<std::string, Fragment>::value_type;
+  bool ReadActivity();
+  bool AddMolecule(const dicer_data::DicedMolecule& proto);
+  bool ReadText(const char* fname);
+  bool ReadBinary(const char* fname);
+  bool OutputOverwritesInput(const Command_Line_v2& cl) const;
+  std::vector<Entry*> OutputFragments();
+  bool Supported(const Fragment& fragment) const;
+  void PrepareReport();
+  uint32_t HistogramBin(double value) const;
+  double AbsentValue(const std::vector<uint32_t>& members, uint32_t index) const;
+  Struct FragmentReport(const std::string& smiles, Fragment& fragment, uint32_t index);
+  bool WriteJson();
+  bool WriteTable();
+
+ public:
+  bool Initialise(Command_Line_v2& cl);
+  bool Read(const char* fname);
+  bool Write();
+};
+
+bool
+Analysis::OutputOverwritesInput(const Command_Line_v2& cl) const {
+  if (_json_fname.empty() || _json_fname == "-") {
+    return false;
+  }
+  std::error_code error;
+  const auto destination = std::filesystem::weakly_canonical(_json_fname, error);
+  if (error) {
+    cerr << "Cannot resolve JSON output path: " << error.message() << '\n';
+    return true;
+  }
+  auto same_file = [&](const std::string& name) {
+    std::error_code ec;
+    if (std::filesystem::equivalent(name, _json_fname, ec) && !ec) {
+      return true;
+    }
+    ec.clear();
+    return std::filesystem::weakly_canonical(name, ec) == destination && !ec;
+  };
+  if (same_file(_activity_fname)) {
+    return true;
+  }
+  for (const char* fname : cl) {
+    if (same_file(fname)) {
+      return true;
+    }
+  }
+  return false;
+}
+
+bool
+Analysis::Initialise(Command_Line_v2& cl) {
+  _verbose = cl.option_present('v');
+  _tfdata = cl.option_present("tfdata");
+  _activity_fname = cl.string_value('A').AsString();
+  if (cl.option_present("support") && (!cl.value("support", _support) || _support < 1)) {
+    return false;
+  }
+  if (cl.option_present('C') && (!cl.value('C', _max_atoms) || _max_atoms < 1)) {
+    return false;
+  }
+  if (cl.option_present("unmatched_support") &&
+      (!cl.value("unmatched_support", _unmatched_support) || _unmatched_support < 1)) {
+    return false;
+  }
+  if (cl.option_present("bins") && (!cl.value("bins", _bins) || _bins < 1)) {
+    return false;
+  }
+  if (cl.option_present("examples") &&
+      (!cl.value("examples", _examples) || _examples < 0)) {
+    cerr << "Examples must be a non-negative integer\n";
+    return false;
+  }
+  if (cl.option_present("json")) {
+    _json_fname = cl.string_value("json").AsString();
+    if (OutputOverwritesInput(cl)) {
+      cerr << "JSON output would overwrite an input file\n";
+      return false;
+    }
+  }
+  return ReadActivity();
+}
+
+bool
+Analysis::ReadActivity() {
+  iwstring_data_source input(_activity_fname.c_str());
+  if (!input.good()) {
+    cerr << "Cannot read activity file '" << _activity_fname << "'\n";
+    return false;
+  }
+  const_IWSubstring line;
+  if (!input.next_record(line) || line.empty()) {
+    cerr << "Activity file needs a header\n";
+    return false;
+  }
+  while (input.next_record(line)) {
+    line.strip_leading_blanks();
+    if (line.empty() || line.starts_with('#')) {
+      continue;
+    }
+    int i = 0;
+    const_IWSubstring id, token;
+    double value;
+    if (!line.nextword(id, i) || !line.nextword(token, i) ||
+        !token.numeric_value(value) || !std::isfinite(value)) {
+      cerr << "Invalid id/activity record: " << line << '\n';
+      return false;
+    }
+    if (!_activities.emplace(id.AsString(), Activity{value}).second) {
+      cerr << "Duplicate activity identifier '" << id << "'\n";
+      return false;
+    }
+  }
+  if (!input.good() || !input.eof()) {
+    cerr << "Error reading activity file '" << _activity_fname << "'\n";
+    return false;
+  }
+  if (_activities.empty()) {
+    cerr << "No activity values read\n";
+    return false;
+  }
+  return true;
+}
+
+bool
+Analysis::AddMolecule(const dicer_data::DicedMolecule& proto) {
+  auto activity = _activities.find(proto.name());
+  if (activity == _activities.end()) {
+    const size_t end = proto.name().find_first_of(" \t\r\n");
+    activity = _activities.find(proto.name().substr(0, end));
+  }
+  if (activity == _activities.end()) {
+    cerr << "No activity for '" << proto.name() << "'\n";
+    return false;
+  }
+  if (activity->second._seen) {
+    cerr << "Duplicate molecule identifier '" << activity->first << "'\n";
+    return false;
+  }
+  activity->second._seen = true;
+  const double value = activity->second._value;
+  const uint32_t parent = _population.n();
+  _population.extra(value);
+  if (!_json_fname.empty()) {
+    _parents.push_back({activity->first, proto.smiles(), value});
+  }
+  absl::flat_hash_set<absl::string_view> seen;
   for (const auto& fragment : proto.fragment()) {
-    AddToFragments(proto, fragment, iter.value()->second, fragment_data);
-  }
-
-  return 1;
-}
-
-int
-ReadDicerDataTfDataRecord(TFDataReader& reader, Options& options,
-                          const absl::flat_hash_map<std::string, double>& activity,
-                          absl::flat_hash_map<std::string, Fragment>& fragment_data) {
-  while (1) {
-    std::optional<dicer_data::DicedMolecule> maybe_proto =
-        reader.ReadProto<dicer_data::DicedMolecule>();
-
-    if (!maybe_proto) {
-      return 1;
+    const std::string& key = fragment.usmi().empty() ? fragment.smi() : fragment.usmi();
+    if (key.empty() || fragment.nat() == 0) {
+      cerr << "Fragment needs SMILES and a positive atom count: "
+           << fragment.ShortDebugString() << '\n';
+      return false;
     }
-
-    if (!ReadDicerData(*maybe_proto, activity, fragment_data)) {
-      cerr << "ReadDicerDataTfDataRecord:invalid proto\n";
-      cerr << maybe_proto->ShortDebugString() << '\n';
-      return 0;
+    auto [iter, inserted] = _fragments.try_emplace(key);
+    Fragment& result = iter->second;
+    if (inserted) {
+      result._parent = activity->first;
+      result._natoms = fragment.nat();
+    } else if (result._natoms != fragment.nat()) {
+      cerr << "Inconsistent atom counts for fragment '" << key << "'\n";
+      return false;
     }
-  }
-
-  return 1;
-}
-
-int
-ReadDicerDataTfDataRecord(const char* fname, Options& options,
-                          const absl::flat_hash_map<std::string, double>& activity,
-                          absl::flat_hash_map<std::string, Fragment>& fragment_data) {
-  TFDataReader reader(fname);
-  if (!reader.good()) {
-    cerr << "ReadDicerDataTfDataRecord:cannot open '" << fname << "'\n";
-    return 0;
-  }
-
-  return ReadDicerDataTfDataRecord(reader, options, activity, fragment_data);
-}
-
-int
-ReadDicerDataTextprotoRecord(const const_IWSubstring& buffer,
-                             const absl::flat_hash_map<std::string, double>& activity,
-                             absl::flat_hash_map<std::string, Fragment>& fragment_data) {
-  dicer_data::DicedMolecule proto;
-  const absl::string_view tmp(buffer.data(), buffer.length());
-  if (!google::protobuf::TextFormat::ParseFromString(tmp, &proto)) {
-    cerr << "ReadDicerDataTextprotoRecord:cannot parse text proto " << buffer << '\n';
-    return 0;
-  }
-
-  return ReadDicerData(proto, activity, fragment_data);
-}
-
-int
-ReadDicerDataTextproto(iwstring_data_source& input, Options& options,
-                       const absl::flat_hash_map<std::string, double>& activity,
-                       absl::flat_hash_map<std::string, Fragment>& fragment_data) {
-  const_IWSubstring buffer;
-  while (input.next_record(buffer)) {
-    if (!ReadDicerDataTextprotoRecord(buffer, activity, fragment_data)) {
-      cerr << "ReadDicerDataTextproto:invalid textproto record\n";
-      cerr << buffer << '\n';
-      return 0;
+    if (!seen.insert(key).second) {
+      continue;
+    }
+    result._activity.extra(value);
+    if (!_json_fname.empty()) {
+      result._members.push_back(parent);
     }
   }
-
-  return 1;
+  return true;
 }
 
-int
-ReadDicerDataTextproto(const char* fname, Options& options,
-                       const absl::flat_hash_map<std::string, double>& activity,
-                       absl::flat_hash_map<std::string, Fragment>& fragment_data) {
+bool
+Analysis::ReadText(const char* fname) {
   iwstring_data_source input(fname);
   if (!input.good()) {
-    cerr << "ReadDicerDataTextproto:cannot open '" << fname << "'\n";
-    return 0;
+    cerr << "Cannot open dicer input '" << fname << "'\n";
+    return false;
   }
-
-  return ReadDicerDataTextproto(input, options, activity, fragment_data);
+  const_IWSubstring line;
+  while (input.next_record(line)) {
+    line.strip_leading_blanks();
+    if (line.empty() || line.starts_with('#')) {
+      continue;
+    }
+    dicer_data::DicedMolecule proto;
+    if (!google::protobuf::TextFormat::ParseFromString(line.AsString(), &proto) ||
+        !AddMolecule(proto)) {
+      cerr << "Invalid dicer textproto in '" << fname << "'\n";
+      return false;
+    }
+  }
+  if (!input.good() || !input.eof()) {
+    cerr << "Error reading dicer input '" << fname << "'\n";
+    return false;
+  }
+  return true;
 }
 
-int
-ReadDicerData(const char* fname, Options& options,
-              const absl::flat_hash_map<std::string, double>& activity,
-              absl::flat_hash_map<std::string, Fragment>& fragment_data) {
-  if (options.input_is_textproto()) {
-    return ReadDicerDataTextproto(fname, options, activity, fragment_data);
+bool
+Analysis::ReadBinary(const char* fname) {
+  iw_tf_data_record::TFDataReader input(fname);
+  if (!input.good()) {
+    cerr << "Cannot open dicer input '" << fname << "'\n";
+    return false;
   }
+  while (true) {
+    const auto record = input.Next();
+    if (!record) {
+      // A failed protobuf parse is not EOF. Check framing separately, too.
+      if (input.good() && input.eof()) {
+        return true;
+      }
+      cerr << "Invalid TFDataRecord in '" << fname << "'\n";
+      return false;
+    }
+    dicer_data::DicedMolecule proto;
+    if (!proto.ParseFromArray(record->data(), record->length()) || !AddMolecule(proto)) {
+      cerr << "Invalid serialized DicedMolecule in '" << fname << "'\n";
+      return false;
+    }
+  }
+}
 
-  return ReadDicerDataTfDataRecord(fname, options, activity, fragment_data);
+bool
+Analysis::Read(const char* fname) {
+  return _tfdata ? ReadBinary(fname) : ReadText(fname);
+}
+
+std::vector<Analysis::Entry*>
+Analysis::OutputFragments() {
+  std::vector<Entry*> result;
+  // Apply support/size limits before sorting: most generated fragments may
+  // have low support, so sorting every discovered SMILES would waste time and
+  // a large pointer array on entries that will never be written.
+  for (auto& entry : _fragments) {
+    if (!Supported(entry.second)) {
+      continue;
+    }
+    if (!_json_fname.empty() &&
+        _population.n() - entry.second._activity.n() < _unmatched_support) {
+      continue;
+    }
+    result.push_back(&entry);
+  }
+  std::sort(result.begin(), result.end(),
+            [](const Entry* lhs, const Entry* rhs) { return lhs->first < rhs->first; });
+  return result;
+}
+
+bool
+Analysis::Supported(const Fragment& fragment) const {
+  return fragment._activity.n() >= _support &&
+         (_max_atoms == 0 || fragment._natoms <= static_cast<uint32_t>(_max_atoms));
+}
+
+void
+Analysis::PrepareReport() {
+  _order.resize(_parents.size());
+  std::iota(_order.begin(), _order.end(), uint32_t{0});
+  std::sort(_order.begin(), _order.end(), [&](uint32_t lhs, uint32_t rhs) {
+    if (_parents[lhs]._activity != _parents[rhs]._activity) {
+      return _parents[lhs]._activity < _parents[rhs]._activity;
+    }
+    return _parents[lhs]._id < _parents[rhs]._id;
+  });
+  _ranks.resize(_parents.size());
+  for (uint32_t rank = 0; rank < _order.size(); ++rank) {
+    _ranks[_order[rank]] = rank;
+    _values.push_back(_parents[_order[rank]]._activity);
+    _sum += _values.back();
+  }
+  if (_values.front() == _values.back()) {
+    _edges = {_values.front(), _values.back()};
+    _bins = 1;
+  } else {
+    const long double low = _values.front();
+    const long double range = static_cast<long double>(_values.back()) - low;
+    for (int i = 0; i < _bins; ++i) {
+      _edges.push_back(low + range * i / _bins);
+    }
+    _edges.push_back(_values.back());
+  }
+  _histogram.resize(_bins, 0);
+  for (double value : _values) {
+    ++_histogram[HistogramBin(value)];
+  }
+}
+
+uint32_t
+Analysis::HistogramBin(double value) const {
+  if (_values.front() == _values.back()) {
+    return 0;
+  }
+  const long double fraction =
+      (static_cast<long double>(value) - _values.front()) /
+      (static_cast<long double>(_values.back()) - _values.front());
+  return std::min<uint32_t>(_bins - 1, fraction * _bins);
+}
+
+// Select the kth value absent from this fragment. At rank r, the number of
+// absent values is (r + 1) minus the number of member ranks <= r. Binary search
+// this monotone count. This costs O(log N log support), not a scan over all N
+// molecules for every fragment, and handles tied activities by their ranks.
+double
+Analysis::AbsentValue(const std::vector<uint32_t>& members, uint32_t index) const {
+  uint32_t low = 0;
+  uint32_t high = _values.size() - 1;
+  while (low < high) {
+    const uint32_t mid = low + (high - low) / 2;
+    const auto hits =
+        std::upper_bound(members.begin(), members.end(), mid) - members.begin();
+    if (mid + 1 - hits > index) {
+      high = mid;
+    } else {
+      low = mid + 1;
+    }
+  }
+  return _values[low];
+}
+
+Struct
+Analysis::FragmentReport(const std::string& smiles, Fragment& fragment, uint32_t index) {
+  Struct result;
+  Number(result, "index", index);
+  String(result, "name", "Fragment " + std::to_string(index));
+  String(result, "source", smiles);
+  String(result, "source_type", "dicer");
+  Number(result, "natoms", fragment._natoms);
+  auto* examples = (*result.mutable_fields())["examples"].mutable_list_value();
+  const uint32_t nexamples = std::min<size_t>(_examples, fragment._members.size());
+  for (uint32_t i = 0; i < nexamples; ++i) {
+    const Parent& parent = _parents[fragment._members[i]];
+    Struct& example = *examples->add_values()->mutable_struct_value();
+    String(example, "identifier", parent._id);
+    String(example, "smiles", parent._smiles);
+    Number(example, "activity", parent._activity);
+  }
+  for (uint32_t& member : fragment._members) {
+    member = _ranks[member];
+  }
+  std::sort(fragment._members.begin(), fragment._members.end());
+  std::vector<uint32_t> matched_histogram(_bins, 0);
+  long double matched_sum = 0;
+  for (uint32_t rank : fragment._members) {
+    matched_sum += _values[rank];
+    ++matched_histogram[HistogramBin(_values[rank])];
+  }
+  Struct& matched = Object(result, "matched");
+  Object(matched, "summary") =
+      Summary(fragment._members.size(), matched_sum,
+              [&](uint32_t i) { return _values[fragment._members[i]]; });
+  Array(matched, "histogram", matched_histogram);
+  std::vector<uint32_t> unmatched_histogram(_histogram);
+  for (int i = 0; i < _bins; ++i) {
+    unmatched_histogram[i] -= matched_histogram[i];
+  }
+  Struct& unmatched = Object(result, "unmatched");
+  Object(unmatched, "summary") =
+      Summary(_values.size() - fragment._members.size(), _sum - matched_sum,
+              [&](uint32_t i) { return AbsentValue(fragment._members, i); });
+  Array(unmatched, "histogram", unmatched_histogram);
+  for (const char* statistic : {"mean", "median"}) {
+    const auto& a = matched.fields().at("summary").struct_value().fields().at(statistic);
+    const auto& b =
+        unmatched.fields().at("summary").struct_value().fields().at(statistic);
+    if (a.kind_case() == Value::kNumberValue && b.kind_case() == Value::kNumberValue) {
+      Number(result, std::string("delta_") + statistic,
+             a.number_value() - b.number_value());
+    } else {
+      (*result.mutable_fields())[std::string("delta_") + statistic].set_null_value(
+          google::protobuf::NULL_VALUE);
+    }
+  }
+  return result;
+}
+
+bool
+Analysis::WriteJson() {
+  PrepareReport();
+  std::ofstream file;
+  std::ostream* output = &std::cout;
+  if (_json_fname != "-") {
+    file.open(_json_fname);
+    if (!file.good()) {
+      cerr << "Cannot open JSON output '" << _json_fname << "'\n";
+      return false;
+    }
+    output = &file;
+  }
+  Struct metadata;
+  String(metadata, "activity", _activity_fname);
+  String(metadata, "feature_kind", "fragment");
+  String(metadata, "multiplicity_mode", "presence");
+  Number(metadata, "molecules_read_with_activity", _population.n());
+  Number(metadata, "activities_unused", _activities.size() - _population.n());
+  Number(metadata, "queries", _fragments.size());
+  Number(metadata, "min_matches", _support);
+  Number(metadata, "min_unmatched", _unmatched_support);
+  Number(metadata, "histogram_bins", _bins);
+  const auto ordered = OutputFragments();
+  Number(metadata, "queries_reported", ordered.size());
+  Struct global;
+  Object(global, "summary") =
+      Summary(_values.size(), _sum, [&](uint32_t i) { return _values[i]; });
+  Array(global, "histogram", _histogram);
+  Struct& bins = Object(global, "bins");
+  Number(bins, "min", _values.front());
+  Number(bins, "max", _values.back());
+  Array(bins, "edges", _edges);
+  *output << "{\"metadata\":";
+  if (!WriteObject(*output, metadata)) {
+    return false;
+  }
+  *output << ",\"global\":";
+  if (!WriteObject(*output, global)) {
+    return false;
+  }
+  *output << ",\"queries\":[";
+  uint32_t index = 0;
+  for (Entry* entry : ordered) {
+    if (index) {
+      *output << ',';
+    }
+    if (!WriteObject(*output, FragmentReport(entry->first, entry->second, ++index))) {
+      return false;
+    }
+  }
+  *output << "]}\n";
+  output->flush();
+  return output->good();
+}
+
+bool
+Analysis::WriteTable() {
+  std::cout << "Frag Parent Natoms N Fraction Minval Ave Maxval Diff\n"
+            << std::setprecision(7);
+  for (const Entry* entry : OutputFragments()) {
+    const Fragment& fragment = entry->second;
+    if (!Supported(fragment)) {
+      continue;
+    }
+    std::cout << entry->first << ' ' << fragment._parent << ' ' << fragment._natoms << ' '
+              << fragment._activity.n() << ' '
+              << static_cast<double>(fragment._activity.n()) / _population.n() << ' '
+              << fragment._activity.minval() << ' ' << fragment._activity.average() << ' '
+              << fragment._activity.maxval() << ' '
+              << fragment._activity.average() - _population.average() << '\n';
+  }
+  std::cout.flush();
+  return std::cout.good();
+}
+
+bool
+Analysis::Write() {
+  if (_population.n() == 0) {
+    cerr << "No diced molecules read\n";
+    return false;
+  }
+  if (_verbose) {
+    cerr << "Read " << _population.n() << " molecules and " << _fragments.size()
+         << " fragments; " << _activities.size() - _population.n()
+         << " activity ids unused\n";
+  }
+  return _json_fname.empty() ? WriteTable() : WriteJson();
 }
 
 int
 Main(int argc, char** argv) {
-  Command_Line_v2 cl(argc, argv, "-v-A=sfile-tfdata-support=ipos-C=ipos");
-  if (cl.unrecognised_options_encountered()) {
-    cerr << "unrecognised_options_encountered\n";
+  Command_Line_v2 cl(argc, argv,
+                     "-v-A=sfile-tfdata-support=ipos-C=ipos-json=s-bins=ipos-examples=i-"
+                     "unmatched_support=ipos");
+  if (cl.unrecognised_options_encountered() || !cl.option_present('A') || cl.empty()) {
     Usage(1);
   }
-
-  const int verbose = cl.option_count('v');
-
-  if (!cl.option_present('A')) {
-    cerr << "Must specify activity file with the -A option\n";
-    Usage(1);
-  }
-
-  Options options;
-  if (!options.Initialise(cl)) {
-    cerr << "Cannot initialise options\n";
+  Analysis analysis;
+  if (!analysis.Initialise(cl)) {
     return 1;
   }
-
-  absl::flat_hash_map<std::string, double> activity;
-  double mean_activity = 0.0;
-
-  if (cl.option_present('A')) {
-    IWString fname = cl.string_value('A');
-    if (!options.ReadActivity(fname.null_terminated_chars(), activity)) {
-      cerr << "Cannot read activity '" << fname << "'\n";
-      return 1;
-    }
-
-    if (verbose) {
-      cerr << "Read " << activity.size() << " id->activity values from '" << fname
-           << "'\n";
-    }
-
-    Accumulator<double> acc;
-    for (const auto& [_, v] : activity) {
-      acc.extra(v);
-    }
-    mean_activity = acc.average();
-    if (verbose) {
-      cerr << "Values btw " << acc.minval() << " and " << acc.maxval() << " ave "
-           << acc.average() << '\n';
-    }
-  }
-
-  options.set_mean_activity(mean_activity);
-
-  // Mapping from unique smiles to data about the fragment.
-  absl::flat_hash_map<std::string, Fragment> fragment_data;
-
   for (const char* fname : cl) {
-    if (!ReadDicerData(fname, options, activity, fragment_data)) {
-      cerr << "Error reading dicer data '" << fname << "'\n";
+    if (!analysis.Read(fname)) {
       return 1;
     }
   }
-
-  if (verbose) {
-    cerr << "Read information on " << fragment_data.size() << " dicer fragments\n";
-  }
-
-  IWString_and_File_Descriptor output(1);
-  output.reserve(8192);
-
-  static constexpr char kSep = ' ';
-  output << "Frag" << kSep << "Parent" << kSep << "Natoms" << kSep << "N" << kSep
-         << "Fraction" << kSep << "Minval" << kSep << "Ave" << kSep << "Maxval" << kSep
-         << "Diff" << '\n';
-
-  const uint32_t nmolecules = activity.size();
-  for (const auto& [smiles, fragment] : fragment_data) {
-    options.WriteResult(smiles, nmolecules, fragment, output);
-
-    output.write_if_buffer_holds_more_than(4096);
-  }
-  output.flush();
-
-  if (verbose) {
-    options.Report(cerr);
-  }
-
-  return 0;
+  return analysis.Write() ? 0 : 1;
 }
-
 }  // namespace dicer_fragment_activity
 
 int
 main(int argc, char** argv) {
-  int rc = dicer_fragment_activity::Main(argc, argv);
-
-  return rc;
+  return dicer_fragment_activity::Main(argc, argv);
 }

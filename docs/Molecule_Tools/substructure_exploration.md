@@ -105,6 +105,14 @@ For a query file, use `fname: "path/to/query.textproto"`. Relative query filenam
 are resolved from the working directory. Legacy `ncon` and `charge_assigner`
 metadata are recorded but not applied; the script warns if they are supplied.
 
+`--min_matches 1` is the default: only queries matching at least one molecule
+with an activity value are included in the JSON and HTML output. Increase the
+threshold to require more support, or use `--min_matches 0` to retain every
+query, including those with no matches. This counts molecules, not embeddings
+or retained display examples. The global activity statistics still use all
+molecules with activity. Metadata records the total queries, queries reported
+and threshold. HTML rebuilt from JSON uses the queries retained in that JSON.
+
 `--max_examples 3` limits examples retained per feature. `--bins 20` controls the
 common activity histogram bins, and `--count-buckets '0,1,2,3+'` controls the
 multiplicity profiles. Rebuild an HTML report from existing JSON with:
@@ -112,6 +120,18 @@ multiplicity profiles. Rebuild an HTML report from existing JSON with:
 ```shell
 substructure_exploration.sh html exploration.json -o exploration.html
 ```
+
+When rendering existing JSON, `--sort abs_median --top_n 100` selects the
+largest activity separations in either direction. Other sort keys are
+`abs_mean`, `median`, `mean` and `support`; `--ascending` reverses score direction.
+`--min_matches` and `--min_unmatched` can further filter the retained queries.
+By default, the `html` command preserves the stored order and includes all
+stored queries. These options change HTML only and cannot restore queries
+filtered out during analysis.
+
+The molecule-independent report renderer is shared with
+[dicer_fragment_activity](dicer_fragment_activity.md), which analyzes generated
+fragments rather than dictionary queries.
 
 The report compares groups within this dataset. Differences may reflect
 correlated features and chemical series as well as the queried feature.

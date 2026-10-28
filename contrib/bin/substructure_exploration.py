@@ -5,7 +5,6 @@ from __future__ import annotations
 
 import argparse
 import csv
-import html
 import json
 import math
 import statistics
@@ -13,6 +12,8 @@ import sys
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Iterable
+
+from activity_report import SORT_FIELDS, build_html, ranked_rows
 
 from google.protobuf import text_format
 
@@ -383,6 +384,8 @@ def analyse(args: argparse.Namespace) -> dict[str, object]:
 
     results = []
     for ndx, acc in enumerate(accumulators, 1):
+        if len(acc.matched) < args.min_matches:
+            continue
         matched_summary = summary(acc.matched)
         unmatched_summary = summary(acc.unmatched)
         delta_mean = None
@@ -432,6 +435,8 @@ def analyse(args: argparse.Namespace) -> dict[str, object]:
             'molecules_read_with_activity': len(molecules),
             'molecules_missing_activity': missing_activity,
             'queries': len(queries),
+            'queries_reported': len(results),
+            'min_matches': args.min_matches,
             'histogram_bins': args.bins,
             'multiplicity_mode': args.multiplicity,
             'count_buckets': count_buckets,
@@ -443,230 +448,6 @@ def analyse(args: argparse.Namespace) -> dict[str, object]:
         },
         'queries': results,
     }
-
-
-def fmt(value, digits: int = 3) -> str:
-    if value is None:
-        return ''
-    if isinstance(value, int):
-        return str(value)
-    return f"{value:.{digits}f}".rstrip('0').rstrip('.')
-
-
-def simple_histogram_svg(counts: list[int], width: int = 220, height: int = 44) -> str:
-    max_count = max(counts + [1])
-    nbins = max(len(counts), 1)
-    slot = width / nbins
-    bar_width = max(1.0, slot * 0.72)
-    parts = [f'<svg viewBox="0 0 {width} {height}" class="hist global-hist" aria-hidden="true">']
-    parts.append(f'<line x1="0" y1="{height - 1}" x2="{width}" y2="{height - 1}"/>')
-    for i, count in enumerate(counts):
-        h = (count / max_count) * (height - 6)
-        x = i * slot + slot * 0.14
-        y = height - h - 1
-        parts.append(f'<rect x="{x:.2f}" y="{y:.2f}" width="{bar_width:.2f}" height="{h:.2f}"/>')
-    parts.append('</svg>')
-    return ''.join(parts)
-
-
-def histogram_svg(matched: list[int], unmatched: list[int], width: int = 220, height: int = 54) -> str:
-    max_count = max(matched + unmatched + [1])
-    nbins = max(len(matched), 1)
-    slot = width / nbins
-    bar_width = max(1.0, slot * 0.38)
-    parts = [f'<svg viewBox="0 0 {width} {height}" class="hist" aria-hidden="true">']
-    parts.append(f'<line x1="0" y1="{height - 1}" x2="{width}" y2="{height - 1}"/>')
-    for i, count in enumerate(unmatched):
-        h = (count / max_count) * (height - 6)
-        x = i * slot + slot * 0.12
-        y = height - h - 1
-        parts.append(f'<rect class="unmatched" x="{x:.2f}" y="{y:.2f}" width="{bar_width:.2f}" height="{h:.2f}"/>')
-    for i, count in enumerate(matched):
-        h = (count / max_count) * (height - 6)
-        x = i * slot + slot * 0.50
-        y = height - h - 1
-        parts.append(f'<rect class="matched" x="{x:.2f}" y="{y:.2f}" width="{bar_width:.2f}" height="{h:.2f}"/>')
-    parts.append('</svg>')
-    return ''.join(parts)
-
-
-def multiplicity_profiles_html(row: dict[str, object]) -> str:
-    profiles = row['multiplicity']['profiles']
-    parts = ['<div class="count-profiles">']
-    for bucket, profile in profiles.items():
-        s = profile['summary']
-        if s['n'] == 0:
-            continue
-        parts.append(
-            f'<span><b>{html.escape(bucket)}</b> n {s["n"]} med {fmt(s["median"])}</span>'
-        )
-    parts.append('</div>')
-    return ''.join(parts)
-
-
-def examples_html(examples: list[dict[str, object]]) -> str:
-    if not examples:
-        return '<span class="muted">No matched examples</span>'
-    parts = ['<div class="examples">']
-    for example in examples:
-        parts.append('<div class="example">')
-        parts.append(f'<code>{html.escape(str(example["labelled_smiles"]))}</code>')
-        parts.append(
-            '<span>' + html.escape(str(example['identifier'])) +
-            f' activity {fmt(example["activity"])} hits {example["nhits"]}</span>'
-        )
-        parts.append('</div>')
-    parts.append('</div>')
-    return ''.join(parts)
-
-
-def build_html(data: dict[str, object], title: str) -> str:
-    metadata = data['metadata']
-    global_data = data['global']
-    rows = data['queries']
-    parts = ["""<!doctype html>
-<html lang="en">
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-"""]
-    parts.append(f'<title>{html.escape(title)}</title>\n')
-    parts.append("""<style>
-:root { --bg: #f6f7f9; --panel: #fff; --ink: #20242a; --muted: #69707d; --border: #d7dce3; --matched: #246b73; --unmatched: #b7c2cf; --warn: #9b5b00; }
-* { box-sizing: border-box; }
-body { margin: 0; font-family: Arial, Helvetica, sans-serif; background: var(--bg); color: var(--ink); font-size: 14px; }
-header { padding: 18px 24px 12px; background: var(--panel); border-bottom: 1px solid var(--border); }
-h1 { margin: 0 0 6px; font-size: 22px; line-height: 1.2; }
-.summary { margin: 0; color: var(--muted); line-height: 1.4; }
-.toolbar { position: sticky; top: 0; z-index: 20; display: flex; flex-wrap: wrap; gap: 10px; align-items: center; padding: 10px 24px; background: #edf1f4; border-bottom: 1px solid var(--border); }
-.toolbar input { width: min(420px, 100%); padding: 7px 9px; border: 1px solid var(--border); border-radius: 4px; font: inherit; }
-.toolbar button { border: 1px solid var(--border); background: #fff; border-radius: 4px; padding: 7px 10px; font: inherit; cursor: pointer; }
-.status { margin-left: auto; color: var(--muted); }
-main { padding: 16px 24px 32px; }
-.legend { display: flex; gap: 14px; margin-bottom: 12px; color: var(--muted); }
-.legend span::before { content: ''; display: inline-block; width: 12px; height: 12px; margin-right: 5px; vertical-align: -1px; }
-.legend .m::before { background: var(--matched); }
-.legend .u::before { background: var(--unmatched); }
-.table-wrap { overflow-x: auto; border: 1px solid var(--border); background: var(--panel); }
-table { width: 100%; border-collapse: collapse; min-width: 1180px; }
-th, td { border-bottom: 1px solid var(--border); padding: 8px 10px; text-align: left; vertical-align: top; }
-th { background: #dfe6eb; color: #3d4651; font-size: 12px; text-transform: uppercase; letter-spacing: 0; white-space: nowrap; }
-th.sortable { cursor: pointer; }
-td.num { text-align: right; font-variant-numeric: tabular-nums; }
-.name strong { display: block; }
-.name code { display: block; color: var(--muted); font-size: 12px; margin-top: 3px; overflow-wrap: anywhere; }
-.hist { width: 220px; height: 54px; }
-.hist line { stroke: #c7cdd4; stroke-width: 1; }
-.hist .matched { fill: var(--matched); }
-.hist .unmatched { fill: var(--unmatched); }
-.global-hist rect { fill: #7a8794; }
-.global-panel { display: inline-flex; align-items: center; gap: 10px; margin-bottom: 12px; color: var(--muted); }
-.count-profiles { display: grid; gap: 2px; color: var(--muted); font-size: 12px; margin-top: 4px; }
-.warn { color: var(--warn); font-weight: 600; }
-.muted { color: var(--muted); }
-.examples { display: grid; grid-template-columns: repeat(3, minmax(160px, 1fr)); gap: 6px; max-width: 640px; }
-.example { border: 1px solid #e2e5e9; background: #fff; padding: 6px; }
-.example code { display: block; overflow-wrap: anywhere; }
-.example span { display: block; color: var(--muted); font-size: 12px; margin-top: 4px; }
-.hidden { display: none; }
-@media (max-width: 720px) { header, .toolbar, main { padding-left: 12px; padding-right: 12px; } .status { width: 100%; margin-left: 0; } }
-</style>
-</head>
-<body>
-""")
-    parts.append('<header>')
-    parts.append(f'<h1>{html.escape(title)}</h1>')
-    parts.append(
-        '<p class="summary">' +
-        f'{metadata["queries"]} queries, {metadata["molecules_read_with_activity"]} molecules with activity. ' +
-        f'Activity file: <code>{html.escape(str(metadata["activity"]))}</code>. ' +
-        f'Global activity median {fmt(global_data["summary"]["median"])}.</p>'
-    )
-    parts.append('</header>')
-    parts.append("""<div class="toolbar">
-<input id="search" type="search" placeholder="Filter by query name or source" oninput="updateView()">
-<button type="button" onclick="sortTable('delta_median')">Sort delta median</button>
-<button type="button" onclick="sortTable('matched_n')">Sort support</button>
-<button type="button" onclick="sortTable('multi')">Sort multiple hits</button>
-<span id="status" class="status"></span>
-</div>
-<main>
-""")
-    parts.append('<div class="global-panel"><span>Global activity distribution</span>')
-    parts.append(simple_histogram_svg(global_data['histogram']))
-    parts.append('</div>')
-    parts.append('<div class="legend"><span class="m">Matched</span><span class="u">Unmatched</span></div>')
-    parts.append("""<div class="table-wrap">
-<table id="results">
-<thead><tr>
-<th>Query</th><th class="sortable" onclick="sortTable('matched_n')">Matched N</th><th>Matched</th><th>Unmatched</th><th class="sortable" onclick="sortTable('delta_median')">Delta Median</th><th class="sortable" onclick="sortTable('delta_mean')">Delta Mean</th><th class="sortable" onclick="sortTable('multi')">Multiple</th><th>Distribution</th><th>Examples</th>
-</tr></thead>
-<tbody>
-""")
-
-    for row in rows:
-        matched = row['matched']['summary']
-        unmatched = row['unmatched']['summary']
-        multi = row['multiplicity']['molecules_with_multiple_matches']
-        max_hits = row['multiplicity']['max_matches']
-        searchable = f"{row['name']} {row['source']}".lower()
-        parts.append(
-            f'<tr data-search="{html.escape(searchable, quote=True)}" '
-            f'data-matched_n="{matched["n"]}" data-delta_median="{row["delta_median"] if row["delta_median"] is not None else -1e99}" '
-            f'data-delta_mean="{row["delta_mean"] if row["delta_mean"] is not None else -1e99}" data-multi="{multi}">'
-        )
-        parts.append('<td class="name">')
-        parts.append(f'<strong>{html.escape(row["name"])}</strong>')
-        parts.append(f'<code>{html.escape(row["source"])}</code>')
-        parts.append('</td>')
-        parts.append(f'<td class="num">{matched["n"]}</td>')
-        parts.append(f'<td class="num">median {fmt(matched["median"])}<br>mean {fmt(matched["mean"])}</td>')
-        parts.append(f'<td class="num">median {fmt(unmatched["median"])}<br>mean {fmt(unmatched["mean"])}</td>')
-        parts.append(f'<td class="num">{fmt(row["delta_median"])}</td>')
-        parts.append(f'<td class="num">{fmt(row["delta_mean"])}</td>')
-        multi_text = f'{multi}' if multi else '<span class="muted">0</span>'
-        if multi:
-            multi_text += f'<br><span class="muted">max {max_hits}</span>'
-        if metadata.get('multiplicity_mode') == 'count':
-            multi_text += multiplicity_profiles_html(row)
-        parts.append(f'<td class="num">{multi_text}</td>')
-        parts.append('<td>' + histogram_svg(row['matched']['histogram'], row['unmatched']['histogram']) + '</td>')
-        parts.append('<td>' + examples_html(row['examples']) + '</td>')
-        parts.append('</tr>\n')
-    parts.append("""</tbody>
-</table>
-</div>
-</main>
-<script>
-let sortDescending = true;
-function updateView() {
-  const needle = document.getElementById('search').value.toLowerCase();
-  let shown = 0;
-  document.querySelectorAll('#results tbody tr').forEach(row => {
-    const match = row.dataset.search.includes(needle);
-    row.classList.toggle('hidden', !match);
-    if (match) shown += 1;
-  });
-  document.getElementById('status').textContent = shown + ' queries shown';
-}
-function sortTable(key) {
-  const tbody = document.querySelector('#results tbody');
-  const rows = Array.from(tbody.querySelectorAll('tr'));
-  rows.sort((a, b) => {
-    const av = Number(a.dataset[key]);
-    const bv = Number(b.dataset[key]);
-    return sortDescending ? bv - av : av - bv;
-  });
-  sortDescending = !sortDescending;
-  rows.forEach(row => tbody.appendChild(row));
-  updateView();
-}
-updateView();
-</script>
-</body>
-</html>
-""")
-    return ''.join(parts)
 
 
 def write_json(data: dict[str, object], path: str | None) -> None:
@@ -692,8 +473,22 @@ def command_html(args: argparse.Namespace) -> int:
         die(f"Cannot read '{args.input}': {exc}")
     except json.JSONDecodeError as exc:
         die(f"Cannot parse JSON '{args.input}': {exc}")
-    Path(args.output).write_text(build_html(data, args.title))
+    if args.sort is not None or args.top_n:
+        rows = ranked_rows(data, args.sort or 'abs_median', args.ascending,
+                           args.top_n, args.min_matches, args.min_unmatched)
+    else:
+        rows = [row for row in data['queries']
+                if row['matched']['summary']['n'] >= args.min_matches and
+                row['unmatched']['summary']['n'] >= args.min_unmatched]
+    Path(args.output).write_text(build_html(data, args.title, rows=rows))
     return 0
+
+
+def nonnegative_integer(value: str) -> int:
+    result = int(value)
+    if result < 0:
+        raise argparse.ArgumentTypeError('must be a non-negative integer')
+    return result
 
 
 def add_analyse_args(parser: argparse.ArgumentParser) -> None:
@@ -706,6 +501,8 @@ def add_analyse_args(parser: argparse.ArgumentParser) -> None:
     parser.add_argument('--html', help='Optional HTML report written from the same analysis')
     parser.add_argument('--title', default='Substructure Activity Exploration', help='HTML report title')
     parser.add_argument('--bins', type=int, default=20, help='Number of common histogram bins')
+    parser.add_argument('--min_matches', type=nonnegative_integer, default=1,
+                        help='Minimum number of matched molecules for a query to appear in JSON/HTML (default 1; 0 keeps all queries)')
     parser.add_argument('--max_examples', type=int, default=3, help='Matched example molecules retained per query')
     parser.add_argument('--okmissing_activity', action='store_true', help='Allow molecules with no activity value; they are skipped')
     parser.add_argument('--multiplicity', choices=['presence', 'count'], default='presence', help='Primary multiplicity interpretation')
@@ -725,6 +522,15 @@ def main(argv: list[str] | None = None) -> int:
     html_parser.add_argument('input', help='Analysis JSON')
     html_parser.add_argument('-o', '--output', required=True, help='Output HTML file')
     html_parser.add_argument('--title', default='Substructure Activity Exploration', help='HTML report title')
+    html_parser.add_argument('--top_n', type=nonnegative_integer, default=0,
+                             help='Limit HTML rows after ranking (default 0: all)')
+    html_parser.add_argument('--sort', choices=SORT_FIELDS,
+                             help='Rank by effect or support; --top_n defaults to abs_median')
+    html_parser.add_argument('--ascending', action='store_true', help='Rank low to high')
+    html_parser.add_argument('--min_matches', type=nonnegative_integer, default=0,
+                             help='Minimum matched molecules when rendering existing JSON')
+    html_parser.add_argument('--min_unmatched', type=nonnegative_integer, default=0,
+                             help='Minimum unmatched molecules when rendering existing JSON')
     html_parser.set_defaults(func=command_html)
 
     args = parser.parse_args(argv)

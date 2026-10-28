@@ -1,5 +1,8 @@
 #include <algorithm>
 #include <cstdint>
+#include <cstring>
+#include <limits>
+#include <unistd.h>
 
 #ifdef __APPLE__
 #include <machine/endian.h>
@@ -76,6 +79,9 @@ TFDataReader::TFDataReader(const const_IWSubstring& fname) {
 }
 
 TFDataReader::~TFDataReader() {
+  if (_fd >= 0) {
+    close(_fd);
+  }
 }
 
 int
@@ -118,31 +124,25 @@ TFDataReader::OpenFile(const char * fname) {
 // _next is pointing at length data. Retrieve that length.
 std::optional<uint64_t>
 TFDataReader::GetLength() {
-  const uint64_t* lptr = reinterpret_cast<const uint64_t*>(_read_buffer.rawdata() + _next);
-  const uint32_t* crc = reinterpret_cast<const uint32_t*>(_read_buffer.rawdata() + _next + sizeof_length);
-
-#ifdef DEBUG_IW_TF_DATA
-  cerr << "Length " << *lptr  << " crc " << *crc << '\n';
-#else
-  (void) crc;  // keep the compiler quiet.
-#endif
+  // Records are packed without alignment padding. Copy scalar fields rather
+  // than dereferencing potentially unaligned uint64_t/uint32_t pointers.
+  uint64_t length;
+  uint32_t crc;
+  std::memcpy(&length, _read_buffer.rawdata() + _next, sizeof(length));
+  std::memcpy(&crc, _read_buffer.rawdata() + _next + sizeof_length, sizeof(crc));
 #ifdef LILLYMOL_HAS_CRC32C
-  // If using crc32c directly
-  // uint32_t result = crc32c::Crc32c(reinterpret_cast<const char*>(lptr), sizeof_length);
-  // result = MaskedCrc(result);
-
-  const absl::string_view tmp(reinterpret_cast<const char*>(lptr), sizeof_length);
-  const absl::crc32c_t hash = absl::ComputeCrc32c(tmp);
-  const uint32_t result = MaskedCrc(static_cast<uint32_t>(hash));
-  if (result != *crc) {
-    cerr << "TFDataReader::GetLength:crc fails, length " << *lptr << '\n';
-    cerr << result << " vs " << *crc << '\n';
-    _good = 0;
+  const absl::string_view bytes(_read_buffer.rawdata() + _next, sizeof_length);
+  const uint32_t expected = MaskedCrc(static_cast<uint32_t>(absl::ComputeCrc32c(bytes)));
+  if (expected != crc) {
+    cerr << "TFDataReader::GetLength:invalid length CRC\n";
+    _good = false;
     return std::nullopt;
   }
+#else
+  (void) crc;
 #endif
   _next += sizeof_length + sizeof_crc;
-  return *lptr;
+  return length;
 }
 
 std::optional<const_IWSubstring>
@@ -152,33 +152,33 @@ TFDataReader::Next() {
     return std::nullopt;
   }
 
-  // First task is to read the size of the next item.
-  // At a minimum, we need 8+4 bytes for size of next and the crc
-  if(_read_buffer.size() - _next < (sizeof_length + sizeof_crc)) {
-    if (! FillReadBuffer()) {
-      return std::nullopt;
-    }
-    if (_read_buffer.size() - _next < (sizeof_length + sizeof_crc)) {
-      _eof = 1;
+  // EOF is successful only between complete records. A short header or
+  // payload must set good() false, even when the underlying read reached EOF.
+  while (_read_buffer.size() - _next < sizeof_length + sizeof_crc) {
+    if (!FillReadBuffer(sizeof_length + sizeof_crc)) {
+      if (_read_buffer.size() != _next) {
+        cerr << "TFDataReader::Next:truncated record header\n";
+        _good = false;
+      }
       return std::nullopt;
     }
   }
 
-  std::optional<uint64_t> length = GetLength();
-  if (! length) {
+  const std::optional<uint64_t> length = GetLength();
+  if (!length) {
     return std::nullopt;
   }
-#ifdef DEBUG_IW_TF_DATA
-  cerr << "TFDataReader::Next: to read " << *length << " bytes\n";
-#endif
-
-  if (length == 0) {
-    ++_items_read;
-    return const_IWSubstring("");
+  // The backing resizable_array uses int sizes. Reject invalid lengths before
+  // arithmetic, allocation or construction of an out-of-bounds substring.
+  if (*length > static_cast<uint64_t>(std::numeric_limits<int>::max()) - sizeof_crc) {
+    cerr << "TFDataReader::Next:record exceeds buffer size limit\n";
+    _good = false;
+    return std::nullopt;
   }
-
-  if (_next + *length + sizeof_crc > static_cast<uint64_t>(_read_buffer.number_elements())) {
-    if (! FillReadBuffer(*length + sizeof_crc)) {
+  while (_read_buffer.size() - _next < *length + sizeof_crc) {
+    if (!FillReadBuffer(*length + sizeof_crc)) {
+      cerr << "TFDataReader::Next:truncated record data\n";
+      _good = false;
       return std::nullopt;
     }
   }
@@ -193,8 +193,9 @@ TFDataReader::Next() {
   const absl::crc32c_t hash = absl::ComputeCrc32c(absl::string_view(result.data(), *length));
   const uint32_t masked_crc = MaskedCrc(static_cast<uint32_t>(hash));
 
-  const uint32_t * crc = reinterpret_cast<const uint32_t*>(_read_buffer.rawdata() + _next + *length);
-  if (*crc != masked_crc) {
+  uint32_t crc;
+  std::memcpy(&crc, _read_buffer.rawdata() + _next + *length, sizeof(crc));
+  if (crc != masked_crc) {
     cerr << "TFDataReader::Next:Invalid data crc " << *length << " bytes\n";
     _good = 0;
     return std::nullopt;
@@ -334,7 +335,7 @@ TFDataWriter::Write(const void * data, uint64_t nbytes) {
 int
 TFDataWriter::CommonWrite(const void * data, const uint64_t nbytes) {
   const char * p = reinterpret_cast<const char *>(data);
-  if (! _output.write(p, nbytes)) {
+  if (nbytes > 0 && ! _output.write(p, nbytes)) {
     cerr << "TFDataWriter::CommonWrite:cannot write " << nbytes << " bytes\n";
     return 0;
   }
@@ -366,9 +367,7 @@ TFDataWriter::WriteLength(const uint64_t nbytes) {
 
 ssize_t
 TFDataWriter::WriteData(const void * data, uint64_t nbytes) {
-  if (nbytes == 0) {
-    return 1;
-  }
+  // Even an empty payload has a data CRC in TFRecord framing.
   return CommonWrite(data, nbytes);
 }
 

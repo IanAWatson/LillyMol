@@ -1,3 +1,4 @@
+load("@rules_python//python:defs.bzl", "py_test")
 load("@com_google_protobuf//bazel:py_proto_library.bzl", "py_proto_library")
 # load("@rules_python//python:proto.bzl", "py_proto_library")
 load("@rules_cc//cc:defs.bzl", "cc_binary", "cc_proto_library", "cc_library", "cc_test")
@@ -739,6 +740,7 @@ cc_binary(
         "//Foundational/iwaray",
         "//Foundational/iwmisc",
         "@com_google_protobuf//:protobuf",
+        "@com_google_protobuf//:json_util",
     ],
 )
 
@@ -4191,4 +4193,12 @@ cc_test(
         "//Molecule_Lib:moleculeio",
         "@googletest//:gtest_main",
     ],
+)
+
+py_test(
+    name = "dicer_fragment_activity_test",
+    size = "small",
+    srcs = ["dicer_fragment_activity_test.py"],
+    args = ["$(location :dicer_fragment_activity)"],
+    data = [":dicer_fragment_activity"],
 )

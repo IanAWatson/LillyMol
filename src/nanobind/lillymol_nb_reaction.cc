@@ -77,8 +77,10 @@ SidechainName(const IWReaction& reaction, int sidechain_number, int reagent_numb
 
 bool
 AddSidechainReagents(IWReaction& reaction, int sidechain, const char* fname,
-                     FileType file_type, const Sidechain_Match_Conditions& smc) {
-  return reaction.add_sidechain_reagents(sidechain, fname, file_type, smc);
+                     const Sidechain_Match_Conditions& smc,
+                     std::optional<FileType> file_type) {
+  return reaction.add_sidechain_reagents(
+      sidechain, fname, file_type.value_or(FILE_TYPE_INVALID), smc);
 }
 
 bool
@@ -387,8 +389,9 @@ BindReaction(nb::module_& m) {
       .def("set_one_embedding_per_start_atom", &IWReaction::set_one_embedding_per_start_atom,
            nb::arg("value"), "One embedding per start atom")
       .def("add_sidechain_reagents", &AddSidechainReagents, nb::arg("sidechain"),
-           nb::arg("fname"), nb::arg("file_type"), nb::arg("match_conditions"),
-           "Add reagent molecules from a file to a sidechain")
+           nb::arg("fname"), nb::arg("match_conditions"), nb::kw_only(),
+           nb::arg("file_type") = nb::none(),
+           "Add reagents from a file; infer type from filename unless file_type is supplied")
       .def("add_sidechain_reagent", &AddSidechainReagent, nb::arg("sidechain"),
            nb::arg("mol"), nb::arg("match_conditions"),
            "Add a reagent molecule to a sidechain")

@@ -1946,6 +1946,33 @@ sidechain {
         self.assertIsNotNone(product)
         self.assertEqual(product.unique_smiles(), "O=C(Nc1ccc(C)cc1)c1ccccc1")
 
+    def test_reaction_reagent_file_type(self):
+        with tempfile.TemporaryDirectory() as directory:
+            for suffix, explicit in [(".smi", False), (".data", True), (".sdf", True)]:
+                with self.subTest(suffix=suffix, explicit=explicit):
+                    fname = os.path.join(directory, "reagents" + suffix)
+                    with open(fname, "w") as output:
+                        output.write("CN* methylamine\nCCN* ethylamine\n")
+                    reaction = lillymol.Reaction()
+                    self.assertTrue(reaction.construct_from_smirks(
+                        "[c:1][#0:3].[#0:4][*:2]>>[*:1]-[*:2]"))
+                    conditions = lillymol.SidechainMatchConditions()
+                    kwargs = {"file_type": lillymol.FileType.SMI} if explicit else {}
+                    self.assertTrue(reaction.add_sidechain_reagents(
+                        0, fname, conditions, **kwargs))
+                    self.assertEqual(reaction.sidechain_name(0, 0), "methylamine")
+                    self.assertEqual(reaction.sidechain_name(0, 1), "ethylamine")
+
+            fname = os.path.join(directory, "reagents.unknown")
+            with open(fname, "w") as output:
+                output.write("CN* methylamine\n")
+            reaction = lillymol.Reaction()
+            self.assertTrue(reaction.construct_from_smirks(
+                "[c:1][#0:3].[#0:4][*:2]>>[*:1]-[*:2]"))
+            self.assertFalse(reaction.add_sidechain_reagents(0, fname, conditions))
+            with self.assertRaises(TypeError):
+                reaction.add_sidechain_reagents(0, fname, conditions, lillymol.FileType.SMI)
+
     def test_reaction_iterator_and_reagent_names(self):
         core = lillymol.MolFromSmiles("*c1ccccc1 scaffold")
         sidechain = lillymol.MolFromSmiles("CN* methylamine")

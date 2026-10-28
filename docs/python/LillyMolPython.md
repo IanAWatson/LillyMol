@@ -1388,6 +1388,13 @@ or
 ```
 
 ### Multiple Reagents
+`add_sidechain_reagents(sidechain, fname, match_conditions, *, file_type=None)`
+infers the input format from the filename by default. Override it with the
+keyword-only `file_type` argument when the suffix does not identify the format,
+for example `rxn.add_sidechain_reagents(0, 'reagents.dat', conditions,
+file_type=FileType.SMI)`. An explicit type takes precedence over the suffix.
+The method returns `False` if the format cannot be inferred or loading fails.
+
 The reaction object was designed to be able to rapidly enumerate large combinatorial
 libraries. For this reason, it stores precomputed sets of sidechain reagents, which can
 be rapidly added to a new scaffold. We cycle through these sidechains via an
@@ -1402,7 +1409,8 @@ molecules might look like
 ```
   rxn = Reaction()
   rxn.read('/path/to/reaction.textproto')
-  rxn.add_sidechain_reagents(0, '/path/to/r2.smi', FileType.SMI)
+  conditions = SidechainMatchConditions()
+  rxn.add_sidechain_reagents(0, '/path/to/r2.smi', conditions)
 
   matches = rxn.substructure_search_matches(mol)
   if not matches:

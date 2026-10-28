@@ -24,6 +24,9 @@ HEADING_TO_CLASS = {
     'Bond Methods': lillymol.Bond,
     'Set_of_Atoms Methods': lillymol.Set_of_Atoms,
     'Ring Methods': lillymol.Ring,
+    'Reaction Methods': lillymol.Reaction,
+    'ReactionIterator Methods': lillymol.ReactionIterator,
+    'SidechainMatchConditions Methods': lillymol.SidechainMatchConditions,
 }
 
 _NOT_A_METHOD = re.compile(r'^(Method|-+|m1\s|\\?_)')
@@ -83,6 +86,17 @@ def documented_methods(directory):
 
 
 class TestNanobindDocumentedMethodsExist(unittest.TestCase):
+
+  def test_reaction_examples_match_guide(self):
+    guide = os.path.join(docs_directory(), 'reactions.md')
+    with open(guide) as inp:
+      text = inp.read()
+    directory = os.path.join(os.path.dirname(__file__), 'examples', 'reactions')
+    for name in ('in_place', 'per_embedding', 'explicit_reagents', 'enumerate_reagents'):
+      with self.subTest(example=name):
+        with open(os.path.join(directory, name + '.py')) as inp:
+          source = inp.read()
+        self.assertIn('```python\n' + source + '```', text)
 
   def test_every_documented_method_is_bound(self):
     directory = docs_directory()

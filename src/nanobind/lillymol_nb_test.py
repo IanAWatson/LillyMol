@@ -1958,6 +1958,36 @@ sidechain {
         self.assertIsNotNone(product)
         self.assertEqual(product.unique_smiles(), "O=C(Nc1ccc(C)cc1)c1ccccc1")
 
+    def test_reaction_accepts_embedding_lists(self):
+        reaction = lillymol.Reaction()
+        self.assertTrue(reaction.construct_from_smirks("[Cl:1]>>[F:1]"))
+        scaffold = lillymol.MolFromSmiles("ClCCC(Cl)C")
+        matches = reaction.substructure_search_matches(scaffold)
+        self.assertEqual(len(matches), 2)
+        for match in matches:
+            with self.subTest(match=match):
+                reference = reaction.perform_reaction(scaffold, lillymol.Set_of_Atoms(match))
+                product = reaction.perform_reaction(scaffold, match)
+                self.assertIsNotNone(reference)
+                self.assertIsNotNone(product)
+                self.assertEqual(product.unique_smiles(), reference.unique_smiles())
+                output = lillymol.Molecule()
+                self.assertTrue(reaction.perform_reaction(scaffold, match, output))
+                self.assertEqual(output.unique_smiles(), reference.unique_smiles())
+
+    def test_reaction_embedding_list_with_explicit_sidechains(self):
+        for as_list in (True, False):
+            reaction = lillymol.Reaction()
+            self.assertTrue(reaction.construct_from_smirks(
+                "[c:1][#0:3].[#0:4][*:2]>>[*:1]-[*:2]"))
+            scaffold = lillymol.MolFromSmiles("*c1ccccc1")
+            sidechain = lillymol.MolFromSmiles("CN*")
+            match = reaction.substructure_search_matches(scaffold)[0]
+            embedding = match if as_list else lillymol.Set_of_Atoms(match)
+            product = reaction.perform_reaction(scaffold, embedding, [sidechain])
+            self.assertIsNotNone(product)
+            self.assertEqual(product.unique_smiles(), "CNc1ccccc1")
+
     def test_reaction_reagent_file_type(self):
         with tempfile.TemporaryDirectory() as directory:
             for suffix, explicit in [(".smi", False), (".data", True), (".sdf", True)]:
@@ -2010,6 +2040,9 @@ sidechain {
         product = reaction.perform_reaction(core, lillymol.Set_of_Atoms(matches[0]), iterator)
         self.assertIsNotNone(product)
         self.assertEqual(product.unique_smiles(), "CNc1ccccc1")
+        product_from_list = reaction.perform_reaction(core, matches[0], iterator)
+        self.assertIsNotNone(product_from_list)
+        self.assertEqual(product_from_list.unique_smiles(), product.unique_smiles())
 
     def test_gfp_list_read_and_distance(self):
         fname = _write_text_file(CARBON_GFP, suffix=".gfp")

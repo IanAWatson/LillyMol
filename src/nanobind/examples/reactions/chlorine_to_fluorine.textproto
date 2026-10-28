@@ -1,0 +1,8 @@
+name: "Chlorine to fluorine"
+scaffold {
+  smarts: "[Cl]"
+  change_element {
+    atom: 0
+    element: "F"
+  }
+}

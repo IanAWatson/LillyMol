@@ -1336,103 +1336,24 @@ file-generation requirements, storage modes, default-distance behaviour, and C++
 API.
 
 ## Reactions
-Enable reactions via
-```
-from lillymol_query import *
-from lillymol_reaction import *
-```
-The `query` module must be imported first.
 
-Reactions can be build from
+`Reaction` supports in-place transformations, individual products at selected
+scaffold sites, and enumeration with sidechain reagent libraries. Import it
+directly from `lillymol`:
 
-* textproto reaction file
-* smirks
-* MDL reaction file.
+```python
+from lillymol import MolFromSmiles, Reaction
 
-```
-  rxn = Reaction()
-  if not rxn.read('/path/to/rxn.textproto'):
-    logging.error('Cannot read reaction %s...
-```
-or
-```
-  rxn = Reaction()
-  if not rxn.construct_from_smirks(smirks):
-    logging.error('Cannot interpret smirks %s...
-```
-If the reaction is a simple form that has either no sidechains,
-or all sidechains have a single, already specified, reagent, then
-the `in_place_transformations` method can be used.
-```
-  rxn.in_place_transformations(m)
-```
-will perform a reaction to however many substructure matches
-there are in `m`. This may, or may not be what you want. Since
-a reaction inherits from a Substructure_Query object, there are
-methods available for modifying the matching.
-
-For more control over multiple matches, something like this may help
-```
-  rxn = Reaction()
-  rxn.read('/path/to/reaction.textproto')
-  matches = rxn.substructure_search_matches(m)
-  # stop here if zero matches...
-  for match in matches:
-    product = rxn.perform_reaction(m, match)
-    product.set_name(m.name() + ' ' + rxn.name())
-    print(product)
-```
-or
-```
-  [product = rxn.perform_reaction(m, match) for match in matches]
+reaction = Reaction()
+assert reaction.construct_from_smirks("[Cl:1]>>[F:1]")
+molecule = MolFromSmiles("ClCCCCl")
+assert reaction.in_place_transformations(molecule)
+print(molecule.smiles())
 ```
 
-### Multiple Reagents
-`add_sidechain_reagents(sidechain, fname, match_conditions, *, file_type=None)`
-infers the input format from the filename by default. Override it with the
-keyword-only `file_type` argument when the suffix does not identify the format,
-for example `rxn.add_sidechain_reagents(0, 'reagents.dat', conditions,
-file_type=FileType.SMI)`. An explicit type takes precedence over the suffix.
-The method returns the number of reagents added by this call, excluding any
-reagents already loaded. It returns `0` if the format cannot be inferred or
-loading fails.
-
-The reaction object was designed to be able to rapidly enumerate large combinatorial
-libraries. For this reason, it stores precomputed sets of sidechain reagents, which can
-be rapidly added to a new scaffold. We cycle through these sidechains via an
-iterator class. This workflow looks like 
-
-1. Instantiate Reaction
-2. Add reagents to the reaction
-3. Process scaffolds, generating multiple products for each scaffold.
-
-In python, for a reaction with a single sidechain, processing a set of
-molecules might look like
-```
-  rxn = Reaction()
-  rxn.read('/path/to/reaction.textproto')
-  conditions = SidechainMatchConditions()
-  rxn.add_sidechain_reagents(0, '/path/to/r2.smi', conditions)
-
-  matches = rxn.substructure_search_matches(mol)
-  if not matches:
-    logging.error("No matches to %s", mol.name())
-
-  iter = ReactionIterator(rxn)
-
-  for scaffold in reader:
-    iter.reset()
-    while iter.active():
-      for match in matches:
-        product = rxn.perform_reaction(mol, match, iter)
-        # do something with product
-
-      iter++
-```
-The loop involving 'iter.active()' will loop over the reagents stored
-in the reaction. For each such reagent, a product will be formed for
-each embedding of the query in 'm', generating `number_reagents * number_matches`
-products. Some molecules may have differing numbers of matches...
+The [reaction guide](reactions.md) explains construction, matching, reagent
+loading, product generation, and enumeration, with
+[standalone tested examples](../../src/nanobind/examples/reactions/).
 
 ## Formal Charge Assignment
 LillyMol contains a set of formal charge rules primarily developed by Robert F Bruns

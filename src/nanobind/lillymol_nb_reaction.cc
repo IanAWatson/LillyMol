@@ -430,6 +430,27 @@ BindReaction(nb::module_& m) {
       .def("perform_reaction", &PerformReactionWithIterator, nb::arg("scaffold"),
            nb::arg("embedding"), nb::arg("iterator"),
            "Generate product based on embedding and iterator")
+      // Accept search-result lists here without introducing implicit conversion
+      // to Set_of_Atoms throughout the Python API.
+      .def("perform_reaction", [](IWReaction& reaction, Molecule& scaffold,
+                                   const std::vector<int>& embedding, Molecule& product) {
+             return PerformReactionWithProduct(reaction, scaffold, Set_of_Atoms(embedding), product);
+           }, nb::arg("scaffold"), nb::arg("embedding"), nb::arg("product"))
+      .def("perform_reaction", [](IWReaction& reaction, Molecule& scaffold,
+                                   const std::vector<int>& embedding) {
+             return PerformReactionWithEmbedding(reaction, scaffold, Set_of_Atoms(embedding));
+           }, nb::arg("scaffold"), nb::arg("embedding"))
+      .def("perform_reaction", [](IWReaction& reaction, const Molecule& scaffold,
+                                   const std::vector<int>& embedding,
+                                   const Reaction_Iterator& iterator) {
+             return PerformReactionWithIterator(reaction, scaffold, Set_of_Atoms(embedding), iterator);
+           }, nb::arg("scaffold"), nb::arg("embedding"), nb::arg("iterator"))
+      .def("perform_reaction", [](IWReaction& reaction, Molecule& scaffold,
+                                   const std::vector<int>& embedding,
+                                   std::vector<Molecule*> sidechains) {
+             return PerformReactionWithSidechainVectorAndEmbedding(
+                 reaction, scaffold, Set_of_Atoms(embedding), sidechains);
+           }, nb::arg("scaffold"), nb::arg("scaffold_embedding"), nb::arg("sidechains"))
       .def("perform_reaction", &PerformReactionWithSidechain, nb::arg("scaffold"),
            nb::arg("sidechain"), "React scaffold with one sidechain reagent")
       .def("perform_reaction", &PerformReactionWithSidechainVectorAndEmbedding,

@@ -68,7 +68,7 @@ py_test(
     name = "lillymol_doc_test",
     srcs = ["lillymol_nb_doc_test.py"],
     main = "lillymol_nb_doc_test.py",
-    data = [":lillymol"],
+    data = [":lillymol"] + glob(["examples/reactions/*.py"]),
 )
 
 py_test(
@@ -156,5 +156,61 @@ py_test(
         "//BerkeleyDB:iwbdb_load",
         "//Molecule_Tools_Bdb:structure_database_load",
         "//Molecule_Tools_Bdb:substituent_identification",
+    ],
+)
+
+py_test(
+    name = "reaction_in_place_example_test",
+    size = "small",
+    srcs = ["examples/reactions/in_place.py"],
+    main = "examples/reactions/in_place.py",
+    imports = ["."],
+    data = [
+        ":lillymol",
+        "examples/reactions/chlorine_to_fluorine.textproto",
+        "examples/reactions/amide.textproto",
+        "examples/reactions/amines.smi",
+    ],
+)
+
+py_test(
+    name = "reaction_per_embedding_example_test",
+    size = "small",
+    srcs = ["examples/reactions/per_embedding.py"],
+    main = "examples/reactions/per_embedding.py",
+    imports = ["."],
+    data = [
+        ":lillymol",
+        "examples/reactions/chlorine_to_fluorine.textproto",
+        "examples/reactions/amide.textproto",
+        "examples/reactions/amines.smi",
+    ],
+)
+
+py_test(
+    name = "reaction_explicit_reagents_example_test",
+    size = "small",
+    srcs = ["examples/reactions/explicit_reagents.py"],
+    main = "examples/reactions/explicit_reagents.py",
+    imports = ["."],
+    data = [
+        ":lillymol",
+        "examples/reactions/chlorine_to_fluorine.textproto",
+        "examples/reactions/amide.textproto",
+        "examples/reactions/amines.smi",
+    ],
+)
+
+py_test(
+    name = "reaction_enumerate_reagents_example_test",
+    size = "small",
+    srcs = ["examples/reactions/enumerate_reagents.py"],
+    main = "examples/reactions/enumerate_reagents.py",
+    imports = ["."],
+    data = [
+        ":lillymol",
+        "examples/reactions/chlorine_to_fluorine.textproto",
+        "examples/reactions/amide.textproto",
+        "examples/reactions/amines.smi",
     ],
 )

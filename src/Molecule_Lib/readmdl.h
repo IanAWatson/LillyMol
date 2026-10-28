@@ -709,6 +709,7 @@ Molecule::_read_molecule_mdl_trailing_records(
   // Keep compiler warnings at bay
   (void) msal;
   (void) msbl;
+  (void) msmt;
   (void) msbv;
   (void) trailing_lines;
   (void) tags_encountered;

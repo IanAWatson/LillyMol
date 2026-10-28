@@ -941,7 +941,7 @@ Lookup_Calculation_Results::do_lookups_calculate_score(Molecule& m,
 
   int max_radius = 0;
 
-  int nbits = 0;
+  //int nbits = 0;
   for (auto i : _sob) {
     const auto& k = i.first;
 
@@ -953,7 +953,7 @@ Lookup_Calculation_Results::do_lookups_calculate_score(Molecule& m,
 
     //  cerr << "Processing bit at radius " << static_cast<int>(r) << '\n';
 
-    nbits++;
+   // nbits++;
 
 #ifdef DEBUG_DO_LOOKUP_NO_EXAMPLES
     cerr << "Looking up bit " << k._bit << ", radius " << static_cast<int>(k._radius)

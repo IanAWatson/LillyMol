@@ -195,7 +195,7 @@ novartis_polar_suface_area_sulphur (Molecule & m,
   int aromatic_bonds = 0;
   int single_bonds = 0;
   int double_bonds = 0;
-  int triple_bonds = 0;
+  //int triple_bonds = 0;
 
   for (int i = 0; i < ncon; i++)
   {
@@ -207,8 +207,8 @@ novartis_polar_suface_area_sulphur (Molecule & m,
       single_bonds++;
     else if (b->is_double_bond())
       double_bonds++;
-    else
-      triple_bonds++;
+//  else
+//    triple_bonds++;
   }
 
   int hcount = a.implicit_hydrogens();
@@ -1202,7 +1202,7 @@ write_thibault_data(Molecule & parent,
 
     const int acon = a->ncon();
 
-    int connection_to_fragment = 0;
+    //int connection_to_fragment = 0;
 
     for (int k = 0; k < acon; ++k)
     {
@@ -1215,7 +1215,7 @@ write_thibault_data(Molecule & parent,
         continue;
 
       mcopy.set_isotope(l, i + 1);
-      connection_to_fragment++;
+     // connection_to_fragment++;
     }
 
 //  if (0 == connection_to_fragment)

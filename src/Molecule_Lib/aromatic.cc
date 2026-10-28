@@ -7644,11 +7644,15 @@ Molecule::_find_kekule_form_positive_nitrogen(Kekule_Temporary_Arrays & tka)
          << " vary hcount " << tka.vary_hcount()[i] << '\n';
 #endif
 
-    if (aromatic_atoms[i])
+    if (aromatic_atoms[i]) {
       atoms_to_process++;
+    }
   }
 
   assert(atoms_to_process > 0);
+  if (atoms_to_process == 0) [[unlikely]] {
+    return 0;
+  }
 
 #ifdef DEBUG_VARY_NPLUS
   cerr << "Let's see if we can place a positive charge\n";

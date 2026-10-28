@@ -7166,6 +7166,8 @@ Breakages::identify_bonds_to_not_break(Molecule& m) {
     }
   }
 
+  (void) queries_hitting;   // keep compiler quiet, perhaps remove TODO:ianwatson
+
   return _transformations.number_elements();
 }
 

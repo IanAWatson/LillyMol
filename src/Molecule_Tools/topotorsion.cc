@@ -561,13 +561,13 @@ filter_torsions()
 
   int nt = hits.number_elements();
 
-  int torsions_suppressed = 0;
+  //int torsions_suppressed = 0;
 
   if (low) {
     for (int i = 0; i < nt; i++) {
       if (hits[i] <= low) {
         ignore_torsion[i] = 1;
-        torsions_suppressed++;
+        //torsions_suppressed++;
         if (verbose) {
           cerr << "Torsion " << i << " too few hits " << hits[i] << " min " << low
                << '\n';
@@ -593,7 +593,7 @@ filter_torsions()
 
       if (hits[i] >= high) {
         ignore_torsion[i] = 1;
-        torsions_suppressed++;
+        //torsions_suppressed++;
         if (verbose) {
           cerr << "Torsion " << i << " too many hits " << hits[i] << " max " << high
                << '\n';

@@ -2692,7 +2692,7 @@ int
 SubstituentIdentification::_matched_pairs_qsar_db(Molecule& m, const atom_number_t zatom,
                                                   FragmentLost& fragment_lost,
                                                   IW_STL_Hash_Set& smiles_already_found,
-                                                  struct Dbt& dbkey, int radius, MMP_Related& mmp,
+                                                  class Dbt& dbkey, int radius, MMP_Related& mmp,
                                                   IWString_and_File_Descriptor& output) {
   Dbt fromdb;
 

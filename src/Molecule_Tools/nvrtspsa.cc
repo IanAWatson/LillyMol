@@ -266,7 +266,7 @@ novartis_polar_surface_area_sulphur(const nvrtspsa::NovartisPolarSurfaceArea& op
   int aromatic_bonds = 0;
   int single_bonds = 0;
   int double_bonds = 0;
-  int triple_bonds = 0;
+  // int triple_bonds = 0;
 
 //return 0.0;
 
@@ -280,7 +280,7 @@ novartis_polar_surface_area_sulphur(const nvrtspsa::NovartisPolarSurfaceArea& op
     } else if (b->is_double_bond()) {
       double_bonds++;
     } else {
-      triple_bonds++;
+      // triple_bonds++;
     }
   }
 

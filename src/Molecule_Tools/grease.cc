@@ -450,8 +450,6 @@ grease (Molecule & m,
 // At this stage, we should update the various counts for atoms identified by the search(es)
 // Consider substructure stuff not really implemented yet....
 
-  int rc = 0;
-
   int small_hydrophobic_sections = 0;  // those smaller than min size
   int hydrophillic_atoms = 0;
   int hydrophobic_atoms = 0;
@@ -477,7 +475,7 @@ grease (Molecule & m,
       cerr << "Begin grease identification with atom " << i << endl;
 #endif
 
-      rc += tmp->identify_grease (m, z, i, id, grease_id);
+      tmp->identify_grease (m, z, i, id, grease_id);
       hydrophobic_atoms += tmp->number_elements ();
 
       if (tmp->number_elements () < min_grease_size)

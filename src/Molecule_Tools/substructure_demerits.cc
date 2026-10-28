@@ -787,14 +787,14 @@ alkyl_halides(const Molecule& m, Demerit& demerit, const atomic_number_t* mz,
 
   int matoms = m.natoms();
   //int nbromine = 0;
-  int nchlorine = 0;
+  //int nchlorine = 0;
   for (int i = 0; i < matoms; i++) {
     if (1 != ncon[i]) {
       continue;
     }
 
     if (17 == mz[i]) {
-      nchlorine++;
+      //nchlorine++;
     } else if (35 == mz[i]) {
       //nbromine++;
     } else if (53 == mz[i])

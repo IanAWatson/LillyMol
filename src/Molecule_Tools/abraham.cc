@@ -1401,11 +1401,11 @@ abraham(Molecule &m, int *already_hit, int *isotope, Queries_and_Additive_Models
 
   Molecule_to_Match target(&m);
 
-  int failures = 0;
+  // int failures = 0;
 
   for (auto i = 0; i < number_query_sets; ++i) {
     if (!models[i].process(m, target, already_hit, isotope, v)) {
-      failures++;
+      // failures++;
     }
 
     if (nullptr != int_output_for_fingerprints) {

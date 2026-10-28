@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <memory>
+#include <limits>
 #include <vector>
 
 #include "Molecule_Lib/atom_typing.h"
@@ -727,4 +728,139 @@ TEST(Chemotypes, FixedExitIsotopeWithoutComplementOutput) {
     labelled += m.isotope(i) == 99;
   }
   EXPECT_EQ(labelled, 1);
+}
+
+TEST(Chemotypes, RingIsotopesFollowSelectionOrderAndRepeatLast) {
+  Molecule m;
+  ASSERT_TRUE(m.build_from_smiles("N1CCC(c2ccccc2)C(C2CC2)C1"));
+  resizable_array_p<Substructure_Query> queries;
+  AddSmarts(queries, "[N]");
+  chemotypes::ChemotypeOptions options;
+  options.adjacent_ring_systems_to_include = 2;
+  options.ring_isotopes = {10, 20};
+  chemotypes::ChemotypeScratch scratch;
+  chemotypes::ChemotypeQueryMatch match;
+  ASSERT_EQ(chemotypes::ReduceToChemotype(m, queries, options, scratch, match),
+            chemotypes::ChemotypeQueryMatchStatus::kMatched);
+  ASSERT_EQ(m.natoms(), 15);
+  int seed_atoms = 0;
+  int adjacent_atoms = 0;
+  for (int atom = 0; atom < m.natoms(); ++atom) {
+    if (match.ring_system[atom] == match.seed_ring_system) {
+      EXPECT_EQ(m.isotope(atom), 10u);
+      ++seed_atoms;
+    } else {
+      EXPECT_EQ(m.isotope(atom), 20u);
+      ++adjacent_atoms;
+    }
+  }
+  EXPECT_EQ(seed_atoms, 6);
+  EXPECT_EQ(adjacent_atoms, 9);
+}
+
+TEST(Chemotypes, DistinctBasesForAdjacentSystems) {
+  Molecule m;
+  ASSERT_TRUE(m.build_from_smiles("N1CCC(c2ccccc2)C(C2CC2)C1"));
+  resizable_array_p<Substructure_Query> queries;
+  AddSmarts(queries, "[N]");
+  chemotypes::ChemotypeOptions options;
+  options.adjacent_ring_systems_to_include = 2;
+  options.ring_isotopes = {10, 20, 30, 40};
+  chemotypes::ChemotypeScratch scratch;
+  chemotypes::ChemotypeQueryMatch match;
+  ASSERT_EQ(chemotypes::ReduceToChemotype(m, queries, options, scratch, match),
+            chemotypes::ChemotypeQueryMatchStatus::kMatched);
+  auto adjacent = chemotypes::DirectlyAdjacentRingSystems(
+      m, match.ring_system.data(), match.seed_ring_system, match.embedding);
+  ASSERT_EQ(adjacent.size(), 2u);
+  for (int atom = 0; atom < m.natoms(); ++atom) {
+    const int system = match.ring_system[atom];
+    const isotope_t expected = system == match.seed_ring_system ? 10 :
+        (system == adjacent[0].ring_system ? 20 : 30);
+    EXPECT_EQ(m.isotope(atom), expected);
+  }
+}
+
+TEST(Chemotypes, RingBoundaryBaseAddedOnlyOnceAndComplementHasNoBase) {
+  Molecule m;
+  ASSERT_TRUE(m.build_from_smiles("CC1(C)CCNCC1"));
+  resizable_array_p<Substructure_Query> queries;
+  AddSmarts(queries, "[N]");
+  chemotypes::ChemotypeOptions options;
+  options.ring_isotopes = {10};
+  options.isotope_for_exit_points = 2;
+  chemotypes::ChemotypeScratch scratch;
+  chemotypes::ChemotypeQueryMatch match;
+  Molecule complement;
+  ASSERT_EQ(chemotypes::ReduceToChemotype(m, queries, options, scratch, match,
+                                        nullptr, &complement),
+            chemotypes::ChemotypeQueryMatchStatus::kMatched);
+  ASSERT_EQ(m.natoms(), 6);
+  EXPECT_EQ(m.isotope(0), 12u);
+  for (int atom = 1; atom < m.natoms(); ++atom) {
+    EXPECT_EQ(m.isotope(atom), 10u);
+  }
+  ASSERT_EQ(complement.natoms(), 2);
+  EXPECT_EQ(complement.isotope(0), 2u);
+  EXPECT_EQ(complement.isotope(1), 2u);
+}
+
+TEST(Chemotypes, RingBasesDoNotExtendToRetainedAttachmentAtoms) {
+  Molecule m;
+  ASSERT_TRUE(m.build_from_smiles("CCN1CCCCC1"));
+  resizable_array_p<Substructure_Query> queries;
+  AddSmarts(queries, "[N]");
+  chemotypes::ChemotypeOptions options;
+  options.ring_isotopes = {10};
+  options.isotope_for_exit_points = 2;
+  options.include_attached_atoms = 1;
+  chemotypes::ChemotypeScratch scratch;
+  chemotypes::ChemotypeQueryMatch match;
+  ASSERT_EQ(chemotypes::ReduceToChemotype(m, queries, options, scratch, match),
+            chemotypes::ChemotypeQueryMatchStatus::kMatched);
+  ASSERT_EQ(m.natoms(), 7);
+  EXPECT_EQ(m.isotope(0), 2u);
+  for (int atom = 1; atom < m.natoms(); ++atom) {
+    EXPECT_EQ(m.isotope(atom), 10u);
+  }
+}
+
+TEST(Chemotypes, FusedAndSpiroSystemsShareOneBase) {
+  for (const char* smiles : {"C1CCC2CCCCC2C1", "C1CCC2(CC1)CCCC2"}) {
+    Molecule m;
+    ASSERT_TRUE(m.build_from_smiles(smiles));
+    m.set_isotope(0, 13);
+    resizable_array_p<Substructure_Query> queries;
+    AddSmarts(queries, "[C]");
+    chemotypes::ChemotypeOptions options;
+    options.ring_isotopes = {7, 20};
+    chemotypes::ChemotypeScratch scratch;
+    chemotypes::ChemotypeQueryMatch match;
+    ASSERT_EQ(chemotypes::ReduceToChemotype(m, queries, options, scratch, match),
+              chemotypes::ChemotypeQueryMatchStatus::kMatched);
+    for (int atom = 0; atom < m.natoms(); ++atom) {
+      EXPECT_EQ(m.isotope(atom), 7u);
+    }
+  }
+}
+
+TEST(Chemotypes, InvalidRingIsotopeOptionsLeaveMoleculeUnchanged) {
+  Molecule m;
+  ASSERT_TRUE(m.build_from_smiles("CN1CCCCC1"));
+  const IWString before = m.smiles();
+  resizable_array_p<Substructure_Query> queries;
+  AddSmarts(queries, "[N]");
+  chemotypes::ChemotypeOptions options;
+  options.ring_isotopes = {10};
+  Atom_Typing_Specification typing;
+  ASSERT_TRUE(typing.build("Z"));
+  chemotypes::ChemotypeScratch scratch;
+  chemotypes::ChemotypeQueryMatch match;
+  EXPECT_EQ(chemotypes::ReduceToChemotype(m, queries, options, scratch, match, &typing),
+            chemotypes::ChemotypeQueryMatchStatus::kInvalidOptions);
+  options.ring_isotopes = {std::numeric_limits<isotope_t>::max()};
+  options.isotope_for_exit_points = 1;
+  EXPECT_EQ(chemotypes::ReduceToChemotype(m, queries, options, scratch, match),
+            chemotypes::ChemotypeQueryMatchStatus::kInvalidOptions);
+  EXPECT_EQ(m.smiles(), before);
 }

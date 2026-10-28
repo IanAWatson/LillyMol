@@ -3,6 +3,7 @@
 #include <cstdlib>
 #include <iostream>
 #include <memory>
+#include <limits>
 #include <string>
 #include <vector>
 
@@ -186,6 +187,41 @@ ParseDashYQualifier(const const_IWSubstring& qualifier,
   return 0;
 }
 
+// Ring bases and the fixed boundary isotope are independent -I qualifiers.
+int
+ParseIsotopeQualifier(const const_IWSubstring& qualifier,
+                       chemotypes::ChemotypeOptions& options) {
+  const uint64_t max_isotope = std::numeric_limits<isotope_t>::max();
+  if (!qualifier.starts_with("ring=")) {
+    uint64_t isotope;
+    if (!qualifier.numeric_value(isotope) || isotope == 0 || isotope > max_isotope) {
+      cerr << "Invalid boundary isotope (-I) '" << qualifier << "'\n";
+      return 0;
+    }
+    options.isotope_for_exit_points = static_cast<isotope_t>(isotope);
+    return 1;
+  }
+
+  const_IWSubstring values(qualifier);
+  values.remove_leading_chars(5);
+  if (!options.ring_isotopes.empty() || values.empty() || values.starts_with(',') ||
+      values.ends_with(',') || values.contains(",,")) {
+    cerr << "Specify one nonempty list of ring isotopes (-I ring=...)\n";
+    return 0;
+  }
+  const_IWSubstring token;
+  int i = 0;
+  while (values.nextword(token, i, ',')) {
+    uint64_t isotope;
+    if (!token.numeric_value(isotope) || isotope > max_isotope) {
+      cerr << "Invalid ring isotope (-I) '" << token << "'\n";
+      return 0;
+    }
+    options.ring_isotopes.push_back(static_cast<isotope_t>(isotope));
+  }
+  return !options.ring_isotopes.empty();
+}
+
 void
 Usage(int rc) {
 // clang-format off
@@ -210,6 +246,8 @@ Options:
  -t             with -n, include all adjacent ring systems tied at the cutoff distance.
  -P <atype>     atom typing specification; non-terminal attachment atoms become labelled.
  -I <iso>       label both endpoints of chemotype boundary bonds with isotope <iso>; incompatible with -P.
+ -I ring=i,j    ring-system isotope bases: seed first, then selected adjacent systems; repeat last.
+                May combine with numeric -I; boundary labels add to ring bases. Incompatible with -P.
  -C <stem>      write excluded atoms to a separate output stem; uses -o types.
  -J FP<tag>     generate fixed-width linear fingerprint of chemotype atoms.
  -J NC<tag>     generate non-colliding EC fingerprint of chemotype atoms.
@@ -504,13 +542,18 @@ Options::Initialise(Command_Line& cl) {
   }
 
 
-  if (cl.option_present('I')) {
-    uint64_t iso;
-    if (! cl.value('I', iso) || iso == 0) {
-      cerr << "The exit point isotope (-I) must be a positive integer\n";
+  const_IWSubstring isotope_qualifier;
+  for (int i = 0; cl.value('I', isotope_qualifier, i); ++i) {
+    if (!ParseIsotopeQualifier(isotope_qualifier, _chemotype_options)) {
       return 0;
     }
-    _chemotype_options.isotope_for_exit_points = static_cast<isotope_t>(iso);
+  }
+  for (isotope_t base : _chemotype_options.ring_isotopes) {
+    if (base > std::numeric_limits<isotope_t>::max() -
+                   _chemotype_options.isotope_for_exit_points) {
+      cerr << "Ring base plus boundary isotope exceeds isotope range\n";
+      return 0;
+    }
   }
 
   if (cl.option_present('P')) {
@@ -529,6 +572,11 @@ Options::Initialise(Command_Line& cl) {
     _atom_typing_ptr = &_atom_typing;
   }
 
+
+  if (!_chemotype_options.ring_isotopes.empty() && _atom_typing_ptr != nullptr) {
+    cerr << "Ring isotope bases (-I ring=...) cannot be used with atom typing (-P)\n";
+    return 0;
+  }
 
   if (_chemotype_options.isotope_for_exit_points != 0 && _atom_typing_ptr != nullptr &&
       ! fingerprinting_active()) {
@@ -601,6 +649,13 @@ Options::Initialise(Command_Line& cl) {
     }
     if (_atom_typing_ptr != nullptr) {
       cerr << "Will label non-terminal attachment atoms with atom types\n";
+    }
+    if (!_chemotype_options.ring_isotopes.empty()) {
+      cerr << "Ring-system isotope bases";
+      for (isotope_t base : _chemotype_options.ring_isotopes) {
+        cerr << ' ' << base;
+      }
+      cerr << "; repeating last base for additional systems\n";
     }
     if (_chemotype_options.isotope_for_exit_points != 0) {
       cerr << "Will label chemotype boundary atoms with isotope "
@@ -753,6 +808,10 @@ Options::ProcessFingerprint(Molecule& m, IWString_and_File_Descriptor& output) {
            << "', use -z first to use the first embedding\n";
       return 0;
 
+    case chemotypes::ChemotypeQueryMatchStatus::kInvalidOptions:
+      cerr << "Invalid chemotype isotope options\n";
+      return 0;
+
     case chemotypes::ChemotypeQueryMatchStatus::kAtomTypingFailed:
       ++_atom_typing_failures;
       cerr << "Atom typing failed for '" << m.name() << "'\n";
@@ -876,6 +935,10 @@ Options::Process(Molecule& m, Molecule_Output_Object& output) {
            << "', use -z first to use the first embedding\n";
       return 0;
 
+    case chemotypes::ChemotypeQueryMatchStatus::kInvalidOptions:
+      cerr << "Invalid chemotype isotope options\n";
+      return 0;
+
     case chemotypes::ChemotypeQueryMatchStatus::kAtomTypingFailed:
       ++_atom_typing_failures;
       cerr << "Atom typing failed for '" << m.name() << "'\n";
@@ -892,7 +955,7 @@ DicerIsotope(const chemotypes::ChemotypeOptions& options,
     return dicer_data::ATYPE;
   }
 
-  if (options.isotope_for_exit_points != 0) {
+  if (options.isotope_for_exit_points != 0 || !options.ring_isotopes.empty()) {
     return dicer_data::ATT;
   }
 

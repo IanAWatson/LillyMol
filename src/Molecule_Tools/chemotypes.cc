@@ -372,7 +372,14 @@ AddAttachedAtoms(Molecule& m, const std::vector<int>& ring_system,
 
 void
 ApplyExitPointIsotopes(Molecule& m, const std::vector<int>& keep,
-                       isotope_t isotope) {
+                       isotope_t isotope, const std::vector<isotope_t>& ring_bases) {
+  // Establish ring bases before assigning boundary labels. Assign the final
+  // sum, rather than incrementing, because an atom can have several cuts.
+  for (int atom = 0; atom < static_cast<int>(ring_bases.size()); ++atom) {
+    if (keep[atom] && m.is_ring_atom(atom)) {
+      m.set_isotope(atom, ring_bases[atom]);
+    }
+  }
   if (isotope == 0) {
     return;
   }
@@ -387,7 +394,7 @@ ApplyExitPointIsotopes(Molecule& m, const std::vector<int>& keep,
     for (const Bond* bond : m[atom]) {
       const atom_number_t other = bond->other(atom);
       if (! keep[other]) {
-        m.set_isotope(atom, isotope);
+        m.set_isotope(atom, isotope + (ring_bases.empty() ? 0 : ring_bases[atom]));
         m.set_isotope(other, isotope);
       }
     }
@@ -583,9 +590,13 @@ DirectlyAdjacentRingSystems(Molecule& m, const int* ring_system, int seed_ring_s
 
 std::vector<int>
 ChemotypeAtomMask(Molecule& m, const ChemotypeQueryMatch& match,
-                  const ChemotypeOptions& options, ChemotypeScratch& scratch) {
+                  const ChemotypeOptions& options, ChemotypeScratch& scratch,
+                  std::vector<isotope_t>* ring_bases) {
   const int matoms = m.natoms();
   std::vector<int> result(matoms, kChemotypeNotKept);
+  if (ring_bases != nullptr) {
+    ring_bases->assign(matoms, 0);
+  }
 
   if (match.seed_ring_system <= 0 ||
       match.ring_system.size() != static_cast<size_t>(matoms)) {
@@ -611,10 +622,11 @@ ChemotypeAtomMask(Molecule& m, const ChemotypeQueryMatch& match,
   ResizeAdjacentRingSystems(adjacent, adjacent_ring_systems_to_include,
                             options.include_tied_adjacent_ring_systems);
 
+  int region = 2;  // 1 is the seed; retain selection order for isotope bases.
   for (const AdjacentRingSystem& ring_system : adjacent) {
     if (ring_system.ring_system >= 0 &&
         ring_system.ring_system < static_cast<int>(selected_ring_system.size())) {
-      selected_ring_system[ring_system.ring_system] = 1;
+      selected_ring_system[ring_system.ring_system] = region++;
     }
   }
 
@@ -623,6 +635,11 @@ ChemotypeAtomMask(Molecule& m, const ChemotypeQueryMatch& match,
     if (r > 0 && r < static_cast<int>(selected_ring_system.size()) &&
         selected_ring_system[r]) {
       result[atom] = kChemotypeCoreAtom;
+      if (ring_bases != nullptr && !options.ring_isotopes.empty()) {
+        const size_t index = selected_ring_system[r] - 1;
+        (*ring_bases)[atom] = options.ring_isotopes[
+            std::min(index, options.ring_isotopes.size() - 1)];
+      }
     }
   }
 
@@ -667,6 +684,16 @@ ReduceToChemotype(Molecule& m, resizable_array_p<Substructure_Query>& queries,
   if (complement != nullptr) {
     *complement = Molecule();
   }
+  if (!options.ring_isotopes.empty()) {
+    if (atom_typing != nullptr) {
+      return ChemotypeQueryMatchStatus::kInvalidOptions;
+    }
+    for (isotope_t base : options.ring_isotopes) {
+      if (base > std::numeric_limits<isotope_t>::max() - options.isotope_for_exit_points) {
+        return ChemotypeQueryMatchStatus::kInvalidOptions;
+      }
+    }
+  }
   if (atom_typing != nullptr && ! ApplyAtomTypeIsotopes(m, *atom_typing)) {
     return ChemotypeQueryMatchStatus::kAtomTypingFailed;
   }
@@ -677,11 +704,13 @@ ReduceToChemotype(Molecule& m, resizable_array_p<Substructure_Query>& queries,
     return status;
   }
 
-  std::vector<int> keep = ChemotypeAtomMask(m, match, options, scratch);
+  std::vector<isotope_t> ring_bases;
+  std::vector<int> keep = ChemotypeAtomMask(
+      m, match, options, scratch, options.ring_isotopes.empty() ? nullptr : &ring_bases);
   if (atom_typing != nullptr) {
     UnsetIsotopesAddAdjacent(m, keep);
-  } else if (options.isotope_for_exit_points != 0) {
-    ApplyExitPointIsotopes(m, keep, options.isotope_for_exit_points);
+  } else if (options.isotope_for_exit_points != 0 || !ring_bases.empty()) {
+    ApplyExitPointIsotopes(m, keep, options.isotope_for_exit_points, ring_bases);
   }
 
   if (complement != nullptr) {

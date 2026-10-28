@@ -140,6 +140,36 @@ No record is written for an empty complement. `-C` requires a separate file
 stem and cannot be used with fingerprint output. A fixed isotope marks sites;
 it does not uniquely pair multiple connections.
 
+### Ring-system isotope bases
+
+Use `-I ring=i,j,k` to label each selected ring system with a base isotope:
+
+```shell
+chemotypes -s '[N]' -n 1 -I ring=10,20 -I 1 -i smi input.smi > labelled.smi
+```
+
+The first base labels all atoms in the seed ring system. Subsequent bases label
+additional systems in their existing selection order, including the ordering
+selected by `-Y larger`. Fused and spiro-connected rings form one system. If the
+list is shorter than the selected systems, its last value is repeated; extra
+values are unused. Zero is allowed as a ring base. Ring bases replace existing
+isotopes on those ring atoms. Linkers, exocyclic atoms and optional retained
+attachment atoms do not receive a ring base.
+
+Numeric `-I` can be combined with `-I ring=...` in either order. The boundary
+isotope is added to the base once per boundary atom, even when several bonds
+are cut there. For bases `10,20` and `-I 1`, ordinary ring atoms receive `10` or
+`20`, and boundary ring atoms receive `11` or `21`. Non-ring boundary atoms and
+complement endpoints receive `1`. Without numeric `-I`, only the ring bases are
+applied. Choose sufficiently separated bases if distinct regions must remain
+distinguishable after adding boundary labels.
+
+Ring bases are incompatible with `-P` and fingerprint output (`-J`). They affect
+unique SMILES, chemotype accumulation and hashes. Equally ranked systems can be
+ordered by input atom numbers, so distinct bases encode selection order rather
+than canonical chemical roles. Isotope sums exceeding the supported range are
+rejected. Only one `-I ring=...` list may be specified.
+
 Use `-u` to retain one-hop atoms attached to retained ring atoms without
 applying atom-type labels:
 
@@ -320,7 +350,8 @@ single-ring molecules should simply be skipped.
 | `-u` | Include one-hop atoms attached to retained ring atoms. |
 | `-x` | With `-u`, ignore singly connected attached atoms. |
 | `-C <stem>` | Write excluded atoms to a separate output stem using the `-o` types. |
-| `-I <iso>` | Label retained boundary atoms, and complement endpoints, with isotope `iso`. Incompatible with `-P`. |
+| `-I <iso>` | Label retained boundary atoms, and complement endpoints, with isotope `iso`; additive with ring bases. Incompatible with `-P`. |
+| `-I ring=i,j,k` | Label seed and selected adjacent ring systems with isotope bases; repeat the last base when needed. Incompatible with `-P` and `-J`. |
 | `-P <atype>` | Atom typing specification for retained non-terminal attachment atoms; also controls fingerprint atom types when `-J` is active. |
 | `-J FP<tag>` | Write a fixed-width linear fingerprint of the chemotype atom set. |
 | `-J NC<tag>` | Write a non-colliding counted EC fingerprint of the chemotype atom set; trailing digits set the EC radius. |

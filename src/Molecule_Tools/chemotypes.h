@@ -25,6 +25,7 @@ enum class ChemotypeQueryMatchStatus {
   kMatchedQueryNoRingAtom,
   kAmbiguousQueryMatches,
   kAtomTypingFailed,
+  kInvalidOptions,
 };
 
 struct ChemotypeOptions {
@@ -38,6 +39,8 @@ struct ChemotypeOptions {
   bool prefer_larger_adjacent_ring_system = false;
   bool choose_first_embedding = false;
   isotope_t isotope_for_exit_points = 0;
+  // Seed system first, then selected adjacent systems. Repeat the last base.
+  std::vector<isotope_t> ring_isotopes;
 };
 
 
@@ -108,7 +111,8 @@ std::vector<AdjacentRingSystem> DirectlyAdjacentRingSystems(
 // double-bonded atoms and one-hop attachment atoms are controlled by options.
 std::vector<int> ChemotypeAtomMask(Molecule& m, const ChemotypeQueryMatch& match,
                                    const ChemotypeOptions& options,
-                                   ChemotypeScratch& scratch);
+                                   ChemotypeScratch& scratch,
+                                   std::vector<isotope_t>* ring_bases = nullptr);
 
 std::vector<int> ChemotypeAtomMask(Molecule& m, const ChemotypeQueryMatch& match,
                                    const ChemotypeOptions& options);
@@ -124,6 +128,8 @@ std::vector<int> ChemotypeAtomMask(Molecule& m, const ChemotypeQueryMatch& match
 // removed so full-molecule context is available. If supplied, complement receives
 // the excluded atoms with the parent name; it is empty on a failed match or when
 // all atoms are retained. Fixed exit isotopes label both endpoints of each cut.
+// Ring bases replace existing ring isotopes and add to fixed boundary labels.
+// Atom typing and ring bases are incompatible; invalid options are rejected.
 ChemotypeQueryMatchStatus ReduceToChemotype(
     Molecule& m, resizable_array_p<Substructure_Query>& queries,
     const ChemotypeOptions& options, ChemotypeScratch& scratch,

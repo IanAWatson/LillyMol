@@ -4202,3 +4202,11 @@ py_test(
     args = ["$(location :dicer_fragment_activity)"],
     data = [":dicer_fragment_activity"],
 )
+
+py_test(
+    name = "chemotypes_cli_test",
+    size = "small",
+    srcs = ["chemotypes_cli_test.py"],
+    args = ["$(location :chemotypes)"],
+    data = [":chemotypes"],
+)

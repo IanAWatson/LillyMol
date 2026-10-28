@@ -145,7 +145,7 @@ TEST(SubstituentIdentificationLookup, DonorContextSmartsMatchesProducts) {
     EXPECT_GE(std::count(replacement.context_smarts.begin(), replacement.context_smarts.end(), '['), 2);
     Molecule_to_Match target(&replacement.molecule);
     Substructure_Results matches;
-    EXPECT_GT(query.substructure_search(target, matches), 0)
+    EXPECT_GT(query.substructure_search(target, matches), 0u)
         << replacement.context_smarts << " in " << replacement.smiles;
   }
   // Failed replacement opens preserve the original read-only handle.

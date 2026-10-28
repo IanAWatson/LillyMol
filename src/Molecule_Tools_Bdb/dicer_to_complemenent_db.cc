@@ -550,7 +550,7 @@ Main(int argc, char** argv) {
     Usage(1);
   }
 
-  const int verbose = cl.option_count('v');
+  // const int verbose = cl.option_count('v');
 
   Options options;
   if (! options.Initialise(cl)) {

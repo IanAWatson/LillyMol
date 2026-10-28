@@ -287,7 +287,7 @@ Ring_Extraction_Replacement_Conditions::identify_atoms_associated_with_ring_syst
 
   Set_of_Atoms to_be_added;
 
-  int join_to_ring_atom = 0;
+  // int join_to_ring_atom = 0;
 
   int isotopes_set = 0;
 
@@ -318,7 +318,7 @@ Ring_Extraction_Replacement_Conditions::identify_atoms_associated_with_ring_syst
         to_be_added.add(k);
       else   // something outside the ring
       {
-        join_to_ring_atom++;
+        // join_to_ring_atom++;
         if (_isotope_for_substitution_points) {
           m.set_isotope(i, _isotope_for_substitution_points);
           ++isotopes_set;

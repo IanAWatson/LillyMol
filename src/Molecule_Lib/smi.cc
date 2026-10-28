@@ -422,7 +422,8 @@ Molecule::ParseCoords(const const_IWSubstring& chemaxon, int* claimed) {
       return 0;
     }
     values.resize_keep_storage(0);
-    for (int j = 0, xyz = 0; atom_token.nextword(coord_token, j, ','); ++xyz) {
+    int j = 0;
+    while (atom_token.nextword(coord_token, j, ',')) {
       coord_t value;
       if (!coord_token.numeric_value(value)) {
         cerr << "Molecule::ParseCoords:invalid numeric '" << coord_token << "'\n";
@@ -1839,7 +1840,7 @@ Molecule::_build_from_smiles(const char* smiles, int characters_to_process,
 
   int paren_level = 0;
 
-  int fragments_found = 0;
+  // int fragments_found = 0;
 
   while (characters_processed < characters_to_process) {
     const char* s = smiles + characters_processed;
@@ -2091,7 +2092,7 @@ Molecule::_build_from_smiles(const char* smiles, int characters_to_process,
       previous_atom = kInvalidAtomNumber;
       previous_token_was = PREVIOUS_TOKEN_DOT;
       characters_processed++;
-      fragments_found++;
+      // fragments_found++;
     } else if (characters_processed && ('/' == *s)) {
       if (!previous_token_should_be(previous_token_was,
                                     PREVIOUS_TOKEN_ATOM_SPECIFIER |

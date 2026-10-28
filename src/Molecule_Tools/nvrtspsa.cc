@@ -200,7 +200,7 @@ novartis_polar_surface_area_oxygen(const nvrtspsa::NovartisPolarSurfaceArea& opt
   int aromatic_bonds = 0;
   int single_bonds = 0;
   int double_bonds = 0;
-  int triple_bonds = 0;
+  // int triple_bonds = 0;
 
   for (int i = 0; i < ncon; i++) {
     const Bond *b = a[i];
@@ -212,7 +212,7 @@ novartis_polar_surface_area_oxygen(const nvrtspsa::NovartisPolarSurfaceArea& opt
     } else if (b->is_double_bond()) {
       double_bonds++;
     } else {
-      triple_bonds++;
+      // triple_bonds++;
     }
   }
 

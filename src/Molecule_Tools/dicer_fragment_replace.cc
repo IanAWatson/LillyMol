@@ -648,6 +648,10 @@ BaseFragment<M>::Read(TFDataReader& reader, ReplacementSpecifications& replaceme
     return 0;
   }
 
+  if (bad_valence > 0) {
+    cerr << "BaseFragment::Read:skiped " << bad_valence << " fragments with bad valence\n";
+  }
+
   return 1;
 }
 
@@ -700,6 +704,10 @@ BaseFragment<M>::ReadTextProto(iwstring_data_source& input, ReplacementSpecifica
     cerr << "BaseFragment::Read:no fragments\n";
     cerr << "Read " << protos_read << " protos, " << failed_constraints << " failed constraints\n";
     return 0;
+  }
+
+  if (bad_valence > 0) {
+    cerr << "BaseFragment::Read:skiped " << bad_valence << " fragments with bad valence\n";
   }
 
   return 1;

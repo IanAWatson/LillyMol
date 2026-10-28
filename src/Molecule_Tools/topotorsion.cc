@@ -448,6 +448,7 @@ TorsionToIndex(const uint32_t fixed_ncols,
   return hasher(name) % fixed_ncols;
 }
 
+#ifdef MAYBE_IMPLEMENT_THIS_SOMETIME
 class Topological_Torsion
 {
  private:
@@ -458,6 +459,7 @@ class Topological_Torsion
 
  public:
 };
+#endif
 
 // Within a tt_atom_t, the atomic number is the first 4 bits
 

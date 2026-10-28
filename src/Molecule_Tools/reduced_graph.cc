@@ -71,7 +71,7 @@ Usage(int rc) {
 class TypeAndRingAtoms {
   private:
     // The type of the ring - isotope to be applied.
-    int _type;
+    int _type = 0;
 
     // The element for the abstract atom.
     const Element * _element;

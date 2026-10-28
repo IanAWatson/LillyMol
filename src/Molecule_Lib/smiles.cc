@@ -2823,6 +2823,9 @@ Molecule::_find_raw_rings_for_fragment(int id, int* already_done) {
     return 1;
   }
 
+  if (atoms_being_processed < 2) [[unlikely]] {
+    return 0;
+  }
   assert(atoms_being_processed > 2);
 
   resizable_array<Ring*> rings;

@@ -744,8 +744,7 @@ grease (Molecule & m,
   }
   else if (nh > ng + 3)
     ;
-  else if ( (tmp = float (hydrophillic_atoms) / float (atoms_in_hydrophobic_groups)) < hydrophillic_hydrophobic_ratio)
-  {
+  else if ( (tmp = float (hydrophillic_atoms) / float (atoms_in_hydrophobic_groups)) < hydrophillic_hydrophobic_ratio) {
     if (verbose > 1)
       cerr << "Demerited for too few hydrophillic atoms " << tmp << endl;
     demerit += int (300.0 * (hydrophillic_hydrophobic_ratio - tmp));

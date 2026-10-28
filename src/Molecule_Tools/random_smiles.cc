@@ -443,22 +443,22 @@ For_Convolution::build(Command_Line& cl, char flag)
 
   resizable_array_p<Molecule_and_Atom_Type> molecules;
 
-  for (int i = 0; nullptr != (m = input.next_molecule()); ++i) {
+  while ((m = input.next_molecule()) != nullptr) {
+    std::unique_ptr<Molecule_and_Atom_Type> free_m(m);
+
     if (!m->assign_atom_types(atom_typing_specification)) {
       cerr << "For_Convolution::build:fatal error processing " << m->smiles() << ' '
-           << m->name() << endl;
-      delete m;
-      ;
+           << m->name() << '\n';
       return 0;
     }
 
-    molecules.add(m);
+    molecules.add(free_m.release());
   }
 
   assert(molecules.number_elements() == _n);
 
-  std::unordered_map<int, int>
-      atype_count;  // how frequently do we find a given atom type
+  // how frequently do we find a given atom type
+  std::unordered_map<int, int> atype_count;
 
   for (int i = 0; i < _n; ++i) {
     count_atom_types(*molecules[i], atype_count);

@@ -1933,11 +1933,11 @@ Substructure_Atom::construct_from_smarts_token(const const_IWSubstring& smarts) 
   // operators.
 
   int right_square_bracket = -1;
-  int nsemicolons = 0;
-  int ncommas = 0;
-  int ncarets = 0;
-  int nnot = 0;
-  int environment_present = 0;
+  // int nsemicolons = 0;
+  // int ncommas = 0;
+  // int ncarets = 0;
+  // int nnot = 0;
+  // int environment_present = 0;
   int environment_level = 0;
   int paren_level = 0;           // parentheses must balance
   int square_bracket_level = 1;  // the square brackets must balance
@@ -1968,17 +1968,17 @@ Substructure_Atom::construct_from_smarts_token(const const_IWSubstring& smarts) 
         break;
       }
     } else if (';' == smarts[i]) {
-      nsemicolons++;
+      // nsemicolons++;
     } else if (',' == smarts[i]) {
-      ncommas++;
+      // ncommas++;
     } else if ('^' == smarts[i]) {
-      ncarets++;
+      // ncarets++;
     } else if ('!' == smarts[i]) {
-      nnot++;
+      // nnot++;
     } else if ('$' == smarts[i] && i < characters_to_process - 1 &&
                '(' == smarts[i + 1]) {
       if (0 == environment_level) {
-        environment_present++;
+        // environment_present++;
       }
       environment_level++;
     } else if ('(' == smarts[i]) {
@@ -1994,7 +1994,12 @@ Substructure_Atom::construct_from_smarts_token(const const_IWSubstring& smarts) 
 #endif
   }
 
-  assert(0 == paren_level);
+  if (curly_brace_level != 0) {
+    smiles_error_message(initial_smarts_ptr, characters_to_process, 0, "Unbalanced curly braces");
+  }
+  if (paren_level != 0) {
+    smiles_error_message(initial_smarts_ptr, characters_to_process, 0, "Unbalanced parentheses");
+  }
 
   if (right_square_bracket < 0) {
     smiles_error_message(initial_smarts_ptr, characters_to_process, 0,
@@ -2702,9 +2707,9 @@ Substructure_Atom_Specifier::construct_from_smarts_token(
   int fc = 0;
   int fc_encountered = 0;
 
-  // Non organic matches are hard. That is because when the query is formed, likely
-  // the non organic atoms will not have been defined yet.
-  int _match_non_organic = 0;
+  // Previously there was a non-working local variable about non_organic matches.
+  // That was because of the ability to subsequently change what is considered
+  // organic. In practice that never happens, just an FYI warning here.
 
   while (characters_processed < characters_to_process) {
     const char s = *smarts;

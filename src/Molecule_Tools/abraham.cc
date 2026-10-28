@@ -978,6 +978,7 @@ Queries_and_Additive_Models::_parse_global_min_max(const IWString &buffer, doubl
 
   for (auto col = 0; buffer.nextword(token, i); ++col) {
     IWString mname, s;
+    (void) col;   // keep compiler quiet.
 
     if (!token.split(mname, '=', s) || 0 == mname.length() || 0 == s.length()) {
       cerr << "Queries_and_Additive_Models::_parse_global_min_max:invalid token form '"

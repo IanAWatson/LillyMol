@@ -771,7 +771,7 @@ ISIS_RXN_FILE_Molecule::identify_unmapped_neighbours(int m, Set_of_Atoms &nbr) {
   atom_number_t unmapped_singly_bonded_neighbour = kInvalidAtomNumber;
   atom_number_t unmapped_doubly_bonded_neighbour = kInvalidAtomNumber;
 
-  int mapped_connections_found = 0;
+  //int mapped_connections_found = 0;
 
   for (int i = 0; i < aa->ncon(); i++) {
     const Bond *b = aa->item(i);
@@ -780,7 +780,7 @@ ISIS_RXN_FILE_Molecule::identify_unmapped_neighbours(int m, Set_of_Atoms &nbr) {
 
     if (_atom_map[j] > 0)  // is mapped
     {
-      mapped_connections_found++;
+      //mapped_connections_found++;
       continue;
     }
 
@@ -7876,7 +7876,7 @@ RXN_File::identify_atoms_changing_product(const int prdct, int *changed,
 
     const atom_number_t j = _reagent[r].which_is_mapped_atom(amap[i]);
 
-    if (j < 0) {  // should not happen
+    if (j < 0) [[unlikely]] {  // should not happen
       continue;
     }
 
@@ -7905,7 +7905,7 @@ RXN_File::identify_atoms_changing_product(const int prdct, int *changed,
   cerr << " rc " << rc << '\n';
 #endif
 
-  return 1;
+  return rc;
 }
 
 /*

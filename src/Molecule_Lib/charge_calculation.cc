@@ -71,9 +71,11 @@ static const double gasteiger_constant_b[NUMBER_OF_ATOM_TYPE] =                 
 static const double gasteiger_constant_c[NUMBER_OF_ATOM_TYPE] =                       {-0.56,1.88,  1.51, 1.51,  0.73, 11.86,  1.36,  0.85, -0.27,  0.85,  1.34,  1.34,  1.39,  0.47,  1.38,  1.33,  0.96, 1.16,  1.35,  2.31, 0.96,  1.38,  1.20,  0.47,  1.51};
 
 // The following are defined for the partial charge calculation (Gasteiger's method)  pi charges
+#ifdef THESE_ARE_NOT_BEING_USED
 static const double gasteiger_pi_constant_a[NUMBER_OF_ATOM_TYPE] = {0,0,5.6,5.6,5.64,0,4.54,7.95,7.92,7.95,3.57,3.57,7.91,10.09,6.6,7.73,0,5.2,6.5,7.34,8.81,6.6,6.6,10.09,5.6};
 static const double gasteiger_pi_constant_b[NUMBER_OF_ATOM_TYPE] = {0,0,8.93,8.93,8.4,11.86,11.86,9.73,9.775,9.73,10.17,10.17,14.76,11.73,10.32,8.16,0,9.68,9.69,13.86,8.81,10.32,10.32,11.73,8.93};
 static const double gasteiger_pi_constant_c[NUMBER_OF_ATOM_TYPE] = {0,0,2.94,2.94,2.81,11.86,7.32,2.67,2.685,2.67,6.6,6.6,6.85,2.87,3.72,1.81,0,4.48,5.49,9.64,0,3.72,3.72,2.87,2.94};
+#endif
 // For everything except hydrogen, cation's electronegativity is the additon of constant a, b and c
 // for hydrogen it is 20.02
 static const double gasteiger_element_cation_electronegativity[NUMBER_OF_ATOM_TYPE] = {20.02,19.04,19.62,19.62, 20.57, 23.72, 23.72, 24.87, 27.11, 24.87, 24.86, 24.86, 28.49, 31.33, 20.65, 21.70, 18.1, 30.82, 22.04, 19.71,18.82,  20.65,24.00, 31.33, 19.62};
@@ -4101,7 +4103,7 @@ int Molecule :: _compute_charge_for_fragment
 {
   int rc;
   int n_atoms = natoms();
-  int number_in_fragment = 0;
+  // int number_in_fragment = 0;
 
 
   resizable_array<int> fragment_matrix_no_to_atomi;
@@ -4110,7 +4112,7 @@ int Molecule :: _compute_charge_for_fragment
   for (int i=0; i<n_atoms; i++)
     if ((conjugated_fragment_array [i] == fragment_no) && (atomic_number(i) != 1))
       {
-        number_in_fragment ++;
+        // number_in_fragment ++;
         fragment_matrix_no_to_atomi.add(i);
       }
 

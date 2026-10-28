@@ -1984,8 +1984,7 @@ Molecule::_complete_chiral_centre_from_mdl_files(
   Set_of_Atoms con;
 
   int explicit_hydrogen_present = 0;
-  int hydrogen_isotope_present =
-      0;  // I suppose they could have D and T and an implicit Hydrogen
+  int hydrogen_isotope_present = 0;  // I suppose they could have D and T and an implicit Hydrogen
 
   for (int i = 0; i < acon; i++) {
     atom_number_t j = atom_a->other(a, i);
@@ -2023,6 +2022,8 @@ Molecule::_complete_chiral_centre_from_mdl_files(
   }
 
   int tcon = acon + ih;
+
+  (void) hydrogen_isotope_present;   // not being used, TODO:ianwatson investigate
 
   // Three connections and a lone pair is fine.
 

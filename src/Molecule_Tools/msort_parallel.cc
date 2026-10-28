@@ -1543,7 +1543,7 @@ identify_next_equi_atom_group(const resizable_array_p<T>& records, int& istart,
 
   const T* reff = records[istart];
 
-  int last_break = -1;
+  //int last_break = -1;
 
   istop = istart + 1;
 
@@ -1569,7 +1569,7 @@ identify_next_equi_atom_group(const resizable_array_p<T>& records, int& istart,
     }
 
     reff = records[istop];
-    last_break = istop;
+    //last_break = istop;
     istop++;
   }
 
@@ -1906,7 +1906,7 @@ write_some_data(const float* zdata, int nmolecules, int fd)
 static int
 do_forked_child_process(data_source_and_type<Molecule>& input, float* zdata, int fd)
 {
-  int molecules_read = 0;
+  //int molecules_read = 0;
   int ndx = 0;
 
   int write_every = WRITE_BLOCK_CHUNK_SIZE / nproperties;
@@ -1919,7 +1919,7 @@ do_forked_child_process(data_source_and_type<Molecule>& input, float* zdata, int
   Molecule* m;
 
   while (nullptr != (m = input.next_molecule())) {
-    molecules_read++;
+    //molecules_read++;
 
     std::unique_ptr<Molecule> free_m(m);
 

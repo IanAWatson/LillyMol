@@ -6640,7 +6640,7 @@ Breakages::lower_numbers_if_needed(Molecule& m, int& bonds_to_break_this_molecul
   int bonds_removed = 0;
   while (1) {
     int lowest_priority = std::numeric_limits<int>::max();
-    int number_with_min = 0;
+    int number_with_min = 0;  // not being used, TODO:ianwatson investigate
     int first_with_min = -1;
 
     for (int i = 0; i < n; i++) {

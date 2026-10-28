@@ -355,7 +355,7 @@ Molecule::_read_mdl_bond_list(T& input, int nb, int* aromatic_atoms, int* aromat
 
 extern int looks_like_sdf_tag(const const_IWSubstring& buffer);
 
-static int
+static inline int
 MdlReadExtraTextInfo(const MDL_File_Supporting_Material& mdlfos) {
   return mdlfos.read_extra_text_info() || moleculeio::read_extra_text_info();
 }
@@ -705,6 +705,13 @@ Molecule::_read_molecule_mdl_trailing_records(
   if (got_dollar) {
     return 1;
   }
+
+  // Keep compiler warnings at bay
+  (void) msal;
+  (void) msbl;
+  (void) msbv;
+  (void) trailing_lines;
+  (void) tags_encountered;
 
   // If we come out here, it must be EOF. That's OK.
 

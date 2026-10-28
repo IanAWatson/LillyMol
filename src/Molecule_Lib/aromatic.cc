@@ -5383,13 +5383,9 @@ Molecule::_bonded_to_heteroatom_outside_system(atom_number_t zatom, const int * 
 int
 Molecule::_kekule_identify_next_atom(const int * process_these, atom_number_t & zatom) const
 {
-  int found = 0;
-  for (int i = 0; i < _number_elements; i++)
-  {
+  for (int i = 0; i < _number_elements; i++) {
     if (KEKULE_READY_TO_PROCESS != process_these[i])
       continue;
-
-    found++;
 
     //  We have an unprocessed atom. Is it bonded to an already processed atom?
 
@@ -5408,8 +5404,6 @@ Molecule::_kekule_identify_next_atom(const int * process_these, atom_number_t & 
   }
 
   // We did not find any suitable atoms.
-
-  //assert (0 == found);   sep 06, not sure why this was here
 
   return 0;
 }

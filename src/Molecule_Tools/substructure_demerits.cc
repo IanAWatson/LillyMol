@@ -786,7 +786,7 @@ alkyl_halides(const Molecule& m, Demerit& demerit, const atomic_number_t* mz,
   resizable_array<atom_number_t> ccl3;  // carbons which are CCl3 centres
 
   int matoms = m.natoms();
-  int nbromine = 0;
+  //int nbromine = 0;
   int nchlorine = 0;
   for (int i = 0; i < matoms; i++) {
     if (1 != ncon[i]) {
@@ -796,7 +796,7 @@ alkyl_halides(const Molecule& m, Demerit& demerit, const atomic_number_t* mz,
     if (17 == mz[i]) {
       nchlorine++;
     } else if (35 == mz[i]) {
-      nbromine++;
+      //nbromine++;
     } else if (53 == mz[i])
       ;
     else {

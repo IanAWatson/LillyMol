@@ -134,8 +134,8 @@ class Options {
     uint64_t _too_few_fragments = 0;
     uint64_t _too_many_fragments = 0;
 
-    uint64_t _matches_exclusion_smarts = 0;
-    uint64_t _no_match_required_smarts = 0;
+    //uint64_t _matches_exclusion_smarts = 0;
+    //uint64_t _no_match_required_smarts = 0;
 
     // for use with parallel processing.
     off_t _seek_to;

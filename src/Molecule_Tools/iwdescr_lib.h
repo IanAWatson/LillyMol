@@ -13,7 +13,7 @@
 
 class Command_Line;
 class Molecule;
-class DescriptorsToCompute;
+struct DescriptorsToCompute;
 class Sparse_Fingerprint_Creator;
 
 // 

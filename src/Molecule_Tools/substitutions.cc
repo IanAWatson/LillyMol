@@ -145,7 +145,6 @@ novartis_polar_suface_area_oxygen (Molecule & m,
   int aromatic_bonds = 0;
   int single_bonds = 0;
   int double_bonds = 0;
-  int triple_bonds = 0;
 
   for (int i = 0; i < ncon; i++)
   {
@@ -157,8 +156,6 @@ novartis_polar_suface_area_oxygen (Molecule & m,
       single_bonds++;
     else if (b->is_double_bond())
       double_bonds++;
-    else
-      triple_bonds++;
   }
 
   int hcount = a.implicit_hydrogens();
@@ -272,6 +269,8 @@ novartis_polar_suface_area_phosphorus (Molecule & m,
       triple_bonds++;
   }
 
+  (void) aromatic_bonds;
+
   int hcount = a.implicit_hydrogens();
 
   formal_charge_t fc = a.formal_charge();
@@ -288,6 +287,7 @@ novartis_polar_suface_area_phosphorus (Molecule & m,
   return 0.0;
 }
 
+// TODO:ianwatson this should call the regular TPSA function for psa. Investigate.
 static void
 quick_prop(Molecule & m,IWString & prop)
 {
@@ -333,7 +333,6 @@ quick_prop(Molecule & m,IWString & prop)
       nvrtspsa += novartis_polar_suface_area_sulphur(m, i, *a, m.is_aromatic(i));
     else if (15 == zi)
       nvrtspsa += novartis_polar_suface_area_phosphorus(m, i, *a, m.is_aromatic(i));
-   
   }
   if(nr > 0)
   {

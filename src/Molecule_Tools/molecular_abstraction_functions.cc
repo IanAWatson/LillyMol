@@ -1288,7 +1288,7 @@ Molecular_Abstraction_Base_Class::_is_spinach(Molecule_With_Info_About_Parent& m
   // Set_of_Atoms doubly_bonded_single_connection;
   Set_of_Atoms doubly_bonded;
   Set_of_Atoms to_be_checked;
-  int found_singly_connected = 0;
+  // int found_singly_connected = 0;
 
   for (int i = 0; i < acon; i++) {
     const Bond* b = a->item(i);
@@ -1315,7 +1315,7 @@ Molecular_Abstraction_Base_Class::_is_spinach(Molecule_With_Info_About_Parent& m
       if (b->is_double_bond())
         ;
       else {
-        found_singly_connected++;
+        //found_singly_connected++;
       }
 
       continue;

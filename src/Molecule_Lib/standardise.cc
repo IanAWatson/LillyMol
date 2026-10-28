@@ -8976,7 +8976,7 @@ Chemical_Standardisation::_do_transform_pyrazolone_new(
   for (int exo : exocyclic_index) {
     atom_number_t carbon = r[exo];
 
-    standardisation::Status status;
+    standardisation::Status status = standardisation::Status::kAlreadyCorrect;
     if (m.are_bonded(n1, carbon)) {
       status = _do_transform_pyrazolone_new(m, keto_enol, n2, n1, carbon, r, ring_is_fused, atom_already_changed, current_molecule_data);
     } else if (m.are_bonded(n2, carbon)) {

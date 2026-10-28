@@ -1567,6 +1567,8 @@ DemoEachBond() {
       ++single_bonds;
     }
   }
+
+  cerr << "Found " << single_bonds << " single bonds\n";
 }
 
 // Iterators through rings.

@@ -263,6 +263,7 @@ Options::ReadNeedles(data_source_and_type<Molecule>& input) {
   Molecule* m;
   for (int ndx = 0; (m = input.next_molecule()) != nullptr; ++ndx) {
     std::unique_ptr<Molecule> free_m(m);
+    (void) ndx;   // TODO:ianwatson remove this variable.
 
     if (! Preprocess(*m)) {
       return 0;
@@ -274,6 +275,7 @@ Options::ReadNeedles(data_source_and_type<Molecule>& input) {
       return 0;
     }
   }
+
 
   return _usmi_to_find.size();
 }

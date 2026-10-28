@@ -220,8 +220,8 @@ MFormula::ToFixedCountedFingerprint(int* destination, int n) const {
 constexpr char kOpenSquareBracket = '[';
 constexpr char kCloseSquareBracket = ']';
 
-constexpr char kOpenParen = '(';
-constexpr char kCloseParen = ')';
+//constexpr char kOpenParen = '(';
+//constexpr char kCloseParen = ')';
 
 static bool skip_char[256];
 static bool need_to_initialise_skip_char = true;

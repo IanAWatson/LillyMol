@@ -664,7 +664,7 @@ do_third_party_symmetry_demerit (Molecule & m,
 
 // We have multiple groups
 
-  int atoms_in_symmetry_groupings = 0;
+  // int atoms_in_symmetry_groupings = 0;
 
   for (int i = 0; i < groups; i++)
   {
@@ -674,7 +674,7 @@ do_third_party_symmetry_demerit (Molecule & m,
     if (1 == ns)       // not symmetric
       continue;
 
-    atoms_in_symmetry_groupings += s->number_elements();
+    // atoms_in_symmetry_groupings += s->number_elements();
 
     float tmp = 0.6f * iwmisc::Fraction<float>(s->number_elements(), matoms);
 

@@ -793,7 +793,7 @@ MFingerprint::_do_isotope_bits (int istart,
 
   istart += istep;    // we have already accounted for the first atom
 
-  int d = 0;    // measure of distance into the vector, regardless of direction
+  // int d = 0;    // measure of distance into the vector, regardless of direction
 
   for (int i = istart; i != istop; i += istep)
   {
@@ -801,7 +801,7 @@ MFingerprint::_do_isotope_bits (int istart,
 
     atom_number_t j = _path[i];
 
-    d++;
+    // d++;
 
     if (0 != _isotope[j])
       zbit += 17;
@@ -1991,7 +1991,7 @@ Linear_Fingerprint_Defaults::build (Command_Line & cl,
     return 1;
 
   const_IWSubstring y;
-  for (int i = 0; cl.value(flag, y); ++i)
+  for (int i = 0; cl.value(flag, y, i); ++i)
   {
     const_IWSubstring directive;    // several of our things look like XX=nn
     int dvalue;

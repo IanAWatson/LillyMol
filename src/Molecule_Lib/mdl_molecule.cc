@@ -394,7 +394,7 @@ MDL_Molecule::remove_atoms(const int * to_remove)
     }
   }
 
-  return 1;
+  return rc;
 }
 
 /*

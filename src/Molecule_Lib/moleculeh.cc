@@ -927,10 +927,12 @@ Molecule::_place_3_hydrogens(const Make_Implicit_Hydrogens_Explicit& mihe) {
     return 1;
   }
 
+#ifdef NOT_USING_BOND_LENGTH
   coord_t blen = default_h_bond_length;
   if (6 != a->atomic_number()) {
     blen *= static_cast<coord_t>(0.9);
   }
+#endif
 
   if (acon != 1) {
     cerr << "Molecule::_place_3_hydrogens:cannot place onto atom with " << acon
@@ -989,7 +991,7 @@ Molecule::_place_3_hydrogens(const Make_Implicit_Hydrogens_Explicit& mihe) {
   h1 += va;
   h2 += va;
 #ifdef DEBUG_PLACE_3_HYDROGENS
-  cerr << "After tralsnation\n";
+  cerr << "After translation\n";
   cerr << "btw " << first_h << " and " << anchor << " "
        << distance_between_atoms(first_h, anchor) << '\n';
   cerr << "btw " << (first_h + 1) << " and " << anchor << " "
@@ -997,6 +999,7 @@ Molecule::_place_3_hydrogens(const Make_Implicit_Hydrogens_Explicit& mihe) {
   cerr << "btw " << (first_h + 2) << " and " << anchor << " "
        << distance_between_atoms(first_h + 2, anchor) << '\n';
 #endif
+
   return 1;
 }
 

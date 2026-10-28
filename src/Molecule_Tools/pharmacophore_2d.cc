@@ -94,7 +94,7 @@ static constexpr uint32_t kPropHcount = 2048;
 
 class PerMoleculeData {
  private:
-  Molecule& _m;
+  Molecule& _m;  // not being used. TODO:ianwatson investigate
 
   const int _matoms;
 

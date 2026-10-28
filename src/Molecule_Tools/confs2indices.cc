@@ -63,7 +63,7 @@ class Options {
     Chemical_Standardisation _chemical_standardisation;
 
     // Upon first call, we count the number of molecules in the input.
-    uint64_t _molecules_in_input = 0;
+    // uint64_t _molecules_in_input = 0;
 
     uint64_t _molecules_read = 0;
 

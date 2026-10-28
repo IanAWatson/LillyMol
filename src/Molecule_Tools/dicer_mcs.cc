@@ -764,7 +764,7 @@ int
 DicedMolecule::UpdateStats(int nmolecules, int ndx,
                 absl::flat_hash_map<IWString, FragmentSummary>& frag_data) {
   for (const Fragment* frag : _fragment) {
-    auto [iter, emplaced] = frag_data.try_emplace(frag->usmi(), std::move(FragmentSummary(nmolecules, ndx)));
+    auto [iter, emplaced] = frag_data.try_emplace(frag->usmi(), FragmentSummary(nmolecules, ndx));
     if (emplaced) {
       iter->second.set_natoms(frag->natoms());
     } else {

@@ -1312,7 +1312,7 @@ do_delocalise_bonds(Molecule& m, Substructure_Query& q, const Set_of_Atoms& e)
     }
   }
 
-  return 1;
+  return rc;
 }
 
 static int

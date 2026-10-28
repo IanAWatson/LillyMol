@@ -2537,7 +2537,7 @@ Molecule::formula_distinguishing_aromatic(IWString& f) {
     }
 
     int arom_count = 0;
-    int arom_hcount = 0;
+    // int arom_hcount = 0;    currently not being used.
     int aliph_count = 0;
     int aliph_hcount = 0;
 
@@ -2596,7 +2596,7 @@ Molecule::formula_distinguishing_aromatic(IWString& f) {
 
       if (is_aromatic_atom(_aromaticity[j])) {
         arom_count++;
-        arom_hcount += implicit_hydrogens(j);
+        // arom_hcount += implicit_hydrogens(j);
       } else {
         aliph_count++;
         aliph_hcount += implicit_hydrogens(j);
@@ -3422,7 +3422,7 @@ Molecule::molecular_weight() const {
 
   molecular_weight_t rc = static_cast<molecular_weight_t>(0.0);
 
-  int atoms_encountered = 0;
+  // int atoms_encountered = 0;
 
   for (int i = 0; i <= highest_atomic_number; i++) {
     if (0 == element_count[i]) {
@@ -3431,7 +3431,7 @@ Molecule::molecular_weight() const {
 
     const Element* e = get_element_from_atomic_number(i);
 
-    atoms_encountered += element_count[i];
+    // atoms_encountered += element_count[i];
 
     rc += static_cast<molecular_weight_t>((element_count[i]) * e->atomic_mass());
   }
@@ -3459,7 +3459,7 @@ Molecule::molecular_weight_ignore_isotopes() const {
 
   molecular_weight_t rc = static_cast<molecular_weight_t>(0.0);
 
-  int atoms_encountered = 0;
+  // int atoms_encountered = 0;
 
   for (int i = 0; i <= highest_atomic_number; i++) {
     if (0 == element_count[i]) {
@@ -3468,7 +3468,7 @@ Molecule::molecular_weight_ignore_isotopes() const {
 
     const Element* e = get_element_from_atomic_number(i);
 
-    atoms_encountered += element_count[i];
+    // atoms_encountered += element_count[i];
 
     rc += static_cast<molecular_weight_t>((element_count[i]) * e->atomic_mass());
     //  cerr << "got " << element_count[i] << " of atomic number " << i << " sum now " <<

@@ -899,7 +899,7 @@ Ring_Size_Fingerprints::_Ring_Size_Fingerprints(Molecule& m,
   int aromatic_ring_count = 0;
   int fused_rings = 0;
   int strongly_fused = 0;
-  int isolated_rings = 0;
+  //int isolated_rings = 0;
   int isolated_aliphatic_ring_count = 0;
   int largest_isolated_ring_size = 0;
   int isolated_aromatic_ring_count = 0;
@@ -928,7 +928,7 @@ Ring_Size_Fingerprints::_Ring_Size_Fingerprints(Molecule& m,
     if (ri->is_fused()) {
       fused_rings++;
     } else {
-      isolated_rings++;
+      //isolated_rings++;
       if (rsize > largest_isolated_ring_size) {
         largest_isolated_ring_size = rsize;
       }

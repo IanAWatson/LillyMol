@@ -44,10 +44,10 @@ namespace safe_generate {
 
 using std::cerr;
 
-constexpr char kPercent = '%';
+// constexpr char kPercent = '%';
 
-constexpr char kOpenSquareBracket = '[';
-constexpr char kCloseSquareBracket = ']';
+// constexpr char kOpenSquareBracket = '[';
+// constexpr char kCloseSquareBracket = ']';
 
 using iwmatcher::Matcher;
 using molecule_filter_lib::MoleculeFilter;

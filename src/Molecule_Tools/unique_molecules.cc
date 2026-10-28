@@ -641,6 +641,7 @@ WriteCounts(Command_Line& cl, int verbose) {
   return 1;
 }
 
+#ifdef FOR_DEBUGGING
 static int
 WriteDicerFragments(
     const resizable_array_p<absl::flat_hash_map<IWString, dicer_data::DicerFragment>>&
@@ -678,7 +679,6 @@ WriteSmilesHash(const resizable_array_p<IW_STL_Hash_Map_int>& smiles_hash,
   return output.good();
 }
 
-#ifdef FOR_DEBUGGING
 static int
 WriteHash(std::ostream& output) {
   if (write_dicer_textproto) {

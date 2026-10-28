@@ -127,4 +127,33 @@ TEST(IWDescr, NovartisPsaPerAtomDisabledWithPsa) {
   EXPECT_EQ(DescriptorIndex(iwdescr, "fnvrtspsa"), -1);
 }
 
+TEST(IWDescr, BiphenylCountIsWrittenToResults) {
+  const char* argv[] = {"iwdescr_test", "-O", "none", "-O", "rcj"};
+  Command_Line cl(5, const_cast<char**>(argv), "O:");
+  IWDescr iwdescr;
+  ASSERT_TRUE(iwdescr.Initialise(cl));
+  std::vector<float> values(iwdescr.number_descriptors());
+
+  struct TestCase {
+    const char* smiles;
+    float expected;
+  };
+  // Reuse the calculator to check that zero counts replace earlier values.
+  for (const TestCase& test : {
+           TestCase{"c1ccccc1-c1ccccc1", 1.0f},
+           TestCase{"CCC", 0.0f},
+           TestCase{"c1ccccc1-c1ccc(-c2ccccc2)cc1", 2.0f},
+           TestCase{"c1ccc2ccccc2c1", 0.0f},
+           TestCase{"c1ccncc1-c1ccccc1", 1.0f},
+           TestCase{"c1ccccc1", 0.0f},
+           TestCase{"c1ccccc1CCc1ccccc1", 0.0f},
+           TestCase{"C1CCCCC1-C1CCCCC1", 0.0f}}) {
+    Molecule molecule;
+    ASSERT_TRUE(molecule.build_from_smiles(test.smiles));
+    ASSERT_TRUE(iwdescr.Process(molecule, values.data()));
+    EXPECT_FLOAT_EQ(DescriptorValue(iwdescr, values, "biphenyl"), test.expected)
+        << test.smiles;
+  }
+}
+
 }  // namespace

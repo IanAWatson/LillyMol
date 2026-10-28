@@ -3151,6 +3151,8 @@ void
 IWDescr::IWDescrImpl::ZeroAllRingRelatedDescriptors() {
   static constexpr float kZero = 0.0f;
 
+  descriptor[iwdescr_biphenyl].set(kZero);
+
   descriptor[iwdescr_ar5].set(kZero);
   descriptor[iwdescr_al5].set(kZero);
   descriptor[iwdescr_ar6].set(kZero);
@@ -4214,6 +4216,7 @@ IWDescr::IWDescrImpl::ComputeRingDescriptors(Molecule& m, PerMoleculeData& data)
   }
 
   if (nr == 0) {
+    descriptor[iwdescr_biphenyl].set(0.0f);
     descriptor[iwdescr_mhr].set(0.0f);
     descriptor[iwdescr_mxhrf].set(0.0f);
     descriptor[iwdescr_mnhrf].set(0.0f);
@@ -4527,6 +4530,7 @@ IWDescr::IWDescrImpl::ComputeRingDescriptors(Molecule& m, PerMoleculeData& data)
     descriptor[offset].set(static_cast<float>(nrings[i]));
   }
 
+  descriptor[iwdescr_biphenyl].set(static_cast<float>(biphenyl));
   descriptor[iwdescr_rcj].set(static_cast<float>(ring_chain_join_count));
   descriptor[iwdescr_rchj].set(static_cast<float>(ring_chain_heteroatom_join_count));
   descriptor[iwdescr_amrcj].set(static_cast<float>(aromatic_ring_chain_join_count));

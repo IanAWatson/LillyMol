@@ -1,3 +1,6 @@
+#include <cstdlib>
+#include <filesystem>
+#include <fstream>
 #include <iostream>
 #include <string>
 
@@ -814,6 +817,128 @@ TEST_F(TestSubstructureEnv, TestNumericEnv2) {
 
   EXPECT_TRUE(_DoPerumationsTests(0));
 
+}
+
+
+// File-backed alternatives should behave exactly like inline environment SMARTS.
+class TestEnvironmentSmartsFile : public testing::Test {
+ protected:
+  std::filesystem::path _directory;
+
+  void SetUp() override {
+    const char* tmp = std::getenv("TEST_TMPDIR");
+    ASSERT_NE(tmp, nullptr);
+    _directory = std::filesystem::path(tmp) / "environment_smarts";
+    std::filesystem::create_directories(_directory);
+    Write("groups.textproto", "# Reusable alternatives\nsmarts: \"F\"\nsmarts: \"Cl\"\n");
+    Write("other.textproto", "smarts: \"Br\"\n");
+  }
+
+  void Write(const std::string& name, const std::string& contents) {
+    std::ofstream output(_directory / name);
+    output << contents;
+    ASSERT_TRUE(output.good());
+  }
+
+  SubstructureSearch::SubstructureQuery Proto(bool rejection = false) {
+    SubstructureSearch::SubstructureQuery proto;
+    proto.set_originating_file_name_internal_use_only((_directory / "query.textproto").string());
+    auto* query = proto.add_query();
+    query->set_smarts("[CD1]");
+    auto* env = rejection ? query->add_environment_no_match() : query->add_environment();
+    env->add_smarts_file("groups.textproto");
+    env->mutable_attachment()->add_attachment_point(0);
+    env->mutable_attachment()->add_btype(SubstructureSearch::SS_SINGLE_BOND);
+    return proto;
+  }
+
+  int Hits(Substructure_Query& query, const char* smiles) {
+    Molecule molecule;
+    if (!molecule.build_from_smiles(smiles)) {
+      ADD_FAILURE() << smiles;
+      return -1;
+    }
+    Substructure_Results results;
+    return query.substructure_search(molecule, results);
+  }
+};
+
+TEST_F(TestEnvironmentSmartsFile, RelativeFilesAndInlineAlternatives) {
+  auto proto = Proto();
+  auto* env = proto.mutable_query(0)->mutable_environment(0);
+  env->add_smarts("I");
+  env->add_smarts_file("other.textproto");
+  Substructure_Query query;
+  ASSERT_TRUE(query.ConstructFromProto(proto));
+  for (const char* smiles : {"CF", "CCl", "CBr", "CI"}) {
+    EXPECT_EQ(Hits(query, smiles), 1) << smiles;
+  }
+  EXPECT_EQ(Hits(query, "CO"), 0);
+}
+
+TEST_F(TestEnvironmentSmartsFile, RejectionEnvironment) {
+  Substructure_Query query;
+  ASSERT_TRUE(query.ConstructFromProto(Proto(true)));
+  EXPECT_EQ(Hits(query, "CF"), 0);
+  EXPECT_EQ(Hits(query, "CCl"), 0);
+  EXPECT_EQ(Hits(query, "CO"), 1);
+}
+
+TEST_F(TestEnvironmentSmartsFile, EnvironmentVariablesAndAbsolutePath) {
+  auto proto = Proto();
+  // TEST_TMPDIR is provided by Bazel; no process environment mutation is needed.
+  proto.mutable_query(0)->mutable_environment(0)->set_smarts_file(
+      0, "${TEST_TMPDIR}/environment_smarts/groups.textproto");
+  Substructure_Query query;
+  ASSERT_TRUE(query.ConstructFromProto(proto));
+  EXPECT_EQ(Hits(query, "CF"), 1);
+}
+
+TEST_F(TestEnvironmentSmartsFile, ReusedAtTwoSitesAndAcrossQueries) {
+  auto proto = Proto();
+  auto* component = proto.mutable_query(0);
+  component->set_smarts("CC");
+  auto* second = component->add_environment();
+  second->CopyFrom(component->environment(0));
+  second->mutable_attachment()->set_attachment_point(0, 1);
+  for (int i = 0; i < 2; ++i) {
+    Substructure_Query query;
+    ASSERT_TRUE(query.ConstructFromProto(proto));
+    EXPECT_GT(Hits(query, "FCCCl"), 0);
+    EXPECT_EQ(Hits(query, "FCCO"), 0);
+  }
+}
+
+TEST_F(TestEnvironmentSmartsFile, ReadQueryFileAndIncludedQuery) {
+  auto proto = Proto();
+  std::string text;
+  ASSERT_TRUE(google::protobuf::TextFormat::PrintToString(proto, &text));
+  Write("query.textproto", text);
+  Substructure_Query direct;
+  ASSERT_TRUE(direct.ReadProto(IWString((_directory / "query.textproto").string())));
+  EXPECT_EQ(Hits(direct, "CF"), 1);
+  SubstructureSearch::SubstructureQuery outer;
+  outer.add_query_file((_directory / "query.textproto").string());
+  Substructure_Query included;
+  ASSERT_TRUE(included.ConstructFromProto(outer));
+  EXPECT_EQ(Hits(included, "CCl"), 1);
+}
+
+TEST_F(TestEnvironmentSmartsFile, InvalidListsFailConstruction) {
+  for (const std::string contents : {"", "smarts: \"\"", "smarts: \"[\"",
+                                     "unknown_field: 1", "smarts: {"}) {
+    Write("bad.textproto", contents);
+    auto proto = Proto();
+    proto.mutable_query(0)->mutable_environment(0)->set_smarts_file(0, "bad.textproto");
+    Substructure_Query query;
+    EXPECT_FALSE(query.ConstructFromProto(proto)) << contents;
+  }
+  for (const char* filename : {"missing.textproto", "", "${LILLYMOL_UNDEFINED_SMARTS_VARIABLE}/groups"}) {
+    auto proto = Proto();
+    proto.mutable_query(0)->mutable_environment(0)->set_smarts_file(0, filename);
+    Substructure_Query query;
+    EXPECT_FALSE(query.ConstructFromProto(proto)) << filename;
+  }
 }
 
 }  // namespace

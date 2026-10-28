@@ -1579,7 +1579,8 @@ class Substructure_Environment : public resizable_array_p<Substructure_Atom>
     int construct_from_proto(const SubstructureSearch::SubstructureEnvironment& proto,
                                extending_resizable_array<Substructure_Atom *> & completed,
                                atom_number_t possible_parent = kInvalidAtomNumber,
-                               bond_type_t possible_parent_bond_type = INVALID_BOND_TYPE);
+                               bond_type_t possible_parent_bond_type = INVALID_BOND_TYPE,
+                               const std::string& originating_file = "");
 
     int write_msi(std::ostream & os, int & object_id, int indentation);
     int BuildProto(SubstructureSearch::SubstructureEnvironment& proto) const;
@@ -3399,14 +3400,16 @@ class Single_Substructure_Query
     int _parse_element_hits_needed(const SubstructureSearch::SingleSubstructureQuery& proto);
     int _parse_elements_needed_object(const msi_object & msi);
     int _construct_from_msi_object(const msi_object &, int *);
-    int _construct_from_proto(const SubstructureSearch::SingleSubstructureQuery & proto);
+    int _construct_from_proto(const SubstructureSearch::SingleSubstructureQuery & proto,
+                              const std::string& originating_file);
     int _construct_environment_from_msi_object(const msi_object &, 
                                extending_resizable_array<Substructure_Atom *> &,
                                resizable_array_p<Substructure_Environment> & env);
     int _construct_environment_from_proto(
     const google::protobuf::RepeatedPtrField<SubstructureSearch::SubstructureEnvironment>& env,
     extending_resizable_array<Substructure_Atom *> & completed,
-    resizable_array_p<Substructure_Environment> & destination);
+    resizable_array_p<Substructure_Environment> & destination,
+    const std::string& originating_file);
     int _construct_matched_atoms_match(
         const google::protobuf::RepeatedPtrField<SubstructureSearch::MatchedAtomMatch>& matched_atoms_match);
     int _parse_smarts_specifier(const const_IWSubstring & smarts);
@@ -3518,7 +3521,8 @@ class Single_Substructure_Query
     int print_connectivity_graph(std::ostream &) const;
 
     int construct_from_msi_object(const msi_object &);
-    int ConstructFromProto(const SubstructureSearch::SingleSubstructureQuery& proto);
+    int ConstructFromProto(const SubstructureSearch::SingleSubstructureQuery& proto,
+                           const std::string& originating_file = "");
 
 //  We can create a molecule from a query. This will necessarily be very crude.
 

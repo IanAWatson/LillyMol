@@ -930,6 +930,11 @@ message SubstructureAtom {
 }
 
 // Specifications of the atoms adjacent to the matched atoms.
+// Reusable alternatives for an environment. Stored as a textproto file.
+message SmartsList {
+  repeated string smarts = 1;
+}
+
 message SubstructureEnvironment {
   optional uint32 id = 1;
 
@@ -972,6 +977,10 @@ message SubstructureEnvironment {
   // If 2 environment matches are needed, you can ensure that
   // the come from 2 different matched atoms.
   optional uint32 max_env_matches_per_anchor = 18;
+
+  // Append alternatives from SmartsList textprotos. Expand ${VAR} first;
+  // relative paths are resolved against the containing query file.
+  repeated string smarts_file = 19;
 }
 
 // Environments work if there is just one attachment point, but I

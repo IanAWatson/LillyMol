@@ -726,6 +726,47 @@ If multiple environments are specified, they must all match unless `and_id` or
 `or_id` is used. Those fields exist for more complex logic, but they are harder
 to read than separate well-named query files.
 
+### Reusable Environment SMARTS
+
+Both `environment` and `environment_no_match` can import alternatives from a
+shared SMARTS list. For example, `withdrawing.textproto` could contain:
+
+```textproto
+# Alternatives attached through their first atom.
+smarts: "C#N"
+smarts: "C(=O)[OH]"
+```
+
+Reference this file wherever the same alternatives are needed:
+
+```textproto
+query {
+  smarts: "c"
+  environment {
+    attachment {
+      attachment_point: 0
+      btype: SS_SINGLE_BOND
+    }
+    smarts_file: "withdrawing.textproto"
+    smarts_file: "${LILLYMOL_HOME}/data/queries/other_groups.textproto"
+    smarts: "[N+](=O)[O-]"
+  }
+}
+```
+
+Each file is a `SmartsList` textproto containing only repeated `smarts` fields.
+Imported patterns are appended to inline patterns and follow the same matching
+and hit-count rules. The attachment specification belongs to the environment,
+so the same list can be used at different attachment sites and in different
+queries. Multiple `smarts_file` entries are supported; nested imports are not.
+
+`${VAR}` references are expanded before resolving paths. Relative paths are
+resolved against the directory containing the query file, including when that
+query is loaded through `query_file`. For an in-memory query without a source
+filename, relative paths use the current working directory. Files are read only
+when constructing the query. Missing files, undefined environment variables,
+empty lists, malformed textprotos, and invalid SMARTS cause construction to fail.
+
 ## Matched-Atom Constraints
 
 `matched_atom_must_be` applies one or more rooted SMARTS to a specific matched

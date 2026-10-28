@@ -1,5 +1,6 @@
 #include <cstdint>
 
+#include <filesystem>
 #include <fstream>
 #include <iostream>
 #include <limits>
@@ -1859,7 +1860,8 @@ int
 Single_Substructure_Query::_construct_environment_from_proto(
     const google::protobuf::RepeatedPtrField<SubstructureSearch::SubstructureEnvironment>& env,
     extending_resizable_array<Substructure_Atom *> & completed,
-    resizable_array_p<Substructure_Environment> & destination)
+    resizable_array_p<Substructure_Environment> & destination,
+    const std::string& originating_file)
 {
   for (const auto& e : env)
   {
@@ -1867,7 +1869,8 @@ Single_Substructure_Query::_construct_environment_from_proto(
 
     _collect_all_atoms(completed);
 
-    int rc = a->construct_from_proto(e, completed);
+    int rc = a->construct_from_proto(e, completed, kInvalidAtomNumber,
+                                     INVALID_BOND_TYPE, originating_file);
 
     if (0 == rc) {
       cerr << "Single_Substructure_Query::_construct_environment_from_proto:invalid environment " << e.ShortDebugString() << "\n";
@@ -1937,8 +1940,43 @@ int
 Substructure_Environment::construct_from_proto(const SubstructureSearch::SubstructureEnvironment& proto,
                                extending_resizable_array<Substructure_Atom *> & completed,
                                atom_number_t possible_parent,
-                               bond_type_t possible_parent_bond_type)
+                               bond_type_t possible_parent_bond_type,
+                               const std::string& originating_file)
 {
+  // Resolve imports once during construction. Matching uses ordinary environment
+  // alternatives and does not need to retain filenames or access files.
+  if (!proto.smarts_file().empty()) {
+    SubstructureSearch::SubstructureEnvironment expanded(proto);
+    expanded.clear_smarts_file();
+    for (const std::string& name : proto.smarts_file()) {
+      IWString fname(name);
+      if (name.empty() || !fname.ExpandEnvironmentVariablesInPlace()) {
+        cerr << "Substructure_Environment:invalid smarts_file '" << name << "'\n";
+        return 0;
+      }
+      std::filesystem::path path(fname.AsString());
+      if (path.is_relative() && !originating_file.empty()) {
+        path = std::filesystem::path(originating_file).parent_path() / path;
+      }
+      fname = path.string();
+      auto list = iwmisc::ReadTextProtoCommentsOK<SubstructureSearch::SmartsList>(fname);
+      if (!list || list->smarts().empty()) {
+        cerr << "Substructure_Environment:cannot read nonempty SMARTS list '" << fname << "'\n";
+        return 0;
+      }
+      for (const std::string& smarts : list->smarts()) {
+        *expanded.add_smarts() = smarts;
+      }
+    }
+    if (!construct_from_proto(expanded, completed, possible_parent,
+                              possible_parent_bond_type, originating_file)) {
+      cerr << "Substructure_Environment:invalid environment including SMARTS files "
+           << proto.ShortDebugString() << "\n";
+      return 0;
+    }
+    return 1;
+  }
+
 // Process any bonds which have been specified as attributes
 
   if (! _process_how_connected(proto, completed))
@@ -2166,7 +2204,9 @@ FetchRepeatedField(const google::protobuf::RepeatedField<FROM> & values,
 }
 
 int
-Single_Substructure_Query::_construct_from_proto(const SubstructureSearch::SingleSubstructureQuery & proto)
+Single_Substructure_Query::_construct_from_proto(
+    const SubstructureSearch::SingleSubstructureQuery & proto,
+    const std::string& originating_file)
 {
   assert (ok());
   assert (_root_atoms.empty());
@@ -2686,13 +2726,13 @@ Single_Substructure_Query::_construct_from_proto(const SubstructureSearch::Singl
     }
   }
 
-  if (! _construct_environment_from_proto(proto.environment(), completed, _environment)) {
+  if (! _construct_environment_from_proto(proto.environment(), completed, _environment, originating_file)) {
     cerr << "Single_Substructure_Query::_construct_from_proto: environment interpretation failed\n";
     cerr << proto.ShortDebugString() << '\n';
     return 0;
   }
 
-  if (! _construct_environment_from_proto(proto.environment_no_match(), completed, _environment_rejections)) {
+  if (! _construct_environment_from_proto(proto.environment_no_match(), completed, _environment_rejections, originating_file)) {
     cerr << "Single_Substructure_Query::_construct_from_proto: environment interpretation failed\n";
     cerr << proto.ShortDebugString() << '\n';
     return 0;
@@ -2790,11 +2830,13 @@ Single_Substructure_Query::_atom_numbers_in_geometric_constraints_ok(const geome
 
 // Note that this silently does the wrong thing if called multiple times.
 int
-Single_Substructure_Query::ConstructFromProto(const SubstructureSearch::SingleSubstructureQuery& proto)
+Single_Substructure_Query::ConstructFromProto(
+    const SubstructureSearch::SingleSubstructureQuery& proto,
+    const std::string& originating_file)
 {
   assert (ok());
 
-  if (! _construct_from_proto(proto))
+  if (! _construct_from_proto(proto, originating_file))
   {
     cerr << "SingleSubstructureQuery::ConstructFromProto:cannot build from proto\n";
     cerr << proto.ShortDebugString() << "\n";
@@ -3667,7 +3709,7 @@ Substructure_Query::ConstructFromProto(const SubstructureSearch::SubstructureQue
   for (const auto& query : proto.query()) {
     std::unique_ptr<Single_Substructure_Query> q = std::make_unique<Single_Substructure_Query>();
 
-    if (! q->ConstructFromProto(query)) {
+    if (! q->ConstructFromProto(query, proto.originating_file_name_internal_use_only())) {
       cerr << "Substructure_Query::ConstructFromProto:cannot parse component\n";
       cerr << query.ShortDebugString() << '\n';
       return 0;
@@ -3690,7 +3732,7 @@ Substructure_Query::ConstructFromProto(const SubstructureSearch::SubstructureQue
       cerr << "Substructure_Query::ConstructFromProto:no query in proto '" << fname << "'\n";
       return 0;
     }
-    if (! qry->ConstructFromProto(maybe_qry->query(0))) {
+    if (! qry->ConstructFromProto(maybe_qry->query(0), tmp.AsString())) {
       cerr << "Substructure_Query::ConstructFromProto:cannot parse " << maybe_qry->ShortDebugString() << '\n';
       return 0;
     }

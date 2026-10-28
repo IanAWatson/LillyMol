@@ -369,6 +369,15 @@ BindReaction(nb::module_& m) {
 
   nb::class_<IWReaction, Substructure_Query>(m, "Reaction")
       .def(nb::init<>())
+      .def("__repr__", [](const IWReaction& reaction) {
+        std::string result = "Reaction(sidechains=" +
+                             std::to_string(reaction.number_sidechains());
+        if (!reaction.comment().empty()) {
+          result += ", name=";
+          result += nb::cast<std::string>(nb::repr(nb::str(ReactionName(reaction).c_str())));
+        }
+        return result + ")";
+      })
       .def("name", &ReactionName, "Name")
       .def("set_name", &SetReactionName, nb::arg("name"), "Assign new reaction name")
       .def("read", [](IWReaction& reaction, const std::string& fname) -> bool {

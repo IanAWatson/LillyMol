@@ -1885,6 +1885,18 @@ query {
         replacement.set_preserve_connectivity(False)
         self.assertEqual(replacement.read_replacement_rings(replacement_file), 2)
 
+    def test_reaction_repr(self):
+        reaction = lillymol.Reaction()
+        self.assertEqual(repr(reaction), "Reaction(sidechains=0)")
+        self.assertTrue(reaction.construct_from_smirks(
+            "[c:1][#0:3].[#0:4][*:2]>>[*:1]-[*:2]"))
+        self.assertEqual(repr(reaction), "Reaction(sidechains=1)")
+        name = "Coupling 'example'\nsecond line"
+        reaction.set_name(name)
+        self.assertEqual(repr(reaction), f"Reaction(sidechains=1, name={name!r})")
+        reaction.set_name("")
+        self.assertEqual(repr(reaction), "Reaction(sidechains=1)")
+
     def test_reaction_rdkit_cookbook_smirks(self):
         core = lillymol.MolFromSmiles("*c1c(C)cccc1O")
         sidechain = lillymol.MolFromSmiles("CN*")

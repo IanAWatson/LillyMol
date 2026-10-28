@@ -29,7 +29,7 @@ TEST_F(TestSplitOnPlusses, Empty)
 TEST_F(TestSplitOnPlusses, One)
 {
   EXPECT_EQ(SplitOnPlusses("One", _tokens, '+'), 1);
-  EXPECT_EQ(_tokens.size(), 1);
+  EXPECT_EQ(_tokens.size(), 1u);
   EXPECT_EQ(*_tokens[0], "One");
 }
 

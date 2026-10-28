@@ -1625,6 +1625,7 @@ IWDescr::IWDescrImpl::AllocateDescriptors() {
   SetDescriptorName(iwdescr_nchiral, "nchiral");
   if (descriptors_to_compute.psa) {
     SetDescriptorName(iwdescr_nvrtspsa, "nvrtspsa");
+    SetDescriptorName(iwdescr_fnvrtspsa, "fnvrtspsa");
   }
   if (descriptors_to_compute.long_carbon_chains) {
     SetDescriptorName(iwdescr_mxlencchain2, "mxlencchain2");
@@ -5682,7 +5683,9 @@ IWDescr::IWDescrImpl::ComputeNovartisPsaDescriptor(Molecule& m, PerMoleculeData&
 
   std::optional<double> psa = tpsa_calculator.PolarSurfaceArea(
       m, data.atomic_numbers(), data.atoms(), data.aromaticity());
-  descriptor[iwdescr_nvrtspsa].set(static_cast<float>(psa.value_or(0.0)));
+  const double value = psa.value_or(0.0);
+  descriptor[iwdescr_nvrtspsa].set(static_cast<float>(value));
+  descriptor[iwdescr_fnvrtspsa].set(data.matoms > 0 ? value / data.matoms : 0.0);
 
   return 1;
 }

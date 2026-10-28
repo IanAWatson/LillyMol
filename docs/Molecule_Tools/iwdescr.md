@@ -460,6 +460,7 @@ atomic number; otherwise it is considered polar.
 | pbunset | Number of polar bonds in unsaturated regions. The historical name is a misspelling of `pbunsat`. | `pbond` |
 | internalhbd | Number of possible internal hydrogen bonds, based on donor-acceptor bond separation and the rotatable bonds between each pair. | Always |
 | nvrtspsa | Novartis topological polar surface area (J. Med. Chem. 2000, 43, 3714-3717). | `psa` |
+| fnvrtspsa | Novartis topological polar surface area divided by the number of atoms in the processed molecule (`nvrtspsa / natoms`). | `psa` |
 
 ### Topological distance and shape
 

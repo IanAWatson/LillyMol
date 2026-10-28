@@ -875,6 +875,7 @@ FillDescriptorExtremeties(std::span<Descriptor>&  d, const int resolution) {
   d[iwdescr_fsdrngalal].set_min_max_resolution(0.0f, 2.0f, resolution);
   d[iwdescr_nchiral].set_min_max_resolution(0.0f, 5.821545f, resolution);
   d[iwdescr_nvrtspsa].set_min_max_resolution(0.0f, 220.2642f, resolution);
+  d[iwdescr_fnvrtspsa].set_min_max_resolution(0.0f, 40.0f, resolution);
   d[iwdescr_mxlencchain2].set_min_max_resolution(0.0f, 20.0f, resolution);
   d[iwdescr_mxlencchain3].set_min_max_resolution(0.0f, 20.0f, resolution);
   d[iwdescr_nsatchain].set_min_max_resolution(0.0f, 20.0f, resolution);

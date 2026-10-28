@@ -7,6 +7,7 @@
 
 #include "gtest/gtest.h"
 
+#include "Foundational/cmdline/cmdline.h"
 #include "Molecule_Lib/molecule.h"
 #include "Molecule_Tools/iwdescr_lib.h"
 
@@ -87,6 +88,43 @@ TEST(IWDescr, SpinachRotatableBondDescriptors) {
   EXPECT_EQ(DescriptorValue(iwdescr, hexane_values, "scafrotb"), 0.0f);
   EXPECT_EQ(DescriptorValue(iwdescr, hexane_values, "spchrotb"), 3.0f);
   EXPECT_EQ(DescriptorValue(iwdescr, hexane_values, "maxrotbgrp"), 3.0f);
+}
+
+TEST(IWDescr, NovartisPsaPerAtom) {
+  const char* argv[] = {"iwdescr_test", "-O", "none", "-O", "psa"};
+  Command_Line cl(5, const_cast<char**>(argv), "O:");
+  IWDescr iwdescr;
+  ASSERT_TRUE(iwdescr.Initialise(cl));
+  std::vector<float> values(iwdescr.number_descriptors());
+
+  struct TestCase {
+    const char* smiles;
+    double psa;
+    int natoms;
+  };
+  for (const TestCase& test : {TestCase{"CCO", 20.23, 3},
+                              TestCase{"CC", 0.0, 2},
+                              TestCase{"CN", 26.02, 2}}) {
+    Molecule molecule;
+    ASSERT_TRUE(molecule.build_from_smiles(test.smiles));
+    ASSERT_TRUE(iwdescr.Process(molecule, values.data()));
+    EXPECT_NEAR(DescriptorValue(iwdescr, values, "nvrtspsa"), test.psa, 0.0001);
+    EXPECT_NEAR(DescriptorValue(iwdescr, values, "fnvrtspsa"),
+                test.psa / test.natoms, 0.0001) << test.smiles;
+  }
+}
+
+TEST(IWDescr, NovartisPsaPerAtomDisabledWithPsa) {
+  const char* argv[] = {"iwdescr_test", "-O", "none"};
+  Command_Line cl(3, const_cast<char**>(argv), "O:");
+  IWDescr iwdescr;
+  ASSERT_TRUE(iwdescr.Initialise(cl));
+  std::vector<float> values(iwdescr.number_descriptors());
+  Molecule molecule;
+  ASSERT_TRUE(molecule.build_from_smiles("CCO"));
+  ASSERT_TRUE(iwdescr.Process(molecule, values.data()));
+  EXPECT_EQ(DescriptorIndex(iwdescr, "nvrtspsa"), -1);
+  EXPECT_EQ(DescriptorIndex(iwdescr, "fnvrtspsa"), -1);
 }
 
 }  // namespace

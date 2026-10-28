@@ -323,10 +323,12 @@ enum IWDescr_Enum {
   iwdescr_rmyncl,
   iwdescr_rmynbr,
   iwdescr_rmyni,
-  iwdescr_rmy_heavy_halogen  // remember to update NUMBER_DESCRIPTORS below.
+  iwdescr_rmy_heavy_halogen,
+  // Append new descriptors to preserve existing indices and fingerprint bits.
+  iwdescr_fnvrtspsa
 };
 
-constexpr int kNumberDescriptors = iwdescr_rmy_heavy_halogen + 1;
+constexpr int kNumberDescriptors = iwdescr_fnvrtspsa + 1;
 
 
 // Various features can be computed optionally. Put them all into a struct that

@@ -73,7 +73,6 @@ GFP_Standard::build_molecular_properties(const int* properties, int nproperties)
   }
 }
 
-static const unsigned int max_uint = std::numeric_limits<unsigned int>::max();
 static uint32_t bits_in_mk = std::numeric_limits<uint32_t>::max();
 
 // A new maccs keys fingerprint is being constructed. Make sure the number

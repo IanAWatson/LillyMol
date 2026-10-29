@@ -350,22 +350,22 @@ novartis_polar_surface_area_phosphorus(const nvrtspsa::NovartisPolarSurfaceArea&
 
   int ncon = a.ncon();
 
-  int aromatic_bonds = 0;
+  //int aromatic_bonds = 0;
   int single_bonds = 0;
   int double_bonds = 0;
-  int triple_bonds = 0;
+  //int triple_bonds = 0;
 
   for (int i = 0; i < ncon; i++) {
     const Bond *b = a[i];
 
     if (b->is_aromatic()) {
-      aromatic_bonds++;
+      //aromatic_bonds++;
     } else if (b->is_single_bond()) {
       single_bonds++;
     } else if (b->is_double_bond()) {
       double_bonds++;
     } else {
-      triple_bonds++;
+      //triple_bonds++;
     }
   }
 

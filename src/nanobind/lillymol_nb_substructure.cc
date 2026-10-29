@@ -91,6 +91,8 @@ BindSubstructure(nb::module_& m) {
              return SubstructureSearchMatches(query, mol);
            },
            nb::arg("mol"))
+      .def("substructure_search_embeddings", &SubstructureSearchMatches,
+           nb::arg("mol"), "Return embeddings as lists of atom indices; empty if unmatched")
       .def("read_proto",
            [](Substructure_Query& query, const std::string& fname) {
              return static_cast<bool>(query.ReadProto(IWString(fname)));

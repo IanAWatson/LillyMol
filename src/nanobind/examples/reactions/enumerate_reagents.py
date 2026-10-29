@@ -19,8 +19,8 @@ def main():
     products = []
     for smiles in ("CC(=O)O acetic_acid", "CCC(=O)O propionic_acid", "CCC no_acid"):
         scaffold = MolFromSmiles(smiles)
-        matches = reaction.substructure_search_matches(scaffold)
-        if matches is None:
+        matches = reaction.substructure_search_embeddings(scaffold)
+        if not matches:
             continue
         iterator.reset()
         while iterator.active():

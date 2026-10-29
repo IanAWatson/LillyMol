@@ -8,8 +8,8 @@ def main():
     reaction.set_name("One chlorine to fluorine")
     scaffold = MolFromSmiles("ClCCC(Cl)C dichloropentane")
     original = scaffold.unique_smiles()
-    matches = reaction.substructure_search_matches(scaffold)
-    assert matches is not None
+    matches = reaction.substructure_search_embeddings(scaffold)
+    assert matches
     assert len(matches) == 2
     products = []
     for match in matches:
@@ -22,7 +22,7 @@ def main():
                 for s in ("FCCC(Cl)C", "ClCCC(F)C")}
     assert set(products) == expected
     assert scaffold.unique_smiles() == original
-    assert reaction.substructure_search_matches(MolFromSmiles("CCO")) is None
+    assert reaction.substructure_search_embeddings(MolFromSmiles("CCO")) == []
 
 
 if __name__ == "__main__":

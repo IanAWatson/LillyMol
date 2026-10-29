@@ -1286,9 +1286,13 @@ $$$$
         matches = qry.substructure_search_matches(mol)
         self.assertEqual([m.as_list() for m in matches], [[0], [1]])
         self.assertEqual(qry.substructure_search_match_lists(mol), [[0], [1]])
+        self.assertEqual(qry.substructure_search_embeddings(mol), [[0], [1]])
+        self.assertEqual(qry.substructure_search_embeddings(
+            lillymol.MolFromSmiles("N")), [])
 
         qry.set_max_matches_to_find(1)
         self.assertEqual(qry.substructure_search(mol), 1)
+        self.assertEqual(len(qry.substructure_search_embeddings(mol)), 1)
 
     def test_substructure_query_from_proto(self):
         mol = lillymol.MolFromSmiles("Oc1ccccc1 phenol")
@@ -1989,7 +1993,16 @@ sidechain {
         reaction = lillymol.Reaction()
         self.assertTrue(reaction.construct_from_smirks("[Cl:1]>>[F:1]"))
         scaffold = lillymol.MolFromSmiles("ClCCC(Cl)C")
-        matches = reaction.substructure_search_matches(scaffold)
+        matches = reaction.substructure_search_embeddings(scaffold)
+        self.assertEqual(reaction.substructure_search(scaffold), 2)
+        results = lillymol.SubstructureResults()
+        self.assertTrue(reaction.substructure_search(scaffold, results))
+        self.assertEqual(results.embeddings(), matches)
+        no_match = lillymol.MolFromSmiles("CCO")
+        self.assertEqual(reaction.substructure_search(no_match), 0)
+        self.assertEqual(reaction.substructure_search_embeddings(no_match), [])
+        self.assertEqual(list(reaction.substructure_search_embeddings(no_match)), [])
+        self.assertIsNone(reaction.substructure_search_matches(no_match))
         self.assertEqual(len(matches), 2)
         for match in matches:
             with self.subTest(match=match):

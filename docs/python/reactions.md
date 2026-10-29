@@ -93,7 +93,7 @@ choice of how to handle those sites should be explicit. Both `trxn` and the
 Python bindings provide controls for this. In Python, distinguish the scaffold's
 matches from the sidechain reagents' matches:
 
-- For scaffold sites, loop over `substructure_search_matches()` and generate a
+- For scaffold sites, loop over `substructure_search_embeddings()` and generate a
   separate product for each embedding, as shown below. In contrast,
   `in_place_transformations()` applies the transformations to the same molecule.
 - For sidechain sites, set
@@ -129,8 +129,9 @@ Use explicit embeddings when each matching site should generate a separate
 product from the original scaffold. This example constructs a SMIRKS reaction
 and changes one of two chlorine sites at a time.
 
-`substructure_search_matches(scaffold)` returns a list of lists of atom indices,
-or `None` when there is no match. Pass each match directly to
+`substructure_search_embeddings(scaffold)` returns a list of lists of atom
+indices, or `[]` when there is no match, so it can be used directly in a loop.
+`substructure_search(scaffold)` returns the number of matches. Pass each match directly to
 `perform_reaction`; an existing `Set_of_Atoms` embedding is also accepted. The
 product is a new `Molecule`, or `None` on
 failure. Do not modify the scaffold between finding and using its embeddings:
@@ -152,8 +153,8 @@ def main():
     reaction.set_name("One chlorine to fluorine")
     scaffold = MolFromSmiles("ClCCC(Cl)C dichloropentane")
     original = scaffold.unique_smiles()
-    matches = reaction.substructure_search_matches(scaffold)
-    assert matches is not None
+    matches = reaction.substructure_search_embeddings(scaffold)
+    assert matches
     assert len(matches) == 2
     products = []
     for match in matches:
@@ -166,7 +167,7 @@ def main():
                 for s in ("FCCC(Cl)C", "ClCCC(F)C")}
     assert set(products) == expected
     assert scaffold.unique_smiles() == original
-    assert reaction.substructure_search_matches(MolFromSmiles("CCO")) is None
+    assert reaction.substructure_search_embeddings(MolFromSmiles("CCO")) == []
 
 
 if __name__ == "__main__":
@@ -262,8 +263,8 @@ def main():
     products = []
     for smiles in ("CC(=O)O acetic_acid", "CCC(=O)O propionic_acid", "CCC no_acid"):
         scaffold = MolFromSmiles(smiles)
-        matches = reaction.substructure_search_matches(scaffold)
-        if matches is None:
+        matches = reaction.substructure_search_embeddings(scaffold)
+        if not matches:
             continue
         iterator.reset()
         while iterator.active():
@@ -347,6 +348,9 @@ This table summarizes the entry points used in the examples. Always check
 | `add_sidechain_reagent(sidechain, mol, match_conditions)` | `bool`; add a molecule to one sidechain. |
 | `reagent_names(iterator)` | Names of the currently selected reagents, in sidechain order. |
 | `remove_all_reagents()` | Delete stored reagents; return the number of sidechain components. |
+| `substructure_search(mol)` | Number of scaffold matches. |
+| `substructure_search(mol, results)` | `bool`; populate a `SubstructureResults` object. |
+| `substructure_search_embeddings(mol)` | List of scaffold embeddings, or `[]` if unmatched. |
 | `substructure_search_matches(mol)` | List of scaffold embeddings, or `None` if unmatched. |
 | `in_place_transformations(mol)` | `bool`; modify the input molecule at its matching sites. |
 | `perform_reaction(scaffold, embedding)` | New `Molecule` or `None`; accepts a list of atom indices or `Set_of_Atoms`. |

@@ -897,6 +897,20 @@ if query in m:
 This is equivalent to asking whether `query.substructure_search(m)` finds at
 least one match, but it does not return the match count or matched atoms.
 
+To iterate over matched atom indices, use `substructure_search_embeddings()`.
+It returns a list of embeddings (each a list of atom indices), or an empty list
+when nothing matches. The same method is available on `Reaction`:
+
+```python
+for embedding in query.substructure_search_embeddings(m):
+  for atom in embedding:
+    print(atom)
+```
+
+`substructure_search(m)` continues to return a match count. The older
+`substructure_search_matches(m)` method below retains its existing return type
+and returns `None` when nothing matches.
+
 To get the matched atoms directly as a list of `Set_of_Atoms` objects, use:
 ```python
 matches = query.substructure_search_matches(m)

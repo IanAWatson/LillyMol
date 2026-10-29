@@ -129,6 +129,18 @@ ReactionSubstructureSearch(IWReaction& reaction, Molecule& mol,
   return reaction.substructure_search(mol, sresults);
 }
 
+std::vector<std::vector<int>>
+ReactionSubstructureSearchEmbeddings(IWReaction& reaction, Molecule& mol) {
+  Substructure_Results results;
+  {
+    nb::gil_scoped_release release;
+    if (!reaction.substructure_search(mol, results)) {
+      return {};
+    }
+  }
+  return SubstructureResultsAsVectors(results);
+}
+
 std::optional<Molecule>
 PerformReactionWithEmbedding(IWReaction& reaction, Molecule& scaffold,
                              const Set_of_Atoms& embedding) {
@@ -419,6 +431,12 @@ BindReaction(nb::module_& m) {
            "Return sidechain reagent names at the iterator position")
       .def("substructure_search", &ReactionSubstructureSearch, nb::arg("mol"),
            nb::arg("results"))
+      .def("substructure_search", [](IWReaction& reaction, Molecule& mol) {
+             nb::gil_scoped_release release;
+             return reaction.substructure_search(mol);
+           }, nb::arg("mol"), "Return the number of scaffold matches")
+      .def("substructure_search_embeddings", &ReactionSubstructureSearchEmbeddings,
+           nb::arg("mol"), "Return scaffold embeddings as lists; empty if unmatched")
       .def("substructure_search_matches", &ReactionSubstructureSearchMatches,
            nb::arg("mol"), "Search scaffold queries and return embeddings")
       .def("in_place_transformations",

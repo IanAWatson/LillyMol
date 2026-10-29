@@ -1,12 +1,12 @@
 #ifndef POPCOUNT_H
 #define POPCOUNT_H
 
+// The compiler builtin also works when the target does not enable POPCNT.
+// The _mm_popcnt_* intrinsics require -mpopcnt and break portable builds.
 #if defined(__x86_64__)
-#include <nmmintrin.h>
-#define POPCOUNT _mm_popcnt_u64
+#define POPCOUNT __builtin_popcountll
 #elif defined(__i386__)
-#include <nmmintrin.h>
-#define POPCOUNT _mm_popcnt_u32
+#define POPCOUNT __builtin_popcount
 #elif __APPLE__
 #define POPCOUNT __builtin_popcountll
 #else

@@ -150,6 +150,14 @@ ReaderContext::ResetSdfOptions() {
   }
 }
 
+bool
+ReaderContext::PreprocessAndKeep(Molecule& mol) {
+  if (preprocessing.active()) {
+    preprocessing.Process(mol);
+  }
+  return !ShouldSkip(mol);
+}
+
 std::optional<Molecule>
 ReaderContext::Next() {
   if (!reader) {
@@ -162,11 +170,7 @@ ReaderContext::Next() {
       return std::nullopt;
     }
 
-    if (preprocessing.active()) {
-      preprocessing.Process(*mol);
-    }
-
-    if (ShouldSkip(*mol)) {
+    if (!PreprocessAndKeep(*mol)) {
       continue;
     }
 

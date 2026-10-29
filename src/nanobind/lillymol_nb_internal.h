@@ -115,6 +115,7 @@ struct ReaderContext {
   void SetSkipOptions(bool invalid_valence, bool non_organic,
                       bool non_periodic_table_elements);
   bool ShouldSkip(Molecule& mol);
+  bool PreprocessAndKeep(Molecule& mol);
   void EnableNonPeriodicTableElementReading();
   void RestoreElementCreationFlags();
   bool SetSdfOptions(const std::string& sdf_identifier, bool sdf_tags_to_json,

@@ -332,6 +332,89 @@ class TestNanobindMolecule(LillyMolNanobindTestCase):
             self.assertEqual(molecules[0].name(), "CHEMBL45466")
             self.assertEqual([mol.name() for mol in molecules[:2]], ["CHEMBL45466", "CHEMBL1200345"])
 
+    def test_slurp_preprocessing_and_filtering(self):
+        settings = dict(largest_fragment=True, remove_chirality=True,
+                        remove_cis_trans_bonds=True, remove_isotopes=True,
+                        skip_invalid_valence=True, skip_non_organic=True,
+                        skip_non_periodic_table_elements=False)
+        with tempfile.TemporaryDirectory() as directory:
+            fname = os.path.join(directory, "input.smi")
+            with open(fname, "w") as output:
+                output.write("CC.[Na+] salt\n[13CH3][C@H](O)F chiral\n"
+                             "F/C=C/F alkene\nC=[SH]-C bad_valence\n"
+                             "CC[Na] sodium\nCCC last\n")
+            options = lillymol.ReaderOptions(**settings)
+            direct = lillymol.slurp(fname, **settings)
+            configured = lillymol.slurp(fname, options=options)
+            with lillymol.MolReaderContext(fname, options=options) as reader:
+                streamed = list(reader)
+            for molecules in (direct, configured, streamed):
+                self.assertIsNotNone(molecules)
+                self.assertEqual([m.name() for m in molecules],
+                                 ["salt", "chiral", "alkene", "last"])
+                self.assertEqual(molecules[0].natoms(), 2)
+                self.assertEqual(molecules[1].number_chiral_centres(), 0)
+                self.assertTrue(all(m.isotope(a) == 0 for m in molecules
+                                    for a in range(m.natoms())))
+                self.assertNotIn("/", molecules[2].smiles())
+                self.assertNotIn("\\", molecules[2].smiles())
+            self.assertEqual([m.unique_smiles() for m in direct],
+                             [m.unique_smiles() for m in streamed])
+            self.assertEqual([m.unique_smiles() for m in configured],
+                             [m.unique_smiles() for m in streamed])
+
+    def test_slurp_skip_non_periodic_elements(self):
+        lillymol.set_auto_create_new_elements(False)
+        lillymol.set_atomic_symbols_can_have_arbitrary_length(False)
+        with tempfile.TemporaryDirectory() as directory:
+            fname = os.path.join(directory, "input.smi")
+            with open(fname, "w") as output:
+                output.write("CC first\nC[Zz] unknown\nCCC last\n")
+            molecules = lillymol.slurp(fname, skip_non_periodic_table_elements=True)
+            self.assertEqual([m.name() for m in molecules], ["first", "last"])
+            self.assertIsNone(lillymol.MolFromSmiles("C[SlurpUncreatedElement]"))
+
+    def test_slurp_file_type_and_empty_results(self):
+        with tempfile.TemporaryDirectory() as directory:
+            fname = os.path.join(directory, "input.sdf")
+            with open(fname, "w") as output:
+                output.write("CC ethane\n")
+            molecules = lillymol.slurp(fname, file_type=lillymol.FileType.SMI)
+            self.assertEqual([m.name() for m in molecules], ["ethane"])
+            molecules = lillymol.slurp(fname, file_type=lillymol.FileType.SMI,
+                                      options=lillymol.ReaderOptions())
+            self.assertEqual(len(molecules), 1)
+            unknown = os.path.join(directory, "input.unknown")
+            with open(unknown, "w") as output:
+                output.write("CC ethane\n")
+            self.assertEqual(len(lillymol.slurp(unknown)), 1)
+            with open(unknown, "w") as output:
+                output.write("CC[Na] sodium\nCC[Na] more_sodium\n")
+            self.assertEqual(lillymol.slurp(unknown, skip_non_organic=True), [])
+            with open(unknown, "w"):
+                pass
+            self.assertEqual(lillymol.slurp(unknown), [])
+            self.assertEqual(lillymol.slurp(unknown, largest_fragment=True), [])
+            self.assertIsNone(lillymol.slurp(os.path.join(directory, "missing.smi")))
+
+    def test_slurp_failure_and_options_validation(self):
+        with tempfile.TemporaryDirectory() as directory:
+            fname = os.path.join(directory, "input.smi")
+            with open(fname, "w") as output:
+                output.write("CC good\n[ malformed\n")
+            self.assertIsNone(lillymol.slurp(fname))
+            self.assertIsNone(lillymol.slurp(fname, largest_fragment=True))
+            lillymol.set_auto_create_new_elements(False)
+            lillymol.set_atomic_symbols_can_have_arbitrary_length(False)
+            self.assertIsNone(lillymol.slurp(fname, skip_non_periodic_table_elements=True))
+            self.assertIsNone(lillymol.MolFromSmiles("C[SlurpUnknownElement]"))
+            options = lillymol.ReaderOptions()
+            options.keep_sdf_tags = True
+            with self.assertRaisesRegex(ValueError, "MolReaderContext"):
+                lillymol.slurp(fname, options=options)
+            with self.assertRaises(TypeError):
+                lillymol.slurp(fname, options=lillymol.ReaderOptions(), largest_fragment=True)
+
     def test_global_sdf_option_helpers_are_available(self):
         self.assertTrue(lillymol.set_sdf_identifier("idnumber"))
         lillymol.set_prepend_sdfid(True)

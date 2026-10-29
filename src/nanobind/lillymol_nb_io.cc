@@ -2,6 +2,62 @@
 
 namespace lillymol_nb {
 
+namespace {
+
+std::optional<std::vector<Molecule>>
+Slurp(const std::string& fname, std::optional<FileType> file_type,
+      const ReaderOptions& options) {
+  if (options.keep_sdf_tags || !options.sdf_identifier.empty() ||
+      options.sdf_tags_to_json || options.all_sdf_tags || options.first_sdf_tag ||
+      !options.prepend_sdfid || options.mdlquiet) {
+    throw std::invalid_argument("slurp does not support SDF metadata options; use MolReaderContext");
+  }
+  FileType input_type = file_type.value_or(discern_file_type_from_name(IWString(fname)));
+  if (input_type == FILE_TYPE_INVALID) {
+    input_type = FILE_TYPE_SMI;  // Preserve slurp's unknown-suffix fallback.
+  }
+  ReaderContext context(fname, input_type);
+  if (!context.reader->good()) {
+    std::cerr << "slurp:cannot open '" << fname << "'\n";
+    return std::nullopt;
+  }
+  context.SetPreprocessing(options.largest_fragment, options.remove_chirality,
+                           options.remove_cis_trans_bonds, options.remove_isotopes);
+  context.SetSkipOptions(options.skip_invalid_valence, options.skip_non_organic,
+                         options.skip_non_periodic_table_elements);
+  auto& input = *context.reader;
+  const size_t count = input.molecules_remaining();
+  std::vector<Molecule> result(count);
+  if (!context.preprocessing.active() && !options.skip_invalid_valence &&
+      !options.skip_non_organic && !options.skip_non_periodic_table_elements) {
+    // Keep the default bulk path free of per-molecule preprocessing checks.
+    for (size_t i = 0; i < count; ++i) {
+      if (!input.next_molecule(result[i])) {
+        return std::nullopt;
+      }
+    }
+    return result;
+  }
+
+  size_t kept = 0;
+  for (size_t i = 0; i < count; ++i) {
+    Molecule& molecule = result[kept];
+    if (!input.next_molecule(molecule)) {
+      return std::nullopt;
+    }
+    if (context.PreprocessAndKeep(molecule)) {
+      ++kept;
+    } else {
+      // Reuse the slot without retaining names, coordinates or other state.
+      molecule = Molecule();
+    }
+  }
+  result.resize(kept);
+  return result;
+}
+
+}  // namespace
+
 void
 BindIo(nb::module_& m) {
   nb::enum_<FileType>(m, "FileType")
@@ -390,31 +446,35 @@ BindIo(nb::module_& m) {
 
   m.attr("ContextWriter") = m.attr("MolWriterContext");
 
-  m.def("slurp",
-        [](const std::string& fname) -> std::optional<std::vector<Molecule>> {
-          IWString tmp(fname);
-          FileType file_type = discern_file_type_from_name(tmp);
-          if (file_type == FILE_TYPE_INVALID) {
-            file_type = FILE_TYPE_SMI;
-          }
-
-          data_source_and_type<Molecule> input(file_type, tmp);
-          if (!input.good()) {
-            std::cerr << "slurp:cannot open '" << fname << "'\n";
-            return std::nullopt;
-          }
-
-          const uint32_t number_molecules = input.molecules_remaining();
-          std::vector<Molecule> result(number_molecules);
-          for (uint32_t i = 0; i < number_molecules; ++i) {
-            if (!input.next_molecule(result[i])) {
-              return std::nullopt;
-            }
-          }
-
-          return result;
-        },
-        nb::arg("fname"), "Read all molecules from fname");
+  m.def("slurp", [](const std::string& fname, std::optional<FileType> file_type,
+                     bool largest_fragment, bool remove_chirality,
+                     bool remove_cis_trans_bonds, bool remove_isotopes,
+                     bool skip_invalid_valence, bool skip_non_organic,
+                     bool skip_non_periodic_table_elements) {
+          ReaderOptions options;
+          options.largest_fragment = largest_fragment;
+          options.remove_chirality = remove_chirality;
+          options.remove_cis_trans_bonds = remove_cis_trans_bonds;
+          options.remove_isotopes = remove_isotopes;
+          options.skip_invalid_valence = skip_invalid_valence;
+          options.skip_non_organic = skip_non_organic;
+          options.skip_non_periodic_table_elements = skip_non_periodic_table_elements;
+          return Slurp(fname, file_type, options);
+        }, nb::arg("fname"), nb::kw_only(), nb::arg("file_type") = nb::none(),
+           nb::arg("largest_fragment") = false,
+           nb::arg("remove_chirality") = false,
+           nb::arg("remove_cis_trans_bonds") = false,
+           nb::arg("remove_isotopes") = false,
+           nb::arg("skip_invalid_valence") = false,
+           nb::arg("skip_non_organic") = false,
+           nb::arg("skip_non_periodic_table_elements") = false,
+           "Read all molecules, optionally preprocess and filter; None on read failure");
+  m.def("slurp", [](const std::string& fname, const ReaderOptions& options,
+                     std::optional<FileType> file_type) {
+          return Slurp(fname, file_type, options);
+        }, nb::arg("fname"), nb::kw_only(), nb::arg("options"),
+           nb::arg("file_type") = nb::none(),
+           "Read all molecules using preprocessing/filtering ReaderOptions; SDF metadata options require MolReaderContext");
 
   m.def("set_sdf_identifier",
         [](const std::string& sdf_identifier) {

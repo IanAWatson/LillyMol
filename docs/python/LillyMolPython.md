@@ -288,15 +288,56 @@ molecule, and the second retrieved the third atom and asked it
 for the atomic number. In terms of efficiency, the first method
 will be more efficient in python.
 
-And for the greatest simplicity in getting a list of molecules
-into python
+For bulk reading, `slurp` reads all molecules into a Python list:
+
+```python
+from lillymol import slurp
+
+mols = slurp("input.smi")
+mols = slurp("input.smi", largest_fragment=True, remove_isotopes=True,
+             skip_invalid_valence=True)
 ```
-mols = slurp(fname)
+
+All options after the filename are keyword-only. The supported preprocessing
+options are `largest_fragment`, `remove_chirality`, `remove_cis_trans_bonds`, and
+`remove_isotopes`. Filtering options are `skip_invalid_valence`,
+`skip_non_organic`, and `skip_non_periodic_table_elements`. They default to
+`False`. Preprocessing runs before filtering, just as in `MolReaderContext`;
+for example, largest-fragment selection can remove a non-organic counterion
+before the organic-only check. Retained molecules remain in input order.
+
+A current limitation shared with `MolReaderContext`: the permissive element
+parser enabled by `skip_non_periodic_table_elements` can misinterpret bracketed
+chiral atoms. This parser behavior is unchanged by the bulk-reading interface.
+
+Reusable preprocessing and filtering settings can be supplied as `ReaderOptions`
+instead of individual keywords:
+
+```python
+from lillymol import ReaderOptions, FileType
+
+options = ReaderOptions(largest_fragment=True, skip_non_organic=True)
+mols = slurp("input.smi", options=options)
+mols = slurp("input.dat", options=options, file_type=FileType.SMI)
 ```
-will read all molecules from `fname` into a list. Note that this
-only works if `fname` has the proper suffix, and it will not work
-if trying to read stdin. Returns None if anything goes wrong. Note
-that if any molecule fails nothing is returned.
+
+Do not combine `options=` with individual preprocessing/filtering keywords.
+`file_type=` may accompany either form and takes precedence over the filename
+suffix. Without it, the format is inferred from the suffix, with SMILES as the
+fallback for an unrecognized suffix. SDF structures can be read, but SDF tag and
+naming controls remain with `MolReaderContext`; non-default SDF metadata fields
+in an options object are rejected rather than silently ignored.
+
+An empty file, or a file where all molecules are filtered out, returns `[]`.
+An open or molecule-reading failure returns `None` instead of a partial list.
+Filtering skips successfully parsed molecules; it does not enable skipping
+malformed input records. Invalid option combinations raise an exception.
+`slurp` requires a countable file and does not support stdin. Use
+`MolReaderContext` for streaming or when skipped-molecule statistics are needed.
+
+The bulk reader preallocates molecule storage and performs preprocessing and
+filtering in C++ before constructing the Python list. With default options, it
+uses the original direct-read loop without per-molecule preprocessing checks.
 
 ## Molecule Methods
 The most common methods for a Molecule currently implemented are

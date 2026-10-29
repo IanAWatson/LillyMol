@@ -386,6 +386,42 @@ TEST(TestStrcmp, TestAll) {
   EXPECT_EQ(bar.strcasecmp(foo), 0) << "HELLO.strcasecmp(hello)";
 }
 
+TEST(TestStrcmp, LexicographicOrdering) {
+  struct TestCase {
+    const char* lhs;
+    const char* rhs;
+    int expected;
+  };
+  const TestCase cases[] = {
+      {"", "", 0}, {"", "a", -1}, {"a", "", 1},
+      {"a", "a", 0}, {"a", "aa", -1}, {"aa", "a", 1},
+      {"a", "z", -1}, {"z", "a", 1},
+      {"az", "b", -1}, {"b", "az", 1},
+      {"hello", "hello world", -1}, {"hello world", "hello", 1},
+  };
+  const auto sign = [](int value) { return (value > 0) - (value < 0); };
+  for (const auto& test : cases) {
+    SCOPED_TRACE(::testing::Message() << test.lhs << " versus " << test.rhs);
+    const IWString lhs(test.lhs);
+    const IWString rhs(test.rhs);
+    EXPECT_EQ(sign(lhs.strcmp(rhs)), test.expected);
+    EXPECT_EQ(sign(lhs.strcmp(test.rhs)), test.expected);
+    const const_IWSubstring lhs_view(lhs);
+    const const_IWSubstring rhs_view(rhs);
+    EXPECT_EQ(sign(lhs_view.strcmp(rhs_view)), test.expected);
+  }
+}
+
+TEST(TestStrcmp, SubstringsNeedNotBeNullTerminated) {
+  const char data[] = {'a', 'a', 'z'};
+  const const_IWSubstring shorter(data, 1);
+  const const_IWSubstring longer(data, 2);
+  const const_IWSubstring same("aa");
+  EXPECT_LT(shorter.strcmp(longer), 0);
+  EXPECT_GT(longer.strcmp(shorter), 0);
+  EXPECT_EQ(longer.strcmp(same), 0);
+}
+
 TEST(TestStrncat, TestAll) {
   IWString foo("hello");
 

@@ -701,7 +701,22 @@ _strcmp(const char* s1, int l1, const char* s2, int l2) {
     ncomp = l2;
   }
 
-  return ::strncmp(s1, s2, ncomp);
+  // Empty strings may have null storage. Compare bytes only when present.
+  if (ncomp > 0) {
+    const int rc = ::strncmp(s1, s2, ncomp);
+    if (rc != 0) {
+      return rc;
+    }
+  }
+
+  // An equal prefix does not imply equal strings: the shorter sorts first.
+  if (l1 < l2) {
+    return -1;
+  }
+  if (l1 > l2) {
+    return 1;
+  }
+  return 0;
 }
 
 static int

@@ -2999,7 +2999,7 @@ Path_so_Far::_determine_direction_around_ring(const PD_Molecule_Data& pdmd, int 
 
   assert(lhs < rhs);
 
-  int steps_taken = 0;
+  // int steps_taken = 0;
 
   while (1) {
 #ifdef DEBUG_DETERMINE_DIRECTION_AROUND_RING
@@ -3075,7 +3075,7 @@ Path_so_Far::_determine_direction_around_ring(const PD_Molecule_Data& pdmd, int 
       return easiest;
     }
 
-    steps_taken++;
+    // steps_taken++;
   }
 }
 

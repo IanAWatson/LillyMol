@@ -312,7 +312,7 @@ ez_descriptor (Molecule & m,
 {
   Molecule_to_Match target (&m);
 
-  int queries_matching = 0;
+  //int queries_matching = 0;
 
   for (int i = 0; i < nq; i++)
   {
@@ -337,7 +337,7 @@ ez_descriptor (Molecule & m,
       return 0;
     }
 
-    queries_matching++;
+    //queries_matching++;
 
     if (! ez_descriptor (m, *(sresults.embedding(0)), result_vector[i]))
       return 0;

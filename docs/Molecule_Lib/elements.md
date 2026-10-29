@@ -45,6 +45,30 @@ become valid elements. The restriction to alphanumeric characters
 is also lifted. Using this implies `-E autocreate` so you do not
 need to specify both options.
 
+In bracketed SMILES, an arbitrary element name must start with a letter.
+Leading digits specify an isotope: `[1Foo]` is isotope 1 of the pseudo-element
+`Foo`, not an element called `1Foo`. The complete symbol is recognized, so
+`[Cz]` remains the pseudo-element `Cz` rather than carbon followed by `z`.
+
+The characters `@`, `+`, `-`, and `:` delimit SMILES atom attributes and cannot
+be part of an element name in this representation. A trailing `H` or `H` followed
+by a hydrogen-count digit is also an attribute. For example:
+
+| SMILES atom | Element | Isotope | H count | Charge | Atom map |
+| --- | --- | --- | --- | --- | --- |
+| `[Foo]` | Foo | 0 | 0 | 0 | 0 |
+| `[FooH]` | Foo | 0 | 1 | 0 | 0 |
+| `[1FooH2+:17]` | Foo | 1 | 2 | +1 | 17 |
+| `[Cz:20]` | Cz | 0 | 0 | 0 | 20 |
+
+Consequently, a literal pseudo-element name ending in an apparent hydrogen-count
+suffix cannot be represented unambiguously and is interpreted as the shorter
+name plus that count. This does not depend on which names have already been
+created. A standalone `[H]` remains the hydrogen element. Periodic-table atoms
+retain their ordinary hydrogen counts, charge, chirality, isotope, and atom-map
+attributes when arbitrary names are enabled. These annotations do not assign
+valences to pseudo-elements.
+
 If you need to perform substructure searches against these elements,
 you will need to use the #{symbol} smarts extension. See the file
 `Molecule_Tools/introduction.cc` for examples of how to do substructure

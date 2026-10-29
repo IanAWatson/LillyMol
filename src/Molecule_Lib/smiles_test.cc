@@ -5,6 +5,7 @@
 
 #include "molecule.h"
 #include "smiles.h"
+#include "substructure.h"
 
 namespace {
 
@@ -238,5 +239,119 @@ INSTANTIATE_TEST_SUITE_P(TestAnyLength, TestAnyLength, testing::Values(
   SmilesResult{"c2nnn[nH]2", 1, "C1=NN=NN1", {6, 7, 7, 7, 7}}
 ));
 
+
+// These flags are global; restore the caller's settings after every case.
+class TestPermissiveAtomParsing : public testing::Test {
+ protected:
+  int _saved_anylength;
+  int _saved_autocreate;
+
+  void SetUp() override {
+    _saved_anylength = atomic_symbols_can_have_arbitrary_length();
+    _saved_autocreate = auto_create_new_elements();
+  }
+  void TearDown() override {
+    set_atomic_symbols_can_have_arbitrary_length(_saved_anylength);
+    set_auto_create_new_elements(_saved_autocreate);
+  }
+  void Permissive(bool enabled) {
+    set_atomic_symbols_can_have_arbitrary_length(enabled);
+    set_auto_create_new_elements(enabled);
+  }
+};
+
+TEST_F(TestPermissiveAtomParsing, StandardAtomsRetainTheirAttributes) {
+  for (const char* smiles : {"C[C@H](O)F", "N[C@@H](C)C(=O)O",
+                             "C[13C@H:8](O)F", "C[NH2+:7]C", "[NH4+:17]",
+                             "[O-:4]", "[Fe+2:31]", "[Fe++:32]", "[H]", "[2H]",
+                             "[He]", "[13CH3:5]", "[nH:9]1cccc1"}) {
+    SCOPED_TRACE(smiles);
+    Permissive(false);
+    Molecule reference;
+    ASSERT_TRUE(reference.build_from_smiles(smiles));
+    Permissive(true);
+    Molecule actual;
+    ASSERT_TRUE(actual.build_from_smiles(smiles));
+    ASSERT_EQ(actual.natoms(), reference.natoms());
+    EXPECT_EQ(actual.chiral_centres(), reference.chiral_centres());
+    EXPECT_EQ(actual.unique_smiles(), reference.unique_smiles());
+    for (int atom = 0; atom < actual.natoms(); ++atom) {
+      EXPECT_EQ(actual.atomic_number(atom), reference.atomic_number(atom));
+      EXPECT_EQ(actual.atomic_symbol(atom), reference.atomic_symbol(atom));
+      EXPECT_EQ(actual.formal_charge(atom), reference.formal_charge(atom));
+      EXPECT_EQ(actual.isotope(atom), reference.isotope(atom));
+      EXPECT_EQ(actual.atom_map_number(atom), reference.atom_map_number(atom));
+      EXPECT_EQ(actual.implicit_hydrogens(atom), reference.implicit_hydrogens(atom));
+    }
+  }
+}
+
+TEST_F(TestPermissiveAtomParsing, CompleteNamesAndAttributeBoundaries) {
+  Permissive(true);
+  struct TestCase {
+    const char* smiles;
+    const char* symbol;
+    isotope_t isotope;
+    int hydrogens;
+    int charge;
+    int atom_map;
+  };
+  for (const TestCase& test : {
+           TestCase{"[1FooH2+:17]", "Foo", 1, 2, 1, 17},
+           TestCase{"[FooH]", "Foo", 0, 1, 0, 0},
+           TestCase{"[Foo]", "Foo", 0, 0, 0, 0},
+           TestCase{"[1Foo]", "Foo", 1, 0, 0, 0},
+           TestCase{"[FooH-:18]", "Foo", 0, 1, -1, 18},
+           TestCase{"[Foo+2:19]", "Foo", 0, 0, 2, 19},
+           TestCase{"[Cz:20]", "Cz", 0, 0, 0, 20},
+           TestCase{"[NH2Thing:21]", "NH2Thing", 0, 0, 0, 21},
+           TestCase{"[Foo_bar:22]", "Foo_bar", 0, 0, 0, 22}}) {
+    SCOPED_TRACE(test.smiles);
+    Molecule molecule;
+    ASSERT_TRUE(molecule.build_from_smiles(test.smiles));
+    ASSERT_EQ(molecule.natoms(), 1);
+    EXPECT_EQ(molecule.atomic_number(0), kInvalidAtomicNumber);
+    EXPECT_EQ(molecule.atomic_symbol(0), test.symbol);
+    EXPECT_EQ(molecule.isotope(0), test.isotope);
+    EXPECT_EQ(molecule.implicit_hydrogens(0), test.hydrogens);
+    EXPECT_EQ(molecule.formal_charge(0), test.charge);
+    EXPECT_EQ(molecule.atom_map_number(0), test.atom_map);
+  }
+  Molecule target;
+  ASSERT_TRUE(target.build_from_smiles("[Foo][Cz]"));
+  Substructure_Query query;
+  ASSERT_TRUE(query.create_from_smarts("[#{Foo}]-[#{Cz}]"));
+  Substructure_Results results;
+  EXPECT_EQ(query.substructure_search(target, results), 1u);
+}
+
+TEST_F(TestPermissiveAtomParsing, BraceSmartsMatchPseudoElementAndIsotope) {
+  Permissive(true);
+  Molecule target;
+  ASSERT_TRUE(target.build_from_smiles("[1FooH2+:17]"));
+  struct TestCase {
+    const char* smarts;
+    uint32_t expected;
+  };
+  for (const TestCase& test : {TestCase{"[#{Foo}]", 1},
+                              TestCase{"[1#{Foo}]", 1},
+                              TestCase{"[2#{Foo}]", 0}}) {
+    SCOPED_TRACE(test.smarts);
+    Substructure_Query query;
+    ASSERT_TRUE(query.create_from_smarts(test.smarts));
+    Substructure_Results results;
+    EXPECT_EQ(query.substructure_search(target, results), test.expected);
+  }
+}
+
+TEST_F(TestPermissiveAtomParsing, MalformedAttributesAreNotElementNames) {
+  Permissive(true);
+  for (const char* smiles : {"[Foo:]", "[Foo:abc]", "[Foo:-1]", "[Foo+2+2]",
+                             "[FooH2+H]", "[1]", "[+Foo]", "[Foo", "[13Foo"}) {
+    SCOPED_TRACE(smiles);
+    Molecule molecule;
+    EXPECT_FALSE(molecule.build_from_smiles(smiles));
+  }
+}
 
 }  // namespace

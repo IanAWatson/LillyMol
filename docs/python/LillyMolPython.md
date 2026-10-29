@@ -306,10 +306,6 @@ options are `largest_fragment`, `remove_chirality`, `remove_cis_trans_bonds`, an
 for example, largest-fragment selection can remove a non-organic counterion
 before the organic-only check. Retained molecules remain in input order.
 
-A current limitation shared with `MolReaderContext`: the permissive element
-parser enabled by `skip_non_periodic_table_elements` can misinterpret bracketed
-chiral atoms. This parser behavior is unchanged by the bulk-reading interface.
-
 Reusable preprocessing and filtering settings can be supplied as `ReaderOptions`
 instead of individual keywords:
 

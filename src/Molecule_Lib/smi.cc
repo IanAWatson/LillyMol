@@ -956,140 +956,81 @@ maybe_deuterium_or_tritium(const char* smiles, const Element*& e, int& atomic_ma
   return 1;
 }
 
-// Element symbols can have arbitrary lengths.
-// Examine `smiles, first determining if it is a valid known element.
+// Identify only the element symbol. The caller has already consumed any isotope
+// prefix and must still parse hydrogen counts, chirality, charge and atom maps.
+// Attribute delimiters cannot be part of an arbitrary element name. A trailing
+// H or H<digits> is a hydrogen count, independently of previously created names.
 int
 GetMaybeLongElement(const char* smiles, int characters_to_process, int& aromatic,
-                    formal_charge_t& fc, int& hcount, int& atomic_mass,
-                    const Element*& result) {
-  // Not always true.
-  // assert(*smiles == kOpenBracket);
+                    int& atomic_mass, const Element*& result) {
+  int close_bracket = 0;
+  while (close_bracket < characters_to_process && smiles[close_bracket] != kCloseBracket) {
+    ++close_bracket;
+  }
+  if (close_bracket == characters_to_process || close_bracket == 0) {
+    cerr << "GetMaybeLongElement:missing closing bracket or empty atom\n";
+    return 0;
+  }
 
-  // cerr << "GetMaybeLongElement char " << *smiles << " characters_to_process " <<
-  // characters_to_process << '\n';
-
-  // Find the closing square bracket.
-  int close_square_bracket = -1;
-  for (int i = 0; i < characters_to_process; ++i) {
-    if (smiles[i] == kCloseBracket) {
-      close_square_bracket = i;
+  int symbol_length = 0;
+  while (symbol_length < close_bracket) {
+    const char c = smiles[symbol_length];
+    if (c == '@' || c == '+' || c == '-' || c == ':') {
       break;
     }
+    ++symbol_length;
   }
 
-  if (close_square_bracket < 0) {
-    cerr << "GetMaybeLongElement:no closing bracket\n";
+  // Strip a suffix, not an arbitrary occurrence of H within the name. Keep a
+  // standalone H as the hydrogen element, rather than an empty element name.
+  int suffix = symbol_length;
+  while (suffix > 0 && isdigit(static_cast<unsigned char>(smiles[suffix - 1]))) {
+    --suffix;
+  }
+  if (suffix > 1 && smiles[suffix - 1] == 'H') {
+    symbol_length = suffix - 1;
+  }
+  if (symbol_length == 0 || !isalpha(static_cast<unsigned char>(*smiles))) {
+    cerr << "GetMaybeLongElement:element names must start with a letter\n";
     return 0;
   }
 
-  characters_to_process = close_square_bracket;
-  if (characters_to_process == 0) {
-    cerr << "GetMaybeLongElement:empty atom\n";
-    return 0;
-  }
-
-  int rc = 0;
-
-  if (characters_to_process <= 0) {
-    cerr << "GetMaybeLongElement:pure numeric element not allowed\n";
-    return 0;
-  }
-
-  if (smiles[characters_to_process - 1] == '+') {
-    fc = 1;
-    --characters_to_process;
-    ++rc;
-  } else if (smiles[characters_to_process - 1] == '-') {
-    fc = -1;
-    --characters_to_process;
-    ++rc;
-  }
-
-  if (smiles[characters_to_process - 1] == 'H') {
-    hcount = 1;
-    --characters_to_process;
-    ++rc;
-  }
-
-  if (characters_to_process <= 0) {
-    cerr << "GetMaybeLongElement:no element\n";
-    return 0;
-  }
-
-  if (characters_to_process > 2) {
-    if (isdigit(smiles[characters_to_process - 1]) &&
-        smiles[characters_to_process - 2] == 'H') {
-      hcount = smiles[characters_to_process - 1] - '0';
-      characters_to_process -= 2;
-      rc += 2;
-    }
-  }
-
-  // cerr << "Hcount now " << hcount << " charge " << fc << '\n';
-
-  // Even long element names must start alphanumeric.
-  if (!::isalpha(*smiles)) {
-    cerr << "GetMaybeLongElement:elements must start with an alphanumeric '" << *smiles
-         << "' invalid\n";
-    return 0;
-  }
-
-  // cerr << "characters_to_process " << characters_to_process << " check for single
-  // letter element\n";
-  if (characters_to_process == 1) {
-    const char c = smiles[0];
-
-    if (c == 'D' && element::interpret_d_as_deuterium()) {
+  if (symbol_length == 1) {
+    if (*smiles == 'D' && element::interpret_d_as_deuterium()) {
       result = get_element_from_atomic_number(1);
       atomic_mass = 2;
-      return rc + 1;
+      return 1;
     }
-
-    if (c == 'T' && element::interpret_t_as_tritium()) {
+    if (*smiles == 'T' && element::interpret_t_as_tritium()) {
       result = get_element_from_atomic_number(1);
       atomic_mass = 3;
-      return rc + 1;
+      return 1;
     }
-
-    if (c == 'c') {
-      result = get_element_from_atomic_number(6);
-      aromatic = 1;
-      return rc + 1;
-    }
-    if (c == 'n') {
-      result = get_element_from_atomic_number(7);
-      aromatic = 1;
-      return rc + 1;
-    }
-    if (c == 'o') {
-      result = get_element_from_atomic_number(8);
-      aromatic = 1;
-      return rc + 1;
-    }
-    if (c == 's') {
-      result = get_element_from_atomic_number(16);
-      aromatic = 1;
-      return rc + 1;
-    }
-
-    result = get_element_from_symbol_no_case_conversion(smiles, 1);
-    if (result != nullptr) {
-      return rc + 1;
-    }
-
-    // element_from_long_smiles_string needs the closing square bracket.
-    // It might be here, but might not...
-    IWString tmp;
-    tmp << *smiles << kCloseBracket;
-    return rc + element_from_long_smiles_string(tmp.data(), 3, result);
   }
 
-  // element_from_long_smiles_string needs the closing square bracket.
-  IWString tmp;
-  tmp.strncat(smiles, characters_to_process);
-  tmp << kCloseBracket;
-  return rc +
-         element_from_long_smiles_string(tmp.data(), characters_to_process + 1, result);
+  // Recognize complete aromatic symbols, without treating an arbitrary name
+  // beginning with one of these letters as a periodic-table element.
+  const const_IWSubstring symbol(smiles, symbol_length);
+  if (symbol == "b" || symbol == "c" || symbol == "n" || symbol == "o" ||
+      symbol == "p" || symbol == "s" || symbol == "as" || symbol == "se") {
+    IWString normalized(symbol);
+    normalized[0] = toupper(static_cast<unsigned char>(normalized[0]));
+    result = get_element_from_symbol_no_case_conversion(normalized.data(), normalized.length());
+    if (result != nullptr) {
+      aromatic = AROMATIC;
+      return symbol_length;
+    }
+  }
+
+  result = get_element_from_symbol_no_case_conversion(smiles, symbol_length);
+  if (result != nullptr) {
+    return symbol_length;
+  }
+
+  // Look up or create the whole symbol: [Cz] must not become C followed by z.
+  IWString token(symbol);
+  token << kCloseBracket;
+  return element_from_long_smiles_string(token.data(), token.length(), result);
 }
 
 /*
@@ -1137,7 +1078,7 @@ parse_smiles_token(const char* smiles, int characters_to_process, const Element*
   // cerr << "Begin check on smiles at " << *smiles << '\n';
   if (isalpha(*smiles)) {
     if (atomic_symbols_can_have_arbitrary_length()) {
-      tmp = GetMaybeLongElement(smiles, characters_to_process, aromatic, fc, hcount,
+      tmp = GetMaybeLongElement(smiles, characters_to_process - rc, aromatic,
                                 atomic_mass, e);
     } else {
       tmp = element_from_smiles_string(smiles, characters_to_process, e);

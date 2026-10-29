@@ -336,13 +336,13 @@ class TestNanobindMolecule(LillyMolNanobindTestCase):
         settings = dict(largest_fragment=True, remove_chirality=True,
                         remove_cis_trans_bonds=True, remove_isotopes=True,
                         skip_invalid_valence=True, skip_non_organic=True,
-                        skip_non_periodic_table_elements=False)
+                        skip_non_periodic_table_elements=True)
         with tempfile.TemporaryDirectory() as directory:
             fname = os.path.join(directory, "input.smi")
             with open(fname, "w") as output:
                 output.write("CC.[Na+] salt\n[13CH3][C@H](O)F chiral\n"
                              "F/C=C/F alkene\nC=[SH]-C bad_valence\n"
-                             "CC[Na] sodium\nCCC last\n")
+                             "CC[Na] sodium\nC[Zz] unknown\nCCC last\n")
             options = lillymol.ReaderOptions(**settings)
             direct = lillymol.slurp(fname, **settings)
             configured = lillymol.slurp(fname, options=options)
@@ -369,9 +369,10 @@ class TestNanobindMolecule(LillyMolNanobindTestCase):
         with tempfile.TemporaryDirectory() as directory:
             fname = os.path.join(directory, "input.smi")
             with open(fname, "w") as output:
-                output.write("CC first\nC[Zz] unknown\nCCC last\n")
+                output.write("CC first\nC[Zz] unknown\nC[C@H](O)F stereo\nCCC last\n")
             molecules = lillymol.slurp(fname, skip_non_periodic_table_elements=True)
-            self.assertEqual([m.name() for m in molecules], ["first", "last"])
+            self.assertEqual([m.name() for m in molecules], ["first", "stereo", "last"])
+            self.assertEqual(molecules[1].number_chiral_centres(), 1)
             self.assertIsNone(lillymol.MolFromSmiles("C[SlurpUncreatedElement]"))
 
     def test_slurp_file_type_and_empty_results(self):

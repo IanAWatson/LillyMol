@@ -24,8 +24,8 @@ fi
 # If inside Lilly, use local scratch storage when available.
 if [[ ${inside_lilly} -eq 1 && -d '/node/scratch' ]] ; then
     echo "--output_user_root=/node/scratch/${USER}/bazel"
-elif [[ -d '/Projects' && -w '/Projects' ]] ; then
-    echo "--output_user_root=/Projects/${USER}/bazel"
+elif [[ -d '/projects' && -w '/projects' ]] ; then
+    echo "--output_user_root=/projects/${USER}/bazel"
 elif [[ $(uname) == 'Linux' && $(df -TP "${HOME}") =~ 'nfs' ]] ; then
     echo 'Your HOME dir is an NFS mounted file system. bazel will not work there.' >&2
     echo 'Will attempt to use /tmp for bazel cache; change this if needed.' >&2

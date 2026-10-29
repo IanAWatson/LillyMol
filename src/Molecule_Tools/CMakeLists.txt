@@ -184,6 +184,7 @@ target_link_libraries(geometric_descriptors LINK_PUBLIC ${geometric_descriptors_
 # hydrophobic_sections
 set(hydrophobic_sections_srcs
   hydrophobic_sections.cc
+  hydrophobic_sections_lib.cc
 )
 set(hydrophobic_sections_libs
   ${common_libs}

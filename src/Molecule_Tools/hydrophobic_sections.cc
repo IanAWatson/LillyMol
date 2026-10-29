@@ -5,12 +5,15 @@
 #include <stdlib.h>
 
 #include <algorithm>
+#include <cmath>
+#include <limits>
 #include <iostream>
 #include <memory>
 
 #include "Foundational/accumulator/accumulator.h"
 #include "Foundational/cmdline/cmdline.h"
 #include "Foundational/iwmisc/misc.h"
+#include "Foundational/iwmisc/iwdigits.h"
 
 #include "Molecule_Lib/aromatic.h"
 #include "Molecule_Lib/istream_and_type.h"
@@ -21,9 +24,13 @@
 #include "Molecule_Lib/smiles.h"
 #include "Molecule_Lib/target.h"
 
+#include "Molecule_Tools/hydrophobic_sections_lib.h"
+
 using std::cerr;
 
 static int verbose = 0;
+
+static Fraction_as_String fraction_as_string;
 
 static float float_zero = static_cast<float>(0.0);
 
@@ -71,6 +78,9 @@ static Molecule_Output_Object stream_for_labelled_molecules;
   aren't hydrophobic at all
 */
 
+// Zero processes all atoms; positive selects labelled, negative unlabelled.
+static int isotope_selection = 0;
+
 static int min_hydrophobic_section_size = 1;
 static int min_hydrophillic_section_size = 1;
 
@@ -94,12 +104,13 @@ usage(int rc) {
 #endif
   // clang-format on
   // clang-format off
+  cerr << "  -I iso|noiso   process only labelled|unlabelled atoms, then clear isotopes\n";
   cerr << "  -G <smarts>    SMARTS query to designate hydrophobic atoms\n";
   cerr << "  -G q:<file>    hydrophobic query file\n";
   cerr << "  -G Q:<file>    hydrophobic queries in <file>\n";
   cerr << "  -G minsize=nn  minimum size for a hydrophobic section\n";
   cerr << "  -G charge=q    max partial charge for a hydrophobic atom\n";
-  cerr << "  -G iso=nn      write hydrophillic atoms with isotope <nn>\n";
+  cerr << "  -G iso=nn      write hydrophobic atoms with isotope <nn>\n";
   cerr << "  -G simple      use simple builtin rules for hydrophobicity\n";
   cerr << "  -L <smarts>    SMARTS query to designate hydrophillic atoms\n";
   cerr << "  -L q:<file>    hydrophillic query file\n";
@@ -120,13 +131,27 @@ usage(int rc) {
   exit(rc);
 }
 
+// Use integer output for counts and stable fixed-decimal output for fractions.
+static void
+AppendDescriptor(float value, IWString& buffer) {
+  constexpr double kIntegerTolerance = 1.0e-5;
+  const double nearest = std::round(static_cast<double>(value));
+  if (std::abs(value - nearest) <= kIntegerTolerance &&
+      nearest >= std::numeric_limits<int>::min() &&
+      nearest <= std::numeric_limits<int>::max()) {
+    buffer << static_cast<int>(nearest);
+  } else {
+    fraction_as_string.append_number(buffer, value);
+  }
+}
+
 static int
 do_write_descriptors(const resizable_array<float>& descriptors, IWString& buffer) {
   int n = descriptors.number_elements();
 
   for (int i = 0; i < n; i++) {
     buffer += ' ';
-    buffer.append_number(descriptors[i], 3);
+    AppendDescriptor(descriptors[i], buffer);
   }
 
   return 1;
@@ -298,7 +323,7 @@ arom_count(Molecule& m, int flag, const int* hydrophobic) {
       continue;
     }
 
-    if (!m.is_aromatic(i)) {  // found ! aromatic works better than aromatic()
+    if (m.is_aromatic(i)) {
       rc++;
     }
   }
@@ -389,63 +414,6 @@ is_terminal(const Molecule& m, int flag, const int* hydrophobic) {
 }
 
 static int
-identify_contiguous_section(const Molecule& m, atom_number_t zatom, int flag,
-                            int* hydrophobic) {
-  hydrophobic[zatom] = flag;
-
-  int rc = 1;
-
-  const Atom* a = m.atomi(zatom);
-
-  int nc = a->ncon();
-  for (int i = 0; i < nc; i++) {
-    atom_number_t j = a->other(zatom, i);
-    if (0 == hydrophobic[j]) {
-      continue;
-    }
-
-    if (flag == hydrophobic[j]) {  // must be a hydrophobic ring somewhere
-      continue;
-    }
-
-    rc += identify_contiguous_section(m, j, flag, hydrophobic);
-  }
-
-  return rc;
-}
-
-static int
-identify_contiguous_sections(const Molecule& m, resizable_array<int>& section_size,
-                             int* hydrophobic) {
-  int matoms = m.natoms();
-  for (int i = 0; i < matoms; i++) {
-    if (hydrophobic[i]) {
-      hydrophobic[i] = matoms + 1;
-    }
-  }
-
-  int number_sections = 0;
-
-  for (int i = 0; i < matoms; i++) {
-    if (0 == hydrophobic[i]) {
-      continue;
-    }
-
-    if (matoms + 1 != hydrophobic[i]) {  // already assigned
-      continue;
-    }
-
-    number_sections++;
-    hydrophobic[i] = number_sections;
-    int size_of_section = identify_contiguous_section(m, i, number_sections, hydrophobic);
-
-    section_size.add(size_of_section);
-  }
-
-  return number_sections;
-}
-
-static int
 do_write_labelled_smiles(Molecule& m, const isotope_t* isotope,
                          Molecule_Output_Object& output) {
   m.set_isotopes(isotope);
@@ -461,12 +429,15 @@ do_write_labelled_smiles(Molecule& m, const isotope_t* isotope,
 static int
 check_atoms_both_hydrophobic_and_hydrophillic(
     const Molecule& m, const int* hyphil, const int* hyphob,
-    int& atoms_neither_hydrophobic_nor_hydrophillic) {
+    const int* eligible, int& atoms_neither_hydrophobic_nor_hydrophillic) {
   atoms_neither_hydrophobic_nor_hydrophillic = 0;
 
   int matoms = m.natoms();
 
   for (int i = 0; i < matoms; i++) {
+    if (eligible && !eligible[i]) {
+      continue;
+    }
     if (hyphil[i] && hyphob[i]) {
       cerr << "\nFatal error, atom " << i << " " << m.smarts_equivalent_for_atom(i)
            << " both hydrophobic and hydrophillic, molecule '" << m.name() << "'\n";
@@ -555,16 +526,19 @@ check_3_connected_aromatic(Molecule& m, atom_number_t c) {
 
     const Atom* aj = m.atomi(j);
 
-    if (1 == aj->ncon() && 6 != aj->atomic_number()) {  // phenol, aniline
+    const atomic_number_t z = aj->atomic_number();
+    // Halogens are hydrophobic and must remain connected to the ring section.
+    if (z == 9 || z == 17 || z == 35 || z == 53) {
+      continue;
+    }
+    if (1 == aj->ncon() && 6 != z) {  // phenol, aniline
       return 0;
     }
 
     int j_attached_heteroatom_count = m.attached_heteroatom_count(j);
 
-    if (6 == aj->atomic_number() && j_attached_heteroatom_count &&
-        aj->ncon() < aj->nbonds()) {  // maybe an aldehyde or cyano or amide
-      return 0;
-    }
+    // A polar group on an external carbon does not exclude this ring carbon.
+    // The external carbon is classified separately by the simple rules.
 
     if (7 == aj->atomic_number() && 3 == aj->ncon() && 2 == j_attached_heteroatom_count &&
         5 == aj->nbonds()) {  // probably a nitro, can be hydrophobic
@@ -737,7 +711,8 @@ do_apply_simple_hydrophillic_rules(Molecule& m, int* hydrophillic) {
     }
 
     if (16 == z) {
-      if (two_connected_sulphur_is_greasy && 2 == a->ncon() && !m.is_aromatic(i)) {
+      if ((2 == a->ncon() && m.is_aromatic(i) && a->formal_charge() == 0) ||
+          (two_connected_sulphur_is_greasy && 2 == a->ncon() && !m.is_aromatic(i))) {
         continue;
       }
     }
@@ -752,8 +727,38 @@ do_apply_simple_hydrophillic_rules(Molecule& m, int* hydrophillic) {
   return;
 }
 
+// A hydrogen on a carbonyl or imine carbon does not make that carbon
+// hydrophobic. Aromatic bonds and multiple bonds to carbon do not exclude it.
+static bool
+MultipleBondToHeteroatom(const Molecule& m, atom_number_t carbon) {
+  for (const Bond* bond : m[carbon]) {
+    if (bond->is_aromatic() || bond->is_single_bond()) {
+      continue;
+    }
+    const atomic_number_t z = m.atomic_number(bond->other(carbon));
+    if (z != 6 && z != 1) {
+      return true;
+    }
+  }
+  return false;
+}
+
+// Includes substituted alkene and alkyne carbons with no attached hydrogen.
+static bool
+OnlyCarbonOrHydrogenNeighbours(const Molecule& m, atom_number_t carbon) {
+  for (const Bond* bond : m[carbon]) {
+    const atomic_number_t z = m.atomic_number(bond->other(carbon));
+    if (z != 6 && z != 1) {
+      return false;
+    }
+  }
+  return true;
+}
+
 static void
 do_apply_simple_hydrophobic_rules(Molecule& m, int* hydrophobic) {
+  // Bond aromaticity is needed before testing multiple bonds to heteroatoms.
+  m.compute_aromaticity_if_needed();
   int matoms = m.natoms();
 
   for (int i = 0; i < matoms; i++) {
@@ -766,11 +771,16 @@ do_apply_simple_hydrophobic_rules(Molecule& m, int* hydrophobic) {
     const atomic_number_t z = a->atomic_number();
 
     if (6 == z) {
+      if (MultipleBondToHeteroatom(m, i)) {
+        continue;
+      }
       if (attached_to_Nitrogen(m, i)) {
         ;
       } else if (a->implicit_hydrogens()) {
         hydrophobic[i] = 1;
       } else if (4 == a->ncon()) {
+        hydrophobic[i] = 1;
+      } else if (!m.is_aromatic(i) && OnlyCarbonOrHydrogenNeighbours(m, i)) {
         hydrophobic[i] = 1;
       } else if (m.is_aromatic(i) && 3 == a->ncon() && check_3_connected_aromatic(m, i)) {
         hydrophobic[i] = 1;
@@ -787,7 +797,8 @@ do_apply_simple_hydrophobic_rules(Molecule& m, int* hydrophobic) {
 
       hydrophobic[i] = 1;
     } else if (16 == z) {
-      if (two_connected_sulphur_is_greasy && 2 == a->ncon() && !m.is_aromatic(i)) {
+      if ((2 == a->ncon() && m.is_aromatic(i) && a->formal_charge() == 0) ||
+          (two_connected_sulphur_is_greasy && 2 == a->ncon() && !m.is_aromatic(i))) {
         hydrophobic[i] = 1;
       }
     } else if (part_of_aromatic_nitro(m, i, hydrophobic, 1)) {
@@ -863,25 +874,24 @@ identify_hydrophobic_atoms(Molecule& m, int* hydrophobic) {
 }
 
 static int
-do_create_descriptors(Molecule& m, int hydrophobic_atoms, int* hydrophobic,
-                      resizable_array<float>& descriptors) {
-  int matoms = m.natoms();
+do_create_descriptors(Molecule& m, const hydrophobic::Sections& sections,
+                      int eligible_atoms, resizable_array<float>& descriptors) {
+  const int hydrophobic_atoms = sections.atoms_in_sections();
+  const int* hydrophobic = sections.membership().data();
 
   float hydrophobic_atom_fraction =
-      static_cast<float>(hydrophobic_atoms) / static_cast<float>(matoms);
+      eligible_atoms ? static_cast<float>(hydrophobic_atoms) /
+                           static_cast<float>(eligible_atoms) : 0.0f;
 
   descriptors.add(static_cast<float>(hydrophobic_atoms));          // DDnumbr
   descriptors.add(static_cast<float>(hydrophobic_atom_fraction));  // DDratio
 
-  resizable_array<int> section_size;
-
-  int contiguous_sections = identify_contiguous_sections(m, section_size, hydrophobic);
+  const std::vector<int>& section_size = sections.sizes();
+  const int contiguous_sections = sections.number_sections();
 
   if (verbose > 2) {
     cerr << "Found " << contiguous_sections << " contiguous sections\n";
   }
-
-  assert(contiguous_sections == section_size.number_elements());
 
   descriptors.add(static_cast<float>(contiguous_sections));  // DDnsect
 
@@ -920,14 +930,14 @@ do_create_descriptors(Molecule& m, int hydrophobic_atoms, int* hydrophobic,
       static_cast<float>(size_acc.average_if_available_minval_if_not()));  // DDavesz
   descriptors.add(static_cast<float>(size_acc.maxval()));                  // DDmaxsz
   descriptors.add(static_cast<float>(size_acc.maxval()) /
-                  static_cast<float>(matoms));  // DDmxntr
+                  static_cast<float>(eligible_atoms));  // DDmxntr
 
   descriptors.add(static_cast<float>(pi_acc.minval()));  // DDminpi
   descriptors.add(
       static_cast<float>(pi_acc.average_if_available_minval_if_not()));  // DDavepi
   descriptors.add(static_cast<float>(pi_acc.maxval()));                  // DDmaxpi
   descriptors.add(static_cast<float>(pi_acc.maxval()) /
-                  static_cast<float>(matoms));  // DDmpntr
+                  static_cast<float>(eligible_atoms));  // DDmpntr
 
   descriptors.add(static_cast<float>(mxdst_acc.maxval()));  // DDmxmxd
   descriptors.add(
@@ -944,7 +954,8 @@ do_create_descriptors(Molecule& m, int hydrophobic_atoms, int* hydrophobic,
 }
 
 static int
-hydrophobic_sections(Molecule& m, int* hyphil, isotope_t* isotope, IWString& output_buffer) {
+hydrophobic_sections(Molecule& m, int* hyphil, isotope_t* isotope,
+                     const int* eligible, int eligible_atoms, IWString& output_buffer) {
   int matoms = m.natoms();
 
   if (verbose > 1) {
@@ -960,8 +971,21 @@ hydrophobic_sections(Molecule& m, int* hyphil, isotope_t* isotope, IWString& out
   }
 
   identify_hydrophobic_atoms(m, hyphob);
+  if (eligible) {
+    for (int i = 0; i < matoms; ++i) {
+      if (!eligible[i]) {
+        hyphob[i] = 0;
+      }
+    }
+  }
 
-  int hydrophobic_atoms = count_non_zero_occurrences_in_array(hyphob, matoms);
+  hydrophobic::Sections hydrophobic_sections;
+  if (!hydrophobic_sections.Build(m, hyphob, min_hydrophobic_section_size)) {
+    return 0;
+  }
+  std::copy(hydrophobic_sections.membership().begin(),
+            hydrophobic_sections.membership().end(), hyphob);
+  const int hydrophobic_atoms = hydrophobic_sections.atoms_in_sections();
   hydrophobic_atom_count.extra(hydrophobic_atoms);
 
   if (verbose > 2) {
@@ -986,7 +1010,7 @@ hydrophobic_sections(Molecule& m, int* hyphil, isotope_t* isotope, IWString& out
 
   resizable_array<float> hydrophobic_descriptors;
 
-  do_create_descriptors(m, hydrophobic_atoms, hyphob, hydrophobic_descriptors);
+  do_create_descriptors(m, hydrophobic_sections, eligible_atoms, hydrophobic_descriptors);
 
 #ifdef DEBUG_WRITE_DESCRIPTORS
   cerr << "Writing " << hydrophobic_descriptors.number_elements()
@@ -997,6 +1021,19 @@ hydrophobic_sections(Molecule& m, int* hyphil, isotope_t* isotope, IWString& out
 
   if (create_hydrophillic_descriptors) {
     identify_hydrophillic(m, hyphil, hyphob);
+    if (eligible) {
+      for (int i = 0; i < matoms; ++i) {
+        if (!eligible[i]) {
+          hyphil[i] = 0;
+        }
+      }
+    }
+    hydrophobic::Sections hydrophillic_sections;
+    if (!hydrophillic_sections.Build(m, hyphil, min_hydrophillic_section_size)) {
+      return 0;
+    }
+    std::copy(hydrophillic_sections.membership().begin(),
+              hydrophillic_sections.membership().end(), hyphil);
 
     if (hydrophillic_isotope) {
       copy_isotopic_info(matoms, isotope, hyphil, hydrophillic_isotope);
@@ -1004,7 +1041,7 @@ hydrophobic_sections(Molecule& m, int* hyphil, isotope_t* isotope, IWString& out
 
     int atoms_neither_hydrophobic_nor_hydrophillic = 0;
     if (!check_atoms_both_hydrophobic_and_hydrophillic(
-            m, hyphil, hyphob, atoms_neither_hydrophobic_nor_hydrophillic)) {
+            m, hyphil, hyphob, eligible, atoms_neither_hydrophobic_nor_hydrophillic)) {
       return 0;
     }
 
@@ -1016,16 +1053,16 @@ hydrophobic_sections(Molecule& m, int* hyphil, isotope_t* isotope, IWString& out
     }
 
     if (hydrophillic_atoms) {
-      output_buffer << ' '
-                    << static_cast<float>(hydrophobic_atoms) /
-                           static_cast<float>(hydrophillic_atoms);
+      output_buffer << ' ';
+      AppendDescriptor(static_cast<float>(hydrophobic_atoms) /
+                           static_cast<float>(hydrophillic_atoms), output_buffer);
     } else {
-      output_buffer << " 99";
+      output_buffer << (eligible_atoms ? " 99" : " 0");
     }
 
     resizable_array<float> hydrophillic_descriptors;
 
-    do_create_descriptors(m, hydrophillic_atoms, hyphil, hydrophillic_descriptors);
+    do_create_descriptors(m, hydrophillic_sections, eligible_atoms, hydrophillic_descriptors);
 
 #ifdef DEBUG_WRITE_DESCRIPTORS
     cerr << "Writing " << hydrophillic_descriptors.number_elements()
@@ -1057,9 +1094,9 @@ hydrophobic_sections(Molecule& m, int* hyphil, isotope_t* isotope, IWString& out
 
     if (atoms_neither_hydrophobic_nor_hydrophillic) {
       float tmp = static_cast<float>(atoms_neither_hydrophobic_nor_hydrophillic) /
-                  static_cast<float>(matoms);
-      output_buffer << ' ' << atoms_neither_hydrophobic_nor_hydrophillic << ' '
-                    << tmp;  // DDNTnhphpi DDNTfnhopi
+                  static_cast<float>(eligible_atoms);
+      output_buffer << ' ' << atoms_neither_hydrophobic_nor_hydrophillic << ' ';
+      AppendDescriptor(tmp, output_buffer);  // DDNTnhphpi DDNTfnhopi
     } else {
       output_buffer << " 0 0";
     }
@@ -1077,6 +1114,18 @@ preprocess(Molecule& m) {
   }
 
   return;
+}
+
+// Capture isotope-based eligibility before input isotope labels are cleared.
+static std::unique_ptr<int[]>
+EligibleAtoms(const Molecule& m, int selection, int& eligible_atoms) {
+  auto eligible = std::make_unique<int[]>(m.natoms());
+  eligible_atoms = 0;
+  for (int i = 0; i < m.natoms(); ++i) {
+    eligible[i] = selection > 0 ? m.isotope(i) != 0 : m.isotope(i) == 0;
+    eligible_atoms += eligible[i];
+  }
+  return eligible;
 }
 
 static int
@@ -1104,7 +1153,16 @@ hydrophobic_sections(Molecule& m,
     std::fill_n(isotope.get(), matoms, 0);
   }
 
-  int rc = hydrophobic_sections(m, hyphil.get(), isotope.get(), output);
+  std::unique_ptr<int[]> eligible;
+  int eligible_atoms = matoms;
+  if (isotope_selection) {
+    eligible = EligibleAtoms(m, isotope_selection, eligible_atoms);
+    // The input labels define eligibility only; output labels are independent.
+    m.transform_to_non_isotopic_form();
+  }
+
+  int rc = hydrophobic_sections(m, hyphil.get(), isotope.get(), eligible.get(),
+                               eligible_atoms, output);
 
   if (isotope) {
     do_write_labelled_smiles(m, isotope.get(), stream_for_labelled_molecules);
@@ -1379,7 +1437,7 @@ DisplayDashYOptions() {
 
 static int
 hydrophobic_sections(int argc, char** argv) {
-  Command_Line cl(argc, argv, "vi:A:E:nG:L:e:xo:S:Y:");
+  Command_Line cl(argc, argv, "vi:A:E:nG:L:e:xo:S:Y:I:");
 
   if (cl.unrecognised_options_encountered()) {
     cerr << "unrecognised_options_encountered\n";
@@ -1387,6 +1445,33 @@ hydrophobic_sections(int argc, char** argv) {
   }
 
   verbose = cl.option_count('v');
+
+  // Values outside [0, 1] use the same stable three-decimal fallback.
+  if (!fraction_as_string.initialise(0.0f, 1.0f, 3)) {
+    cerr << "Cannot initialise descriptor number formatting\n";
+    return 1;
+  }
+
+  if (cl.option_present('I')) {
+    const_IWSubstring selection;
+    int i = 0;
+    while (cl.value('I', selection, i++)) {
+      int mode;
+      if (selection == "iso") {
+        mode = 1;
+      } else if (selection == "noiso") {
+        mode = -1;
+      } else {
+        cerr << "Invalid -I qualifier '" << selection << "', use iso or noiso\n";
+        return 1;
+      }
+      if (isotope_selection && isotope_selection != mode) {
+        cerr << "Cannot combine -I iso and -I noiso\n";
+        return 1;
+      }
+      isotope_selection = mode;
+    }
+  }
 
   strip_to_largest_fragment = 1;
 

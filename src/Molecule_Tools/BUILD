@@ -1139,8 +1139,10 @@ cc_binary(
         "hydrophobic_sections.cc",
     ],
     deps = [
+        ":hydrophobic_sections_lib",
         "//Foundational/cmdline:iwcmdline",
         "//Foundational/iwaray",
+        "//Foundational/iwmisc",
         "//Molecule_Lib:iwmolecule",
         "//Molecule_Lib:moleculeio",
     ],
@@ -4218,4 +4220,32 @@ py_test(
     srcs = ["substitutions_test.py"],
     args = ["$(location :substitutions)"],
     data = [":substitutions"],
+)
+
+cc_library(
+    name = "hydrophobic_sections_lib",
+    srcs = ["hydrophobic_sections_lib.cc"],
+    hdrs = ["hydrophobic_sections_lib.h"],
+    visibility = ["//visibility:public"],
+    deps = ["//Molecule_Lib:iwmolecule"],
+)
+
+cc_test(
+    name = "hydrophobic_sections_lib_test",
+    size = "small",
+    srcs = ["hydrophobic_sections_lib_test.cc"],
+    deps = [
+        ":hydrophobic_sections_lib",
+        "//Molecule_Lib:iwmolecule",
+        "//Molecule_Lib:moleculeio",
+        "@googletest//:gtest_main",
+    ],
+)
+
+py_test(
+    name = "hydrophobic_sections_test",
+    size = "small",
+    srcs = ["hydrophobic_sections_test.py"],
+    args = ["$(location :hydrophobic_sections)"],
+    data = [":hydrophobic_sections"],
 )

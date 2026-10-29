@@ -2977,6 +2977,7 @@ cc_binary(
         "substitutions.cc",
     ],
     deps = [
+        ":nvrtspsa",
         "//Foundational/cmdline:iwcmdline",
         "//Foundational/histogram:iwhistogram",
         "//Foundational/iwmisc",
@@ -4209,4 +4210,12 @@ py_test(
     srcs = ["chemotypes_cli_test.py"],
     args = ["$(location :chemotypes)"],
     data = [":chemotypes"],
+)
+
+py_test(
+    name = "substitutions_test",
+    size = "small",
+    srcs = ["substitutions_test.py"],
+    args = ["$(location :substitutions)"],
+    data = [":substitutions"],
 )

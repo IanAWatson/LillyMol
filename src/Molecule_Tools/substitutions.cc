@@ -5,6 +5,7 @@
 
 #include <algorithm>
 #include <deque>
+#include <filesystem>
 #include <iomanip>
 #include <limits>
 #include <map>
@@ -33,263 +34,27 @@
 #include "Molecule_Lib/standardise.h"
 #include "Molecule_Lib/target.h"
 
+#include "Molecule_Tools/nvrtspsa.h"
+
 using std::cerr;
 using std::endl;
 
+static constexpr char kSep = '\t';
+
 static int add_properties_to_groups = 0;
-static const char * prop_header[] = {"natoms", "nrings", "amw", "ro5_ohnh", "ro5_on", "nvrtspsa",  "halogen",  "fcsp3",  "ringsys",  "arring",  "alring", "ringatom",  "mxdst"};
-static int prop_number = 13;
+static const char* const prop_header[] = {"natoms", "nrings", "amw", "ro5_ohnh", "ro5_on", "nvrtspsa",  "halogen",  "fcsp3",  "ringsys",  "arring",  "alring", "ringatom",  "mxdst"};
+static constexpr int prop_number = sizeof(prop_header) / sizeof(prop_header[0]);
 
-static double
-novartis_polar_suface_area_nitrogen (Molecule & m,
-                                     atom_number_t zatom,
-                                     Atom & a,
-                                     int is_aromatic)
-{
-  int ncon = a.ncon();
+// Use the same TPSA classification as the descriptor tools. Unlike the old
+// private copy, this includes aromatic/thioether sulphur and handles explicit H.
+static const nvrtspsa::NovartisPolarSurfaceArea tpsa_calculator = [] {
+  nvrtspsa::NovartisPolarSurfaceArea result;
+  result.set_display_psa_unclassified_atom_messages(0);
+  return result;
+}();
 
-  int aromatic_bonds = 0;
-  int single_bonds = 0;
-  int double_bonds = 0;
-  int triple_bonds = 0;
-
-  for (int i = 0; i < ncon; i++)
-  {
-    const Bond * b = a[i];
-
-    if (b->is_aromatic())
-      aromatic_bonds++;
-    else if (b->is_single_bond())
-      single_bonds++;
-    else if (b->is_double_bond())
-      double_bonds++;
-    else
-      triple_bonds++;
-  }
-
-  int hcount = a.implicit_hydrogens();
-
-  formal_charge_t fc = a.formal_charge();
-
-  if (is_aromatic)
-  {
-    if (0 == fc && 0 == hcount && 2 == ncon && 2 == aromatic_bonds)   // [n](:*):*
-      return 12.89;
-    if (0 == fc && 0 == hcount && 3 == ncon && 3 == aromatic_bonds)   // [n](:*)(:*):*
-      return 4.41;
-    if (0 == fc && 0 == hcount && 3 == ncon && 2 == aromatic_bonds && 1 == single_bonds)    // [n](-*)(:*):*
-      return 4.93;
-    if (0 == fc && 0 == hcount && 3 == ncon && 2 == aromatic_bonds && 1 == double_bonds)    // [n](=*)(:*):*
-      return 8.39;
-    if (0 == fc && 1 == hcount && 2 == ncon && 2 == aromatic_bonds)   // [nH](:*):*
-      return 15.79;
-    if (1 == fc && 0 == hcount && 3 == ncon && 3 == aromatic_bonds)   // [n+](:*)(:*):*
-      return 4.10;
-    if (1 == fc && 0 == hcount && 3 == ncon && 2 == aromatic_bonds && 1 == single_bonds)    // [n+](-*):*):*
-      return 3.88;
-    if (1 == fc && 1 == hcount && 2 == ncon && 2 == aromatic_bonds)   // [nH+](:*):*
-      return 14.14;
-  }
-  else
-  {
-    if (0 == fc && 0 == hcount && 3 == ncon && 3 == single_bonds && m.in_ring_of_given_size(zatom, 3))    // case of N1C=C1 maybe handled incorrectly       // [N]1(-*)-*-*-1     do ring queries first
-      return 3.01;
-    if (0 == fc && 1 == hcount && 2 == ncon && 2 == single_bonds && m.in_ring_of_given_size(zatom, 3))       // [NH]1-*-*-1     do ring queries first
-      return 21.94;
-
-    if (0 == fc && 0 == hcount && 3 == ncon && 3 == single_bonds)      // [N](-*)-*
-      return 3.24;
-    if (0 == fc && 0 == hcount && 2 == ncon && 1 == single_bonds && 1 == double_bonds)   // [N](-*)=*
-      return 12.36;
-    if (0 == fc && 0 == hcount && 1 == ncon && 1 == triple_bonds)       // [N]#*
-      return 23.79;
-    if (0 == fc && 0 == hcount && 3 == ncon && 1 == single_bonds && 2 == double_bonds)       // [N](-*)(=*)(=*)
-      return 11.68;
-    if (0 == fc && 0 == hcount && 2 == ncon && 1 == double_bonds && 1 == triple_bonds)       // [N](=*)#*
-      return 13.60;
-    if (0 == fc && 1 == hcount && 2 == ncon && 2 == single_bonds)       // [NH](-*)-*
-      return 12.03;
-    if (0 == fc && 1 == hcount && 1 == ncon && 1 == double_bonds)       // [NH]=*
-      return 23.85;
-    if (0 == fc && 2 == hcount && 1 == ncon && 1 == single_bonds)       // [NH2]-*
-      return 26.02;
-    if (1 == fc && 0 == hcount && 4 == ncon && 4 == single_bonds)     // [N+](-*)(-*)(-*)-*
-      return 0.0;
-    if (1 == fc && 0 == hcount && 3 == ncon && 2 == single_bonds && 1 == double_bonds)     // [N+](-*)(-*)=*
-      return 3.01;
-    if (1 == fc && 0 == hcount && 2 == ncon && 1 == single_bonds && 1 == triple_bonds)     // [N+](-*)#*
-      return 4.36;
-    if (1 == fc && 1 == hcount && 3 == ncon && 3 == single_bonds)     // [NH+](-*)(-*)-*
-      return 4.44;
-    if (1 == fc && 1 == hcount && 2 == ncon && 1 == single_bonds && 1 == double_bonds)     // [NH+](-*)=*
-      return 13.97;
-    if (1 == fc && 2 == hcount && 2 == ncon && 2 == single_bonds)     // [NH2+](-*)-*
-      return 16.61;
-    if (1 == fc && 2 == hcount && 1 == ncon && 1 == double_bonds)     // [NH2+]=*
-      return 25.59;
-    if (1 == fc && 3 == hcount && 1 == single_bonds)     // [NH3+]-*
-      return 27.64;
-  }
-
-  return 0.0;
-}
-
-static double
-novartis_polar_suface_area_oxygen (Molecule & m,
-                                   atom_number_t zatom,
-                                   Atom & a,
-                                   int is_aromatic)
-{
-  int ncon = a.ncon();
-
-  int aromatic_bonds = 0;
-  int single_bonds = 0;
-  int double_bonds = 0;
-
-  for (int i = 0; i < ncon; i++)
-  {
-    const Bond * b = a[i];
-
-    if (b->is_aromatic())
-      aromatic_bonds++;
-    else if (b->is_single_bond())
-      single_bonds++;
-    else if (b->is_double_bond())
-      double_bonds++;
-  }
-
-  int hcount = a.implicit_hydrogens();
-
-  formal_charge_t fc = a.formal_charge();
-
-  if (is_aromatic)
-  {
-    if (0 == fc && 0 == hcount && 2 == ncon && 2 == aromatic_bonds)   // [o](:*):*
-      return 13.14;
-  }
-  else
-  {
-    if (0 == fc && 0 == hcount && 2 == ncon && m.in_ring_of_given_size(zatom, 3))     // [O]1-*-*-1     do ring queries first
-      return 12.53;
-    if (0 == fc && 0 == hcount && 2 == ncon && 2 == single_bonds)     // [O](-*)-*     do ring queries first
-      return 9.23;
-    if (0 == fc && 0 == hcount && 1 == ncon && 1 == double_bonds)     // [O]=*
-      return 17.07;
-    if (0 == fc && 1 == hcount && 1 == ncon && 1 == single_bonds)     // [OH]-*
-      return 20.23;
-    if (-1 == fc && 0 == hcount && 1 == ncon && 1 == single_bonds)    // [O-]-*
-      return 23.06;
-  }
-
-  return 0;
-}
-
-static double
-novartis_polar_suface_area_sulphur (Molecule & m,
-                                    atom_number_t zatom,
-                                    Atom & a,
-                                    int is_aromatic)
-{
-  int ncon = a.ncon();
-
-  int aromatic_bonds = 0;
-  int single_bonds = 0;
-  int double_bonds = 0;
-  //int triple_bonds = 0;
-
-  for (int i = 0; i < ncon; i++)
-  {
-    const Bond * b = a[i];
-
-    if (b->is_aromatic())
-      aromatic_bonds++;
-    else if (b->is_single_bond())
-      single_bonds++;
-    else if (b->is_double_bond())
-      double_bonds++;
-//  else
-//    triple_bonds++;
-  }
-
-  int hcount = a.implicit_hydrogens();
-
-  formal_charge_t fc = a.formal_charge();
-
-  if (is_aromatic)
-  {
-    return 0.0;    // the paper doesn't seem to use its own data
-
-    if (0 == fc && 0 == hcount && 2 == ncon && 2 == aromatic_bonds)   // [s](:*):*
-      return 28.24;
-    if (0 == fc && 0 == hcount && 3 == ncon && 2 == aromatic_bonds && 1 == double_bonds)   // [s](=*)(:*):*
-      return 21.70;
-  }
-  else
-  {
-    if (0 == fc && 0 == hcount && 2 == ncon && 2 == single_bonds)   // [S](-*)-*
-//    return 25.30;    // the paper doesn't seem to use this value, but not using it makes no sense
-      return 0.0;
-    if (0 == fc && 0 == hcount && 1 == ncon && 1 == double_bonds)   // [S]=*
-      return 32.09;
-    if (0 == fc && 0 == hcount && 3 == ncon && 2 == single_bonds && 1 == double_bonds)   // [S](-*)(-*)=*
-      return 19.21;
-    if (0 == fc && 0 == hcount && 4 == ncon && 2 == single_bonds && 2 == double_bonds)   // [S](-*)(-*)(=*)=*
-      return 8.38;    // sometimes they don't use this, but I'll use it
-    if (0 == fc && 1 == hcount && 1 == ncon && 1 == single_bonds)   // [SH]-*
-      return 38.80;
-  }
-
-  return 0.0;
-}
-
-static double
-novartis_polar_suface_area_phosphorus (Molecule & m,
-                                       atom_number_t zatom,
-                                       Atom & a,
-                                       int is_aromatic)
-{
-  int ncon = a.ncon();
-
-  int aromatic_bonds = 0;
-  int single_bonds = 0;
-  int double_bonds = 0;
-  int triple_bonds = 0;
-
-  for (int i = 0; i < ncon; i++)
-  {
-    const Bond * b = a[i];
-
-    if (b->is_aromatic())
-      aromatic_bonds++;
-    else if (b->is_single_bond())
-      single_bonds++;
-    else if (b->is_double_bond())
-      double_bonds++;
-    else
-      triple_bonds++;
-  }
-
-  (void) aromatic_bonds;
-
-  int hcount = a.implicit_hydrogens();
-
-  formal_charge_t fc = a.formal_charge();
-
-  if (0 == fc && 0 == hcount && 3 == ncon && 3 == single_bonds)   // [P](-*)(-*)-*
-    return 13.59;
-  if (0 == fc && 0 == hcount && 2 == ncon && 1 == single_bonds && 1 == double_bonds)    // [P](-*)=*
-    return 34.14;
-  if (0 == fc && 0 == hcount && 4 == ncon && 3 == single_bonds && 1 == double_bonds)    // [P](-*)(-*)(-*)=*
-    return 9.81;
-  if (0 == fc && 1 == hcount && 3 == ncon && 2 == single_bonds && 1 == double_bonds)    // [PH](-*)(-*)=*
-    return 23.47;
-
-  return 0.0;
-}
-
-// TODO:ianwatson this should call the regular TPSA function for psa. Investigate.
 static void
-quick_prop(Molecule & m,IWString & prop)
+ComputeGroupProperties(Molecule & m,IWString & prop)
 {
   prop.resize_keep_storage(0);
 
@@ -297,12 +62,12 @@ quick_prop(Molecule & m,IWString & prop)
 
   const int matoms = m.natoms();
   const int nr = m.nrings();
-  prop <<"\t"<<matoms;
-  prop <<"\t"<<nr;
-  prop <<"\t"<<m.molecular_weight_ignore_isotopes();
+  prop <<kSep<<matoms;
+  prop <<kSep<<nr;
+  prop <<kSep<<m.molecular_weight_ignore_isotopes();
   int ro5_ohnh =0;
   int ro5_on = 0;
-  float nvrtspsa = 0.0;
+  const double psa = matoms == 0 ? 0.0 : tpsa_calculator.PolarSurfaceArea(m).value_or(0.0);
   int halogen = 0; 
   int fcsp3 = 0;
   int ringsys = nr;
@@ -311,7 +76,7 @@ quick_prop(Molecule & m,IWString & prop)
   int ringatom =0; 
   for (int i = 0; i < matoms; i++)
   {
-    Atom * a = const_cast<Atom *>(m.atomi(i));
+    const Atom* a = m.atomi(i);
     atomic_number_t zi = a->atomic_number();
     if (7 == zi || 8 == zi)
     {
@@ -325,14 +90,7 @@ quick_prop(Molecule & m,IWString & prop)
       fcsp3 ++; 
     if ( m.is_ring_atom(i))
       ringatom ++;
-    if ( 7 == zi)
-      nvrtspsa += novartis_polar_suface_area_nitrogen(m, i, *a, m.is_aromatic(i));
-    else if ( 8 == zi)
-      nvrtspsa += novartis_polar_suface_area_oxygen(m, i, *a, m.is_aromatic(i));
-    else if (16 == zi)
-      nvrtspsa += novartis_polar_suface_area_sulphur(m, i, *a, m.is_aromatic(i));
-    else if (15 == zi)
-      nvrtspsa += novartis_polar_suface_area_phosphorus(m, i, *a, m.is_aromatic(i));
+
   }
   if(nr > 0)
   {
@@ -361,17 +119,22 @@ quick_prop(Molecule & m,IWString & prop)
       }
     }
   }
-  prop <<"\t"<<ro5_ohnh; 
-  prop <<"\t"<<ro5_on;
-  prop <<"\t"<<nvrtspsa;
-  prop <<"\t"<<halogen;
-  prop <<"\t"<<static_cast<float>(fcsp3)/static_cast<float>(matoms);
-  prop <<"\t"<<ringsys;
-  prop <<"\t"<<arring;
-  prop <<"\t"<<alring;
-  prop <<"\t"<<ringatom;
-  m.reduce_to_largest_fragment();
-  prop <<"\t"<<m.longest_path();
+  prop <<kSep<<ro5_ohnh;
+  prop <<kSep<<ro5_on;
+  prop <<kSep<<psa;
+  prop <<kSep<<halogen;
+  prop <<kSep<<(matoms == 0 ? 0.0f : static_cast<float>(fcsp3) / matoms);
+  prop <<kSep<<ringsys;
+  prop <<kSep<<arring;
+  prop <<kSep<<alring;
+  prop <<kSep<<ringatom;
+  if (m.number_fragments() > 1) {
+    Molecule largest(m);
+    largest.reduce_to_largest_fragment();
+    prop << kSep << largest.longest_path();
+  } else {
+    prop << kSep << (matoms == 0 ? 0 : m.longest_path());
+  }
 }
 
 namespace {
@@ -388,7 +151,14 @@ namespace {
 // we are doing capping
 
   String hydrogen_smiles("H");
-  String hydrogen_molecular_properties("\t0\t0\t1\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0");
+  String hydrogen_molecular_properties = [] {
+    String result;
+    for (int value : {0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}) {
+      result += kSep;
+      result += std::to_string(value);
+    }
+    return result;
+  }();
 
   void adjust_hydrogen_data (Molecule & m)    // we have a capping group
   {
@@ -397,7 +167,7 @@ namespace {
 
     tmp.resize_keep_storage(0);
 
-    quick_prop(m, tmp);
+    ComputeGroupProperties(m, tmp);
     hydrogen_molecular_properties = tmp.c_str();
 //  cerr << "hydrogen_smiles '" << hydrogen_smiles << "'\n";
 
@@ -408,12 +178,11 @@ namespace {
   public:
     explicit GroupR();
     void push_molecule(const String& smiles, const String& name);
-    int get_current_molecule_id() const;
 
-    void push_scaffold(int qid, const String& smiles);
-    void push_group(const String& smiles, const String& props);
+    void push_scaffold(int qid, const String& smiles, int query_atoms);
+    void set_group(int atom, const String& smiles, const String& props);
+    void set_missing(int atom);
 
-    int  debug_print(std::ostream &) const;
 
     void close();
 
@@ -429,35 +198,38 @@ namespace {
   GroupR::GroupR() 
   { }
 
-  int GroupR::debug_print(std::ostream & output) const
-  {
-    output << "GroupR::debug_print:has " << _groups.size() << " groups\n";
-    return 1;
-  }
-
   void GroupR::push_molecule(const String& smiles, const String& name) {
     _molecules.push_back(std::make_pair(smiles, name));
     _scaffolds_per_mol.push_back(0);
 //  cerr << "push_molecule:got " << smiles << endl;
   }
 
-  int GroupR::get_current_molecule_id() const {
-    return _molecules.size()-1;
-  }
-
-  void GroupR::push_scaffold(int query_id, const String& smiles) {
+  void GroupR::push_scaffold(int query_id, const String& smiles, int query_atoms) {
     if (!_scaffolds.empty()) {
       _groups.push_back(std::deque<std::pair<String, String> >());
       _groups.back().swap(_current_groups);
     }
     _scaffolds.push_back(std::make_pair(query_id, smiles));
     ++_scaffolds_per_mol.back();
+    _current_groups.assign(query_atoms, std::make_pair(
+        hydrogen_smiles, add_properties_to_groups ? hydrogen_molecular_properties : String()));
 //  cerr << "push_scaffold:got " << smiles << endl;
   }
   
-  void GroupR::push_group(const String& smiles, const String& props) {
-    _current_groups.push_back(std::make_pair(smiles,props));
-//  cerr << "push_group:got " << smiles << " cmp " << _current_groups.back().first << endl;
+  void GroupR::set_group(int atom, const String& smiles, const String& props) {
+    assert(atom >= 0 && atom < static_cast<int>(_current_groups.size()));
+    _current_groups[atom] = std::make_pair(smiles, props);
+  }
+
+  void GroupR::set_missing(int atom) {
+    String properties;
+    if (add_properties_to_groups) {
+      for (int i = 0; i < prop_number; ++i) {
+        properties += kSep;
+        properties += '.';
+      }
+    }
+    set_group(atom, ".", properties);
   }
 
   void GroupR::close() {
@@ -478,11 +250,9 @@ namespace {
   }
 
   String get_scaffold(const String& smiles, const std::set<int>& r2idx) {
-    assert(!r2idx.empty());
 
     Molecule mm;
-    mm.build_from_smiles(smiles.c_str());
-    cerr << " scaffold smiles " << mm.smiles() << endl;
+    mm.build_from_smiles(smiles);
     int natoms = mm.natoms();
 
     Set_of_Atoms discard_atoms;
@@ -498,7 +268,6 @@ namespace {
       }
     }
     mm.remove_atoms(discard_atoms);
-    cerr << "Didscarded " << discard_atoms << " to yield " << mm.smiles() << endl;
 
     IWString ss = mm.unique_smiles();
     String result = ss.c_str();
@@ -511,7 +280,8 @@ namespace {
       sprintf(buf3, "[R%d]", ++count_r);
       result = replace(result, buf2, buf3);
     }
-    IWString tmp("\t");
+    IWString tmp;
+    tmp << kSep;
     tmp += (mm.natoms() - count_r);
     result+=tmp.c_str();
 //  cerr << "Returning scaffold " << result << endl;
@@ -562,14 +332,14 @@ namespace {
       }
     }
 
-    stream << "CompoundName\tSMILES\t";
-    stream << "Scaffold\tScaffold_natoms"; // TODO: Dump Scaffold for every molecule
+    stream << "CompoundName" << kSep << "SMILES" << kSep;
+    stream << "Scaffold" << kSep << "Scaffold_natoms"; // TODO: Dump Scaffold for every molecule
     for (int j = 0; j < max_r; ++j) {
-      stream << "\tR" << j+1 << "_SMILES" ;
+      stream << kSep << "R" << j+1 << "_SMILES" ;
       if(!add_properties_to_groups)
         continue;
       for(int k =0; k < prop_number; ++k)
-        stream <<"\tR" << j+1 << "_"<<prop_header[k];
+        stream <<kSep << "R" << j+1 << "_"<<prop_header[k];
     }
     stream << "\n";
 
@@ -585,11 +355,19 @@ namespace {
           }
         }
         
-        stream << group._molecules[j].second << "\t" << group._molecules[j].first << "\t";
+        stream << group._molecules[j].second << kSep << group._molecules[j].first << kSep;
         stream << get_scaffold(group._scaffolds[offset].second, r2idx); // TODO: Dump Scaffold for every molecule
         for (std::set<int>::const_iterator k = r2idx.begin(); k != r2idx.end(); ++k) 
         {
-          stream << "\t" << group._groups[offset][*k].first << group._groups[offset][*k].second;
+          stream << kSep << group._groups[offset][*k].first << group._groups[offset][*k].second;
+        }
+        for (int unused = r2idx.size(); unused < max_r; ++unused) {
+          stream << kSep << '.';
+          if (add_properties_to_groups) {
+            for (int property = 0; property < prop_number; ++property) {
+              stream << kSep << '.';
+            }
+          }
         }
         stream << "\n";
       }
@@ -839,8 +617,8 @@ Matched_Atoms_From_Which_to_Grow::build (const const_IWSubstring & s)
         return 0;
       }
 
-      add(_a1[ndx]);
-      add(_a2[ndx]);
+      resizable_array<int>::add(_a1[ndx]);
+      resizable_array<int>::add(_a2[ndx]);
     }
     else if (! token.numeric_value(_a1[ndx]) || _a1[ndx] < 0)
     {
@@ -889,6 +667,7 @@ Matched_Atoms_From_Which_to_Grow::set_single_attachment_point(int s)
 
   _a1[0] = s;
   _a2[0] = -1;
+  resizable_array<int>::add(s);
 
   return 1;
 }
@@ -906,6 +685,8 @@ Matched_Atoms_From_Which_to_Grow::set_double_attachment_point(int s1, int s2)
 
   _a1[0] = s1;
   _a2[0] = s2;
+  resizable_array<int>::add(s1);
+  resizable_array<int>::add(s2);
 
   return 1;
 }
@@ -1027,7 +808,7 @@ do_compute_unique_smiles_of_fragments (const IWString & zkey,
   return 1;
 }
 
-#define DEBUG_IDENTIFY_ATOMS_IN_FRAGMENT
+// #define DEBUG_IDENTIFY_ATOMS_IN_FRAGMENT
 
 static int
 identify_atoms_in_fragment (Molecule & m,
@@ -1055,9 +836,6 @@ identify_atoms_in_fragment (Molecule & m,
     cerr << "identify_atoms_in_fragment:atom " << zatom << " to " << j << " visited " << in_fragment[j] << endl;
 #endif
 
-    if (in_fragment[j])
-      continue;
-
     if (EMBEDDING_ISO == in_fragment[j])    // we've found a ring closing substituent - ring back to the embedding
     {
       if (INVALID_ATOM_NUMBER == previous_atom)    // just passing around the embedding
@@ -1071,6 +849,9 @@ identify_atoms_in_fragment (Molecule & m,
         m.set_isotope(zatom, isotope_for_ring_closures);
       continue;
     }
+
+    if (in_fragment[j])
+      continue;
 
     rc += identify_atoms_in_fragment(m, j, zatom, in_fragment, anchor);
   }
@@ -1242,7 +1023,8 @@ write_parent_if_needed_and_subset (Molecule & parent,
 {
   if (! parent_molecule_written)
   {
-    output.write(parent);
+    if (write_parent_molecule && !output.write(parent))
+      return 0;
     parent_molecule_written = 1;
   }
 
@@ -1258,6 +1040,27 @@ write_parent_if_needed_and_subset (Molecule & parent,
   arguments to pass around if I try to break it up
 */
 
+// Attachment and ring-closure isotopes belong to extracted fragments, not to
+// the parent or later embeddings. Restore on early returns as well as success.
+class IsotopeRestorer {
+ private:
+  Molecule& _m;
+  std::vector<isotope_t> _isotopes;
+
+ public:
+  explicit IsotopeRestorer(Molecule& m) : _m(m), _isotopes(m.natoms()) {
+    for (int atom = 0; atom < m.natoms(); ++atom) {
+      _isotopes[atom] = m.isotope(atom);
+    }
+  }
+  ~IsotopeRestorer() { Restore(); }
+  void Restore() {
+    for (int atom = 0; atom < _m.natoms(); ++atom) {
+      _m.set_isotope(atom, _isotopes[atom]);
+    }
+  }
+};
+
 static int
 process_join_points_that_form_rings(Molecule & m,
                                     int * already_done,
@@ -1267,7 +1070,9 @@ process_join_points_that_form_rings(Molecule & m,
                                     IWString & data_for_jibo,
                                     int & parent_molecule_written)
 {
+  IsotopeRestorer restore_isotopes(m);
   int matoms = m.natoms();
+  int fragments = 0;
 
   const Matched_Atoms_From_Which_to_Grow & ma = matched_atoms_from_which_to_grow[query_number];
 
@@ -1380,6 +1185,8 @@ process_join_points_that_form_rings(Molecule & m,
       else
         m.set_isotope(unmatched_connections, 0);
 
+      restore_isotopes.Restore();
+      ++fragments;
       if (stream_for_substituents.active())
         write_parent_if_needed_and_subset(m, subset, parent_molecule_written, stream_for_substituents);
 
@@ -1395,7 +1202,7 @@ process_join_points_that_form_rings(Molecule & m,
     }
   }
 
-  return 1;
+  return fragments;
 }
 
 static int
@@ -1465,6 +1272,7 @@ identify_substituent_between (Molecule & m,
                               IWString & data_for_jibo)
 
 {
+  IsotopeRestorer restore_isotopes(m);
   assert (embedding.ok_index(ndx1));
   assert (embedding.ok_index(ndx2));
 
@@ -1475,10 +1283,10 @@ identify_substituent_between (Molecule & m,
 
   int fragment_size = identify_atoms_between(m, zatom1, zatom2, in_fragment, 1);
 
-  if (fragment_size <= 1)
+  if (fragment_size == 0)
   {
     if (stream_for_jw.is_open())
-      data_for_jibo << " QQ" << query_number << '.' << ndx1 << '-' << ndx2 << '.' << 0 << ' ' << '*' << '\n';
+      data_for_jibo << " QQ" << query_number << '.' << ndx1 << '-' << ndx2 << '.' << 0 << ' ' << '*';
 
     return 0;
   }
@@ -1525,6 +1333,7 @@ identify_substituent_between (Molecule & m,
   if (INVALID_ATOM_NUMBER != c2)
     m.set_isotope(c2, 0);
 
+  restore_isotopes.Restore();
   if (stream_for_substituents.active())
     stream_for_substituents.write(subset);
 
@@ -1576,6 +1385,7 @@ identify_substituent (Molecule & m,
                       int & parent_molecule_written,
                       Molecule & matched_atoms)
 {
+  IsotopeRestorer restore_isotopes(m);
   assert(embedding.ok_index(ndx));
 
   const atom_number_t zatom = embedding[ndx];
@@ -1607,7 +1417,6 @@ identify_substituent (Molecule & m,
     //  cerr << "Atom " << j << " status " << in_fragment[j] << endl;
   }
 
-  cerr << "Around atom " << zatom << ' ' << m.smarts_equivalent_for_atom(zatom) << " unmatched " << unmatched_connections << endl;
 
   int fragment_size;
   if (unmatched_connections.number_elements() > 0)
@@ -1632,7 +1441,7 @@ identify_substituent (Molecule & m,
       IWString prop;
       if (add_properties_to_groups)
         prop << hydrogen_molecular_properties;
-      gp_group_r->push_group("H", prop.c_str());
+      gp_group_r->set_group(ndx, hydrogen_smiles, prop.c_str());
 
 #ifdef BREAKS_THINGS
       IWString s;
@@ -1640,7 +1449,7 @@ identify_substituent (Molecule & m,
         s << "[1" << m.atomic_symbol(zatom) << "]H";
       else
         s = hydrogen_smiles;
-      gp_group_r->push_group(s.c_str(), prop.c_str());
+      gp_group_r->set_group(ndx, s.c_str(), prop.c_str());
 #endif
 //    cerr << "Added H substituent " << hydrogen_smiles << endl;
     }
@@ -1690,6 +1499,7 @@ identify_substituent (Molecule & m,
   if (capping_group.natoms())
     add_capping_group(subset, capping_group);
 
+  restore_isotopes.Restore();
   if (stream_for_substituents.active())
     write_parent_if_needed_and_subset(m, subset, parent_molecule_written, stream_for_substituents);
 
@@ -1707,8 +1517,8 @@ identify_substituent (Molecule & m,
     IWString ss = subset.unique_smiles();
     IWString prop;
      if (add_properties_to_groups)
-      quick_prop(subset,prop);
-    gp_group_r->push_group(ss.c_str(), prop.c_str());
+      ComputeGroupProperties(subset,prop);
+    gp_group_r->set_group(ndx, ss.c_str(), prop.c_str());
   }
 
   return 1;
@@ -1721,6 +1531,10 @@ same_atoms(const Matched_Atoms_From_Which_to_Grow & ma,
            const Set_of_Atoms & s2)
 {
   int n = ma.number_join_points();
+  if (n == 0) {
+    return s1.size() == s2.size() &&
+           std::all_of(s1.begin(), s1.end(), [&](atom_number_t atom) { return s2.contains(atom); });
+  }
 
   for (int i = 0; i < n; i++)
   {
@@ -1741,8 +1555,12 @@ remove_embeddings_that_result_in_duplicate_atoms(const Matched_Atoms_From_Which_
                           int query_number,
                           Substructure_Results & sresults)
 {
-  if (! ma.is_single_attachment_point(query_number))   // not bothering to handle these - complex
-    return 0;
+  // Query numbers are not attachment-point indices. Skip pair-based deduplication.
+  for (int i = 0; i < ma.number_join_points(); ++i) {
+    if (!ma.is_single_attachment_point(i)) {
+      return sresults.number_embeddings();
+    }
+  }
 
   int nhits = sresults.number_embeddings();
 
@@ -1820,6 +1638,21 @@ identify_substituents (Molecule & m,
   int rc = 0;
 
   const int n = ma.number_join_points();
+  if (gp_group_r != nullptr) {
+    if (n == 0) {
+      for (int atom = 0; atom < embedding.number_elements(); ++atom) {
+        gp_group_r->set_missing(atom);
+      }
+    } else {
+      for (int point = 0; point < n; ++point) {
+        gp_group_r->set_missing(ma.a1(point));
+        if (!ma.is_single_attachment_point(point)) {
+          gp_group_r->set_missing(ma.a2(point));
+        }
+      }
+    }
+  }
+
 
   int array_size = n;
   if (0 == n)
@@ -1833,7 +1666,7 @@ identify_substituents (Molecule & m,
 #endif
 
   if (n > 1)
-    process_join_points_that_form_rings(m, already_done, query_number, embedding, in_fragment, data_for_jibo, parent_molecule_written);
+    rc += process_join_points_that_form_rings(m, already_done, query_number, embedding, in_fragment, data_for_jibo, parent_molecule_written);
 
   Molecule matched_atoms;
 
@@ -1927,7 +1760,7 @@ gp_add_scaffold_iw(const Molecule & m,
 //cerr << "From " << mm.smiles() << " generate fragment " << frag.smiles() << endl;
 
   IWString ss = frag.unique_smiles();
-  gp_group_r->push_scaffold(query_number, ss.c_str());
+  gp_group_r->push_scaffold(query_number, ss.c_str(), natoms_in_frag);
 
   return 1;
 }
@@ -2017,11 +1850,8 @@ gp_add_scaffold_iw_v2(const Molecule & m,
     frag.add_bond(j, natoms_in_frag + j, SINGLE_BOND);
   }
 
-  Molecule mm(m);
-  cerr << "From " << mm.smiles() << " generate fragment " << frag.smiles() << endl;
-
   IWString ss = frag.unique_smiles();
-  gp_group_r->push_scaffold(query_number, ss.c_str());
+  gp_group_r->push_scaffold(query_number, ss.c_str(), natoms_in_frag);
 
   return 1;
 }
@@ -2071,10 +1901,9 @@ gp_add_scaffold (const Molecule & m,
     frag.add_bond(j, natoms_in_frag + j, SINGLE_BOND);
   }
 
-  cerr << "From " << mm.smiles() << " generate fragment " << frag.smiles() << endl;
 
   IWString ss = frag.unique_smiles();
-  gp_group_r->push_scaffold(query_number, ss.c_str());
+  gp_group_r->push_scaffold(query_number, ss.c_str(), natoms_in_frag);
 
   return 1;
 }
@@ -2101,7 +1930,8 @@ identify_substituents (Molecule & m,
     if (nullptr != gp_group_r)
       gp_add_scaffold_iw_v2(m,query_number,*e);
 
-    identify_substituents(m, query_number, *e, in_fragment, data_for_jibo, parent_molecule_written);
+    fragments_this_molecule += identify_substituents(
+        m, query_number, *e, in_fragment, data_for_jibo, parent_molecule_written);
   }
 
   return 1;
@@ -2252,6 +2082,18 @@ substitutions (Molecule & m,
     if (verbose > 2)
       cerr << nhits << " hits to query " << i << endl;
           
+    const auto& attachments = matched_atoms_from_which_to_grow[i];
+    for (const Set_of_Atoms* embedding : sresults.embeddings()) {
+      for (int point = 0; point < attachments.number_join_points(); ++point) {
+        if (!embedding->ok_index(attachments.a1(point)) ||
+            (!attachments.is_single_attachment_point(point) &&
+             !embedding->ok_index(attachments.a2(point)))) {
+          cerr << "Attachment index (-j) outside query embedding for query " << i << '\n';
+          return 0;
+        }
+      }
+    }
+
     if(remove_non_single_bond_match || remove_ring_bond_match )
       remove_embeddings(m,sresults);
   
@@ -2273,7 +2115,8 @@ substitutions (Molecule & m,
     }
     else if (ignore_queries_hitting_multiple_times)
     {
-      cerr << "Skipped because of " << ignore_queries_hitting_multiple_times << endl;
+      if (verbose)
+        cerr << "Skipping query " << i << " with multiple matches\n";
       continue;
     }
     else if (take_first_of_multiple_hits)
@@ -2303,6 +2146,7 @@ substitutions (Molecule & m,
   }
 
   fragments_per_molecule[fragments_this_molecule]++;
+  matches_per_molecule[queries_matching_this_molecule]++;
 
   if (0 == queries_matching_this_molecule)
   {
@@ -2403,7 +2247,11 @@ substitutions(data_source_and_type<Molecule> & input,
       return 0;
   }
 
-  return 1;
+  if (input.stopped_because_of_error()) {
+    cerr << "Stopped reading substitutions input after a molecule error\n";
+    return 0;
+  }
+  return output.good();
 }
 
 static int
@@ -2625,6 +2473,23 @@ build_header (IWString & header)
   return;
 }
 
+static bool
+WouldOverwriteInput(const Command_Line& cl, const IWString& output) {
+  namespace fs = std::filesystem;
+  const fs::path destination(output.AsString());
+  for (int i = 0; i < cl.number_elements(); ++i) {
+    const fs::path input(cl[i]);
+    std::error_code error;
+    if (fs::equivalent(input, destination, error)) {
+      return true;
+    }
+    if (fs::weakly_canonical(input) == fs::weakly_canonical(destination)) {
+      return true;
+    }
+  }
+  return false;
+}
+
 static int
 substitutions (int argc, char ** argv)
 {
@@ -2814,6 +2679,11 @@ substitutions (int argc, char ** argv)
 
   if (cl.option_present('m'))
   { 
+    if (cl.option_count('m') != 1 || !queries.empty()) {
+      cerr << "Use one -m query file, without -s, -q or -e queries\n";
+      return 4;
+    }
+
     if (cl.option_present('j'))
     {
       cerr << "Cannot use the -j option with the -m option - connection points determined automatically\n";
@@ -2926,6 +2796,20 @@ substitutions (int argc, char ** argv)
   }
   else if (! all_files_recognised_by_suffix(cl))
     return 4;
+
+  for (char flag : {'J', 'T', 'd'}) {
+    if (!cl.option_present(flag)) {
+      continue;
+    }
+    IWString output = cl.string_value(flag);
+    if (flag == 'T' && !output.ends_with(".smi")) {
+      output << ".smi";
+    }
+    if (WouldOverwriteInput(cl, output)) {
+      cerr << "Output (-" << flag << ") would overwrite input '" << output << "'\n";
+      return 4;
+    }
+  }
 
   // If we are reading isotopically labelled molecules, the
   // matched_atoms_from_which_to_grow array will already have been set up
@@ -3188,9 +3072,20 @@ substitutions (int argc, char ** argv)
 
   if (gp_group_r) {
     gp_group_r->close();
-    std::ofstream ss(gs_rgroup_file.c_str());
-    ss << *gp_group_r;
-    ss.close();
+    if (rc == 0) {
+      std::ofstream ss(gs_rgroup_file.c_str());
+      if (!ss.is_open()) {
+        cerr << "Cannot open R-group output '" << gs_rgroup_file << "'\n";
+        rc = 1;
+      } else {
+        ss << *gp_group_r;
+        ss.close();
+        if (!ss.good()) {
+          cerr << "Cannot write R-group output '" << gs_rgroup_file << "'\n";
+          rc = 1;
+        }
+      }
+    }
     delete gp_group_r;
   }
 

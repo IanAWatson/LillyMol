@@ -6,6 +6,13 @@
       "args": [
            " -p ${LILLYMOL_HOME}/data/pubchem.gfp -T 0.5 #{indir}/100PairIds"
       ]
+    },
+
+    {
+      "name": "mpr_only",
+      "args": [
+           " -p #{indir}/mpr.gfp -o 4 #{indir}/pairs"
+      ]
     }
 
   ]

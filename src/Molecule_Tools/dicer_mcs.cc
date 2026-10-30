@@ -1,6 +1,7 @@
 // Read output from dicer to find MCS
 
 #include <algorithm>
+#include <cstdint>
 #include <iostream>
 #include <memory>
 #include <optional>
@@ -34,6 +35,7 @@ using std::cerr;
 
 constexpr char kOpenSquareBracket = '[';
 constexpr char kCloseSquareBracket = ']';
+constexpr int kMaxFragmentAtoms = 100;
 
 int
 Usage(int rc) {
@@ -59,7 +61,8 @@ dicer_mcs -m 2 -v frags.textproto
 
 The following options are recognised.
  -m <natoms>            minimum size of a fragment. Stronly suggest something > 1.
- -P <atype>             atom type specification for single atom expansion - not implemented.
+ -s <N|NN%>            minimum parent support; select largest qualifying fragment.
+ -P <atype>             atom type specification for greedy single atom expansion for pairwise matches.
  -Y <fname>             write all pairwise MCS combinations. File can become very large!
  -v                     verbose output.
 )";
@@ -73,6 +76,8 @@ class Options {
     int _verbose;
 
     int _min_atoms_in_fragment;
+    int _minimum_support;
+    int _minimum_support_percent;
 
   public:
     Options();
@@ -86,11 +91,25 @@ class Options {
     int min_atoms_in_fragment() const {
       return _min_atoms_in_fragment;
     }
+
+    bool has_minimum_support() const {
+      return _minimum_support > 0 || _minimum_support_percent > 0;
+    }
+
+    // Integer arithmetic avoids rounding an exact percentage boundary upward.
+    int minimum_support(int nmolecules) const {
+      if (_minimum_support_percent > 0) {
+        return (static_cast<int64_t>(nmolecules) * _minimum_support_percent + 99) / 100;
+      }
+      return _minimum_support;
+    }
 };
 
 Options::Options() {
   _verbose = 0;
   _min_atoms_in_fragment = 0;
+  _minimum_support = 0;
+  _minimum_support_percent = 0;
 }
 
 int
@@ -100,11 +119,30 @@ Options::Initialise(Command_Line& cl) {
   if (cl.option_present('m')) {
     if (! cl.value('m', _min_atoms_in_fragment) || _min_atoms_in_fragment < 1) {
       cerr << "The min fragment size (-m) option must be a whole +ve number\n";
-      return 1;
+      return 0;
     }
 
     if (_verbose) {
       cerr << "Will discard fragments with fewer than " << _min_atoms_in_fragment << " atoms\n";
+    }
+  }
+
+  if (cl.option_present('s')) {
+    if (cl.option_count('s') != 1) {
+      cerr << "Specify minimum support (-s) only once\n";
+      return 0;
+    }
+    const_IWSubstring value = cl.string_value('s');
+    if (value.ends_with('%')) {
+      value.chop();
+      if (!value.numeric_value(_minimum_support_percent) ||
+          _minimum_support_percent < 1 || _minimum_support_percent > 100) {
+        cerr << "Minimum support (-s) percentage must be a whole number from 1 to 100\n";
+        return 0;
+      }
+    } else if (!value.numeric_value(_minimum_support) || _minimum_support < 1) {
+      cerr << "Minimum support (-s) must be a positive parent count or whole percentage\n";
+      return 0;
     }
   }
 
@@ -143,6 +181,9 @@ class FragmentSummary {
     // The caller is telling us that our fragment has been found in
     // molecule number `s`.
     void found_in_molecule(int s) {
+      if (_in_molecule[s]) {
+        return;
+      }
       _in_molecule[s] = 1;
       ++_molecules_with_fragment;
     }
@@ -270,6 +311,18 @@ Fragment::Build(const Molecule& parent, int* tmp, const dicer_data::DicerFragmen
   if (!_mol.build_from_smiles(proto.smi())) {
     cerr << "Fragment::Build:invalid smiles '" << proto.smi() << "'\n";
     return 0;
+  }
+
+  if (_mol.empty()) {
+    cerr << "Fragment::Build:empty fragment\n";
+    return 0;
+  }
+  if (parent.natoms() >= kMaxFragmentAtoms) [[unlikely]] {
+    if (_mol.natoms() >= kMaxFragmentAtoms) {
+      cerr << "Fragment::Build:fragments must contain fewer than "
+           << kMaxFragmentAtoms << " atoms\n";
+      return 0;
+    }
   }
 
   std::unique_ptr<isotope_t[]> isosave = _mol.GetIsotopes();
@@ -434,6 +487,8 @@ class DicedMolecule {
                 int rhs_frag_number,
                 const ComparisonConditions& cmp,
                 IWString_and_File_Descriptor& output);
+    int WriteMatch(DicedMolecule& rhs, const ComparisonConditions& cmp,
+                   IWString_and_File_Descriptor& output);
     int TryExpansion(DicedMolecule& rhs,
                 const ComparisonConditions& cmp,
                 isotope_t& next_isotope_to_assign);
@@ -493,7 +548,10 @@ ProperIsotopicLabelling(Molecule& m, int* tmp) {
     TruncateToRange(iso);
     if (static_cast<int>(iso) >= matoms) {
       cerr << "ProperIsotopicLabelling:isotopic label out of range\n";
+      cerr << "Isotope " << iso << " in molecule with " << matoms << " atoms, initial " << m.isotope(i) << '\n';
+      cerr << m.smiles() << ' ' << m.name() << '\n';
       rc = false;
+      continue;
     }
     tmp[iso] += 1;
   }
@@ -505,12 +563,12 @@ ProperIsotopicLabelling(Molecule& m, int* tmp) {
   // Each isotopic value must have been encountered once.
   // Could use all_of, but the loop seems simpler
   // std::all_of(tmp.get(), tmp.get() + matoms, [](int one) { return one == 1;});
-  rc = 0;
+  rc = true;
   for (int i = 0; i < matoms; ++i) {
     if (tmp[i] != 1) {
       cerr << "isotope " << i << " not initialised, count " << tmp[i]
            << ' ' << m.smarts_equivalent_for_atom(i) << '\n';
-      rc = 1;
+      rc = false;
     }
   }
 
@@ -534,6 +592,14 @@ DicedMolecule::Build(const Options& options, const dicer_data::DicedMolecule& pr
 
   _mol.set_name(proto.name());
 
+  // Original labels must be below the attachment increment to decode uniquely.
+  if (matoms > static_cast<int>(kIsotopeOffset)) [[unlikely]] {
+    cerr << "DicedMolecule::Build:parent '" << _mol.name() << "' has " << matoms
+         << " atoms; the +" << kIsotopeOffset
+         << " attachment encoding supports at most " << kIsotopeOffset << " atoms\n";
+    return 0;
+  }
+
   std::unique_ptr<int[]> tmp = std::make_unique<int[]>(matoms);
 
   // All atoms must have an isotopic label.
@@ -548,6 +614,7 @@ DicedMolecule::Build(const Options& options, const dicer_data::DicedMolecule& pr
   if (number_fragments == 0) {
     cerr << "DicedMolecule::Build:no fragments\n";
     cerr << proto.ShortDebugString() << '\n';
+    _mol.transform_to_non_isotopic_form();
     return 1;
   }
 
@@ -578,7 +645,10 @@ DicedMolecule::Build(const Options& options, const dicer_data::DicedMolecule& pr
 
   // Sort by fragment size, largest first.
   std::sort(_fragment.rawdata(), _fragment.rawdata() + number_fragments, [](const Fragment* f1, const Fragment* f2) {
-    return f1->natoms() > f2->natoms();
+    if (f1->natoms() != f2->natoms()) {
+      return f1->natoms() > f2->natoms();
+    }
+    return f1->usmi().strcmp(f2->usmi()) < 0;
   });
 
   // Establish the cross reference from fragment unique smiles to index.
@@ -642,14 +712,18 @@ DicedMolecule::CompareInner(DicedMolecule& rhs, const ComparisonConditions& cmp,
     }
     // cerr << "Found match for " << _fragment[i]->usmi() << '\n';
 
-    ProcessMatch(i, rhs, *maybe_rhs, cmp, output);
+    if (!ProcessMatch(i, rhs, *maybe_rhs, cmp, output)) {
+      return 0;
+    }
 
     if (_atype) {
       isotope_t next_isotope_to_assign = std::max<isotope_t>(_mol.natoms(), rhs._mol.natoms());
       isotope_t isave = next_isotope_to_assign;
       TryExpansion(rhs, cmp, next_isotope_to_assign);
       if (next_isotope_to_assign > isave) {
-        ProcessMatch(i, rhs, *maybe_rhs, cmp, output);
+        if (!WriteMatch(rhs, cmp, output)) {
+          return 0;
+        }
       }
     }
 
@@ -658,7 +732,7 @@ DicedMolecule::CompareInner(DicedMolecule& rhs, const ComparisonConditions& cmp,
     }
   }
 
-  return 0;
+  return 1;  // No common fragment is a successful comparison with no output.
 }
 
 int
@@ -672,16 +746,22 @@ DicedMolecule::ProcessMatch(int lhs_frag_number, DicedMolecule& rhs,
   lhs_frag.SetIsotopes(_mol);
   rhs_frag.SetIsotopes(rhs._mol);
 
+  return WriteMatch(rhs, cmp, output);
+}
+
+int
+DicedMolecule::WriteMatch(DicedMolecule& rhs, const ComparisonConditions& cmp,
+                         IWString_and_File_Descriptor& output) {
   static constexpr char kSep = ' ';
-
-  output << _mol.smiles() << kSep << _mol.name() << kSep << "LHS" << kSep;
-  lhs_frag.AtomsAndFraction(output);
-  output << cmp.record_separator;
-  output << rhs._mol.smiles() << kSep << rhs._mol.name() << kSep << "RHS" << kSep;
-  rhs_frag.AtomsAndFraction(output);
-  output << cmp.record_separator;
-
-  return 1;
+  const int lhs_atoms = _mol.number_isotopic_atoms();
+  const int rhs_atoms = rhs._mol.number_isotopic_atoms();
+  output << _mol.smiles() << kSep << _mol.name() << kSep << "LHS" << kSep
+         << lhs_atoms << kSep << iwmisc::Fraction<float>(lhs_atoms, _mol.natoms())
+         << cmp.record_separator;
+  output << rhs._mol.smiles() << kSep << rhs._mol.name() << kSep << "RHS" << kSep
+         << rhs_atoms << kSep << iwmisc::Fraction<float>(rhs_atoms, rhs._mol.natoms())
+         << cmp.record_separator;
+  return output.good();
 }
 
 int
@@ -764,7 +844,7 @@ int
 DicedMolecule::UpdateStats(int nmolecules, int ndx,
                 absl::flat_hash_map<IWString, FragmentSummary>& frag_data) {
   for (const Fragment* frag : _fragment) {
-    auto [iter, emplaced] = frag_data.try_emplace(frag->usmi(), FragmentSummary(nmolecules, ndx));
+    auto [iter, emplaced] = frag_data.try_emplace(frag->usmi(), nmolecules, ndx);
     if (emplaced) {
       iter->second.set_natoms(frag->natoms());
     } else {
@@ -796,7 +876,7 @@ class DicedMolecules {
       return _mol[i];
     }
     
-    void AssignAtomTypes(Atom_Typing_Specification& ats);
+    int AssignAtomTypes(Atom_Typing_Specification& ats);
 
     const Fragment* GetFragment(const IWString& smi, const FragmentSummary& frag_summary) const;
 
@@ -855,11 +935,14 @@ DicedMolecules::Build(const Options& options, const char* fname) {
   return Build(options, input);
 }
 
-void
+int
 DicedMolecules::AssignAtomTypes(Atom_Typing_Specification& ats) {
   for (int i = 0; i < _number_molecules; ++i) {
-    _mol[i].AssignAtomTypes(ats);
+    if (!_mol[i].AssignAtomTypes(ats)) {
+      return 0;
+    }
   }
+  return 1;
 }
 
 struct McsCandidate {
@@ -896,12 +979,10 @@ int
 DicedMolecules::DetermineMCS(const Options& options,
                              IWString& smarts,
                              IWString_and_File_Descriptor& output) {
-  if (_number_molecules == 0) {  [[unlikely]]
+  if (_number_molecules == 0) [[unlikely]] {
     return 0;
   }
   cerr << "Scanning " << _number_molecules << " molecules for fragments\n";
-
-  int rc = 0;
 
   // Across all molecules read, a mapping from unique smiles of a
   // fragment to the molecules with that fragment.
@@ -911,14 +992,21 @@ DicedMolecules::DetermineMCS(const Options& options,
     _mol[i].UpdateStats(_number_molecules, i, frag_data);
   }
 
-  constexpr int kMaxNatoms = 100;
+  if (frag_data.empty()) {
+    cerr << "No fragments survive the fragment size requirements\n";
+    return 0;
+  }
+
+  constexpr int kMaxNatoms = kMaxFragmentAtoms;
   std::unique_ptr<McsCandidate[]> candidates =
         std::make_unique<McsCandidate[]>(kMaxNatoms);
 
   for (const auto& [smi, data] : frag_data) {
     cerr << smi << " in " << data.molecules_with_fragment() << " molecules\n";
     int nat = data.natoms();
-    if (data.molecules_with_fragment() > candidates[nat].nmolecules) {
+    if (data.molecules_with_fragment() > candidates[nat].nmolecules ||
+        (data.molecules_with_fragment() == candidates[nat].nmolecules &&
+         smi.strcmp(candidates[nat].smi) < 0)) {
       candidates[nat].nmolecules = data.molecules_with_fragment();
 //    candidates[nat].fragment = _mol[i].FragmentForSmiles(smi);
       candidates[nat].smi = smi;
@@ -935,27 +1023,46 @@ DicedMolecules::DetermineMCS(const Options& options,
     }
   }
 
-  // For each atom count, we discern the most common MCS'
+  // Without -s, retain support-first selection. With -s, support is an
+  // eligibility requirement and fragment size becomes the primary objective.
+  const int minimum_support = options.minimum_support(_number_molecules);
+  if (options.verbose() && options.has_minimum_support()) {
+    cerr << "Minimum support " << minimum_support << " of " << _number_molecules
+         << " input parents\n";
+  }
   int most_frequent = 0;
   int atoms_in_largest_mcs = 0;
   const FragmentSummary* frag = nullptr;
   const IWString* mcs_smiles = nullptr;
   for (const auto& [smi, data] : frag_data) {
-    if (data.molecules_with_fragment() < most_frequent) {
+    const int support = data.molecules_with_fragment();
+    if (support < minimum_support) {
       continue;
     }
 
-    if (data.molecules_with_fragment() > most_frequent ||
-        (data.molecules_with_fragment() == most_frequent &&
-         data.natoms() > atoms_in_largest_mcs)) {
-      most_frequent = data.molecules_with_fragment();
+    const int primary = options.has_minimum_support() ? data.natoms() : support;
+    const int secondary = options.has_minimum_support() ? support : data.natoms();
+    const int best_primary = options.has_minimum_support() ? atoms_in_largest_mcs : most_frequent;
+    const int best_secondary = options.has_minimum_support() ? most_frequent : atoms_in_largest_mcs;
+    if (frag == nullptr || primary > best_primary ||
+        (primary == best_primary &&
+         (secondary > best_secondary ||
+          (secondary == best_secondary && smi.strcmp(*mcs_smiles) < 0)))) {
+      most_frequent = support;
       mcs_smiles = &smi;
       atoms_in_largest_mcs = data.natoms();
       frag = &data;
     }
   }
 
-  cerr << "Most common fragment " << *mcs_smiles << " found " << most_frequent << " times\n";
+  if (frag == nullptr) {
+    cerr << "No fragment meets minimum support " << minimum_support << " of "
+         << _number_molecules << " input parents\n";
+    return 0;
+  }
+
+  cerr << (options.has_minimum_support() ? "Selected fragment " : "Most common fragment ")
+       << *mcs_smiles << " found " << most_frequent << " times\n";
 
   // We need to find an example of the Fragment for the FragmentSummary found.
 
@@ -994,7 +1101,7 @@ DicedMolecules::DetermineMCS(const Options& options,
     output.write_if_buffer_holds_more_than(4096);
   }
 
-  return rc;
+  return output.good();
 }
 
 int
@@ -1023,14 +1130,14 @@ PerformPairwiseComparisons(Command_Line& cl,
       } else if (m1.name() == m2.name()) {
         continue;
       }
-      m1.Compare(m2, cmp, output);
+      if (!m1.Compare(m2, cmp, output)) {
+        return 0;
+      }
       output.write_if_buffer_holds_more_than(4096);
     }
   }
 
-  output.flush();
-
-  return 1;
+  return output.flush();
 }
 
 int
@@ -1048,7 +1155,7 @@ PerformPairwiseComparisons(Command_Line& cl,
 
 int
 Main(int argc, char** argv) {
-  Command_Line cl(argc, argv, "vE:A:m:P:Y:");
+  Command_Line cl(argc, argv, "vE:A:m:P:Y:s:");
 
   if (cl.unrecognised_options_encountered()) {
     cerr << "Unrecognised options encountered\n";
@@ -1104,20 +1211,29 @@ Main(int argc, char** argv) {
       return 1;
     }
 
-    diced1.AssignAtomTypes(ats);
+    if (!diced1.AssignAtomTypes(ats)) {
+      cerr << "Cannot assign atom types\n";
+      return 1;
+    }
   }
 
   if (cl.option_present('Y')) {
     IWString fname = cl.string_value('Y');
-    PerformPairwiseComparisons(cl, diced1, fname);
+    if (!PerformPairwiseComparisons(cl, diced1, fname)) {
+      return 1;
+    }
   }
 
   IWString_and_File_Descriptor output(1);
 
   IWString smarts;
-  diced1.DetermineMCS(options, smarts, output);
+  if (!diced1.DetermineMCS(options, smarts, output)) {
+    return 1;
+  }
 
-  output.flush();
+  if (!output.flush()) {
+    return 1;
+  }
 
   cerr << smarts << " MCS smarts\n";
 

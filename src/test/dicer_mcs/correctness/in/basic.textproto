@@ -1,0 +1,2 @@
+name: "one" smiles: "C[1CH3]" fragment { smi: "[100CH4]" }
+name: "two" smiles: "C[1NH2]" fragment { smi: "[100CH4]" }

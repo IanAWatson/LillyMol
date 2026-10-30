@@ -58,6 +58,8 @@ static int sort_molecule_by_numbering = 0;
 
 static int change_to_graph_form = 0;
 
+static int reduce_to_largest_fragment = 0;
+
 static int make_implicit_hydrogens_explicit = 0;
 
 static int compute_bond_symmetry_small = 0;
@@ -101,6 +103,7 @@ usage(int rc = 0)
   cerr << "  -s <smarts>    only label atoms matched by the smarts\n";
   cerr << "  -m             apply atom map numbers instead of isotopic labels\n";
   cerr << "  -c             remove all chiral centres\n";
+  cerr << "  -l             reduce to the largest fragment before processing\n";
   cerr << "  -Y ...         more options, enter '-Y help' for info\n";
   cerr << "  -S <stem>      specify output file name stem\n";
   cerr << "  -K ...         standard smiles control options\n";
@@ -472,6 +475,10 @@ numbered_smiles(Molecule& m, Molecule_Output_Object& output)
 {
   assert(m.ok());
 
+  if (reduce_to_largest_fragment) {
+    m.reduce_to_largest_fragment_carefully();
+  }
+
   if (remove_chiral_centres) {
     m.remove_all_chiral_centres();
   }
@@ -570,7 +577,7 @@ DisplayDashYOptions(std::ostream& output) {
 static int
 numbered_smiles(int argc, char** argv)
 {
-  Command_Line cl(argc, argv, "Ivq:s:q:S:i:o:n:E:A:rpHb:e:mK:P:Y:t:c");
+  Command_Line cl(argc, argv, "Ivq:s:q:S:i:o:n:E:A:rpHb:e:mK:P:Y:t:cl");
 
   if (cl.unrecognised_options_encountered()) {
     cerr << "Unrecognised options encountered\n";
@@ -578,6 +585,13 @@ numbered_smiles(int argc, char** argv)
   }
 
   verbose = cl.option_count('v');
+
+  if (cl.option_present('l')) {
+    reduce_to_largest_fragment = 1;
+    if (verbose) {
+      cerr << "Will reduce molecules to their largest fragment\n";
+    }
+  }
 
   if (!process_elements(cl, verbose)) {
     usage(1);

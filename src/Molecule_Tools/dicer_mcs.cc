@@ -4,7 +4,7 @@
 #include <cstdint>
 #include <iostream>
 #include <memory>
-#include <optional>
+#include <utility>
 #include <vector>
 
 #include "google/protobuf/text_format.h"
@@ -239,6 +239,14 @@ class Fragment {
     // The isotopic label placed on the parent atom. Same as the canonical ranking.
     isotope_t* _parent_isotope;
 
+    // Fragment atom numbers where dicer cut a bond. Metadata only: these
+    // annotations must not affect fragment identity or canonical atom ranks.
+    Set_of_Atoms _attachment_points;
+
+    // Parent atom numbers in canonical fragment rank order. Used to choose
+    // reproducibly between occurrences without consulting input record order.
+    std::vector<atom_number_t> _parent_atoms_by_rank;
+
   public:
     Fragment();
     ~Fragment();
@@ -258,6 +266,10 @@ class Fragment {
     }
     int parent_id() const {
       return _parent_id;
+    }
+
+    const std::vector<atom_number_t>& parent_atoms_by_rank() const {
+      return _parent_atoms_by_rank;
     }
 
     // Atom `parent` must be our parent molecule.
@@ -329,7 +341,6 @@ Fragment::Build(const Molecule& parent, int* tmp, const dicer_data::DicerFragmen
 
   const int matoms = _mol.natoms();
 
-  Set_of_Atoms attachment_points;
   for (int i = 0; i < matoms; ++i) {
     isotope_t iso = _mol.isotope(i);
 
@@ -338,28 +349,23 @@ Fragment::Build(const Molecule& parent, int* tmp, const dicer_data::DicerFragmen
     }
 
     if (TruncateToRange(iso)) {
-      _mol.set_isotope(i, iso);
       isosave[i] = iso;
     }
 
-    attachment_points << i;
+    _attachment_points << i;
   }
 
+  // Parent numbering and cut locations are metadata. Compute both identity
+  // and correspondence from the isotope-free fragment so a cut attachment in
+  // one parent can correspond to a hydrogen in another.
   _mol.transform_to_non_isotopic_form();
-  // Re-label the attachment points.
-  for (atom_number_t a : attachment_points) {
-    _mol.set_isotope(a, 1);
-  }
-
-  // After removal of isotopes, compute the canonical rank.
-  // Beware, this includes the isotopic labels applied above.
-  // Probably OK...
   const int* canonical_rank = _mol.canonical_ranks();
 
   _atoms_in_parent = parent.natoms();
 
   _parent_atom = new int[matoms];
   _parent_isotope = new isotope_t[matoms];
+  _parent_atoms_by_rank.resize(matoms);
 
   for (int i = 0; i < matoms; ++i) {
     isotope_t iso = isosave[i];
@@ -376,6 +382,7 @@ Fragment::Build(const Molecule& parent, int* tmp, const dicer_data::DicerFragmen
     // cerr << " atom " << i << " iso " << iso << " came from atom " << p << " in parent molecule\n";
     _parent_atom[i] = p;
     _parent_isotope[i] = canonical_rank[i];
+    _parent_atoms_by_rank[canonical_rank[i] - 1] = p;
   }
 
   _usmi = _mol.unique_smiles();
@@ -412,10 +419,11 @@ FormSmarts(Molecule& m, atom_number_t zatom, IWString& smt) {
     smt << e->symbol();
   }
 
-  if (m.isotope(zatom)) {
-    smt << "D>" << m.ncon(zatom);
-  } else {
-    smt << "D" << m.ncon(zatom);
+  // All fragment connections must exist, but external substituents are
+  // optional at every atom, irrespective of where the exemplar was cut.
+  // A zero-degree fragment atom imposes no degree restriction.
+  if (m.ncon(zatom) > 0) {
+    smt << "D>" << (m.ncon(zatom) - 1);
   }
 
   smt << kCloseSquareBracket;
@@ -453,13 +461,8 @@ Fragment::BuildSmarts(IWString& smarts) {
 
 
 struct ComparisonConditions {
-  // Each molecule consists of a number of fragments.
-  // We scan each list looking for fragments that match.
-  // If we stop at the first match, that will be a fully connected MCS.
-  // If we allow disconnected MCS to be found then we need to
-  // continue looking for non-overlapping fragments.
-  int allow_disconnected_matches = 1;
-
+  // Pairwise comparisons start from occurrences of the largest shared
+  // fragments. Disconnected unions of separate seeds are not formed.
   char record_separator = '\n';
 
   Accumulator_Int<uint32_t> _acc_natoms_overlap;
@@ -472,9 +475,8 @@ class DicedMolecule {
 
     Molecule _mol;
 
-    // Across all our fragments, a mapping from unique smiles to 
-    // fragment number.
-    absl::flat_hash_map<IWString, int> _usmi;
+    // Every occurrence of each isotope-free fragment identity.
+    absl::flat_hash_map<IWString, std::vector<int>> _usmi;
 
     resizable_array_p<Fragment> _fragment;
 
@@ -513,8 +515,8 @@ class DicedMolecule {
       return _mol;
     }
 
-    // If _usmi contains `s`, return _usmi[s].
-    std::optional<int> Contains(const IWString& s) const;
+    // All occurrences, or nullptr when the fragment is absent.
+    const std::vector<int>* Occurrences(const IWString& s) const;
 
     const Fragment* FragmentForSmiles(const IWString& smi) const;
 
@@ -648,12 +650,16 @@ DicedMolecule::Build(const Options& options, const dicer_data::DicedMolecule& pr
     if (f1->natoms() != f2->natoms()) {
       return f1->natoms() > f2->natoms();
     }
-    return f1->usmi().strcmp(f2->usmi()) < 0;
+    const int cmp = f1->usmi().strcmp(f2->usmi());
+    if (cmp != 0) {
+      return cmp < 0;
+    }
+    return f1->parent_atoms_by_rank() < f2->parent_atoms_by_rank();
   });
 
   // Establish the cross reference from fragment unique smiles to index.
   for (int i = 0; i < number_fragments; ++i) {
-    _usmi[_fragment[i]->usmi()] = i;
+    _usmi[_fragment[i]->usmi()].push_back(i);
   }
 
   _mol.transform_to_non_isotopic_form();
@@ -661,14 +667,14 @@ DicedMolecule::Build(const Options& options, const dicer_data::DicedMolecule& pr
   return 1;
 }
 
-std::optional<int>
-DicedMolecule::Contains(const IWString& s) const {
+const std::vector<int>*
+DicedMolecule::Occurrences(const IWString& s) const {
   const auto iter = _usmi.find(s);
   if (iter == _usmi.end()) {
-    return std::nullopt;
+    return nullptr;
   }
 
-  return iter->second;
+  return &iter->second;
 }
 
 const Fragment*
@@ -678,7 +684,7 @@ DicedMolecule::FragmentForSmiles(const IWString& smi) const {
     return nullptr;
   }
   
-  return _fragment[iter->second];
+  return _fragment[iter->second.front()];
 }
 
 int
@@ -701,38 +707,100 @@ DicedMolecule::Compare(DicedMolecule& rhs, const ComparisonConditions& cmp,
   return rc;
 }
 
+// Form an atom correspondence independent of the temporary isotope numbers.
+// Pairs are ordered by lhs atom number for deterministic tie-breaking.
+static std::vector<std::pair<atom_number_t, atom_number_t>>
+CorrespondenceKey(const Molecule& lhs, const Molecule& rhs) {
+  std::vector<std::pair<atom_number_t, atom_number_t>> result;
+  for (atom_number_t i = 0; i < lhs.natoms(); ++i) {
+    const isotope_t iso = lhs.isotope(i);
+    if (iso == 0) {
+      continue;
+    }
+    const atom_number_t j = rhs.atom_with_isotope(iso);
+    assert(j != kInvalidAtomNumber);
+    result.emplace_back(i, j);
+  }
+  return result;
+}
+
 int
 DicedMolecule::CompareInner(DicedMolecule& rhs, const ComparisonConditions& cmp,
                 IWString_and_File_Descriptor& output) {
+  int largest_shared_size = 0;
+  int best_count = 0;
+  int best_lhs = -1;
+  int best_rhs = -1;
+  std::vector<std::pair<atom_number_t, atom_number_t>> best_key;
+  std::unique_ptr<isotope_t[]> best_lhs_isotopes;
+  std::unique_ptr<isotope_t[]> best_rhs_isotopes;
 
-  for (int i = 0; i < _fragment.number_elements(); ++i) {
-    std::optional<int> maybe_rhs = rhs.Contains(_fragment[i]->usmi());
-    if (! maybe_rhs) {
+  // The fragment list groups identities, largest first. Evaluate each shared
+  // identity once and every lhs/rhs occurrence pairing within that identity.
+  // Smaller seeds are deliberately not considered after a shared size is found.
+  for (int i = 0; i < _fragment.number_elements();) {
+    const Fragment& fragment = *_fragment[i];
+    if (largest_shared_size > 0 && fragment.natoms() < largest_shared_size) {
+      break;
+    }
+    const std::vector<int>& lhs_occurrences = *Occurrences(fragment.usmi());
+    i += lhs_occurrences.size();
+    const std::vector<int>* rhs_occurrences = rhs.Occurrences(fragment.usmi());
+    if (rhs_occurrences == nullptr) {
       continue;
     }
-    // cerr << "Found match for " << _fragment[i]->usmi() << '\n';
+    largest_shared_size = fragment.natoms();
 
-    if (!ProcessMatch(i, rhs, *maybe_rhs, cmp, output)) {
-      return 0;
-    }
-
-    if (_atype) {
-      isotope_t next_isotope_to_assign = std::max<isotope_t>(_mol.natoms(), rhs._mol.natoms());
-      isotope_t isave = next_isotope_to_assign;
-      TryExpansion(rhs, cmp, next_isotope_to_assign);
-      if (next_isotope_to_assign > isave) {
-        if (!WriteMatch(rhs, cmp, output)) {
-          return 0;
+    for (int lhs_index : lhs_occurrences) {
+      for (int rhs_index : *rhs_occurrences) {
+        // No labels from another seed or expansion may enter this trial.
+        _mol.unset_isotopes();
+        rhs._mol.unset_isotopes();
+        _fragment[lhs_index]->SetIsotopes(_mol);
+        rhs._fragment[rhs_index]->SetIsotopes(rhs._mol);
+        if (_atype) {
+          isotope_t next_isotope = std::max(_mol.natoms(), rhs._mol.natoms()) + 1;
+          TryExpansion(rhs, cmp, next_isotope);
         }
-      }
-    }
 
-    if (! cmp.allow_disconnected_matches) {
-      return 1;
+        const int count = _mol.number_isotopic_atoms();
+        if (count < best_count) {
+          continue;
+        }
+        auto key = CorrespondenceKey(_mol, rhs._mol);
+        if (best_lhs >= 0 && count == best_count) {
+          const int smi_cmp = fragment.usmi().strcmp(_fragment[best_lhs]->usmi());
+          if (smi_cmp > 0 || (smi_cmp == 0 && !(key < best_key))) {
+            continue;
+          }
+        }
+        best_count = count;
+        best_lhs = lhs_index;
+        best_rhs = rhs_index;
+        best_key = std::move(key);
+        best_lhs_isotopes = _mol.GetIsotopes();
+        best_rhs_isotopes = rhs._mol.GetIsotopes();
+      }
     }
   }
 
-  return 1;  // No common fragment is a successful comparison with no output.
+  if (best_lhs < 0) {
+    return 1;  // No shared fragment is a successful comparison with no output.
+  }
+
+  // Preserve the output format: the winning seed, then its expanded match if
+  // expansion added atoms. Trials themselves produce no output.
+  _mol.unset_isotopes();
+  rhs._mol.unset_isotopes();
+  if (!ProcessMatch(best_lhs, rhs, best_rhs, cmp, output)) {
+    return 0;
+  }
+  if (best_count > largest_shared_size) {
+    _mol.set_isotopes(best_lhs_isotopes.get());
+    rhs._mol.set_isotopes(best_rhs_isotopes.get());
+    return WriteMatch(rhs, cmp, output);
+  }
+  return 1;
 }
 
 int
@@ -1115,8 +1183,6 @@ PerformPairwiseComparisons(Command_Line& cl,
   }
 
   ComparisonConditions cmp;
-
-  cmp.allow_disconnected_matches = 0;
 
   for (int i = 0; i < diced.number_molecules(); ++i) {
     DicedMolecule& m1 = diced[i];

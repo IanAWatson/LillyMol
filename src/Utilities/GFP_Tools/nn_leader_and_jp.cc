@@ -5,7 +5,6 @@
 #include <stdlib.h>
 
 #include <algorithm>
-#include <fstream>
 #include <limits>
 #include <memory>
 #include <optional>
@@ -17,6 +16,7 @@
 #include "Foundational/data_source/iwstring_data_source.h"
 #include "Foundational/data_source/tfdatarecord.h"
 #include "Foundational/iw_tdt/iw_tdt.h"
+#include "Foundational/iwmisc/iwdigits.h"
 #include "Foundational/iwmisc/misc.h"
 #include "Foundational/iwmisc/set_or_unset.h"
 #include "Foundational/iwmisc/timsort.hpp"
@@ -47,6 +47,8 @@ static int scores_present = 0;
 static int score_column = -1;
 
 static int verbose = 0;
+
+static Fraction_as_String fraction_as_string;
 
 static float maximum_distance = 1.0f;
 
@@ -233,12 +235,13 @@ class Leader_Item {
   int form_cluster_threshold(int* selected, const float threshold,
                              const int cluster_number,
                              const resizable_array_p<IWString>& smiles,
-                             const resizable_array_p<IWString>& id, std::ostream& output);
+                             const resizable_array_p<IWString>& id,
+                             IWString_and_File_Descriptor& output);
   int form_cluster_max_cluster_size(int* selected, const float threshold,
                                     const int max_cluster_size, const int cluster_number,
                                     const resizable_array_p<IWString>& smiles,
                                     const resizable_array_p<IWString>& id,
-                                    std::ostream& output);
+                                    IWString_and_File_Descriptor& output);
 
   int mark_neighbours(int* n, const int maxn, const int x) const;
   bool neighbours_in_common(const int* n, const JarvisPatrickParameters&,
@@ -704,7 +707,7 @@ Leader_Item::Build(const nnbr::NearNeighbours& proto,
 static int
 write_cluster_header(const int ndx, const resizable_array_p<IWString>& smiles,
                      const resizable_array_p<IWString>& id, const int cluster_number,
-                     const int csize, std::ostream& output) {
+                     const int csize, IWString_and_File_Descriptor& output) {
   if (write_tdt_output) {
     output << smiles_tag << *(smiles[ndx]) << ">\n";
     output << identifier_tag << *(id[ndx]) << ">\n";
@@ -720,29 +723,36 @@ write_cluster_header(const int ndx, const resizable_array_p<IWString>& smiles,
 
 static void
 write_smiles_id_dist(const IWString* smiles, const IWString* id, const float d,
-                     std::ostream& output) {
+                     IWString_and_File_Descriptor& output) {
   if (write_tdt_output) {
     output << smiles_tag << *(smiles) << ">\n";
     output << identifier_tag << *(id) << ">\n";
     if (d >= 0.0f) {
-      output << distance_tag << d << ">\n";
+      output << distance_tag;
+      fraction_as_string.append_number(output, d);
+      output << ">\n";
     }
   } else {
     output << *smiles << ' ' << *id;
     if (d >= 0.0f) {
-      output << ' ' << d;
+      output << ' ';
+      fraction_as_string.append_number(output, d);
     }
     output << '\n';
   }
+
+  output.write_if_buffer_holds_more_than(32768);
 
   return;
 }
 
 static int
-finish_cluster(const int csize, std::ostream& output) {
+finish_cluster(const int csize, IWString_and_File_Descriptor& output) {
   if (write_tdt_output) {
     output << "|\n";
   }
+
+  output.write_if_buffer_holds_more_than(32768);
 
   return csize;
 }
@@ -752,7 +762,7 @@ Leader_Item::form_cluster_threshold(int* selected, const float threshold,
                                     const int cluster_number,
                                     const resizable_array_p<IWString>& smiles,
                                     const resizable_array_p<IWString>& id,
-                                    std::ostream& output) {
+                                    IWString_and_File_Descriptor& output) {
   // First need to find the cluster size so we can write the CSIZE tag.
   int csize = 1;
 
@@ -811,7 +821,7 @@ Leader_Item::form_cluster_max_cluster_size(int* selected, const float threshold,
                                            const int cluster_number,
                                            const resizable_array_p<IWString>& smiles,
                                            const resizable_array_p<IWString>& id,
-                                           std::ostream& output) {
+                                           IWString_and_File_Descriptor& output) {
   int csize = 1;
 
   for (int i = 0; i < _nbrs; ++i)  // first work out the cluster size
@@ -1020,7 +1030,8 @@ Jarvis_Patrick(Leader_Item* pool, const int pool_size, const JarvisPatrickParame
 static int
 Jarvis_Patrick(Leader_Item* pool, const int pool_size, const JarvisPatrickParameters& jp,
                const resizable_array_p<IWString>& smiles,
-               const resizable_array_p<IWString>& id, std::ostream& output) {
+               const resizable_array_p<IWString>& id,
+               IWString_and_File_Descriptor& output) {
   int* cluster = new int[pool_size];
   std::unique_ptr<int[]> free_cluster(cluster);
 
@@ -1077,7 +1088,7 @@ Jarvis_Patrick(Leader_Item* pool, const int pool_size, const JarvisPatrickParame
     cerr << in_clusters << " items in clusters\n";
   }
 
-  return output.good();
+  return output.flush();
 }
 
 static int
@@ -1339,7 +1350,7 @@ int
 leader(Leader_Item* pool, const int pool_size, int* selected,
        const resizable_array_p<IWString>& smiles, const resizable_array_p<IWString>& id,
        similarity_type_t global_threshold, const int threshold_number,
-       std::ostream& output) {
+       IWString_and_File_Descriptor& output) {
   if (verbose > 1) {
     cerr << "Beginning clustering at " << global_threshold << " threshold "
          << threshold_number << '\n';
@@ -1415,7 +1426,7 @@ leader(Leader_Item* pool, const int pool_size, int* selected,
     report_clustering(selected, cluster_size, pool_size, clusters_found);
   }
 
-  return output.good();
+  return output.flush();
 }
 
 static int
@@ -1427,8 +1438,8 @@ leader(Leader_Item* pool, const int pool_size, int* selected,
   fname << ndx;
   fname << ".ldr";
 
-  std::ofstream output(fname.null_terminated_chars(), std::ios::out);
-  if (!output.good()) {
+  IWString_and_File_Descriptor output;
+  if (!output.open(fname)) {
     cerr << "Cannot open '" << fname << "'\n";
     return 0;
   }
@@ -1545,15 +1556,15 @@ do_jarvis_patrick(const JarvisPatrickParameters* jp, const int njp, Leader_Item*
                   const resizable_array_p<IWString>& id, const IWString& stem) {
   if (1 == njp) {
     if (0 == stem.length()) {
-      return Jarvis_Patrick(pool, pool_size, jp[0], smiles, id, std::cout);
+      IWString_and_File_Descriptor output(1);
+      return Jarvis_Patrick(pool, pool_size, jp[0], smiles, id, output);
     }
 
     IWString fname;
     fname << stem << ".jpc";
 
-    std::ofstream output(fname.null_terminated_chars());
-
-    if (!output.good()) {
+    IWString_and_File_Descriptor output;
+    if (!output.open(fname)) {
       cerr << "Cannot open output file '" << fname << "'\n";
       return 0;
     }
@@ -1566,9 +1577,8 @@ do_jarvis_patrick(const JarvisPatrickParameters* jp, const int njp, Leader_Item*
 
     fname << stem << i << ".jpc";
 
-    std::ofstream output(fname.null_terminated_chars());
-
-    if (!output.good()) {
+    IWString_and_File_Descriptor output;
+    if (!output.open(fname)) {
       cerr << "Cannot open output file '" << fname << "'\n";
       return 0;
     }
@@ -1589,10 +1599,14 @@ do_leader_clustering(Leader_Item* pool, const int pool_size,
   int* selected = new int[pool_size];
   std::unique_ptr<int[]> free_selected(selected);
 
+  IWString_and_File_Descriptor output(1);
+
   int computation_number = 0;
 
   if (1 == number_thresholds && 0 == number_threshold_tags) {
-    leader(pool, pool_size, selected, smiles, id, threshold[0], -1, std::cout);
+    if (!leader(pool, pool_size, selected, smiles, id, threshold[0], -1, output)) {
+      return 0;
+    }
   } else {
     for (int i = 0; i < number_thresholds; i++) {
       if (!leader(pool, pool_size, selected, smiles, id, threshold[i], -1, stem,
@@ -1606,7 +1620,9 @@ do_leader_clustering(Leader_Item* pool, const int pool_size,
   }
 
   if (1 == number_threshold_tags && 0 == number_thresholds) {
-    leader(pool, pool_size, selected, smiles, id, 0.0, 0, std::cout);
+    if (!leader(pool, pool_size, selected, smiles, id, 0.0, 0, output)) {
+      return 0;
+    }
   } else {
     for (int i = 0; i < number_threshold_tags; i++) {
       if (!leader(pool, pool_size, selected, smiles, id, 0.0, i, stem,
@@ -1710,6 +1726,11 @@ leader(int argc, char** argv) {
   }
 
   verbose = cl.option_count('v');
+
+  if (!fraction_as_string.initialise(0.0f, 1.0f, 4)) {
+    cerr << "Cannot initialise distance formatting\n";
+    return 1;
+  }
 
   if (cl.option_present('a')) {
     write_tdt_output = 0;

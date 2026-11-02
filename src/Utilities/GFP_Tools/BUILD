@@ -1125,6 +1125,7 @@ cc_binary(
     ],
     deps = [
         ":gfp",
+        "//Foundational/iwmisc",
         "//Foundational/data_source:iwtfdata_record",
     ],
 )

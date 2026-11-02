@@ -715,6 +715,14 @@
       "args": [
         "-s C#N -m out.smi #{indir}/in.smi"
       ]
+    },
+
+    {
+      "name": "reaction_queries",
+      "difftool": "diff",
+      "shell_script": {
+        "script_name": "run_test.py"
+      }
     }
   ]
 

@@ -4,8 +4,8 @@
     (A C smarts "[CH>0D<3]")
   )
   (1 Sidechain
-    (A C smiles "CO SHR.add_hydroxyethyl")
-    (A C smarts "CO")
+    (A C smiles "CCO SHR.add_hydroxyethyl")
+    (A C smarts "CCO")
     (A I join (0 0))
   )
 )

@@ -24,6 +24,7 @@
 #include "Foundational/cmdline/cmdline.h"
 #include "Foundational/data_source/iwstring_data_source.h"
 #include "Foundational/iw_tdt/iw_tdt.h"
+#include "Foundational/iwmisc/iwdigits.h"
 #include "Foundational/iwmisc/misc.h"
 #include "spread.h"
 #include "re2/re2.h"
@@ -32,6 +33,8 @@ using std::cerr;
 using std::endl;
 
 static int verbose = 0;
+
+static Fraction_as_String fraction_as_string;
 
 static IWString smiles_tag("$SMI<");
 static IWString identifier_tag("PCN<");
@@ -884,7 +887,9 @@ do_object_has_been_selected(int isel, int number_selected,
   if (fpsel.has_a_nearest_selected_neighbour()) {
     output << smiles_tag << nsn.smiles() << ">\n";
     output << identifier_tag << nsn.id() << ">\n";
-    output << distance_tag << fpsel.distance() << ">\n";
+    output << distance_tag;
+    fraction_as_string.append_number(output, fpsel.distance());
+    output << ">\n";
   }
   output << "|\n";
 
@@ -1091,6 +1096,12 @@ spread_buckets(int argc, char **argv) {
   }
 
   verbose = cl.option_count('v');
+
+  // Scaled distances outside [0, 1] use the formatter's stable fallback.
+  if (!fraction_as_string.initialise(0.0f, 1.0f, 4)) {
+    cerr << "Cannot initialise distance formatting\n";
+    return 1;
+  }
 
   if (0 == cl.number_elements()) {
     cerr << "Insufficient arguments\n";

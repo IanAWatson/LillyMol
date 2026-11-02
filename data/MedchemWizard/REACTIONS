@@ -71,7 +71,6 @@ Aryl_substituent_Scan.add_trifluoromethoxy.rxn
 Aryl_substituent_Scan.add_trifluromethyl.rxn
 Aryl_substituent_Scan.add_urea.rxn
 PROTO:Ester-amide_isosteres.1-3-4_oxadiazole.textproto
-PROTO:Ester-amide_isosteres.2_pyrazine.textproto
 PROTO:Ester-amide_isosteres.amidine.textproto
 PROTO:Ester-amide_isosteres.amino_1-2-4-oxazole.textproto
 PROTO:Ester-amide_isosteres.amino-1-3-4-_oxazole.textproto

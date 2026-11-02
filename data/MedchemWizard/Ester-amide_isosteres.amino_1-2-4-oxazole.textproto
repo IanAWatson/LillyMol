@@ -13,6 +13,6 @@ sidechain {
   id: 1
   reagent: "NC1OC=NN=1"
   smarts: "Nc1ocnn1"
-  single_bond: [2, 0]
-  single_bond: [4, 3]
+  single_bond: [4, 0]
+  single_bond: [2, 3]
 }

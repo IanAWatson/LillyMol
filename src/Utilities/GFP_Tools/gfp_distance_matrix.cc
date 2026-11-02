@@ -75,7 +75,6 @@ static char token_separator = ' ';
 
 static int squeeze_multiple_blanks_from_fast_io = 0;
 
-// not yet implemented. TODO:ianwatson
 static Fraction_as_String fraction_as_string;
 
 /*
@@ -317,7 +316,8 @@ distance_matrix(IW_General_Fingerprint *pool1, int n1, IW_General_Fingerprint *p
       if (fast_io) {
         output_buffer[j] = int_sr[int(100.0 * result + 0.499999)];
       } else {
-        output << token_separator << result;
+        output << token_separator;
+        fraction_as_string.append_number(output, result);
       }
       //    cerr << "Completed i = " << i << " j = " << j << '\n';
     }
@@ -541,7 +541,10 @@ distance_matrix(int argc, char **argv) {
     return 32;
   }
 
-  set_default_iwstring_float_concatenation_precision(4);
+  if (!fraction_as_string.initialise(0.0f, 1.0f, 4)) {
+    cerr << "Cannot initialise distance formatting\n";
+    return 1;
+  }
 
   IWString_and_File_Descriptor output(1);
   
@@ -609,9 +612,6 @@ distance_matrix(int argc, char **argv) {
 
     output << '\n';
   }
-
-  fraction_as_string.initialise(0.0f, 1.0f, 100);
-  fraction_as_string.set_include_leading_space(token_separator);
 
   if (0 == ncomparators) {
     (void)distance_matrix(pool, nfingerprints, pool, pool_size, output);

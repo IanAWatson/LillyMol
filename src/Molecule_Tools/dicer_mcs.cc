@@ -1,7 +1,9 @@
 // Read output from dicer to find MCS
 
 #include <algorithm>
+#include <array>
 #include <cstdint>
+#include <filesystem>
 #include <iostream>
 #include <memory>
 #include <utility>
@@ -15,6 +17,7 @@
 #include "Foundational/cmdline/cmdline.h"
 #include "Foundational/data_source/iwstring_data_source.h"
 #include "Foundational/iwmisc/misc.h"
+#include "Foundational/iwmisc/iwdigits.h"
 #include "Foundational/iwstring/absl_hash.h"
 #include "Foundational/iwstring/iwstring.h"
 
@@ -63,6 +66,9 @@ The following options are recognised.
  -m <natoms>            minimum size of a fragment. Stronly suggest something > 1.
  -s <N|NN%>            minimum parent support; select largest qualifying fragment.
  -P <atype>             atom type specification for greedy single atom expansion for pairwise matches.
+ -R <fname>             write a regular fragment report (default separator: tab).
+ -R sep=<name>          report separator, e.g. tab, comma, space, vbar.
+ -X <fname>             write parents lacking the selected candidate fragment (SMILES).
  -Y <fname>             write all pairwise MCS combinations. File can become very large!
  -v                     verbose output.
 )";
@@ -78,6 +84,8 @@ class Options {
     int _min_atoms_in_fragment;
     int _minimum_support;
     int _minimum_support_percent;
+    IWString _report_fname;
+    char _report_separator = '\t';
 
   public:
     Options();
@@ -87,6 +95,9 @@ class Options {
     int verbose() const {
       return _verbose;
     }
+
+    const IWString& report_fname() const { return _report_fname; }
+    char report_separator() const { return _report_separator; }
 
     int min_atoms_in_fragment() const {
       return _min_atoms_in_fragment;
@@ -146,6 +157,33 @@ Options::Initialise(Command_Line& cl) {
     }
   }
 
+  if (cl.option_present('R')) {
+    const_IWSubstring value;
+    int i = 0;
+    while (cl.value('R', value, i++)) {
+      if (value.starts_with("sep=")) {
+        IWString separator(value);
+        separator.remove_leading_chars(4);
+        if (!char_name_to_char(separator) || separator.length() != 1 ||
+            separator[0] == '\n' || separator[0] == '\r' || separator[0] == '\0' ||
+            separator[0] == '"') {
+          cerr << "Invalid report separator '" << value << "'\n";
+          return 0;
+        }
+        _report_separator = separator[0];
+      } else if (_report_fname.empty() && !value.empty()) {
+        _report_fname = value;
+      } else {
+        cerr << "Specify one report filename with -R\n";
+        return 0;
+      }
+    }
+    if (_report_fname.empty()) {
+      cerr << "-R sep= requires a report filename as well\n";
+      return 0;
+    }
+  }
+
   return 1;
 }
 
@@ -159,6 +197,9 @@ class FragmentSummary {
     // For this fragment a list of the molecules that contain the fragment.
     int* _in_molecule;
     int _molecules_with_fragment;
+    int _molecules_as_whole = 0;
+    int _molecules_with_cut = 0;
+    int _first_molecule;
 
     // This must be initialised by a caller.
     int _natoms;
@@ -180,13 +221,24 @@ class FragmentSummary {
 
     // The caller is telling us that our fragment has been found in
     // molecule number `s`.
-    void found_in_molecule(int s) {
-      if (_in_molecule[s]) {
-        return;
+    void found_in_molecule(int s, bool whole = false, bool cut = false) {
+      constexpr int kPresent = 1, kWhole = 2, kCut = 4;
+      int& flags = _in_molecule[s];
+      if (!(flags & kPresent)) {
+        ++_molecules_with_fragment;
       }
-      _in_molecule[s] = 1;
-      ++_molecules_with_fragment;
+      if (whole && !(flags & kWhole)) {
+        ++_molecules_as_whole;
+      }
+      if (cut && !(flags & kCut)) {
+        ++_molecules_with_cut;
+      }
+      flags |= kPresent | (whole ? kWhole : 0) | (cut ? kCut : 0);
     }
+
+    int first_molecule() const { return _first_molecule; }
+    int molecules_as_whole() const { return _molecules_as_whole; }
+    int molecules_with_cut() const { return _molecules_with_cut; }
 
     int molecules_with_fragment() const {
       return _molecules_with_fragment;
@@ -202,6 +254,7 @@ FragmentSummary::FragmentSummary(int nmolecules, int findx) {
   _in_molecule = new_int(nmolecules);
   _molecules_with_fragment = 0;
   _natoms = 0;
+  _first_molecule = findx;
   found_in_molecule(findx);
 }
 
@@ -210,6 +263,9 @@ FragmentSummary::FragmentSummary(FragmentSummary&& rhs) {
   rhs._in_molecule = nullptr;
   _molecules_with_fragment = rhs._molecules_with_fragment;
   _natoms = rhs._natoms;
+  _molecules_as_whole = rhs._molecules_as_whole;
+  _molecules_with_cut = rhs._molecules_with_cut;
+  _first_molecule = rhs._first_molecule;
 }
 
 FragmentSummary::~FragmentSummary() {
@@ -242,6 +298,7 @@ class Fragment {
     // Fragment atom numbers where dicer cut a bond. Metadata only: these
     // annotations must not affect fragment identity or canonical atom ranks.
     Set_of_Atoms _attachment_points;
+    bool _is_whole_parent = false;
 
     // Parent atom numbers in canonical fragment rank order. Used to choose
     // reproducibly between occurrences without consulting input record order.
@@ -271,6 +328,11 @@ class Fragment {
     const std::vector<atom_number_t>& parent_atoms_by_rank() const {
       return _parent_atoms_by_rank;
     }
+
+    bool is_whole_parent() const { return _is_whole_parent; }
+    void set_is_whole_parent() { _is_whole_parent = true; }
+    bool has_attachments() const { return !_attachment_points.empty(); }
+    IWString AttachmentSmiles() const;
 
     // Atom `parent` must be our parent molecule.
     // Scan through _parent_atom and set the appropriate isotope in `parent`.
@@ -390,6 +452,15 @@ Fragment::Build(const Molecule& parent, int* tmp, const dicer_data::DicerFragmen
   return 1;
 }
 
+IWString
+Fragment::AttachmentSmiles() const {
+  Molecule labelled(_mol);
+  for (atom_number_t atom : _attachment_points) {
+    labelled.set_isotope(atom, 1);
+  }
+  return labelled.unique_smiles();
+}
+
 void
 Fragment::SetIsotopes(Molecule& parent) const {
   const int matoms = _mol.natoms();
@@ -421,8 +492,8 @@ FormSmarts(Molecule& m, atom_number_t zatom, IWString& smt) {
 
   // All fragment connections must exist, but external substituents are
   // optional at every atom, irrespective of where the exemplar was cut.
-  // A zero-degree fragment atom imposes no degree restriction.
-  if (m.ncon(zatom) > 0) {
+  // Zero-degree atoms need no restriction; a query bond already implies D>0.
+  if (m.ncon(zatom) > 1) {
     smt << "D>" << (m.ncon(zatom) - 1);
   }
 
@@ -495,7 +566,8 @@ class DicedMolecule {
                 const ComparisonConditions& cmp,
                 isotope_t& next_isotope_to_assign);
     atom_number_t UnmatchedAtom(atom_number_t zatom, const Bond* b1,
-                             uint32_t atype) const;
+                               uint32_t atype, const Molecule& lhs,
+                               atom_number_t lhs_atom) const;
 
   public:
     DicedMolecule();
@@ -613,14 +685,7 @@ DicedMolecule::Build(const Options& options, const dicer_data::DicedMolecule& pr
 
   int number_fragments = proto.fragment_size();
 
-  if (number_fragments == 0) {
-    cerr << "DicedMolecule::Build:no fragments\n";
-    cerr << proto.ShortDebugString() << '\n';
-    _mol.transform_to_non_isotopic_form();
-    return 1;
-  }
-
-  _fragment.reserve(number_fragments);
+  _fragment.reserve(number_fragments + 1);
 
   // cerr << "Paremt molecule contains " << matoms << " atoms\n";
 
@@ -641,6 +706,38 @@ DicedMolecule::Build(const Options& options, const dicer_data::DicedMolecule& pr
     f->set_parent_id(i);
 
     _fragment << f.release();
+  }
+
+  // Include the zero-cut case: dicer need not emit its whole input molecule.
+  // The original numbered SMILES supplies the same parent mapping as fragments.
+  if (matoms >= kMaxFragmentAtoms) [[unlikely]] {
+    if (options.verbose()) {
+      cerr << "Not adding the " << matoms << "-atom parent '" << _mol.name()
+           << "' as a zero-cut fragment: fragments must have fewer than "
+           << kMaxFragmentAtoms << " atoms\n";
+    }
+  } else if (matoms >= options.min_atoms_in_fragment()) {
+    dicer_data::DicerFragment whole_parent;
+    whole_parent.set_smi(proto.smiles());
+    whole_parent.set_nat(matoms);
+    auto f = std::make_unique<Fragment>();
+    if (!f->Build(_mol, tmp.get(), whole_parent)) {
+      cerr << "DicedMolecule::Build:cannot build zero-cut parent fragment\n";
+      return 0;
+    }
+    f->set_is_whole_parent();
+    // Avoid adding the whole structure twice when dicer already emitted it.
+    bool already_present = false;
+    for (Fragment* existing : _fragment) {
+      if (existing->usmi() == f->usmi()) {
+        existing->set_is_whole_parent();
+        already_present = true;
+        break;
+      }
+    }
+    if (!already_present) {
+      _fragment << f.release();
+    }
   }
 
   number_fragments = _fragment.number_elements();
@@ -699,6 +796,9 @@ DicedMolecule::Compare(DicedMolecule& rhs, const ComparisonConditions& cmp,
 //std::unique_ptr<int[]> lhs_ipa = InParentArray();
 //std::unique_ptr<int[]> rhs_ipa = rhs.InParentArray();
 
+  // Parent bond aromaticity must be available even for simple atom types.
+  _mol.compute_aromaticity_if_needed();
+  rhs._mol.compute_aromaticity_if_needed();
   int rc = CompareInner(rhs, cmp, output);
 
   _mol.transform_to_non_isotopic_form();
@@ -722,6 +822,51 @@ CorrespondenceKey(const Molecule& lhs, const Molecule& rhs) {
     result.emplace_back(i, j);
   }
   return result;
+}
+
+// Check an edge (or its absence) between two corresponding atom pairs.
+static bool
+SameInducedBond(const Molecule& lhs, atom_number_t lhs1, atom_number_t lhs2,
+                const Molecule& rhs, atom_number_t rhs1, atom_number_t rhs2) {
+  const Bond* b1 = lhs.bond_between_atoms_if_present(lhs1, lhs2);
+  const Bond* b2 = rhs.bond_between_atoms_if_present(rhs1, rhs2);
+  if (b1 == nullptr || b2 == nullptr) {
+    return b1 == nullptr && b2 == nullptr;
+  }
+  return b1->same_bond_type(*b2);
+}
+
+static bool
+IsInducedMatch(const Molecule& lhs, const Molecule& rhs) {
+  const auto mapping = CorrespondenceKey(lhs, rhs);
+  for (size_t i = 0; i < mapping.size(); ++i) {
+    for (size_t j = 0; j < i; ++j) {
+      if (!SameInducedBond(lhs, mapping[i].first, mapping[j].first,
+                           rhs, mapping[i].second, mapping[j].second)) {
+        return false;
+      }
+    }
+  }
+  return true;
+}
+
+// A new atom pair must agree with every existing pair, not just the bond
+// along which expansion reached it. This also detects extra ring closures.
+static bool
+CompatibleWithMatchedAtoms(const Molecule& lhs, atom_number_t lhs_atom,
+                           const Molecule& rhs, atom_number_t rhs_atom) {
+  for (atom_number_t i = 0; i < lhs.natoms(); ++i) {
+    const isotope_t iso = lhs.isotope(i);
+    if (iso == 0) {
+      continue;
+    }
+    const atom_number_t j = rhs.atom_with_isotope(iso);
+    assert(j != kInvalidAtomNumber);
+    if (!SameInducedBond(lhs, lhs_atom, i, rhs, rhs_atom, j)) {
+      return false;
+    }
+  }
+  return true;
 }
 
 int
@@ -749,8 +894,6 @@ DicedMolecule::CompareInner(DicedMolecule& rhs, const ComparisonConditions& cmp,
     if (rhs_occurrences == nullptr) {
       continue;
     }
-    largest_shared_size = fragment.natoms();
-
     for (int lhs_index : lhs_occurrences) {
       for (int rhs_index : *rhs_occurrences) {
         // No labels from another seed or expansion may enter this trial.
@@ -758,6 +901,10 @@ DicedMolecule::CompareInner(DicedMolecule& rhs, const ComparisonConditions& cmp,
         rhs._mol.unset_isotopes();
         _fragment[lhs_index]->SetIsotopes(_mol);
         rhs._fragment[rhs_index]->SetIsotopes(rhs._mol);
+        if (!IsInducedMatch(_mol, rhs._mol)) {
+          continue;
+        }
+        largest_shared_size = fragment.natoms();
         if (_atype) {
           isotope_t next_isotope = std::max(_mol.natoms(), rhs._mol.natoms()) + 1;
           TryExpansion(rhs, cmp, next_isotope);
@@ -838,7 +985,7 @@ DicedMolecule::TryExpansion(DicedMolecule& rhs,
                 isotope_t& next_isotope_to_assign) {
   int rc = 0;
 
-  // Branch from each of the attachment points.
+  // Branch from each matched atom, preserving induced connectivity.
 
   const int matoms = _mol.natoms();
   for (int i = 0; i < matoms; ++i) {
@@ -857,7 +1004,7 @@ DicedMolecule::TryExpansion(DicedMolecule& rhs,
         continue;
       }
 
-      atom_number_t rhs_atom = rhs.UnmatchedAtom(a2, b, _atype[o]);
+      atom_number_t rhs_atom = rhs.UnmatchedAtom(a2, b, _atype[o], _mol, o);
       if (rhs_atom == kInvalidAtomNumber) {
         // cerr << "No matchon other side\n";
         continue;
@@ -882,7 +1029,8 @@ DicedMolecule::TryExpansion(DicedMolecule& rhs,
 // bond of type `b` with the same atom type `atype`.
 atom_number_t
 DicedMolecule::UnmatchedAtom(atom_number_t zatom, const Bond* b1,
-                             uint32_t atype) const {
+                             uint32_t atype, const Molecule& lhs,
+                             atom_number_t lhs_atom) const {
   // cerr << "Looking for unmatched atom from " << zatom << " isotope " << _mol.isotope(zatom) << '\n';
 
   // cerr << " atom has " << _mol.ncon(zatom) << " connections\n";
@@ -901,6 +1049,9 @@ DicedMolecule::UnmatchedAtom(atom_number_t zatom, const Bond* b1,
     if (_atype[o] != atype) {
       continue;
     }
+    if (!CompatibleWithMatchedAtoms(lhs, lhs_atom, _mol, o)) {
+      continue;
+    }
 
     return o;
   }
@@ -915,9 +1066,8 @@ DicedMolecule::UpdateStats(int nmolecules, int ndx,
     auto [iter, emplaced] = frag_data.try_emplace(frag->usmi(), nmolecules, ndx);
     if (emplaced) {
       iter->second.set_natoms(frag->natoms());
-    } else {
-      iter->second.found_in_molecule(ndx);
     }
+    iter->second.found_in_molecule(ndx, frag->is_whole_parent(), frag->has_attachments());
   }
 
   return 1;
@@ -928,6 +1078,13 @@ class DicedMolecules {
     int _number_molecules;
 
     DicedMolecule* _mol;
+
+    int WriteNonMatching(const FragmentSummary* selected,
+                         IWString_and_File_Descriptor& output);
+    int WriteFragmentReport(const Options& options,
+        const absl::flat_hash_map<IWString, FragmentSummary>& fragments,
+        const IWString* selected, IWString_and_File_Descriptor& output);
+
 
   public:
     DicedMolecules();
@@ -948,7 +1105,10 @@ class DicedMolecules {
 
     const Fragment* GetFragment(const IWString& smi, const FragmentSummary& frag_summary) const;
 
-    int DetermineMCS(const Options& options, IWString& smarts, IWString_and_File_Descriptor& output);
+    int DetermineMCS(const Options& options, IWString& smarts,
+                     IWString_and_File_Descriptor& output,
+                     IWString_and_File_Descriptor* non_matching,
+                     IWString_and_File_Descriptor* fragment_report);
 };
 
 DicedMolecules::DicedMolecules() {
@@ -1043,10 +1203,121 @@ DicedMolecules::GetFragment(const IWString& smi,
   return nullptr;
 }
 
+static void
+AppendReportField(const IWString& field, char separator, IWString_and_File_Descriptor& output) {
+  bool quote = false;
+  for (char c : field) {
+    if (c == separator || c == '"' || c == '\n' || c == '\r') {
+      quote = true;
+      break;
+    }
+  }
+  if (!quote) {
+    output << field;
+    return;
+  }
+  output << '"';
+  for (char c : field) {
+    if (c == '"') {
+      output << '"';
+    }
+    output << c;
+  }
+  output << '"';
+}
+
+int
+DicedMolecules::WriteFragmentReport(const Options& options,
+    const absl::flat_hash_map<IWString, FragmentSummary>& fragments,
+    const IWString* selected, IWString_and_File_Descriptor& output) {
+  const char sep = options.report_separator();
+  const std::array<const char*, 10> header = {"SMILES", "NATOMS", "NPARENTS", "FPARENTS",
+      "FIRST_PARENT", "SMARTS", "NWHOLE", "NCUT", "SELECTED", "ATTACHMENT_SMILES"};
+  for (size_t i = 0; i < header.size(); ++i) {
+    if (i > 0) {
+      output << sep;
+    }
+    AppendReportField(IWString(header[i]), sep, output);
+  }
+  output << '\n';
+
+  struct Entry {
+    const IWString* _smiles;
+    const FragmentSummary* _summary;
+  };
+  std::vector<Entry> entries;
+  entries.reserve(fragments.size());
+  for (const auto& [smiles, summary] : fragments) {
+    entries.push_back({&smiles, &summary});
+  }
+  std::sort(entries.begin(), entries.end(), [](const Entry& a, const Entry& b) {
+    if (a._summary->molecules_with_fragment() != b._summary->molecules_with_fragment()) {
+      return a._summary->molecules_with_fragment() > b._summary->molecules_with_fragment();
+    }
+    if (a._summary->natoms() != b._summary->natoms()) {
+      return a._summary->natoms() > b._summary->natoms();
+    }
+    return a._smiles->strcmp(*b._smiles) < 0;
+  });
+  Fraction_as_String fraction;
+  if (!fraction.initialise(0.0f, 1.0f, 4)) {
+    return 0;
+  }
+  for (const Entry& entry : entries) {
+    const FragmentSummary& summary = *entry._summary;
+    DicedMolecule& parent = _mol[summary.first_molecule()];
+    const Fragment* fragment = parent.FragmentForSmiles(*entry._smiles);
+    std::array<IWString, 10> fields;
+    fields[0] = *entry._smiles;
+    fields[1] << summary.natoms();
+    fields[2] << summary.molecules_with_fragment();
+    fraction.append_number(fields[3], static_cast<float>(summary.molecules_with_fragment()) /
+                                        _number_molecules);
+    fields[4] = parent.name();
+    fields[9] = fragment->AttachmentSmiles();
+    const_cast<Fragment*>(fragment)->BuildSmarts(fields[5]);
+    fields[6] << summary.molecules_as_whole();
+    fields[7] << summary.molecules_with_cut();
+    fields[8] << (selected != nullptr && *selected == *entry._smiles ? 1 : 0);
+    for (size_t i = 0; i < fields.size(); ++i) {
+      if (i > 0) {
+        output << sep;
+      }
+      AppendReportField(fields[i], sep, output);
+    }
+    output << '\n';
+    if (!output.write_if_buffer_holds_more_than(4096)) {
+      return 0;
+    }
+  }
+  return output.flush();
+}
+
+// Membership means the selected candidate was emitted by dicer or added as
+// the whole parent, not that a parent substructure search would fail.
+int
+DicedMolecules::WriteNonMatching(const FragmentSummary* selected,
+                                 IWString_and_File_Descriptor& output) {
+  for (int i = 0; i < _number_molecules; ++i) {
+    if (selected != nullptr && selected->is_found_in_molecule(i)) {
+      continue;
+    }
+    Molecule& m = _mol[i].mol();
+    m.unset_isotopes();
+    output << m.smiles() << ' ' << m.name() << '\n';
+    if (!output.write_if_buffer_holds_more_than(4096)) {
+      return 0;
+    }
+  }
+  return output.flush();
+}
+
 int
 DicedMolecules::DetermineMCS(const Options& options,
                              IWString& smarts,
-                             IWString_and_File_Descriptor& output) {
+                             IWString_and_File_Descriptor& output,
+                             IWString_and_File_Descriptor* non_matching,
+                             IWString_and_File_Descriptor* fragment_report) {
   if (_number_molecules == 0) [[unlikely]] {
     return 0;
   }
@@ -1061,16 +1332,22 @@ DicedMolecules::DetermineMCS(const Options& options,
   }
 
   if (frag_data.empty()) {
+    if (fragment_report != nullptr) {
+      WriteFragmentReport(options, frag_data, nullptr, *fragment_report);
+    }
     cerr << "No fragments survive the fragment size requirements\n";
+    if (non_matching != nullptr) {
+      WriteNonMatching(nullptr, *non_matching);
+    }
     return 0;
   }
 
+  cerr << "Found " << frag_data.size() << " unique candidate fragments\n";
   constexpr int kMaxNatoms = kMaxFragmentAtoms;
   std::unique_ptr<McsCandidate[]> candidates =
         std::make_unique<McsCandidate[]>(kMaxNatoms);
 
   for (const auto& [smi, data] : frag_data) {
-    cerr << smi << " in " << data.molecules_with_fragment() << " molecules\n";
     int nat = data.natoms();
     if (data.molecules_with_fragment() > candidates[nat].nmolecules ||
         (data.molecules_with_fragment() == candidates[nat].nmolecules &&
@@ -1123,9 +1400,18 @@ DicedMolecules::DetermineMCS(const Options& options,
     }
   }
 
+  if (fragment_report != nullptr &&
+      !WriteFragmentReport(options, frag_data, mcs_smiles, *fragment_report)) {
+    cerr << "Cannot write fragment report\n";
+    return 0;
+  }
+
   if (frag == nullptr) {
     cerr << "No fragment meets minimum support " << minimum_support << " of "
          << _number_molecules << " input parents\n";
+    if (non_matching != nullptr) {
+      WriteNonMatching(nullptr, *non_matching);
+    }
     return 0;
   }
 
@@ -1153,6 +1439,10 @@ DicedMolecules::DetermineMCS(const Options& options,
   }
 
   const_cast<Fragment*>(f)->BuildSmarts(smarts);
+
+  if (non_matching != nullptr && !WriteNonMatching(frag, *non_matching)) {
+    return 0;
+  }
 
   // Now write out all matching molecules.
 
@@ -1219,9 +1509,81 @@ PerformPairwiseComparisons(Command_Line& cl,
   return PerformPairwiseComparisons(cl, diced, output);
 }
 
+static bool
+SameFile(const IWString& a, const IWString& b) {
+  namespace fs = std::filesystem;
+  const fs::path pa(a.AsString()), pb(b.AsString());
+  std::error_code error;
+  if (fs::equivalent(pa, pb, error)) {
+    return true;
+  }
+  error.clear();
+  const auto absolute_a = fs::absolute(pa, error);
+  if (error) {
+    return pa.lexically_normal() == pb.lexically_normal();
+  }
+  const auto absolute_b = fs::absolute(pb, error);
+  if (error) {
+    return pa.lexically_normal() == pb.lexically_normal();
+  }
+  const auto ca = fs::weakly_canonical(absolute_a, error);
+  if (error) {
+    return absolute_a.lexically_normal() == absolute_b.lexically_normal();
+  }
+  const auto cb = fs::weakly_canonical(absolute_b, error);
+  return !error && ca == cb;
+}
+
+static int
+CheckOutputFiles(const Command_Line& cl, const IWString& non_matching_fname,
+                 const IWString& report_fname) {
+  std::vector<std::pair<char, IWString>> outputs;
+  for (char flag : {'X', 'Y', 'R'}) {
+    if (!cl.option_present(flag)) {
+      continue;
+    }
+    if (flag != 'R' && cl.option_count(flag) != 1) {
+      cerr << "Specify -" << flag << " only once\n";
+      return 0;
+    }
+    IWString output = cl.string_value(flag);
+    if (flag == 'X' && output == "-") {
+      cerr << "-X requires a separate file; stdout is used for matching parents\n";
+      return 0;
+    }
+    if (flag == 'X') {
+      output = non_matching_fname;
+    }
+    if (flag == 'R') {
+      output = report_fname;
+      if (output == "-") {
+        cerr << "-R requires a separate file; stdout is used for matching parents\n";
+        return 0;
+      }
+    }
+    outputs.emplace_back(flag, output);
+    for (const char* input : cl) {
+      if (SameFile(output, IWString(input))) {
+        cerr << "Output -" << flag << " would overwrite input '" << input << "'\n";
+        return 0;
+      }
+    }
+  }
+  for (size_t i = 0; i < outputs.size(); ++i) {
+    for (size_t j = 0; j < i; ++j) {
+      if (SameFile(outputs[j].second, outputs[i].second)) {
+        cerr << '-' << outputs[j].first << " and -" << outputs[i].first
+             << " must name different output files\n";
+        return 0;
+      }
+    }
+  }
+  return 1;
+}
+
 int
 Main(int argc, char** argv) {
-  Command_Line cl(argc, argv, "vE:A:m:P:Y:s:");
+  Command_Line cl(argc, argv, "vE:A:m:P:Y:s:X:R:");
 
   if (cl.unrecognised_options_encountered()) {
     cerr << "Unrecognised options encountered\n";
@@ -1257,6 +1619,15 @@ Main(int argc, char** argv) {
   }
 #endif
 
+  IWString non_matching_fname;
+  if (cl.option_present('X')) {
+    non_matching_fname = cl.string_value('X');
+    non_matching_fname.EnsureEndsWith(".smi");
+  }
+  if (!CheckOutputFiles(cl, non_matching_fname, options.report_fname())) {
+    return 1;
+  }
+
   DicedMolecules diced1;
 
   if (! diced1.Build(options, cl[0])) {
@@ -1283,6 +1654,25 @@ Main(int argc, char** argv) {
     }
   }
 
+  std::unique_ptr<IWString_and_File_Descriptor> non_matching;
+  if (cl.option_present('X')) {
+    non_matching = std::make_unique<IWString_and_File_Descriptor>();
+    if (!non_matching->open(non_matching_fname.null_terminated_chars())) {
+      cerr << "Cannot open non-matching output '" << non_matching_fname << "'\n";
+      return 1;
+    }
+  }
+
+  std::unique_ptr<IWString_and_File_Descriptor> fragment_report;
+  if (!options.report_fname().empty()) {
+    IWString fname = options.report_fname();
+    fragment_report = std::make_unique<IWString_and_File_Descriptor>();
+    if (!fragment_report->open(fname.null_terminated_chars())) {
+      cerr << "Cannot open fragment report '" << fname << "'\n";
+      return 1;
+    }
+  }
+
   if (cl.option_present('Y')) {
     IWString fname = cl.string_value('Y');
     if (!PerformPairwiseComparisons(cl, diced1, fname)) {
@@ -1293,7 +1683,7 @@ Main(int argc, char** argv) {
   IWString_and_File_Descriptor output(1);
 
   IWString smarts;
-  if (!diced1.DetermineMCS(options, smarts, output)) {
+  if (!diced1.DetermineMCS(options, smarts, output, non_matching.get(), fragment_report.get())) {
     return 1;
   }
 

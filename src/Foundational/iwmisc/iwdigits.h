@@ -75,6 +75,10 @@ class Fraction_as_String
 
     int initialise(float minval, float maxval, int digits);
 
+    // Stable formatting at `digits` decimal places without a lookup table.
+    // Releases any previously initialised cache; leading strings are retained.
+    int initialise_without_lookup(int digits);
+
     int nbuckets() const { return _nbuckets;}
 
     int active() const { return nullptr != _fraction;}

@@ -82,6 +82,18 @@ Fraction_as_String::initialise(float minvl, float maxvl, int digits)
 }
 
 int
+Fraction_as_String::initialise_without_lookup(int digits) {
+  if (digits < 1) {
+    return 0;
+  }
+  delete [] _fraction;
+  _fraction = nullptr;
+  _nbuckets = 0;
+  _digits = digits;
+  return 1;
+}
+
+int
 Fraction_as_String::_fill_string_data()
 {
   assert(nullptr != _fraction);

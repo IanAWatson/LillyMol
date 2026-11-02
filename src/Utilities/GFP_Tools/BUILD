@@ -783,6 +783,7 @@ cc_binary(
     ],
     deps = [
         ":gfp",
+        "//Foundational/iwmisc",
         "//Foundational/histogram:iwhistogram",
     ],
 )

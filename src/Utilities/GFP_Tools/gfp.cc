@@ -2046,7 +2046,8 @@ IW_General_Fingerprint::_construct_from_tdt(IW_TDT& tdt, int& fatal) {
 
   assert(bit_fingerprints_in_file > 0 || _number_sparse_fingerprints > 0 ||
          number_fixed_size_counted_fingerprints_in_file ||
-         multiconformer_fingerprints_present);
+         multiconformer_fingerprints_present || molecular_property_integer_tag.length() ||
+         molecular_property_continuous_tag.length());
 
   if (nullptr == _fingerprint && nullptr == _sparse_fingerprint &&
       nullptr == _fixed_size_counted_fingerprint) {

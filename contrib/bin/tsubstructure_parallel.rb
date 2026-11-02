@@ -57,6 +57,11 @@ if (cl.option_count('m') > 1)
   end
 end
 
+# tsubstructure adds the .smi suffix itself, and does not double it, so
+# work with the stem. Otherwise the joined output goes to file.smi.smi.
+mfile = mfile.sub(/\.smi$/, '') if (mfile)
+nfile = nfile.sub(/\.smi$/, '') if (nfile)
+
 nthreads = if cl.option_present('thr')
              cl.value('thr')
            else

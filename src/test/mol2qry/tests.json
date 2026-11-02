@@ -4,10 +4,14 @@
     {
       "name": "case_1",
       "args": [
-           "-S output #{indir}/input.smi"
+        "-S output #{indir}/input.smi"
       ]
+    },
+    {
+      "name": "smarts",
+      "shell_script": {
+        "script_name": "run_test.py"
+      }
     }
-
   ]
-
 }

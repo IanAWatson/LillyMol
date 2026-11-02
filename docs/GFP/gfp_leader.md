@@ -2,6 +2,12 @@
 
 A clustering tool also known as sphere exclusion.
 
+Text `DIST<...>` values use platform-independent formatting rounded to four
+decimal places, with trailing zeros omitted. This applies to cluster output and
+the `-L` report of molecules excluded by previously selected molecules (`-A`).
+Clustering thresholds and sorting use the original distances. Textproto output
+(`-k .`) retains the original numeric precision.
+
 ## Use Case
 The most common use case for `gfp_leader` is when you have a set of molecules
 which can be ordered by some desirability function, and when you need to select

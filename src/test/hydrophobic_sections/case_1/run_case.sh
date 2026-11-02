@@ -29,16 +29,7 @@ fi
 
 in="$test_cmd_top/$case/in/test.smi"
 out=test.out
-cmp_out="$test_cmd_top/$case/out/test.out"
-
-# Support linux and mac 
-if [[ "${UNAME}" == "Linux" ]]; then
-    cmp_out=out/${UNAME}/test.out
-elif [[ "${UNAME}" == "darwin"* ]]; then
-    cmp_out=out/osx/test.out
-else
-    echo "OS is not supported"
-fi
+cmp_out="$test_cmd_top/$case/out/stdout"
 
 echo "Testing: $command"
 

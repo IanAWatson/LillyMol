@@ -4,10 +4,14 @@
     {
       "name": "case_1",
       "args": [
-           "#{indir}/test.smi"
+        "#{indir}/test.smi"
+      ]
+    },
+    {
+      "name": "fractional",
+      "args": [
+        "-G '[#6]' -L '[O]' #{indir}/test.smi"
       ]
     }
-
   ]
-
 }

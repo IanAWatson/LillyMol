@@ -61,6 +61,8 @@ static Report_Progress report_progress;
 
 static IWDigits iwdigits(200);
 
+static Fraction_as_String fraction_as_string;
+
 static int remove_leading_zeros_from_identifiers = 0;
 
 static int chop_dos_carriage_returns = 0;
@@ -374,7 +376,18 @@ NN_Object::WriteNNData(IWString_and_File_Descriptor& output) {
     remove_distant_neighbours(min_number_neighbours, upper_distance_threshold);
   }
 
-  write(output);
+  for (const Smiles_ID_Dist* neighbour : _neighbours) {
+    if (neighbour->id().empty()) {
+      break;  // Unfilled slots in a bounded neighbour list.
+    }
+    if (!smiles_tag.empty()) {
+      output << smiles_tag << neighbour->smiles() << ">\n";
+    }
+    output << identifier_tag << neighbour->id() << ">\n" << distance_tag;
+    fraction_as_string.append_number(output, neighbour->distance());
+    output << ">\n";
+    output.write_if_buffer_holds_more_than(32768);
+  }
   output << "|\n";
 
   output.write_if_buffer_holds_more_than(32768);
@@ -1232,7 +1245,10 @@ nearneighbours(int argc, char** argv) {
     }
 
   } else {
-    set_default_iwstring_float_concatenation_precision(3);
+    if (!fraction_as_string.initialise(0.0f, 1.0f, 3)) {
+      cerr << "Cannot initialise distance formatting\n";
+      return 1;
+    }
 
     for (int i = 0; i < pool_size; i++) {
       NN_Object& nni = pool[i];

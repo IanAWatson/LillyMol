@@ -743,6 +743,7 @@ cc_binary(
     deps = [
         ":gfp",
         ":neighbour_list",
+        "//Foundational/iwmisc",
     ],
 )
 

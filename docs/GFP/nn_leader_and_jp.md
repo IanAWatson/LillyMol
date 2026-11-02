@@ -12,6 +12,10 @@ nn_leader_and_jp -J 10,3 neighbours.nn > jp.tdt
 Use `-r` for TFDataRecord serialized nearest-neighbour protos instead of TDT
 input. `-a` writes SMILES with identifiers instead of TDT records.
 
+The `-t` cutoff is inclusive: neighbours at the threshold are eligible; neighbours
+beyond it remain available for later clusters. Each threshold in a multi-threshold
+run starts with all molecules available.
+
 Leader and Taylor–Butina member distances use platform-independent formatting
 with four decimal places and trailing zeros omitted, in both output modes.
 Clustering comparisons retain the original precision. Jarvis–Patrick members

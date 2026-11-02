@@ -56,6 +56,23 @@ class Formatting(unittest.TestCase):
             self.assertEqual(text.count('|\n'), 1)
             self.assertIn('CSIZE<3>', text)
 
+    def test_threshold_excludes_distant_members(self):
+        for mode in ([], ['-T']):
+            for threshold in ('0.2', '0.1234567'):
+                with self.subTest(mode=mode, threshold=threshold):
+                    text = self.run_tool('-h', '-t', threshold, *mode)
+                    clusters = [record for record in text.split('|') if record.strip()]
+                    self.assertEqual(len(clusters), 2)
+                    membership = []
+                    for cluster in clusters:
+                        ids = re.findall(r'^PCN<(m[0-9]+)', cluster, re.MULTILINE)
+                        size = int(re.search(r'CSIZE<([0-9]+)>', cluster).group(1))
+                        self.assertEqual(size, len(ids))
+                        membership.append(set(ids))
+                    self.assertIn({'m0', 'm1'}, membership)
+                    self.assertIn({'m2'}, membership)
+                    self.assertEqual(self.distances(text), ['0.1235'])
+
     def test_smiles_output(self):
         for mode in ([], ['-T']):
             text = self.run_tool('-h', '-a', '-t', '0.9', *mode)
@@ -74,14 +91,14 @@ class Formatting(unittest.TestCase):
 
     def test_multiple_threshold_files(self):
         stem = Path(self.tmp.name) / 'clusters'
-        self.run_tool('-h', '-t', '0.2,0.9', '-B', stem)
+        self.run_tool('-h', '-t', '0.2,0.9,0.2', '-B', stem)
         first = Path(str(stem) + '0.ldr').read_text()
         second = Path(str(stem) + '1.ldr').read_text()
         self.assertEqual(first, self.run_tool('-h', '-t', '0.2'))
-        values = self.distances(second)
-        self.assertEqual(len(values), 2)
-        self.assertIn('0.1235', values)
-        self.assertTrue(set(values) <= {'0.1235', '0.7654', '0.8765'})
+        self.assertEqual(second, self.run_tool('-h', '-t', '0.9'))
+        self.assertEqual(Path(str(stem) + '2.ldr').read_text(), first)
+        self.assertEqual(self.distances(first), ['0.1235'])
+        self.assertEqual(first.count('|\n'), 2)
         self.assertEqual(second.count('PCN<'), 3)
         self.assertEqual(second.count('|\n'), 1)
 

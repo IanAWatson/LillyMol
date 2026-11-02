@@ -770,7 +770,7 @@ Leader_Item::form_cluster_threshold(int* selected, const float threshold,
   int istop = _nbrs;
   for (int i = 0; i < _nbrs; ++i) {
     if (_dist[i] > threshold) {
-      istop = i + 1;
+      istop = i;
       break;
     }
 
@@ -1300,7 +1300,7 @@ identify_next_tb_leader(const Leader_Item* pool, const int pool_size, const int*
 static int
 choose_next_centre(const int* selected, const Leader_Item* pool, const int pool_size,
                    const int threshold_number, const similarity_type_t global_threshold,
-                   int& icentre) {
+                   int& istart, int& icentre) {
   if (taylor_butina) {
     return identify_next_tb_leader(pool, pool_size, selected, threshold_number,
                                    global_threshold, icentre);
@@ -1315,7 +1315,6 @@ choose_next_centre(const int* selected, const Leader_Item* pool, const int pool_
   // If scores not present, return the first unselected.
   // Save the position of the previously selected item for efficiency
   if (!scores_present) {
-    static int istart = 0;
     for (int i = istart; i < pool_size; i++) {
       if (!selected[i]) {
         icentre = i;
@@ -1361,9 +1360,11 @@ leader(Leader_Item* pool, const int pool_size, int* selected,
 
   extending_resizable_array<int> cluster_size;
 
+  // Each threshold starts a fresh scan, while selections within a run advance it.
+  int istart = 0;
   int icentre;
   if (!choose_next_centre(selected, pool, pool_size, threshold_number, global_threshold,
-                          icentre)) {
+                          istart, icentre)) {
     cerr << "Yipes, cannot find initial leader\n";
     return 0;
   }
@@ -1417,7 +1418,7 @@ leader(Leader_Item* pool, const int pool_size, int* selected,
     }
 
     if (!choose_next_centre(selected, pool, pool_size, threshold_number, global_threshold,
-                            icentre)) {
+                            istart, icentre)) {
       break;
     }
   }

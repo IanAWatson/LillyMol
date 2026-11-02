@@ -822,17 +822,25 @@ specified chiral centres, each gets its own cap. Other cuts add no dummy atoms.
 Dummy atoms have no implicit hydrogens or parent-atom identity and are not
 candidates for subsequent fragmentation.
 
-A centre can receive at most one added cap. If a proposed cut would add a second
-cap at either endpoint, the entire cut is skipped without modifying the fragment.
-Cuts elsewhere in that fragment can still proceed. Added caps count as atoms for
-fragment-size limits and reported atom counts. RECAP can therefore leave a
-proposed bond unbroken when another cut has already capped the same centre.
+Every cut at a centre adds a separate cap, including when two or more bonds
+at the same centre are broken. A centre isolated by three or four cuts therefore
+retains three or four dummy neighbours. This applies to recursive fragmentation,
+RECAP, and fragment/complement output. Caps are ordinary, non-isotopic `*` atoms;
+no attachment identities are assigned. Added caps count as atoms for
+fragment-size limits and reported atom counts.
+
+Two identical dummy substituents generally make the fragment achiral. Stored
+neighbour ordering is preserved while a chiral designation remains, but written
+SMILES cannot be relied upon to preserve the original orientation for subsequent
+reconstruction. `-B lostchiral` removes invalid designations; subsequent cuts at
+an already capped centre still add the remaining caps. Recoverable stereochemistry
+would require attachment identities and a separate reconstruction protocol.
 
 This preserves local orientation, not necessarily genuine chirality throughout
 a fragment. Fragmentation farther from a centre can make substituents equivalent.
 Use the existing `-B lostchiral` option to remove invalid chiral designations;
 it does not discard the entire fragment. Input chirality removal (`-c`) leaves
-no specified centres to cap. A reconstruction reaction should replace the dummy
+no specified centres to cap. Where attachment identities are known, reconstruction should replace each dummy
 using a stereo-preserving substitution.
 
 This initial implementation rejects combinations with ring transformations

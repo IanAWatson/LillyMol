@@ -10,6 +10,8 @@
 namespace dicer_lib {
 
 namespace {
+// A previously capped centre remains eligible even if lostchiral cleanup has
+// removed its designation after two identical caps made it achiral.
 bool
 HasChiralDummy(const Molecule& m, atom_number_t centre) {
   for (const Bond* bond : m[centre]) {
@@ -35,35 +37,40 @@ BreakBondWithChiralDummies(Molecule& m, atom_number_t a1, atom_number_t a2) {
   if (bond == nullptr) {
     return false;
   }
-  Chiral_Centre* c1 = m.chiral_centre_at_atom(a1);
-  Chiral_Centre* c2 = m.chiral_centre_at_atom(a2);
-  if (!c1 && !c2) {
+  const bool cap1 = m.chiral_centre_at_atom(a1) || HasChiralDummy(m, a1);
+  const bool cap2 = m.chiral_centre_at_atom(a2) || HasChiralDummy(m, a2);
+  if (!cap1 && !cap2) {
     m.remove_bond_between_atoms(a1, a2);
     return true;
   }
-  // Preflight both ends before adding atoms or changing connections.
-  if (!bond->is_single_bond() || (c1 && HasChiralDummy(m, a1)) ||
-      (c2 && HasChiralDummy(m, a2))) {
+  // Each departing neighbour gets its own cap. Repeated caps preserve the
+  // stored neighbour slots, but identical * groups need not remain chiral.
+  if (!bond->is_single_bond()) {
     return false;
   }
-  if (!c1) {
+  bool cap_other_end = cap2;
+  if (!cap1) {
     std::swap(a1, a2);
-    std::swap(c1, c2);
+    cap_other_end = cap1;
   }
   const atom_number_t dummy1 = AddChiralDummy(m);
   if (!m.stereo_preserving_substitute(a1, a2, dummy1)) {
     return false;
   }
-  if (c2) {
+  if (cap_other_end) {
     // The substitution has already detached the shared bond at its other end.
     // Replace that end's saved neighbour slot directly, then add its own cap.
     const atom_number_t dummy2 = AddChiralDummy(m);
     // add_bond would otherwise replace an implicit-H stereo slot. Detach the
     // centre temporarily, then restore the explicitly substituted ordering.
     std::unique_ptr<Chiral_Centre> second(m.remove_no_delete_chiral_centre_at_atom(a2));
-    second->change_atom_number(a1, dummy2);
+    if (second) {
+      second->change_atom_number(a1, dummy2);
+    }
     m.add_bond(a2, dummy2, SINGLE_BOND);
-    m.add_chiral_centre(second.release());
+    if (second) {
+      m.add_chiral_centre(second.release());
+    }
   } else {
     m.unset_all_implicit_hydrogen_information(a2);
   }

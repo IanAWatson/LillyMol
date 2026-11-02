@@ -7634,7 +7634,7 @@ display_misc_B_options(std::ostream& os) {
   os << " -B FMC:heteroatom fragments reported must contain a heteroatom, :n for count\n";
   os << " -B VF=<n>         output will be viewed in vf with <n> structures per page\n";
   os << " -B flush          flush output after each molecule\n";
-  os << " -B chiraldummy    preserve local chirality with one terminal * cap per centre (chain cuts)\n";
+  os << " -B chiraldummy    replace each removed chiral neighbour with a terminal * (chain cuts)\n";
   os << " -B lostchiral     check each fragment for lost chirality\n";
   os << " -B recap          work like Recap - break all breakable bonds at once\n";
   os << " -B nooutput       suppress writing diced fragments, useful with the '-B fragstat' option\n";

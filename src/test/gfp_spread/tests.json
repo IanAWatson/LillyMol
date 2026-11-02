@@ -4,10 +4,14 @@
     {
       "name": "case_1",
       "args": [
-           "-A ${LILLYMOL_HOME}/data/pubchem_10.gfp ${LILLYMOL_HOME}/data/pubchem.gfp"
+        "-A ${LILLYMOL_HOME}/data/pubchem_10.gfp ${LILLYMOL_HOME}/data/pubchem.gfp"
       ]
+    },
+    {
+      "name": "formatting",
+      "shell_script": {
+        "script_name": "run_test.py"
+      }
     }
-
   ]
-
 }

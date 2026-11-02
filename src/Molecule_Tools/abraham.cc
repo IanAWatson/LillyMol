@@ -32,6 +32,8 @@ const char *prog_name = nullptr;
 
 static int verbose = 0;
 
+static Fraction_as_String fraction_as_string;
+
 static int molecules_read = 0;
 
 static Chemical_Standardisation chemical_standardisation;
@@ -1465,13 +1467,10 @@ abraham(Molecule &m, int *already_hit, int *isotope, Queries_and_Additive_Models
     append_first_token_of_name(m.name(), output);
   }
 
-  set_default_iwstring_float_concatenation_precision(5);
-
   for (auto i = 0; i < nmodels; ++i) {
-    output << output_separator << static_cast<float>(v[i]);
+    output << output_separator;
+    fraction_as_string.append_number(output, static_cast<float>(v[i]));
   }
-
-  set_default_iwstring_float_concatenation_precision(7);
 
   output << '\n';
 
@@ -1539,7 +1538,8 @@ abraham(data_source_and_type<Molecule> &input, Queries_and_Additive_Models *mode
     std::unique_ptr<Molecule> free_m(m);
 
 #ifdef TEST_MCGOWAN
-    output << mcgowan(*m) << "\n";
+    fraction_as_string.append_number(output, mcgowan(*m));
+    output << "\n";
     output.write_if_buffer_holds_more_than(8192);
     continue;
 #endif
@@ -1727,6 +1727,12 @@ abraham(int argc, char **argv) {
   }
 
   verbose = cl.option_count('v');
+
+  // Descriptor values are signed and span more than the fractional range.
+  if (!fraction_as_string.initialise_without_lookup(4)) {
+    cerr << "Cannot initialise descriptor formatting\n";
+    return 1;
+  }
 
   if (cl.option_present('A')) {
     if (!process_standard_aromaticity_options(cl, verbose, 'A')) {

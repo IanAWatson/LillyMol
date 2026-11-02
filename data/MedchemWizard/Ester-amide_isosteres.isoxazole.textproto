@@ -12,8 +12,8 @@ scaffold {
 }
 sidechain {
   id: 1
-  reagent: "CC1=CC=NO1"
-  smarts: "Cc1ccno1"
-  single_bond: [2, 0]
-  single_bond: [4, 2]
+  reagent: "Oc1ccon1"
+  smarts: "Oc1ccon1"
+  single_bond: [2, 3]
+  single_bond: [4, 0]
 }

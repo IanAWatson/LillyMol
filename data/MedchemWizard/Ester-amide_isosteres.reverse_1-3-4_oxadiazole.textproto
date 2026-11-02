@@ -14,6 +14,6 @@ sidechain {
   id: 1
   reagent: "c1ncno1"
   smarts: "c1ncno1"
-  single_bond: [2, 0]
-  single_bond: [4, 2]
+  single_bond: [4, 0]
+  single_bond: [2, 2]
 }

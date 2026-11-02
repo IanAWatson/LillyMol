@@ -1694,9 +1694,19 @@ IW_General_Fingerprint::initialise(const IW_TDT& tdt) {
   }
 
   if (nfp <= 0 && sfp <= 0 && cfp <= 0 && mc01 <= 0 && mcfsc <= 0 && mcsparse <= 0) {
+    // Molecular properties are normally an adjunct to other fingerprints, but if
+    // they are all there is, they must carry the whole weight. Otherwise the weight
+    // retains its unset value of -1 and the similarity is negative.
+    const_IWSubstring notused;
+    if (molecular_property_integer_tag.length() && _property_weight_integer < 0.0 &&
+        tdt.dataitem_value(molecular_property_integer_tag, notused)) {
+      _property_weight_integer = 1.0;
+      return 1;
+    }
+
     cerr << "IW_General_Fingerprint::_initalize_auto: no fingerprints '"
          << fingerprint_rx->pattern() << "' in tdt\n";
-    return 1;  // should this be return 0
+    return 1;  // Ok to have computation just using MPR
   }
 
   if (!set_nfingerprints(nfp, sfp, cfp, mc01, mcfsc, mcsparse)) {

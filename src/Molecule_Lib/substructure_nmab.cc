@@ -1504,10 +1504,10 @@ NearbyAtoms::Matches(Molecule_to_Match& target, Query_Atoms_Matched& qam,
 
       if (_matched_atom.empty()) {
         if (! AnyMatchedAtomInRange(target, already_matched, *e)) {
-          return 0;
+          continue;
         }
       } else if (! SpecifiedmatchedAtomInRange(target, qam, *e)) {
-        return 0;
+        continue;
       }
 
       ++got_match;

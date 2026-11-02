@@ -25,17 +25,8 @@ then
 fi
 
 name1=out.txt
-name1_out=out/out.txt
+name1_out=out/stdout
 
-# Support linux and mac 
-if [[ "${UNAME}" == "Linux" ]]; then
-    name1_out=out/${UNAME}/out.txt
-elif [[ "${UNAME}" == "darwin"* ]]; then
-    name1_out=out/osx/out.txt
-else
-    echo "${UNAME} is not supported"
-    name1_out=out/${UNAME}/out.txt
-fi
 
 diff_tool=../../fileDiff.sh
 $command -E in/activityFile.txt $shared_data_dir/pubchem.gfp >out.txt 2>err.log

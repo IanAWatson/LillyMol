@@ -14,6 +14,7 @@
 #include "Foundational/cmdline/cmdline.h"
 #include "Foundational/data_source/iwstring_data_source.h"
 #include "Foundational/iwmisc/misc.h"
+#include "Foundational/iwmisc/iwdigits.h"
 #include "Foundational/iwmisc/timsort.hpp"
 #define IWQSORT_FO_IMPLEMENTATION
 #include "Foundational/iw_tdt/iw_tdt.h"
@@ -46,7 +47,9 @@ static int write_most_informative_bits = 0;
 
 static IWString_and_File_Descriptor stream_for_table_output;
 
-static int output_precision = 0;
+static int output_precision = 4;
+
+static Fraction_as_String fraction_as_string;
 
 static int write_full_data = 1;
 
@@ -310,7 +313,8 @@ Class_Membership::report(int n, IWString_and_File_Descriptor &output) const {
     //  static_cast<double>(_n + 10) / probability_active;
 
     if (write_full_data) {
-      output << " NB " << static_cast<float>(pcorr);
+      output << " NB ";
+      fraction_as_string.append_number(output, static_cast<float>(pcorr));
     }
 
     if (pcorr < lower_pcorr_report_threshold || pcorr > upper_pcorr_report_threshold) {
@@ -328,8 +332,11 @@ Class_Membership::report(int n, IWString_and_File_Descriptor &output) const {
 static int
 write_table_output(IWString_and_File_Descriptor &output, unsigned int b, int times_hit,
                    float ave) {
-  output << bit_prefix << b << " hit " << times_hit << " ave " << ave << " diff "
-         << (ave - average_activity_of_whole_collection) << '\n';
+  output << bit_prefix << b << " hit " << times_hit << " ave ";
+  fraction_as_string.append_number(output, ave);
+  output << " diff ";
+  fraction_as_string.append_number(output, ave - average_activity_of_whole_collection);
+  output << '\n';
 
   output.write_if_buffer_holds_more_than(32768);
 
@@ -341,9 +348,9 @@ write_pair_of_activities(float act1, float act2, IWString_and_File_Descriptor &o
   output << " diff ";
 
   if (show_absolute_differences) {
-    output << static_cast<float>(fabs(act1 - act2));
+    fraction_as_string.append_number(output, static_cast<float>(fabs(act1 - act2)));
   } else {
-    output << static_cast<float>(act2 - act1);
+    fraction_as_string.append_number(output, act2 - act1);
   }
 
   return output;
@@ -1920,18 +1927,26 @@ profile_sparse_fingerprint(int f, const activity_type_t *activity,
     //    continue;
 
     write_smiles_if_present_and_bit_number(bit_number[i], output);
-    output << " set " << acc.n() << " btw " << acc.minval() << " and " << acc.maxval();
+    output << " set " << acc.n() << " btw ";
+    fraction_as_string.append_number(output, acc.minval());
+    output << " and ";
+    fraction_as_string.append_number(output, acc.maxval());
     if (0 == acc.n()) {  // no range to show
       ;
     } else if (show_set_and_nset_averages) {
-      output << " ave " << static_cast<float>(acc_set[i].average());
-      output << " Nset " << acc_nset[i].n() << " " << acc_nset[i].minval() << " to "
-             << acc_nset[i].maxval() << " ave "
-             << static_cast<float>(acc_nset[i].average());
+      output << " ave ";
+      fraction_as_string.append_number(output, static_cast<float>(acc_set[i].average()));
+      output << " Nset " << acc_nset[i].n() << " ";
+      fraction_as_string.append_number(output, acc_nset[i].minval());
+      output << " to ";
+      fraction_as_string.append_number(output, acc_nset[i].maxval());
+      output << " ave ";
+      fraction_as_string.append_number(output, static_cast<float>(acc_nset[i].average()));
       write_pair_of_activities(acc_set[i].average(), acc_nset[i].average(), output);
     } else {
       activity_type_t ave = static_cast<activity_type_t>(acc.average());
-      output << " ave " << ave;
+      output << " ave ";
+      fraction_as_string.append_number(output, ave);
       ave_act_acc.extra(ave);
       write_pair_of_activities(average_activity_of_whole_collection, ave, output);
     }
@@ -2064,7 +2079,7 @@ profile_fingerprint(int f, const activity_type_t *activity,
       output << '*';
     } else {
       aset = s.average_if_available_minval_if_not();
-      output << static_cast<float>(aset);
+      fraction_as_string.append_number(output, static_cast<float>(aset));
     }
 
     output << " not set " << ns.n() << " ave ";
@@ -2072,7 +2087,7 @@ profile_fingerprint(int f, const activity_type_t *activity,
       output << '*';
     } else {
       anset = ns.average_if_available_minval_if_not();
-      output << static_cast<float>(anset);
+      fraction_as_string.append_number(output, static_cast<float>(anset));
     }
 
     if (constant_bit) {
@@ -2365,7 +2380,7 @@ do_classification(const IWString &experimental_file_name, int experimental_colum
     }
   }
 
-  return 1;
+  return output.flush() ? 0 : 1;
 }
 
 static int
@@ -2502,7 +2517,7 @@ read_smiles(const char *fname, IW_STL_Hash_Map_String &smiles) {
 
 static void
 display_dash_m_options(std::ostream &os) {
-  os << " -M prec=<n>      set output precision\n";
+  os << " -M prec=<n>      set decimal places for results (default 4)\n";
   os << " -M brief         suppress output of bit numbers and other disagnostics\n";
 
   exit(1);
@@ -2674,6 +2689,11 @@ gfp_profile_activity(int argc, char **argv) {
         display_dash_m_options(cerr);
       }
     }
+  }
+
+  if (!fraction_as_string.initialise_without_lookup(output_precision)) {
+    cerr << "Cannot initialise activity formatting\n";
+    return 1;
   }
 
   if (!cl.option_present('E')) {

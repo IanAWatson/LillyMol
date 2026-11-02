@@ -1,14 +1,17 @@
 {
   "executable": "gfp_profile_activity_by_bits",
   "test": [
-
     {
       "name": "case_1",
       "args": [
-           "-E #{indir}/activityFile.txt ${LILLYMOL_HOME}/data/pubchem.gfp"
+        "-E #{indir}/activityFile.txt ${LILLYMOL_HOME}/data/pubchem.gfp"
       ]
+    },
+    {
+      "name": "formatting",
+      "shell_script": {
+        "script_name": "run_test.py"
+      }
     }
-
   ]
-
 }

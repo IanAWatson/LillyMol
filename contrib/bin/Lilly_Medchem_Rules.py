@@ -82,6 +82,16 @@ def lillymol_home() -> Path:
     return Path(value).resolve()
 
 
+def positive_int(value: str) -> int:
+    try:
+        result = int(value)
+    except ValueError:
+        raise argparse.ArgumentTypeError(f"'{value}' is not an integer")
+    if result < 1:
+        raise argparse.ArgumentTypeError(f"'{value}' must be a positive integer")
+    return result
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         description="Run the Lilly medchem rejection/demerit rules."
@@ -152,6 +162,8 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("-nodemerit", action="store_true", help="Hard rejections only")
     parser.add_argument("-S", metavar="FILE", help="Write output to file rather than stdout")
     parser.add_argument("-dcf", metavar="FILE", help="Demerit control file for iwdemerit")
+    parser.add_argument("-demeritfile", metavar="FILE", help="Demerit weight file for iwdemerit")
+    parser.add_argument("-tabular", action="store_true", help="Produce tabular output with 'smiles id demerit'")
     parser.add_argument("-nobadfiles", action="store_true", help="Do not create bad*.smi files")
     parser.add_argument(
         "-symm",
@@ -163,6 +175,12 @@ def build_parser() -> argparse.ArgumentParser:
         "-nophosphorus",
         action="store_true",
         help="Reject all phosphorus-containing molecules",
+    )
+    parser.add_argument(
+        "-maxringsize",
+        type=positive_int,
+        metavar="N",
+        help="Reject molecules with a ring larger than N atoms (passed to tp_first_pass as -Z)",
     )
     parser.add_argument(
         "-label",
@@ -252,6 +270,9 @@ def build_command(args: argparse.Namespace) -> tuple[str, list[Path]]:
 
     if not args.okiso:
         mc_first_pass_options += " -I 0"
+
+    if args.maxringsize is not None:
+        mc_first_pass_options += f" -Z {args.maxringsize}"
 
     mc_first_pass_options += " -A I -A ipp"
 
@@ -348,6 +369,10 @@ def build_command(args: argparse.Namespace) -> tuple[str, list[Path]]:
     iwdemerit_optional_control_file = args.dcf
     additional_demerits = args.edm
 
+    iwdemerit_numeric_demerits_override_file = args.demeritfile
+
+    iwdemerit_tabular_output = args.tabular
+
     quoted_inputs = " ".join(quote(x) for x in args.inputs)
 
     cmd = f"{mc_first_pass} "
@@ -395,6 +420,10 @@ def build_command(args: argparse.Namespace) -> tuple[str, list[Path]]:
         cmd += f"-q F:{quote(additional_demerits)} "
     if iwdemerit_optional_control_file:
         cmd += f"-C {quote(iwdemerit_optional_control_file)} "
+    if iwdemerit_numeric_demerits_override_file:
+        cmd += f"-W demerits={quote(iwdemerit_numeric_demerits_override_file)} "
+    if iwdemerit_tabular_output:
+        cmd += "-W tabular "
     if append_demerit_reason:
         cmd += "-t "
     cmd += f"- 2> {quote(logfilestem + '3.log')} "

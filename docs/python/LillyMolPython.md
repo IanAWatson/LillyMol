@@ -1159,6 +1159,13 @@ radius and atom-type specification are encoded in the tag, for example
 from tags; other non-alphanumeric characters are rejected. Multiple EC
 fingerprints with different atom types can be combined in one context.
 
+Sparse/count-based generators also accept `fixed_width=N` to fold to binary
+bits. For example, `GFP.ec(radius=3, fixed_width=2048)` generates tag
+`FPEC3USTZFW2048<`. The default zero preserves the native form. Positive counts
+set `feature_number % N`; counts are discarded and collisions merge. Widths are
+part of context identity. See [binary folding](fingerprints.md) for supported
+factories, storage padding, and the consequences of discarding counts.
+
 `GFP.substructure(smarts, radius=0, atom_type="UST:ARY", no_match="empty")`
 adds a fixed-width binary path fingerprint over the atoms matched by one SMARTS
 query, optionally expanded by `radius` bonds around all matched atoms. The tag

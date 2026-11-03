@@ -439,6 +439,40 @@ GFPGeneratorSpec::SubstructureFingerprint(const IWString& smarts, int radius,
 
 std::vector<Component>
 GFPGeneratorSpec::Components() const {
+  auto components = NativeComponents();
+  if (_fixed_width == 0) {
+    return components;
+  }
+  for (Component& component : components) {
+    if (_fixed_width < 0 || (component.kind != ComponentKind::kSparse &&
+                            component.kind != ComponentKind::kFixedCounted)) {
+      return {};
+    }
+    IWString stem(component.tag);
+    stem.remove_leading_chars(2);  // NC or FC.
+    stem.chop();                  // Trailing '<'.
+    component.tag = "FP";
+    component.tag << stem << "FW" << _fixed_width << '<';
+    component.kind = ComponentKind::kFixedBinary;
+  }
+  return components;
+}
+
+std::string
+GFPGeneratorSpec::Repr() const {
+  std::string result = NativeRepr();
+  if (_fixed_width != 0) {
+    result.pop_back();
+    if (result.back() != '(') {
+      result += ", ";
+    }
+    result += "fixed_width=" + std::to_string(_fixed_width) + ")";
+  }
+  return result;
+}
+
+std::vector<Component>
+GFPGeneratorSpec::NativeComponents() const {
   switch (_kind) {
     case GeneratorKind::kMolecularProperties:
       return {Component{ComponentKind::kMolecularProperties, IWString("MPR<"), 0, 1.0f}};
@@ -489,7 +523,7 @@ GFPGeneratorSpec::Components() const {
 }
 
 std::string
-GFPGeneratorSpec::Repr() const {
+GFPGeneratorSpec::NativeRepr() const {
   switch (_kind) {
     case GeneratorKind::kMolecularProperties:
       return "GFP.mpr()";
@@ -539,7 +573,34 @@ GFPGeneratorSpec::Repr() const {
 struct GeneratorComponentAssignment {
   ComponentKind kind;
   int index = 0;
+  int fixed_width = 0;
 };
+
+// Native sparse generators can write directly to their folded binary slot.
+// No Daylight encoding or intermediate Sparse_Fingerprint is required.
+static bool
+IsSparseOutput(const GeneratorComponentAssignment& slot) {
+  return slot.kind == ComponentKind::kSparse ||
+         (slot.kind == ComponentKind::kFixedBinary && slot.fixed_width > 0);
+}
+
+static int
+StoreSparseFingerprint(Sparse_Fingerprint_Creator& source,
+                       const GeneratorComponentAssignment& slot,
+                       GFPFingerprint& destination) {
+  if (slot.kind == ComponentKind::kSparse) {
+    return destination.mutable_sparse(slot.index)
+        .build_from_sparse_fingerprint_creator(source);
+  }
+  std::vector<int> bits(slot.fixed_width, 0);
+  for (const auto& [bit, count] : source.bits_found()) {
+    if (count > 0) {
+      bits[bit % slot.fixed_width] = 1;
+    }
+  }
+  return destination.mutable_fixed_binary(slot.index)
+      .BuildFromArray(bits.data(), slot.fixed_width);
+}
 
 class FingerprintGeneratorImplementation {
  public:
@@ -696,7 +757,7 @@ int
 ReplicatedCountFingerprintGenerator::Generate(
     Molecule& m, const std::vector<GeneratorComponentAssignment>& slots,
     GFPFingerprint& destination) {
-  if (slots.size() != 1 || slots[0].kind != ComponentKind::kSparse) {
+  if (slots.size() != 1 || !IsSparseOutput(slots[0])) {
     std::cerr << Name() << "::Generate:invalid slots\n";
     return 0;
   }
@@ -706,10 +767,20 @@ ReplicatedCountFingerprintGenerator::Generate(
   }
 
   std::optional<int> count = Count(m);
-  if (!count) {
+  if (!count || *count < 0) {
     return 0;
   }
 
+  if (slots[0].fixed_width > 0) {
+    std::vector<int> bits(slots[0].fixed_width, 0);
+    if (*count > 0) {
+      for (int i = 0; i < std::min(_replicates, slots[0].fixed_width); ++i) {
+        bits[i] = 1;
+      }
+    }
+    return destination.mutable_fixed_binary(slots[0].index)
+        .BuildFromArray(bits.data(), slots[0].fixed_width);
+  }
   return destination.mutable_sparse(slots[0].index)
       .build_from_replicates(_replicates, *count);
 }
@@ -820,7 +891,9 @@ int
 FormulaFingerprintGenerator::Generate(
     Molecule& m, const std::vector<GeneratorComponentAssignment>& slots,
     GFPFingerprint& destination) {
-  if (slots.size() != 1 || slots[0].kind != ComponentKind::kFixedCounted) {
+  if (slots.size() != 1 ||
+      (slots[0].kind != ComponentKind::kFixedCounted &&
+       !(slots[0].kind == ComponentKind::kFixedBinary && slots[0].fixed_width > 0))) {
     std::cerr << "FormulaFingerprintGenerator::Generate:invalid slots\n";
     return 0;
   }
@@ -834,6 +907,16 @@ FormulaFingerprintGenerator::Generate(
     return 0;
   }
 
+  if (slots[0].fixed_width > 0) {
+    std::vector<int> bits(slots[0].fixed_width, 0);
+    for (int i = 0; i < kFormulaFingerprintNbits; ++i) {
+      if (_count[i] > 0) {
+        bits[i % slots[0].fixed_width] = 1;
+      }
+    }
+    return destination.mutable_fixed_binary(slots[0].index)
+        .BuildFromArray(bits.data(), slots[0].fixed_width);
+  }
   return destination.mutable_fixed_counted(slots[0].index)
       .construct_from_array_of_ints(_count, kFormulaFingerprintNbits);
 }
@@ -894,7 +977,7 @@ int
 CATSFingerprintGenerator::Generate(Molecule& m,
                                    const std::vector<GeneratorComponentAssignment>& slots,
                                    GFPFingerprint& destination) {
-  if (slots.size() != 1 || slots[0].kind != ComponentKind::kSparse) {
+  if (slots.size() != 1 || !IsSparseOutput(slots[0])) {
     std::cerr << "CATSFingerprintGenerator::Generate:invalid slots\n";
     return 0;
   }
@@ -922,8 +1005,7 @@ CATSFingerprintGenerator::Generate(Molecule& m,
     }
   }
 
-  return destination.mutable_sparse(slots[0].index)
-      .build_from_sparse_fingerprint_creator(sfc);
+  return StoreSparseFingerprint(sfc, slots[0], destination);
 }
 
 class AtomPairFingerprintGenerator : public FingerprintGeneratorImplementation {
@@ -985,7 +1067,7 @@ int
 AtomPairFingerprintGenerator::Generate(
     Molecule& m, const std::vector<GeneratorComponentAssignment>& slots,
     GFPFingerprint& destination) {
-  if (slots.size() != 1 || slots[0].kind != ComponentKind::kSparse) {
+  if (slots.size() != 1 || !IsSparseOutput(slots[0])) {
     std::cerr << "AtomPairFingerprintGenerator::Generate:invalid slots\n";
     return 0;
   }
@@ -1001,8 +1083,7 @@ AtomPairFingerprintGenerator::Generate(
     return 0;
   }
 
-  return destination.mutable_sparse(slots[0].index)
-      .build_from_sparse_fingerprint_creator(sfc);
+  return StoreSparseFingerprint(sfc, slots[0], destination);
 }
 
 class ECFingerprintGenerator : public FingerprintGeneratorImplementation {
@@ -1043,7 +1124,7 @@ int
 ECFingerprintGenerator::Generate(Molecule& m,
                                  const std::vector<GeneratorComponentAssignment>& slots,
                                  GFPFingerprint& destination) {
-  if (slots.size() != 1 || slots[0].kind != ComponentKind::kSparse) {
+  if (slots.size() != 1 || !IsSparseOutput(slots[0])) {
     std::cerr << "ECFingerprintGenerator::Generate:invalid slots\n";
     return 0;
   }
@@ -1067,8 +1148,7 @@ ECFingerprintGenerator::Generate(Molecule& m,
     return 0;
   }
 
-  return destination.mutable_sparse(slots[0].index)
-      .build_from_sparse_fingerprint_creator(sfc);
+  return StoreSparseFingerprint(sfc, slots[0], destination);
 }
 
 class RingSubstitutionFingerprintGenerator : public FingerprintGeneratorImplementation {
@@ -1096,7 +1176,7 @@ int
 RingSubstitutionFingerprintGenerator::Generate(
     Molecule& m, const std::vector<GeneratorComponentAssignment>& slots,
     GFPFingerprint& destination) {
-  if (slots.size() != 1 || slots[0].kind != ComponentKind::kSparse) {
+  if (slots.size() != 1 || !IsSparseOutput(slots[0])) {
     std::cerr << "RingSubstitutionFingerprintGenerator::Generate:invalid slots\n";
     return 0;
   }
@@ -1108,8 +1188,7 @@ RingSubstitutionFingerprintGenerator::Generate(
     return 0;
   }
 
-  return destination.mutable_sparse(slots[0].index)
-      .build_from_sparse_fingerprint_creator(sfc);
+  return StoreSparseFingerprint(sfc, slots[0], destination);
 }
 
 enum class FingerprintSubset : uint8_t {
@@ -1917,7 +1996,7 @@ GFPContext::BuildFromSpecs(const std::vector<GFPGeneratorSpec>& specs, bool prep
       }
     }
 
-    std::vector<Component> components = generator->Components();
+    std::vector<Component> components = spec.Components();
     if (components.empty()) {
       std::cerr << "GFPContext::BuildFromSpecs:no components from " << spec.Repr()
                 << '\n';
@@ -1954,6 +2033,7 @@ GFPContext::BuildFromSpecs(const std::vector<GFPGeneratorSpec>& specs, bool prep
                   << component.tag << "'\n";
         return 0;
       }
+      assignment.fixed_width = specs[i].fixed_width();
       assignments.push_back(assignment);
     }
 

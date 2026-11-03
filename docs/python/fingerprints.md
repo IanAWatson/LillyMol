@@ -96,6 +96,32 @@ ctx = GFPContext.from_specs([
 ])
 ```
 
+Sparse and counted generators accept `fixed_width` to produce a binary bitvector:
+
+```python
+ctx = GFPContext.from_specs([
+    GFP.ec(radius=3, fixed_width=2048),
+    GFP.atom_pair(fixed_width=1024),
+])
+```
+
+The default, `fixed_width=0`, preserves native counted output. Positive widths
+fold each feature number modulo the width; positive counts set a bit, and both
+counts and collisions are discarded. The tag includes the binary representation
+and width, for example `FPEC3USTZFW2048<`. Native and folded forms, or multiple
+widths, can coexist in a context. Different widths have different context identities.
+Storage is padded with zero bits to a multiple of 64; folding uses the requested
+width, including when it is not a multiple of 64.
+
+Supported factories are `ec`, `atom_pair`, `cats`, `ring_substitution`, `formula`,
+`alogp`, `xlogp`, and `tpsa`. Already-binary generators and molecular properties
+retain their existing factory interfaces. `spec.fixed_width` reports the setting.
+Negative widths are rejected.
+
+Discarding counts can remove useful information. In particular, replicated
+`alogp`, `xlogp`, and `tpsa` components store their property value in the counts;
+folding these to binary generally removes that numeric-property signal.
+
 See the GFP section of [LillyMolPython.md](LillyMolPython.md#gfp-fingerprint-files-and-similarity-search)
 for the supported generators, file reading, metadata storage, and compatibility
 rules between contexts.

@@ -2319,6 +2319,44 @@ sidechain {
         with self.assertRaises(RuntimeError):
             gfp.add_smiles(["CCC"])
 
+    def test_gfp_fixed_width_binary_specs(self):
+        factories = (lillymol.GFP.alogp, lillymol.GFP.xlogp, lillymol.GFP.tpsa,
+                     lillymol.GFP.formula, lillymol.GFP.cats, lillymol.GFP.atom_pair,
+                     lillymol.GFP.ec, lillymol.GFP.ring_substitution)
+        for factory in factories:
+            with self.subTest(factory=factory):
+                native = factory()
+                self.assertEqual(native.fixed_width, 0)
+                self.assertEqual(native.components(), factory(fixed_width=0).components())
+                folded = factory(fixed_width=128)
+                self.assertEqual(folded.fixed_width, 128)
+                self.assertTrue(folded.components()[0].startswith("FP"))
+                self.assertTrue(folded.components()[0].endswith("FW128<"))
+                self.assertIn("fixed_width=128", repr(folded))
+                with self.assertRaises(ValueError):
+                    factory(fixed_width=-1)
+        a = lillymol.GFPContext.from_specs([lillymol.GFP.ec(fixed_width=64)])
+        b = lillymol.GFPContext.from_specs([lillymol.GFP.ec(fixed_width=128)])
+        mol = lillymol.MolFromSmiles("CCO")
+        fp = a.fingerprint(mol)
+        self.assertEqual(a.distance(fp, a.fingerprint(mol)), 0)
+        other = b.fingerprint(mol)
+        self.assertNotEqual(fp.context_hash(), other.context_hash())
+        self.assertTrue(math.isnan(a.distance(fp, other)))
+        stored = lillymol.GFPList(a)
+        stored.add(mol)
+        with self.assertRaises(ValueError):
+            stored.distance(other, 0)
+        context = lillymol.GFPContext.from_specs([lillymol.GFP.formula(fixed_width=128)])
+        ethane = context.fingerprint(lillymol.MolFromSmiles("CC"))
+        propane = context.fingerprint(lillymol.MolFromSmiles("CCC"))
+        self.assertEqual(context.distance(ethane, propane), 0)
+        mixed = lillymol.GFPContext.from_specs([lillymol.GFP.ec(),
+                                              lillymol.GFP.ec(fixed_width=64),
+                                              lillymol.GFP.ec(fixed_width=128)])
+        self.assertEqual(len(mixed.tags()), 3)
+        mixed.fingerprint(mol)
+
     def test_gfp_generator_specs_and_errors(self):
         self.assertEqual(lillymol.GFP.maccs(level2=False).components(), ["FPMK<"])
         self.assertEqual(lillymol.GFP.formula().components(), ["FCFML<"])

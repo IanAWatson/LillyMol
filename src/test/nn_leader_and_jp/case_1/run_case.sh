@@ -24,16 +24,7 @@ then
 fi
 
 name1=err.txt
-name1_out=out/err.txt
-
-# Support linux and mac 
-if [[ "${UNAME}" == "Linux" ]]; then
-    name1_out=out/${UNAME}/err.txt
-elif [[ "${UNAME}" == "darwin"* ]]; then
-    name1_out=out/osx/err.txt
-else
-    echo "${UNAME} is not supported"
-fi
+name1_out=out/stdout
 
 diff_tool=../../fileDiff.sh
 $command -h -T -t 0.3 in/input.txt >>log.txt>>err.txt

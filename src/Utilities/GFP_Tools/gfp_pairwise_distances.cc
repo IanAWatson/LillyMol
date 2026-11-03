@@ -12,6 +12,7 @@
 #include "Foundational/data_source/iwstring_data_source.h"
 #include "Foundational/histogram/iwhistogram.h"
 #include "Foundational/iw_tdt/iw_tdt.h"
+#include "Foundational/iwmisc/iwdigits.h"
 #include "Foundational/iwstring/iw_stl_hash_map.h"
 #include "gfp.h"
 #include "tversky.h"
@@ -22,6 +23,8 @@ using std::endl;
 const char* prog_name = nullptr;
 
 static int verbose = 0;
+
+static Fraction_as_String fraction_as_string;
 
 static IW_General_Fingerprint* pool = nullptr;
 static int pool_size = 0;
@@ -70,7 +73,7 @@ usage(int rc)
   cerr << " -K id1,id2     specify identifiers to be processed on the command line\n";
   cerr << " -s <num>       number of fingerprints in -p file (optional)\n";
   cerr << " -T <dist>      upper distance threshold - don't write\n";
-  cerr << " -o <ndigits>   output precision\n";
+  cerr << " -o <ndigits>   decimal places for distances (default 4)\n";
   cerr << " -V ...         Tversky options\n";
   cerr << " -F,-P, ...     standard gfp fingerprint options\n";
   cerr << " -a             write entire input records (not just first two tokens)\n";
@@ -245,7 +248,8 @@ gfp_pairwise_distance(const const_IWSubstring& buffer,
     return 1;
   }
 
-  output << id1 << ' ' << id2 << ' ' << d;
+  output << id1 << ' ' << id2 << ' ';
+  fraction_as_string.append_number(output, d);
 
   if (write_entire_input_records) {
     const_IWSubstring token;
@@ -297,7 +301,7 @@ gfp_pairwise_distances(const char* fname, IWString_and_File_Descriptor& output) 
 static int
 gfp_pairwise_distances_random(std::default_random_engine& generator,
                               IWString_and_File_Descriptor& output) {
-  std::uniform_int_distribution<int> u(0, pool_size);
+  std::uniform_int_distribution<int> u(0, pool_size - 1);
 
   const int i1 = u(generator);
   int i2;
@@ -311,7 +315,9 @@ gfp_pairwise_distances_random(std::default_random_engine& generator,
     distance_acc.extra(d);
   }
 
-  output << pool[i1].id() << ' ' << pool[i2].id() << ' ' << d << '\n';
+  output << pool[i1].id() << ' ' << pool[i2].id() << ' ';
+  fraction_as_string.append_number(output, d);
+  output << '\n';
   output.write_if_buffer_holds_more_than(8192);
 
   return 1;
@@ -400,6 +406,7 @@ gfp_pairwise_distances(int argc, char** argv) {
     }
   }
 
+  int distance_precision = 4;
   if (cl.option_present('o')) {
     int o;
     if (!cl.value('o', o) || o < 1) {
@@ -411,7 +418,17 @@ gfp_pairwise_distances(int argc, char** argv) {
       cerr << "Default output precision " << o << endl;
     }
 
+    distance_precision = o;
     set_default_iwstring_float_concatenation_precision(o);
+  }
+
+  // Bound cache size; higher precisions use the same stable formatter directly.
+  const int format_ok = distance_precision <= 4
+      ? fraction_as_string.initialise(0.0f, 1.0f, distance_precision)
+      : fraction_as_string.initialise_without_lookup(distance_precision);
+  if (!format_ok) {
+    cerr << "Cannot initialise distance formatting\n";
+    return 1;
   }
 
   if (cl.option_present('a')) {
@@ -446,6 +463,11 @@ gfp_pairwise_distances(int argc, char** argv) {
     if (!cl.value('r', randomly_choose) || randomly_choose < 1) {
       cerr << "The number of random samples to process (-r) must be a whole +ve number\n";
       usage(2);
+    }
+
+    if (pool_size < 2) {
+      cerr << "Random pair selection requires at least two fingerprints\n";
+      return 1;
     }
 
     if (verbose) {

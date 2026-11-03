@@ -1,16 +1,20 @@
 {
   "executable": "abraham",
-  "difftool": "${LILLYMOL_HOME}/test/numerically_equivalent.rb",
   "test": [
     {
       "name": "case_1",
       "preamble": [
-         "QUERY_DIR=${LILLYMOL_HOME}/data/queries"
+        "QUERY_DIR=${LILLYMOL_HOME}/data/queries"
       ],
       "args": [
         " -l -F ${QUERY_DIR}/abraham/Abraham -P ${QUERY_DIR}/abraham/Alpha2H -g all #{indir}/pubchem_example.smi"
       ]
+    },
+    {
+      "name": "formatting",
+      "shell_script": {
+        "script_name": "run_test.py"
+      }
     }
-
   ]
 }

@@ -75,6 +75,8 @@ queries (see [Several queries](#several-queries)). For more than a few queries, 
 | `-q F:<file>` | a file that contains the names of query files |
 | `-q M:<file>` | a file of molecules. Each molecule becomes a query |
 | `-q PROTO:<file>` | a file containing a textproto query |
+| `-q RXN:<file>` | scaffold queries from a reaction textproto |
+| `-q RXN:<file>,sidechain=N` | queries from sidechain N (zero-based position) |
 | `-q PROTOFILE:<file>` | a file containing the names of textproto query files |
 | `-q 'proto:query { smarts: "n" }'` | a textproto query written on the command line |
 
@@ -91,6 +93,48 @@ matches molecules containing either. Whether a `-q` file is a historical query o
 textproto is usually detected from the file contents, and `PROTO:` removes any doubt.
 The textproto form is described in [substructure_proto.md](../Molecule_Lib/substructure_proto.md),
 and the query files supplied with LillyMol are in `data/queries`.
+
+### Queries from reaction files
+
+```shell
+tsubstructure -q RXN:reaction.rxn -m matching molecules.smi
+tsubstructure -q RXN:reaction.rxn,sidechain=0 -m matching molecules.smi
+```
+
+`RXN:` reads a **reaction textproto**, including files beginning with comments.
+Without a selector it reads the scaffold; `sidechain=0` selects the first
+sidechain in the file, independently of that site's optional `id`. Legacy MSI
+and MDL RXN files are not supported by this directive.
+
+All `query`, `query_file`, and `smarts` entries on the selected site become
+separate search queries. Composite queries retain their original components
+and logical operators. Existing query names are retained; unnamed queries use
+the reaction name, or its filename if there is no name. Reagents and
+transformation instructions are not loaded or executed.
+
+Environment variables are expanded in the reaction filename and site
+`query_file` references. Relative query files are resolved beside the reaction
+file, unless `query_files_in_current_directory: true` requests the current
+working directory. Resources used by inline queries resolve beside the
+reaction; resources used by referenced queries resolve beside their query file.
+
+Explicit fields in the site's `match_conditions` override the corresponding
+settings on every extracted query:
+
+* `find_unique_embeddings`
+* `one_embedding_per_start_atom`
+* `ignore_symmetry_related_matches`
+* `embeddings_can_overlap`
+* A positive `max_matches_to_find`
+
+Unspecified fields leave embedded query settings unchanged. Explicit `false`
+values are honoured; a zero match limit leaves the embedded limit unchanged.
+Normal `tsubstructure` command-line search controls still apply afterward.
+Reaction-only controls such as `process_hit_number`, hit-count suppression,
+reagent preprocessing, and combinatorial enumeration do not apply.
+
+A missing scaffold, invalid sidechain index, empty selected site, unreadable
+query file, or invalid query causes an error.
 
 ## Reading molecules
 

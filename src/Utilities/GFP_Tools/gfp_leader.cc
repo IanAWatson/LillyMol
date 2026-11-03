@@ -6,7 +6,6 @@
 #include <stdint.h>
 #include <stdlib.h>
 
-#include <fstream>
 #include <iostream>
 #include <limits>
 
@@ -15,6 +14,7 @@
 #include "Foundational/accumulator/accumulator.h"
 #include "Foundational/cmdline/cmdline.h"
 #include "Foundational/iw_tdt/iw_tdt.h"
+#include "Foundational/iwmisc/iwdigits.h"
 
 #define RESIZABLE_ARRAY_IWQSORT_IMPLEMENTATION
 #include "Foundational/iwqsort/iwqsort.h"
@@ -52,6 +52,8 @@ static resizable_array_p<IWString> dataitems_to_echo;
 
 static int verbose = 0;
 
+static Fraction_as_String fraction_as_string;
+
 static similarity_type_t abandon_distance_cutoff = -1.0;
 
 /*
@@ -79,7 +81,7 @@ extending_resizable_array<int> cluster_size;
 
 static Accumulator<float> distance_stats;
 
-static std::ofstream stream_for_discarded_by_previously_selected;
+static IWString_and_File_Descriptor stream_for_discarded_by_previously_selected;
 
 static IWString smiles_tag("$SMI<");
 static IWString identifier_tag("PCN<");
@@ -284,7 +286,9 @@ write_cluster_data(IW_TDT &tdt, int clusters_found, int id_within_cluster,
   }
 
   if (distance_to_centre >= 0.0) {
-    output << distance_tag << distance_to_centre << ">\n";
+    output << distance_tag;
+    fraction_as_string.append_number(output, distance_to_centre);
+    output << ">\n";
   }
 
   if (!output.good()) {
@@ -890,11 +894,13 @@ do_previously_selected_file(IW_General_Fingerprint &fp, similarity_type_t t) {
            << "'\n";
     }
 
-    if (stream_for_discarded_by_previously_selected.rdbuf()->is_open()) {
+    if (stream_for_discarded_by_previously_selected.is_open()) {
       stream_for_discarded_by_previously_selected << identifier_tag << p.id() << ">\n";
       stream_for_discarded_by_previously_selected << identifier_tag << fp.id() << ">\n";
-      stream_for_discarded_by_previously_selected << distance_tag << d << ">\n";
-      stream_for_discarded_by_previously_selected << "|\n";
+      stream_for_discarded_by_previously_selected << distance_tag;
+      fraction_as_string.append_number(stream_for_discarded_by_previously_selected, d);
+      stream_for_discarded_by_previously_selected << ">\n|\n";
+      stream_for_discarded_by_previously_selected.write_if_buffer_holds_more_than(32768);
     }
   }
 
@@ -1085,6 +1091,8 @@ leader(int argc, char **argv) {
   }
 
   verbose = cl.option_count('v');
+
+  fraction_as_string.initialise(0.0, 1.0, 4);
 
   if (cl.option_present('D')) {
     int i = 0;
@@ -1389,9 +1397,7 @@ leader(int argc, char **argv) {
 
     if (cl.option_present('L')) {
       IWString fname = cl.string_value('L');
-      stream_for_discarded_by_previously_selected.open(fname.null_terminated_chars(),
-                                                       std::ios::out);
-      if (!stream_for_discarded_by_previously_selected.good()) {
+      if (!stream_for_discarded_by_previously_selected.open(fname)) {
         cerr << "Cannot open stream for molecules discarded by previously selected '"
              << fname << "'\n";
         return 4;
@@ -1426,6 +1432,10 @@ leader(int argc, char **argv) {
         cerr << "Cannot process previously selected file (-A option)\n";
         return 8;
       }
+    }
+
+    if (stream_for_discarded_by_previously_selected.is_open()) {
+      stream_for_discarded_by_previously_selected.flush();
     }
 
     if (verbose) {

@@ -2,10 +2,13 @@
 #define MOLECULE_LIB_RWSUBSTRUCTURE_H_
 
 #include <cassert>
+#include <cstdint>
 #include <filesystem>
 #include <iostream>
+#include <limits>
 #include <memory>
 #include <string>
+#include <vector>
 
 namespace fs = std::filesystem;
 
@@ -31,6 +34,12 @@ namespace fs = std::filesystem;
 #include "mdl_molecule.h"
 #include "molecule_to_query.h"
 
+#ifdef BUILD_BAZEL
+#include "Molecule_Lib/reaction.pb.h"
+#else
+#include "reaction.pb.h"
+#endif
+
 template <typename T>
 T*
 ReadProtoQueryFile(const const_IWSubstring fname) {
@@ -53,6 +62,153 @@ ReadProtoQueryFile(const const_IWSubstring fname) {
   }
 
   return to_be_returned;
+}
+
+// Only fields explicitly present in the reaction override the query. Reaction
+// execution controls (hit selection, reagent handling, enumeration) do not apply.
+template <typename T, typename M>
+int
+ApplyReactionQueryMatchConditions(const M& conditions, T& query) {
+  if (conditions.has_find_unique_embeddings()) {
+    query.set_find_unique_embeddings_only(conditions.find_unique_embeddings());
+  }
+  if (conditions.has_one_embedding_per_start_atom()) {
+    query.set_find_one_embedding_per_atom(conditions.one_embedding_per_start_atom());
+  }
+  if (conditions.has_ignore_symmetry_related_matches()) {
+    query.set_do_not_perceive_symmetry_equivalent_matches(
+        conditions.ignore_symmetry_related_matches());
+  }
+  if (conditions.has_embeddings_can_overlap()) {
+    query.set_embeddings_do_not_overlap(!conditions.embeddings_can_overlap());
+  }
+  if (conditions.has_max_matches_to_find()) {
+    const int64_t limit = conditions.max_matches_to_find();
+    if (limit < 0 || limit > std::numeric_limits<int>::max()) {
+      std::cerr << "RXN: invalid max_matches_to_find " << limit << '\n';
+      return 0;
+    }
+    // Zero requests no override, matching the reaction convention.
+    if (limit > 0) {
+      query.set_max_matches_to_find(static_cast<int>(limit));
+    }
+  }
+  return 1;
+}
+
+// Read only the selected site's query sources, without loading reagents or
+// interpreting transformation directives. Commit queries only after all succeed.
+template <typename T, typename Site>
+int
+ReadReactionSiteQueries(const Site& site, const IWString& fname,
+                        bool files_in_current_directory, const IWString& name,
+                        resizable_array_p<T>& queries) {
+  std::vector<std::unique_ptr<T>> pending;
+  for (auto proto : site.query()) {
+    proto.set_originating_file_name_internal_use_only(fname.data(), fname.length());
+    auto query = std::make_unique<T>();
+    if (!query->ConstructFromProto(proto)) {
+      std::cerr << "RXN: cannot construct query from " << fname << '\n';
+      return 0;
+    }
+    pending.push_back(std::move(query));
+  }
+  for (const std::string& reference : site.query_file()) {
+    IWString file(reference);
+    auto expanded = file.ExpandEnvironmentVariables();
+    if (!expanded) {
+      std::cerr << "RXN: cannot expand query_file " << reference << '\n';
+      return 0;
+    }
+    fs::path path(expanded->AsString());
+    if (path.is_relative() && !files_in_current_directory) {
+      path = fs::path(fname.AsString()).parent_path() / path;
+    }
+    std::unique_ptr<T> query(ReadProtoQueryFile<T>(IWString(path.string())));
+    if (!query) {
+      std::cerr << "RXN: cannot read query_file " << path << '\n';
+      return 0;
+    }
+    pending.push_back(std::move(query));
+  }
+  for (const std::string& smarts : site.smarts()) {
+    auto query = std::make_unique<T>();
+    if (!query->create_from_smarts(IWString(smarts))) {
+      std::cerr << "RXN: invalid SMARTS " << smarts << " in " << fname << '\n';
+      return 0;
+    }
+    pending.push_back(std::move(query));
+  }
+  if (pending.empty()) {
+    std::cerr << "RXN: selected site has no queries in " << fname << '\n';
+    return 0;
+  }
+  for (auto& query : pending) {
+    if (site.has_match_conditions() &&
+        !ApplyReactionQueryMatchConditions(site.match_conditions(), *query)) {
+      return 0;
+    }
+    if (query->comment().empty()) {
+      query->set_comment(name);
+    }
+  }
+  for (auto& query : pending) {
+    queries.add(query.release());
+  }
+  return 1;
+}
+
+// `specification` has the RXN: prefix removed. A trailing sidechain=N selects
+// the zero-based position in the proto's sidechain list, not its optional id.
+template <typename T>
+int
+ReadReactionQueries(const const_IWSubstring& specification,
+                    resizable_array_p<T>& queries) {
+  IWString fname(specification);
+  int sidechain = -1;
+  if (const int comma = fname.rindex(','); comma >= 0) {
+    const_IWSubstring selector(fname);
+    selector.remove_leading_chars(comma + 1);
+    if (!selector.starts_with("sidechain=")) {
+      std::cerr << "RXN: unrecognised selector " << selector << '\n';
+      return 0;
+    }
+    selector.remove_leading_chars(10);
+    if (!selector.numeric_value(sidechain) || sidechain < 0) {
+      std::cerr << "RXN: invalid sidechain index " << selector << '\n';
+      return 0;
+    }
+    fname.resize(comma);
+  }
+  auto expanded = fname.ExpandEnvironmentVariables();
+  if (!expanded || expanded->empty()) {
+    std::cerr << "RXN: missing or invalid reaction filename\n";
+    return 0;
+  }
+  fname = *expanded;
+  auto reaction = iwmisc::ReadTextProtoCommentsOK<ReactionProto::Reaction>(fname);
+  if (!reaction) {
+    std::cerr << "RXN: cannot read reaction textproto " << fname << '\n';
+    return 0;
+  }
+  IWString name(reaction->name());
+  if (name.empty()) {
+    name = fname;
+  }
+  if (sidechain >= 0) {
+    if (sidechain >= reaction->sidechain_size()) {
+      std::cerr << "RXN: sidechain " << sidechain << " out of range in " << fname << '\n';
+      return 0;
+    }
+    return ReadReactionSiteQueries(reaction->sidechain(sidechain), fname,
+        reaction->query_files_in_current_directory(), name, queries);
+  }
+  if (!reaction->has_scaffold()) {
+    std::cerr << "RXN: no scaffold in " << fname << '\n';
+    return 0;
+  }
+  return ReadReactionSiteQueries(reaction->scaffold(), fname,
+      reaction->query_files_in_current_directory(), name, queries);
 }
 
 // Normally, if there are multiple "queries {" directives in a file, that
@@ -1124,6 +1280,8 @@ process_cmdline_token(char option, const const_IWSubstring& token,
     std::cerr << " -" << option <<" I:file                 an ISIS query file\n";
     std::cerr << " -" << option <<" proto:proto            inline proto 'proto:query{nrings:3}'\n";
     std::cerr << " -" << option <<" PROTO:file             a query in text proto form\n";
+    std::cerr << " -" << option <<" RXN:file               scaffold queries from a reaction textproto\n";
+    std::cerr << " -" << option <<" RXN:file,sidechain=N   queries from sidechain N (zero-based)\n";
     std::cerr << " -" << option <<" PROTOFILE:file         a file containing names of proto query files\n";
     std::cerr << " -" << option <<" TFPROTO:file           TFDataRecord file containing serialized protos\n";
     std::cerr << " -" << option <<" DIR:/path/to/dir       all *.qry and *.textproto files in the directory\n";
@@ -1142,6 +1300,11 @@ process_cmdline_token(char option, const const_IWSubstring& token,
     }
 
     queries.add(q);
+  } else if (mytoken.starts_with("RXN:")) {
+    mytoken.remove_leading_chars(4);
+    if (!ReadReactionQueries(mytoken, queries)) {
+      return 0;
+    }
   } else if (mytoken.starts_with("PROTO:")) {
     mytoken.remove_leading_chars(6);
     T* q = ReadProtoQueryFile<T>(mytoken);

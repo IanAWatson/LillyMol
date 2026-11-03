@@ -831,55 +831,114 @@ process_smiles_from_command_line(const IWString& smiles,
 #endif
 }
 
-// Only a limited set of functionality is supported.
+// Append a minimum degree using either LillyMol relationals or SMARTS ranges.
+// A minimum of zero adds no constraint.
+void
+AppendMinimumDegree(int degree, IWString& smarts) {
+  if (degree == 0) {
+    return;
+  }
+  if (write_smarts_relationals_as_rdkit_ranges) {
+    smarts << ";D" << kOpenBrace << degree << '-' << kCloseBrace;
+  } else {
+    smarts << ";D>" << (degree - 1);
+  }
+}
+
+// Isotopic substitution markers affect connectivity, rather than constraining
+// the target isotope. Ordinary atoms retain their original degree unless -m
+// requests an embedding with room for additional neighbours.
+void
+AppendDegree(const Molecule_to_Query_Specifications& mqs, Molecule& m,
+             atom_number_t atom, IWString& smarts) {
+  const int degree = m.ncon(atom);
+  if (mqs.substituents_only_at_isotopic_atoms()) {
+    if (m.isotope(atom)) {
+      if (mqs.isotope_count_means_extra_connections()) {
+        smarts << ";D" << (degree + m.isotope(atom));
+      } else {
+        // Preserve the existing SMARTS-output requirement for substitution.
+        AppendMinimumDegree(degree + 1, smarts);
+      }
+    } else {
+      smarts << ";D" << degree;
+    }
+  } else if (mqs.make_embedding()) {
+    AppendMinimumDegree(degree, smarts);
+  } else {
+    smarts << ";D" << degree;
+  }
+}
+
+IWString
+AtomSmarts(const Molecule_to_Query_Specifications& mqs, Molecule& m,
+           atom_number_t atom) {
+  IWString smarts;
+  if (mqs.smarts_for_element(&m.element(atom), smarts)) {
+    return smarts;
+  }
+
+  smarts << kOpenSquareBracket;
+  const isotope_t isotope = m.isotope(atom);
+  const bool wildcard = mqs.isotope_means_match_any_atom() != 0 &&
+                        isotope == mqs.isotope_means_match_any_atom();
+  if (isotope && !mqs.substituents_only_at_isotopic_atoms() && !wildcard) {
+    smarts << isotope;
+  }
+
+  if (wildcard) {
+    smarts << '*';
+  } else if (m.IsAromatic(atom)) {
+    smarts << m.element(atom).aromatic_symbol();
+  } else if (!m.element(atom).is_in_periodic_table()) {
+    smarts << "#{" << m.element(atom).symbol() << '}';
+  } else {
+    // An atomic number allows aromatic targets unless -a restricts this atom.
+    smarts << '#' << m.atomic_number(atom);
+    if (mqs.only_aromatic_atoms_match_aromatic_atoms()) {
+      smarts << ";A";
+    }
+  }
+
+  AppendDegree(mqs, m, atom, smarts);
+
+  const int charge = m.formal_charge(atom);
+  if (charge > 0) {
+    smarts << ";+" << charge;
+  } else if (charge < 0) {
+    smarts << ";-" << -charge;
+  }
+  if (atoms_conserve_ring_membership) {
+    smarts << ";x" << m.ring_bond_count(atom);
+  } else if (non_ring_atoms_become_nrings_0 && !m.is_ring_atom(atom)) {
+    smarts << ";R0";
+  }
+  if (mqs.preserve_saturation()) {
+    smarts << ";G" << (m.nbonds(atom) - m.ncon(atom));
+  }
+
+  smarts << kCloseSquareBracket;
+  return smarts;
+}
+
 int
 Mol2Smarts(Molecule_to_Query_Specifications& mqs, Molecule& m,
            IWString_and_File_Descriptor& output) {
   m.compute_aromaticity_if_needed();
 
   const int matoms = m.natoms();
-
   Smiles_Information smiles_information(matoms);
   smiles_information.allocate_user_specified_atomic_smarts();
   smiles_information.set_smiles_is_smarts(1);
 
-  if (mqs.substituents_only_at_isotopic_atoms()) {
-    for (int i = 0; i < matoms; ++i) {
-      IWString smt;
-      smt << kOpenSquareBracket;
-      if (mqs.substituents_only_at_isotopic_atoms()) {
-        if (m.IsAromatic(i)) {
-          smt << m.element(i).aromatic_symbol();
-        } else {
-          smt << m.element(i).symbol();
-        }
-        // Only need to nail down the connectivity if the atom has implicit Hydrogens
-        if (m.implicit_hydrogens(i)) {
-          smt << 'D';
-          if (m.isotope(i)) {
-            if (write_smarts_relationals_as_rdkit_ranges) {
-              smt << kOpenBrace << (m.ncon(i) + 1) << '-' << kCloseBrace;
-            } else {
-              smt << ">" << m.ncon(i);
-            }
-          } else {
-            smt << m.ncon(i);
-          }
-        }
-      }
-      if (atoms_conserve_ring_membership) {
-        // Beware any elements ending in 'x'.
-        smt << ";x" << m.ring_bond_count(i);
-      }
-
-      smt << kCloseSquareBracket;
-      smiles_information.set_user_specified_atomic_smarts(i, smt);
-    }
+  for (atom_number_t atom = 0; atom < matoms; ++atom) {
+    smiles_information.set_user_specified_atomic_smarts(atom, AtomSmarts(mqs, m, atom));
   }
 
+  const int saved_aromatic_bonds_as_colons = write_smiles_aromatic_bonds_as_colons();
   set_write_smiles_aromatic_bonds_as_colons(1);
   m.smiles(smiles_information);
-  set_write_smiles_aromatic_bonds_as_colons(0);
+  set_write_smiles_aromatic_bonds_as_colons(saved_aromatic_bonds_as_colons);
 
   IWString smt = smiles_information.smiles();
 
@@ -891,23 +950,28 @@ Mol2Smarts(Molecule_to_Query_Specifications& mqs, Molecule& m,
 }
 
 int
-Mol2Smarts(Molecule_to_Query_Specifications& mqs, data_source_and_type<Molecule>& input,
+Mol2Smarts(Molecule_to_Query_Specifications& mqs, data_source_and_type<MDL_Molecule>& input,
            IWString_and_File_Descriptor& output) {
-  Molecule* m;
+  MDL_Molecule* m;
   while ((m = input.next_molecule()) != nullptr) {
+    std::unique_ptr<MDL_Molecule> free_m(m);
+    preprocess(*m);
     if (!Mol2Smarts(mqs, *m, output)) {
       cerr << "Cannot process " << m->name() << '\n';
       return 0;
     }
   }
 
-  return 1;
+  return !input.stopped_because_of_error();
 }
 
 int
 Mol2Smarts(Molecule_to_Query_Specifications& mqs, const char* fname, FileType input_type,
            IWString_and_File_Descriptor& output) {
-  data_source_and_type<Molecule> input(input_type, fname);
+  if (input_type == FILE_TYPE_INVALID) {
+    input_type = discern_file_type_from_name(fname);
+  }
+  data_source_and_type<MDL_Molecule> input(input_type, fname);
   if (!input.good()) {
     cerr << "Mol2Smarts:cannot open '" << fname << "'\n";
     return 0;
@@ -938,7 +1002,10 @@ Mol2Smarts(Molecule_to_Query_Specifications& mqs, Command_Line& cl, FileType inp
     return 0;
   }
 
-  return Mol2Smarts(mqs, cl, input_type, output);
+  if (!Mol2Smarts(mqs, cl, input_type, output)) {
+    return 0;
+  }
+  return output.flush();
 }
 
 void
@@ -1426,7 +1493,7 @@ mol2qry(int argc, char** argv) {
 
   if (cl.option_present('B')) {
     IWString fname = cl.string_value('B');
-    return Mol2Smarts(mqs, cl, input_type, fname);
+    return Mol2Smarts(mqs, cl, input_type, fname) ? 0 : 1;
   }
 
   Mol2QryOutput mol2qry_output;

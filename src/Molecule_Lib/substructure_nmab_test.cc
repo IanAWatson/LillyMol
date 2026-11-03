@@ -853,7 +853,35 @@ query {
     can_overlap_matched_atoms: true
   }
 }
-)pb", "Fc1cncnc1", 1}
+)pb", "Fc1cncnc1", 1},
+
+  // do not match a target (benzene) if there is a specified other functional
+  // group nearby
+  ProtoMolMatches{R"pb(
+query {
+  smarts: "c1ccccc1"
+  unique_embeddings_only: true
+  nearby_atoms {
+    smarts: "o1cccc1"
+    max_bonds_between: 4
+    rejection: true
+  }
+}
+)pb", "c1ccccc1CCc1occc1", 0},
+  // do not match a target (benzene) if there is a specified other functional
+  // group nearby
+  // ok to match if it is a long way away
+  ProtoMolMatches{R"pb(
+query {
+  smarts: "c1ccccc1"
+  unique_embeddings_only: true
+  nearby_atoms {
+    smarts: "o1cccc1"
+    max_bonds_between: 4
+    rejection: true
+  }
+}
+)pb", "c1ccccc1CCCCCc1occc1", 1}
 
 ));
 

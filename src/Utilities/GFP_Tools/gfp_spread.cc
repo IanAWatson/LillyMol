@@ -9,6 +9,7 @@
 #include "Foundational/cmdline/cmdline.h"
 #include "Foundational/data_source/iwstring_data_source.h"
 #include "Foundational/iw_tdt/iw_tdt.h"
+#include "Foundational/iwmisc/iwdigits.h"
 #include "Foundational/iwmisc/numeric_data_from_file.h"
 
 #include "sparse_collection.h"
@@ -18,6 +19,8 @@
 using std::cerr;
 
 static int verbose = 0;
+
+static Fraction_as_String fraction_as_string;
 
 static Tversky tversky;
 
@@ -697,8 +700,10 @@ fpobj_spread(IWString_and_File_Descriptor &output) {
       previously_computed_nn_distance_tag.length()) {
     output << smiles_tag << sid.smiles() << ">\n";
     output << identifier_tag << sid.id() << ">\n";
-    output << distance_tag
-           << static_cast<float>(sid.distance() * pool[first_selected].scale()) << ">\n";
+    output << distance_tag;
+    fraction_as_string.append_number(
+        output, static_cast<float>(sid.distance() * pool[first_selected].scale()));
+    output << ">\n";
   } else {
     output << smiles_tag << "*>\n";
     output << identifier_tag << "*>\n";
@@ -755,11 +760,15 @@ fpobj_spread(IWString_and_File_Descriptor &output) {
     output << smiles_tag << sid.smiles() << ">\n";
     output << identifier_tag << sid.id() << ">\n";
     if (static_cast<float>(1.0) != fpsel.scale()) {
-      output << "SCALE<" << fpsel.scale() << ">\n";
+      output << "SCALE<";
+      fraction_as_string.append_number(output, fpsel.scale());
+      output << ">\n";
     }
 
     // the sid object does not know about any scaling of the distance
-    output << distance_tag << fpsel.distance() << ">\n";
+    output << distance_tag;
+    fraction_as_string.append_number(output, fpsel.distance());
+    output << ">\n";
     output << "|\n";
 
     if (verbose > 1) {
@@ -918,6 +927,12 @@ fpobj_spread(int argc, char **argv) {
   }
 
   verbose = cl.option_count('v');
+
+  // Scaled values outside [0, 1] use the formatter's stable fallback.
+  if (!fraction_as_string.initialise(0.0f, 1.0f, 4)) {
+    cerr << "Cannot initialise distance and scale formatting\n";
+    return 1;
+  }
 
   if (cl.option_present('W')) {
     use_atom_count_window = 1;

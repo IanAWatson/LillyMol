@@ -321,7 +321,7 @@ class Molecule_to_Query_Specifications : public MDL_File_Data
     void set_ignore_atom_type(int s) { _ignore_atom_type = s;}
     void set_only_include_isotopically_labeled_atoms(int s) { _only_include_isotopically_labeled_atoms = s;}
     void set_must_have_substituent_at_every_isotopic_atom(int s) { _must_have_substituent_at_every_isotopic_atom = s;}
-    void set_isotope_count_means_extra_connections(isotope_t s) { _isotope_means_match_any_atom = s;}
+    void set_isotope_count_means_extra_connections(int s) { _isotope_count_means_extra_connections = s;}
 
     int parse_directives(const const_IWSubstring &);
 

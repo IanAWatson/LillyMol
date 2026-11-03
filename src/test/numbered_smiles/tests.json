@@ -1,0 +1,17 @@
+{
+  "executable": "numbered_smiles",
+  "test": [
+    {
+      "name": "largest_fragment",
+      "args": [
+        "-l -n 1 -S numbered #{indir}/input.smi"
+      ]
+    },
+    {
+      "name": "all_fragments",
+      "args": [
+        "-n 1 -S numbered #{indir}/input.smi"
+      ]
+    }
+  ]
+}

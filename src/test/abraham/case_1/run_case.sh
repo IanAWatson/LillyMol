@@ -25,18 +25,7 @@ then
 fi
 
 name1=log.txt
-name1_out=out/log.txt
-
-
-# Support linux and mac 
-if [[ "${UNAME}" == "Linux" ]]; then
-    name1_out=out/${UNAME}/log.txt
-elif [[ "${UNAME}" == "darwin"* ]]; then
-    name1_out=out/osx/log.txt
-else
-    echo "OS is not supported"
-fi
-
+name1_out=out/stdout
 
 diff_tool=../../fileDiff.sh
 $command -l -F $QUERY_DIR/abraham/Abraham -P $QUERY_DIR/abraham/Alpha2H -g all in/pubchem_example.smi >log.txt 2>err.txt

@@ -5,6 +5,7 @@ input = File.join(indir, 'input.smi')
 def run(exe, input, args, success: true)
   out, err, status = Open3.capture3(exe, *args, input)
   abort "#{args.inspect}: #{err}" unless status.success? == success
+  abort "Sanitizer failure: #{err}" if err.match?(/AddressSanitizer|runtime error:/)
   out
 end
 base = ['-s', 'C-Cl', '-k', '2', '-m', '1', '-M', '20']
@@ -15,11 +16,33 @@ expected = {'enantiomer1' => 'Br[C@@H](F)*', 'enantiomer2' => 'Br[C@H](F)*'}
 expected.each do |name, smiles|
   abort "Lost orientation for #{name}: #{capped}" unless capped.include?("#{smiles} #{name} FRAGID=")
 end
-# Multiple potential cuts at a centre must never produce a second cap.
-multiple = run(exe, input, ['-B', 'chiraldummy', '-s', 'C-[Cl,F,Br]', '-k', '3', '-m', '1', '-M', '20'])
-multiple.lines.grep(/FRAGID=/).each do |line|
-  abort "Multiple caps: #{line}" if line.split.first.count('*') > 1
+# Multiple cuts at one centre each add a separate unlabelled cap.
+multi_args = ['-B', 'chiraldummy', '-s', 'C-[Cl,F,Br]', '-k', '3', '-m', '1', '-M', '20']
+[[], ['-B', 'recap'], ['-B', 'lostchiral']].each do |extra|
+  multiple = run(exe, input, [*multi_args, *extra])
+  fragments = multiple.lines.grep(/FRAGID=/).map { |line| line.split.first }
+  abort "Missing three-cap fragment: #{multiple}" unless fragments.any? { |smi| smi.count('*') == 3 }
+  unless extra.include?('recap')
+    abort "Missing two-cap fragment: #{multiple}" unless fragments.any? { |smi| smi.count('*') == 2 }
+  end
+  abort 'Dummy caps unexpectedly isotopic' if fragments.any? { |smi| smi.match?(/\[\d+\*/) }
+  if extra.include?('lostchiral')
+    abort 'Invalid chirality retained' if fragments.any? { |smi| smi.count('*') >= 2 && smi.include?('@') }
+  end
 end
+# Reconstructing complements must also add every cap at the parent centre.
+['def', 'auto'].each do |mode|
+  text = run(exe, input, [*multi_args, '-C', mode])
+  abort 'Text complement lacks multiple caps' unless text.split.any? { |token| token.count('*') >= 2 }
+end
+proto = run(exe, input, [*multi_args, '-C', 'def', '-B', 'proto'])
+abort 'Proto complement lacks multiple caps' unless proto.scan(/(?:smi|comp): "([^"]+)"/).flatten.any? { |smi| smi.count('*') >= 2 }
+# A four-connected centre can become the only real atom in a capped fragment.
+File.write('four.smi', "F[C@](Cl)(Br)I four\n")
+four = run(exe, 'four.smi', ['-B', 'chiraldummy', '-s', 'C-[F,Cl,Br,I]', '-k', '4', '-m', '1', '-M', '20'])
+abort 'Missing four-cap central fragment' unless four.lines.grep(/FRAGID=/).any? { |line| line.split.first.count('*') == 4 }
+four_clean = run(exe, 'four.smi', ['-B', 'chiraldummy', '-B', 'lostchiral', '-s', 'C-[F,Cl,Br,I]', '-k', '4', '-m', '1', '-M', '20'])
+abort 'Cleanup prevented four caps' unless four_clean.lines.grep(/FRAGID=/).any? { |line| line.split.first.count('*') == 4 && !line.split.first.include?('@') }
 recap = run(exe, input, [*base, '-B', 'chiraldummy', '-B', 'recap'])
 expected.each_value { |smiles| abort 'RECAP lost cap orientation' unless recap.include?(smiles) }
 text = run(exe, input, [*base, '-B', 'chiraldummy', '-C', 'def'])

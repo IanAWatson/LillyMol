@@ -43,8 +43,10 @@ initialise_atom_pointers(Molecule & m,
                          USPVPTR * uspvptr);
 
 // Cut a bond, replacing a departing neighbour at each specified chiral
-// endpoint with a terminal *. Caps have no parent identity. Returns false,
-// without changing m, if a chiral endpoint already has a cap or needs a non-single cap bond.
+// endpoint, or previously capped centre, with a terminal *. Each cut gets a
+// separate cap with no parent
+// identity. Multiple identical caps need not preserve genuine chirality.
+// Returns false without changing m for missing bonds or non-single chiral cuts.
 bool BreakBondWithChiralDummies(Molecule& m, atom_number_t a1, atom_number_t a2);
 
 // Rebuild a parent partition with the same capping semantics as recursive cuts.

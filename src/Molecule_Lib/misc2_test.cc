@@ -36,7 +36,7 @@ TEST_F(TestSplitOnPlusses, One)
 TEST_F(TestSplitOnPlusses, EmptyFirst)
 {
   EXPECT_EQ(SplitOnPlusses("+One", _tokens, '+'), 2);
-  EXPECT_EQ(_tokens.size(), 2);
+  EXPECT_EQ(_tokens.size(), 2u);
   EXPECT_TRUE(_tokens[0]->empty());
   EXPECT_EQ(*_tokens[1], "One");
 }
@@ -44,7 +44,7 @@ TEST_F(TestSplitOnPlusses, EmptyFirst)
 TEST_F(TestSplitOnPlusses, EmptyLast)
 {
   EXPECT_EQ(SplitOnPlusses("One+Two+", _tokens, '+'), 3);
-  EXPECT_EQ(_tokens.size(), 3);
+  EXPECT_EQ(_tokens.size(), 3u);
   EXPECT_EQ(*_tokens[0], "One");
   EXPECT_EQ(*_tokens[1], "Two");
   EXPECT_TRUE(_tokens[2]->empty());
@@ -53,7 +53,7 @@ TEST_F(TestSplitOnPlusses, EmptyLast)
 TEST_F(TestSplitOnPlusses, EmptyMiddle)
 {
   EXPECT_EQ(SplitOnPlusses("One++Two", _tokens, '+'), 3);
-  EXPECT_EQ(_tokens.size(), 3);
+  EXPECT_EQ(_tokens.size(), 3u);
   EXPECT_EQ(*_tokens[0], "One");
   EXPECT_TRUE(_tokens[1]->empty());
   EXPECT_EQ(*_tokens[2], "Two");

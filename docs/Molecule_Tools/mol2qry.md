@@ -222,6 +222,45 @@ can be processed with tsubstructure with `tsubstructure -q TFPROTO:fname ...`
 ### -p
 Write individual textproto query files, subject to the `-S` value.
 
+### -B <fname>: SMARTS output
+
+Write one `SMARTS name` record per input molecule:
+
+```shell
+mol2qry -B queries.sma molecules.smi
+mol2qry -m -B embeddings.sma molecules.smi
+```
+
+Every atom is processed, whether or not isotope substitution is enabled. By
+default, its degree is exact: a two-connected atom gets `D2`. With `-m`, that
+becomes `D>1`, allowing extra connections. An isolated atom gets `D0` by default
+and has no degree restriction with `-m`.
+
+The following options also apply to SMARTS output:
+
+| Option | Atom constraint |
+| --- | --- |
+| `-a` | Non-aromatic input atoms require non-aromatic targets. Without it, their atomic-number constraint also allows aromatic targets. Aromatic input atoms always require aromatic targets. |
+| `-d` | Preserve unsaturation with the LillyMol `G` primitive. |
+| `-j` | Preserve the number of ring bonds at each atom (`x`). |
+| `-n` | Non-ring atoms require non-ring targets (`R0`). |
+| `-s` or `-t` | Isotopically labelled atoms require substitution (`D>ncon`); other atoms retain exact degree. Labels are markers and do not constrain target isotopes. This retains the existing SMARTS-output behaviour. |
+| `-c` | The isotope gives the exact number of extra connections: an isotope-2 atom with one connection gets `D3`. |
+| `-x iso` | Atoms with that isotope become wildcard atoms, retaining connectivity constraints. |
+| `-f ele=smarts` | Replace atoms of that element with the supplied atomic SMARTS. |
+| `-Y smtrange` | Write minimum degrees as ranges, for example `D{2-}` instead of `D>1`. |
+
+Ordinary isotope labels and nonzero formal charges are retained unless isotopes
+are being interpreted as substitution markers or wildcard selectors. Input
+preprocessing, including `-g`, `-T`, `-o`, and `-Y rmiso`, runs before atom
+SMARTS are formed. In particular, `-Y rmiso` removes substitution markers too.
+
+This output covers atom constraints and the molecule's bond topology and bond
+types. It does not encode tetrahedral chirality, query environments, whole-query
+constraints, or atom-subset selection (`-I`, `-L`/`-l`). Use query-file output
+for those features and other options not listed above. `-Y smtrange` changes
+degree syntax only; other LillyMol extensions may still be present.
+
 ### -D ...
 Create proto query files with geometric constraints. This only works
 if the input molecules contain 3D coordinates. The resulting smarts

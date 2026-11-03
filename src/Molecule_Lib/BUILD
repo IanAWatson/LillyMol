@@ -428,6 +428,7 @@ cc_library(
         ":mol2graph_cc_proto",
         ":molecule_to_query_cc_proto",
         ":pharmacophore_cc_proto",
+        ":reaction_cc_proto",
         ":space_vector",
         ":standardise_cc_proto",
         ":substructure_cc_proto",

@@ -3,6 +3,12 @@
 These tools perform a max/min type selection on a set of molecules,
 selecting for maximum diversity.
 
+`gfp_spread` writes `DIST` and `SCALE` values using platform-independent
+formatting with four decimal places and trailing zeros omitted. This includes
+the first selection when previously selected molecules or precomputed distances
+are supplied. Scaled values greater than one are supported. Selection and
+threshold calculations retain the original precision.
+
 ## TLDR
 ```
 # Generate fingerprints.

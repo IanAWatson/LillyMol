@@ -4,17 +4,20 @@
     {
       "name": "case_1",
       "args": [
-           " -p ${LILLYMOL_HOME}/data/pubchem.gfp -T 0.5 #{indir}/100PairIds"
+        " -p ${LILLYMOL_HOME}/data/pubchem.gfp -T 0.5 #{indir}/100PairIds"
       ]
     },
-
     {
       "name": "mpr_only",
       "args": [
-           " -p #{indir}/mpr.gfp -o 4 #{indir}/pairs"
+        " -p #{indir}/mpr.gfp -o 4 #{indir}/pairs"
       ]
+    },
+    {
+      "name": "formatting",
+      "shell_script": {
+        "script_name": "run_test.py"
+      }
     }
-
   ]
-
 }

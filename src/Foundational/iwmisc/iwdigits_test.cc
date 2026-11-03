@@ -43,6 +43,23 @@ TEST(TestFractionAsString, FixedPrecisionTrimmedCachedFractions) {
   EXPECT_EQ(fraction.string_for_fraction(1.0f), "1");
 }
 
+TEST(TestFractionAsString, HighPrecisionWithoutLookup) {
+  Fraction_as_String fraction;
+  ASSERT_TRUE(fraction.initialise(0.0f, 1.0f, 4));
+  fraction.set_leading_string('|');
+  ASSERT_TRUE(fraction.initialise_without_lookup(7));
+  EXPECT_FALSE(fraction.active());
+  EXPECT_EQ(fraction.nbuckets(), 0);
+  IWString buffer;
+  fraction.append_number(buffer, 1.0f / 3.0f);
+  fraction.append_number(buffer, 1.0f);
+  EXPECT_EQ(buffer, "|0.3333333|1");
+  EXPECT_FALSE(fraction.initialise_without_lookup(0));
+  ASSERT_TRUE(fraction.initialise(0.0f, 1.0f, 2));
+  EXPECT_TRUE(fraction.active());
+  EXPECT_EQ(fraction.string_for_fraction(0.5f), "|0.5");
+}
+
 TEST(TestFractionAsString, FixedPrecisionTrimmedFallback) {
   Fraction_as_String fraction;
   ASSERT_TRUE(fraction.initialise(0.0f, 1.0f, 4));

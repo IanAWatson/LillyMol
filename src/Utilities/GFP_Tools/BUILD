@@ -743,6 +743,7 @@ cc_binary(
     deps = [
         ":gfp",
         ":neighbour_list",
+        "//Foundational/iwmisc",
     ],
 )
 
@@ -783,6 +784,7 @@ cc_binary(
     ],
     deps = [
         ":gfp",
+        "//Foundational/iwmisc",
         "//Foundational/histogram:iwhistogram",
     ],
 )
@@ -1123,6 +1125,7 @@ cc_binary(
     ],
     deps = [
         ":gfp",
+        "//Foundational/iwmisc",
         "//Foundational/data_source:iwtfdata_record",
     ],
 )

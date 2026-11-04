@@ -187,11 +187,38 @@ ParseDashYQualifier(const const_IWSubstring& qualifier,
   return 0;
 }
 
-// Ring bases and the fixed boundary isotope are independent -I qualifiers.
+// Ring bases and the fixed boundary isotope may combine; whole-molecule
+// labelling is a separate mode that replaces all existing isotope labels.
 int
 ParseIsotopeQualifier(const const_IWSubstring& qualifier,
                        chemotypes::ChemotypeOptions& options) {
   const uint64_t max_isotope = std::numeric_limits<isotope_t>::max();
+  if (qualifier.starts_with("whole=")) {
+    const_IWSubstring values(qualifier);
+    values.remove_leading_chars(6);
+    if (options.whole_molecule || values.nwords(',') != 2 ||
+        values.starts_with(',') || values.ends_with(',')) {
+      cerr << "Specify one pair of isotopes (-I whole=inside,outside)\n";
+      return 0;
+    }
+    uint64_t isotopes[2];
+    const_IWSubstring token;
+    int position = 0;
+    for (int i = 0; i < 2; ++i) {
+      if (!values.nextword(token, position, ',') || !token.numeric_value(isotopes[i]) ||
+          isotopes[i] > max_isotope) {
+        cerr << "Invalid whole-molecule isotope pair '" << qualifier << "'\n";
+        return 0;
+      }
+    }
+    if (values.contains(",,")) {
+      return 0;
+    }
+    options.whole_molecule = true;
+    options.chemotype_isotope = isotopes[0];
+    options.outside_isotope = isotopes[1];
+    return 1;
+  }
   if (!qualifier.starts_with("ring=")) {
     uint64_t isotope;
     if (!qualifier.numeric_value(isotope) || isotope == 0 || isotope > max_isotope) {
@@ -248,6 +275,7 @@ Options:
  -I <iso>       label both endpoints of chemotype boundary bonds with isotope <iso>; incompatible with -P.
  -I ring=i,j    ring-system isotope bases: seed first, then selected adjacent systems; repeat last.
                 May combine with numeric -I; boundary labels add to ring bases. Incompatible with -P.
+ -I whole=i,j   retain the whole molecule; label chemotype atoms i and all other atoms j (zero allowed).
  -C <stem>      write excluded atoms to a separate output stem; uses -o types.
  -J FP<tag>     generate fixed-width linear fingerprint of chemotype atoms.
  -J NC<tag>     generate non-colliding EC fingerprint of chemotype atoms.
@@ -547,6 +575,14 @@ Options::Initialise(Command_Line& cl) {
     if (!ParseIsotopeQualifier(isotope_qualifier, _chemotype_options)) {
       return 0;
     }
+  }
+  if (_chemotype_options.whole_molecule &&
+      (!_chemotype_options.ring_isotopes.empty() ||
+       _chemotype_options.isotope_for_exit_points != 0 || cl.option_present('P') ||
+       cl.option_present('J') || cl.option_present('F') || cl.option_present('H') ||
+       cl.option_present('U') || cl.option_present('p'))) {
+    cerr << "-I whole= cannot be combined with other isotope modes, -P, -J, -F, -H, -U or -p\n";
+    return 0;
   }
   for (isotope_t base : _chemotype_options.ring_isotopes) {
     if (base > std::numeric_limits<isotope_t>::max() -

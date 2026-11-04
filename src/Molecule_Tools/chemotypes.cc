@@ -684,6 +684,11 @@ ReduceToChemotype(Molecule& m, resizable_array_p<Substructure_Query>& queries,
   if (complement != nullptr) {
     *complement = Molecule();
   }
+  if (options.whole_molecule &&
+      (atom_typing != nullptr || !options.ring_isotopes.empty() ||
+       options.isotope_for_exit_points != 0)) {
+    return ChemotypeQueryMatchStatus::kInvalidOptions;
+  }
   if (!options.ring_isotopes.empty()) {
     if (atom_typing != nullptr) {
       return ChemotypeQueryMatchStatus::kInvalidOptions;
@@ -707,6 +712,11 @@ ReduceToChemotype(Molecule& m, resizable_array_p<Substructure_Query>& queries,
   std::vector<isotope_t> ring_bases;
   std::vector<int> keep = ChemotypeAtomMask(
       m, match, options, scratch, options.ring_isotopes.empty() ? nullptr : &ring_bases);
+  if (options.whole_molecule) {
+    for (atom_number_t atom = 0; atom < m.natoms(); ++atom) {
+      m.set_isotope(atom, keep[atom] ? options.chemotype_isotope : options.outside_isotope);
+    }
+  }
   if (atom_typing != nullptr) {
     UnsetIsotopesAddAdjacent(m, keep);
   } else if (options.isotope_for_exit_points != 0 || !ring_bases.empty()) {
@@ -720,7 +730,9 @@ ReduceToChemotype(Molecule& m, resizable_array_p<Substructure_Query>& queries,
                    [](int value) { return value == kChemotypeNotKept; });
     complement->remove_atoms(outside.data(), 0);
   }
-  m.remove_atoms(keep.data(), 0);
+  if (!options.whole_molecule) {
+    m.remove_atoms(keep.data(), 0);
+  }
   return ChemotypeQueryMatchStatus::kMatched;
 }
 

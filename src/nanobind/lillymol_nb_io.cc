@@ -12,6 +12,9 @@ Slurp(const std::string& fname, std::optional<FileType> file_type,
       !options.prepend_sdfid || options.mdlquiet) {
     throw std::invalid_argument("slurp does not support SDF metadata options; use MolReaderContext");
   }
+  if (options.max_molecules && *options.max_molecules < 0) {
+    throw std::invalid_argument("max_molecules must be non-negative or None");
+  }
   FileType input_type = file_type.value_or(discern_file_type_from_name(IWString(fname)));
   if (input_type == FILE_TYPE_INVALID) {
     input_type = FILE_TYPE_SMI;  // Preserve slurp's unknown-suffix fallback.
@@ -25,7 +28,19 @@ Slurp(const std::string& fname, std::optional<FileType> file_type,
                            options.remove_cis_trans_bonds, options.remove_isotopes);
   context.SetSkipOptions(options.skip_invalid_valence, options.skip_non_organic,
                          options.skip_non_periodic_table_elements);
+  context.SetMaxMolecules(options.max_molecules);
   auto& input = *context.reader;
+  if (options.max_molecules) {
+    // Stream only the requested prefix; do not count or allocate for the full file.
+    std::vector<Molecule> result;
+    while (auto molecule = context.Next()) {
+      result.push_back(std::move(*molecule));
+    }
+    if (input.stopped_because_of_error()) {
+      return std::nullopt;
+    }
+    return result;
+  }
   const size_t count = input.molecules_remaining();
   std::vector<Molecule> result(count);
   if (!context.preprocessing.active() && !options.skip_invalid_valence &&
@@ -78,8 +93,13 @@ BindIo(nb::module_& m) {
                           const std::string& sdf_identifier, bool sdf_tags_to_json,
                           bool all_sdf_tags, bool first_sdf_tag, bool prepend_sdfid,
                           bool skip_invalid_valence, bool skip_non_organic,
-                          bool skip_non_periodic_table_elements) {
+                          bool skip_non_periodic_table_elements,
+                     std::optional<int64_t> max_molecules) {
+             if (max_molecules && *max_molecules < 0) {
+               throw std::invalid_argument("max_molecules must be non-negative or None");
+             }
              new (options) ReaderOptions();
+             options->max_molecules = max_molecules;
              options->largest_fragment = largest_fragment;
              options->remove_chirality = remove_chirality;
              options->remove_cis_trans_bonds = remove_cis_trans_bonds;
@@ -107,7 +127,16 @@ BindIo(nb::module_& m) {
            nb::arg("prepend_sdfid") = true,
            nb::arg("skip_invalid_valence") = false,
            nb::arg("skip_non_organic") = false,
-           nb::arg("skip_non_periodic_table_elements") = false)
+           nb::arg("skip_non_periodic_table_elements") = false,
+           nb::arg("max_molecules") = nb::none())
+      .def_prop_rw("max_molecules",
+           [](const ReaderOptions& options) { return options.max_molecules; },
+           [](ReaderOptions& options, std::optional<int64_t> limit) {
+             if (limit && *limit < 0) {
+               throw std::invalid_argument("max_molecules must be non-negative or None");
+             }
+             options.max_molecules = limit;
+           })
       .def_rw("largest_fragment", &ReaderOptions::largest_fragment)
       .def_rw("remove_chirality", &ReaderOptions::remove_chirality)
       .def_rw("remove_cis_trans_bonds", &ReaderOptions::remove_cis_trans_bonds)
@@ -251,8 +280,10 @@ BindIo(nb::module_& m) {
                           bool sdf_tags_to_json, bool all_sdf_tags, bool first_sdf_tag,
                           bool prepend_sdfid, bool mdlquiet,
                           bool skip_invalid_valence, bool skip_non_organic,
-                          bool skip_non_periodic_table_elements) {
+                          bool skip_non_periodic_table_elements,
+                     std::optional<int64_t> max_molecules) {
              new (context) ReaderContext(fname, file_type);
+             context->SetMaxMolecules(max_molecules);
              context->SetPreprocessing(largest_fragment, remove_chirality,
                                        remove_cis_trans_bonds, remove_isotopes);
              context->SetSkipOptions(skip_invalid_valence, skip_non_organic,
@@ -281,7 +312,8 @@ BindIo(nb::module_& m) {
            nb::arg("mdlquiet") = false,
            nb::arg("skip_invalid_valence") = false,
            nb::arg("skip_non_organic") = false,
-           nb::arg("skip_non_periodic_table_elements") = false)
+           nb::arg("skip_non_periodic_table_elements") = false,
+           nb::arg("max_molecules") = nb::none())
       .def("__init__", [](ReaderContext* context, const std::string& fname,
                           bool largest_fragment, bool remove_chirality,
                           bool remove_cis_trans_bonds, bool remove_isotopes,
@@ -289,8 +321,10 @@ BindIo(nb::module_& m) {
                           bool sdf_tags_to_json, bool all_sdf_tags, bool first_sdf_tag,
                           bool prepend_sdfid, bool mdlquiet,
                           bool skip_invalid_valence, bool skip_non_organic,
-                          bool skip_non_periodic_table_elements) {
+                          bool skip_non_periodic_table_elements,
+                     std::optional<int64_t> max_molecules) {
              new (context) ReaderContext(fname);
+             context->SetMaxMolecules(max_molecules);
              context->SetPreprocessing(largest_fragment, remove_chirality,
                                        remove_cis_trans_bonds, remove_isotopes);
              context->SetSkipOptions(skip_invalid_valence, skip_non_organic,
@@ -319,7 +353,8 @@ BindIo(nb::module_& m) {
            nb::arg("mdlquiet") = false,
            nb::arg("skip_invalid_valence") = false,
            nb::arg("skip_non_organic") = false,
-           nb::arg("skip_non_periodic_table_elements") = false)
+           nb::arg("skip_non_periodic_table_elements") = false,
+           nb::arg("max_molecules") = nb::none())
       .def("__enter__", [](ReaderContext& context) -> ReaderContext& {
         return context;
       }, nb::rv_policy::reference_internal)
@@ -450,8 +485,10 @@ BindIo(nb::module_& m) {
                      bool largest_fragment, bool remove_chirality,
                      bool remove_cis_trans_bonds, bool remove_isotopes,
                      bool skip_invalid_valence, bool skip_non_organic,
-                     bool skip_non_periodic_table_elements) {
+                     bool skip_non_periodic_table_elements,
+                     std::optional<int64_t> max_molecules) {
           ReaderOptions options;
+          options.max_molecules = max_molecules;
           options.largest_fragment = largest_fragment;
           options.remove_chirality = remove_chirality;
           options.remove_cis_trans_bonds = remove_cis_trans_bonds;
@@ -468,13 +505,14 @@ BindIo(nb::module_& m) {
            nb::arg("skip_invalid_valence") = false,
            nb::arg("skip_non_organic") = false,
            nb::arg("skip_non_periodic_table_elements") = false,
-           "Read all molecules, optionally preprocess and filter; None on read failure");
+           nb::arg("max_molecules") = nb::none(),
+           "Read molecules with optional preprocessing, filtering and max_molecules; None on read failure");
   m.def("slurp", [](const std::string& fname, const ReaderOptions& options,
                      std::optional<FileType> file_type) {
           return Slurp(fname, file_type, options);
         }, nb::arg("fname"), nb::kw_only(), nb::arg("options"),
            nb::arg("file_type") = nb::none(),
-           "Read all molecules using preprocessing/filtering ReaderOptions; SDF metadata options require MolReaderContext");
+           "Read molecules using ReaderOptions, including max_molecules; SDF metadata options require MolReaderContext");
 
   m.def("set_sdf_identifier",
         [](const std::string& sdf_identifier) {

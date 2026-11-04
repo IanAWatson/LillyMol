@@ -71,6 +71,7 @@ struct RingInfo {
 };
 
 struct ReaderOptions {
+  std::optional<int64_t> max_molecules;
   bool largest_fragment = false;
   bool remove_chirality = false;
   bool remove_cis_trans_bonds = false;
@@ -93,6 +94,10 @@ struct ReaderOptions {
 struct ReaderContext {
   std::unique_ptr<data_source_and_type<Molecule>> reader;
   MoleculePreprocessing preprocessing;
+  std::optional<int64_t> max_molecules;
+  uint64_t molecules_returned = 0;
+
+  void SetMaxMolecules(std::optional<int64_t> limit);
 
   bool skip_invalid_valence = false;
   bool skip_non_organic = false;

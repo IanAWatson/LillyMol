@@ -129,6 +129,7 @@ ReaderContext::SetSdfOptions(const std::string& sdf_identifier, bool sdf_tags_to
 
 bool
 ReaderContext::ApplyOptions(const ReaderOptions& options) {
+  SetMaxMolecules(options.max_molecules);
   SetPreprocessing(options.largest_fragment, options.remove_chirality,
                    options.remove_cis_trans_bonds, options.remove_isotopes);
   SetSkipOptions(options.skip_invalid_valence, options.skip_non_organic,
@@ -158,9 +159,18 @@ ReaderContext::PreprocessAndKeep(Molecule& mol) {
   return !ShouldSkip(mol);
 }
 
+void
+ReaderContext::SetMaxMolecules(std::optional<int64_t> limit) {
+  if (limit && *limit < 0) {
+    throw std::invalid_argument("max_molecules must be non-negative or None");
+  }
+  max_molecules = limit;
+}
+
 std::optional<Molecule>
 ReaderContext::Next() {
-  if (!reader) {
+  if (!reader || (max_molecules &&
+                  molecules_returned >= static_cast<uint64_t>(*max_molecules))) {
     return std::nullopt;
   }
 
@@ -174,6 +184,7 @@ ReaderContext::Next() {
       continue;
     }
 
+    ++molecules_returned;
     return std::move(*mol);
   }
 }

@@ -243,7 +243,7 @@ with MolReaderContext('/path/to/second.sdf', options=options) as reader:
 `remove_chirality`, `remove_cis_trans_bonds`, `remove_isotopes`,
 `keep_sdf_tags`, `sdf_identifier`, `sdf_tags_to_json`, `all_sdf_tags`,
 `first_sdf_tag`, `prepend_sdfid`, `mdlquiet`, `skip_invalid_valence`,
-`skip_non_organic`, and `skip_non_periodic_table_elements`. The fields are
+`skip_non_organic`, `skip_non_periodic_table_elements`, and `max_molecules`. The fields are
 mutable, and an existing
 `MolReaderContext` can be updated with `reader.apply_options(options)`.
 
@@ -288,6 +288,28 @@ molecule, and the second retrieved the third atom and asked it
 for the atomic number. In terms of efficiency, the first method
 will be more efficient in python.
 
+Both `MolReaderContext` and `slurp` accept `max_molecules=N` to return at
+most N molecules **after filtering**, in input order:
+
+```python
+from lillymol import slurp
+
+with MolReaderContext("input.smi", max_molecules=1000) as reader:
+    for mol in reader:
+        ...
+
+mols = slurp("input.smi", max_molecules=1000, skip_non_organic=True)
+```
+
+The default, `None`, means unlimited; zero returns no molecules and negative
+values raise `ValueError`. The input must still be openable. Reading stops
+without parsing records beyond the limit. Limited `slurp` calls do not count
+the entire file or allocate storage for all its molecules.
+The limit can also be specified in `ReaderOptions`. Updating a context via
+`apply_options` applies the new limit to the total number already returned;
+it does not reset that count. `molecules_read()` still counts input molecules,
+including those skipped by filters.
+
 For bulk reading, `slurp` reads all molecules into a Python list:
 
 ```python
@@ -317,7 +339,8 @@ mols = slurp("input.smi", options=options)
 mols = slurp("input.dat", options=options, file_type=FileType.SMI)
 ```
 
-Do not combine `options=` with individual preprocessing/filtering keywords.
+Do not combine `options=` with individual preprocessing/filtering keywords or
+`max_molecules=`; put the limit in the options object instead.
 `file_type=` may accompany either form and takes precedence over the filename
 suffix. Without it, the format is inferred from the suffix, with SMILES as the
 fallback for an unrecognized suffix. SDF structures can be read, but SDF tag and

@@ -332,6 +332,77 @@ class TestNanobindMolecule(LillyMolNanobindTestCase):
             self.assertEqual(molecules[0].name(), "CHEMBL45466")
             self.assertEqual([mol.name() for mol in molecules[:2]], ["CHEMBL45466", "CHEMBL1200345"])
 
+    def test_reader_molecule_limits(self):
+        with tempfile.TemporaryDirectory() as directory:
+            fname = os.path.join(directory, "input.smi")
+            with open(fname, "w") as output:
+                output.write("CC[Na] skipped\nCC.[Na+] first\nCCC second\nCCCC third\n")
+            for limit, expected in ((None, ["first", "second", "third"]),
+                                    (0, []), (1, ["first"]), (2, ["first", "second"]),
+                                    (20, ["first", "second", "third"])):
+                settings = dict(max_molecules=limit, largest_fragment=True,
+                                skip_non_organic=True)
+                options = lillymol.ReaderOptions(**settings)
+                self.assertEqual(options.max_molecules, limit)
+                for molecules in (lillymol.slurp(fname, **settings),
+                                  lillymol.slurp(fname, options=options)):
+                    self.assertEqual([m.name() for m in molecules], expected)
+                for extra in (settings, dict(options=options)):
+                    for file_type in ({}, dict(file_type=lillymol.FileType.SMI)):
+                        with lillymol.MolReaderContext(fname, **file_type, **extra) as reader:
+                            self.assertEqual([m.name() for m in reader], expected)
+                            self.assertIsNone(reader.next())
+                            self.assertEqual(reader.molecules_read(),
+                                             0 if limit == 0 else len(expected) + 1)
+
+            # Both fast/default and preprocessing paths stop before malformed input.
+            with open(fname, "w") as output:
+                output.write("CC first\nCCC second\nnot_a_smiles bad\n")
+            for extra in ({}, dict(remove_isotopes=True)):
+                self.assertEqual(len(lillymol.slurp(fname, max_molecules=2, **extra)), 2)
+                with lillymol.MolReaderContext(fname, max_molecules=2, **extra) as reader:
+                    self.assertEqual(len(list(reader)), 2)
+                    self.assertEqual(reader.molecules_read(), 2)
+                self.assertIsNone(lillymol.slurp(fname, max_molecules=3, **extra))
+            with open(fname, "w") as output:
+                output.write("not_a_smiles bad\n")
+            self.assertEqual(lillymol.slurp(fname, max_molecules=0), [])
+            with lillymol.MolReaderContext(fname, max_molecules=0) as reader:
+                self.assertEqual(list(reader), [])
+                self.assertEqual(reader.molecules_read(), 0)
+
+            with self.assertRaises(ValueError):
+                lillymol.ReaderOptions(max_molecules=-1)
+            options = lillymol.ReaderOptions()
+            options.max_molecules = 2
+            self.assertEqual(options.max_molecules, 2)
+            options.max_molecules = None
+            self.assertIsNone(options.max_molecules)
+            with self.assertRaises(ValueError):
+                options.max_molecules = -1
+            self.assertIsNone(lillymol.slurp(os.path.join(directory, "missing.smi"),
+                                            max_molecules=0))
+            for file_type in ({}, dict(file_type=lillymol.FileType.SMI)):
+                with self.assertRaises(ValueError):
+                    lillymol.MolReaderContext(fname, max_molecules=-1, **file_type)
+            with self.assertRaises(ValueError):
+                lillymol.slurp(fname, max_molecules=-1)
+
+    def test_reader_limit_apply_options(self):
+        with tempfile.TemporaryDirectory() as directory:
+            fname = os.path.join(directory, "input.smi")
+            with open(fname, "w") as output:
+                output.write("CC first\nCCC second\nCCCC third\n")
+            with lillymol.MolReaderContext(fname, max_molecules=1) as reader:
+                self.assertEqual(reader.next().name(), "first")
+                self.assertIsNone(reader.next())
+                reader.apply_options(lillymol.ReaderOptions(max_molecules=2))
+                self.assertEqual(reader.next().name(), "second")
+                self.assertIsNone(reader.next())
+                reader.apply_options(lillymol.ReaderOptions())
+                self.assertEqual(reader.next().name(), "third")
+                self.assertIsNone(reader.next())
+
     def test_slurp_preprocessing_and_filtering(self):
         settings = dict(largest_fragment=True, remove_chirality=True,
                         remove_cis_trans_bonds=True, remove_isotopes=True,
@@ -538,6 +609,17 @@ $$$$
                 mol = reader.next()
                 self.assertIsNotNone(mol)
                 self.assertEqual(mol.natoms(), 3)
+
+            # Limits also apply to SDF reads, including readers retaining metadata.
+            with open(fname, "w") as writer:
+                writer.write(sdf)
+                writer.write(sdf.replace("ethanol", "second"))
+            with lillymol.MolReaderContext(fname, max_molecules=1,
+                                           keep_sdf_tags=True, mdlquiet=True) as reader:
+                self.assertEqual([m.name() for m in reader], ["ethanol"])
+                self.assertEqual(reader.molecules_read(), 1)
+            self.assertEqual([m.name() for m in lillymol.slurp(fname, max_molecules=1)],
+                             ["ethanol"])
 
     def test_retained_sdf_text_info_and_tags(self):
         sdf = """ethanol

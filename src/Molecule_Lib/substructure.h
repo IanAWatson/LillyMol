@@ -1898,6 +1898,9 @@ class InterRingAtoms {
     // InterRingAtoms can set a global_id.
     int _set_global_id;
 
+    SubstructureSearch::InterRingAtoms::Selection _selection =
+        SubstructureSearch::InterRingAtoms::ALL;
+
     // Queries that are applied to the atoms in the region.
     resizable_array_p<Substructure_Query> _required;
     resizable_array_p<Substructure_Query> _disqualifying;
@@ -1921,6 +1924,11 @@ class InterRingAtoms {
     int global_id() const {
       return _set_global_id;
     }
+
+    bool selects_best_region() const {
+      return _selection != SubstructureSearch::InterRingAtoms::ALL;
+    }
+    int SelectionScore(const InterRingRegionData& data) const;
 
     int ConstructFromProto(const SubstructureSearch::InterRingAtoms& proto);
     int BuildProto(SubstructureSearch::InterRingAtoms& proto) const;

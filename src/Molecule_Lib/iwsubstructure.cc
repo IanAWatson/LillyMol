@@ -3465,7 +3465,7 @@ IdentifyRegion(InterRingRegionData& irrd, atom_number_t zatom) {
   ++irrd.atoms_in_region;
   for (const Bond* b : a) {
     atom_number_t j = b->other(zatom);
-    if (irrd.region[j] == irrd.region_number) {
+    if (irrd.region[j] == 0 || irrd.region[j] == irrd.region_number) {
       continue;
     }
     if (irrd.m->ring_bond_count(j)) {
@@ -3501,13 +3501,15 @@ Single_Substructure_Query::InterRingRegionsMatch(
   // for each _inter_ring_region we need to keep track of which regions
   // it matches.
   std::vector<std::vector<int>> region_matched(number_region_specifications);
+  std::vector<int> best_score(number_region_specifications, -1);
+  std::vector<std::vector<int>> best_regions(number_region_specifications);
 
   // Ring atoms are numbered 1, so start region numbering at 2,
   int region_number = 2;
   InterRingRegionData irrd(target.molecule(), region.get());
 
   for (int i = 0; i < matoms; ++i) {
-    if (region[i] == 0) {  // spinach atom, not interested.
+    if (region[i] != 1) {  // spinach or an already identified region.
       continue;
     }
     if (target[i].ring_bond_count() > 0) {  // scaffold atom in a ring.
@@ -3530,6 +3532,16 @@ Single_Substructure_Query::InterRingRegionsMatch(
         continue;
       }
       region_matched[j].push_back(region_number);
+      if (_inter_ring_region[j]->selects_best_region()) {
+        const int score = _inter_ring_region[j]->SelectionScore(irrd);
+        if (score > best_score[j]) {
+          best_score[j] = score;
+          best_regions[j].clear();
+        }
+        if (score == best_score[j]) {
+          best_regions[j].push_back(region_number);
+        }
+      }
     }
     ++region_number;
   }
@@ -3545,6 +3557,10 @@ Single_Substructure_Query::InterRingRegionsMatch(
 #endif
     if (!_inter_ring_region[i]->MatchesNhits(region_matched[i].size())) {
       return 0;
+    }
+    // Count all qualifying regions before restricting global-id assignment.
+    if (_inter_ring_region[i]->selects_best_region()) {
+      region_matched[i].swap(best_regions[i]);
     }
     if (_inter_ring_region[i]->global_id() > 0) {
       found_set_global_id = 1;

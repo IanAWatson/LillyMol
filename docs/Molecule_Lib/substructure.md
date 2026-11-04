@@ -979,6 +979,12 @@ This is equivalent to:
 hits_needed: [1, 2]
 ```
 
+Inter-ring regions also support `selection: MAX_ATOMS` and
+`selection: LONGEST_LENGTH` to assign a global id only to the best qualifying
+regions, retaining ties. The default `ALL` retains every qualifying region.
+See [region selection and isotope labelling](substructure_proto.md#selecting-the-largest-or-longest-inter-ring-region)
+for a complete example and the interaction with hit counts.
+
 ### Separated Rings
 
 A pharmacophore-style query may need to identify two ring features separated by a

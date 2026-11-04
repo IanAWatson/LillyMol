@@ -612,6 +612,145 @@ query {
   EXPECT_THAT(*_sresults.embedding(0), UnorderedElementsAreArray({3}));
 }
 
+struct RegionSelectionCase {
+  const char* smiles;
+  const char* criteria;
+  std::vector<int> expected;
+};
+
+class TestInterRingSelection : public testing::TestWithParam<RegionSelectionCase> {};
+
+TEST_P(TestInterRingSelection, SelectsExpectedAtoms) {
+  const auto& params = GetParam();
+  SubstructureSearch::SubstructureQuery proto;
+  const std::string text = std::string(
+      "query { compress_embeddings: true inter_ring_region { set_global_id: 1 ") +
+      params.criteria + " } smarts: \"[/IWgid1]\" }";
+  ASSERT_TRUE(google::protobuf::TextFormat::ParseFromString(text, &proto));
+  Substructure_Query query;
+  ASSERT_TRUE(query.ConstructFromProto(proto));
+  Molecule mol;
+  ASSERT_TRUE(mol.build_from_smiles(params.smiles));
+  Substructure_Results results;
+  const int nhits = query.substructure_search(&mol, results);
+  if (params.expected.empty()) {
+    EXPECT_EQ(nhits, 0);
+    return;
+  }
+  ASSERT_EQ(nhits, 1);
+  EXPECT_THAT(*results.embedding(0), UnorderedElementsAreArray(params.expected));
+
+  // Preserve original atom identities across random SMILES orderings.
+  for (int i = 0; i < mol.natoms(); ++i) {
+    mol.set_isotope(i, i + 1);
+  }
+  for (int iteration = 0; iteration < 5; ++iteration) {
+    Molecule reordered;
+    ASSERT_TRUE(reordered.build_from_smiles(mol.random_smiles()));
+    Substructure_Results reordered_results;
+    ASSERT_EQ(query.substructure_search(&reordered, reordered_results), 1u);
+    std::vector<int> original_atoms;
+    for (atom_number_t atom : *reordered_results.embedding(0)) {
+      original_atoms.push_back(reordered.isotope(atom) - 1);
+    }
+    EXPECT_THAT(original_atoms, UnorderedElementsAreArray(params.expected));
+  }
+}
+
+INSTANTIATE_TEST_SUITE_P(InterRingSelection, TestInterRingSelection, testing::Values(
+    RegionSelectionCase{"C1CC1CCC1CC1CCCCC1CC1", "", {3, 4, 8, 9, 10, 11}},
+    RegionSelectionCase{"C1CC1CCC1CC1CCCCC1CC1",
+                        "selection: MAX_ATOMS", {8, 9, 10, 11}},
+    RegionSelectionCase{"C1CC1CCC1CC1CCCCC1CC1",
+                        "selection: LONGEST_LENGTH", {8, 9, 10, 11}},
+    RegionSelectionCase{"C1CC1CCC1CC1CCCCC1CC1",
+                        "selection: MAX_ATOMS max_natoms: 3", {3, 4}},
+    RegionSelectionCase{"C1CC1CCC1CC1CCCCC1CC1",
+                        "selection: MAX_ATOMS min_natoms: 5", {}},
+    RegionSelectionCase{"C1CC1CCC1CC1CCCCC1CC1",
+                        "selection: MAX_ATOMS hits_needed: 2", {8, 9, 10, 11}},
+    RegionSelectionCase{"C1CC1CCC1CC1CCCCC1CC1",
+                        "selection: MAX_ATOMS hits_needed: 1", {}},
+    RegionSelectionCase{"C1CC1CCC1CC1CCC1CC1",
+                        "selection: MAX_ATOMS", {3, 4, 8, 9}},
+    RegionSelectionCase{"C1CC1CCC1CC1CCC1CC1",
+                        "selection: LONGEST_LENGTH", {3, 4, 8, 9}},
+    RegionSelectionCase{"C1CC1NCC1CC1CCCCC1CC1",
+                        "selection: MAX_ATOMS required_smarts: \"[N]\"", {3, 4}},
+    RegionSelectionCase{"C1CC1CCC1CC1CCCCC1CC1",
+                        "selection: LONGEST_LENGTH max_length: 3", {3, 4}},
+    RegionSelectionCase{"C1CC1CCC1CC1", "selection: MAX_ATOMS", {3, 4}},
+    // A pendant carbon must not count towards region size or receive a global id.
+    RegionSelectionCase{"C1CC1C(C)CC1CC1",
+                        "selection: MAX_ATOMS natoms: 2 hits_needed: 1", {3, 5}},
+    RegionSelectionCase{"C1CC1CCC1CC1", "selection: ALL hits_needed: 1", {3, 4}}
+));
+
+TEST_F(TestSubstituent, InterRingSelectionIsPerSpecification) {
+  _string_proto = R"pb(
+query {
+  compress_embeddings: true
+  inter_ring_region {
+    max_natoms: 2
+    selection: MAX_ATOMS
+    set_global_id: 1
+  }
+  inter_ring_region {
+    min_natoms: 3
+    selection: LONGEST_LENGTH
+    set_global_id: 1
+  }
+  smarts: "[/IWgid1]"
+}
+)pb";
+  ASSERT_TRUE(google::protobuf::TextFormat::ParseFromString(_string_proto, &_proto));
+  ASSERT_TRUE(_query.ConstructFromProto(_proto));
+  ASSERT_TRUE(_mol.build_from_smiles("C1CC1CCC1CC1CCCCC1CC1"));
+  ASSERT_EQ(_query.substructure_search(&_mol, _sresults), 1u);
+  EXPECT_THAT(*_sresults.embedding(0), UnorderedElementsAre(3, 4, 8, 9, 10, 11));
+}
+
+TEST_F(TestSubstituent, InterRingSelectionSerializes) {
+  SubstructureSearch::InterRingAtoms proto;
+  proto.set_selection(SubstructureSearch::InterRingAtoms::LONGEST_LENGTH);
+  proto.set_min_natoms(3);
+  proto.set_set_global_id(7);
+  InterRingAtoms specification;
+  ASSERT_TRUE(specification.ConstructFromProto(proto));
+  SubstructureSearch::InterRingAtoms output;
+  // BuildProto currently reports incomplete support for other legacy fields.
+  specification.BuildProto(output);
+  EXPECT_EQ(output.selection(), SubstructureSearch::InterRingAtoms::LONGEST_LENGTH);
+  EXPECT_EQ(output.min_natoms(), 3u);
+  EXPECT_EQ(output.set_global_id(), 7u);
+}
+
+TEST_F(TestSubstituent, InterRingSelectionCriteriaDiffer) {
+  // The branched region has 7 atoms and length 6; the linear region has
+  // 6 atoms and length 7. Ranking should choose different components.
+  ASSERT_TRUE(_mol.build_from_smiles(
+      "C(CCC1CC1)(CCC1CC1)CCC1CC1.C1CC1CCCCCCC1CC1"));
+  for (const auto selection : {SubstructureSearch::InterRingAtoms::MAX_ATOMS,
+                               SubstructureSearch::InterRingAtoms::LONGEST_LENGTH}) {
+    SubstructureSearch::SubstructureQuery proto;
+    auto* query = proto.add_query();
+    query->set_smarts("[/IWgid1]");
+    query->set_compress_embeddings(true);
+    auto* region = query->add_inter_ring_region();
+    region->set_set_global_id(1);
+    region->set_selection(selection);
+    Substructure_Query q;
+    ASSERT_TRUE(q.ConstructFromProto(proto));
+    Substructure_Results results;
+    ASSERT_EQ(q.substructure_search(&_mol, results), 1u);
+    const bool max_atoms = selection == SubstructureSearch::InterRingAtoms::MAX_ATOMS;
+    EXPECT_EQ(results.embedding(0)->number_elements(), max_atoms ? 7 : 6);
+    for (atom_number_t atom : *results.embedding(0)) {
+      EXPECT_EQ(atom < 16, max_atoms);
+    }
+  }
+}
+
 struct ProtoSmilesExpected {
   std::string proto;
   IWString smiles;

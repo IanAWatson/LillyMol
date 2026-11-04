@@ -1182,6 +1182,44 @@ InterRingAtoms::InterRingAtoms() {
   _set_global_id = -1;
 }
 
+// Rank an already qualifying region. Length paths may end on ring atoms,
+// but must not travel through rings or other inter-ring regions.
+int
+InterRingAtoms::SelectionScore(const InterRingRegionData& data) const {
+  if (_selection == SubstructureSearch::InterRingAtoms::MAX_ATOMS) {
+    return data.atoms_in_region;
+  }
+
+  int longest = 0;
+  std::vector<int> distance(data.m->natoms(), -1);
+  std::vector<atom_number_t> pending;
+  for (atom_number_t start : data.ring_connections) {
+    std::fill(distance.begin(), distance.end(), -1);
+    pending.clear();
+    pending.push_back(start);
+    distance[start] = 0;
+    for (size_t i = 0; i < pending.size(); ++i) {
+      const atom_number_t atom = pending[i];
+      const Atom& a = data.m->atom(atom);
+      for (const Bond* bond : a) {
+        const atom_number_t other = bond->other(atom);
+        if (distance[other] >= 0) {
+          continue;
+        }
+        if (data.region[other] == data.region_number) {
+          distance[other] = distance[atom] + 1;
+          pending.push_back(other);
+        } else if (atom != start && data.m->ring_bond_count(other)) {
+          // A ring atom terminates a path; it is never added to the queue.
+          distance[other] = distance[atom] + 1;
+          longest = std::max(longest, distance[other]);
+        }
+      }
+    }
+  }
+  return longest;
+}
+
 int
 InterRingAtoms::Matches(Molecule_to_Match& target, const int region_number,
                         InterRingRegionData& data,

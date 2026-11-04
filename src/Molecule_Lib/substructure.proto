@@ -554,7 +554,18 @@ message InterRingAtoms {
   // what happens if we specify two numbers, but there is another ring attached? That fails?
   repeated uint32 defined_by_ring_global_id = 18;
 
-  // Next id to assign = 19.
+  // Select regions only after all other criteria and hits_needed are checked.
+  // Selection controls global-id assignment; all equally best regions are kept.
+  enum Selection {
+    ALL = 0;
+    MAX_ATOMS = 1;
+    // Greatest distance between ring attachment atoms through this region,
+    // including the two bonds connecting the region to those ring atoms.
+    LONGEST_LENGTH = 2;
+  }
+  optional Selection selection = 19 [default = ALL];
+
+  // Next id to assign = 20.
 }
 
 // In a SubstructureRingSystemSpecification we can specify ring sizes as well as

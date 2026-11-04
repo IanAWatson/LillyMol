@@ -4123,6 +4123,7 @@ Substituent::BuildProto(SubstructureSearch::Substituent& proto) const {
 
 int
 InterRingAtoms::ConstructFromProto(const SubstructureSearch::InterRingAtoms& proto) {
+  _selection = proto.selection();
   if (!GETVALUES(proto, hits_needed, 0, no_limit))
     return 0;
   if (!GETVALUES(proto, natoms, 1, no_limit))
@@ -4186,6 +4187,9 @@ InterRingAtoms::ConstructFromProto(const SubstructureSearch::InterRingAtoms& pro
 
 int
 InterRingAtoms::BuildProto(SubstructureSearch::InterRingAtoms& proto) const {
+  if (selects_best_region()) {
+    proto.set_selection(_selection);
+  }
   SetProtoValues(_hits_needed, "hits_needed", proto);
   SetProtoValues(_natoms, "natoms", proto);
   SetProtoValues(_ring_connections, "ring_connections", proto);

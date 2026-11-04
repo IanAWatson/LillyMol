@@ -1017,6 +1017,55 @@ between rings".
 It can constrain the number of atoms, ring connections, and distances between
 ring atoms, and can require or reject SMARTS within the region.
 
+
+### Selecting the largest or longest inter-ring region
+
+By default, every qualifying inter-ring region is retained. The optional
+`selection` enum restricts which regions receive `set_global_id`:
+
+| Selection | Regions retained |
+| --- | --- |
+| `ALL` (default) | All qualifying regions |
+| `MAX_ATOMS` | Regions with the greatest number of non-ring scaffold atoms |
+| `LONGEST_LENGTH` | Regions with the greatest bond distance between ring attachment atoms, through the region |
+
+Length includes the two bonds to the flanking ring atoms. For a branched region
+with more than two ring attachments, the greatest attachment-to-attachment
+distance is used. Paths cannot shortcut through rings or other regions.
+Ring atoms and pendant sidechains are excluded from the region's atom count.
+
+All other region criteria are applied first. `hits_needed`, `min_hits_needed`,
+and `max_hits_needed` count qualifying regions **before** selection.
+All equally best regions are retained. Each `inter_ring_region` specification
+performs its own selection.
+
+For example, label the largest inter-ring region containing at least six atoms:
+
+```textproto
+name: "Largest long inter-ring region"
+query {
+  inter_ring_region {
+    min_natoms: 6
+    selection: MAX_ATOMS
+    set_global_id: 1
+  }
+  smarts: "[/IWgid1]"
+  compress_embeddings: true
+}
+```
+
+Save this as `largest_linker.textproto`, then run:
+
+```shell
+tsubstructure -q largest_linker.textproto -j 1 -j same -m labelled input.smi
+```
+
+The output `labelled.smi` contains matching molecules with the selected region
+atoms labelled with isotope 1. The global-id SMARTS returns those atoms as
+matches; `compress_embeddings` combines them into one embedding, including all
+tied regions. Add `ring_connections: 2` to restrict selection to two-ended
+linkers rather than branched inter-ring regions.
+
 ## Writing Maintainable Query Files
 
 Prefer small, named query files over one giant query. Good names matter because

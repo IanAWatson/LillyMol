@@ -357,6 +357,56 @@ chemotypes -s '[c]' -n 1 -r 2 -z i -i smi input.smi > chemotypes.smi
 This is useful when the requested chemotype expansion requires nearby rings and
 single-ring molecules should simply be skipped.
 
+## Rejected molecules
+
+Use `-B <fname>` to capture molecules that cannot produce a chemotype and
+continue processing the remaining input:
+
+```shell
+chemotypes -s '[N]' -B rejected -i smi input.smi > chemotypes.smi
+```
+
+The rejection filename gets `.smi` appended unless it already ends in `.smi`.
+For example, `-B rejected.txt` writes `rejected.txt.smi`. The rejection stream is
+always SMILES, independently of `-o`, and each line contains the complete
+molecule, its original name, and a reason:
+
+```text
+C1CCCCC1 example_id chemotype_reject=no_query_match
+```
+
+Unnamed molecules receive `molecule_N`, using the molecule's input count. The
+following reasons are recorded:
+
+| Reason | Meaning |
+| --- | --- |
+| `below_min_rings` | Fewer rings than required by `-r`. |
+| `no_query_match` | None of the queries matched. |
+| `no_ring_atom` | The query matched, but no usable ring atom was identified. |
+| `ambiguous_ring_systems` | The query matched multiple ring systems. |
+| `atom_typing_failed` | Per-molecule atom typing failed. |
+| `empty_after_preprocessing` | Preprocessing removed all atoms; the original molecule is written. |
+
+Except for the empty-after-preprocessing case, rejections contain the
+preprocessed whole parent as presented to chemotype perception, before
+chemotype isotope or atom-type labelling. Existing input isotopes and names
+are preserved. A parent is recorded once, with the first applicable rejection
+reason.
+
+With `-B`, a no-match molecule is recorded even with `-z i`; `-z i` is not
+required to continue. With `-z first`, ambiguity is resolved by selecting an
+embedding, so that ambiguity is not a rejection. Without `-B`, the existing
+skip/failure rules remain in effect. Invalid options, unreadable or malformed
+input, internal errors, and output failures remain fatal. The rejection path
+must differ from input files and other output destinations.
+
+Rejection output also works with fingerprint generation (`-J`) and TDT filter
+mode (`-f`). A rejected molecule receives an empty fingerprint, preserving
+record alignment. The TDT record's `PCN` supplies the rejection identifier even
+when it follows the SMILES line, and existing TDT fields are retained. Verbose
+output includes the rejection count and filename, together with the existing
+per-reason counters.
+
 ## Options
 
 | Option | Meaning |
@@ -371,6 +421,7 @@ single-ring molecules should simply be skipped.
 | `-u` | Include one-hop atoms attached to retained ring atoms. |
 | `-x` | With `-u`, ignore singly connected attached atoms. |
 | `-C <stem>` | Write excluded atoms to a separate output stem using the `-o` types. |
+| `-B <fname>` | Write rejected whole molecules as SMILES with their identifier and rejection reason, and continue. Appends `.smi` if needed. |
 | `-I <iso>` | Label retained boundary atoms, and complement endpoints, with isotope `iso`; additive with ring bases. Incompatible with `-P`. |
 | `-I whole=i,j` | Retain the whole molecule; replace chemotype isotopes with `i` and outside isotopes with `j`. Zero is allowed. |
 | `-I ring=i,j,k` | Label seed and selected adjacent ring systems with isotope bases; repeat the last base when needed. Incompatible with `-P` and `-J`. |

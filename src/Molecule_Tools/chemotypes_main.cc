@@ -1,6 +1,7 @@
 #include <cctype>
 #include <cstdint>
 #include <cstdlib>
+#include <filesystem>
 #include <iostream>
 #include <memory>
 #include <limits>
@@ -20,6 +21,7 @@
 
 #include "Molecule_Lib/istream_and_type.h"
 #include "Molecule_Lib/molecule.h"
+#include "Molecule_Lib/moleculeio.h"
 #include "Molecule_Lib/iwmfingerprint.h"
 #include "Molecule_Lib/molecule_preprocessing.h"
 #include "Molecule_Lib/output.h"
@@ -277,6 +279,8 @@ Options:
                 May combine with numeric -I; boundary labels add to ring bases. Incompatible with -P.
  -I whole=i,j   retain the whole molecule; label chemotype atoms i and all other atoms j (zero allowed).
  -C <stem>      write excluded atoms to a separate output stem; uses -o types.
+ -B <fname>     write rejected whole molecules as SMILES, identifier and reason; append .smi.
+                Continue after per-molecule rejections; fingerprint output gets an empty fingerprint.
  -J FP<tag>     generate fixed-width linear fingerprint of chemotype atoms.
  -J NC<tag>     generate non-colliding EC fingerprint of chemotype atoms.
                 A trailing digit sets the EC radius, default 3.
@@ -321,6 +325,10 @@ class Options {
   Molecule_Output_Object _complement_output;
   bool _write_complement = false;
   uint64_t _complements_written = 0;
+  IWString_and_File_Descriptor _rejection_output;
+  IWString _rejection_fname;
+  uint64_t _rejections_written = 0;
+  uint64_t _preprocessing_failures = 0;
   IWString _parent_annotation;
   IWString _summary_fname;
   int _hash_chemotypes = 0;
@@ -357,6 +365,7 @@ class Options {
 
  public:
   int Initialise(Command_Line& cl);
+  // 1: ready to process; 0: skipped/rejected; -1: unrecoverable error.
   int Preprocess(Molecule& m);
   int Process(Molecule& m, Molecule_Output_Object& output);
   int ProcessFingerprint(Molecule& m, IWString_and_File_Descriptor& output);
@@ -369,6 +378,12 @@ class Options {
   int ChemotypeHash(Molecule& m, const IWString& parent_name, IWString& hash);
   int WriteSummary();
   int WriteHashXref();
+  int OpenRejections();
+  int WriteRejected(Molecule& m, const char* reason);
+  int RejectFingerprint(Molecule& m, const char* reason,
+                        IWString_and_File_Descriptor& output);
+  int FinishRejections() { return !_rejection_output.is_open() || _rejection_output.flush(); }
+  bool rejections_enabled() const { return !_rejection_fname.empty(); }
   int Report(std::ostream& output) const;
 
   int verbose() const {
@@ -384,9 +399,89 @@ class Options {
   }
 };
 
+static bool
+SameOutputFile(const IWString& a, const IWString& b) {
+  namespace fs = std::filesystem;
+  std::error_code error;
+  if (fs::equivalent(a.AsString(), b.AsString(), error)) {
+    return true;
+  }
+  const auto first = fs::weakly_canonical(a.AsString(), error);
+  if (error) {
+    return a == b;
+  }
+  const auto second = fs::weakly_canonical(b.AsString(), error);
+  return !error && first == second;
+}
+
+static bool
+CheckRejectionFilename(const Command_Line& cl, IWString& filename) {
+  if (cl.option_count('B') != 1) {
+    cerr << "Specify one rejection filename (-B)\n";
+    return false;
+  }
+  filename = cl.string_value('B');
+  if (filename.empty() || filename == "-") {
+    cerr << "Rejections (-B) require a separate file\n";
+    return false;
+  }
+  filename.EnsureEndsWith(".smi");
+  for (const char* input : cl) {
+    if (IWString(input) != "-" && SameOutputFile(filename, IWString(input))) {
+      cerr << "Rejection output would overwrite input '" << input << "'\n";
+      return false;
+    }
+  }
+  std::vector<FileType> types;
+  const_IWSubstring type;
+  for (int i = 0; cl.value('o', type, i); ++i) {
+    if (const FileType ft = moleculeio::string_to_file_type(type); ft != FILE_TYPE_INVALID) {
+      types.push_back(ft);
+    }
+  }
+  if (types.empty()) {
+    types.push_back(FILE_TYPE_SMI);
+  }
+  for (char flag : {'S', 'C'}) {
+    if (!cl.option_present(flag) || cl.string_value(flag) == "-") {
+      continue;
+    }
+    for (FileType ft : types) {
+      IWString output;
+      if (create_file_with_appropriate_name(cl.string_value(flag), output, ft) &&
+          SameOutputFile(filename, output)) {
+        cerr << "Rejection output conflicts with -" << flag << '\n';
+        return false;
+      }
+    }
+  }
+  if (cl.option_present('F') && SameOutputFile(filename, cl.string_value('F'))) {
+    cerr << "Rejection output conflicts with summary (-F)\n";
+    return false;
+  }
+  const_IWSubstring hash;
+  for (int i = 0; cl.value('H', hash, i); ++i) {
+    if (!hash.starts_with("xref=")) {
+      continue;
+    }
+    IWString output(hash);
+    output.remove_leading_chars(5);
+    if (SameOutputFile(filename, output)) {
+      cerr << "Rejection output conflicts with hash cross-reference\n";
+      return false;
+    }
+  }
+  return true;
+}
+
 int
 Options::Initialise(Command_Line& cl) {
   _verbose = cl.option_count('v');
+
+  // Validate before any other output stream can truncate a conflicting file.
+  if (cl.option_present('B') && !CheckRejectionFilename(cl, _rejection_fname)) {
+    return 0;
+  }
 
   if (! _preprocessing.Initialise(cl)) {
     cerr << "Cannot initialise molecule preprocessing\n";
@@ -705,14 +800,63 @@ Options::Initialise(Command_Line& cl) {
 int
 Options::Preprocess(Molecule& m) {
   if (m.empty()) {
+    if (rejections_enabled()) {
+      cerr << "Cannot write an empty input molecule to the rejection stream\n";
+      return -1;
+    }
     return 0;
   }
 
   if (_preprocessing.active()) {
+    std::unique_ptr<Molecule> original;
+    if (rejections_enabled()) {
+      original = std::make_unique<Molecule>(m);
+    }
     _preprocessing.Process(m);
+    if (m.empty() && original) {
+      ++_molecules_read;
+      ++_preprocessing_failures;
+      if (!WriteRejected(*original, "empty_after_preprocessing")) {
+        return -1;
+      }
+      m = *original;
+      return 0;
+    }
   }
 
   return ! m.empty();
+}
+
+int
+Options::OpenRejections() {
+  if (_rejection_fname.empty()) {
+    return 1;
+  }
+  if (!_rejection_output.open(_rejection_fname.null_terminated_chars())) {
+    cerr << "Cannot open rejection file '" << _rejection_fname << "'\n";
+    return 0;
+  }
+  return 1;
+}
+
+int
+Options::WriteRejected(Molecule& m, const char* reason) {
+  _rejection_output << m.smiles() << ' ';
+  if (m.name().empty()) {
+    _rejection_output << "molecule_" << _molecules_read;
+  } else {
+    _rejection_output << m.name();
+  }
+  _rejection_output << " chemotype_reject=" << reason << '\n';
+  ++_rejections_written;
+  return _rejection_output.write_if_buffer_holds_more_than(4096);
+}
+
+int
+Options::RejectFingerprint(Molecule& m, const char* reason,
+                            IWString_and_File_Descriptor& output) {
+  return WriteRejected(m, reason) && StartFingerprintRecord(m, output) &&
+         WriteEmptyFingerprint(output) && FinishFingerprintRecord(m, output);
 }
 
 int
@@ -808,12 +952,19 @@ Options::ProcessFingerprint(Molecule& m, IWString_and_File_Descriptor& output) {
 
   if (_min_rings > 0 && m.nrings() < _min_rings) {
     ++_molecules_below_min_rings;
+    if (rejections_enabled()) {
+      return RejectFingerprint(m, "below_min_rings", output);
+    }
     if (! StartFingerprintRecord(m, output) || ! WriteEmptyFingerprint(output)) {
       return 0;
     }
     return FinishFingerprintRecord(m, output);
   }
 
+  std::unique_ptr<Molecule> original;
+  if (rejections_enabled()) {
+    original = std::make_unique<Molecule>(m);
+  }
   chemotypes::ChemotypeQueryMatch match;
   const chemotypes::ChemotypeQueryMatchStatus status = chemotypes::FirstChemotypeQueryMatch(
       m, _queries, match, _chemotype_options.choose_first_embedding);
@@ -824,6 +975,9 @@ Options::ProcessFingerprint(Molecule& m, IWString_and_File_Descriptor& output) {
 
     case chemotypes::ChemotypeQueryMatchStatus::kNoQueryMatch:
       ++_molecules_not_matching_queries;
+      if (original) {
+        return RejectFingerprint(*original, "no_query_match", output);
+      }
       if (_ignore_molecules_not_matching_query) {
         if (! StartFingerprintRecord(m, output) || ! WriteEmptyFingerprint(output)) {
           return 0;
@@ -835,11 +989,17 @@ Options::ProcessFingerprint(Molecule& m, IWString_and_File_Descriptor& output) {
 
     case chemotypes::ChemotypeQueryMatchStatus::kMatchedQueryNoRingAtom:
       ++_molecules_matched_query_without_ring_atom;
+      if (original) {
+        return RejectFingerprint(*original, "no_ring_atom", output);
+      }
       cerr << "Query matched no ring atom in '" << m.name() << "'\n";
       return 0;
 
     case chemotypes::ChemotypeQueryMatchStatus::kAmbiguousQueryMatches:
       ++_molecules_with_ambiguous_query_matches;
+      if (original) {
+        return RejectFingerprint(*original, "ambiguous_ring_systems", output);
+      }
       cerr << "Query matched multiple ring systems in '" << m.name()
            << "', use -z first to use the first embedding\n";
       return 0;
@@ -850,6 +1010,9 @@ Options::ProcessFingerprint(Molecule& m, IWString_and_File_Descriptor& output) {
 
     case chemotypes::ChemotypeQueryMatchStatus::kAtomTypingFailed:
       ++_atom_typing_failures;
+      if (original) {
+        return RejectFingerprint(*original, "atom_typing_failed", output);
+      }
       cerr << "Atom typing failed for '" << m.name() << "'\n";
       return 0;
   }
@@ -878,6 +1041,9 @@ Options::ProcessFingerprint(Molecule& m, IWString_and_File_Descriptor& output) {
   std::vector<uint32_t> atom_type(matoms, 0);
   if (! _atom_typing_ptr->assign_atom_types(m, atom_type.data())) {
     ++_atom_typing_failures;
+    if (original) {
+      return RejectFingerprint(*original, "atom_typing_failed", output);
+    }
     cerr << "Atom typing failed for '" << m.name() << "'\n";
     return 0;
   }
@@ -897,13 +1063,13 @@ Options::Process(Molecule& m, Molecule_Output_Object& output) {
 
   if (_min_rings > 0 && m.nrings() < _min_rings) {
     ++_molecules_below_min_rings;
-    return 1;
+    return rejections_enabled() ? WriteRejected(m, "below_min_rings") : 1;
   }
 
   const IWString parent_name = m.name();
 
   std::unique_ptr<Molecule> parent;
-  if (_write_parent) {
+  if (_write_parent || rejections_enabled()) {
     parent = std::make_unique<Molecule>(m);
   }
 
@@ -921,7 +1087,7 @@ Options::Process(Molecule& m, Molecule_Output_Object& output) {
         }
         ++_complements_written;
       }
-      if (parent) {
+      if (_write_parent) {
         if (! _parent_annotation.empty()) {
           parent->append_to_name(_parent_annotation);
         }
@@ -954,6 +1120,9 @@ Options::Process(Molecule& m, Molecule_Output_Object& output) {
 
     case chemotypes::ChemotypeQueryMatchStatus::kNoQueryMatch:
       ++_molecules_not_matching_queries;
+      if (rejections_enabled()) {
+        return WriteRejected(*parent, "no_query_match");
+      }
       if (_ignore_molecules_not_matching_query) {
         return 1;
       }
@@ -962,11 +1131,17 @@ Options::Process(Molecule& m, Molecule_Output_Object& output) {
 
     case chemotypes::ChemotypeQueryMatchStatus::kMatchedQueryNoRingAtom:
       ++_molecules_matched_query_without_ring_atom;
+      if (rejections_enabled()) {
+        return WriteRejected(*parent, "no_ring_atom");
+      }
       cerr << "Query matched no ring atom in '" << m.name() << "'\n";
       return 0;
 
     case chemotypes::ChemotypeQueryMatchStatus::kAmbiguousQueryMatches:
       ++_molecules_with_ambiguous_query_matches;
+      if (rejections_enabled()) {
+        return WriteRejected(*parent, "ambiguous_ring_systems");
+      }
       cerr << "Query matched multiple ring systems in '" << m.name()
            << "', use -z first to use the first embedding\n";
       return 0;
@@ -977,6 +1152,9 @@ Options::Process(Molecule& m, Molecule_Output_Object& output) {
 
     case chemotypes::ChemotypeQueryMatchStatus::kAtomTypingFailed:
       ++_atom_typing_failures;
+      if (rejections_enabled()) {
+        return WriteRejected(*parent, "atom_typing_failed");
+      }
       cerr << "Atom typing failed for '" << m.name() << "'\n";
       return 0;
   }
@@ -1162,6 +1340,13 @@ Options::Report(std::ostream& output) const {
   if (_atom_typing_failures) {
     output << _atom_typing_failures << " atom typing failures\n";
   }
+  if (rejections_enabled()) {
+    output << "Wrote " << _rejections_written << " rejected molecules to '"
+           << _rejection_fname << "'\n";
+  }
+  if (_preprocessing_failures) {
+    output << _preprocessing_failures << " molecules became empty during preprocessing\n";
+  }
 
   return 1;
 }
@@ -1173,7 +1358,16 @@ ChemotypeFingerprints(Options& options, data_source_and_type<Molecule>& input,
   while ((m = input.next_molecule()) != nullptr) {
     std::unique_ptr<Molecule> free_m(m);
 
-    if (! options.Preprocess(*m)) {
+    const int preprocessed = options.Preprocess(*m);
+    if (preprocessed < 0) {
+      return 0;
+    }
+    if (preprocessed == 0) {
+      if (options.rejections_enabled() &&
+          (!options.StartFingerprintRecord(*m, output) ||
+           !options.WriteEmptyFingerprint(output) || !options.FinishFingerprintRecord(*m, output))) {
+        return 0;
+      }
       continue;
     }
 
@@ -1182,7 +1376,7 @@ ChemotypeFingerprints(Options& options, data_source_and_type<Molecule>& input,
     }
   }
 
-  return output.good();
+  return !input.stopped_because_of_error() && output.good();
 }
 
 int
@@ -1207,7 +1401,11 @@ ChemotypeFingerprints(Options& options, const char* fname, FileType input_type,
 
 int
 ProcessFilterRecord(Options& options, const const_IWSubstring& buffer,
-                    IWString_and_File_Descriptor& output) {
+                    IWString_and_File_Descriptor& output, const IWString* name = nullptr) {
+  if (!buffer.ends_with('>')) {
+    cerr << "Unterminated SMILES TDT data item\n";
+    return 0;
+  }
   const_IWSubstring smiles(buffer);
   smiles.remove_up_to_first('<');
   smiles.chop();
@@ -1217,17 +1415,67 @@ ProcessFilterRecord(Options& options, const const_IWSubstring& buffer,
     cerr << "Cannot parse smiles '" << smiles << "'\n";
     return 0;
   }
+  if (name != nullptr && !name->empty()) {
+    m.set_name(*name);
+  }
 
-  if (! options.Preprocess(m)) {
-    return options.WriteEmptyFingerprint(output);
+  const int preprocessed = options.Preprocess(m);
+  if (preprocessed < 0) {
+    return 0;
+  }
+  if (preprocessed == 0) {
+    if (!options.WriteEmptyFingerprint(output)) {
+      return 0;
+    }
+    return !options.rejections_enabled() || options.FinishFingerprintRecord(m, output);
   }
 
   return options.ProcessFingerprint(m, output);
 }
 
+// Buffer one TDT only when rejection output needs the PCN identifier, which
+// commonly follows the SMILES line. Preserve the input lines and insertion point.
+static int
+FilterWithRejections(Options& options, iwstring_data_source& input,
+                      IWString_and_File_Descriptor& output) {
+  std::vector<IWString> record;
+  IWString name;
+  const_IWSubstring buffer;
+  while (input.next_record(buffer)) {
+    record.emplace_back(buffer);
+    if (buffer.starts_with("PCN<") && buffer.ends_with('>')) {
+      name = buffer;
+      name.remove_leading_chars(4);
+      name.chop();
+    }
+    if (buffer != "|") {
+      continue;
+    }
+    for (const IWString& line : record) {
+      output << line << '\n';
+      if (line.starts_with("$SMI<") && !ProcessFilterRecord(options, line, output, &name)) {
+        return 0;
+      }
+    }
+    record.clear();
+    name.resize_keep_storage(0);
+    if (!output.write_if_buffer_holds_more_than(4096)) {
+      return 0;
+    }
+  }
+  if (!record.empty()) {
+    cerr << "Incomplete TDT record in rejection-output mode\n";
+    return 0;
+  }
+  return input.good() && output.good();
+}
+
 int
 ChemotypeFingerprintFilter(Options& options, iwstring_data_source& input,
                            IWString_and_File_Descriptor& output) {
+  if (options.rejections_enabled()) {
+    return FilterWithRejections(options, input, output);
+  }
   const_IWSubstring buffer;
   while (input.next_record(buffer)) {
     output << buffer << '\n';
@@ -1266,7 +1514,11 @@ Chemotypes(Options& options, data_source_and_type<Molecule>& input,
   while ((m = input.next_molecule()) != nullptr) {
     std::unique_ptr<Molecule> free_m(m);
 
-    if (! options.Preprocess(*m)) {
+    const int preprocessed = options.Preprocess(*m);
+    if (preprocessed < 0) {
+      return 0;
+    }
+    if (preprocessed == 0) {
       continue;
     }
 
@@ -1275,7 +1527,7 @@ Chemotypes(Options& options, data_source_and_type<Molecule>& input,
     }
   }
 
-  return 1;
+  return !input.stopped_because_of_error();
 }
 
 int
@@ -1300,7 +1552,7 @@ Chemotypes(Options& options, const char* fname, FileType input_type,
 
 int
 Chemotypes(int argc, char** argv) {
-  Command_Line cl(argc, argv, "vE:A:g:clfi:o:S:F:U:H:q:s:n:r:D:P:I:C:up:xtz:J:Y:");
+  Command_Line cl(argc, argv, "vE:A:g:clfi:o:S:F:U:H:q:s:n:r:D:P:I:C:B:up:xtz:J:Y:");
 
   if (cl.unrecognised_options_encountered()) {
     cerr << "Unrecognised options encountered\n";
@@ -1342,6 +1594,9 @@ Chemotypes(int argc, char** argv) {
     cerr << "Insufficient arguments\n";
     Usage(1);
   }
+  if (!options.OpenRejections()) {
+    return 1;
+  }
 
   if (options.fingerprinting_active()) {
     IWString_and_File_Descriptor output(1);
@@ -1357,7 +1612,9 @@ Chemotypes(int argc, char** argv) {
         return 1;
       }
     }
-    output.flush();
+    if (!output.flush() || !options.FinishRejections()) {
+      return 1;
+    }
     if (verbose) {
       options.Report(cerr);
     }
@@ -1398,6 +1655,9 @@ Chemotypes(int argc, char** argv) {
   }
 
   if (! options.WriteHashXref()) {
+    return 1;
+  }
+  if (!options.FinishRejections()) {
     return 1;
   }
 

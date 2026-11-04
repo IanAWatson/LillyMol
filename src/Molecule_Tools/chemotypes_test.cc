@@ -864,3 +864,32 @@ TEST(Chemotypes, InvalidRingIsotopeOptionsLeaveMoleculeUnchanged) {
             chemotypes::ChemotypeQueryMatchStatus::kInvalidOptions);
   EXPECT_EQ(m.smiles(), before);
 }
+
+TEST(Chemotypes, WholeMoleculeLabelsIncludeExocyclicAndAttachedAtoms) {
+  for (bool attached : {false, true}) {
+    Molecule m;
+    ASSERT_TRUE(m.build_from_smiles("CC1CCC(=O)CC1"));
+    for (int i = 0; i < m.natoms(); ++i) {
+      m.set_isotope(i, 99);
+    }
+    const int atoms = m.natoms();
+    const int bonds = m.nedges();
+    resizable_array_p<Substructure_Query> queries;
+    AddSmarts(queries, "[R]");
+    chemotypes::ChemotypeOptions options;
+    options.choose_first_embedding = true;
+    options.whole_molecule = true;
+    options.chemotype_isotope = 10;
+    options.outside_isotope = 0;
+    options.include_attached_atoms = attached;
+    chemotypes::ChemotypeScratch scratch;
+    chemotypes::ChemotypeQueryMatch match;
+    ASSERT_EQ(chemotypes::ReduceToChemotype(m, queries, options, scratch, match),
+              chemotypes::ChemotypeQueryMatchStatus::kMatched);
+    EXPECT_EQ(m.natoms(), atoms);
+    EXPECT_EQ(m.nedges(), bonds);
+    for (int i = 0; i < atoms; ++i) {
+      EXPECT_EQ(m.isotope(i), (i == 0 && !attached) ? 0u : 10u) << i;
+    }
+  }
+}

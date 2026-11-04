@@ -140,6 +140,27 @@ No record is written for an empty complement. `-C` requires a separate file
 stem and cannot be used with fingerprint output. A fixed isotope marks sites;
 it does not uniquely pair multiple connections.
 
+### Label the whole molecule
+
+Use `-I whole=inside,outside` to retain the full molecule and label every atom
+according to whether it belongs to the selected chemotype:
+
+```shell
+chemotypes -s '[N]' -I whole=1,0 -i smi input.smi > labelled_parents.smi
+```
+
+Chemotype atoms receive isotope 1; all other atoms have their isotopes cleared.
+Both values may be zero. For example, `-I whole=10,20` labels the two regions
+with 10 and 20. These assignments replace all existing isotopes. The usual
+selection options still apply, including adjacent ring systems, linkers,
+exocyclic atoms and optional attached atoms. No atoms or bonds are removed
+from the processed molecule; preprocessing such as `-l` still takes place.
+
+This mode cannot be combined with numeric `-I`, `-I ring=...`, atom typing
+(`-P`), fingerprinting (`-J`), parent duplication (`-p`), or chemotype summaries
+and hashes (`-F`, `-U`, `-H`). Optional `-C` still writes the excluded region
+separately, using the outside isotope. Query failure handling is unchanged.
+
 ### Ring-system isotope bases
 
 Use `-I ring=i,j,k` to label each selected ring system with a base isotope:
@@ -351,6 +372,7 @@ single-ring molecules should simply be skipped.
 | `-x` | With `-u`, ignore singly connected attached atoms. |
 | `-C <stem>` | Write excluded atoms to a separate output stem using the `-o` types. |
 | `-I <iso>` | Label retained boundary atoms, and complement endpoints, with isotope `iso`; additive with ring bases. Incompatible with `-P`. |
+| `-I whole=i,j` | Retain the whole molecule; replace chemotype isotopes with `i` and outside isotopes with `j`. Zero is allowed. |
 | `-I ring=i,j,k` | Label seed and selected adjacent ring systems with isotope bases; repeat the last base when needed. Incompatible with `-P` and `-J`. |
 | `-P <atype>` | Atom typing specification for retained non-terminal attachment atoms; also controls fingerprint atom types when `-J` is active. |
 | `-J FP<tag>` | Write a fixed-width linear fingerprint of the chemotype atom set. |

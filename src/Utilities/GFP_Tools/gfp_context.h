@@ -56,6 +56,8 @@ class GFPGeneratorSpec {
   GeneratorKind _kind = GeneratorKind::kMolecularProperties;
   bool _maccs_level2 = true;
   int _replicates = 0;
+  // Zero preserves the native representation; positive values fold to binary.
+  int _fixed_width = 0;
   int _radius = 0;
   int _min_separation = 0;
   int _max_separation = 0;
@@ -66,6 +68,9 @@ class GFPGeneratorSpec {
   bool _no_match_is_empty = true;
   IWString _atom_type;
   IWString _smarts;
+
+  std::vector<Component> NativeComponents() const;
+  std::string NativeRepr() const;
 
  public:
   GFPGeneratorSpec() = default;
@@ -113,6 +118,16 @@ class GFPGeneratorSpec {
   int
   replicates() const {
     return _replicates;
+  }
+
+  int
+  fixed_width() const {
+    return _fixed_width;
+  }
+
+  void
+  set_fixed_width(int width) {
+    _fixed_width = width;
   }
 
   int

@@ -274,6 +274,8 @@ Atom_Typing_Specification::_parse_user_specified_type(const const_IWSubstring& p
       _user_specified_type |= IWATTYPE_USP_K;
     } else if ('g' == c) {
       _user_specified_type |= IWATTYPE_USP_G;
+    } else if ('w' == c) {
+      _user_specified_type |= IWATTYPE_USP_W;
     } else {
       cerr << "Atom_Typing_Specification::_parse_user_specified_type:unrecognised '" << c
            << "'\n";
@@ -1797,6 +1799,7 @@ display_atom_type_specifications(std::ostream& os) {
         S          size of smallest ring.
         T          atomic number, but possibly tautomeric nitrogens grouped.
         U          unsaturation - aromatics are considered unsaturaged - compare 'B'.
+        W          atoms in non-aromatic rings sharing more than one bond.
         X          centrality of atom (expensive, uses distance matrix).
         Y          atomic number, heavy halogens compressed.
         Z          atomic numbers.
@@ -2758,6 +2761,63 @@ Atom_Typing_Specification::_ust_assign_atom_types_formal_charge(const Molecule& 
 
 template <typename T>
 int
+Atom_Typing_Specification::_ust_assign_atom_types_caged_ring(Molecule& m, T* atype) const {
+  if (m.nrings() == 0) {
+    return 1;
+  }
+
+  const int matoms = m.natoms();
+
+  std::unique_ptr<int[]> to_process(new_int(matoms));
+
+  m.compute_aromaticity_if_needed();
+
+  bool instances_found = false;
+  for (int i = 0; i < m.nrings(); ++i) {
+    const Ring* ri = m.ringi(i);
+
+    if (! ri->is_fused()) {
+      continue;
+    }
+    if (ri->strongly_fused_ring_neighbours() == 0) {
+      continue;
+    }
+    // Deliberately exclude aromatic rings from this cage-region modifier.
+    if (ri->is_aromatic()) [[ unlikely ]] {
+      continue;
+    }
+
+    for (const Ring* rj : ri->fused_neighbours()) {
+      if (rj->ring_number() <= ri->ring_number()) {
+        continue;
+      }
+      if (rj->is_aromatic()) {
+        continue;
+      }
+
+      if (ri->compute_bonds_shared_with(*rj) > 1) {
+        ri->increment_vector(to_process.get(), 1);
+        rj->increment_vector(to_process.get(), 1);
+        instances_found = true;
+      }
+    }
+  }
+
+  if (! instances_found) {
+    return 1;
+  }
+
+  for (int i = 0; i < matoms; ++i) {
+    if (to_process[i] > 0) {
+      atype[i] += 24737;
+    }
+  }
+
+  return 1;
+}
+
+template <typename T>
+int
 Atom_Typing_Specification::_assign_user_specified_type(Molecule& m, T* atype,
                                                        const int* ncon) const {
   const int matoms = m.natoms();
@@ -2795,6 +2855,9 @@ Atom_Typing_Specification::_assign_user_specified_type(Molecule& m, T* atype,
     } else if (t & IWATTYPE_USP_O) {
       _ust_assign_atom_types_formal_charge(m, atype);
       t = t ^ IWATTYPE_USP_O;
+    } else if (t & IWATTYPE_USP_W) {
+      _ust_assign_atom_types_caged_ring(m, atype);
+      t = t ^ IWATTYPE_USP_W;
     } else if (t & IWATTYPE_USP_P) {
       _ust_assign_atom_types_pi(m, atype);
       t = t ^ IWATTYPE_USP_P;
@@ -2916,6 +2979,9 @@ Atom_Typing_Specification::_append_tag_for_user_specified_type(IWString& tag) co
   }
   if (IWATTYPE_USP_G & _user_specified_type) {
     tag << 'G';
+  }
+  if (IWATTYPE_USP_W & _user_specified_type) {
+    tag << 'W';
   }
 
   return 1;
@@ -3405,7 +3471,7 @@ QueryAndValue::AssignAtomTypes(Molecule_to_Match& target,
     }
   }
 
-  return 1;
+  return rc;
 }
 
 int

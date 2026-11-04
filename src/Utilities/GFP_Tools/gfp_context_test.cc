@@ -687,4 +687,140 @@ TEST(TestGFPContext, StandardListFromMoleculesCanStoreMetadata) {
   EXPECT_EQ(gfp->smiles(1), "CCC");
 }
 
+TEST(TestGFPContext, FoldedSparseMatchesNativeFeatures) {
+  std::vector<gfp_context::GFPGeneratorSpec> specs = {
+      gfp_context::GFPGeneratorSpec::ALogP(),
+      gfp_context::GFPGeneratorSpec::XLogP(),
+      gfp_context::GFPGeneratorSpec::TPSA(),
+      gfp_context::GFPGeneratorSpec::AtomPair(),
+      gfp_context::GFPGeneratorSpec::ECFingerprint(),
+      gfp_context::GFPGeneratorSpec::RingSubstitution()};
+  for (const auto& spec : specs) {
+    SCOPED_TRACE(spec.Repr());
+    gfp_context::GFPContext native;
+    ASSERT_TRUE(native.BuildFromSpecs({spec}, false));
+    for (int width : {1, 17, 64, 2048}) {
+      auto folded_spec = spec;
+      folded_spec.set_fixed_width(width);
+      gfp_context::GFPContext folded;
+      ASSERT_TRUE(folded.BuildFromSpecs({folded_spec}, false));
+      EXPECT_EQ(folded.nfixed_binary(), 1);
+      EXPECT_EQ(folded.nsparse(), 0);
+      EXPECT_NE(native.context_hash(), folded.context_hash());
+      gfp_context::GFPFingerprint original, binary;
+      for (const char* smiles : {"CC(=O)Oc1ccccc1C(=O)O", "CCO", "CCCC"}) {
+        SCOPED_TRACE(smiles);
+        Molecule m;
+        ASSERT_TRUE(m.build_from_smiles(smiles));
+        ASSERT_TRUE(native.Fingerprint(m, original));
+        ASSERT_TRUE(folded.Fingerprint(m, binary));
+        std::vector<int> expected(width, 0);
+        int next = 0;
+        unsigned int bit;
+        int count;
+        while (original.sparse(0).next_bit_set(next, bit, count)) {
+          if (count > 0) {
+            expected[bit % width] = 1;
+          }
+        }
+        gfp_context::FixedBitVector expected_bits;
+        ASSERT_TRUE(expected_bits.BuildFromArray(expected.data(), width));
+        EXPECT_TRUE(binary.fixed_binary(0).bits() == expected_bits.bits());
+        EXPECT_EQ(binary.fixed_binary(0).nset(), expected_bits.nset());
+        EXPECT_FLOAT_EQ(folded.Distance(binary, binary), 0.0f);
+      }
+    }
+  }
+}
+
+TEST(TestGFPContext, FoldedCatsMatchesNativeFeatures) {
+  if (std::getenv("LILLYMOL_HOME") == nullptr) {
+    GTEST_SKIP() << "LILLYMOL_HOME not set";
+  }
+  auto spec = gfp_context::GFPGeneratorSpec::CATS();
+  gfp_context::GFPContext native, folded;
+  ASSERT_TRUE(native.BuildFromSpecs({spec}));
+  spec.set_fixed_width(64);
+  ASSERT_TRUE(folded.BuildFromSpecs({spec}));
+  Molecule m;
+  ASSERT_TRUE(m.build_from_smiles("NCC(O)c1ccccc1"));
+  gfp_context::GFPFingerprint original, binary;
+  ASSERT_TRUE(native.Fingerprint(m, original));
+  ASSERT_TRUE(folded.Fingerprint(m, binary));
+  std::vector<int> expected(64, 0);
+  int next = 0, count;
+  unsigned int bit;
+  while (original.sparse(0).next_bit_set(next, bit, count)) {
+    if (count > 0) {
+      expected[bit % 64] = 1;
+    }
+  }
+  gfp_context::FixedBitVector expected_bits;
+  ASSERT_TRUE(expected_bits.BuildFromArray(expected.data(), 64));
+  EXPECT_TRUE(binary.fixed_binary(0).bits() == expected_bits.bits());
+}
+
+TEST(TestGFPContext, FixedWidthSchemaAndMixedGeneration) {
+  auto native = gfp_context::GFPGeneratorSpec::ECFingerprint();
+  auto small = native;
+  small.set_fixed_width(64);
+  auto large = native;
+  large.set_fixed_width(128);
+  EXPECT_EQ(small.Repr(), "GFP.ec(radius=3, atom_type='UST:Z', fixed_width=64)");
+  EXPECT_EQ(small.Components()[0].tag, "FPEC3USTZFW64<");
+  gfp_context::GFPContext mixed, reordered;
+  ASSERT_TRUE(mixed.BuildFromSpecs({native, small, large}));
+  ASSERT_TRUE(reordered.BuildFromSpecs({large, native, small}));
+  EXPECT_EQ(mixed.context_hash(), reordered.context_hash());
+  EXPECT_EQ(mixed.nfixed_binary(), 2);
+  EXPECT_EQ(mixed.nsparse(), 1);
+  Molecule m;
+  ASSERT_TRUE(m.build_from_smiles("CCO"));
+  gfp_context::GFPFingerprint a, b;
+  ASSERT_TRUE(mixed.Fingerprint(m, a));
+  ASSERT_TRUE(reordered.Fingerprint(m, b));
+  EXPECT_FLOAT_EQ(mixed.Distance(a, b), 0.0f);
+  gfp_context::GFPContext first, second;
+  ASSERT_TRUE(first.BuildFromSpecs({small}));
+  ASSERT_TRUE(second.BuildFromSpecs({large}));
+  EXPECT_NE(first.context_hash(), second.context_hash());
+  EXPECT_FALSE(first.BuildFromSpecs({small, small}));
+  small.set_fixed_width(-1);
+  EXPECT_FALSE(first.BuildFromSpecs({small}));
+  auto unsupported = gfp_context::GFPGeneratorSpec::MolecularProperties();
+  unsupported.set_fixed_width(64);
+  EXPECT_FALSE(first.BuildFromSpecs({unsupported}));
+  unsupported = gfp_context::GFPGeneratorSpec::IWMFingerprint();
+  unsupported.set_fixed_width(64);
+  EXPECT_FALSE(first.BuildFromSpecs({unsupported}));
+}
+
+TEST(TestGFPContext, FoldedFormulaDropsCountsAndWorksInLists) {
+  auto spec = gfp_context::GFPGeneratorSpec::FormulaFingerprint();
+  auto native = std::make_shared<gfp_context::GFPContext>();
+  ASSERT_TRUE(native->BuildFromSpecs({spec}));
+  spec.set_fixed_width(128);
+  EXPECT_EQ(spec.Components()[0].tag, "FPFMLFW128<");
+  auto context = std::make_shared<gfp_context::GFPContext>();
+  ASSERT_TRUE(context->BuildFromSpecs({spec}));
+  EXPECT_EQ(context->nfixed_counted(), 0);
+  Molecule ethane, propane;
+  ASSERT_TRUE(ethane.build_from_smiles("CC"));
+  ASSERT_TRUE(propane.build_from_smiles("CCC"));
+  gfp_context::GFPFingerprint a, b;
+  ASSERT_TRUE(context->Fingerprint(ethane, a));
+  ASSERT_TRUE(context->Fingerprint(propane, b));
+  EXPECT_GT(a.fixed_binary(0).nset(), 0);
+  EXPECT_FLOAT_EQ(context->Distance(a, b), 0.0f);
+  gfp_context::GFPFingerprint native_a, native_b;
+  ASSERT_TRUE(native->Fingerprint(ethane, native_a));
+  ASSERT_TRUE(native->Fingerprint(propane, native_b));
+  EXPECT_GT(native->Distance(native_a, native_b), 0.0f);
+  gfp_context::GFPList list(context);
+  ASSERT_TRUE(list.Add(ethane));
+  ASSERT_TRUE(list.Add(propane));
+  EXPECT_FLOAT_EQ(list.Distance(0, 1), context->Distance(a, b));
+  EXPECT_FLOAT_EQ(list.Distance(a, 1), context->Distance(a, b));
+}
+
 }  // namespace

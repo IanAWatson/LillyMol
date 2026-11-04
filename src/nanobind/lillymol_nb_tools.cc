@@ -155,6 +155,15 @@ CheckCompatibleFingerprint(const gfp_context::GFPList& gfp,
   }
 }
 
+gfp_context::GFPGeneratorSpec
+WithFixedWidth(gfp_context::GFPGeneratorSpec spec, int width) {
+  if (width < 0) {
+    throw std::invalid_argument("fixed_width must be non-negative");
+  }
+  spec.set_fixed_width(width);
+  return spec;
+}
+
 std::vector<std::string>
 GFPGeneratorSpecComponents(const gfp_context::GFPGeneratorSpec& spec) {
   std::vector<std::string> result;
@@ -440,6 +449,7 @@ BindTools(nb::module_& m) {
 
   nb::class_<gfp_context::GFPGeneratorSpec>(m, "GFPGeneratorSpec")
       .def("components", &GFPGeneratorSpecComponents)
+      .def_prop_ro("fixed_width", &gfp_context::GFPGeneratorSpec::fixed_width)
       .def("__repr__", &gfp_context::GFPGeneratorSpec::Repr);
 
   nb::class_<GFPFactory>(m, "GFP")
@@ -447,44 +457,46 @@ BindTools(nb::module_& m) {
       .def_static("iw", &gfp_context::GFPGeneratorSpec::IWMFingerprint)
       .def_static("maccs", &gfp_context::GFPGeneratorSpec::MACCSKeys,
                   nb::arg("level2") = true)
-      .def_static("formula", &gfp_context::GFPGeneratorSpec::FormulaFingerprint)
+      .def_static("formula", [](int fixed_width) {
+        return WithFixedWidth(gfp_context::GFPGeneratorSpec::FormulaFingerprint(), fixed_width);
+      }, nb::arg("fixed_width") = 0)
       .def_static("cats",
-           [](int max_path_length, bool include_hydrophobic_pairs) {
+           [](int max_path_length, bool include_hydrophobic_pairs, int fixed_width) {
              if (max_path_length < 1) {
                throw std::invalid_argument("max_path_length must be positive");
              }
-             return gfp_context::GFPGeneratorSpec::CATS(max_path_length,
-                                                        include_hydrophobic_pairs);
+             return WithFixedWidth(gfp_context::GFPGeneratorSpec::CATS(
+                 max_path_length, include_hydrophobic_pairs), fixed_width);
            },
            nb::arg("max_path_length") = 10,
-           nb::arg("include_hydrophobic_pairs") = true)
+           nb::arg("include_hydrophobic_pairs") = true, nb::arg("fixed_width") = 0)
       .def_static("alogp",
-           [](int replicates) {
+           [](int replicates, int fixed_width) {
              if (replicates <= 0) {
                throw std::invalid_argument("replicates must be positive");
              }
-             return gfp_context::GFPGeneratorSpec::ALogP(replicates);
+             return WithFixedWidth(gfp_context::GFPGeneratorSpec::ALogP(replicates), fixed_width);
            },
-           nb::arg("replicates") = 9)
+           nb::arg("replicates") = 9, nb::arg("fixed_width") = 0)
       .def_static("xlogp",
-           [](int replicates) {
+           [](int replicates, int fixed_width) {
              if (replicates <= 0) {
                throw std::invalid_argument("replicates must be positive");
              }
-             return gfp_context::GFPGeneratorSpec::XLogP(replicates);
+             return WithFixedWidth(gfp_context::GFPGeneratorSpec::XLogP(replicates), fixed_width);
            },
-           nb::arg("replicates") = 9)
+           nb::arg("replicates") = 9, nb::arg("fixed_width") = 0)
       .def_static("tpsa",
-           [](int replicates) {
+           [](int replicates, int fixed_width) {
              if (replicates <= 0) {
                throw std::invalid_argument("replicates must be positive");
              }
-             return gfp_context::GFPGeneratorSpec::TPSA(replicates);
+             return WithFixedWidth(gfp_context::GFPGeneratorSpec::TPSA(replicates), fixed_width);
            },
-           nb::arg("replicates") = 9)
+           nb::arg("replicates") = 9, nb::arg("fixed_width") = 0)
       .def_static("atom_pair",
            [](int min_separation, int max_separation, const std::string& atom_type,
-              bool include_out_of_range) {
+              bool include_out_of_range, int fixed_width) {
              if (min_separation < 0) {
                throw std::invalid_argument("min_separation must be non-negative");
              }
@@ -494,25 +506,29 @@ BindTools(nb::module_& m) {
              if (atom_type.empty()) {
                throw std::invalid_argument("atom_type must be non-empty");
              }
-             return gfp_context::GFPGeneratorSpec::AtomPair(
+             return WithFixedWidth(gfp_context::GFPGeneratorSpec::AtomPair(
                  min_separation, max_separation, IWString(atom_type),
-                 include_out_of_range);
+                 include_out_of_range), fixed_width);
            },
            nb::arg("min_separation") = 1, nb::arg("max_separation") = 10,
-           nb::arg("atom_type") = "UST:Y", nb::arg("include_out_of_range") = false)
+           nb::arg("atom_type") = "UST:Y", nb::arg("include_out_of_range") = false,
+           nb::arg("fixed_width") = 0)
       .def_static("ec",
-           [](int radius, const std::string& atom_type) {
+           [](int radius, const std::string& atom_type, int fixed_width) {
              if (radius < 0) {
                throw std::invalid_argument("radius must be non-negative");
              }
              if (atom_type.empty()) {
                throw std::invalid_argument("atom_type must be non-empty");
              }
-             return gfp_context::GFPGeneratorSpec::ECFingerprint(radius,
-                                                                 IWString(atom_type));
+             return WithFixedWidth(gfp_context::GFPGeneratorSpec::ECFingerprint(
+                 radius, IWString(atom_type)), fixed_width);
            },
-           nb::arg("radius") = 3, nb::arg("atom_type") = "UST:Z")
-      .def_static("ring_substitution", &gfp_context::GFPGeneratorSpec::RingSubstitution)
+           nb::arg("radius") = 3, nb::arg("atom_type") = "UST:Z",
+           nb::arg("fixed_width") = 0)
+      .def_static("ring_substitution", [](int fixed_width) {
+        return WithFixedWidth(gfp_context::GFPGeneratorSpec::RingSubstitution(), fixed_width);
+      }, nb::arg("fixed_width") = 0)
       .def_static("spinach", &gfp_context::GFPGeneratorSpec::SpinachFingerprint,
                   nb::arg("label_join_points") = false)
       .def_static("scaffold", &gfp_context::GFPGeneratorSpec::ScaffoldFingerprint,

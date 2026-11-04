@@ -86,3 +86,23 @@ cc_binary(
         "//Molecule_Lib:moleculeio",
     ],
 )
+
+# Measures existing coordinates; does not require the optional layout engine.
+cc_library(
+    name = "bond_crossings",
+    srcs = ["bond_crossings.cc"],
+    hdrs = ["bond_crossings.h"],
+    deps = ["//Molecule_Lib:iwmolecule"],
+    visibility = ["//visibility:public"],
+)
+
+cc_test(
+    name = "bond_crossings_test",
+    srcs = ["bond_crossings_test.cc"],
+    deps = [
+        ":bond_crossings",
+        "//Molecule_Lib:iwmolecule",
+        "//Molecule_Lib:moleculeio",
+        "@googletest//:gtest_main",
+    ],
+)

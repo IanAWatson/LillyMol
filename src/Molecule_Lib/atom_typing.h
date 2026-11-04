@@ -112,6 +112,11 @@ inline constexpr uint32_t IWATTYPE_PPHORE = 262144;
 
 inline constexpr uint32_t IWATTYPE_USP_G = one_bit_32[21];
 
+// Add 24737 to atoms in non-aromatic rings sharing more than one bond.
+// Note that only atoms in a ring participating in a strongly fused
+// relationship are processed.
+inline constexpr uint32_t IWATTYPE_USP_W = one_bit_32[22];
+
 static_assert(IWATTYPE_USP_Z == one_bit_32[0]);
 static_assert(IWATTYPE_USP_B == one_bit_32[20]);
 static_assert(IWATTYPE_USP_G == one_bit_32[21]);
@@ -212,6 +217,8 @@ class Atom_Typing_Specification {
   int _ust_assign_atom_types_atomic_symbol_hash_value(const Molecule& m, T* atype) const;
   template <typename T>
   int _ust_assign_atom_types_formal_charge(const Molecule& m, T* atype) const;
+  template <typename T>
+  int _ust_assign_atom_types_caged_ring(Molecule& m, T* atype) const;
 
   template <typename T>
   int AssignExternalAtomTypes(Molecule& m, T* atype);

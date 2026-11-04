@@ -55,6 +55,30 @@ class ChemotypeIsotopes(unittest.TestCase):
                 result = self.run_tool("-I", "ring=10", *extra)
                 self.assertNotEqual(result.returncode, 0)
 
+    def test_whole_molecule_labels_and_zero(self):
+        for inside, outside in [(1, 0), (10, 20), (0, 2), (0, 0)]:
+            result = self.run_tool("-I", f"whole={inside},{outside}")
+            self.assertEqual(result.returncode, 0, result.stderr)
+            expected = ([inside] * 6 if inside else []) + ([outside] * 2 if outside else [])
+            self.assertEqual(self.labels(result.stdout), sorted(expected))
+            self.assertEqual(len(result.stdout.splitlines()), 1)
+        result = self.run_tool("-I", "whole=10,20", "-C", "complement")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(self.labels(
+            (self._directory / "complement.smi").read_text()), [20, 20])
+
+    def test_invalid_whole_labels_and_conflicts(self):
+        for value in ["whole=", "whole=1", "whole=1,", "whole=,2",
+                      "whole=1,2,3", "whole=1,,2", "whole=-1,0",
+                      "whole=1,4294967296", "whole=x,0"]:
+            result = self.run_tool("-I", value)
+            self.assertNotEqual(result.returncode, 0, value)
+        for extra in [("-I", "ring=10"), ("-I", "2"), ("-I", "whole=2,0"),
+                      ("-P", "Z"), ("-J", "FPCTYPE"), ("-F", "summary"),
+                      ("-H", "def"), ("-p", ".")]:
+            result = self.run_tool("-I", "whole=1,0", *extra)
+            self.assertNotEqual(result.returncode, 0, extra)
+
 
 if __name__ == "__main__":
     unittest.main()

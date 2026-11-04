@@ -41,6 +41,9 @@ struct ChemotypeOptions {
   isotope_t isotope_for_exit_points = 0;
   // Seed system first, then selected adjacent systems. Repeat the last base.
   std::vector<isotope_t> ring_isotopes;
+  bool whole_molecule = false;
+  isotope_t chemotype_isotope = 0;
+  isotope_t outside_isotope = 0;
 };
 
 
@@ -130,6 +133,8 @@ std::vector<int> ChemotypeAtomMask(Molecule& m, const ChemotypeQueryMatch& match
 // all atoms are retained. Fixed exit isotopes label both endpoints of each cut.
 // Ring bases replace existing ring isotopes and add to fixed boundary labels.
 // Atom typing and ring bases are incompatible; invalid options are rejected.
+// With whole_molecule, retain all atoms and replace every isotope according to
+// mask membership. This is incompatible with atom typing and other isotope modes.
 ChemotypeQueryMatchStatus ReduceToChemotype(
     Molecule& m, resizable_array_p<Substructure_Query>& queries,
     const ChemotypeOptions& options, ChemotypeScratch& scratch,

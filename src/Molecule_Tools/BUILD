@@ -4250,3 +4250,15 @@ py_test(
     args = ["$(location :hydrophobic_sections)"],
     data = [":hydrophobic_sections"],
 )
+
+cc_binary(
+    name = "bond_crossings",
+    srcs = ["bond_crossings.cc"],
+    deps = [
+        "//Depict:bond_crossings",
+        "//Foundational/cmdline:iwcmdline",
+        "//Foundational/iwmisc",
+        "//Molecule_Lib:iwmolecule",
+        "//Molecule_Lib:moleculeio",
+    ],
+)

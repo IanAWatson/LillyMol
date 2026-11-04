@@ -1,4 +1,5 @@
 #include <cstdint>
+#include <vector>
 
 #include "gtest/gtest.h"
 
@@ -101,5 +102,88 @@ INSTANTIATE_TEST_SUITE_P(
                 IWATTYPE_USP_R | IWATTYPE_USP_U | IWATTYPE_USP_S |
                 IWATTYPE_USP_L | IWATTYPE_USP_O,
             "[#6;D2;x2;G0;r3;r3]"}));
+
+TEST(CagedRingAtomType, TagIncludesModifier) {
+  Atom_Typing_Specification spec;
+  ASSERT_TRUE(spec.build("UST:ZW"));
+  IWString tag;
+  ASSERT_TRUE(spec.append_to_tag(tag));
+  EXPECT_TRUE(tag.contains('W'));
+}
+
+TEST(CagedRingAtomType, ModifierAddsToExistingTypes) {
+  Molecule mol;
+  ASSERT_TRUE(mol.build_from_smiles("NC1CC2CCC1C2"));
+  Atom_Typing_Specification base, combined;
+  ASSERT_TRUE(base.build("UST:Z"));
+  ASSERT_TRUE(combined.build("UST:ZW"));
+  std::vector<uint32_t> before(mol.natoms()), after(mol.natoms());
+  ASSERT_TRUE(base.assign_atom_types(mol, before.data()));
+  ASSERT_TRUE(combined.assign_atom_types(mol, after.data()));
+  EXPECT_EQ(after[0], before[0]);
+  for (int i = 1; i < mol.natoms(); ++i) {
+    EXPECT_EQ(after[i], before[i] + 24737);
+  }
+}
+
+struct CageCase {
+  const char* _smiles;
+  int _marked;
+};
+
+class CagedRingAtomType : public testing::TestWithParam<CageCase> {};
+
+TEST_P(CagedRingAtomType, RandomAtomOrderPreservesTypes) {
+  set_global_aromaticity_type(Daylight);
+  const auto& test = GetParam();
+  Molecule original;
+  ASSERT_TRUE(original.build_from_smiles(test._smiles));
+  for (int i = 0; i < original.natoms(); ++i) {
+    original.set_isotope(i, i + 1);
+  }
+  Atom_Typing_Specification spec;
+  ASSERT_TRUE(spec.build("UST:W"));
+  std::vector<uint32_t> expected(original.natoms());
+  ASSERT_TRUE(spec.assign_atom_types(original, expected.data()));
+  int marked = 0;
+  for (uint32_t value : expected) {
+    EXPECT_TRUE(value == 1 || value == 24738);
+    marked += value == 24738;
+  }
+  EXPECT_EQ(marked, test._marked) << test._smiles;
+
+  for (int trial = 0; trial < 200; ++trial) {
+    const IWString smiles = original.random_smiles();
+    SCOPED_TRACE(smiles.AsString());
+    Molecule reordered;
+    ASSERT_TRUE(reordered.build_from_smiles(smiles));
+    ASSERT_EQ(reordered.natoms(), original.natoms());
+    std::vector<uint32_t> actual(reordered.natoms());
+    ASSERT_TRUE(spec.assign_atom_types(reordered, actual.data()));
+    for (int i = 0; i < reordered.natoms(); ++i) {
+      const int index = reordered.isotope(i) - 1;
+      ASSERT_GE(index, 0);
+      ASSERT_LT(index, original.natoms());
+      EXPECT_EQ(actual[i], expected[index]) << "original atom " << index;
+    }
+  }
+}
+
+INSTANTIATE_TEST_SUITE_P(
+    RingTopologies, CagedRingAtomType,
+    testing::Values(
+        CageCase{"CCC", 0},
+        CageCase{"C1CCCCC1", 0},
+        CageCase{"C1CCC2CCCCC2C1", 0},
+        CageCase{"C1CCC2(CC1)CCCC2", 0},
+        CageCase{"c1ccc2ccccc2c1", 0},
+        CageCase{"C1CC2CCC1C2", 7},
+        CageCase{"C1CCC2CCC1C2", 8},
+        CageCase{"C1C2CC3CC1CC(C2)C3", 10},
+        CageCase{"C12C3C4C1C5C2C3C45", 0},
+        CageCase{"CC1CC2CCC1C2", 7},
+        CageCase{"C13C(CCCC3)C2CCC1C2", 7},
+        CageCase{"C1CC2CCC1C23CCCCC3", 7},
+        CageCase{"C1CC2CCC1C2C3CCCCC3", 7}));
 
 }  // namespace

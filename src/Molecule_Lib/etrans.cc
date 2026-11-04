@@ -291,7 +291,7 @@ Element_Transformations::construct_from_command_line(Command_Line& cl, int verbo
   for (int i = 0; cl.value(eflag, c, i); ++i) {;
     if ("help" == c) {
       display_standard_etrans_options(cerr, eflag);
-      exit(2);
+      exit(0);
     }
 
     std::unique_ptr<Element_Transformation> tmp =

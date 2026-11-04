@@ -56,6 +56,124 @@ class Correctness(unittest.TestCase):
         self.assertEqual(names, set(expected), (smarts, search.stderr))
         return smarts
 
+    def assert_highlight_count(self, line, count):
+        self.assertEqual(re.findall(r'\[(\d+)', line.split()[0]), ['1'] * count)
+
+    def test_select_fragment_identity_whole_parent_and_no_parent_search(self):
+        data = (record('cut example', '[3OH][2CH2][1CH2]N', 'N[1CH2][102CH3]') +
+                record('whole', 'N[1CH2][2CH3]') +
+                record('contains_but_not_emitted', 'N[1CH2][2CH2][3CH3]'))
+        result = self.run_tool(data, '-F', 'CCN')
+        lines = result.stdout.splitlines()
+        self.assertEqual(len(lines), 2)
+        self.assertIn(' cut example nmatch=1', lines[0])
+        self.assertIn(' whole nmatch=1', lines[1])
+        for line in lines:
+            self.assert_highlight_count(line, 3)
+        self.assertIn('found in 2 of 3 parents; 2 distinct occurrences', result.stderr)
+
+    def test_select_union_separate_and_duplicate_atom_sets(self):
+        left, right = 'N[1CH2][102CH3]', '[6NH2][5CH2][104CH3]'
+        cap_left = 'N[1CH2][10102CH3]'
+        parent = 'N[1CH2][2CH2][3CH2][4CH2][5CH2][6NH2]'
+        outputs = []
+        for fragments in [(left, right, left, cap_left), (cap_left, left, right, left)]:
+            data = record('two', parent, *fragments)
+            union = self.run_tool(data, '-F', 'NCC')
+            self.assertEqual(len(union.stdout.splitlines()), 1)
+            self.assertIn('nmatch=2', union.stdout)
+            self.assert_highlight_count(union.stdout, 6)
+            separate = self.run_tool(data, '-F', 'NCC', '-F', 'separate')
+            lines = separate.stdout.splitlines()
+            self.assertEqual(len(lines), 2)
+            for i, line in enumerate(lines, 1):
+                self.assertIn(f'nmatch=2 match={i}/2', line)
+                self.assert_highlight_count(line, 3)
+            outputs.append((union.stdout, separate.stdout))
+        self.assertEqual(outputs[0], outputs[1])
+
+    def test_select_overlapping_occurrences(self):
+        data = record('overlap', 'C[1CH2][2CH2][3CH3]',
+                      'C[1CH2][102CH3]', '[1CH3][2CH2][3CH3]')
+        result = self.run_tool(data, '-F', 'CCC')
+        self.assertIn('nmatch=2', result.stdout)
+        self.assert_highlight_count(result.stdout, 4)
+        result = self.run_tool(data, '-F', 'CCC', '-F', 'separate')
+        for line in result.stdout.splitlines():
+            self.assert_highlight_count(line, 3)
+
+    def test_select_attachment_positions_and_unlabelled_atoms_unconstrained(self):
+        parent = 'N[1CH2][2CH2][3OH]'
+        middle = '[100NH2][101CH2][2CH3]'
+        terminal = 'N[1CH2][102CH3]'
+        data = (record('middle', parent, middle) + record('terminal', parent, terminal) +
+                record('plain', parent, 'N[1CH2][2CH3]'))
+        for smiles, expected in [('N[1CH2]C', 'middle'), ('NC[1CH3]', 'terminal'),
+                                  ('N[7CH2]C', 'middle')]:
+            result = self.run_tool(data, '-F', smiles)
+            self.assertEqual(len(result.stdout.splitlines()), 1)
+            self.assertIn(f' {expected} nmatch=1', result.stdout)
+        self.assertEqual(len(self.run_tool(data, '-F', 'NCC').stdout.splitlines()), 3)
+        self.run_tool(data, '-F', 'N[1CH2][1CH3]', success=False)
+        # Every occurrence must be considered, not just the first representative.
+        for fragments in [(middle, terminal), (terminal, middle)]:
+            result = self.run_tool(record('both', parent, *fragments), '-F', 'NC[1CH3]')
+            self.assertIn(' both nmatch=1', result.stdout)
+
+    def test_select_attachment_symmetry(self):
+        data = record('symmetric', 'C[1CH2][2CH2][3CH3]',
+                      'C[101CH3]', '[102CH3][3CH3]')
+        outputs = []
+        for pattern in ['[1CH3]C', 'C[1CH3]']:
+            result = self.run_tool(data, '-F', pattern)
+            self.assertIn('nmatch=2', result.stdout)
+            self.assert_highlight_count(result.stdout, 4)
+            outputs.append(result.stdout)
+        self.assertEqual(outputs[0], outputs[1])
+        self.run_tool(data, '-F', '[1CH3][1CH3]', success=False)
+
+    def test_select_caps_highlight_original_parent_atoms(self):
+        data = record('cap', 'N[1CH2][2C]([3F])([4F])[5F]',
+                      'N[101CH2][10102CH3]')
+        result = self.run_tool(data, '-F', 'NC[1CH3]')
+        self.assertIn('[1C]', result.stdout)
+        self.assertNotIn('[1F]', result.stdout)
+        self.assertEqual(result.stdout.count('F'), 3)
+        self.assert_highlight_count(result.stdout, 3)
+
+    def test_select_no_match_invalid_input_and_conflicting_options(self):
+        data = record('parent', 'N[1CH2][2CH3]')
+        result = self.run_tool(data, '-F', 'CCC', success=False)
+        self.assertEqual(result.stdout, '')
+        self.assertIn('No parents contributed', result.stderr)
+        for args in [('-F', 'separate'), ('-F', ''), ('-F', 'invalid'), ('-F', 'C.C'),
+                     ('-F', 'NC', '-F', 'CC')]:
+            self.run_tool(data, *args, success=False)
+        for args in [('-m', '2'), ('-s', '50%'), ('-R', 'report'), ('-X', 'missing'),
+                     ('-Y', 'pairs'), ('-P', 'UST:Z')]:
+            self.run_tool(data, '-F', 'NCC', *args, success=False)
+        self.run_tool('not a proto\n', '-F', 'NC', success=False)
+        self.run_tool(record('bad', 'N[2CH3]'), '-F', 'NC', success=False)
+        self.run_tool('', '-F', 'NC', success=False)
+        result = subprocess.run([EXE, '-F', 'NC', str(self.root / 'absent')],
+                                capture_output=True, text=True)
+        self.assertNotEqual(result.returncode, 0)
+
+    def test_select_stdin_and_multiple_input_files(self):
+        data = record('stdin', 'N[1CH3]')
+        result = subprocess.run([EXE, '-F', 'NC', '-'], input=data,
+                                capture_output=True, text=True, timeout=30)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn(' stdin nmatch=1', result.stdout)
+        first, second = self.root / 'first.textproto', self.root / 'second.textproto'
+        first.write_text(record('absent', 'N[1NH2]'))
+        second.write_text(data)
+        result = subprocess.run([EXE, '-F', 'NC', str(first), str(second)],
+                                capture_output=True, text=True, timeout=30)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(len(result.stdout.splitlines()), 1)
+        self.assertIn('found in 1 of 2 parents', result.stderr)
+
     def test_attachment_can_match_hydrogen(self):
         plain = record('plain', 'C[1CH3]', 'C[1CH3]')
         cut = record('cut', 'C[1CH2][2CH3]', 'C[101CH3]')

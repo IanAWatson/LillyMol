@@ -216,6 +216,84 @@ selected core instead of dumping every fragment. `-v` retains the compact
 best-per-atom-count summary. Structural matches in stdout and pairwise output
 are unaffected by requesting a report.
 
+## Label examples for a chosen fragment
+
+After examining the `-R` table, copy a fragment from its `SMILES` column and
+select its contributing parents with `-F`:
+
+```shell
+dicer_mcs -F 'NCC' fragments.textproto > NCC_examples.smi
+```
+
+The supplied SMILES must be connected and contain fewer than 100 atoms. It is
+canonicalized without isotopes, so equivalent spellings such as `CCN` select
+the same identity. This is an exact candidate-identity
+lookup, not a substructure search of the original parents. It considers all
+recorded occurrences and the implicit whole-parent candidate. A parent that
+contains NCC but did not contribute it as a candidate is not selected.
+
+The default writes each qualifying parent once, in input order. All atoms in
+all qualifying occurrences receive isotope 1; other isotopes are cleared. The
+original parent name is retained and `nmatch=N` is appended. Occurrences are
+counted as **distinct sets of original parent atoms**, so repeated fragment
+records, capped/uncapped forms and symmetry-related mappings of the same atom
+set count once. Overlapping occurrences are allowed. The highlighted union can
+contain more atoms than the requested fragment, and `nmatch` preserves the fact
+that the result is ambiguous even when labels do not distinguish the overlaps.
+
+To write one parent per distinct occurrence instead, add `-F separate`:
+
+```shell
+dicer_mcs -F 'NCC' -F separate fragments.textproto > NCC_occurrences.smi
+```
+
+Each record labels just one occurrence and appends both `nmatch=N` and
+`match=i/N`. Occurrences are ordered by their sorted parent atom numbers,
+independently of the order of fragment records.
+
+### Require particular attachment positions
+
+A positive isotope in the supplied SMILES means that atom must be an attachment
+point in a contributing occurrence. These requirements do not change the
+isotope-free structural identity being selected. For example:
+
+```shell
+# Require the middle carbon to be an attachment point.
+dicer_mcs -F 'N[1CH2]C' fragments.textproto > middle_attachment.smi
+# Require the terminal carbon to be an attachment point.
+dicer_mcs -F 'NC[1CH3]' fragments.textproto > terminal_attachment.smi
+```
+
+Unlabelled atoms remain unconstrained and can also be attachment points. Any
+positive isotope value acts as the same requirement; it is not an original atom
+number, required isotope value, or required number of cuts. Use ordinary valid
+SMILES with the appropriate bracketed hydrogen counts.
+
+Requirements are checked against each recorded fragment's decoded attachment
+metadata, before deduplicating its parent atom set. Equivalent atoms can exchange
+positions when testing the requirements; the chosen representative from the
+report does not limit which occurrences qualify. Numbering isotopes alone do
+not identify attachment points: the usual `-I inc=100` output supplies that
+information. Cap markers are decoded separately. When a cap qualifies, its
+original parent atom is highlighted, retaining the parent's actual bonds and
+substituents. Attachment requirements can reduce coverage relative to the
+report row, which combines all attachment patterns.
+
+### Streaming and command options
+
+This mode processes one parent at a time, without retaining the dataset or
+ranking fragments. Multiple input files are processed in command-line order;
+`-` reads textproto records from standard input. It writes SMILES to stdout and
+reports contributing-parent and distinct-occurrence counts on stderr. No
+contributing parent gives nonzero exit status. Invalid records and input/output
+errors also give nonzero status; already written records remain partial output.
+
+Specify one fragment SMILES, optionally `-F separate`. Explicit selection cannot
+be combined with `-m`, `-s`, `-P`, `-R`, `-X` or `-Y`; these belong to the global
+analysis mode. The normal `-A`, `-E` and `-v` options remain available. Output
+labels are uniformly isotope 1, including when different positive isotopes were
+used to specify attachment requirements.
+
 ## Attachment-independent common cores
 
 A bond cut in one parent can correspond to a hydrogen in another. Fragments with

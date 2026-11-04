@@ -26,6 +26,7 @@
 #include "Molecule_Lib/atom_typing.h"
 #include "Molecule_Lib/molecule.h"
 #include "Molecule_Lib/smiles.h"
+#include "Molecule_Lib/substructure.h"
 #include "Molecule_Tools/dicer_lib.h"
 
 #ifdef BUILD_BAZEL
@@ -75,6 +76,9 @@ The following options are recognised.
  -P <atype>             atom type specification for greedy single atom expansion for pairwise matches.
  -R <fname>             write a regular fragment report (default separator: tab).
  -R sep=<name>          report separator, e.g. tab, comma, space, vbar.
+ -F <smiles>            stream parents contributing this fragment; isotopes require attachment points.
+ -F separate            with -F <smiles>, write each distinct occurrence separately.
+                       Default: isotope 1 on the union of occurrences, with nmatch=N in the name.
  -X <fname>             write parents lacking the selected candidate fragment (SMILES).
  -Y <fname>             write all pairwise MCS combinations. File can become very large!
  -v                     verbose output.
@@ -109,6 +113,7 @@ class Options {
     int min_atoms_in_fragment() const {
       return _min_atoms_in_fragment;
     }
+    void set_min_atoms_in_fragment(int n) { _min_atoms_in_fragment = n; }
 
     bool has_minimum_support() const {
       return _minimum_support > 0 || _minimum_support_percent > 0;
@@ -330,6 +335,8 @@ class Fragment {
     // Scan through _parent_atom and set the appropriate isotope in `parent`.
     void SetIsotopes(Molecule& parent) const;
     IWString HighlightedParent(const Molecule& parent) const;
+    bool MatchesAttachments(Substructure_Query& query) const;
+    std::vector<atom_number_t> ParentAtomSet() const;
 
     // Wrtie our atom count and the atom count as a fraction of atoms in parent
     void AtomsAndFraction(IWString_and_File_Descriptor& output) const;
@@ -482,6 +489,25 @@ Fragment::HighlightedParent(const Molecule& parent) const {
   return labelled.unique_smiles();
 }
 
+bool
+Fragment::MatchesAttachments(Substructure_Query& query) const {
+  Molecule labelled(_mol);
+  for (atom_number_t atom : _attachment_points) {
+    labelled.set_isotope(atom, 1);
+  }
+  // Searching the full fragment graph allows equivalent atoms to exchange
+  // positions. The query's positive isotopes require attachment metadata.
+  return query.substructure_search(&labelled) > 0;
+}
+
+std::vector<atom_number_t>
+Fragment::ParentAtomSet() const {
+  std::vector<atom_number_t> result(_parent_atom, _parent_atom + natoms());
+  std::sort(result.begin(), result.end());
+  result.erase(std::unique(result.begin(), result.end()), result.end());
+  return result;
+}
+
 void
 Fragment::AtomsAndFraction(IWString_and_File_Descriptor& output) const {
   output << _mol.natoms() << ' ' << iwmisc::Fraction<float>(_mol.natoms(),
@@ -605,6 +631,8 @@ class DicedMolecule {
     const std::vector<int>* Occurrences(const IWString& s) const;
 
     const Fragment* FragmentForSmiles(const IWString& smi) const;
+    std::vector<std::vector<atom_number_t>> MatchingAtomSets(
+        const IWString& smiles, Substructure_Query* attachment_query) const;
 
     int Compare(DicedMolecule& rhs, const ComparisonConditions& cmp,
                 IWString_and_File_Descriptor& output);
@@ -812,6 +840,28 @@ DicedMolecule::FragmentForSmiles(const IWString& smi) const {
   }
   
   return _fragment[iter->second.front()];
+}
+
+std::vector<std::vector<atom_number_t>>
+DicedMolecule::MatchingAtomSets(const IWString& smiles,
+                               Substructure_Query* attachment_query) const {
+  std::vector<std::vector<atom_number_t>> result;
+  const std::vector<int>* occurrences = Occurrences(smiles);
+  if (occurrences == nullptr) {
+    return result;
+  }
+  for (int index : *occurrences) {
+    const Fragment& fragment = *_fragment[index];
+    if (attachment_query != nullptr && !fragment.MatchesAttachments(*attachment_query)) {
+      continue;
+    }
+    result.push_back(fragment.ParentAtomSet());
+  }
+  // Different mappings, cap forms and repeated records can describe the same
+  // parent atoms. Count these once, after applying attachment requirements.
+  std::sort(result.begin(), result.end());
+  result.erase(std::unique(result.begin(), result.end()), result.end());
+  return result;
 }
 
 int
@@ -1541,6 +1591,149 @@ PerformPairwiseComparisons(Command_Line& cl,
   return PerformPairwiseComparisons(cl, diced, output);
 }
 
+// Explicit selection keeps just one parent and its occurrences in memory.
+class FragmentSelection {
+ private:
+  IWString _identity;
+  int _natoms = 0;
+  bool _separate = false;
+  std::unique_ptr<Substructure_Query> _attachment_query;
+  uint64_t _parents_read = 0;
+  uint64_t _parents_matched = 0;
+  uint64_t _occurrences = 0;
+
+  bool WriteMatches(Molecule& parent,
+                    const std::vector<std::vector<atom_number_t>>& matches,
+                    IWString_and_File_Descriptor& output);
+
+ public:
+  bool Initialise(const Command_Line& cl);
+  int natoms() const { return _natoms; }
+  bool Read(const Options& options, const char* fname,
+            IWString_and_File_Descriptor& output);
+  bool Report() const;
+};
+
+bool
+FragmentSelection::Initialise(const Command_Line& cl) {
+  IWString smiles;
+  const_IWSubstring value;
+  for (int i = 0; cl.value('F', value, i); ++i) {
+    if (value == "separate") {
+      _separate = true;
+    } else if (smiles.empty() && !value.empty()) {
+      smiles = value;
+    } else {
+      cerr << "Specify one fragment SMILES with -F, optionally -F separate\n";
+      return false;
+    }
+  }
+  Molecule fragment;
+  if (smiles.empty() || !fragment.build_from_smiles(smiles) || fragment.empty() ||
+      fragment.number_fragments() != 1 || fragment.natoms() >= kMaxFragmentAtoms) {
+    cerr << "-F requires one connected fragment SMILES with fewer than "
+         << kMaxFragmentAtoms << " atoms\n";
+    return false;
+  }
+  _natoms = fragment.natoms();
+  std::unique_ptr<isotope_t[]> labels = fragment.GetIsotopes();
+  fragment.unset_isotopes();
+  _identity = fragment.unique_smiles();
+  bool needs_attachments = false;
+  for (int i = 0; i < _natoms; ++i) {
+    if (labels[i] > 0) {
+      fragment.set_isotope(i, 1);
+      needs_attachments = true;
+    }
+  }
+  if (needs_attachments) {
+    _attachment_query = std::make_unique<Substructure_Query>();
+    if (!_attachment_query->create_from_smiles(fragment.smiles())) {
+      cerr << "Cannot construct attachment requirements from '" << smiles << "'\n";
+      return false;
+    }
+    _attachment_query->set_max_matches_to_find(1);
+  }
+  return true;
+}
+
+bool
+FragmentSelection::WriteMatches(Molecule& parent,
+    const std::vector<std::vector<atom_number_t>>& matches,
+    IWString_and_File_Descriptor& output) {
+  parent.unset_isotopes();
+  for (size_t i = 0; i < matches.size(); ++i) {
+    if (_separate) {
+      parent.unset_isotopes();
+    }
+    for (atom_number_t atom : matches[i]) {
+      parent.set_isotope(atom, 1);
+    }
+    if (!_separate) {
+      continue;
+    }
+    output << parent.smiles() << ' ' << parent.name() << " nmatch=" << matches.size()
+           << " match=" << (i + 1) << '/' << matches.size() << '\n';
+    if (!output.write_if_buffer_holds_more_than(4096)) {
+      return false;
+    }
+  }
+  if (!_separate) {
+    output << parent.smiles() << ' ' << parent.name() << " nmatch=" << matches.size() << '\n';
+  }
+  return output.write_if_buffer_holds_more_than(4096);
+}
+
+bool
+FragmentSelection::Read(const Options& options, const char* fname,
+                        IWString_and_File_Descriptor& output) {
+  iwstring_data_source source(fname);
+  if (!source.good()) {
+    cerr << "Cannot open fragment input '" << fname << "'\n";
+    return false;
+  }
+  const_IWSubstring buffer;
+  while (source.next_record(buffer)) {
+    dicer_data::DicedMolecule proto;
+    google::protobuf::io::ArrayInputStream input(buffer.data(), buffer.length());
+    if (!google::protobuf::TextFormat::Parse(&input, &proto)) {
+      cerr << "Invalid textproto at line " << source.lines_read() << " in '" << fname << "'\n";
+      return false;
+    }
+    DicedMolecule parent;
+    if (!parent.Build(options, proto)) {
+      cerr << "Invalid parent at line " << source.lines_read() << " in '" << fname << "'\n";
+      return false;
+    }
+    ++_parents_read;
+    auto matches = parent.MatchingAtomSets(_identity, _attachment_query.get());
+    if (matches.empty()) {
+      continue;
+    }
+    ++_parents_matched;
+    _occurrences += matches.size();
+    if (!WriteMatches(parent.mol(), matches, output)) {
+      return false;
+    }
+  }
+  if (!source.good()) {
+    cerr << "Error reading fragment input '" << fname << "'\n";
+    return false;
+  }
+  return true;
+}
+
+bool
+FragmentSelection::Report() const {
+  cerr << "Fragment " << _identity << " found in " << _parents_matched << " of "
+       << _parents_read << " parents; " << _occurrences << " distinct occurrences\n";
+  if (_parents_matched == 0) {
+    cerr << "No parents contributed the requested fragment\n";
+    return false;
+  }
+  return true;
+}
+
 static bool
 SameFile(const IWString& a, const IWString& b) {
   namespace fs = std::filesystem;
@@ -1615,7 +1808,7 @@ CheckOutputFiles(const Command_Line& cl, const IWString& non_matching_fname,
 
 int
 Main(int argc, char** argv) {
-  Command_Line cl(argc, argv, "vE:A:m:P:Y:s:X:R:");
+  Command_Line cl(argc, argv, "vE:A:m:P:Y:s:X:R:F:");
 
   if (cl.unrecognised_options_encountered()) {
     cerr << "Unrecognised options encountered\n";
@@ -1642,6 +1835,30 @@ Main(int argc, char** argv) {
   if (cl.empty()) {
     cerr << "Insufficient arguments\n";
     Usage(1);
+  }
+
+  if (cl.option_present('F')) {
+    for (char flag : {'m', 's', 'P', 'Y', 'X', 'R'}) {
+      if (cl.option_present(flag)) {
+        cerr << "Explicit fragment selection (-F) cannot be combined with -" << flag << '\n';
+        return 1;
+      }
+    }
+    FragmentSelection selection;
+    if (!selection.Initialise(cl)) {
+      return 1;
+    }
+    options.set_min_atoms_in_fragment(selection.natoms());
+    IWString_and_File_Descriptor output(1);
+    for (const char* fname : cl) {
+      if (!selection.Read(options, fname, output)) {
+        return 1;
+      }
+    }
+    if (!output.flush()) {
+      return 1;
+    }
+    return selection.Report() ? 0 : 1;
   }
 
 #ifdef HUHAS

@@ -29,6 +29,7 @@ The help message is
   -r             sort molecule by numbering
   -p             change to graph form (all bonds become single etc...)
   -H             make all implicit Hydrogens explicit
+  -l             reduce to the largest fragment before processing
   -b ...         write bond symmetry information to stderr
   -q <query>     only label atoms matched by the query/queries
   -s <smarts>    only label atoms matched by the smarts
@@ -41,3 +42,11 @@ The help message is
 ```
 
 
+
+Use `-l` to retain the largest fragment before numbering or other molecule
+processing. Fragment selection uses `Molecule::reduce_to_largest_fragment_carefully()`.
+Without `-l`, all fragments are retained.
+
+```shell
+numbered_smiles -l -n 1 -S numbered salts.smi
+```

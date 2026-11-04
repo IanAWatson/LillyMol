@@ -15,6 +15,14 @@ namespace {
 using std::cerr;
 
 void Usage(int rc) {
+// clang-format off
+#if defined(GIT_HASH) && defined(TODAY)
+  cerr << __FILE__ << " compiled " << TODAY << " git hash " << GIT_HASH << '\n';
+#else
+  cerr << __FILE__ << " compiled " << __DATE__ << " " << __TIME__ << '\n';
+#endif
+  // clang-format on
+  // clang-format off
   cerr << "Score crossed bonds in existing 2D molecular depictions\n"
        << "bond_crossings [options] molecules.sdf\n"
        << " -l          retain the largest fragment, preserving its coordinates\n"
@@ -25,6 +33,7 @@ void Usage(int rc) {
        << " -i <type>   input type; normally inferred from suffix\n"
        << " -A ...      standard aromaticity options\n"
        << " -v          verbose statistics\n";
+  // clang-format on
   ::exit(rc);
 }
 

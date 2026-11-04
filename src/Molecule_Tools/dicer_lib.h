@@ -9,6 +9,10 @@
 
 namespace dicer_lib {
 
+// Element caps carry this marker in addition to their existing isotope payload.
+// Unmarked isotopes must be below this value when element capping is enabled.
+inline constexpr isotope_t kElementCapIsotope = 10000;
+
 /*
   We can store various things with the user specified void pointer of the parent.
   This gets passed down to the fragments

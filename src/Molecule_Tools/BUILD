@@ -765,6 +765,7 @@ cc_binary(
        "dicer_mcs.cc",
    ],
    deps = [
+        ":dicer_lib",
         "dicer_fragments_cc_proto",
         "//Foundational/cmdline:iwcmdline",
         "//Foundational/data_source:iwstring_data_source",

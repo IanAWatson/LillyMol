@@ -5,11 +5,45 @@ corresponding atoms in the parent molecules. It searches the fragments supplied
 by dicer plus each eligible whole parent as a zero-cut candidate; it does not
 perform an unrestricted maximum common substructure search.
 
+The maximum common substructure (MCS) problem is known to be hard and existing solutions
+are notoriously slow. `dicer_mcs` is not an MCS tool. It is a scalable way of
+exploring common fragments in a set of molecules, using `dicer` generated fragments.
+By default, `dicer` does not break ring bonds, so candidates requiring cuts
+through a ring are generally unavailable. Capping can nevertheless expose
+individual ring atoms as fragment endpoints. Other bonds excluded by dicer's
+cutting rules can also prevent useful common fragments from being generated.
+The combination of `dicer` and `dicer_mcs` is not an MCS solution.
+
+There are also judgement issues. Across a set of molecules the actual MCS
+might be a Carbon atom, but this is not useful. Across a set of primary amines,
+the MCS might be `N-C`. But there might be larger fragments, that occur less often
+that are interesting/informative. The `-R` option to `dicer_mcs` presents a table
+of fragments, atom counts, and contributing-parent coverage. Coverage counts
+parents that emit a candidate, rather than all parents matching its SMARTS.
+This table can be examined to determine the most interesting/useful fragments
+in the dataset.
+
 ```shell
 numbered_smiles -I -n 0 -S numbered molecules.smi
-dicer -B proto -I inc=100 -k 2 numbered.smi > fragments.textproto
-dicer_mcs -m 2 fragments.textproto > common.smi
+dicer -B bscb -B nbamide -B brcb -B proto -k 2 -I capboth -I inc=100 numbered.smi > fragments.textproto
+dicer_mcs -m 2 -R fragments.tsv fragments.textproto > common.smi
 ```
+
+The algorithm does not require size-sorted input. However, sorting the starting
+molecules by increasing atom count **before running dicer** can make the report
+more useful: each fragment's first contributing parent will then be one of its
+smallest contributing examples. Use [msort](msort.md), for example:
+
+```shell
+msort -k natoms molecules.smi > sorted.smi
+numbered_smiles -I -n 0 -S numbered sorted.smi
+dicer -B bscb -B nbamide -B brcb -B proto -k 2 -I capboth -I inc=100 numbered.smi > fragments.textproto
+dicer_mcs -m 2 -R fragments.tsv fragments.textproto > common.smi
+```
+
+Apply any structure-changing preprocessing before sorting as well if the sort
+should reflect the molecules actually analysed. Sorting is for choosing readable
+examples; it does not broaden candidate generation or change support counts.
 
 Perform structure-changing preprocessing before numbering. Parent isotopes must
 contain each value from zero through `natoms - 1` exactly once; the atom with
@@ -20,6 +54,18 @@ increments at the same atom are supported. All isotopes are removed before
 computing fragment unique SMILES and canonical atom ranks: attachment locations
 do not affect either fragment identity or the correspondence labels written on
 parents.
+
+Element caps from dicer's `-I cap` and `-I capboth` modes carry the isotope
+marker 10000 in addition to their existing payload. For example, 10117 means a
+cap whose payload is 117. The reader first records the cap flag and subtracts
+10000, then decodes attachment increments and parent numbering as usual. The
+flag is retained separately from attachment metadata, canonical ranks, and
+fragment identity. It does not split support or appear in correspondence labels
+or highlighted examples. Marked caps must be terminal, with payloads below
+10000; cap markers are not valid on the original parent record. Legacy fragments
+without markers remain readable, but their cap provenance cannot be recovered
+reliably. Only explicitly marked caps receive atomic-number SMARTS as described below;
+ordinary fragment atoms retain their atomic symbols.
 
 The fixed attachment increment makes original atom labels of 100 or greater
 ambiguous. Parents with more than 100 atoms are therefore rejected explicitly.
@@ -133,6 +179,7 @@ dicer_mcs -s 80% -R fragments.csv -R sep=comma fragments.textproto > common.smi
 | `NCUT` | Parents with at least one occurrence marked with a cut attachment. |
 | `SELECTED` | One for the selected global core, zero otherwise. |
 | `ATTACHMENT_SMILES` | One exemplar with cut attachment atoms labelled isotope 1. |
+| `EXAMPLE_SMILES` | Complete `FIRST_PARENT` structure, with isotope 1 on all atoms of the exemplar fragment and zero elsewhere. |
 
 `NWHOLE` and `NCUT` are independent per-parent counts, not occurrence counts.
 Repeated cut fragments within a parent increase neither `NPARENTS` nor `NCUT`.
@@ -141,6 +188,16 @@ also produced by fragmentation, without removing useful candidates from the
 report. The attachment SMILES uses the deterministically first occurrence in
 `FIRST_PARENT`. Its labels describe that exemplar only; attachment patterns may
 differ in other occurrences and are not part of candidate identity.
+
+`EXAMPLE_SMILES` highlights one deterministic occurrence in `FIRST_PARENT`,
+using the stored atom correspondence without another substructure search. With
+capped fragments, the original parent atoms represented by caps are highlighted;
+the example retains their original substituents and bonds. Whole-parent
+candidates highlight every atom. The example is made from a copy with the input
+numbering isotopes cleared, so report generation does not alter other output.
+Coverage is contributing-parent coverage, not unrestricted substructure-match
+coverage. Sorting the starting molecules by atom count as described above is
+optional and helps select smaller examples.
 
 Rows are sorted by decreasing `NPARENTS`, decreasing `NATOMS`, then increasing
 canonical SMILES. Fields containing the separator, quotes, or line breaks are
@@ -165,16 +222,33 @@ A bond cut in one parent can correspond to a hydrogen in another. Fragments with
 the same isotope-free structure therefore share support even when different
 atoms were cut, or no atoms were cut in one of the fragments. This intentionally
 broadens matching compared with earlier versions, which included attachment
-labels in fragment identity. Element, aromaticity, bond order, and the existing
-stereochemical representation are retained.
+labels in fragment identity. Candidate identity retains element, aromaticity,
+bond order, and the existing stereochemical representation.
 
 Generated SMARTS require at least the number of connections present within the
 fragment at every atom. Extra external substituents are permitted anywhere;
 attachment annotations from one exemplar do not constrain other parents. A
 single-atom fragment has no degree restriction. `D>0` is omitted for singly
 connected atoms because the query bond already requires a connection. For example,
-an ethane fragment produces `[C][C]`, which can match ethane or a carbon-carbon single bond in
-a larger molecule.
+an uncapped ethane fragment produces `[C][C]`.
+
+Only explicitly marked **cap atoms** use atomic-number SMARTS, such as `[#6]`
+and `[#7]`, allowing either aromatic or aliphatic atoms of that element. Ordinary
+fragment atoms retain their symbols: a genuine terminal primary-amine nitrogen
+is `[N]`, not `[#7]`. This distinction uses the stored 10000 isotope marker;
+it cannot be recovered reliably from older unmarked cap files.
+
+For example, an NCC candidate with a genuine nitrogen, genuine internal carbon,
+and marked carbon cap produces `[N][CD>1][#6]`. Its terminal cap can match the
+aromatic attachment carbon of benzylamine, while the internal carbon must still
+be aliphatic. The report SMARTS describes the chosen occurrence in `FIRST_PARENT`.
+When occurrences map to exactly the same parent atom subset, the one with fewer
+caps is preferred, retaining more genuine atom specifications. A nitrogen that
+actually is a cap still uses `[#7]`.
+
+This change affects generated SMARTS in both stderr and the report, not fragment
+identity, support counts, selection or pairwise comparison. Dummy and
+non-periodic-table elements retain symbolic matching.
 
 Attachment metadata is retained for future reporting and expansion work.
 Pairwise expansion continues to examine all matched atoms, without requiring a
@@ -242,3 +316,8 @@ open failures return nonzero status.
 The executable regression suite uses `tsubstructure` alongside `dicer_mcs` to
 verify that generated SMARTS match contributing parents and reject incompatible
 atom and bond types. Build/install both tools when running these tests.
+
+## Developer notes
+
+See [candidate coverage and support limitations](dicer_mcs_developer_notes.md)
+for an investigation of small amines and a proposed fragment-extension approach.

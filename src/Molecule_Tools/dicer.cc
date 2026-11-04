@@ -218,6 +218,9 @@ static int number_by_initial_atom_number = 0;
 static int apply_environment_isotopic_labels = 0;
 
 static int add_environment_atoms = 0;
+// Add the opposite endpoint's element at each chain cut. Caps have no initial
+// atom-number metadata, so recursive bond selection cannot cut their bonds.
+static int add_element_caps = 0;  // 1: capped only; 2: capped and uncapped.
 
 static int apply_atomic_number_isotopic_labels = 0;
 
@@ -670,6 +673,7 @@ reset_variables() {
   number_by_initial_atom_number = 0;
   apply_environment_isotopic_labels = 0;
   add_environment_atoms = 0;
+  add_element_caps = 0;
   apply_atomic_number_isotopic_labels = 0;
   smiles_tag = "$SMI<";
   identifier_tag = "PCN<";
@@ -2645,6 +2649,18 @@ Dicer_Arguments::is_unique(Molecule& m) {
 
   _stored_bit_vectors.add(b);
 
+  if (add_element_caps == 2) [[unlikely]] {
+    // The subset key above includes only original atoms, so check it once.
+    // Strip caps from a copy for recording; keep m capped for recursion.
+    Molecule uncapped(m);
+    std::vector<int> remove(uncapped.natoms());
+    for (int i = 0; i < uncapped.natoms(); ++i) {
+      remove[i] = !InitialAtomNumber(uncapped.atomi(i)).has_value();
+    }
+    uncapped.remove_atoms(remove.data());
+    contains_fragment(uncapped);
+  }
+
   // The following code was changed by madlee@20120801.
   // we set the -B atype=<atomtype> new meaning now.
   // Maybe we will create a new opiton for this function in future.
@@ -4154,6 +4170,62 @@ do_add_environment_atoms(Molecule& m, const atom_number_t j1, const atom_number_
   m.add(env_element[ndx]);
 
   return m.add_bond(m.natoms() - 1, j2, SINGLE_BOND);
+}
+
+// Copy only element, charge and isotope: omitted neighbours (and their
+// aromaticity/unsaturation) are intentionally not represented. In numbered
+// input, the isotope payload retains correspondence to the opposite atom; the
+// reserved marker identifies the cap after serialization, without proto changes.
+static void
+AddElementCaps(Molecule& m, atom_number_t j1, atom_number_t j2) {
+  for (const auto& [source, destination] :
+       {std::pair{j1, j2}, std::pair{j2, j1}}) {
+    const Element* element = m.atomi(source)->element();
+    const formal_charge_t charge = m.formal_charge(source);
+    const isotope_t isotope = m.isotope(source);
+    const atom_number_t cap = m.add(element);
+    m.set_formal_charge(cap, charge);
+    m.set_isotope(cap, dicer_lib::kElementCapIsotope + isotope);
+    m.add_bond(destination, cap, SINGLE_BOND);
+  }
+}
+
+// Reserve the cap marker only in the optional capping modes. Bound the isotope
+// payload before recursion, including any labels that future cuts can assign.
+static bool
+ElementCapIsotopesOk(Molecule& m, Dicer_Arguments& args) {
+  if (apply_atom_type_isotopic_labels && !atom_typing_specification.active()) {
+    cerr << "Element capping with -I atype requires an atom typing specification (-P)\n";
+    return false;
+  }
+  for (int i = 0; i < m.natoms(); ++i) {
+    uint64_t isotope = m.isotope(i);
+    if (isotope >= dicer_lib::kElementCapIsotope) {
+      cerr << "Element capping reserves isotopes >= " << dicer_lib::kElementCapIsotope
+           << "; input atom " << i << " in '" << m.name() << "' has isotope " << isotope << '\n';
+      return false;
+    }
+    if (increment_isotope_for_join_points) {
+      if (always_increment_isotope) {
+        isotope += static_cast<uint64_t>(std::min(max_recursion_depth, m.ncon(i))) *
+                   increment_isotope_for_join_points;
+      } else if (isotope < static_cast<uint64_t>(increment_isotope_for_join_points)) {
+        isotope += increment_isotope_for_join_points;
+      }
+    } else if (isotope_for_join_points > 0) {
+      isotope = isotope_for_join_points;
+    } else if (apply_atom_type_isotopic_labels) {
+      isotope = args.atom_types()[i];
+    } else if (isotopic_label_is_recursion_depth) {
+      isotope = std::min(max_recursion_depth, m.nedges());
+    }
+    if (isotope >= dicer_lib::kElementCapIsotope) {
+      cerr << "Element capping requires join-point isotope payloads below "
+           << dicer_lib::kElementCapIsotope << " in '" << m.name() << "'\n";
+      return false;
+    }
+  }
+  return true;
 }
 
 static int
@@ -5686,6 +5758,10 @@ Chain_Bond_Breakage::_process(Molecule& m0, Dicer_Arguments& dicer_args,
 
   set_isotopes_if_needed(m, j1, j2, dicer_args);
 
+  if (add_element_caps) [[unlikely]] {
+    AddElementCaps(m, j1, j2);
+  }
+
   resizable_array<Molecule*> components;
 
   if (stream_for_post_breakage.is_open()) {
@@ -5752,7 +5828,10 @@ Chain_Bond_Breakage::_process(Molecule& m0, resizable_array<Molecule*>& componen
     }
 #endif
 
-    if (c.natoms() > upper_atom_count_cutoff)
+    if (add_element_caps == 2) [[unlikely]] {
+      // Each form is filtered independently by contains_fragment().
+      dicer_args.is_unique(c);
+    } else if (c.natoms() > upper_atom_count_cutoff)
       ;
     else if (!contains_user_specified_queries(c))
       ;
@@ -7392,6 +7471,10 @@ dicer(Molecule& m, DicerFragmentOutput& output) {
     (void)dicer_args.store_atom_types(m, atom_typing_specification);
   }
 
+  if (add_element_caps && !ElementCapIsotopesOk(m, dicer_args)) [[unlikely]] {
+    return 0;
+  }
+
   if (max_fragments_per_molecule > 0) {
     dicer_args.adjust_max_recursion_depth(bonds_to_break_this_molecule,
                                           max_fragments_per_molecule);
@@ -7686,6 +7769,8 @@ display_dash_i_options(int rc) {
   // clang-format off
   cerr << R"( -I env           atoms get isotopic labels according to their environment
  -I enva          specific atoms are added to indicate the environment
+ -I cap           add the opposite endpoint's element at each chain cut; caps persist during recursion
+ -I capboth       emit capped and uncapped forms, sharing the capped recursive traversal
  When the 'env' or 'enva' directives are used, these isotopes or elements are added
  Descripton               iso element
  Terminal                 1   Te
@@ -7956,6 +8041,12 @@ dicer(int argc, char** argv) {
       } else if ("enva" == i) {
         ++join_point_labelling_options;
         add_environment_atoms = 1;
+      } else if ("cap" == i || "capboth" == i) {
+        if (add_element_caps) {
+          cerr << "Specify only one of -I cap and -I capboth\n";
+          return 4;
+        }
+        add_element_caps = i == "cap" ? 1 : 2;
       } else if ("depth" == i) {
         ++join_point_labelling_options;
         isotopic_label_is_recursion_depth = 1;
@@ -8659,6 +8750,15 @@ dicer(int argc, char** argv) {
   } else {
     cerr << "NO output specified\n";
     usage(4);
+  }
+
+  if (add_element_caps && (break_ring_bonds || break_fused_rings || break_spiro_rings ||
+                          dearomatise_aromatic_rings || chiral_dummy || add_environment_atoms ||
+                          apply_atom_types_to_fragments || work_like_recap ||
+                          write_smiles_and_complementary_smiles)) {
+    cerr << "-I cap/capboth supports recursive chain cuts only; incompatible with ring transformations, "
+            "-B chiraldummy, -I enva, -I fragatype, RECAP and complement output\n";
+    return 1;
   }
 
   if (chiral_dummy && (break_ring_bonds || break_fused_rings || break_spiro_rings ||

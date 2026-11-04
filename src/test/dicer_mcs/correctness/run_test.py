@@ -41,7 +41,7 @@ class Correctness(unittest.TestCase):
         return result
 
     def assert_smarts_matches(self, result, molecules, expected):
-        smarts = next(line.removesuffix(' MCS smarts')
+        smarts = next(line[:-len(' MCS smarts')]
                       for line in result.stderr.splitlines() if line.endswith(' MCS smarts'))
         self.assertNotIn('D>0', smarts)
         query_tool = Path(EXE).with_name('tsubstructure')
@@ -106,6 +106,70 @@ class Correctness(unittest.TestCase):
         result = self.run_tool((INDIR / 'basic.textproto').read_text())
         self.assert_smarts_matches(result, 'C methane\nCC ethane\nCO methanol\nN nitrogen\n',
                                   ('methane', 'ethane', 'methanol'))
+
+    def test_genuine_terminal_atoms_retain_their_symbols(self):
+        result = self.run_tool(record('methylamine', 'N[1CH3]'))
+        smarts = self.assert_smarts_matches(
+            result,
+            'NC methylamine\nNc1ccccc1 aniline\nCn1cccc1 methylpyrrole\n'
+            'OC wrong_element\nN=C wrong_bond\n',
+            ('methylamine',))
+        self.assertIn('[C]', smarts)
+        self.assertIn('[N]', smarts)
+        self.assertNotIn('#', smarts)
+
+    def test_only_marked_caps_match_aromatic_and_aliphatic_elements(self):
+        examples = [
+            ('N[1c]1[2cH][3cH][4cH][5cH][6cH]1', '[100NH2][10101CH3]',
+             '[#6]', '[N]', ('methylamine', 'aniline')),
+            ('C[1n]1[2cH][3cH][4cH][5cH]1', '[100CH3][10101NH2]',
+             '[#7]', '[C]', ('methylamine', 'methylpyrrole'))]
+        for parent, fragment, cap, genuine, expected in examples:
+            with self.subTest(cap=cap):
+                data = record('capped', parent, fragment) + record('plain', 'N[1CH3]')
+                result = self.run_tool(data, '-s', '100%', '-R', 'fragments.out')
+                smarts = self.assert_smarts_matches(
+                    result, 'NC methylamine\nNc1ccccc1 aniline\nCn1cccc1 methylpyrrole\n'
+                    'OC wrong_element\nN=C wrong_bond\n', expected)
+                self.assertIn(cap, smarts)
+                self.assertIn(genuine, smarts)
+                row = next(r for r in self.read_fragment_report() if r['SMILES'] == 'NC')
+                self.assertEqual(row['SMARTS'], smarts)
+
+    def test_internal_atom_aromaticity_is_not_relaxed(self):
+        data = (record('benzylamine', 'N[1CH2][2c]1[3cH][4cH][5cH][6cH][7cH]1',
+                       'N[101CH2][10102CH3]') + record('ethylamine', 'N[1CH2][2CH3]'))
+        result = self.run_tool(data, '-s', '100%')
+        smarts = self.assert_smarts_matches(
+            result,
+            'NCC ethylamine\nNCc1ccccc1 benzylamine\nNc1ccccc1 aniline\n'
+            'NCO wrong_element\n', ('ethylamine', 'benzylamine'))
+        self.assertIn('[#6]', smarts)
+        self.assertIn('[CD>1]', smarts)
+
+    def test_same_parent_subset_prefers_fewer_caps_for_smarts(self):
+        two_caps = '[10100NH2][101CH2][10102CH3]'
+        one_cap = '[100NH2][101CH2][10102CH3]'
+        for fragments in [(two_caps, one_cap), (one_cap, two_caps)]:
+            data = (record('fluorinated', 'N[1CH2][2C]([3F])([4F])[5F]', *fragments) +
+                    record('ethylamine', 'N[1CH2][2CH3]'))
+            result = self.run_tool(data, '-s', '100%', '-R', 'fragments.out')
+            self.assertIn('[N]', result.stderr)
+            self.assertNotIn('[#7]', result.stderr)
+            row = next(r for r in self.read_fragment_report() if r['SMILES'] == 'NCC')
+            self.assertIn('[N]', row['SMARTS'])
+            self.assertIn('[#6]', row['SMARTS'])
+
+    def test_whole_parent_has_genuine_atoms_even_if_capped_identity_exists(self):
+        data = record('propylamine', 'N[1CH2][2CH2][3CH3]',
+                      '[10100NH2][101CH2][2CH2][3CH3]')
+        result = self.run_tool(data, '-R', 'fragments.out')
+        self.assertNotIn('[#7]', result.stderr)
+        row = next(r for r in self.read_fragment_report() if r['SMILES'] == 'NCCC')
+        self.assertIn('[N]', row['SMARTS'])
+        self.assertNotIn('#', row['SMARTS'])
+        self.assertEqual(row['NWHOLE'], '1')
+        self.assertEqual(row['NCUT'], '1')
 
     def assert_induced_pair(self, lines):
         self.assertEqual(len(lines), 2)
@@ -420,7 +484,8 @@ class Correctness(unittest.TestCase):
         self.assertEqual(carbon, {'SMILES': 'C', 'NATOMS': '1', 'NPARENTS': '2',
                                   'FPARENTS': '1', 'FIRST_PARENT': 'one', 'SMARTS': '[C]',
                                   'NWHOLE': '0', 'NCUT': '2', 'SELECTED': '1',
-                                  'ATTACHMENT_SMILES': '[1CH4]'})
+                                  'ATTACHMENT_SMILES': '[1CH4]',
+                                  'EXAMPLE_SMILES': '[1CH3]C'})
         self.assertEqual(ethane['NWHOLE'], '1')
         self.assertEqual(ethane['NCUT'], '0')
         self.assertEqual(ethane['NPARENTS'], '1')
@@ -448,6 +513,109 @@ class Correctness(unittest.TestCase):
         row = self.read_fragment_report()[0]
         self.assertEqual((row['NPARENTS'], row['NWHOLE'], row['NCUT']), ('2', '2', '0'))
 
+    def test_fragment_report_example_maps_caps_to_original_parent(self):
+        # The endpoint cap is carbon 2, which remains a CF3 carbon in the example.
+        data = record('fluorinated', 'N[1CH2][2C]([3F])([4F])[5F]',
+                      'N[101CH2][102CH3]', 'N[101CH3]')
+        baseline = self.run_tool(data).stdout
+        result = self.run_tool(data, '-R', 'fragments.out')
+        self.assertEqual(result.stdout, baseline)
+        rows = {row['SMILES']: row for row in self.read_fragment_report()}
+        example = rows['NCC']['EXAMPLE_SMILES']
+        self.assertIn('[1NH2]', example)
+        self.assertIn('[1CH2]', example)
+        self.assertIn('[1C]', example)
+        self.assertNotIn('[1F]', example)
+        self.assertEqual(re.findall(r'\[(\d+)', example), ['1'] * 3)
+        self.assertEqual(example.count('F'), 3)
+        # Each row starts from a clean parent copy, not the preceding row's labels.
+        for row in rows.values():
+            self.assertEqual(re.findall(r'\[(\d+)', row['EXAMPLE_SMILES']),
+                             ['1'] * int(row['NATOMS']))
+
+    def test_fragment_report_example_uses_first_contributing_parent(self):
+        big = record('big', 'N[1CH2][2CH3]', 'N[101CH3]')
+        small = record('small', 'N[1CH3]')
+        for data, name, carbons in [(big + small, 'big', 2),
+                                    (small + big, 'small', 1)]:
+            self.run_tool(data, '-R', 'fragments.out')
+            row = next(r for r in self.read_fragment_report() if r['SMILES'] == 'NC')
+            self.assertEqual(row['FIRST_PARENT'], name)
+            self.assertEqual(row['EXAMPLE_SMILES'].count('C'), carbons)
+            self.assertEqual(re.findall(r'\[(\d+)', row['EXAMPLE_SMILES']), ['1'] * 2)
+
+    def test_cap_marker_preserves_identity_mapping_and_attachment_payload(self):
+        parent = 'N[1CH2][2CH2][3OH]'
+        baseline = self.run_tool(record('parent', parent, '[100NH2][101CH2][302CH3]'),
+                                 '-R', 'fragments.out')
+        rows = self.read_fragment_report()
+        for caps in ['[10100NH2][101CH2][10302CH3]',
+                     '[100NH2][101CH2][10302CH3]']:
+            result = self.run_tool(record('parent', parent, caps), '-R', 'fragments.out')
+            self.assertEqual(result.stdout, baseline.stdout)
+            current = self.read_fragment_report()
+            self.assertEqual([{k: v for k, v in r.items() if k != 'SMARTS'} for r in current],
+                             [{k: v for k, v in r.items() if k != 'SMARTS'} for r in rows])
+        # A marker can have a zero payload, mapping a cap to parent atom zero.
+        self.run_tool(record('parent', parent, '[10000NH2][101CH2][102CH3]'),
+                      '-R', 'fragments.out')
+        row = next(r for r in self.read_fragment_report() if r['SMILES'] == 'NCC')
+        self.assertEqual(row['NPARENTS'], '1')
+        self.assertIn('[1NH2]', row['EXAMPLE_SMILES'])
+
+    def test_cap_markers_do_not_split_support(self):
+        data = (record('capped', 'N[1CH2][2CH2][3OH]', '[100NH2][101CH2][10102CH3]') +
+                record('plain', 'N[1CH2][2CH3]'))
+        result = self.run_tool(data, '-m', '2', '-s', '100%', '-R', 'fragments.out')
+        self.assertIn('Selected fragment NCC found 2 times', result.stderr)
+        row = next(r for r in self.read_fragment_report() if r['SMILES'] == 'NCC')
+        self.assertEqual(row['NPARENTS'], '2')
+
+    def test_invalid_cap_marker_payloads_and_parent_markers(self):
+        for fragment in ['N[10101CH2][2CH3]', 'N[1CH2][20102CH3]']:
+            self.run_tool(record('bad', 'N[1CH2][2CH3]', fragment), success=False)
+        self.run_tool(record('bad_parent', '[10000NH2][1CH3]'), success=False)
+
+    def test_sparse_support_gaps_duplicates_and_parent_flags(self):
+        contributors = {1, 7, 22, 38}
+        data = ''
+        for i in range(40):
+            if i == 1:
+                data += record(str(i), 'C[1CH3]', '[100CH3][101CH3]',
+                               '[100CH3][101CH3]')
+            elif i == 7:
+                data += record(str(i), 'C[1CH2][2NH2]', '[100CH3][101CH3]',
+                               'C[101CH3]')
+            elif i == 22:
+                data += record(str(i), 'C[1CH3]')
+            elif i == 38:
+                data += record(str(i), 'C[1CH2][2NH2]', 'C[1CH3]')
+            else:
+                data += record(str(i), 'N[1NH2]')
+        result = self.run_tool(data, '-R', 'fragments.out', '-X', 'missing')
+        row = next(r for r in self.read_fragment_report() if r['SMILES'] == 'CC')
+        self.assertEqual((row['NPARENTS'], row['NWHOLE'], row['NCUT']), ('4', '2', '2'))
+        self.assertEqual(row['FIRST_PARENT'], '1')
+        self.assertEqual({int(s.split()[1]) for s in
+                          (self.root / 'missing.smi').read_text().splitlines()}, contributors)
+        self.assertEqual(len(result.stdout.splitlines()), 36)
+
+    def test_inverse_numbering_handles_parent_order_and_zero(self):
+        data = record('permuted', '[2OH][1CH2]N', 'N[101CH3]')
+        self.run_tool(data, '-R', 'fragments.out')
+        row = next(r for r in self.read_fragment_report() if r['SMILES'] == 'NC')
+        self.assertIn('[1NH2]', row['EXAMPLE_SMILES'])
+        self.assertIn('[1CH2]', row['EXAMPLE_SMILES'])
+        self.assertNotIn('[1OH]', row['EXAMPLE_SMILES'])
+
+    def test_minimum_size_filter_still_validates_discarded_fragments(self):
+        for fragment in ['[99CH4]', '[10000CH4]', '']:
+            with self.subTest(fragment=fragment):
+                self.run_tool(record('invalid', 'C[1NH2]', fragment), '-m', '2', success=False)
+        self.run_tool(record('valid', 'C[1NH2]', '[100CH4]'), '-m', '2',
+                      '-R', 'fragments.out')
+        self.assertEqual([r['SMILES'] for r in self.read_fragment_report()], ['NC'])
+
     def test_fragment_report_separators_and_quoted_fields(self):
         first_name = 'zzz,| "quoted"\tparent'
         data = (record(first_name, 'C[1CH3]', '[100CH4]') +
@@ -458,7 +626,7 @@ class Correctness(unittest.TestCase):
             result = self.run_tool(data, '-R', f'sep={name}', '-R', 'fragments.out')
             self.assertEqual(result.stdout, baseline)
             rows = self.read_fragment_report(separator)
-            self.assertTrue(all(len(row) == 10 and None not in row for row in rows))
+            self.assertTrue(all(len(row) == 11 and None not in row for row in rows))
             self.assertEqual(rows[0]['FIRST_PARENT'], first_name)
             self.assertEqual([row['SMILES'] for row in rows], ['C', 'CC', 'NC'])
 

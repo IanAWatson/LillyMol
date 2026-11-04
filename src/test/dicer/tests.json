@@ -6,6 +6,11 @@
     ],
     "test": [
         {
+          "name": "element_caps",
+          "shell_script": {"script_name": "run.py"},
+          "difftool": "diff"
+        },
+        {
           "name": "chiral_dummy",
           "shell_script": {"script_name": "run.rb"},
           "difftool": "diff"

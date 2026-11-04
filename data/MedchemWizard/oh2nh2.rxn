@@ -1,0 +1,13 @@
+name: "oh2nh2"
+scaffold {
+  id: 0
+  smarts: "[OD1H]-[CX4,c]"
+  change_element {
+    atom: 0
+    element: "N"
+  }
+  isotope {
+    atom: 0
+    isotope: 1
+  }
+}

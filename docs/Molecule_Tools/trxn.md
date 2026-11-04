@@ -1343,7 +1343,7 @@ angle in the reaction, this is not necessary.
 
 # Examples
 
-There are a variety of reactions in the `data/MolecularVariants` directory
+There are a variety of reactions in the `data/MedchemWizard` directory
 of this repo. Those are transformations describing possibly interesting
 bio-isostere pairs.
 

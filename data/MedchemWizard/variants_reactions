@@ -21,7 +21,6 @@ isoindole_to_pyrrole.rxn
 isoxazole_to_oxazole.rxn
 isoquinoline_to_pyridine.rxn
 move_aromatic_nitrogen.rxn
-# nitro_to_benzoxadiazol.rxn
 ortho_meta_halogen_to_ortho.rxn
 ortho_meta_halogen_to_meta.rxn
 ortho_para_halogen_to_para.rxn
@@ -43,13 +42,14 @@ rm_cf2.rxn
 rm_ch2.rxn
 rm_ethane.rxn
 rm_propane.rxn
+rmfmoc.rxn
 rmfused_phenyl.rxn
 rm_fused_cyclohexyl.rxn
-rmmethane.rxn
-shorten_ch2_chain.rxn
+rmtboc.rxn
 sulfonamide_to_amide.rxn
 sulfonic_acid_to_carboxylic.rxn
 tbutyl_2_methyl.rxn
+tbutyl_2_cyclopropyl.rxn
 tetrazole_to_acid.rxn
 thiol_2_alcohol.rxn
 thioether_to_ether.rxn
@@ -63,4 +63,12 @@ rmspinach1.rxn
 mvspinach1.rxn
 mvjoin.rxn
 open3ring.rxn
-swap_chain_carbons.rxn
+amide_D2_to_14triazole.rxn
+amide_D2_to_15triazole.rxn
+amide_D3_to_14triazole.rxn
+amide_D3_to_15triazole.rxn
+nitro_to_benzoxadiazol.rxn
+ohnh_ortho_to_triazine.rxn
+ethylamine2piperazine.rxn
+oh2nh2.rxn
+anthranilamide2phthalazine.rxn

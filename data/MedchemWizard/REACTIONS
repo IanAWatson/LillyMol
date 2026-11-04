@@ -44,7 +44,6 @@ Acid_isosteres.6.rxn
 Acid_isosteres.7.rxn
 Acid_isosteres.8.rxn
 Acid_isosteres.9.rxn
-Acid_isosteres..rxn
 Aryl_group_addition.add_2-pyridyl.rxn
 Aryl_group_addition.add_3-pyridyl.rxn
 Aryl_group_addition.add_4-pyridyl.rxn
@@ -72,7 +71,6 @@ Aryl_substituent_Scan.add_trifluoromethoxy.rxn
 Aryl_substituent_Scan.add_trifluromethyl.rxn
 Aryl_substituent_Scan.add_urea.rxn
 PROTO:Ester-amide_isosteres.1-3-4_oxadiazole.textproto
-PROTO:Ester-amide_isosteres.2_pyrazine.textproto
 PROTO:Ester-amide_isosteres.amidine.textproto
 PROTO:Ester-amide_isosteres.amino_1-2-4-oxazole.textproto
 PROTO:Ester-amide_isosteres.amino-1-3-4-_oxazole.textproto
@@ -108,12 +106,10 @@ Metabolism.alkene_T_ether.rxn
 Metabolism.Benzylic_oxidation.rxn
 Metabolism.Benzylic_substitution_C1.rxn
 Metabolism.Benzylic_substitution_C2.rxn
-Metabolism.Benzylic_substitution.rxn
 Metabolism.Biaryl_-_protect_4_position_Br.rxn
 Metabolism.Biaryl_-_protect_4_position_Cl.rxn
 Metabolism.Biaryl_-_protect_4_position_C.rxn
 Metabolism.Biaryl_-_protect_4_position_F.rxn
-Metabolism.Biaryl_-_protect_4_position.rxn
 Metabolism.Biaryl_-_protect_6_position_Br.rxn
 Metabolism.Biaryl_-_protect_6_position_Cl.rxn
 Metabolism.Biaryl_-_protect_6_position_C.rxn
@@ -123,14 +119,12 @@ Metabolism.Biaryl_-_protect_7_position_Br.rxn
 Metabolism.Biaryl_-_protect_7_position_Cl.rxn
 Metabolism.Biaryl_-_protect_7_position_C.rxn
 Metabolism.Biaryl_-_protect_7_position_F.rxn
-Metabolism.Biaryl_-_protect_7_position.rxn
 Metabolism.Block_ortho_to_a_phenol_C1.rxn
 Metabolism.Block_ortho_to_a_phenol_C2.rxn
 Metabolism.Block_ortho_to_a_phenol_Cl1.rxn
 Metabolism.Block_ortho_to_a_phenol_Cl2.rxn
 Metabolism.Block_ortho_to_a_phenol_F1.rxn
 Metabolism.Block_ortho_to_a_phenol_F2.rxn
-Metabolism.Block_ortho_to_a_phenol.rxn
 PROTO:catechol_to_benzodioxole.rxn
 Metabolism.methyl_T_hydroxymethyl.rxn
 Metabolism.OEt_T_OCH2CF3.rxn
@@ -244,7 +238,6 @@ Virtual_Ring.break_open_a_cycloheptyl_1.rxn
 Virtual_Ring.break_open_a_cycloheptyl_2.rxn
 Virtual_Ring.break_open_a_cycloheptyl_3.rxn
 Virtual_Ring.break_open_a_cycloheptyl_4.rxn
-Virtual_Ring.break_open_a_cycloheptyl.rxn
 PROTO:Virtual_Ring.break_open_a_cyclohexyl_1.rxn
 PROTO:Virtual_Ring.break_open_a_cyclohexyl_2.rxn
 PROTO:Virtual_Ring.break_open_a_cyclohexyl_3.rxn

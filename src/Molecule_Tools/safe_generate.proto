@@ -11,6 +11,7 @@ import "Molecule_Tools/molecule_filter.proto";
 message Config {
   optional bool verbose = 1;
 
+  // Not supported by safe_generate; apply transformations with mol2SAFE.
   optional element_transformation.ElementTransformations etrans = 2;
 
   repeated string library = 3;
@@ -44,8 +45,8 @@ message Config {
 
   optional uint32 max_distance_difference = 14;
 
-  // If used, this must be the same as was given to the -P option
-  // to mol2SAFE
+  // Not implemented: safe_generate rejects this field rather than
+  // silently ignoring atom-type compatibility.
   optional string atom_type = 15;
 
   // Substructure queries that will drop molecules.
@@ -54,9 +55,8 @@ message Config {
   optional molecule_filter_data.Requirements molecule_filter = 17;
 
   // If a replacement involves swapping a ring/ring system,
-  // we can impose constraints on differences in ring sizes
-  // between the excised fragment and the ring sizes in the
-  // replacement.
+  // Limit the change in the largest SSSR ring size between the source
+  // fragment and its replacement. A fragment without rings has size zero.
   optional uint32 max_increase_ring_size = 18;
   optional uint32 max_decrease_ring_size = 19;
 

@@ -70,6 +70,8 @@ Transform smiles to SAFE representations.
  -M ...         constraints on max fragment size
  -M <n>         fragments can contain no more than <n> atoms
  -M maxnr=<n>   the maximum number of non-ring atoms that can be in a fragment
+ -M maxringsys=<n>  optionally limit rings per ring system, including spiro fusions,
+                   and verify SAFE ring numbering; disabled by default.
  -g ...         standardisation options
  -z             ignore connection table errors on input
  -T ...         Element transformations - suggest '-T Br=Cl -T I=Cl'
@@ -82,6 +84,35 @@ In the invocation above, input is stripped to the largest fragment, chirality is
 chemical standardisation is applied, and a common Halogen transformation is applied. We
 limit ourselves to fragments with a maximum of 16 heavy atoms, of which a max of 9 can be
 non ring atoms.
+
+### Optional complexity and ring-number checks
+
+For unfamiliar or potentially complex inputs, enable the optional producer checks:
+
+```shell
+mol2SAFE -I 7 -M maxringsys=7 -S library.textproto input.smi > input.safe.smi
+```
+
+After preprocessing, `-M maxringsys=N` skips molecules whose ring systems contain
+more than N SSSR rings. **Spiro-connected rings belong to the same system.**
+The limit is inclusive: seven rings are permitted with `maxringsys=7`.
+It applies separately to each system, rather than to the total ring count.
+N must be positive.
+
+This qualifier also checks the generated fragments and SAFE output: ordinary
+internal ring closures must use single-digit labels, while SAFE connection
+labels must remain in the range 10–99. The check examines the actual rendered
+output so that an internal ring label cannot collide with a SAFE connection.
+A molecule rejected by any of these checks contributes neither SAFE output
+(including optional parent output) nor fragment-library statistics. Processing
+continues with the next molecule; `-v` reports separate counts for excessive
+ring systems and unsafe numbering.
+
+All these additional checks are **disabled by default**. If the inputs are known
+to be small, no ring-system labelling array, system ring counting, or additional
+fragment/SAFE numbering verification is performed. This preserves the original
+fast path, but assumes that the caller supplies molecules within the supported
+numbering convention.
 
 The file `Sfile` is a textproto file with a summary of the fragments found. This file can be
 used as input as a library file (-L option) to `safe_generate`. For Chembl, it contains about 91k molecules.
@@ -114,28 +145,44 @@ file is preferred.
 ```
 safe_generate -p -e 2000 -b 3000 -n 1000 -C generate.textproto -v -L chembl.lib.textproto input.safe.smi
 ```
+### Attachment isotopes and other molecular labels
+
+When input molecules have isotopes unrelated to fragment attachment, use
+`safe_generate -j <iso>` to recognise only that isotope as an attachment marker.
+**This must be the same value passed to `mol2SAFE -I <iso>`**, both when building
+the fragment library and when preparing the SAFE input molecules.
+
+```shell
+mol2SAFE -I 7 -c -S library.textproto molecules.smi > molecules.safe.smi
+safe_generate -j 7 -I -e 0 -L library.textproto molecules.safe.smi > products.smi
+```
+
+Only atoms labelled with isotope 7 are counted as attachment points or used to
+calculate attachment distances. Other isotopes, such as 13 or 15, remain ordinary
+molecular labels and are preserved in generated SMILES. With `-j 7 -I`, only the
+attachment isotope 7 is removed from product SMILES. Without `-I`, attachment
+labels are retained too. SAFE output (`-s`) retains its connection markers and
+isotopes so that it can be used as input for another generation step.
+
+Choose an attachment isotope absent from the original molecular labels.
+`mol2SAFE` overwrites any original isotope on an attachment atom, so that label
+cannot be recovered by `safe_generate`. If `-j` is omitted, the original behavior
+is retained: every nonzero isotope denotes an attachment and `-I` clears all
+product isotopes. Zero is not a valid explicit attachment isotope.
+
 The -n option specifies up to 1000 variants by replacing SAFE fragments with randomly
 selected fragments from the library - mode #1.
 
-The -e option specifies making as many as 2000 variants by replacing each SAFE
-fragment with all plausible fragments from the library - mode #2.
+The -e option specifies making at most 2000 accepted variants per input molecule
+per library by replacing SAFE fragments with plausible library fragments - mode #2.
+The allowance starts again for each library. Use `-e 0` for unlimited enumeration.
+Rejected candidates and duplicate products do not consume the allowance.
 
 The -b option specifies generating as many as 3000 molecules by swapping SAFE
 fragments between molecules - the library is not used. Mode #3.
 
 The textproto config file is specified by the -C option, and might look like 
 ```
-etrans {
-  etrans {
-    efrom: "I"
-    eto: "Cl"
-  }
-  etrans {
-    efrom: "Br"
-    eto: "Cl"
-  }
-}
-
 max_atoms_in_fragment: 10
 extra_atoms: 2
 fewer_atoms: 2
@@ -150,15 +197,21 @@ molecule_filter {
   max_aliphatic_ring_count: 2
 }
 ```
-The first part describes two elemental transformations: translate I to Cl, and Br to Cl.
-
 Only fragments with at most 10 atoms will be processed. Once a fragment is selected for
 replacement, the library fragment, or fragment chosen from another molecule, must differ
 by at most two atoms (atom count). Additionally, the new fragment can have an extra ring - but this
 might be hard with only two additional atoms. These two parameters are related.
 
-Note that if both `extra_atoms` and `fewer_atoms` are **not** specified, then replacement
-fragments must be the same size as what is being removed.
+Each omitted atom-count allowance defaults to zero. With neither
+`extra_atoms` nor `fewer_atoms` specified, replacements must have the same atom
+count as the fragment removed. Specifying only `extra_atoms` allows growth but
+not shrinkage, and vice versa. The `-x extra=N` and `-x fewer=N` options set the
+corresponding atom-count allowances.
+
+The `extra_rings` and `fewer_rings` fields limit increases and decreases in the
+number of SSSR rings; an omitted ring-count allowance imposes no limit.
+`max_increase_ring_size` and `max_decrease_ring_size` limit changes in the
+largest SSSR ring size, using zero for a fragment without rings.
 
 The `max_formula_difference` specification is unusual. An aromatic molecular formula
 is computed for each fragment: it contains the number of aliphatic Carbon and aromatic
@@ -176,6 +229,51 @@ will enforce more similar structures being formed.
 Then follows specification of the molecule filter that is applied to the product
 molecules before writing.
 
+### Candidate selection and input requirements
+
+Exhaustive generation tries each library fragment at **every eligible source
+fragment** with the same number of connections. This can generate more products
+than older versions, which tried only one source fragment per library entry.
+Atom-count, ring-count, ring-size, formula and attachment-distance constraints
+apply to each proposed replacement. The minimum and maximum fragment atom counts
+apply to both source and replacement fragments in every generation mode.
+
+`-Y` selects source fragments containing query matches; `-N` excludes fragments
+containing matches. The same eligibility restrictions are applied when choosing
+breeding donors. An unmatched `-Y` query set is fatal unless `-z i` is specified,
+in which case that parent is skipped and processing continues. These are
+fragment-level restrictions: matching one atom selects or protects its entire
+fragment.
+
+Random generation (`-n`) requires a nonempty library. Breeding (`-b`) requires at
+least two retained input molecules. Unsupported `atom_type` and `etrans` config
+fields cause an error. Apply preprocessing and element transformations to the
+starting molecules with `mol2SAFE`; `safe_generate` rejects `-l`, `-c`, `-g`
+and `-T`, which older versions accepted without applying them. Changing the graph
+after conversion requires rebuilding its SAFE encoding.
+
+The existing undesirable-adjacency check is now enforced: candidates containing
+adjacent heteroatoms connected by a non-aromatic single bond, or non-aromatic
+carbon–halogen single bonds, are rejected. This check examines the whole product,
+including unchanged regions. The separate attachment-bond checks also apply.
+
+Duplicate detection stores accepted products only, and normalizes attachment
+isotopes first when `-I` is specified. Products differing only in attachment
+labels removed from the output are therefore written once. Ordinary isotopes
+remain significant when `-j` is used. `-p` writes retained parents once before
+variants in all generation modes, in their original SAFE form.
+
+`safe_generate` assumes that ordinary internal ring closures use single-digit
+labels and that `%nn` labels denote only SAFE connections. Unsupported internal
+two-digit closures are rejected when loading a fragment or library.
+There is no per-molecule reserved-label table or per-replacement internal-ring
+renumbering pass. Use `mol2SAFE -M maxringsys=7` to verify the producer contract
+when needed. The extended `%(nnn)` ring-number syntax is unsupported.
+
+Isotopic labels still cannot describe how many severed bonds belonged to a
+single atom in a library fragment. Multiple attachments on one atom remain a
+known representation limitation.
+
 Given an input file with 200 molecules, the invocation above generates
 almost 50k molecules in 36 seconds.
 
@@ -191,7 +289,9 @@ are generated fairly quickly, so we can end up with the unfortunate
 situation of having asked for (say) 100k new molecules, but after a few
 seconds, no more will be found. The -k option says that if a sequence
 of unsuccessful attempts longer than the -k option is encountered,
-abandon the calculation.
+abandon random generation for that parent, or the breeding loop. The cutoff
+counts consecutive failed attempts and resets after each accepted product;
+`-k 0` disables it. It does not affect exhaustive enumeration.
 
 So something like
 ```
@@ -210,6 +310,9 @@ safe_generate ... -L library.textproto -C generate.config file.safe.smi > new_mo
  -C <fname>             safe_generate textproto configuration file.
  -a <ncon>              maximum value for number of connections processed - applied to library.
  -L <fname>             fragment library of SAFE fragments
+ -j <iso>               recognise only this isotope as an attachment point.
+                        Must match the -I value used with mol2SAFE; preserve other isotopes.
+ -I                     remove product isotope labels; with -j, remove only attachment labels.
  -Y <query>             queries for atoms that are allowed to change
  -N <query>             queries for atoms that are NOT allowed to change
  -z i                   ignore molecules not matching queries
@@ -218,7 +321,8 @@ safe_generate ... -L library.textproto -C generate.config file.safe.smi > new_mo
  -n <n>                 number of molecules to generate by fragment swap from library
  -b <n>                 number of molecules to generate by breeding
  -e <n>                 for each molecule, exhaustively scan the library(s) making all possibilities.
-                        For each molecule, a max of <n> variants are made. Use '-e 0' for no limit.
+                        Write at most <n> accepted variants per input molecule per library.
+                        Use '-e 0' for no limit.
  -F <fname>             molecule filter textproto file - products must pass
  -p                     write the parent molecule before variants
  -s                     write SAFE smiles

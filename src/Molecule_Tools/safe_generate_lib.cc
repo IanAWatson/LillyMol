@@ -32,7 +32,7 @@ IsSulfonamide(const Molecule& m, atom_number_t s, atom_number_t n) {
 }
 
 int
-BondsOk(Molecule& m) {
+BondsOk(Molecule& m, isotope_t attachment_isotope) {
   m.compute_aromaticity_if_needed();
 
   for (const Bond* b : m.bond_list()) {
@@ -48,7 +48,8 @@ BondsOk(Molecule& m) {
     atom_number_t a2 = b->a2();
 
     // Bonds are only formed with isotopes
-    if (m.isotope(a1) == 0 || m.isotope(a2) == 0) {
+    if (!IsAttachmentIsotope(m.isotope(a1), attachment_isotope) ||
+        !IsAttachmentIsotope(m.isotope(a2), attachment_isotope)) {
       continue;
     }
 
@@ -134,6 +135,20 @@ BondsOk(Molecule& m) {
   return 1;
 }
 
+// Keep the original all-isotope removal behavior when no marker is specified.
+void
+RemoveAttachmentIsotopes(Molecule& m, isotope_t attachment_isotope) {
+  if (attachment_isotope == 0) {
+    m.transform_to_non_isotopic_form();
+    return;
+  }
+  for (int i = 0; i < m.natoms(); ++i) {
+    if (m.isotope(i) == attachment_isotope) {
+      m.set_isotope(i, 0);
+    }
+  }
+}
+
 SafeFragment::SafeFragment() {
   _natoms = 0;
   _nrings = 0;
@@ -155,7 +170,8 @@ SafeFragment::DebugPrint(std::ostream& output) const {
 }
 
 int
-SafeFragment::Build(const const_IWSubstring& smi) {
+SafeFragment::Build(const const_IWSubstring& smi, isotope_t attachment_isotope) {
+  _attachment_isotope = attachment_isotope;
   const int nchars = smi.length();
   // cerr << "SafeFragment::Build from '" << smi << "'\n";
   // Must have at least an atomic symbol followed by % and a two digit ring number.
@@ -164,22 +180,32 @@ SafeFragment::Build(const const_IWSubstring& smi) {
     return 0;
   }
 
-  // Construct a smiles without the extra %nn ring openings.
+  // All two-digit labels must be SAFE connections to other fragments.
+  // Internal two-digit ring closures are outside this tool's input convention.
+  const_IWSubstring smiles(smi);
+  smiles.truncate_at_first(' ');
+  bool seen[100] = {};
   IWString tmp;
-  tmp.reserve(smi.length());
-
-  for (int i = 0; i < nchars; ++i) {
-    const char c = smi[i];
-    if (c == kPercent) {
-      int n = (smi[i + 1] - '0') * 10 + smi[i + 2] - '0';
-      _ring.push_back(n);
-      _first_digit << (i + 1);
-      i += 2;
-    } else if (c == ' ') {
-      break;
-    } else {
-      tmp << c;
+  tmp.reserve(smiles.length());
+  for (int i = 0; i < smiles.length(); ++i) {
+    if (smiles[i] != kPercent) {
+      tmp << smiles[i];
+      continue;
     }
+    if (i + 2 >= smiles.length() ||
+        !std::isdigit(static_cast<unsigned char>(smiles[i + 1])) ||
+        !std::isdigit(static_cast<unsigned char>(smiles[i + 2]))) {
+      cerr << "SafeFragment::Build:invalid %nn ring label '" << smiles << "'\n";
+      return 0;
+    }
+    const int label = (smiles[i + 1] - '0') * 10 + smiles[i + 2] - '0';
+    if (seen[label]) {
+      cerr << "SafeFragment::Build:internal two-digit ring closures are unsupported\n";
+      return 0;
+    }
+    seen[label] = true;
+    _first_digit << (i + 1);
+    i += 2;
   }
 
   if (! _m.build_from_smiles(tmp)) {
@@ -197,23 +223,24 @@ SafeFragment::Build(const const_IWSubstring& smi) {
     _ring_sizes.add_if_not_already_present(r->size());
   }
 
-  const int niso = _m.number_isotopic_atoms();
+  int niso = 0;
+  for (int i = 0; i < _natoms; ++i) {
+    niso += IsAttachmentIsotope(_m.isotope(i), _attachment_isotope);
+  }
   if (niso == 0) {
-    cerr << "SafeFragment::Build:no isotopes '" << _smiles << "' from '" << smi << "'\n";
+    cerr << "SafeFragment::Build:no attachment isotopes '" << _smiles << "' from '" << smi << "'\n";
     return 0;
   }
 
   if (niso > 1) {
     _distance = _natoms + 1;
     for (int i = 0; i < _natoms; ++i) {
-      if (_m.isotope(i) == 0) {
+      if (!IsAttachmentIsotope(_m.isotope(i), _attachment_isotope)) {
         continue;
       }
 
-      _atypes << static_cast<atom_type_t>(_m.isotope(i));
-
       for (int j = i + 1; j < _natoms; ++j) {
-        if (_m.isotope(j) == 0) {
+        if (!IsAttachmentIsotope(_m.isotope(j), _attachment_isotope)) {
           continue;
         }
         const int d = _m.bonds_between(i, j);
@@ -241,10 +268,21 @@ SafeFragment::ProcessSquareBracket(const IWString& smi, int &i, int& next_ring,
     return 0;
   }
 
-  int got_isotope = 0;
-  if (std::isdigit(smi[i])) {
-    got_isotope = 1;
+  // Read the full isotope number: e.g. marker 1 must not match isotope 13.
+  const int isotope_start = i;
+  int isotope_end = i;
+  while (isotope_end < smi.length() &&
+         std::isdigit(static_cast<unsigned char>(smi[isotope_end]))) {
+    ++isotope_end;
   }
+  isotope_t isotope = 0;
+  if (isotope_end > isotope_start) {
+    const_IWSubstring digits(smi.data() + isotope_start, isotope_end - isotope_start);
+    if (!digits.numeric_value(isotope)) {
+      return 0;
+    }
+  }
+  const bool got_isotope = IsAttachmentIsotope(isotope, _attachment_isotope);
 
   for ( ;i < smi.length(); ++i) {
     destination << smi[i];
@@ -258,6 +296,10 @@ SafeFragment::ProcessSquareBracket(const IWString& smi, int &i, int& next_ring,
     for ( ; (i + 1) < smi.length() && std::isdigit(smi[i + 1]); ++i) {
       destination << smi[i + 1];
     }
+    if (next_ring > 99) {
+      cerr << "SafeFragment::ProcessSquareBracket:no available two-digit ring label\n";
+      return 0;
+    }
     destination << '%';
     _first_digit << destination.length();
     destination << next_ring;
@@ -268,10 +310,15 @@ SafeFragment::ProcessSquareBracket(const IWString& smi, int &i, int& next_ring,
 }
 
 int
-SafeFragment::Build(const dicer_data::DicerFragment& proto) {
+SafeFragment::Build(const dicer_data::DicerFragment& proto, isotope_t attachment_isotope) {
+  _attachment_isotope = attachment_isotope;
   IWString smi = proto.smi();
   if (smi.empty()) {
     cerr << "SafeFragment::Build:empty smiles " << proto.ShortDebugString() << '\n';
+    return 0;
+  }
+  if (smi.contains('%')) {
+    cerr << "SafeFragment::Build:internal two-digit ring closures are unsupported\n";
     return 0;
   }
   if (! _m.build_from_smiles(smi)) {
@@ -284,11 +331,18 @@ SafeFragment::Build(const dicer_data::DicerFragment& proto) {
   _mformula.Build(_m);
 
   _natoms = _m.natoms();
+  _nrings = _m.nrings();
+  for (const Ring* ring : _m.sssr_rings()) {
+    _ring_sizes.add_if_not_already_present(ring->size());
+  }
   // cerr << "SafeFragment::build:smiles " << smi << " natoms " << _natoms << '\n';
 
-  _ncon = _m.number_isotopic_atoms();
+  _ncon = 0;
+  for (int i = 0; i < _natoms; ++i) {
+    _ncon += IsAttachmentIsotope(_m.isotope(i), _attachment_isotope);
+  }
   if (_ncon == 0) {
-    cerr << "SafeFragment::Build:no isotopes '" << smi << "' from '" <<
+    cerr << "SafeFragment::Build:no attachment isotopes '" << smi << "' from '" <<
             proto.ShortDebugString() << "'\n";
     return 0;
   }
@@ -296,11 +350,11 @@ SafeFragment::Build(const dicer_data::DicerFragment& proto) {
   if (_ncon > 1) {
     _distance = _natoms + 1;
     for (int i = 0; i < _natoms; ++i) {
-      if (_m.isotope(i) == 0) {
+      if (!IsAttachmentIsotope(_m.isotope(i), _attachment_isotope)) {
         continue;
       }
       for (int j = i + 1; j < _natoms; ++j) {
-        if (_m.isotope(j) == 0) {
+        if (!IsAttachmentIsotope(_m.isotope(j), _attachment_isotope)) {
           continue;
         }
         const int d = _m.bonds_between(i, j);
@@ -320,7 +374,9 @@ SafeFragment::Build(const dicer_data::DicerFragment& proto) {
   for (int i = 0; i < smi.length(); ++i) {
     const char c = smi[i];
     if (c == kOpenSquareBracket) {
-      ProcessSquareBracket(smi, i, next_ring, tmp);
+      if (!ProcessSquareBracket(smi, i, next_ring, tmp)) {
+        return 0;
+      }
     } else {
       tmp << c;
     }
@@ -334,6 +390,10 @@ SafeFragment::Build(const dicer_data::DicerFragment& proto) {
 
 int
 SafeFragment::SameNumbers(const SafeFragment& f2, IWString& new_smiles) const {
+  if (_first_digit.size() != f2._first_digit.size()) {
+    cerr << "SafeFragment::SameNumbers:attachment count mismatch\n";
+    return 0;
+  }
   new_smiles = f2._smiles;
 
   // Now copy our ring numbers to `new_smiles`.

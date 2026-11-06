@@ -85,4 +85,108 @@ TEST(TestSameRingOpenings, Test1) {
 
 
 
+TEST(TestAttachmentIsotope, SafeInputIgnoresOtherLabels) {
+  SafeFragment fragment;
+  ASSERT_TRUE(fragment.Build("[13CH3][7CH2]%10CC[7CH2]%11[15NH2]", 7));
+  EXPECT_EQ(fragment.ncon(), 2);
+  EXPECT_EQ(fragment.distance(), 3);
+  EXPECT_EQ(fragment.mol().isotope(0), 13u);
+  EXPECT_EQ(fragment.mol().isotope(5), 15u);
+
+  SafeFragment legacy;
+  ASSERT_TRUE(legacy.Build("[13CH3][7CH2]%10CC[7CH2]%11[15NH2]"));
+  EXPECT_EQ(legacy.distance(), 1);
+}
+
+TEST(TestAttachmentIsotope, LibraryOnlyAddsConnectionsAtSelectedIsotope) {
+  dicer_data::DicerFragment proto;
+  proto.set_smi("[13CH3][7CH2]CC[7CH2][15NH2]");
+  proto.set_par("labelled fragment");
+  SafeFragment fragment;
+  ASSERT_TRUE(fragment.Build(proto, 7));
+  EXPECT_EQ(fragment.ncon(), 2);
+  EXPECT_EQ(fragment.distance(), 3);
+  EXPECT_EQ(fragment.smiles(), "[13CH3][7CH2]%11CC[7CH2]%12[15NH2]");
+
+  SafeFragment legacy;
+  ASSERT_TRUE(legacy.Build(proto));
+  EXPECT_EQ(legacy.ncon(), 4);
+  EXPECT_EQ(legacy.distance(), 1);
+}
+
+TEST(TestAttachmentIsotope, MatchWholeNumber) {
+  dicer_data::DicerFragment proto;
+  proto.set_smi("[13CH3][1CH2][15NH2]");
+  SafeFragment fragment;
+  ASSERT_TRUE(fragment.Build(proto, 1));
+  EXPECT_EQ(fragment.ncon(), 1);
+  EXPECT_EQ(fragment.distance(), 0);
+  EXPECT_EQ(fragment.smiles(), "[13CH3][1CH2]%11[15NH2]");
+}
+
+TEST(TestAttachmentIsotope, RejectMissingMarker) {
+  SafeFragment safe;
+  EXPECT_FALSE(safe.Build("[13CH3][1CH2]%10C", 7));
+  dicer_data::DicerFragment proto;
+  proto.set_smi("[13CH3][1CH2]C");
+  SafeFragment library;
+  EXPECT_FALSE(library.Build(proto, 7));
+}
+
+TEST(TestAttachmentIsotope, BondChecksOnlySelectedLabels) {
+  Molecule m;
+  ASSERT_TRUE(m.build_from_smiles("[13NH2][15NH2]"));
+  EXPECT_FALSE(BondsOk(m));
+  EXPECT_TRUE(BondsOk(m, 7));
+  ASSERT_TRUE(m.build_from_smiles("[7NH2][15NH2]"));
+  EXPECT_TRUE(BondsOk(m, 7));
+  ASSERT_TRUE(m.build_from_smiles("[7NH2][7NH2]"));
+  EXPECT_FALSE(BondsOk(m, 7));
+}
+
+TEST(TestAttachmentIsotope, RemoveOnlyAttachmentLabels) {
+  Molecule m;
+  ASSERT_TRUE(m.build_from_smiles("[13CH3][7CH2][2CH2][15NH2]"));
+  safe_generate::RemoveAttachmentIsotopes(m, 7);
+  EXPECT_EQ(m.isotope(0), 13u);
+  EXPECT_EQ(m.isotope(1), 0u);
+  EXPECT_EQ(m.isotope(2), 2u);
+  EXPECT_EQ(m.isotope(3), 15u);
+  safe_generate::RemoveAttachmentIsotopes(m, 0);
+  EXPECT_EQ(m.number_isotopic_atoms(), 0);
+}
+
+TEST(TestFragmentMetadata, LibraryRingCountAndSize) {
+  dicer_data::DicerFragment proto;
+  proto.set_smi("[7CH]1CC1");
+  SafeFragment fragment;
+  ASSERT_TRUE(fragment.Build(proto, 7));
+  EXPECT_EQ(fragment.nrings(), 1);
+  EXPECT_EQ(fragment.largest_ring_size(), 3);
+}
+
+TEST(TestSafeRingNumbers, RejectsInternalTwoDigitRings) {
+  SafeFragment source;
+  EXPECT_FALSE(source.Build("[7CH]%10%12CCCCC%10", 7));
+  dicer_data::DicerFragment proto;
+  proto.set_smi("[7CH]%11CCCCC%11");
+  SafeFragment replacement;
+  EXPECT_FALSE(replacement.Build(proto, 7));
+}
+
+TEST(TestSafeRingNumbers, RejectsMalformedLabels) {
+  for (const char* smiles : {"[1C]%", "[1C]%1", "[1C]%1x"}) {
+    SafeFragment fragment;
+    EXPECT_FALSE(fragment.Build(smiles, 1)) << smiles;
+  }
+}
+
+TEST(TestSafeRingNumbers, RejectsConnectionCountMismatch) {
+  SafeFragment source, replacement;
+  ASSERT_TRUE(source.Build("[7CH2]%10C[7CH2]%12", 7));
+  ASSERT_TRUE(replacement.Build("[7CH2]%11C", 7));
+  IWString smiles;
+  EXPECT_FALSE(source.SameNumbers(replacement, smiles));
+}
+
 }  // namespace

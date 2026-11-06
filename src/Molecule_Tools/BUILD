@@ -4209,6 +4209,22 @@ py_test(
 )
 
 py_test(
+    name = "mol2safe_cli_test",
+    size = "small",
+    srcs = ["mol2safe_cli_test.py"],
+    args = ["$(location :mol2SAFE)"],
+    data = [":mol2SAFE"],
+)
+
+py_test(
+    name = "safe_generate_cli_test",
+    size = "small",
+    srcs = ["safe_generate_cli_test.py"],
+    args = ["$(location :safe_generate)"],
+    data = [":safe_generate"],
+)
+
+py_test(
     name = "chemotypes_cli_test",
     size = "small",
     srcs = ["chemotypes_cli_test.py"],

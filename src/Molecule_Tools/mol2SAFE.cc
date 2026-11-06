@@ -5,6 +5,8 @@
 // https://arxiv.org/pdf/2310.10773.pdf
 
 #include <algorithm>
+#include <cctype>
+#include <vector>
 #include <iostream>
 #include <memory>
 
@@ -23,6 +25,7 @@
 #include "Molecule_Lib/atom_typing.h"
 #include "Molecule_Lib/etrans.h"
 #include "Molecule_Lib/molecule.h"
+#include "Molecule_Lib/path.h"
 #include "Molecule_Lib/smiles.h"
 #include "Molecule_Lib/standardise.h"
 #include "Molecule_Lib/substructure.h"
@@ -55,6 +58,9 @@ Input must be a smiles file.
  -M ...         constraints on max fragment size
  -M <n>         fragments can contain no more than <n> atoms
  -M maxnr=<n>   the maximum number of non-ring atoms that can be in a fragment
+ -M maxringsys=<n>  optionally skip molecules with more than <n> rings in a system,
+                   including spiro fusions; also verify safe ring numbering.
+                   These checks are disabled by default.
  -g ...         standardisation options
  -z             ignore connection table errors on input
  -T ...         Element transformations - suggest '-T Br=Cl -T I=Cl'
@@ -170,10 +176,16 @@ class Options {
   // non ring atoms.
   int _max_non_ring_atoms = 0;
 
+  // Zero disables all additional ring-complexity and numbering checks.
+  int _max_rings_per_system = 0;
+  uint64_t _complex_ring_systems = 0;
+  uint64_t _unsafe_ring_numbers = 0;
+
   absl::flat_hash_map<IWString, dicer_data::DicerFragment> _fragment;
 
   // Private functions
   int Preprocess(Molecule& m);
+  bool RingSystemsWithinLimit(Molecule& m) const;
   int PerformTest(Molecule& m, PerMoleculeArrays& data, const IWString& SAFE_smiles);
   void AccumulateFragmentStatistics(const resizable_array_p<Molecule>& components,
                                     const IWString& parent_name);
@@ -292,6 +304,16 @@ Options::Initialise(Command_Line& cl) {
           cerr << "Will not accumulate fragments with more than " << _max_atoms
                << " atoms\n";
         }
+      } else if (m.starts_with("maxringsys=")) {
+        m.remove_leading_chars(11);
+        if (!m.numeric_value(_max_rings_per_system) || _max_rings_per_system < 1) {
+          cerr << "Invalid maxringsys= specification '" << m << "'\n";
+          return 0;
+        }
+        if (_verbose) {
+          cerr << "Will skip ring systems with more than " << _max_rings_per_system
+               << " rings (including spiro fusions), and check SAFE ring numbering\n";
+        }
       } else if (m.starts_with("maxnr=")) {
         m.remove_leading_chars(6);
         if (!m.numeric_value(_max_non_ring_atoms) || _max_non_ring_atoms < 1) {
@@ -398,9 +420,47 @@ InitialAtomNumber(const Molecule& m, atom_number_t zatom) {
   return ini->initial_atom_number;
 }
 
+// Count only %nn tokens. Atomic symbols, isotopes and single-digit ring
+// closures are irrelevant here. The caller has already checked the number range.
+bool
+CountPercentLabels(const IWString& text, int* count, int delta) {
+  for (int i = 0; i < text.length(); ++i) {
+    if (text[i] != '%') {
+      continue;
+    }
+    if (i + 2 >= text.length() ||
+        !std::isdigit(static_cast<unsigned char>(text[i + 1])) ||
+        !std::isdigit(static_cast<unsigned char>(text[i + 2]))) {
+      return false;
+    }
+    const int label = (text[i + 1] - '0') * 10 + text[i + 2] - '0';
+    count[label] += delta;
+    i += 2;
+  }
+  return true;
+}
+
+// Every %nn in the rendered fragment must have come from an explicitly
+// inserted SAFE connection. Extra occurrences signify an internal ring closure,
+// including a closure that happens to collide with a SAFE connection number.
+bool
+OnlySafeConnectionLabels(const IWString& rendered, const IWString* atomic_smarts,
+                         int natoms) {
+  int count[100] = {};
+  for (int i = 0; i < natoms; ++i) {
+    if (!CountPercentLabels(atomic_smarts[i], count, 1)) {
+      return false;
+    }
+  }
+  if (!CountPercentLabels(rendered, count, -1)) {
+    return false;
+  }
+  return std::all_of(std::begin(count), std::end(count), [](int n) { return n == 0; });
+}
+
 int
 AppendSmiles(Molecule& m, PerMoleculeArrays& data, RingNumberControl& rnc,
-             IWString& smiles) {
+             IWString& smiles, bool check_ring_numbers) {
   if (!smiles.empty()) {
     smiles << '.';
   }
@@ -431,6 +491,9 @@ AppendSmiles(Molecule& m, PerMoleculeArrays& data, RingNumberControl& rnc,
 
       // cerr << "Between " << initial_atom_number << " and " << nbr << " ring number " <<
       // data.ring_number_status[ndx] << " ndx " << ndx << '\n';
+      if (check_ring_numbers && ring_number > 99) {
+        return 0;
+      }
       if (ring_number > 9) {
         data.atom_smarts[i] << '%';
       }
@@ -448,13 +511,17 @@ AppendSmiles(Molecule& m, PerMoleculeArrays& data, RingNumberControl& rnc,
   m.invalidate_smiles();
   const IWString& smt = m.smarts(smiles_information, data.include_atom);
 
+  if (check_ring_numbers && !OnlySafeConnectionLabels(smt, data.atom_smarts, matoms)) {
+    return 0;
+  }
   smiles << smt;
 
   return 1;
 }
 
 int
-AppendSmiles(Molecule& m, PerMoleculeArrays& data, int& ring_number, IWString& smiles) {
+AppendSmiles(Molecule& m, PerMoleculeArrays& data, int& ring_number,
+             IWString& smiles, bool check_ring_numbers) {
   if (!smiles.empty()) {
     smiles << '.';
   }
@@ -482,6 +549,9 @@ AppendSmiles(Molecule& m, PerMoleculeArrays& data, int& ring_number, IWString& s
 
       // cerr << "Between " << initial_atom_number << " and " << nbr << " ring number " <<
       // data.ring_number_status[ndx] << " ndx " << ndx << '\n';
+      if (check_ring_numbers && data.ring_number_status[ndx] > 99) {
+        return 0;
+      }
       if (data.ring_number_status[ndx] > 9) {
         data.atom_smarts[i] << '%';
       }
@@ -499,6 +569,9 @@ AppendSmiles(Molecule& m, PerMoleculeArrays& data, int& ring_number, IWString& s
   m.invalidate_smiles();
   const IWString& smt = m.smarts(smiles_information, data.include_atom);
 
+  if (check_ring_numbers && !OnlySafeConnectionLabels(smt, data.atom_smarts, matoms)) {
+    return 0;
+  }
   smiles << smt;
 
   return 1;
@@ -522,9 +595,31 @@ Options::Preprocess(Molecule& m) {
   return 1;
 }
 
+bool
+Options::RingSystemsWithinLimit(Molecule& m) const {
+  if (m.nrings() <= _max_rings_per_system) {
+    return true;
+  }
+  auto labels = std::make_unique<int[]>(m.natoms());
+  const int nsystems = m.label_atoms_by_ring_system_including_spiro_fused(labels.get());
+  std::vector<int> rings_per_system(nsystems + 1, 0);
+  for (const Ring* ring : m.sssr_rings()) {
+    const int system = labels[ring->front()];
+    if (++rings_per_system[system] > _max_rings_per_system) {
+      return false;
+    }
+  }
+  return true;
+}
+
 int
 Options::Process(Molecule& m, int hring, IWString_and_File_Descriptor& output) {
+  ++_molecules_read;
   Preprocess(m);
+  if (_max_rings_per_system && !RingSystemsWithinLimit(m)) {
+    ++_complex_ring_systems;
+    return 1;
+  }
 
   // Added rings are always >= 10
   if (hring < 10) {
@@ -586,7 +681,19 @@ Options::Process(Molecule& m, int hring, IWString_and_File_Descriptor& output) {
   resizable_array_p<Molecule> components;
   m.create_components(components);
   // cerr << "Molecule generates " << components.size() << " components\n";
-  if (_stream_for_fragment_stats.is_open()) {
+  if (_max_rings_per_system) {
+    for (Molecule* component : components) {
+      // This is also the representation stored in the fragment library.
+      // The SAFE rendering below is checked independently.
+      if (component->smiles().contains('%')) {
+        ++_unsafe_ring_numbers;
+        return 1;
+      }
+    }
+  }
+
+  // Preserve the original unchecked path and its statistics-writing order.
+  if (!_max_rings_per_system && _stream_for_fragment_stats.is_open()) {
     AccumulateFragmentStatistics(components, data.parent_name);
   }
 
@@ -625,12 +732,23 @@ Options::Process(Molecule& m, int hring, IWString_and_File_Descriptor& output) {
   if (_minimise_ring_numbers_used) {
     RingNumberControl rnc(ring_number, components.size());
     for (Molecule* c : components) {
-      AppendSmiles(*c, data, rnc, smiles);
+      if (!AppendSmiles(*c, data, rnc, smiles, _max_rings_per_system != 0)) {
+        ++_unsafe_ring_numbers;
+        return 1;
+      }
     }
   } else {
     for (Molecule* c : components) {
-      AppendSmiles(*c, data, ring_number, smiles);
+      if (!AppendSmiles(*c, data, ring_number, smiles, _max_rings_per_system != 0)) {
+        ++_unsafe_ring_numbers;
+        return 1;
+      }
     }
+  }
+
+  // Rejected parents must not contribute even partial library statistics.
+  if (_max_rings_per_system && _stream_for_fragment_stats.is_open()) {
+    AccumulateFragmentStatistics(components, data.parent_name);
   }
 
   if (_write_parent) {
@@ -740,6 +858,11 @@ Options::Report(std::ostream& output) const {
     }
   }
 
+  if (_max_rings_per_system) {
+    output << _complex_ring_systems << " molecules skipped for ring systems with more than "
+           << _max_rings_per_system << " rings (including spiro fusions)\n";
+    output << _unsafe_ring_numbers << " molecules skipped for unsafe ring numbering\n";
+  }
   if (_test_unique_smiles) {
     output << _invalid_safe_smiles << " invalid SAFE smiles generated\n";
     output << _successful_test << " successful unique smiles matches\n";

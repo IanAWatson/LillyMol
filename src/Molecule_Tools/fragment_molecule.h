@@ -1,6 +1,8 @@
 #ifndef MOLECULE_TOOLS_FRAGMENT_MOLECULE_H_
 #define MOLECULE_TOOLS_FRAGMENT_MOLECULE_H_
 
+#include <cstdint>
+
 #include "Foundational/iwaray/iwaray.h"
 #include "Foundational/cmdline/cmdline.h"
 #include "Molecule_Lib/molecule.h"
@@ -18,6 +20,11 @@ class MoleculeFragmenter {
 
     // Do we break bonds between fully saturated carbon atoms.
     int _break_carbon_carbon_bonds;
+
+    // Preserve a candidate bond when both endpoints carry this isotope.
+    // Zero disables the shortcut; it does not trigger a substructure search.
+    isotope_t _preserve_isotope = 0;
+    uint32_t _bonds_protected_by_isotope = 0;
 
     resizable_array_p<Substructure_Query> _to_break;
     resizable_array_p<Substructure_Query> _never_break;
@@ -39,6 +46,13 @@ class MoleculeFragmenter {
     }
     void set_break_carbon_carbon_bonds(int s) {
       _break_carbon_carbon_bonds = s;
+    }
+
+    void set_preserve_isotope(isotope_t isotope) {
+      _preserve_isotope = isotope;
+    }
+    uint32_t bonds_protected_by_isotope() const {
+      return _bonds_protected_by_isotope;
     }
 
     // Return an array of bond numbers that can be broken. It will be up

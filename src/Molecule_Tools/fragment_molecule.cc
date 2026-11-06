@@ -28,12 +28,12 @@ MoleculeFragmenter::MoleculeFragmenter() {
 int
 MoleculeFragmenter::Initialise(Command_Line& cl) {
   int verbose = cl.option_present('v');
-  if (! process_queries(cl, _to_break, verbose, 'q')) {
+  if (cl.option_present('q') && !process_queries(cl, _to_break, verbose, 'q')) {
     cerr << "MoleculeFragmenter::Initialise:canot process to break queries (-q)\n";
     return 0;
   }
 
-  if (! process_queries(cl, _never_break, verbose, 'Q')) {
+  if (cl.option_present('Q') && !process_queries(cl, _never_break, verbose, 'Q')) {
     cerr << "MoleculeFragmenter::Initialise:canot process never break queries (-Q)\n";
     return 0;
   }
@@ -85,6 +85,7 @@ IdentifyMatchingBonds(Molecule_to_Match& target,
 
 int
 MoleculeFragmenter::IdentifyBreakableBonds(Molecule& m, resizable_array<int>& bonds_to_break) {
+  _bonds_protected_by_isotope = 0;
   const int matoms = m.natoms();
   if (matoms < 2) {
     return 0;
@@ -102,6 +103,12 @@ MoleculeFragmenter::IdentifyBreakableBonds(Molecule& m, resizable_array<int>& bo
       const int s = status[i * matoms + j];
 
       if (s != kCanBreak) {
+        continue;
+      }
+
+      if (_preserve_isotope && m.isotope(i) == _preserve_isotope &&
+          m.isotope(j) == _preserve_isotope) {
+        ++_bonds_protected_by_isotope;
         continue;
       }
 
@@ -308,6 +315,10 @@ IsCf3(Molecule& m,
   const int matoms = m.natoms();
   for (atom_number_t o : singly_connected) {
     status[carbon * matoms + o] = status[o * matoms + carbon] = kDoNotBreak;
+  }
+  // An explicit exclusion takes precedence over this special-case cut.
+  if (status[carbon * matoms + not_singly_connected] == kDoNotBreak) {
+    return 0;
   }
   status[carbon * matoms + not_singly_connected] = status[not_singly_connected * matoms + carbon] = kCanBreak;
 

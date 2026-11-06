@@ -47,6 +47,7 @@ using std::cerr;
 void
 Usage(int rc) {
   cerr << R"(Transform smiles to SAFE representations.
+Primarily used to prepare input molecules and fragment libraries for safe_generate.
 Input must be a smiles file.
  -p             write the parent molecule as well
  -c             remove chirality
@@ -54,6 +55,9 @@ Input must be a smiles file.
  -y             re-use ring numbers in generated ring numbers
  -I <iso>       place a fixed isotope on all attachment points
  -P <atype>     atom typing specification. If specified the isotope will be the atom type.
+ -Q <query>     never break bonds between matched atoms; repeatable, SMARTS:... allowed
+ -k <iso>       never break a bond when both endpoints already have isotope <iso>
+                Protections are applied before -I or -P changes attachment labels.
  -S <fname>     write fragment statistics in dicer_data::DicerFragment textproto form
  -M ...         constraints on max fragment size
  -M <n>         fragments can contain no more than <n> atoms
@@ -142,6 +146,9 @@ class Options {
   // If atom typing is specified, the atom type will be the isotope
   isotope_t _isotope = 0;
 
+  isotope_t _preserve_isotope = 0;
+  uint64_t _isotope_protected_bonds = 0;
+
   // For diagnostic work it can be helpful to see the parent.
   int _write_parent = 0;
 
@@ -204,6 +211,27 @@ class Options {
 int
 Options::Initialise(Command_Line& cl) {
   _verbose = cl.option_count('v');
+
+  if (cl.option_present('Q')) {
+    if (!_fragmenter.Initialise(cl)) {
+      cerr << "Cannot initialise protected-bond queries (-Q)\n";
+      return 0;
+    }
+    // Exclusions supplement the normal rules, rather than replacing them.
+    _fragmenter.set_add_queries_to_default_rules(1);
+  }
+  if (cl.option_present('k')) {
+    if (cl.option_count('k') != 1 || !cl.value('k', _preserve_isotope) ||
+        _preserve_isotope == 0) {
+      cerr << "Invalid protection isotope (-k): specify one positive isotope number\n";
+      return 0;
+    }
+    _fragmenter.set_preserve_isotope(_preserve_isotope);
+    if (_verbose) {
+      cerr << "Will preserve bonds whose endpoints both carry isotope "
+           << _preserve_isotope << '\n';
+    }
+  }
 
   if (cl.option_present('g')) {
     if (!_chemical_standardisation.construct_from_command_line(cl, _verbose > 1)) {
@@ -628,6 +656,9 @@ Options::Process(Molecule& m, int hring, IWString_and_File_Descriptor& output) {
 
   resizable_array<int> breakable_bonds;
   int nbreakable = _fragmenter.IdentifyBreakableBonds(m, breakable_bonds);
+  if (_preserve_isotope) {
+    _isotope_protected_bonds += _fragmenter.bonds_protected_by_isotope();
+  }
 
   ++_breakable_bond_count[nbreakable];
 
@@ -858,6 +889,10 @@ Options::Report(std::ostream& output) const {
     }
   }
 
+  if (_preserve_isotope) {
+    output << _isotope_protected_bonds << " candidate bonds protected by isotope "
+           << _preserve_isotope << '\n';
+  }
   if (_max_rings_per_system) {
     output << _complex_ring_systems << " molecules skipped for ring systems with more than "
            << _max_rings_per_system << " rings (including spiro fusions)\n";
@@ -947,7 +982,7 @@ Mol2SAFE(Options& options, const char* fname, IWString_and_File_Descriptor& outp
 
 int
 Mol2SAFE(int argc, char** argv) {
-  Command_Line cl(argc, argv, "vI:pcltg:S:M:P:yzT:");
+  Command_Line cl(argc, argv, "vI:pcltg:S:M:P:yzT:Q:k:");
   if (cl.unrecognised_options_encountered()) {
     cerr << "unrecognised_options_encountered\n";
     Usage(1);

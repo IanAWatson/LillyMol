@@ -66,6 +66,8 @@ Transform smiles to SAFE representations.
  -y             re-use ring numbers in generated ring numbers
  -I <iso>       place a fixed isotope on all attachment points
  -P <atype>     atom typing specification. If specified the isotope will be the atom type.
+ -Q <query>     never break bonds between matched atoms; repeatable, SMARTS:... allowed
+ -k <iso>       never break a bond when both endpoints already have isotope <iso>
  -S <fname>     write fragment statistics in dicer_data::DicerFragment textproto form
  -M ...         constraints on max fragment size
  -M <n>         fragments can contain no more than <n> atoms
@@ -84,6 +86,59 @@ In the invocation above, input is stripped to the largest fragment, chirality is
 chemical standardisation is applied, and a common Halogen transformation is applied. We
 limit ourselves to fragments with a maximum of 16 heavy atoms, of which a max of 9 can be
 non ring atoms.
+
+### Preserve a labelled region or matched bonds
+
+Use `-k ISO` to protect a bond when **both endpoints already carry isotope ISO**:
+
+```shell
+mol2SAFE -k 13 -I 1 -S library.textproto labelled.smi > labelled.safe.smi
+```
+
+Bonds within a region labelled with isotope 13 remain intact. A boundary bond
+with only one labelled endpoint can still be cut. A bond between isotope 13 and
+a different isotope is not protected by this shortcut. ISO must be a single
+positive isotope number; omitting `-k` disables the shortcut.
+
+This uses a direct isotope comparison on candidate bonds in the shared
+`MoleculeFragmenter`. It performs no substructure search and allocates no extra
+per-atom protection array.
+
+For more general patterns, the fragmenter's existing repeatable `-Q` option
+accepts query files and the standard `SMARTS:` form:
+
+```shell
+mol2SAFE -Q protect.textproto -Q 'SMARTS:COC' -I 1 \
+  -S library.textproto input.smi > input.safe.smi
+```
+
+For every embedding, **all bonds between matched atoms** are protected. This is
+the shared fragmenter's existing behavior, rather than a first-two-atoms-only
+rule. For example, `COC` protects both C–O bonds. A two-atom query can identify a
+single bond. Additional query atoms also participate in protection, not just as
+context. Embeddings with fewer than two atoms protect no bonds.
+
+Exclusions supplement the default fragmentation rules. Queries that match
+nothing leave normal fragmentation unchanged. Multiple `-Q` queries and
+`-k` may be combined: either protection prevents a cut, including cuts nominated
+by the fragmenter's CF3 rule.
+
+Protection is evaluated **after preprocessing and before any bonds are removed
+or attachment isotopes are assigned**. Consequently, new labels from `-I` or
+`-P` cannot accidentally protect later candidate cuts. The protected region's
+original labels are retained on unmodified atoms, but a boundary atom participating
+in an allowed cut can have its isotope overwritten by the attachment label.
+Prefer distinct region and attachment isotope values when using the result
+with `safe_generate -j`.
+
+The resulting components are used for both SAFE output and fragment-library
+statistics. If no cuts remain, the molecule is skipped, as for other inputs with
+no breakable bonds. `-v` reports how many remaining candidate bonds were protected
+by the isotope shortcut, after query exclusions.
+
+These options preserve bonds during `mol2SAFE` conversion. They do not mark a
+fragment as immutable during subsequent `safe_generate` replacement; use that
+tool's own `-Y`/`-N` restrictions when necessary.
 
 ### Optional complexity and ring-number checks
 

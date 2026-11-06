@@ -133,8 +133,15 @@ sel,distance
 5,0.804
 ...
 ```
-which can be imported into your favourite plotting package. The contrib
-directory contains [spreadplot.jl](/docs/GFP/spreadplot.md), which is set up to
+Output precision is controlled by `nplotnn -c` (currently two decimal places by
+default); the example above illustrates higher precision. Add
+`-X spreadreduce` to keep only the endpoints of each constant formatted-distance
+run. This preserves the plotted line and threshold crossing positions while
+greatly reducing large trajectories. See
+[trajectory point reduction](spreadplot.md#large-trajectories-reduce-points-in-nplotnn).
+
+The CSV can be imported into your favourite plotting package. The contrib
+directory contains [spreadplot.py](/docs/GFP/spreadplot.md), which is set up to
 generate and interpret diversity plots from this file.
 
 ## First Item

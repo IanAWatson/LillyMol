@@ -238,6 +238,8 @@ display_dash_x_options(std::ostream & os)
   os << " -X sdcensor=<d>    in tabular output, censor distances shorter than <d>\n";
   os << " -X mnc=<n>         only write targets that have exactly<n> nbrs after distance filtering\n";
   os << " -X sdo             with the -s option, only write the shortest distance\n";
+  os << " -X spreadreduce    with -S, retain both endpoints of each equal-distance run\n";
+  os << "                    compare formatted distances; -c controls resolution (default 2)\n";
   os << " -X app=<fname>     join values from a descriptor file with each id written\n";
 // clang-format on
 
@@ -2043,6 +2045,60 @@ do_create_rfle_for_histogram_plot(const IWHistogram &nearest_neighbour_histogram
   // normalise_h_file, cumulative, fname, output);
 }
 
+// Keep the first and last point of each plateau in the formatted trajectory.
+// Both ends are needed: retaining only run starts would replace horizontal
+// stretches with sloping segments. Positions remain the original zero-based
+// selection indices, so first threshold crossings are preserved too.
+static int
+WriteSpreadDistances(const resizable_array<float>& distances, bool reduce,
+                     IWString_and_File_Descriptor& output) {
+  output << "sel,distance\n";
+  uint32_t written = 0;
+  auto write_row = [&output, &written](uint32_t selected, const IWString& value) {
+    output << selected << ',' << value << '\n';
+    ++written;
+    return output.write_if_buffer_holds_more_than(IW_FLUSH_BUFFER);
+  };
+
+  IWString value;
+  if (!reduce) {
+    for (uint32_t i = 0; i < distances.size(); ++i) {
+      value.resize_keep_storage(0);
+      AppendBareNumber(value, distances[i]);
+      if (!write_row(i, value)) {
+        return 0;
+      }
+    }
+  } else if (!distances.empty()) {
+    uint32_t first = 0;
+    IWString previous;
+    AppendBareNumber(previous, distances[0]);
+    for (uint32_t i = 1; i < distances.size(); ++i) {
+      value.resize_keep_storage(0);
+      AppendBareNumber(value, distances[i]);
+      if (value == previous) {
+        continue;
+      }
+      if (!write_row(first, previous) ||
+          (i - first > 1 && !write_row(i - 1, previous))) {
+        return 0;
+      }
+      first = i;
+      previous = value;
+    }
+    if (!write_row(first, previous) ||
+        (distances.size() - first > 1 && !write_row(distances.size() - 1, previous))) {
+      return 0;
+    }
+  }
+
+  if (reduce && verbose) {
+    cerr << "Spread trajectory reduced from " << distances.size() << " to "
+         << written << " rows at " << output_precision << " decimal places\n";
+  }
+  return output.flush();
+}
+
 static int
 plotnn(int argc, char **argv) {
   Command_Line cl(argc, argv, "vn:t:T:xzD:pO:ru:sf:c:L:m:M:wY:j:X:H:hW:3S:");
@@ -2343,6 +2399,7 @@ plotnn(int argc, char **argv) {
   }
 
   IWString_and_File_Descriptor stream_for_spread_distances;
+  bool reduce_spread_distances = false;
   if (cl.option_present('S')) {
     IWString fname;
     const_IWSubstring s;
@@ -2679,6 +2736,8 @@ plotnn(int argc, char **argv) {
         if (verbose) {
           cerr << "Will take only the first token of name fields\n";
         }
+      } else if ("spreadreduce" == x) {
+        reduce_spread_distances = true;
       } else if ("sdo" == x) {
         write_shortest_distance_with_stats = 1;
 
@@ -2701,6 +2760,11 @@ plotnn(int argc, char **argv) {
         return 4;
       }
     }
+  }
+
+  if (reduce_spread_distances && !from_gfp_spread) {
+    cerr << "-X spreadreduce requires a spread trajectory output file (-S)\n";
+    return 1;
   }
 
   if (input_is_tfdata) {
@@ -2832,16 +2896,11 @@ plotnn(int argc, char **argv) {
     }
   }
 
-  if (stream_for_spread_distances.active()) {
-    constexpr char kSep = ',';
-    stream_for_spread_distances << "sel,distance\n";
-    for (uint32_t i = 0; i < spread_distances.size(); ++i) {
-      stream_for_spread_distances << i << kSep;
-      IWString tmp;
-      AppendBareNumber(tmp, spread_distances[i]);
-      stream_for_spread_distances << tmp << '\n';
-      stream_for_spread_distances.write_if_buffer_holds_more_than(IW_FLUSH_BUFFER);
-    }
+  if (stream_for_spread_distances.active() &&
+      !WriteSpreadDistances(spread_distances, reduce_spread_distances,
+                            stream_for_spread_distances)) {
+    cerr << "Cannot write spread trajectory output\n";
+    return 1;
   }
 
   if (verbose) {

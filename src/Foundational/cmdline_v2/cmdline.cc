@@ -1,5 +1,7 @@
 #include <stdlib.h>
 
+#include <cmath>
+#include <type_traits>
 
 #include "cmdline_v2.h"
 #include "Foundational/iwmisc/misc.h"
@@ -107,7 +109,7 @@ CmdLine_Option_and_Value::initialise (const char * opt,
   else if (IWCMDLINE_FLOAT == valid_as)
   {
     double tmp;
-    if (! _value.numeric_value(tmp))
+    if (!value(tmp))
     {
       cerr << "CmdLine_Option_and_Value:set_value: '" << _opt << "' invalid float value '" << _value << "'\n";
       return 0;
@@ -116,7 +118,7 @@ CmdLine_Option_and_Value::initialise (const char * opt,
   else if (IWCMDLINE_FRACTION == valid_as)
   {
     double tmp;
-    if (! _value.numeric_value(tmp) || tmp < 0.0 || tmp > 1.0)
+    if (!value(tmp) || tmp < 0.0 || tmp > 1.0)
     {
       cerr << "CmdLine_Option_and_Value:set_value: '" << _opt << "' invalid fraction value '" << _value << "'\n";
       return 0;
@@ -160,7 +162,16 @@ int
 CmdLine_Option_and_Value::value(T & v) const
 {
 //cerr << "CmdLine_Option_and_Value:converting '" << _value << "' to type " << sizeof(T) << endl;
-  return _value.numeric_value(v);
+  if constexpr (std::is_floating_point_v<T>) {
+    T parsed;
+    if (!_value.numeric_value(parsed) || !std::isfinite(parsed)) {
+      return 0;
+    }
+    v = parsed;
+    return 1;
+  } else {
+    return _value.numeric_value(v);
+  }
 }
 
 template int CmdLine_Option_and_Value::value(int &) const;

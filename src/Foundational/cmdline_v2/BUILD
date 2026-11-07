@@ -1,5 +1,15 @@
 load("@rules_cc//cc:defs.bzl", "cc_binary", "cc_proto_library", "cc_library", "cc_test")
 
+cc_test(
+    name = "cmdline_v2_test",
+    size = "small",
+    srcs = ["cmdline_v2_test.cc"],
+    deps = [
+        ":cmdline_v2",
+        "@googletest//:gtest_main",
+    ],
+)
+
 cc_library(
     name = "cmdline_v2",
     srcs = [

@@ -1,7 +1,9 @@
 #ifndef FOUNDATIONAL_CMDLINE_CMDLINE_H_
 #define FOUNDATIONAL_CMDLINE_CMDLINE_H_
 
+#include <cmath>
 #include <iostream>
+#include <type_traits>
 
 #include "Foundational/iwstring/iwstring.h"
 
@@ -75,6 +77,7 @@ class Command_Line : public resizable_array<const char *>
 
     const char * option_value (const char, int = 0) const;
 
+    // Floating-point conversions accept only finite values.
     template <typename T> int value (const char, T &, int = 0) const;
 
 //  int value (const char, double &, int = 0) const;
@@ -105,7 +108,16 @@ Option_and_Value::value (T & rc) const
 
   const_IWSubstring tmp(_value);
 
-  return tmp.numeric_value(rc);
+  if constexpr (std::is_floating_point_v<T>) {
+    T parsed;
+    if (!tmp.numeric_value(parsed) || !std::isfinite(parsed)) {
+      return 0;
+    }
+    rc = parsed;
+    return 1;
+  } else {
+    return tmp.numeric_value(rc);
+  }
 }
 
 #endif  // FOUNDATIONAL_CMDLINE_CMDLINE_H_

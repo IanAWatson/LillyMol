@@ -108,6 +108,7 @@ class Command_Line_v2 : public resizable_array<const char *>
     const char * option_value (const std::string & s, int which_one = 0) const { return option_value ( static_cast<int> (s.length()), s.data (), which_one);}
 #endif
 
+    // Floating-point conversions accept only finite values.
     template <typename T> int value (int lens, const char * s, T &, int which_one = 0) const;
     template <typename T> int value (const char * s, T & v, int which_one = 0) const { return value ( static_cast<int> (strlen (s)), s, v, which_one);}
     template <typename T> int value (char c, T & v, int which_one = 0) const { return value (1, &c, v, which_one);}

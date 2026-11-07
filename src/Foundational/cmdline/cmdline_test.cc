@@ -225,6 +225,57 @@ TEST(CommandLine, FloatingPointValues) {
   EXPECT_FLOAT_EQ(f, 250.0f);
 }
 
+template <typename T>
+class FiniteFloatingPointValues : public testing::Test {};
+
+using FloatingPointTypes = testing::Types<float, double>;
+TYPED_TEST_SUITE(FiniteFloatingPointValues, FloatingPointTypes);
+
+TYPED_TEST(FiniteFloatingPointValues, RejectsNonFiniteAndOverflowWithoutChangingDestination) {
+  for (const char* text : {"nan", "NaN", "NAN", "nan(payload)", "-nan",
+                           "inf", "+inf", "-inf", "INF", "infinity",
+                           "-infinity", "1e9999", "-1e9999"}) {
+    SCOPED_TRACE(text);
+    Arguments args{"tool", "-n", text};
+    Command_Line cl(args.argc(), args.argv(), "n:");
+    TypeParam value = 17;
+    EXPECT_FALSE(cl.value('n', value));
+    EXPECT_EQ(value, static_cast<TypeParam>(17));
+    EXPECT_EQ(cl.unrecognised_options_encountered(), 0);
+    // Non-finite text is still available to callers requesting a string.
+    IWString raw;
+    ASSERT_TRUE(cl.value('n', raw));
+    EXPECT_EQ(raw, text);
+  }
+}
+
+TYPED_TEST(FiniteFloatingPointValues, AcceptsFiniteValuesIncludingSignedZero) {
+  Arguments args{"tool", "-n", "0", "-n", "-0", "-n", "-1.25", "-n", "2.5e2",
+                  "-n", "1e-30", "-n", "1e30"};
+  Command_Line cl(args.argc(), args.argv(), "n:");
+  const TypeParam expected[] = {0, -0.0, -1.25, 250, static_cast<TypeParam>(1e-30),
+                                static_cast<TypeParam>(1e30)};
+  for (int i = 0; i < 6; ++i) {
+    TypeParam value = 17;
+    ASSERT_TRUE(cl.value('n', value, i));
+    EXPECT_EQ(value, expected[i]);
+    if (i == 1) {
+      EXPECT_TRUE(std::signbit(value));
+    }
+  }
+}
+
+TEST(CommandLine, FloatingPointRangeDependsOnDestinationType) {
+  Arguments args{"tool", "-n", "1e100"};
+  Command_Line cl(args.argc(), args.argv(), "n:");
+  double d = 0;
+  ASSERT_TRUE(cl.value('n', d));
+  EXPECT_DOUBLE_EQ(d, 1e100);
+  float f = 17;
+  EXPECT_FALSE(cl.value('n', f));
+  EXPECT_FLOAT_EQ(f, 17);
+}
+
 TEST(CommandLine, AllValuesAppendInOccurrenceOrder) {
   Arguments args{"tool", "-s", "a", "-s", "b c"};
   Command_Line cl(args.argc(), args.argv(), "s:");

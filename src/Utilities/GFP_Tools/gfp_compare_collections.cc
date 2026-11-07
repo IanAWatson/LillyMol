@@ -4,7 +4,10 @@
 #include <stdlib.h>
 
 #include <algorithm>
+#include <filesystem>
 #include <iostream>
+#include <limits>
+#include <memory>
 
 #define USE_OMP
 #ifdef USE_OMP
@@ -14,7 +17,6 @@
 #define REPORT_PROGRESS_IMPLEMENTATION
 #include "re2/re2.h"
 
-#include "Foundational/accumulator/accumulator.h"
 #include "Foundational/cmdline/cmdline.h"
 #include "Foundational/data_source/iwstring_data_source.h"
 #include "Foundational/iw_tdt/iw_tdt.h"
@@ -35,11 +37,18 @@ Usage(int rc) {
   // clang-format on
   // clang-format off
   cerr << R"(Compares a set of fingerprints against another, sampling the profile of distances until converged.
+Requires standard MPR/FPIW/FPMK/FPMK2 fingerprints.
+Sampling counts are exact, regardless of batch size.
+A final distribution is written at EOF even without convergence.
+Empty inputs or no distances retained by -T are errors.
+
  -p <fname>     fingerprint file of the comparison set - likely Chembl or some other reference set.
- -s <n>         number of items in the -p file. This tool will count if not specified.
+ -s <n>         use at most the first <n> reference fingerprints; use all if omitted.
+                Randomise the reference order or use a deliberately diverse prefix.
+                Larger values than the file size are allowed but reserve extra memory.
  -T <dist>      upper distance threshold - ignore distances larger than <dist>.
  -n <number>    check convergence and write an output file every <number> fingerprints (default 1000).
- -f <number>    first time to check for convergence. If not specified it will be 1000.
+ -f <number>    first check after this many queries (minimum 10, default 1000).
                 Convergence is assessed either by absolute (-a) or relative (-r) tolerance.
                 A comparison is made between the previous distribution and the current values.
  -r <tol>       Relative tolerance. Converged if every bucketised part of the distribution is within <tol>.
@@ -70,34 +79,41 @@ class Options {
 
     GFP_Standard* _fp;
     uint32_t _number_fingerprints;
+    // Established once from the first reference fingerprint, then reused.
+    int _iw_index = -1;
+    int _mk_index = -1;
+    int _mk2_index = -1;
 
     // From ChatGPT we find that efficiency improves if we can amortize the
     // overhead of thread creation across multiple fingerprints.
     // The initial version processed fingerprints one at a time and parallel
     // processing happened with each fingerprint.
-    uint64_t _batch_size = 10;
+    uint32_t _batch_size = 10;
 
     IWString _stem;
+    IWString _reference_fname;
+    IWString _query_fname;
     int _next_fname_index;
+    uint64_t _last_written_fingerprints = 0;
 
     uint64_t _acc[kNBins];
     double _distribution[kNBins];
     double _previous_distribution[kNBins];
 
   // Private functions
+    int InitialiseFingerprintLayout(const IW_General_Fingerprint& gfp);
+    int ReadFingerprint(IW_TDT& tdt, GFP_Standard& destination,
+                        bool initialise_layout = false);
     int ReadComparisonSet(IWString& fname);
-    int ReadComparisonSet(iwstring_data_source& input);
-    void AddToBinnedDistances(float d);
+    int ReadComparisonSet(iwstring_data_source& input, bool limited);
     int Process(iwstring_data_source& input, int& converged);
-    int Process(GFP_Standard& gfp_standard, int& converged);
-    int WriteDistribution(uint64_t tot);
     int WriteDistribution();
 
-    int IsConverged();
+    int UpdateDistribution();
+    int Sample(int& converged);
     int AtolConverged() const;
     int RtolConverged() const;
-    void ProcessBatch(const GFP_Standard* queries, uint32_t n,
-                      int& converged);
+    int ProcessBatch(const GFP_Standard* queries, uint32_t n, int& converged);
 
   public:
     Options();
@@ -231,7 +247,7 @@ Options::Initialise(Command_Line& cl) {
       return 0;
     }
     if (_verbose) {
-      cerr << "Query fingerprings processed in batches of size " << _batch_size << '\n';
+      cerr << "Query fingerprints processed in batches of size " << _batch_size << '\n';
     }
   }
 
@@ -240,15 +256,22 @@ Options::Initialise(Command_Line& cl) {
 
 int
 Options::ReadComparisonSet(IWString& fname) {
+  _reference_fname = fname;
   iwstring_data_source input(fname);
   if (! input.good()) {
     cerr << "Options::ReadComparisonSet:cannot open '" << fname << "'\n";
     return 0;
   }
 
-  if (_number_fingerprints == 0) {
-    RE2 vbar("^|");
-    _number_fingerprints = input.grep(vbar);
+  const bool limited = _number_fingerprints != 0;
+  if (!limited) {
+    RE2 vbar("^\\|$");
+    const uint64_t count = input.grep(vbar);
+    if (count > std::numeric_limits<uint32_t>::max()) {
+      cerr << "Options::ReadComparisonSet:too many fingerprints\n";
+      return 0;
+    }
+    _number_fingerprints = count;
     if (_number_fingerprints == 0) {
       cerr << "Options::ReadComparisonSet:no fingerprints\n";
       return 0;
@@ -257,50 +280,85 @@ Options::ReadComparisonSet(IWString& fname) {
 
   _fp = new GFP_Standard[_number_fingerprints];
 
-  return ReadComparisonSet(input);
+  return ReadComparisonSet(input, limited);
 }
 
+// Validate the complete layout once. As in other standard GFP tools, all
+// subsequent reference and query fingerprints are assumed to use this layout.
 int
-FromGfp(const IW_General_Fingerprint& gfp,
-        GFP_Standard& destination) {
-
-  destination.build_molecular_properties(gfp.molecular_properties_integer());
-  destination.build_iw(gfp[0]);
-  destination.build_mk(gfp[1]);
-  destination.build_mk2(gfp[2]);
-
+Options::InitialiseFingerprintLayout(const IW_General_Fingerprint& gfp) {
+  if (!standard_fingerprints_present()) {
+    return 0;
+  }
+  for (int i = 0; i < number_fingerprints(); ++i) {
+    const IWString& tag = fixed_fingerprint_tag(i);
+    if (tag.starts_with("FPIW")) {
+      _iw_index = i;
+    } else if (tag.starts_with("FPMK2")) {
+      _mk2_index = i;
+    } else if (tag.starts_with("FPMK")) {
+      _mk_index = i;
+    }
+  }
+  if (gfp.molecular_properties_integer().nproperties() != 8 ||
+      gfp[_iw_index].nbits() != 2048 || gfp[_mk_index].nbits() == 0 ||
+      gfp[_mk_index].nbits() > 256 || gfp[_mk_index].nbits() % 32 != 0 ||
+      gfp[_mk2_index].nbits() != gfp[_mk_index].nbits()) {
+    cerr << "Invalid standard fingerprint layout: expected 8 MPR properties, "
+            "2048 FPIW bits and equal FPMK/FPMK2 sizes (multiples of 32, at most 256)\n";
+    return 0;
+  }
   return 1;
 }
 
 int
-FromGfp(IW_TDT& tdt,
-        GFP_Standard& destination,
-        int& fatal) {
+Options::ReadFingerprint(IW_TDT& tdt, GFP_Standard& destination, bool initialise_layout) {
   IW_General_Fingerprint gfp;
-  fatal = 0;
+  int fatal = 0;
   if (!gfp.construct_from_tdt(tdt, fatal)) {
-    cerr << "Options::ReadComparisonSet:cannot read fingerprint\n";
+    cerr << "Options::ReadFingerprint:cannot read fingerprint\n";
     return 0;
   }
-
-  return FromGfp(gfp, destination);
+  if (initialise_layout && !InitialiseFingerprintLayout(gfp)) {
+    return 0;
+  }
+  destination.build_molecular_properties(gfp.molecular_properties_integer());
+  destination.build_iw(gfp[_iw_index]);
+  destination.build_mk(gfp[_mk_index]);
+  destination.build_mk2(gfp[_mk2_index]);
+  return 1;
 }
 
 int
-Options::ReadComparisonSet(iwstring_data_source& input) {
+Options::ReadComparisonSet(iwstring_data_source& input, bool limited) {
   IW_TDT tdt;
-  int fatal;
   uint32_t ndx = 0;
-  for (; ndx < _number_fingerprints && tdt.next(input); ++ndx) {
-    if (! FromGfp(tdt, _fp[ndx], fatal)) {
-      if (fatal) {
-        cerr << "Options::ReadComparisonSet:error reading fingerprint, line " << input.lines_read() << '\n';
+  // An explicit -s limits reading, not just storage. Leave the rest unread.
+  while (!limited || ndx < _number_fingerprints) {
+    if (!tdt.next(input)) {
+      if (!tdt.rawdata().empty()) {
+        cerr << "Malformed reference TDT near line " << input.lines_read() << '\n';
         return 0;
       }
       break;
     }
+    if (ndx == _number_fingerprints) {
+      cerr << "Reference fingerprint count exceeds allocated capacity "
+           << _number_fingerprints << '\n';
+      return 0;
+    }
+    if (!ReadFingerprint(tdt, _fp[ndx], ndx == 0)) {
+      cerr << "Options::ReadComparisonSet:error reading fingerprint, line "
+           << input.lines_read() << '\n';
+      return 0;
+    }
+    ++ndx;
   }
 
+  if (ndx == 0) {
+    cerr << "No reference fingerprints read\n";
+    return 0;
+  }
   _number_fingerprints = ndx;
 
   if (_verbose) {
@@ -312,6 +370,7 @@ Options::ReadComparisonSet(iwstring_data_source& input) {
 
 int
 Options::Process(const char* fname, int& converged) {
+  _query_fname = fname;
   iwstring_data_source input(fname);
   if (! input.good()) {
     cerr << "Options::Process:cannot open '" << fname << "'\n";
@@ -323,47 +382,62 @@ Options::Process(const char* fname, int& converged) {
 
 int
 Options::Process(iwstring_data_source& input, int& converged) {
-  std::unique_ptr<GFP_Standard[]> batch = std::make_unique<GFP_Standard[]>(_batch_size + 1);
+  // Retain the requested batch size after a small first sampling interval,
+  // but do not allocate more than any sampling interval can use.
+  const uint32_t capacity = std::min<uint64_t>(
+      _batch_size, std::max(_next_sample, _sample_interval));
+  auto batch = std::make_unique<GFP_Standard[]>(capacity);
 
   IW_TDT tdt;
-  int fatal = 0;
   uint32_t ndx = 0;
   while (tdt.next(input)) {
-    if (FromGfp(tdt, batch[ndx], fatal)) {
-    } else if (fatal) {
+    if (!ReadFingerprint(tdt, batch[ndx])) {
       cerr << "Options::Process:error reading fingerprint, line "
            << input.lines_read() << '\n';
       return 0;
-    } else {
-      break;
     }
-
     ++ndx;
 
-    if (ndx == _batch_size) {
-      ProcessBatch(batch.get(), ndx, converged);
+    // Split batches at sampling points so -f and -n are independent of -b.
+    if (ndx == capacity || _fingerprints_read + ndx == _next_sample) {
+      if (!ProcessBatch(batch.get(), ndx, converged)) {
+        return 0;
+      }
+      ndx = 0;
       if (converged) {
-        ndx = 0;   // batch has been fully processed, now must appear empty.
         break;
       }
-
-      ndx = 0;
     }
   }
 
-  if (ndx > 0) {
-    ProcessBatch(batch.get(), ndx, converged);
+  if (!converged && !tdt.rawdata().empty()) {
+    cerr << "Malformed query TDT near line " << input.lines_read() << '\n';
+    return 0;
+  }
+  if (ndx > 0 && !ProcessBatch(batch.get(), ndx, converged)) {
+    return 0;
   }
 
-  if (converged) {
-    cerr << "Converged\n";
-    WriteDistribution();
+  if (_fingerprints_read == 0) {
+    cerr << "No query fingerprints read\n";
+    return 0;
   }
-
+  if (!UpdateDistribution()) {
+    cerr << "No distances retained; check the reference set and -T threshold\n";
+    return 0;
+  }
+  // A scheduled sample may already have written this exact set of observations.
+  if (_last_written_fingerprints != _fingerprints_read && !WriteDistribution()) {
+    return 0;
+  }
+  if (_verbose) {
+    cerr << (converged ? "Converged after " : "End of input without convergence after ")
+         << _fingerprints_read << " query fingerprints\n";
+  }
   return 1;
 }
 
-void
+int
 Options::ProcessBatch(const GFP_Standard* queries, uint32_t n,
                       int& converged) {
   if (_verbose > 1) {
@@ -405,56 +479,57 @@ Options::ProcessBatch(const GFP_Standard* queries, uint32_t n,
   _fingerprints_read += n;
 
   if (_fingerprints_read < _next_sample) {
-    return;
+    return 1;
   }
 
-  if (IsConverged()) {
-    cerr << "IsConverged passed\n";
-    converged = 1;
+  if (!Sample(converged)) {
+    return 0;
   }
-
-  _next_sample = _fingerprints_read + _sample_interval;
+  if (_sample_interval > std::numeric_limits<uint64_t>::max() - _fingerprints_read) {
+    _next_sample = std::numeric_limits<uint64_t>::max();
+  } else {
+    _next_sample = _fingerprints_read + _sample_interval;
+  }
+  return 1;
 }
 
-// Returns true if we have achieved convergence.
-// Not const because it updates _distribution and other variables.
+// Normalise accumulated counts. No retained distances is not a distribution.
 int
-Options::IsConverged() {
-  if (_next_fname_index > 0) {
-    std::copy_n(_distribution, kNBins, _previous_distribution);
-  }
-
+Options::UpdateDistribution() {
   uint64_t tot = 0;
   for (int i = 0; i < kNBins; ++i) {
     tot += _acc[i];
   }
-
-  if (tot == 0) [[ unlikely ]] { 
-    cerr << "Options::IsConverged:no distances\n";
+  if (tot == 0) {
     return 0;
   }
-
   const double multiplier = 1.0 / static_cast<double>(tot);
   for (int i = 0; i < kNBins; ++i) {
     _distribution[i] = static_cast<double>(_acc[i]) * multiplier;
   }
+  return 1;
+}
 
-  if (_next_fname_index == 0) {
-    // No previous against which to compare.
-  } else if (_absolute_tolerance > 0.0) {
-    if (AtolConverged()) {
-      return 1;
-    }
-  } else if (_relative_tolerance > 0.0) {
-    if (RtolConverged()) {
-      return 1;
-    }
+// Keep convergence status separate from errors opening or writing a sample.
+int
+Options::Sample(int& converged) {
+  if (_next_fname_index > 0) {
+    std::copy_n(_distribution, kNBins, _previous_distribution);
   }
-
-  cerr << "Not converged, WriteDistribution\n";
-  WriteDistribution(tot);
-
-  return 0;
+  if (!UpdateDistribution()) {
+    // A later batch can still contain distances within -T.
+    if (_verbose) {
+      cerr << "No distances retained after " << _fingerprints_read << " queries\n";
+    }
+    return 1;
+  }
+  if (_next_fname_index > 0) {
+    converged = _absolute_tolerance > 0.0 ? AtolConverged() : RtolConverged();
+  }
+  if (_verbose) {
+    cerr << "Sample after " << _fingerprints_read << " query fingerprints\n";
+  }
+  return WriteDistribution();
 }
 
 // Return true if the distribution is converted via absolute diff.
@@ -476,7 +551,7 @@ Options::AtolConverged() const {
   }
 
   if (_verbose) {
-    cerr << _fingerprints_read << " fingerprints read, rtol max_diff " << max_diff;
+    cerr << _fingerprints_read << " fingerprints read, atol max_diff " << max_diff << '\n';
   }
 
   return 0;
@@ -529,20 +604,19 @@ Options::RtolConverged() const {
 
 int
 Options::WriteDistribution() {
-  uint64_t tot = 0;
-  for (int i = 0; i < kNBins; ++i) {
-    tot += _acc[i];
-  }
-
-  return WriteDistribution(tot);
-}
-
-int
-Options::WriteDistribution(uint64_t tot) {
   IWString fname;
   fname << _stem << _next_fname_index << ".csv";
-  cerr << "WriteDistribution '" << fname << "'\n";
-  ++_next_fname_index;
+  for (IWString* input : {&_reference_fname, &_query_fname}) {
+    std::error_code ec;
+    if (std::filesystem::equivalent(fname.null_terminated_chars(),
+                                    input->null_terminated_chars(), ec)) {
+      cerr << "Output file '" << fname << "' would overwrite input '" << *input << "'\n";
+      return 0;
+    }
+  }
+  if (_verbose) {
+    cerr << "WriteDistribution '" << fname << "'\n";
+  }
   IWString_and_File_Descriptor output;
   if (! output.open(fname)) {
     cerr << "Options::WriteDistribution:cannot open '" << fname << "'\n";
@@ -551,36 +625,32 @@ Options::WriteDistribution(uint64_t tot) {
 
   static constexpr char kSep = ',';
 
-  Accumulator<double> stats;
+  double mean_distance = 0.0;
 
   output << "Dist" << kSep << "Fraction\n";
-  uint64_t sum = 0;
   for (int i = 0; i < kNBins; ++i) {
-    float dist = static_cast<float>(i / 1000.0f);
-    output << dist << kSep << static_cast<float>(_distribution[i]) << '\n';
-
-    sum += _acc[i];
-
-    if (_acc[i] > 0) {
-      stats.extra(dist, _acc[i]);
-    }
-
+    const float dist = static_cast<float>(i / 1000.0f);
     if (dist > _max_distance) {
       break;
     }
+    output << dist << kSep << static_cast<float>(_distribution[i]) << '\n';
+
+    // Work with fractions rather than narrowing potentially huge bin counts
+    // to the int count accepted by Accumulator::extra.
+    mean_distance += static_cast<double>(dist) * _distribution[i];
   }
 
   if (_verbose) {
-    cerr << "Average " << static_cast<float>(stats.average()) << '\n';
+    cerr << "Average " << static_cast<float>(mean_distance) << '\n';
   }
 
+  if (!output.close()) {
+    cerr << "Options::WriteDistribution:error writing '" << fname << "'\n";
+    return 0;
+  }
+  ++_next_fname_index;
+  _last_written_fingerprints = _fingerprints_read;
   return 1;
-}
-
-void
-Options::AddToBinnedDistances(float d) {
-  int ndx = static_cast<int>(d * 1000.0f + 0.49999f);
-  ++_acc[ndx];
 }
 
 int

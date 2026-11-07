@@ -217,6 +217,14 @@ cc_binary(
     ],
 )
 
+py_test(
+    name = "gfp_compare_collections_test",
+    size = "small",
+    srcs = ["gfp_compare_collections_test.py"],
+    args = ["$(location :gfp_compare_collections)", "$(location testdata/compare_collections.gfp)"],
+    data = [":gfp_compare_collections", "testdata/compare_collections.gfp"],
+)
+
 cc_binary(
     name = "gfp_compare_collections",
     srcs = [
@@ -233,7 +241,6 @@ cc_binary(
     deps = [
         ":gfp",
         ":gfp_standard",
-        "//Foundational/accumulator",
         "//Foundational/cmdline:iwcmdline",
         "//Foundational/data_source:iwstring_data_source",
         "//Foundational/iw_tdt",

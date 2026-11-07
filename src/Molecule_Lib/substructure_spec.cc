@@ -2039,7 +2039,8 @@ Substructure_Atom::construct_from_smarts_token(const const_IWSubstring& smarts) 
 
   int nchars = mysmarts.length() - 4;  // we want to look for /IW.
 
-  for (int i = 0; i < nchars; ++i) {
+  // Include the final possible position: /IWx is only four characters long.
+  for (int i = 0; i <= nchars; ++i) {
     if (!mysmarts.matches_at_position(i, "/IW")) {
       continue;
     }

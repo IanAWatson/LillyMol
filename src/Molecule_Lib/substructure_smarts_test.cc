@@ -417,4 +417,79 @@ TEST_F(TestSubstructureSmarts, TestCr5)
   ASSERT_EQ(query2.substructure_search(_m, _sresults), 5u);
 }
 
+struct IWDirectivePlacement {
+  const char* smarts;
+  uint32_t toluene_hits;
+  uint32_t naphthalene_hits;
+};
+
+// Directive-first is conventional, but /IW predicates can appear after or
+// between ordinary primitives, with implicit or explicit conjunctions.
+class TestIWDirectivePlacement : public testing::TestWithParam<IWDirectivePlacement> {
+ protected:
+  void CheckMatches(Substructure_Query& query) {
+    const auto& params = GetParam();
+    Molecule m;
+    Substructure_Results results;
+    ASSERT_TRUE(m.build_from_smiles("Cc1ccccc1"));
+    EXPECT_EQ(query.substructure_search(m, results), params.toluene_hits);
+    ASSERT_TRUE(m.build_from_smiles("c1ccc2ccccc2c1"));
+    EXPECT_EQ(query.substructure_search(m, results), params.naphthalene_hits);
+    ASSERT_TRUE(m.build_from_smiles("CC(C)C"));
+    EXPECT_EQ(query.substructure_search(m, results), 0u);
+  }
+
+  void SetUp() override {
+    set_global_aromaticity_type(Daylight);
+  }
+};
+
+TEST_P(TestIWDirectivePlacement, DirectSmarts) {
+  SCOPED_TRACE(GetParam().smarts);
+  Substructure_Query query;
+  ASSERT_TRUE(query.create_from_smarts(GetParam().smarts));
+  CheckMatches(query);
+}
+
+TEST_P(TestIWDirectivePlacement, TextprotoSmarts) {
+  SCOPED_TRACE(GetParam().smarts);
+  const std::string text = std::string("query { smarts: \"") +
+                           GetParam().smarts + "\" }";
+  SubstructureSearch::SubstructureQuery proto;
+  ASSERT_TRUE(google::protobuf::TextFormat::ParseFromString(text, &proto));
+  Substructure_Query query;
+  ASSERT_TRUE(query.ConstructFromProto(proto));
+  CheckMatches(query);
+}
+
+INSTANTIATE_TEST_SUITE_P(AnywhereInAtom, TestIWDirectivePlacement, testing::Values(
+    IWDirectivePlacement{"[/IWfss1&cD3]", 1, 0},
+    IWDirectivePlacement{"[/IWfss1cD3]", 1, 0},
+    IWDirectivePlacement{"[cD3/IWfss1]", 1, 0},
+    IWDirectivePlacement{"[cD3&/IWfss1]", 1, 0},
+    IWDirectivePlacement{"[cD3;/IWfss1]", 1, 0},
+    IWDirectivePlacement{"[c/IWfss1D3]", 1, 0},
+    IWDirectivePlacement{"[/IWfss2&cD3]", 0, 2},
+    IWDirectivePlacement{"[/IWfss2cD3]", 0, 2},
+    IWDirectivePlacement{"[cD3/IWfss2]", 0, 2},
+    IWDirectivePlacement{"[cD3&/IWfss2]", 0, 2},
+    IWDirectivePlacement{"[cD3;/IWfss2]", 0, 2},
+    IWDirectivePlacement{"[c/IWfss2D3]", 0, 2}
+));
+
+TEST_F(TestSubstructureSmarts, EmbeddingExclusionDirectivePlacement) {
+  // /IWx is handled by the atom-level pre-scan, unlike the /IWfss predicate.
+  // Initial atom numbering leaves an invalid-atom placeholder for nitrogen.
+  for (const char* smarts : {"C-[/IWxN]", "C-[N/IWx]", "C-[N&/IWx]"}) {
+    SCOPED_TRACE(smarts);
+    Substructure_Query query;
+    ASSERT_TRUE(query.create_from_smarts(smarts));
+    Molecule m;
+    ASSERT_TRUE(m.build_from_smiles("CN"));
+    Substructure_Results results;
+    ASSERT_EQ(query.substructure_search(m, results), 1u);
+    EXPECT_THAT(*results.embedding(0), ElementsAre(0, kInvalidAtomNumber));
+  }
+}
+
 }  // namespace

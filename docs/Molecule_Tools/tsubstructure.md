@@ -481,3 +481,12 @@ Commonly used `-M` qualifiers, others are in `-M help`
 A search can be fast. A simple query may take about two seconds on 100k molecules, including reading
 them. Larger files can be split and searched in parallel with `dopattern.sh`, or
 tsubstructure_parallel.sh. See the [common tasks](../CommonTasks.md) page.
+
+The parallel wrapper requires named output files for `-m` and `-n`. Stdout
+(`-m -` or `-n -`) is not supported and is rejected before workers start.
+The same restriction applies to combined stdout requests such as `-m QDT:-`.
+Use a named stem and read the joined file after a successful run:
+
+```shell
+tsubstructure_parallel.sh -thr 4 -s 'N' -m hits input.smi && cat hits.smi
+```

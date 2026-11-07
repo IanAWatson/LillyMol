@@ -8,6 +8,8 @@ $expert = false
 def usage (rc)
   $stderr.print "Multi-threaded version of tsubstructure\n"
   $stderr.print " -thr <nthreads>  number of threads to use\n"
+  $stderr.print " -m <stem>       matched-molecule output must be a named file, not stdout (-)\n"
+  $stderr.print " -n <stem>       non-matching output must also be a named file\n"
   $stderr.print " -nj              do NOT join the output files, leave in split form\n"
   $stderr.print " -tmpdir <dir>    directory for temporary files\n" if ($expert)
   $stderr.print " -expert          more options\n" unless ($expert)
@@ -30,6 +32,22 @@ tsubstructure = cl.value('tsub') if (cl.option_present('tsub'))
 if ARGV.empty?
   $stderr.print "Insufficient arguments\n"
   usage(2)
+end
+
+# Each worker writes its own file, which is joined after processing. A '-'
+# stem would send only worker zero to stdout and join the rest into '-.smi'.
+# Check every occurrence before selecting stems or starting any workers.
+%w[m n].each do |flag|
+  next unless cl.option_present(flag)
+
+  cl.values(flag).each do |value|
+    stem = value.sub(/\A(?:QDT|QDTVB|SEPA|NONM|NONMX):/, '')
+    next unless stem.sub(/\.smi\z/, '') == '-'
+
+    $stderr << "tsubstructure_parallel: -#{flag} #{value} requests stdout, which is not supported\n"
+    $stderr << "Use a named output stem, for example -#{flag} results, then cat results.smi\n"
+    exit 2
+  end
 end
 
 mfile = cl.value('m')

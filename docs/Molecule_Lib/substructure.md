@@ -21,6 +21,7 @@ Query information can be specified via several means
 * [Other Messages](#other-messages)
 * [Choosing between environment, down_the_bond, and Substituent](#choosing-between-environment-down_the_bond-and-substituent)
 * [Down The Bond](#down-the-bond)
+  * [Example: separated isotope-labelled regions](#example-separated-isotope-labelled-regions)
 * [Substituent](#substituent)
 * [Region](#region)
 * [MatchedAtomMatch](#matchedatommatch)
@@ -1090,9 +1091,9 @@ methoxy-like substituents on benzene and limit the sidechain to at most five ato
 a-[OD2]-{a{1-5}}C
 ```
 The directive is inserted between the two atoms that define the bond, and
-atoms down that bond are considered. The `C` atom in the query above is not
-part of what is matched by the down-the-bond directive, because it can be fully
-specified in the SMARTS. If the bond is in a ring, the match fails.
+atoms down that bond are considered. The `C` atom in the query above is included in the downstream atom count and
+property constraints; the `O` anchor is excluded. If the bond is in a ring,
+the match fails.
 
 The same concept is also available in textproto query files via the
 `down_the_bond` message. The SMARTS form supports several atomic-property
@@ -1201,6 +1202,68 @@ aromatic atoms, five ring atoms, one unsaturated atom, and seven atoms overall.
 Only atomic SMARTS can be specified inside the directive, but those atomic SMARTS
 can be recursive SMARTS. Recursive SMARTS can match any part of the molecule,
 including atoms that are not down the bond.
+
+### Example: separated isotope-labelled regions
+
+Suppose isotope 1 marks a region of interest, and molecules with multiple
+separate labelled regions should be rejected. A useful down-the-bond query is:
+
+```text
+[1]~{[1]>0}[!1]
+```
+
+This crosses a bond from an isotope-1 atom to an atom whose isotope is not 1,
+then requires at least one isotope-1 atom on the downstream side. The anchor
+is excluded from this count. The downstream endpoint itself is included, but
+cannot satisfy `[1]` because it matched `[!1]`. Other isotope values are allowed
+by `[!1]`; use `[0]` if the endpoint must have no isotope.
+
+| Molecule | Matches? | Reason |
+| --- | --- | --- |
+| `[1CH3][1CH2]CC` | No | No labelled atom beyond the boundary |
+| `[1CH3]C[1CH3]` | Yes | A second labelled region lies beyond the unlabelled carbon |
+| `[1CH3]CC[1CH3]` | Yes | A second labelled region lies beyond the unlabelled chain |
+| `[1CH3][2CH3]` | No | The terminal isotope-2 endpoint does not satisfy the downstream `[1]>0` constraint |
+
+For example, write candidates to reject and remaining molecules separately:
+
+```shell
+tsubstructure -s '[1]~{[1]>0}[!1]' -m multiple_regions -n remaining input.smi
+```
+
+An alternative formulation uses a linker:
+
+```text
+[1]~[!1]...[1]
+```
+
+For a non-ring boundary bond, both expressions ask whether another labelled
+atom is reachable after leaving the labelled region. The down-the-bond form
+examines the downstream component rather than enumerating pairs of labelled
+atoms and linker paths. On large, heavily labelled datasets this can be much
+cheaper than starting with `[1]...[1]`. The explicit `[1]~[!1]` boundary can
+also reduce the search space of the linker form.
+
+In one comparison on the same dataset, with both queries restricted by
+`-M maxe=1`, the linker query took 20 seconds and the down-the-bond query took
+16.5 seconds, a 17.5% reduction in elapsed time. Limiting accepted embeddings
+does not eliminate the work required to find the first embedding or establish
+that no match exists. These timings illustrate a benefit on that dataset,
+rather than a guaranteed speedup for other inputs.
+
+These expressions are not universally equivalent: down-the-bond rejects ring
+boundary bonds, whereas the linker form can match them. A partially labelled
+ring can provide an unlabelled route between atoms of a single connected
+labelled region, producing a linker match even though there is only one region.
+Fully labelled rings within a region are fine, provided there is no alternative
+unlabelled route connecting distinct atoms of that region; fully labelling the
+ring system is a sufficient safeguard.
+
+Neither expression detects labelled regions in different disconnected molecular
+fragments, and neither matches a molecule containing no isotope-1 atoms.
+Consequently, `remaining.smi` is not an unconditional guarantee of exactly one
+labelled region. For arbitrary ring labelling or disconnected inputs, count
+connected components of the subgraph induced by isotope-1 atoms instead.
 
 ## Substituent
 

@@ -254,6 +254,14 @@ display_dash_j_options() {
 static void
 DisplayDashmOptions(int rc) {
   cerr << R"(The -m option specifies where molecules that match one or more queries are written
+Supply a filename and modifiers separately, in either order: -m hits -m QDT.
+QDT, QDTVB, SEPA, NONM and NONMX also accept MODIFIER:<filename>:
+  -m QDT:hits    -m QDTVB:/tmp/hits.smi    -m QDT:- (stdout)
+Additional modifiers can be separate: -m QDT:hits -m NONMX.
+Specify only one output filename. A modifier alone does not supply a filename.
+CSR:<char> specifies a separator, not a filename; use -m hits -m CSR:,.
+Use ./QDT for a literal filename that is also a modifier keyword.
+
  -m <fname>     the file name(s) that will be created
  -m QDT         to each molecule append Query DeTails of the query(s) that matched.
                 output might look like: S=C(N)NN=C(C)C1=CC=CN1 CHEMBL1990108 (4 matches to 'c')
@@ -264,11 +272,11 @@ DisplayDashmOptions(int rc) {
                 might generate    S=C(N)NN=C(C)C1=CC=CN1 CHEMBL1990108 q1:4 q2:1
  -m CSR:<char>  might generate    C12=C(SNC1=O)CCNC2 CHEMBL171241,q1:3,q2:1
                 to generate a true csv file, also add '-o csv'
-                tsbstructure -m - -m CSR:, -o csv ...
+                tsubstructure -m - -m CSR:, -o csv ...
  -m SEPA        Write the matches to each query to a separate file.
                 By default, all matches are written to the same -m file.
                 tsubstructure -s 'c q1' -s 'n q2' -m FOO -m SEPA
-                will create files FOO0.smi FOO1.smi containing the matches to the first query, q1
+                will create FOO0.smi containing the matches to the first query, q1
                 and FOO1.smi containing the matches to q2.
  -m NONM        also write the non-matches to the -m file. This is often useful when the -j option
                 is applying isotopic atoms to matched atoms. Some molecules get isotopes
@@ -1985,6 +1993,34 @@ parse_set_of_options(Command_Line& cl, char flag,
 
   IWString tmp;
   for (int i = 0; cl.value(flag, tmp, i); ++i) {
+    // Normalise the combined form so modifier handling stays shared with
+    // the original separate-argument form. CSR:<char> retains its meaning.
+    if (flag == 'm') {
+      for (const char* modifier : {"QDT", "QDTVB", "SEPA", "NONM", "NONMX"}) {
+        IWString prefix(modifier);
+        prefix << ':';
+        if (!tmp.starts_with(prefix)) {
+          continue;
+        }
+        IWString combined_fname(tmp);
+        combined_fname.remove_leading_chars(prefix.length());
+        if (combined_fname.empty()) {
+          cerr << "Missing output filename in -m '" << tmp
+               << "'; use -m " << modifier << ":<stem> or -m <stem> -m "
+               << modifier << '\n';
+          return 0;
+        }
+        if (!fname.empty()) {
+          cerr << "Conflicting output filenames for -m: '" << fname
+               << "' and '" << combined_fname << "'. Specify only one filename\n";
+          return 0;
+        }
+        fname = combined_fname;
+        tmp = modifier;
+        need_to_open_file = 1;
+        break;
+      }
+    }
     if (tmp.starts_with("REPO")) {
       report_matches = 1;
       if (verbose) {
@@ -2037,6 +2073,7 @@ parse_set_of_options(Command_Line& cl, char flag,
         cerr << match_or_non_match << " written to separate file for each query\n";
       }
     } else if ("NONM" == tmp) {
+      need_to_open_file = 1;
       if ('m' != flag) {
         cerr << "The 'NONM' qualifier is only recognised with the -m option\n";
         usage(7);
@@ -2050,6 +2087,7 @@ parse_set_of_options(Command_Line& cl, char flag,
                 "stream\n";
       }
     } else if ("NONMX" == tmp) {
+      need_to_open_file = 1;
       if ('m' != flag) {
         cerr << "The 'NONMX' qualifier is only recognised with the -m option\n";
         usage(7);
@@ -2097,7 +2135,12 @@ parse_set_of_options(Command_Line& cl, char flag,
   }
 
   if (fname.empty()) {
-    cerr << "No file name specified for -" << flag << " option\n";
+    cerr << "Output modifiers for -" << flag << " require an output filename\n";
+    cerr << "Use -" << flag << " <stem> -" << flag
+         << " <modifier> (or use '-' as the stem for stdout)\n";
+    if (flag == 'm') {
+      cerr << "For example: -m hits -m QDT or -m QDT:hits\n";
+    }
     return 0;
   }
 

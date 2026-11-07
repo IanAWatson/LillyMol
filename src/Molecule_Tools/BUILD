@@ -4209,6 +4209,14 @@ py_test(
 )
 
 py_test(
+    name = "tsubstructure_cli_test",
+    size = "small",
+    srcs = ["tsubstructure_cli_test.py"],
+    args = ["$(location :tsubstructure)"],
+    data = [":tsubstructure"],
+)
+
+py_test(
     name = "mol2safe_cli_test",
     size = "small",
     srcs = ["mol2safe_cli_test.py"],

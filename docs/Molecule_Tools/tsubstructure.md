@@ -172,6 +172,39 @@ added, so `-m hits.txt` writes `hits.txt.smi`, and `-m hits.smi -o sdf` writes
 `hits.smi.sdf`. Only a suffix that follows a period is recognised, so `-m out_smi` writes
 `out_smi.smi`.
 
+### Output modifiers and filenames
+
+Supply the output stem and each modifier as separate `-m` arguments, in either
+order, or combine one of `QDT`, `QDTVB`, `SEPA`, `NONM`, or `NONMX` with the stem
+using `MODIFIER:<filename>`:
+
+```shell
+tsubstructure -s 'N nitrogen' -m hits -m QDT input.smi
+tsubstructure -s 'N nitrogen' -m QDT -m hits input.smi
+tsubstructure -s 'N nitrogen' -m QDT:hits input.smi
+```
+
+All three commands write `hits.smi` with query details appended to each name.
+Absolute filenames and stdout are supported:
+
+```shell
+tsubstructure -s 'N nitrogen' -m QDTVB:/tmp/hits.smi input.smi
+tsubstructure -s 'N nitrogen' -m QDT:- input.smi
+```
+
+Everything after the modifier's first colon is the output stem, with the same
+suffix handling as `-m <stem>`. Additional modifiers can still be supplied
+separately, for example `-m QDT:hits -m NONMX`. Specify only one filename;
+`-m hits -m QDT:other` is an error. A modifier alone, such as `-m QDT`, does
+not supply a filename. Use `-m ./QDT` if the intended filename is literally
+`QDT.smi`.
+
+`CSR:<char>` retains its existing meaning: the text after the colon specifies
+the query-detail separator, **not a filename**. Use `-m hits -m CSR:,` for
+comma-separated query details. The `filename:MODIFIER` form is not supported;
+combined filename forms are available only for the five modifiers listed above
+and only with `-m`. The separate-argument syntax remains unchanged.
+
 ### Extra information on each molecule
 
 Extra `-m` qualifiers add details of the queries that matched. With

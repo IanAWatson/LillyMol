@@ -400,7 +400,7 @@ class DownTheBond {
     int OkAromaticCount(Molecule& m, const int* visited) const;
     int OkRingAtomCount(Molecule& m, const int* visited) const;
     int OkMaxDistance(Molecule& m, atom_number_t a2, const int* visited) const;
-    int NoAtomsDownTheBond(Molecule& m, atom_number_t a1, atom_number_t a2);
+    int NoAtomsDownTheBond(Molecule_to_Match& target, atom_number_t a1, atom_number_t a2);
     int OkRingCount(Molecule& m, const int* visited) const;
 
   public:

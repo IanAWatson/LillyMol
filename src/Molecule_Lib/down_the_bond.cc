@@ -792,7 +792,7 @@ DownTheBond::Matches(Molecule_to_Match& target,
   }
 
   if (atom_stack.empty()) {
-    return NoAtomsDownTheBond(m, a1, a2);
+    return NoAtomsDownTheBond(target, a1, a2);
   }
 
   std::fill_n(visited, m.natoms(), 0);
@@ -948,9 +948,11 @@ DownTheBond::AllQueriesRequireZeroHits() const {
 }
 
 // Atom a2 is terminal. There are no further atoms. By definition, atom a2 is
-// included in what is downt he bond, so we have 1 matched atom.
+// included in what is down the bond, so we have 1 matched atom.
 int
-DownTheBond::NoAtomsDownTheBond(Molecule& m, atom_number_t a1, atom_number_t a2) {
+DownTheBond::NoAtomsDownTheBond(Molecule_to_Match& target, atom_number_t a1,
+                              atom_number_t a2) {
+  Molecule& m = *target.molecule();
   int positive_match_found = 0;
 
   if (! _natoms.is_set()) {
@@ -1013,6 +1015,20 @@ DownTheBond::NoAtomsDownTheBond(Molecule& m, atom_number_t a1, atom_number_t a2)
     ++positive_match_found;
   } else {
     return ! _match_as_match;
+  }
+
+  // The terminal endpoint is the only atom down the bond. The anchor a1
+  // must not contribute to atomic SMARTS counts.
+  if (!_query.empty()) {
+    std::unique_ptr<int[]> already_matched = std::make_unique<int[]>(m.natoms());
+    for (QueryMatches* qm : _query) {
+      std::fill_n(already_matched.get(), m.natoms(), 0);
+      const uint32_t nhits = qm->ss_atom().matches(target[a2], already_matched.get()) ? 1 : 0;
+      if (!qm->Matches(nhits)) {
+        return !_match_as_match;
+      }
+    }
+    return _match_as_match;
   }
 
   // Nothing has rejected the value. If there was nothing specified, that is a match.

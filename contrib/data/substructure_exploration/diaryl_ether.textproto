@@ -1,0 +1,5 @@
+# Linkers and unsaturation
+name: "diaryl_ether"
+query {
+  smarts: "a-O-a"
+}

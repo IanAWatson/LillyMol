@@ -1,0 +1,5 @@
+# Unfused aromatic heterocycles
+name: "thiazole"
+query {
+  smarts: "[s/IWfss1]1cncc1"
+}

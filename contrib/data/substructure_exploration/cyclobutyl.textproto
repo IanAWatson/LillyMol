@@ -1,0 +1,5 @@
+# Unfused saturated rings
+name: "cyclobutyl"
+query {
+  smarts: "[C/IWfss1]1CCC1"
+}

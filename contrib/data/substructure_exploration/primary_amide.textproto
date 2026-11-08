@@ -1,0 +1,5 @@
+# Functional groups
+name: "primary_amide"
+query {
+  smarts: "C(=O)-[NH2]"
+}

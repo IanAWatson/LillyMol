@@ -1,0 +1,5 @@
+# Common substituents
+name: "cf3"
+query {
+  smarts: "F-[CD4](-F)-F"
+}

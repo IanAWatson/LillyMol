@@ -37,22 +37,29 @@ it does not assign physiological charge states. Permanent charges, such as
 quaternary ammonium, remain charged. Examples in the report show the standardised
 structures. Use `--no-standardize` to search the input structures directly.
 
-The default catalogue is `contrib/data/substructure_exploration.textproto`. Its
-83 features include functional groups, halogens, common heterocycles, ring-system
+The default selection file is `contrib/data/substructure_exploration/queries`.
+It lists 84 standalone LillyMol query files in the same directory. The features include functional groups, halogens, common heterocycles, ring-system
 topology, aromatic linkers and potentially reactive groups. Definitions overlap:
-a lactam is also an amide, and a carbamate may also match ester and amide queries.
+a lactam is also an amide, and a carbamate may also match the ester query.
 These are descriptive features, rather than disjoint chemical classifications.
 
 Some definitions deserve particular attention:
 
-- `cf3` requires exactly three fluorines attached to a carbon, with a fourth
-  non-fluorine neighbour. It excludes CF4.
+- `cf3` matches `F-[CD4](-F)-F`. It also matches CF4; unique matched atom
+  sets give four matches for CF4, one for each choice of three fluorines.
 - `heavy_halogen` matches Cl, Br or I.
-- `methoxy` matches `[CD1H3]-[OD2]-[c,CX4]`: methyl ethers attached
+- `methoxy` matches `[CD1H3]-[OD2]-[c,CG0]`: methyl ethers attached
   to aromatic or saturated aliphatic carbon, excluding methyl esters and
   non-aromatic unsaturated carbon attachments.
 - `fluorine_not_cf3` matches individual fluorines outside CF3, including aryl
-  fluorine, monofluoroalkyl and difluoroalkyl fluorines.
+  fluorine, monofluoroalkyl and difluoroalkyl fluorines. Its existing definition
+  also matches the fluorines in CF4, so these two features overlap for CF4.
+- `amide` uses `[CX3D3T2](=O)-[NX3]`, excluding formamides, ureas and
+  carbamates from this general amide feature. The separately named amide
+  subtypes can overlap other carbonyl features.
+- `ether` and `ether_cyclic` require two saturated carbons around the oxygen;
+  they distinguish non-ring and ring oxygen respectively. Aryl ethers have
+  their own feature, and ester/lactone oxygens do not satisfy these queries.
 - The primary, secondary, tertiary and cyclic amine queries use separate,
   commented `environment_no_match` messages to exclude common amide-like,
   amidine/guanidine and directly heteroatom-linked nitrogens. Aniline is also
@@ -68,16 +75,69 @@ Some definitions deserve particular attention:
 
 Matching counts use unique matched atom sets to suppress symmetry-equivalent
 embeddings. They are counts of query matches, which need not equal counts of
-chemically distinct groups for every complex motif. The six inline ring-system
+chemically distinct groups for every complex motif. The six ring-system
 predicates are **presence only**: they report zero or one match even when several
 systems qualify, and highlight one atom belonging to a matching system. This
 avoids counting all atoms of a qualifying system as separate occurrences.
 
 ## Custom queries and reports
 
-Use `--config queries.textproto` to replace the catalogue. Each entry needs a
-unique name and one of SMARTS, a query filename, or an inline full LillyMol
-`SubstructureQuery` proto:
+### Selection files and standalone queries
+
+Use `--config <selection>` to choose a subset. A selection file lists one query
+pathname per line, in the desired report order. Blank lines and lines beginning
+with `#` are ignored. Each listed file is a normal LillyMol `SubstructureQuery`
+textproto with its own name, for example `acid.textproto`:
+
+```textproto
+name: "acid"
+query {
+  smarts: "[OD1H]-C=O"
+}
+```
+
+Paths are relative to the selection file, not the current working directory.
+Absolute paths, spaces in filenames, `~`, and environment variables such as
+`${LILLYMOL_HOME}` are supported. Each line is a complete pathname, without shell
+quoting or inline comments. Query names must be unique across the selection.
+
+For example, a file called `my_queries` could contain:
+
+```text
+# A small feature subset
+${LILLYMOL_HOME}/contrib/data/substructure_exploration/acid.textproto
+${LILLYMOL_HOME}/contrib/data/substructure_exploration/primary_amine.textproto
+```
+
+Run it with:
+
+```shell
+substructure_exploration.sh analyse --config my_queries -A activity.txt molecules.smi
+```
+
+The supplied `functional_groups.txt` and `rings.txt` selections provide starting
+subsets. Copy a selection and edit its entries to experiment, or edit an
+individual query file without changing every selection that uses it. Standalone
+files also work with other LillyMol tools:
+
+```shell
+tsubstructure -q "PROTO:$LILLYMOL_HOME/contrib/data/substructure_exploration/acid.textproto" molecules.smi
+```
+
+### Existing textproto configurations
+
+The `SubstructureExploration` textproto format remains supported via
+`--config queries.textproto`. The old
+`contrib/data/substructure_exploration.textproto` path is retained as a small
+compatibility configuration referencing the standalone query files; definitions
+are maintained only in those individual files.
+
+Each textproto entry can specify SMARTS, a query filename, or an inline full
+LillyMol `SubstructureQuery` proto. An explicit name overrides the query file's
+name. When a filename entry omits the name, it is read from that file's textproto.
+Relative filenames and environment variables are resolved as in selection files.
+For legacy MSI query files, continue to supply an explicit name.
+
 
 ```textproto
 query {
@@ -129,7 +189,33 @@ By default, the `html` command preserves the stored order and includes all
 stored queries. These options change HTML only and cannot restore queries
 filtered out during analysis.
 
-The molecule-independent report renderer is shared with
+### Structure examples and long queries
+
+Matched examples are shown as embedded RDKit SVG depictions, with matched atoms
+highlighted in green. Isotope-1 markers from the stored labelled examples are
+hidden in the drawing; the stored SMILES are unchanged and can be expanded
+under each image for copying. Identifiers, activities and match counts remain
+visible beneath the structures.
+
+To enable depictions, install RDKit in the Python environment used by the tool:
+
+```shell
+uv pip install rdkit
+# Alternatively:
+python -m pip install rdkit
+```
+
+RDKit is loaded only for HTML structure rendering. LillyMol still performs
+standardisation and substructure searching, and analysis without HTML does not
+require RDKit. If RDKit is unavailable, or cannot depict a particular LillyMol
+SMILES, the example displays a message and its SMILES instead. Generated HTML
+is self-contained, including its images, and can be viewed offline.
+
+Query/source definitions longer than 100 characters show a shortened preview
+and an expandable **Full query** section. Text filtering still searches the
+complete definition, including the hidden part. JSON retains the full source.
+
+The report renderer is shared with
 [dicer_fragment_activity](dicer_fragment_activity.md), which analyzes generated
 fragments rather than dictionary queries.
 

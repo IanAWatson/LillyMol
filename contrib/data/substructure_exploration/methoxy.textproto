@@ -1,0 +1,5 @@
+# Common substituents
+name: "methoxy"
+query {
+  smarts: "[CD1H3]-[OD2]-[c,CG0]"
+}

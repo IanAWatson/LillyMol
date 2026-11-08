@@ -1,0 +1,5 @@
+# Common substituents
+name: "heavy_halogen"
+query {
+  smarts: "[Cl,Br,I]"
+}

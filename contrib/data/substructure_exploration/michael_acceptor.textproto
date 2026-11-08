@@ -1,0 +1,5 @@
+# Potentially reactive motifs
+name: "michael_acceptor"
+query {
+  smarts: "C=C-[C,S](=O)"
+}

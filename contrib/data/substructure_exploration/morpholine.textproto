@@ -1,0 +1,5 @@
+# Unfused saturated rings
+name: "morpholine"
+query {
+  smarts: "[N/IWfss1]1CCOCC1"
+}

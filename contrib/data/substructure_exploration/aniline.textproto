@@ -1,0 +1,5 @@
+# Functional groups
+name: "aniline"
+query {
+  smarts: "c-[ND1H2+0]"
+}

@@ -140,7 +140,17 @@ cannot restore features omitted by the analyzer's support or size limits. The
 renderer reads the complete JSON; `--top_n` limits rendering, not JSON parsing
 memory. The report uses the same HTML rendering code as
 `substructure_exploration.py`, including text filtering, sortable columns and
-matched/unmatched activity histograms.
+matched/unmatched activity histograms. Parent examples are drawn as embedded
+RDKit SVG images, with expandable SMILES for copying. Dicer parent examples
+without stored match labels are drawn without match highlighting. Long feature
+sources have a 100-character preview and an expandable full definition; text
+filtering still searches the complete source.
+
+RDKit is optional and used only for depiction (`uv pip install rdkit`, or
+`python -m pip install rdkit`). If it is unavailable or cannot depict a SMILES,
+the report displays the SMILES instead. The HTML remains self-contained and
+works offline; neither LillyMol Python bindings nor protobuf are needed by
+this JSON-to-HTML command.
 
 These are exploratory associations within the analyzed dataset; correlated
 fragments may have identical distributions.

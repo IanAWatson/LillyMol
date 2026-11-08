@@ -1,0 +1,5 @@
+# Potentially reactive motifs
+name: "aziridine"
+query {
+  smarts: "[N]1CC1"
+}

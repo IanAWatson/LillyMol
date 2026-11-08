@@ -1,0 +1,5 @@
+# Unfused aromatic heterocycles
+name: "pyrimidine"
+query {
+  smarts: "[n/IWfss1]1cnccc1"
+}

@@ -1,0 +1,5 @@
+# Functional groups
+name: "ester"
+query {
+  smarts: "[CX3](=O)-[OX2]-[#6]"
+}

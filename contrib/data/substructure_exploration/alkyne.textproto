@@ -1,0 +1,5 @@
+# Linkers and unsaturation
+name: "alkyne"
+query {
+  smarts: "C#C"
+}

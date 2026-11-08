@@ -1,0 +1,5 @@
+# Common substituents
+name: "difluoromethyl"
+query {
+  smarts: "[CH1](F)F"
+}

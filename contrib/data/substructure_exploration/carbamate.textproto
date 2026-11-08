@@ -1,0 +1,5 @@
+# Functional groups
+name: "carbamate"
+query {
+  smarts: "N-C(=O)-O-[#6]"
+}

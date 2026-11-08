@@ -1,6 +1,9 @@
-"""Molecule-independent HTML rendering and feature ranking for activity reports."""
+"""Shared activity-report rendering; RDKit is used only for optional depictions."""
+import base64
+from functools import lru_cache
 import heapq
 import html
+import sys
 
 
 SORT_FIELDS = ('abs_median', 'abs_mean', 'median', 'mean', 'support')
@@ -96,13 +99,91 @@ def multiplicity_profiles_html(row: dict[str, object]) -> str:
     return ''.join(parts)
 
 
+
+QUERY_PREVIEW_LENGTH = 100
+
+
+def query_source_html(source: str) -> str:
+    """Keep long query definitions compact without losing the full text."""
+    if len(source) <= QUERY_PREVIEW_LENGTH:
+        return f'<code>{html.escape(source)}</code>'
+    preview = html.escape(source[:QUERY_PREVIEW_LENGTH] + '\u2026')
+    return (f'<code class="query-preview">{preview}</code>'
+            '<details class="query-details"><summary>Full query</summary>'
+            f'<pre>{html.escape(source)}</pre></details>')
+
+
+@lru_cache(maxsize=1)
+def _depiction_modules():
+    # Analysis and ranking must not depend on RDKit. Import it only when an
+    # example is rendered, and report an unavailable backend once per process.
+    try:
+        from rdkit import Chem, rdBase
+        from rdkit.Chem import rdDepictor
+        from rdkit.Chem.Draw import rdMolDraw2D
+    except ImportError:
+        print('RDKit is unavailable; displaying SMILES instead of structure images. '
+              'Install it with: uv pip install rdkit (or python -m pip install rdkit)',
+              file=sys.stderr)
+        return None
+    return Chem, rdBase, rdDepictor, rdMolDraw2D
+
+
+@lru_cache(maxsize=512)
+def depiction_svg(smiles: str, highlight_matches: bool = False) -> str | None:
+    """Draw stored examples; LillyMol has already performed all matching."""
+    modules = _depiction_modules()
+    if modules is None:
+        return None
+    Chem, rdBase, rdDepictor, rdMolDraw2D = modules
+    try:
+        # LillyMol supports some structures RDKit cannot depict. The HTML
+        # fallback reports these without flooding stderr with parser messages.
+        with rdBase.BlockLogs():
+            molecule = Chem.MolFromSmiles(smiles)
+        if molecule is None or molecule.GetNumAtoms() == 0:
+            return None
+        highlighted = []
+        if highlight_matches:
+            for atom in molecule.GetAtoms():
+                if atom.GetIsotope() == 1:
+                    highlighted.append(atom.GetIdx())
+                    atom.SetIsotope(0)
+        atom_set = set(highlighted)
+        highlighted_bonds = [bond.GetIdx() for bond in molecule.GetBonds()
+                             if bond.GetBeginAtomIdx() in atom_set and
+                             bond.GetEndAtomIdx() in atom_set]
+        rdDepictor.Compute2DCoords(molecule)
+        drawer = rdMolDraw2D.MolDraw2DSVG(220, 160)
+        colour = (0.65, 0.86, 0.78)
+        drawer.DrawMolecule(
+            molecule, highlightAtoms=highlighted, highlightBonds=highlighted_bonds,
+            highlightAtomColors={atom: colour for atom in highlighted},
+            highlightBondColors={bond: colour for bond in highlighted_bonds})
+        drawer.FinishDrawing()
+        return drawer.GetDrawingText()
+    except (ValueError, RuntimeError):
+        return None
+
+
 def examples_html(examples: list[dict[str, object]]) -> str:
     if not examples:
         return '<span class="muted">No matched examples</span>'
     parts = ['<div class="examples">']
     for example in examples:
         parts.append('<div class="example">')
-        parts.append(f'<code>{html.escape(str(example.get("labelled_smiles", example.get("smiles", ""))))}</code>')
+        smiles = str(example.get('labelled_smiles') or example.get('smiles', ''))
+        svg = depiction_svg(smiles, bool(example.get('labelled_smiles')))
+        if svg is None:
+            parts.append('<span class="depiction-unavailable">Depiction unavailable</span>')
+            parts.append(f'<code>{html.escape(smiles)}</code>')
+        else:
+            encoded = base64.b64encode(svg.encode('utf-8')).decode('ascii')
+            alt = html.escape(f"Structure of {example['identifier']}", quote=True)
+            parts.append(f'<img class="structure" width="220" height="160" '
+                         f'alt="{alt}" src="data:image/svg+xml;base64,{encoded}">')
+            parts.append('<details class="smiles"><summary>SMILES</summary>'
+                         f'<code>{html.escape(smiles)}</code></details>')
         parts.append(
             '<span>' + html.escape(str(example['identifier'])) +
             f' activity {fmt(example["activity"])}' +
@@ -150,7 +231,10 @@ th, td { border-bottom: 1px solid var(--border); padding: 8px 10px; text-align: 
 th { background: #dfe6eb; color: #3d4651; font-size: 12px; text-transform: uppercase; letter-spacing: 0; white-space: nowrap; }
 th.sortable { cursor: pointer; }
 td.num { text-align: right; font-variant-numeric: tabular-nums; }
-.name strong { display: block; }
+.name { min-width: 180px; width: 240px; max-width: 300px; }
+.name strong { display: block; overflow-wrap: anywhere; }
+.name pre { white-space: pre-wrap; overflow-wrap: anywhere; max-width: 280px; margin: 6px 0; font-size: 12px; }
+details summary { cursor: pointer; color: var(--muted); font-size: 12px; margin-top: 4px; }
 .name code { display: block; color: var(--muted); font-size: 12px; margin-top: 3px; overflow-wrap: anywhere; }
 .hist { width: 220px; height: 54px; }
 .hist line { stroke: #c7cdd4; stroke-width: 1; }
@@ -161,9 +245,10 @@ td.num { text-align: right; font-variant-numeric: tabular-nums; }
 .count-profiles { display: grid; gap: 2px; color: var(--muted); font-size: 12px; margin-top: 4px; }
 .warn { color: var(--warn); font-weight: 600; }
 .muted { color: var(--muted); }
-.examples { display: grid; grid-template-columns: repeat(3, minmax(160px, 1fr)); gap: 6px; max-width: 640px; }
+.examples { display: grid; grid-template-columns: repeat(3, 220px); gap: 6px; width: max-content; }
 .example { border: 1px solid #e2e5e9; background: #fff; padding: 6px; }
 .example code { display: block; overflow-wrap: anywhere; }
+.structure { display: block; max-width: 100%; height: auto; }
 .example span { display: block; color: var(--muted); font-size: 12px; margin-top: 4px; }
 .hidden { display: none; }
 @media (max-width: 720px) { header, .toolbar, main { padding-left: 12px; padding-right: 12px; } .status { width: 100%; margin-left: 0; } }
@@ -222,7 +307,7 @@ td.num { text-align: right; font-variant-numeric: tabular-nums; }
         )
         parts.append('<td class="name">')
         parts.append(f'<strong>{html.escape(row["name"])}</strong>')
-        parts.append(f'<code>{html.escape(row["source"])}</code>')
+        parts.append(query_source_html(row["source"]))
         parts.append('</td>')
         parts.append(f'<td class="num">{matched["n"]}</td>')
         parts.append(f'<td class="num">median {fmt(matched["median"])}<br>mean {fmt(matched["mean"])}</td>')

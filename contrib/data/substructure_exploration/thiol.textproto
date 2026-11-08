@@ -1,0 +1,5 @@
+# Functional groups
+name: "thiol"
+query {
+  smarts: "[SD1H]"
+}

@@ -1,0 +1,23 @@
+# Functional groups
+name: "cyclic_amine"
+query {
+  # Atom 0 is the nitrogen; only this atom is returned in the embedding.
+  smarts: "[NRX3+0]"
+  # Reject amide-like nitrogens: carbonyl, thiocarbonyl, amidine,
+  # sulfonyl and phosphoryl groups attached by a single bond.
+  environment_no_match {
+    attachment { attachment_point: 0 btype: SS_SINGLE_BOND }
+    smarts: "[C,S,P]=[O,S,N]"
+  }
+  # Reject nitrogen attached directly to a cyano carbon.
+  environment_no_match {
+    attachment { attachment_point: 0 btype: SS_SINGLE_BOND }
+    smarts: "C#N"
+  }
+  # Reject nitrogen attached directly to these heteroatoms,
+  # including hydrazines and hydroxylamines.
+  environment_no_match {
+    attachment { attachment_point: 0 btype: SS_SINGLE_BOND }
+    smarts: "[N,O,S,P]"
+  }
+}

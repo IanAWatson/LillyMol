@@ -1,0 +1,5 @@
+# Unfused aromatic heterocycles
+name: "furan"
+query {
+  smarts: "[o/IWfss1]1cccc1"
+}

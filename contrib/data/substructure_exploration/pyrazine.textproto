@@ -1,0 +1,5 @@
+# Unfused aromatic heterocycles
+name: "pyrazine"
+query {
+  smarts: "[n/IWfss1]1ccncc1"
+}

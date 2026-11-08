@@ -1,0 +1,5 @@
+# Potentially reactive motifs
+name: "epoxide"
+query {
+  smarts: "[O]1CC1"
+}

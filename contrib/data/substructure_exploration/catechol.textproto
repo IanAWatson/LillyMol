@@ -1,0 +1,5 @@
+# Functional groups
+name: "catechol"
+query {
+  smarts: "[OH]-c1c([OH])cccc1"
+}

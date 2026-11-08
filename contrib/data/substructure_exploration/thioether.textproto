@@ -1,0 +1,5 @@
+# Functional groups
+name: "thioether"
+query {
+  smarts: "[#6]-[SX2]-[#6]"
+}

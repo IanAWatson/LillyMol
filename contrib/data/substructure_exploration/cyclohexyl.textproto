@@ -1,0 +1,5 @@
+# Unfused saturated rings
+name: "cyclohexyl"
+query {
+  smarts: "[C/IWfss1]1CCCCC1"
+}

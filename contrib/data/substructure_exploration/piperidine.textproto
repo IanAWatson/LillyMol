@@ -1,0 +1,5 @@
+# Unfused saturated rings
+name: "piperidine"
+query {
+  smarts: "[N/IWfss1]1CCCCC1"
+}

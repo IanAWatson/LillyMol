@@ -1,0 +1,5 @@
+# Unfused saturated rings
+name: "oxetane"
+query {
+  smarts: "[O/IWfss1]1CCC1"
+}

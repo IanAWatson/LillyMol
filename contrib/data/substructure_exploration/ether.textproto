@@ -1,0 +1,5 @@
+# Functional groups
+name: "ether"
+query {
+  smarts: "[CG0]-[OD2R0]-[CG0]"
+}

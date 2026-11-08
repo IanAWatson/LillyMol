@@ -1,0 +1,5 @@
+# Unfused aromatic heterocycles
+name: "triazole"
+query {
+  smarts: "[n/IWfss1]1[nH,n]ncc1"
+}

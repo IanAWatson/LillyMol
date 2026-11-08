@@ -1,0 +1,5 @@
+# Functional groups
+name: "sulfonamide"
+query {
+  smarts: "S(=O)(=O)-N"
+}

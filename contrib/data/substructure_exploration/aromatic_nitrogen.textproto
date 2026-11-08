@@ -1,0 +1,5 @@
+# Functional groups
+name: "aromatic_nitrogen"
+query {
+  smarts: "[nH0+0]"
+}

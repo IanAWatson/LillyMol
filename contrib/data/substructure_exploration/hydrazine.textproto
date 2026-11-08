@@ -1,0 +1,5 @@
+# Potentially reactive motifs
+name: "hydrazine"
+query {
+  smarts: "N-N"
+}

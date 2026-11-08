@@ -1,0 +1,5 @@
+# Functional groups
+name: "lactam"
+query {
+  smarts: "[CR](=O)-[NR]"
+}

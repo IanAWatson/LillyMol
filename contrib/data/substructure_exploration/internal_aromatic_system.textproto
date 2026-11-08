@@ -1,0 +1,13 @@
+# Ring topology
+# Presence-only ring-system predicate; count is 0 or 1. Highlighted atom belongs to the matching system.
+name: "internal_aromatic_system"
+query {
+  ring_system_specifier {
+    base { set_global_id: 1 }
+    min_number_non_spinach_groups: 2
+    min_aromatic_ring_count: 1
+    non_aromatic_ring_count: 0
+  }
+  smarts: "[/IWgid1]"
+  max_matches_to_find: 1
+}

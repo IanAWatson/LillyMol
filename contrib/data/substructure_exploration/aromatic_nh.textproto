@@ -1,0 +1,5 @@
+# Functional groups
+name: "aromatic_nh"
+query {
+  smarts: "[nH]"
+}

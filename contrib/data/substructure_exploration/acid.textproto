@@ -1,0 +1,5 @@
+# Functional groups
+name: "acid"
+query {
+  smarts: "[OD1H]-C=O"
+}

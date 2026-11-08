@@ -1,0 +1,5 @@
+# Ring topology
+name: "spiro_centre"
+query {
+  smarts: "[/IWspiro]"
+}

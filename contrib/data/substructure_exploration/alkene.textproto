@@ -1,0 +1,5 @@
+# Linkers and unsaturation
+name: "alkene"
+query {
+  smarts: "C=C"
+}

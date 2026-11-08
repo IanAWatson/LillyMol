@@ -1,0 +1,5 @@
+# Functional groups
+name: "amidine"
+query {
+  smarts: "C(=N)-N"
+}

@@ -1,0 +1,5 @@
+# Common substituents
+name: "aryl_fluoride"
+query {
+  smarts: "c-F"
+}

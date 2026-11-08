@@ -130,6 +130,11 @@
     "negative": "CC(=O)OC"
   },
   {
+    "name": "ether_cyclic",
+    "positive": "O1CCCC1",
+    "negative": "CCOCC"
+  },
+  {
     "name": "aryl_ether",
     "positive": "COc1ccccc1",
     "negative": "Oc1ccccc1"

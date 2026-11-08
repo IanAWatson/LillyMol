@@ -1,0 +1,5 @@
+# Unfused saturated rings
+name: "azetidine"
+query {
+  smarts: "[N/IWfss1]1CCC1"
+}

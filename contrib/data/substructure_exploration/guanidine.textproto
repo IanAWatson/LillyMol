@@ -1,0 +1,5 @@
+# Functional groups
+name: "guanidine"
+query {
+  smarts: "N-C(=N)-N"
+}

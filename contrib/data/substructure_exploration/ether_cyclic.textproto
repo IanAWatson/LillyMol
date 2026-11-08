@@ -1,0 +1,5 @@
+# Functional groups
+name: "ether_cyclic"
+query {
+  smarts: "[CG0]-[OD2R]-[CG0]"
+}

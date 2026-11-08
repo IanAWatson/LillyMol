@@ -1,15 +1,22 @@
-"""Standard-library-only tests for shared ranking and fragment HTML output."""
+"""Shared report tests, including optional real RDKit depiction checks."""
+import base64
 import copy
+import html
+from html.parser import HTMLParser
+import importlib.util
 import json
 from pathlib import Path
 import subprocess
 import sys
 import tempfile
 import unittest
+from unittest import mock
+import xml.etree.ElementTree as ET
 
 BIN = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(BIN))
-from activity_report import build_html, ranked_rows
+from activity_report import (QUERY_PREVIEW_LENGTH, build_html, depiction_svg,
+                             examples_html, query_source_html, ranked_rows)
 
 
 def row(name, effect, support=2, absent=2):
@@ -88,6 +95,133 @@ class ActivityReportTest(unittest.TestCase):
             result = subprocess.run(command + [str(source), '-o', str(alias)], capture_output=True, text=True)
             self.assertNotEqual(result.returncode, 0)
             self.assertEqual(source.read_bytes(), before)
+
+
+class ReportElements(HTMLParser):
+    def __init__(self):
+        super().__init__()
+        self.images = []
+        self.searches = []
+
+    def handle_starttag(self, tag, attrs):
+        attrs = dict(attrs)
+        if tag == 'img':
+            self.images.append(attrs)
+        if tag == 'tr' and 'data-search' in attrs:
+            self.searches.append(attrs['data-search'])
+
+
+class CompactQueryTest(unittest.TestCase):
+    def test_short_source_is_not_truncated(self):
+        source = '[N;H2]-[C] & <source>'
+        self.assertEqual(query_source_html(source), '<code>' + html.escape(source) + '</code>')
+        boundary = 'C' * QUERY_PREVIEW_LENGTH
+        self.assertNotIn('<details', query_source_html(boundary))
+
+    def test_long_source_has_escaped_preview_and_full_definition(self):
+        source = 'C' * QUERY_PREVIEW_LENGTH + '<script>alert("x")</script>&tail'
+        rendered = query_source_html(source)
+        self.assertIn('C' * QUERY_PREVIEW_LENGTH + '\u2026</code>', rendered)
+        self.assertIn('<summary>Full query</summary>', rendered)
+        self.assertIn('<pre>' + html.escape(source) + '</pre>', rendered)
+        self.assertNotIn('<script>', rendered)
+
+    def test_full_source_remains_searchable_and_input_is_unchanged(self):
+        data = report()
+        data['queries'][0]['source'] = 'C' * 120 + ' MixedCaseUniqueTail <&>'
+        original = copy.deepcopy(data)
+        with mock.patch('activity_report.depiction_svg', return_value=None):
+            rendered = build_html(data, 'Long queries')
+        elements = ReportElements()
+        elements.feed(rendered)
+        self.assertIn(data['queries'][0]['source'].lower(), elements.searches[0])
+        self.assertEqual(data, original)
+
+    def test_missing_backend_retains_visible_smiles_and_metadata(self):
+        depiction_svg.cache_clear()
+        self.addCleanup(depiction_svg.cache_clear)
+        with mock.patch('activity_report._depiction_modules', return_value=None):
+            rendered = examples_html([dict(identifier='<example>', activity=2,
+                                          labelled_smiles='[1CH3]N', nhits=1)])
+        self.assertIn('Depiction unavailable', rendered)
+        self.assertIn('<code>[1CH3]N</code>', rendered)
+        self.assertIn('&lt;example&gt; activity 2 hits 1', rendered)
+        self.assertNotIn('<img', rendered)
+
+    def test_import_and_ranking_do_not_load_rdkit(self):
+        code = ('import sys; sys.path.insert(0, sys.argv[1]); '
+                'import activity_report; '
+                'activity_report.ranked_rows({"queries": []}); '
+                'assert "rdkit" not in sys.modules')
+        result = subprocess.run([sys.executable, '-S', '-c', code, str(BIN)],
+                                capture_output=True, text=True, timeout=10)
+        self.assertEqual(result.returncode, 0, result.stderr)
+
+
+@unittest.skipUnless(importlib.util.find_spec('rdkit'), 'requires RDKit')
+class StructureDepictionTest(unittest.TestCase):
+    def setUp(self):
+        depiction_svg.cache_clear()
+        self.addCleanup(depiction_svg.cache_clear)
+
+    def test_labelled_atoms_are_highlighted_and_marker_isotopes_hidden(self):
+        svg = depiction_svg('[1CH3][1CH2]O', True)
+        self.assertIsNotNone(svg)
+        root = ET.fromstring(svg)
+        ellipses = [node.attrib.get('class') for node in root.iter()
+                    if node.tag.endswith('ellipse')]
+        self.assertEqual(ellipses, ['atom-0', 'atom-1'])
+        # With the marker isotopes hidden, these carbons have no atom-label glyphs.
+        labels = [node.attrib.get('class') for node in root.iter()
+                  if node.tag.endswith('path')]
+        self.assertNotIn('atom-0', labels)
+        self.assertNotIn('atom-1', labels)
+        self.assertIn('atom-2', labels)  # Oxygen remains visible.
+
+    def test_plain_smiles_has_no_synthetic_highlights(self):
+        svg = depiction_svg('CCO')
+        self.assertIsNotNone(svg)
+        root = ET.fromstring(svg)
+        self.assertFalse(any(node.tag.endswith('ellipse') for node in root.iter()))
+
+    def test_real_isotopes_are_preserved(self):
+        svg = depiction_svg('[1CH3][13CH2]O', True)
+        self.assertIsNotNone(svg)
+        root = ET.fromstring(svg)
+        ellipses = [node.attrib.get('class') for node in root.iter()
+                    if node.tag.endswith('ellipse')]
+        self.assertEqual(ellipses, ['atom-0'])
+        self.assertTrue(any(node.tag.endswith('path') and node.attrib.get('class') == 'atom-1'
+                            for node in root.iter()))
+
+    def test_self_contained_image_and_expandable_smiles(self):
+        example = dict(identifier='example <&"', activity=1.25, nhits=2,
+                       smiles='CCO', labelled_smiles='[1CH3][1CH2]O')
+        rendered = examples_html([example])
+        elements = ReportElements()
+        elements.feed(rendered)
+        self.assertEqual(len(elements.images), 1)
+        image = elements.images[0]
+        self.assertEqual(image['alt'], 'Structure of example <&"')
+        prefix = 'data:image/svg+xml;base64,'
+        self.assertTrue(image['src'].startswith(prefix))
+        ET.fromstring(base64.b64decode(image['src'][len(prefix):]))
+        self.assertIn('<summary>SMILES</summary>', rendered)
+        self.assertIn('[1CH3][1CH2]O', rendered)
+        self.assertIn('activity 1.25 hits 2', rendered)
+
+    def test_invalid_smiles_falls_back_without_breaking_report(self):
+        rendered = examples_html([dict(identifier='bad', activity=1,
+                                       smiles='not a molecule <&>')])
+        self.assertIn('Depiction unavailable', rendered)
+        self.assertIn('not a molecule &lt;&amp;&gt;', rendered)
+        self.assertNotIn('<img', rendered)
+
+    def test_repeated_examples_reuse_depiction(self):
+        first = depiction_svg('CCO')
+        second = depiction_svg('CCO')
+        self.assertEqual(first, second)
+        self.assertEqual(depiction_svg.cache_info().hits, 1)
 
 
 if __name__ == '__main__':

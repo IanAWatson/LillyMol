@@ -1,0 +1,5 @@
+# Potentially reactive motifs
+name: "disulfide"
+query {
+  smarts: "S-S"
+}

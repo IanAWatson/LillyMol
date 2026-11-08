@@ -1,0 +1,5 @@
+# Potentially reactive motifs
+name: "hydroxylamine"
+query {
+  smarts: "N-[OH]"
+}

@@ -1,0 +1,5 @@
+# Linkers and unsaturation
+name: "diaryl_ethylene"
+query {
+  smarts: "a-[CH2]-[CH2]-a"
+}

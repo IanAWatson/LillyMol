@@ -1,0 +1,5 @@
+# Functional groups
+name: "amide"
+query {
+  smarts: "[CX3D3T2](=O)-[NX3]"
+}

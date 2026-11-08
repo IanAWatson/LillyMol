@@ -1,0 +1,5 @@
+# Functional groups
+name: "alcohol"
+query {
+  smarts: "[OH]-[CX4]"
+}

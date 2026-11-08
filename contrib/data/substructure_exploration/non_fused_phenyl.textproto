@@ -1,0 +1,5 @@
+# Ring topology
+name: "non_fused_phenyl"
+query {
+  smarts: "[/IWfss1c]1ccccc1"
+}

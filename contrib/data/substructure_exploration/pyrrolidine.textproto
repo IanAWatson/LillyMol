@@ -1,0 +1,5 @@
+# Unfused saturated rings
+name: "pyrrolidine"
+query {
+  smarts: "[N/IWfss1]1CCCC1"
+}

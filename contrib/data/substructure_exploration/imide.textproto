@@ -1,0 +1,5 @@
+# Functional groups
+name: "imide"
+query {
+  smarts: "C(=O)-N-C(=O)"
+}

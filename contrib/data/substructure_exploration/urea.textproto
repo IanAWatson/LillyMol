@@ -1,0 +1,5 @@
+# Functional groups
+name: "urea"
+query {
+  smarts: "N-C(=O)-N"
+}

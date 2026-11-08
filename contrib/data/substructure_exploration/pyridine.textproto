@@ -1,0 +1,5 @@
+# Unfused aromatic heterocycles
+name: "pyridine"
+query {
+  smarts: "[n/IWfss1]1ccccc1"
+}

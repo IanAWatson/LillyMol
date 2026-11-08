@@ -1,0 +1,5 @@
+# Functional groups
+name: "ketone"
+query {
+  smarts: "[#6]-C(=O)-[#6]"
+}

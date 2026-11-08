@@ -1,0 +1,5 @@
+# Unfused aromatic heterocycles
+name: "imidazole"
+query {
+  smarts: "[n/IWfss1]1cc[nH,n]c1"
+}

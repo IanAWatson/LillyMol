@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Render dicer_fragment_activity JSON; no molecule toolkit or protobuf runtime needed."""
+"""Render dicer_fragment_activity JSON; optional RDKit images, no LillyMol bindings needed."""
 import argparse
 import json
 from pathlib import Path

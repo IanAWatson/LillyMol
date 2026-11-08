@@ -1,0 +1,5 @@
+# Unfused aromatic heterocycles
+name: "pyrazole"
+query {
+  smarts: "[n/IWfss1]1[nH,n]ccc1"
+}

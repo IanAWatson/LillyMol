@@ -1,0 +1,5 @@
+# Functional groups
+name: "aldehyde"
+query {
+  smarts: "[CH1](=O)-[#6]"
+}

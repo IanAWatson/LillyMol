@@ -1,0 +1,5 @@
+# Functional groups
+name: "phenol"
+query {
+  smarts: "[OH]-c"
+}

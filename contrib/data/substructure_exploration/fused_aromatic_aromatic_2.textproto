@@ -1,0 +1,14 @@
+# Ring topology
+# Presence-only ring-system predicate; count is 0 or 1. Highlighted atom belongs to the matching system.
+name: "fused_aromatic_aromatic_2"
+query {
+  ring_system_specifier {
+    base { set_global_id: 1 }
+
+    rings_in_system: 2
+    aromatic_ring_count: 2
+    non_aromatic_ring_count: 0
+  }
+  smarts: "[/IWgid1]"
+  max_matches_to_find: 1
+}

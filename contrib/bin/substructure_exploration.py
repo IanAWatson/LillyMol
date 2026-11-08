@@ -7,6 +7,8 @@ import argparse
 import csv
 import json
 import math
+import os
+import re
 import statistics
 import sys
 from dataclasses import dataclass, field
@@ -18,6 +20,7 @@ from activity_report import SORT_FIELDS, build_html, ranked_rows
 from google.protobuf import text_format
 
 from substructure_exploration_pb2 import SubstructureExploration
+from Molecule_Lib.substructure_pb2 import SubstructureQuery as SubstructureQueryProto
 
 from lillymol import Molecule, Standardise
 from lillymol_io import MolReaderContext
@@ -73,18 +76,59 @@ def separator_for_file(path: str) -> str | None:
     return None
 
 
+def resolve_query_path(path: str, directory: Path) -> Path:
+    """Resolve environment variables and paths relative to their catalogue."""
+    expanded = Path(os.path.expandvars(path)).expanduser()
+    return (directory / expanded).resolve()
+
+
+def query_name_from_file(path: Path) -> str:
+    proto = SubstructureQueryProto()
+    try:
+        text_format.Parse(path.read_text(), proto)
+    except OSError as exc:
+        die(f"Cannot read query file '{path}': {exc}")
+    except text_format.ParseError as exc:
+        die(f"Cannot parse query file '{path}' as SubstructureQuery textproto: {exc}")
+    if not proto.name:
+        die(f"Query file '{path}' must contain a name")
+    return proto.name
+
+
 def read_config(path: str) -> SubstructureExploration:
+    config_path = resolve_query_path(path, Path.cwd())
     message = SubstructureExploration()
     try:
-        text = Path(path).read_text()
+        text = config_path.read_text()
     except OSError as exc:
         die(f"Cannot read config '{path}': {exc}")
 
-    try:
-        text_format.Parse(text, message)
-    except text_format.ParseError as exc:
-        die(f"Cannot parse config '{path}': {exc}")
+    meaningful = '\n'.join(line for line in text.splitlines()
+                           if line.strip() and not line.lstrip().startswith('#'))
+    is_proto = (config_path.suffix.lower() in ('.textproto', '.pbtxt', '.textpb') or
+                re.match(r'query\s*(?::\s*)?[{<]', meaningful.lstrip()))
+    if is_proto:
+        try:
+            text_format.Parse(text, message)
+        except text_format.ParseError as exc:
+            die(f"Cannot parse config '{path}': {exc}")
+    else:
+        # Selection files contain one complete query pathname per line, not
+        # shell words. Spaces in filenames are preserved; comments occupy a line.
+        for line in text.splitlines():
+            filename = line.strip()
+            if not filename or filename.startswith('#'):
+                continue
+            message.query.add(fname=filename)
 
+    for spec in message.query:
+        if spec.WhichOneof('query_spec') != 'fname':
+            continue
+        query_path = resolve_query_path(spec.fname, config_path.parent)
+        spec.fname = str(query_path)
+        # Explicit names in old configurations continue to override file names.
+        if not spec.name:
+            spec.name = query_name_from_file(query_path)
     return message
 
 
@@ -492,8 +536,8 @@ def nonnegative_integer(value: str) -> int:
 
 
 def add_analyse_args(parser: argparse.ArgumentParser) -> None:
-    default_config = Path(__file__).resolve().parents[1] / 'data' / 'substructure_exploration.textproto'
-    parser.add_argument('--config', default=str(default_config), help='SubstructureExploration textproto; default curated catalogue')
+    default_config = Path(__file__).resolve().parents[1] / 'data' / 'substructure_exploration' / 'queries'
+    parser.add_argument('--config', default=str(default_config), help='Query selection file or SubstructureExploration textproto; default curated queries list')
     parser.add_argument('--standardize', action=argparse.BooleanOptionalAction, default=True,
                         help='Apply all LillyMol chemical standardisations before matching (default enabled)')
     parser.add_argument('-A', '--activity', required=True, help='Activity file with header, id/activity columns')

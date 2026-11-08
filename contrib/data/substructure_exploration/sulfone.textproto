@@ -1,0 +1,5 @@
+# Functional groups
+name: "sulfone"
+query {
+  smarts: "[#6]-S(=O)(=O)-[#6]"
+}

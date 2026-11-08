@@ -1,0 +1,5 @@
+# Unfused saturated rings
+name: "cyclopropyl"
+query {
+  smarts: "[C/IWfss1]1CC1"
+}

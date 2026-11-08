@@ -1,0 +1,5 @@
+# Functional groups
+name: "cyano"
+query {
+  smarts: "N#C"
+}

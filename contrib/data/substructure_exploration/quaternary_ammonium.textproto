@@ -1,0 +1,5 @@
+# Functional groups
+name: "quaternary_ammonium"
+query {
+  smarts: "[N+D4]"
+}

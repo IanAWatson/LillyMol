@@ -1,0 +1,5 @@
+# Linkers and unsaturation
+name: "biaryl_bond"
+query {
+  smarts: "a-!@a"
+}

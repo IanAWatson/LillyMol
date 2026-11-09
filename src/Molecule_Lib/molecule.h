@@ -40,6 +40,13 @@ class iwstring_data_source;
 #include "mol2graph.h"
 #include "set_of_atoms.h"
 
+// Geometric distance and atom indices for a non-bonded pair.
+struct NonbondedDistance {
+  double _distance;
+  atom_number_t _atom1;
+  atom_number_t _atom2;
+};
+
 class Molecule_Read_Options {
   private:
     MDL_File_Supporting_Material _mdl_file_supporting_material;
@@ -1963,6 +1970,11 @@ class __attribute__((visibility("default"))) Molecule : protected resizable_arra
 
   distance_t distance_between_atoms(atom_number_t, atom_number_t) const;
   distance_t longest_intra_molecular_distance() const;
+  // All distinct non-bonded pairs, including pairs in different fragments.
+  // Ties retain the first pair in atom-index order. No eligible pairs returns
+  // nullopt. Non-finite coordinates or all eligible distances zero throw
+  // std::invalid_argument. Accepts 2D as well as 3D coordinates.
+  std::optional<NonbondedDistance> shortest_nonbonded_distance() const;
 
   int recompute_distance_matrix();
   int ComputeDistanceMatrixIfNeeded();

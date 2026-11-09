@@ -351,6 +351,11 @@ BindMolecule(nb::module_& m) {
       .def("are_bonds_in_same_ring", &RingInfoAreBondsInSameRing,
            nb::arg("bond1"), nb::arg("bond2"));
 
+  nb::class_<NonbondedDistance>(m, "NonbondedDistance")
+      .def_ro("distance", &NonbondedDistance::_distance)
+      .def_ro("atom1", &NonbondedDistance::_atom1)
+      .def_ro("atom2", &NonbondedDistance::_atom2);
+
   nb::class_<Coordinates>(m, "Coordinates")
       .def(nb::init<>())
       .def(nb::init<coord_t, coord_t, coord_t>(), nb::arg("x"), nb::arg("y"), nb::arg("z"))
@@ -1108,6 +1113,10 @@ BindMolecule(nb::module_& m) {
       .def("centroid", &Centroid,
            "Return the geometric centroid of all atoms, across all fragments, as Coordinates; "
            "raise ValueError for an empty molecule")
+      .def("shortest_nonbonded_distance", &Molecule::shortest_nonbonded_distance,
+           "Return distance, atom1 and atom2 for the first closest non-bonded pair, "
+           "or None if no pair exists; raise ValueError for non-finite coordinates "
+           "or when all non-bonded distances are zero")
       .def("translate_coordinates",
            [](Molecule& mol, const Coordinates& delta) { mol.translate_atoms(delta); },
            nb::arg("delta"), "Translate all atoms by a Coordinates displacement; alias for translate(delta)")

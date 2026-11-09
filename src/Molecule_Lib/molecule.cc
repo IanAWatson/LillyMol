@@ -1,8 +1,10 @@
 #include <algorithm>
+#include <cmath>
 #include <iomanip>
 #include <iostream>
 #include <memory>
 #include <sstream>
+#include <stdexcept>
 #include <utility>
 
 #include "Foundational/iwmisc/misc.h"
@@ -5060,6 +5062,46 @@ Molecule::longest_intra_molecular_distance() const {
   }
 
   return rc;
+}
+
+std::optional<NonbondedDistance>
+Molecule::shortest_nonbonded_distance() const {
+  std::optional<NonbondedDistance> result;
+  double shortest_squared = 0.0;
+  bool nonzero_distance = false;
+  for (atom_number_t i = 0; i < _number_elements; ++i) {
+    const Atom& a = *_things[i];
+    // Validate each atom once in the same traversal, even if no eligible pair
+    // involves it. Do not make a separate coordinate-dimensionality pass.
+    if (!std::isfinite(a.x()) || !std::isfinite(a.y()) || !std::isfinite(a.z())) {
+      throw std::invalid_argument("shortest_nonbonded_distance: non-finite coordinates");
+    }
+    for (atom_number_t j = i + 1; j < _number_elements; ++j) {
+      if (a.is_bonded_to(j)) {
+        continue;
+      }
+      const Atom& b = *_things[j];
+      // Promote before subtraction to avoid overflow in float coordinates.
+      const double dx = static_cast<double>(a.x()) - b.x();
+      const double dy = static_cast<double>(a.y()) - b.y();
+      const double dz = static_cast<double>(a.z()) - b.z();
+      const double squared = dx * dx + dy * dy + dz * dz;
+      nonzero_distance = nonzero_distance || squared > 0.0;
+      if (!result || squared < shortest_squared) {
+        shortest_squared = squared;
+        result = NonbondedDistance{0.0, i, j};
+      }
+    }
+  }
+  if (!result) {
+    return std::nullopt;
+  }
+  if (!nonzero_distance) {
+    throw std::invalid_argument(
+        "shortest_nonbonded_distance: all non-bonded distances are zero");
+  }
+  result->_distance = std::sqrt(shortest_squared);
+  return result;
 }
 
 void

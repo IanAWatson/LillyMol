@@ -501,6 +501,7 @@ The most common methods for a Molecule currently implemented are
 | signed_dihedral_angle(a1, a2, a3, a4) | Dihedral angle, may be negative |
 | distance_between_atoms(a1, a2) | Distance between atoms - bonded or not |
 | longest_intra_molecular_distance() | Longest inter atom distance |
+| shortest_nonbonded_distance() | Closest non-bonded pair as NonbondedDistance, or None if no pair exists |
 | x(atom) | x coordinate of 'atom' |
 | y(atom) | y coordinate of 'atom' |
 | z(atom) | z coordinate of 'atom' |
@@ -564,6 +565,33 @@ print(mol.centroid())                     # (0,0,0)
 `mol.translate(-centre)` is equivalent. Translation adds the supplied
 displacement to every atom, so passing the positive centroid shifts the
 molecule further in that direction rather than centring it at the origin.
+
+
+### Shortest non-bonded distance
+
+`mol.shortest_nonbonded_distance()` examines every atom pair with `atom1 < atom2`,
+excluding directly bonded atoms. Pairs two bonds apart and pairs in different
+fragments are included. It uses the stored spatial coordinates, accepts both
+2D and 3D, and does not compute a topological bond-distance matrix.
+
+The result is a `NonbondedDistance` object with read-only attributes `distance`,
+`atom1`, and `atom2`. Distance is in the same units as the atom coordinates.
+Exactly tied minimum distances retain the first pair in atom-index order.
+The molecule is not modified.
+
+```python
+closest = mol.shortest_nonbonded_distance()
+if closest is not None and closest.distance < 0.8:
+    print("Close atoms:", closest.atom1, closest.atom2, closest.distance)
+```
+
+If there are no non-bonded pairs, the result is `None`. This includes empty
+molecules, single atoms, and molecules where every atom pair is bonded.
+Non-finite coordinates raise `ValueError`. If eligible pairs exist but **all**
+their distances are zero, `ValueError` is also raised, since this commonly
+indicates unassigned coordinates. A zero minimum is valid when some other
+non-bonded pair has a positive distance, and identifies coincident atoms.
+No separate coordinate-dimensionality scan is performed.
 
 ## Chirality
 

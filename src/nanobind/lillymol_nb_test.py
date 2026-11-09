@@ -914,6 +914,73 @@ $$$$
         mol.set_coordinates([1.0e8, 0.0, 0.0, 1.0, 0.0, 0.0, -1.0e8, 0.0, 0.0])
         self.assertAlmostEqual(mol.centroid().x(), 1.0 / 3.0, places=6)
 
+    def test_shortest_nonbonded_distance_excludes_bonds(self):
+        mol = lillymol.MolFromSmiles("CCC")
+        mol.set_coordinates([0, 0, 0, 0.1, 0, 0, 1, 0, 0])
+        original = mol.get_coordinates()
+        result = mol.shortest_nonbonded_distance()
+        self.assertIsInstance(result, lillymol.NonbondedDistance)
+        self.assertEqual((result.atom1, result.atom2), (0, 2))
+        self.assertAlmostEqual(result.distance, 1.0)
+        self.assertEqual(mol.get_coordinates(), original)
+
+    def test_shortest_nonbonded_distance_ties_keep_first_pair(self):
+        mol = lillymol.MolFromSmiles("CCCC")
+        mol.set_coordinates([0, 0, 0, 1, 0, 0, 2, 0, 0, 3, 0, 0])
+        result = mol.shortest_nonbonded_distance()
+        self.assertEqual((result.atom1, result.atom2), (0, 2))
+        self.assertEqual(result.distance, 2.0)
+
+    def test_shortest_nonbonded_distance_includes_other_fragments_and_3d(self):
+        mol = lillymol.MolFromSmiles("CC.O")
+        mol.set_coordinates([0, 0, 0, 10, 0, 0, 1, 2, 2])
+        result = mol.shortest_nonbonded_distance()
+        self.assertEqual((result.atom1, result.atom2), (0, 2))
+        self.assertEqual(result.distance, 3.0)
+
+    def test_shortest_nonbonded_distance_without_eligible_pairs(self):
+        for smiles in ("", "C", "CC", "C1CC1"):
+            with self.subTest(smiles=smiles):
+                mol = lillymol.Molecule() if not smiles else lillymol.MolFromSmiles(smiles)
+                self.assertIsNone(mol.shortest_nonbonded_distance())
+
+    def test_shortest_nonbonded_distance_all_zero_is_invalid(self):
+        for smiles, coords in (("CCC", None), ("C.C", [1, 2, 3, 1, 2, 3]),
+                               ("CCC", [1, 0, 0, 2, 0, 0, 1, 0, 0])):
+            with self.subTest(smiles=smiles, coords=coords):
+                mol = lillymol.MolFromSmiles(smiles)
+                if coords is not None:
+                    mol.set_coordinates(coords)
+                with self.assertRaisesRegex(ValueError, "all non-bonded distances are zero"):
+                    mol.shortest_nonbonded_distance()
+
+    def test_shortest_nonbonded_distance_zero_minimum_is_valid(self):
+        mol = lillymol.MolFromSmiles("C.C.C")
+        mol.set_coordinates([0, 0, 0, 0, 0, 0, 2, 0, 0])
+        result = mol.shortest_nonbonded_distance()
+        self.assertEqual((result.atom1, result.atom2), (0, 1))
+        self.assertEqual(result.distance, 0.0)
+
+    def test_shortest_nonbonded_distance_rejects_nonfinite_coordinates(self):
+        for value in (float('nan'), float('inf'), -float('inf')):
+            for axis in range(3):
+                with self.subTest(value=value, axis=axis):
+                    mol = lillymol.MolFromSmiles("C.C.C")
+                    # The first pair overlaps; later invalid coordinates must
+                    # still be detected rather than returning early at zero.
+                    coords = [0.0] * 9
+                    coords[6 + axis] = value
+                    mol.set_coordinates(coords)
+                    with self.assertRaisesRegex(ValueError, "non-finite coordinates"):
+                        mol.shortest_nonbonded_distance()
+
+    def test_shortest_nonbonded_distance_large_coordinates(self):
+        mol = lillymol.MolFromSmiles("C.C")
+        mol.set_coordinates([-1e30, 0, 0, 1e30, 0, 0])
+        result = mol.shortest_nonbonded_distance()
+        self.assertTrue(math.isfinite(result.distance))
+        self.assertAlmostEqual(result.distance / 2e30, 1.0, places=6)
+
     def test_coordinates_numpy(self):
         try:
             import gc

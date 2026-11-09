@@ -10,14 +10,14 @@ BUILDSMIDB = buildsmidb_bdb.sh -y -E autocreate -r 500000 -v
 # Used for building the standardized set of smiles.
 COMMON_FILECONV_OPTS = -i smi -i mfc=9 -i ICTE -i mdlquiet -E autocreate -g all -v
 
-all: $(STEM)g.smi $(STEM)gO_70.smi $(STEM)gO.smi $(STEM)_selimsteg.bdb $(STEM)_selimsteg_raw.bdb \
+all: $(STEM)g.smi $(STEM)gO_70.smi $(STEM)gO.smi $(STEM)gO.sorted.smi $(STEM)_selimsteg.bdb $(STEM)_selimsteg_raw.bdb \
 	$(STEM).gfp.gz split_smi_$(STEM) split_gfp_$(STEM) $(STEM).exact.bdb $(STEM).lf.bdb \
 	$(STEM).nc.bdb $(STEM).graph.bdb $(STEM).spc.bdb $(STEM).rings.bdb $(STEM).vs \
 	$(STEM).fragstat ring_replacement_$(STEM) $(STEM).substituent.5.bdb \
 	$(STEM).dicer_fragments/DICER_1_3.textproto $(STEM).dicer.bdb \
 	$(STEM).substituents.textproto
 
-bb: $(STEM)g.smi $(STEM)gO_70.smi $(STEM)gO.smi $(STEM)_selimsteg.bdb $(STEM)_selimsteg_raw.bdb \
+bb: $(STEM)g.smi $(STEM)gO_70.smi $(STEM)gO.smi $(STEM)gO.sorted.smi $(STEM)_selimsteg.bdb $(STEM)_selimsteg_raw.bdb \
 	$(STEM).gfp.gz $(STEM).exact.bdb $(STEM).lf.bdb $(STEM).nc.bdb $(STEM).graph.bdb \
 	$(STEM).spc.bdb $(STEM).rings.bdb $(STEM).vs 
 
@@ -33,6 +33,9 @@ $(STEM)gO_70.smi: $(STEM)g.smi
 
 $(STEM)gO.smi: $(STEM)gO_70.smi
 	fileconv -c 5 -C 50 -S $(STEM)gO -v $<
+
+$(STEM)gO.sorted.smi: $(STEM)gO.smi
+	msort -k natoms $< > $@
 
 $(STEM)_selimsteg.bdb: $(STEM)g.smi
 	iwbdb_load -d /dev/shm/$@ -c 2 -C 1 -v $<

@@ -52,10 +52,9 @@ Its filenames use the Linux convention; substitute `Al` for `A` and `Ar` for
 ## Collection provenance and format
 
 The current 183 files were supplied from
-`/d1/ian/CHEMBL/ring_replacement_chembl` on 2026-11-09, replacing the previous
+`/d1/ian/CHEMBL/ring_replacement_chembl` on 2026-11-09, using Chembl 37, replacing the previous
 ChEMBL 36 collection. The supplied filenames were renamed from `chembl_` to
-`rings_`; record contents are unchanged. The precise new ChEMBL release was not
-recorded with the supplied files.
+`rings_`; record contents are unchanged.
 
 The collection includes 132 aromaticity-specific files and 51
 aromaticity-independent files. Uncompressed size is 34,498,161 bytes; gzip sources

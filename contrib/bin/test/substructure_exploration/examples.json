@@ -170,9 +170,14 @@
     "negative": "CSC"
   },
   {
-    "name": "thioether",
+    "name": "sulphur_carbon_carbon",
     "positive": "CSC",
     "negative": "CS(=O)C"
+  },
+  {
+    "name": "thiazol_2_one",
+    "positive": "O=c1[nH]ccs1",
+    "negative": "O=c1[nH]cco1"
   },
   {
     "name": "cf3",
@@ -260,11 +265,6 @@
     "negative": "CC1CCOC1"
   },
   {
-    "name": "tetrahydrofuran",
-    "positive": "CC1CCOC1",
-    "negative": "CC1COC1"
-  },
-  {
     "name": "pyridine",
     "positive": "Cc1ccncc1",
     "negative": "c1ccccc1"
@@ -313,6 +313,11 @@
     "name": "furan",
     "positive": "c1ccoc1",
     "negative": "C1CCOC1"
+  },
+  {
+    "name": "saturated_furan",
+    "positive": "CC1CCOC1",
+    "negative": "CC1COC1"
   },
   {
     "name": "thiophene",

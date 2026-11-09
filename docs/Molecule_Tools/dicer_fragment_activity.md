@@ -124,6 +124,7 @@ without rereading dicer data.
 | Option | Meaning |
 |---|---|
 | `--top_n n` | Maximum HTML rows after filtering/ranking; default 100, 0 means all. |
+| `--page_size n` | Visible rows per page; default 50, 0 disables pagination. |
 | `--sort abs_median` | Rank separation in either direction; the default. |
 | `--sort abs_mean` | Rank absolute mean differences. |
 | `--sort median` | Rank signed median differences, largest first. |
@@ -151,6 +152,19 @@ RDKit is optional and used only for depiction (`uv pip install rdkit`, or
 the report displays the SMILES instead. The HTML remains self-contained and
 works offline; neither LillyMol Python bindings nor protobuf are needed by
 this JSON-to-HTML command.
+
+The report shows 50 retained fragment rows per page by default, with
+Previous/Next buttons and a page count. Use `--page_size 0` to show all retained
+rows at once. Sorting and text filtering operate across all retained rows,
+then return to page one; they are not restricted to the current page.
+
+`--page_size` changes browsing only. All retained rows and their depictions are
+still embedded in one offline HTML file, so pagination does not reduce file
+size or depiction-generation work. Keep `--top_n` as the total-output limit:
+
+```shell
+dicer_fragment_activity_html.sh fragments.json --top_n 500 --page_size 50 -o report.html
+```
 
 These are exploratory associations within the analyzed dataset; correlated
 fragments may have identical distributions.

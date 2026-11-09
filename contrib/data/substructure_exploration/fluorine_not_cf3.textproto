@@ -1,5 +1,5 @@
 # Common substituents
 name: "fluorine_not_cf3"
 query {
-  smarts: "[F;!$(F-[CD4](F)(F)[!F])]"
+  smarts: "[F;!$(F-[CD4](F)(F)[!F])]C"
 }

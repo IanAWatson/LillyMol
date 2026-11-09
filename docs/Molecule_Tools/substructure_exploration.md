@@ -38,7 +38,7 @@ quaternary ammonium, remain charged. Examples in the report show the standardise
 structures. Use `--no-standardize` to search the input structures directly.
 
 The default selection file is `contrib/data/substructure_exploration/queries`.
-It lists 84 standalone LillyMol query files in the same directory. The features include functional groups, halogens, common heterocycles, ring-system
+It lists 85 standalone LillyMol query files in the same directory. The features include functional groups, halogens, common heterocycles, ring-system
 topology, aromatic linkers and potentially reactive groups. Definitions overlap:
 a lactam is also an amide, and a carbamate may also match the ester query.
 These are descriptive features, rather than disjoint chemical classifications.
@@ -51,9 +51,10 @@ Some definitions deserve particular attention:
 - `methoxy` matches `[CD1H3]-[OD2]-[c,CG0]`: methyl ethers attached
   to aromatic or saturated aliphatic carbon, excluding methyl esters and
   non-aromatic unsaturated carbon attachments.
-- `fluorine_not_cf3` matches individual fluorines outside CF3, including aryl
-  fluorine, monofluoroalkyl and difluoroalkyl fluorines. Its existing definition
-  also matches the fluorines in CF4, so these two features overlap for CF4.
+- `fluorine_not_cf3` matches fluorines bonded to aliphatic carbon outside CF3,
+  including monofluoroalkyl and difluoroalkyl fluorines. Aromatic fluorine is
+  covered separately by `aryl_fluoride`. The non-CF3 query also matches the
+  fluorines in CF4, so it overlaps the `cf3` feature for CF4.
 - `amide` uses `[CX3D3T2](=O)-[NX3]`, excluding formamides, ureas and
   carbamates from this general amide feature. The separately named amide
   subtypes can overlap other carbonyl features.
@@ -64,6 +65,11 @@ Some definitions deserve particular attention:
   commented `environment_no_match` messages to exclude common amide-like,
   amidine/guanidine and directly heteroatom-linked nitrogens. Aniline is also
   available as a separate, overlapping feature.
+- `sulphur_carbon_carbon` matches `[#6]-[SX2]-[#6]`, allowing aromatic as
+  well as aliphatic carbon neighbours.
+- `saturated_furan` identifies an unfused saturated five-membered oxygen ring.
+- `thiazol_2_one` identifies the carbonyl motif on an unfused five-membered
+  aromatic ring with adjacent sulfur and nitrogen atoms.
 - Common named ring queries use `/IWfss1` to restrict them to unfused rings.
 - Terminal, internal and standalone aromatic systems have respectively one,
   at least two, or zero non-spinach connections. A pendant acyclic substituent
@@ -162,7 +168,7 @@ query {
 ```
 
 For a query file, use `fname: "path/to/query.textproto"`. Relative query filenames
-are resolved from the working directory. Legacy `ncon` and `charge_assigner`
+are resolved from the configuration file directory. Legacy `ncon` and `charge_assigner`
 metadata are recorded but not applied; the script warns if they are supplied.
 
 `--min_matches 1` is the default: only queries matching at least one molecule
@@ -188,6 +194,40 @@ largest activity separations in either direction. Other sort keys are
 By default, the `html` command preserves the stored order and includes all
 stored queries. These options change HTML only and cannot restore queries
 filtered out during analysis.
+
+### Pagination
+
+HTML reports display 50 query rows per page by default, with Previous/Next
+buttons and a page count. `--page_size n` sets the number of visible rows;
+`--page_size 0` shows every retained row at once. This option is available for
+both `analyse --html` and the `html` command:
+
+```shell
+substructure_exploration.sh html exploration.json --page_size 25 -o report.html
+```
+
+Sorting and filtering operate on all retained rows before pagination and reset
+the view to page one. Pagination changes browsing only: all retained rows and
+images remain embedded in a single offline HTML file. Use `--top_n` when
+rendering existing JSON to limit total output size and depiction-generation
+work, independently of `--page_size`.
+
+### Hide median statistics
+
+Use `--nomedian` to suppress median activity values and the Delta Median column
+in HTML reports. It also hides the global median and median sorting controls;
+the global summary, sorting control and multiplicity profiles use means instead.
+The JSON still contains all computed median statistics, so it can be rendered
+again with medians later.
+
+```shell
+substructure_exploration.sh analyse --nomedian -A activity.txt --html report.html molecules.smi
+substructure_exploration.sh html exploration.json --nomedian -o report.html
+```
+
+With `--nomedian`, ranking requested through `--top_n` defaults to `abs_mean`
+instead of `abs_median`. An explicit `--sort` choice is still respected. Without
+a ranking request, the stored row order is preserved as usual.
 
 ### Structure examples and long queries
 

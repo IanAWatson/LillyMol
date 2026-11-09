@@ -9,7 +9,7 @@ piperidine.textproto
 piperazine.textproto
 morpholine.textproto
 oxetane.textproto
-tetrahydrofuran.textproto
+saturated_furan.textproto
 pyridine.textproto
 pyrimidine.textproto
 pyrazine.textproto
@@ -19,6 +19,7 @@ pyrazole.textproto
 triazole.textproto
 oxazole.textproto
 thiazole.textproto
+thiazol_2_one.textproto
 furan.textproto
 thiophene.textproto
 non_fused_phenyl.textproto

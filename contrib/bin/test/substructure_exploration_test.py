@@ -43,12 +43,15 @@ class CatalogueTest(unittest.TestCase):
 
     def test_fluorine_features(self):
         for smiles, cf3, other in [
-            ('FC(F)(F)c1ccc(F)cc1', 1, 1), ('CC(F)F', 0, 2),
+            ('FC(F)(F)c1ccc(F)cc1', 1, 0), ('CC(F)F', 0, 2),
             ('FC(F)(F)F', 4, 4), ('CC(F)(F)F', 1, 0),
+            ('Fc1ccccc1', 0, 0),
         ]:
             with self.subTest(smiles=smiles):
                 self.assertEqual(self.count('cf3', smiles), cf3)
                 self.assertEqual(self.count('fluorine_not_cf3', smiles), other)
+        self.assertEqual(self.count('aryl_fluoride', 'Fc1ccccc1'), 1)
+        self.assertEqual(self.count('aryl_fluoride', 'FC(F)(F)c1ccc(F)cc1'), 1)
         for halogen in ('Cl', 'Br', 'I'):
             self.assertEqual(self.count('heavy_halogen', 'CC' + halogen), 1)
         self.assertEqual(self.count('heavy_halogen', 'CCF'), 0)
@@ -269,6 +272,47 @@ class QuerySelectionTest(unittest.TestCase):
         self.assertIn('terminal_aromatic_system', [q.name for q in rings])
         self.assertEqual({q.name for q in functional} | {q.name for q in rings},
                          {q.name for q in complete})
+
+    def test_nomedian_analysis_and_html_commands(self):
+        self.write_query('n.textproto', 'nitrogen', 'N')
+        self.write_query('o.textproto', 'oxygen', 'O')
+        selection = self._directory / 'queries'
+        selection.write_text('n.textproto\no.textproto\n')
+        source = self._directory / 'input.smi'
+        source.write_text('CN amine\nCO alcohol\nCC ethane\n')
+        activity = self._directory / 'activity.txt'
+        activity.write_text('ID activity\namine 3\nalcohol 2\nethane 1\n')
+        output = self._directory / 'report.json'
+        document = self._directory / 'report.html'
+        command = [str(BIN / 'substructure_exploration.sh')]
+        env = dict(os.environ, PYTHON=sys.executable)
+        analysed = subprocess.run(command + ['analyse', '--config', str(selection),
+            '-A', str(activity), '-o', str(output), '--html', str(document),
+            '--nomedian', '--page_size', '1', str(source)], env=env, capture_output=True, text=True, timeout=20)
+        self.assertEqual(analysed.returncode, 0, analysed.stderr)
+        self.assertNotIn('median', document.read_text().lower())
+        self.assertIn('const pageSize = 1;', document.read_text())
+        data = json.loads(output.read_text())
+        self.assertIn('median', data['global']['summary'])
+        self.assertIn('median', data['queries'][0]['matched']['summary'])
+        self.assertIn('delta_median', data['queries'][0])
+        # Make mean and median ranks deliberately disagree.
+        data['queries'][0]['delta_mean'] = 1
+        data['queries'][0]['delta_median'] = 100
+        data['queries'][1]['delta_mean'] = 100
+        data['queries'][1]['delta_median'] = 1
+        output.write_text(json.dumps(data))
+        original = output.read_bytes()
+        for extra, expected in (([], 'oxygen'), (['--sort', 'abs_median'], 'nitrogen')):
+            rendered = subprocess.run(command + ['html', str(output), '-o', str(document),
+                '--nomedian', '--page_size', '0', '--top_n', '1', *extra], env=env,
+                capture_output=True, text=True, timeout=20)
+            self.assertEqual(rendered.returncode, 0, rendered.stderr)
+            text = document.read_text()
+            self.assertNotIn('median', text.lower())
+            self.assertIn('const pageSize = 0;', text)
+            self.assertIn(f'<strong>{expected}</strong>', text)
+        self.assertEqual(output.read_bytes(), original)
 
     def test_selection_cli_from_another_directory(self):
         self.write_query('n.textproto', 'nitrogen', 'N')

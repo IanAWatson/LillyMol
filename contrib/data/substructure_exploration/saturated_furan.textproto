@@ -1,5 +1,5 @@
 # Unfused saturated rings
-name: "tetrahydrofuran"
+name: "saturated_furan"
 query {
   smarts: "[O/IWfss1]1CCCC1"
 }

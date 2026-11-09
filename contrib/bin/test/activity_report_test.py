@@ -5,6 +5,8 @@ import html
 from html.parser import HTMLParser
 import importlib.util
 import json
+import re
+import shutil
 from pathlib import Path
 import subprocess
 import sys
@@ -29,7 +31,7 @@ def row(name, effect, support=2, absent=2):
 def report():
     return dict(metadata=dict(feature_kind='fragment', queries=4, activity='activity.txt',
                               molecules_read_with_activity=4),
-                **{'global': dict(summary=dict(median=0), histogram=[2, 2])},
+                **{'global': dict(summary=dict(median=0, mean=0), histogram=[2, 2])},
                 queries=[row('positive', 4), row('negative', -8),
                          row('sparse', 10, support=1), row('universal', 99, absent=0)])
 
@@ -69,6 +71,26 @@ class ActivityReportTest(unittest.TestCase):
         self.assertIn('<th>Query</th>', html)
         self.assertIn('>Multiple</th>', html)
 
+    def test_median_suppression_and_mean_profiles(self):
+        data = report()
+        data['metadata'].pop('feature_kind')
+        data['metadata']['multiplicity_mode'] = 'count'
+        for item in data['queries']:
+            item['multiplicity'] = dict(molecules_with_multiple_matches=1, max_matches=2,
+                profiles={'2': dict(summary=dict(n=2, median=7, mean=8))})
+        before = copy.deepcopy(data)
+        standard = build_html(data, 'Activity')
+        self.assertIn('Delta Median', standard)
+        self.assertIn('Global activity median', standard)
+        rendered = build_html(data, 'Activity', show_median=False)
+        self.assertNotIn('median', rendered.lower())
+        self.assertNotIn(' med ', rendered)
+        self.assertIn('Global activity mean', rendered)
+        self.assertIn('Sort delta mean', rendered)
+        self.assertIn('Delta Mean', rendered)
+        self.assertIn('n 2 mean 8', rendered)
+        self.assertEqual(data, before)
+
     def test_cli_with_no_site_packages_stdin_and_top_n(self):
         with tempfile.TemporaryDirectory(prefix='activity report ') as tmp:
             root = Path(tmp)
@@ -102,6 +124,7 @@ class ReportElements(HTMLParser):
         super().__init__()
         self.images = []
         self.searches = []
+        self.rows = []
 
     def handle_starttag(self, tag, attrs):
         attrs = dict(attrs)
@@ -109,6 +132,7 @@ class ReportElements(HTMLParser):
             self.images.append(attrs)
         if tag == 'tr' and 'data-search' in attrs:
             self.searches.append(attrs['data-search'])
+            self.rows.append({key[5:]: value for key, value in attrs.items() if key.startswith('data-')})
 
 
 class CompactQueryTest(unittest.TestCase):
@@ -222,6 +246,118 @@ class StructureDepictionTest(unittest.TestCase):
         second = depiction_svg('CCO')
         self.assertEqual(first, second)
         self.assertEqual(depiction_svg.cache_info().hits, 1)
+
+
+class PaginationTest(unittest.TestCase):
+    def run_browser(self, page_size, actions, count=5):
+        if not shutil.which('node'):
+            self.skipTest('requires Node.js to execute the generated pagination code')
+        data = report()
+        names = ['alpha', 'beta', 'alpha_other', 'gamma', 'alpha_last']
+        data['queries'] = [row(names[i] if count == 5 else f'row{i}', i) for i in range(count)]
+        data['metadata']['queries'] = count
+        for item in data['queries']:
+            item['examples'] = []
+        rendered = build_html(data, 'Pages', page_size=page_size)
+        elements = ReportElements()
+        elements.feed(rendered)
+        script = re.search(r'<script>(.*?)</script>', rendered, re.S).group(1)
+        harness = r"""
+const vm = require('node:vm');
+const input = JSON.parse(require('node:fs').readFileSync(0, 'utf8'));
+const rows = input.rows.map((dataset, id) => {
+  const row = {dataset, id, hidden: false};
+  row.classList = {toggle: (name, value) => {row.hidden = value;}};
+  return row;
+});
+const controls = {};
+for (const id of ['search', 'status', 'page-status', 'previous-page', 'next-page', 'pagination']) {
+  controls[id] = {value: '', textContent: '', disabled: false, hidden: false};
+}
+const tbody = {
+  querySelectorAll: () => rows,
+  appendChild: row => { rows.splice(rows.indexOf(row), 1); rows.push(row); }
+};
+const document = {
+  getElementById: id => controls[id],
+  querySelectorAll: () => rows,
+  querySelector: () => tbody
+};
+const context = vm.createContext({document});
+vm.runInContext(input.script, context);
+function state() {
+  return {visible: rows.filter(row => !row.hidden).map(row => row.id),
+          status: controls.status.textContent, page: controls['page-status'].textContent,
+          previous: controls['previous-page'].disabled, next: controls['next-page'].disabled,
+          pagerHidden: controls.pagination.hidden};
+}
+const result = [state()];
+for (const action of input.actions) { vm.runInContext(action, context); result.push(state()); }
+process.stdout.write(JSON.stringify(result));
+"""
+        result = subprocess.run(['node', '-e', harness],
+            input=json.dumps(dict(script=script, rows=elements.rows, actions=actions)),
+            capture_output=True, text=True, timeout=10)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        return json.loads(result.stdout)
+
+    def test_page_navigation_and_boundaries(self):
+        states = self.run_browser(50, ['changePage(1)', 'changePage(1)', 'changePage(1)',
+                                       'changePage(-1)'], count=101)
+        self.assertEqual(states[0]['visible'], list(range(50)))
+        self.assertEqual(states[0]['page'], 'Page 1 of 3')
+        self.assertTrue(states[0]['previous'])
+        self.assertFalse(states[0]['pagerHidden'])
+        self.assertEqual(states[1]['visible'], list(range(50, 100)))
+        self.assertEqual(states[2]['visible'], [100])
+        self.assertTrue(states[2]['next'])
+        self.assertEqual(states[3]['visible'], [100])
+        self.assertEqual(states[4]['visible'], list(range(50, 100)))
+
+    def test_filtering_and_sorting_cover_all_rows_and_reset_page(self):
+        states = self.run_browser(2, [
+            'changePage(2)',
+            'sortTable("delta_mean")',
+            'changePage(1)',
+            'document.getElementById("search").value = "alpha"; updateView()',
+            'changePage(1)',
+            'document.getElementById("search").value = "absent"; updateView()',
+            'document.getElementById("search").value = ""; updateView()'])
+        self.assertEqual(states[1]['visible'], [4])
+        self.assertEqual(states[2]['visible'], [4, 3])
+        self.assertEqual(states[2]['page'], 'Page 1 of 3')
+        self.assertEqual(states[4]['visible'], [4, 2])
+        self.assertEqual(states[4]['page'], 'Page 1 of 2')
+        self.assertEqual(states[5]['visible'], [0])
+        self.assertEqual(states[6]['visible'], [])
+        self.assertEqual(states[6]['status'], '0 matching fragments')
+        self.assertTrue(states[6]['previous'])
+        self.assertTrue(states[6]['next'])
+        self.assertTrue(states[6]['pagerHidden'])
+        self.assertEqual(states[7]['visible'], [4, 3])
+
+    def test_zero_disables_pagination_and_small_reports_hide_controls(self):
+        for size in (0, 50):
+            with self.subTest(size=size):
+                state = self.run_browser(size, [])[0]
+                self.assertEqual(state['visible'], list(range(5)))
+                self.assertTrue(state['pagerHidden'])
+        with self.assertRaises(ValueError):
+            build_html(report(), 'Pages', page_size=-1)
+
+    def test_dicer_cli_page_size_is_independent_of_top_n(self):
+        command = [sys.executable, '-S', str(BIN / 'dicer_fragment_activity_html.py'),
+                   '-', '-o', '-', '--top_n', '2']
+        for size in (1, 0):
+            result = subprocess.run(command + ['--page_size', str(size)],
+                input=json.dumps(report()), capture_output=True, text=True, timeout=10)
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertIn(f'const pageSize = {size};', result.stdout)
+            self.assertIn('2 of 4 fragments', result.stdout)
+            self.assertEqual(result.stdout.count('<td class="name">'), 2)
+        result = subprocess.run(command + ['--page_size', '-1'], input=json.dumps(report()),
+                                capture_output=True, text=True, timeout=10)
+        self.assertNotEqual(result.returncode, 0)
 
 
 if __name__ == '__main__':

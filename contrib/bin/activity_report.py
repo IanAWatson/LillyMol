@@ -85,16 +85,15 @@ def histogram_svg(matched: list[int], unmatched: list[int], width: int = 220, he
     return ''.join(parts)
 
 
-def multiplicity_profiles_html(row: dict[str, object]) -> str:
+def multiplicity_profiles_html(row: dict[str, object], show_median: bool = True) -> str:
     profiles = row['multiplicity']['profiles']
     parts = ['<div class="count-profiles">']
     for bucket, profile in profiles.items():
         s = profile['summary']
         if s['n'] == 0:
             continue
-        parts.append(
-            f'<span><b>{html.escape(bucket)}</b> n {s["n"]} med {fmt(s["median"])}</span>'
-        )
+        statistic = f'med {fmt(s["median"])}' if show_median else f'mean {fmt(s["mean"])}'
+        parts.append(f'<span><b>{html.escape(bucket)}</b> n {s["n"]} {statistic}</span>')
     parts.append('</div>')
     return ''.join(parts)
 
@@ -180,7 +179,7 @@ def examples_html(examples: list[dict[str, object]]) -> str:
         else:
             encoded = base64.b64encode(svg.encode('utf-8')).decode('ascii')
             alt = html.escape(f"Structure of {example['identifier']}", quote=True)
-            parts.append(f'<img class="structure" width="220" height="160" '
+            parts.append(f'<img class="structure" loading="lazy" width="220" height="160" '
                          f'alt="{alt}" src="data:image/svg+xml;base64,{encoded}">')
             parts.append('<details class="smiles"><summary>SMILES</summary>'
                          f'<code>{html.escape(smiles)}</code></details>')
@@ -194,7 +193,10 @@ def examples_html(examples: list[dict[str, object]]) -> str:
     return ''.join(parts)
 
 
-def build_html(data: dict[str, object], title: str, rows=None) -> str:
+def build_html(data: dict[str, object], title: str, rows=None, *,
+               show_median: bool = True, page_size: int = 50) -> str:
+    if not isinstance(page_size, int) or page_size < 0:
+        raise ValueError('page_size must be a non-negative integer')
     metadata = data['metadata']
     global_data = data['global']
     if rows is None:
@@ -220,6 +222,10 @@ h1 { margin: 0 0 6px; font-size: 22px; line-height: 1.2; }
 .toolbar input { width: min(420px, 100%); padding: 7px 9px; border: 1px solid var(--border); border-radius: 4px; font: inherit; }
 .toolbar button { border: 1px solid var(--border); background: #fff; border-radius: 4px; padding: 7px 10px; font: inherit; cursor: pointer; }
 .status { margin-left: auto; color: var(--muted); }
+.pagination { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; color: var(--muted); }
+.pagination[hidden] { display: none; }
+.pagination button { padding: 6px 10px; cursor: pointer; }
+.pagination button:disabled { cursor: default; }
 main { padding: 16px 24px 32px; }
 .legend { display: flex; gap: 14px; margin-bottom: 12px; color: var(--muted); }
 .legend span::before { content: ''; display: inline-block; width: 12px; height: 12px; margin-right: 5px; vertical-align: -1px; }
@@ -256,20 +262,21 @@ details summary { cursor: pointer; color: var(--muted); font-size: 12px; margin-
 </head>
 <body>
 """)
+    statistic = 'median' if show_median else 'mean'
     parts.append('<header>')
     parts.append(f'<h1>{html.escape(title)}</h1>')
     parts.append(
         '<p class="summary">' +
         f'{len(rows)} of {metadata["queries"]} {feature_label}, {metadata["molecules_read_with_activity"]} molecules with activity. ' +
         f'Activity file: <code>{html.escape(str(metadata["activity"]))}</code>. ' +
-        f'Global activity median {fmt(global_data["summary"]["median"])}.</p>'
+        f'Global activity {statistic} {fmt(global_data["summary"][statistic])}.</p>'
     )
     parts.append('</header>')
     parts.append("""<div class="toolbar">
 <input id="search" type="search" placeholder="Filter by query name or source" oninput="updateView()">
-<button type="button" onclick="sortTable('delta_median')">Sort delta median</button>
 <button type="button" onclick="sortTable('matched_n')">Sort support</button>
 """)
+    parts.append(f'<button type="button" onclick="sortTable(\'delta_{statistic}\')">Sort delta {statistic}</button>')
     if show_multiplicity:
         parts.append('<button type="button" onclick="sortTable(\'multi\')">Sort multiple hits</button>')
     parts.append("""<span id="status" class="status"></span>
@@ -280,12 +287,20 @@ details summary { cursor: pointer; color: var(--muted); font-size: 12px; margin-
     parts.append(simple_histogram_svg(global_data['histogram']))
     parts.append('</div>')
     parts.append('<div class="legend"><span class="m">Matched</span><span class="u">Unmatched</span></div>')
-    parts.append("""<div class="table-wrap">
+    parts.append("""<nav id="pagination" class="pagination" aria-label="Report pages">
+<button id="previous-page" type="button" onclick="changePage(-1)">Previous</button>
+<span id="page-status" aria-live="polite"></span>
+<button id="next-page" type="button" onclick="changePage(1)">Next</button>
+</nav>
+<div class="table-wrap">
 <table id="results">
 <thead><tr>
 """)
     parts.append('<th>Fragment</th>' if fragments else '<th>Query</th>')
-    parts.append("""<th class="sortable" onclick="sortTable('matched_n')">Matched N</th><th>Matched</th><th>Unmatched</th><th class="sortable" onclick="sortTable('delta_median')">Delta Median</th><th class="sortable" onclick="sortTable('delta_mean')">Delta Mean</th>""")
+    parts.append("""<th class="sortable" onclick="sortTable('matched_n')">Matched N</th><th>Matched</th><th>Unmatched</th>""")
+    if show_median:
+        parts.append("""<th class="sortable" onclick="sortTable('delta_median')">Delta Median</th>""")
+    parts.append("""<th class="sortable" onclick="sortTable('delta_mean')">Delta Mean</th>""")
     if show_multiplicity:
         parts.append('<th class="sortable" onclick="sortTable(\'multi\')">Multiple</th>')
     parts.append("""<th>Distribution</th><th>Examples</th>
@@ -300,9 +315,13 @@ details summary { cursor: pointer; color: var(--muted); font-size: 12px; margin-
         multi = multiplicity.get('molecules_with_multiple_matches', 0)
         max_hits = multiplicity.get('max_matches', 0)
         searchable = f"{row['name']} {row['source']}".lower()
+        median_attribute = ''
+        if show_median:
+            value = row['delta_median'] if row['delta_median'] is not None else -1e99
+            median_attribute = f'data-delta_median="{value}" '
         parts.append(
             f'<tr data-search="{html.escape(searchable, quote=True)}" '
-            f'data-matched_n="{matched["n"]}" data-delta_median="{row["delta_median"] if row["delta_median"] is not None else -1e99}" '
+            f'data-matched_n="{matched["n"]}" {median_attribute}'
             f'data-delta_mean="{row["delta_mean"] if row["delta_mean"] is not None else -1e99}" data-multi="{multi}">'
         )
         parts.append('<td class="name">')
@@ -310,33 +329,50 @@ details summary { cursor: pointer; color: var(--muted); font-size: 12px; margin-
         parts.append(query_source_html(row["source"]))
         parts.append('</td>')
         parts.append(f'<td class="num">{matched["n"]}</td>')
-        parts.append(f'<td class="num">median {fmt(matched["median"])}<br>mean {fmt(matched["mean"])}</td>')
-        parts.append(f'<td class="num">median {fmt(unmatched["median"])}<br>mean {fmt(unmatched["mean"])}</td>')
-        parts.append(f'<td class="num">{fmt(row["delta_median"])}</td>')
+        for summary in (matched, unmatched):
+            median = f'median {fmt(summary["median"])}<br>' if show_median else ''
+            parts.append(f'<td class="num">{median}mean {fmt(summary["mean"])}</td>')
+        if show_median:
+            parts.append(f'<td class="num">{fmt(row["delta_median"])}</td>')
         parts.append(f'<td class="num">{fmt(row["delta_mean"])}</td>')
         multi_text = f'{multi}' if multi else '<span class="muted">0</span>'
         if multi:
             multi_text += f'<br><span class="muted">max {max_hits}</span>'
         if metadata.get('multiplicity_mode') == 'count':
-            multi_text += multiplicity_profiles_html(row)
+            multi_text += multiplicity_profiles_html(row, show_median)
         if show_multiplicity:
             parts.append(f'<td class="num">{multi_text}</td>')
         parts.append('<td>' + histogram_svg(row['matched']['histogram'], row['unmatched']['histogram']) + '</td>')
         parts.append('<td>' + examples_html(row['examples']) + '</td>')
         parts.append('</tr>\n')
     parts.append('</tbody></table></div></main>')
-    parts.append(f'<script>const featureLabel = "{feature_label}";\n')
+    parts.append(f'<script>const featureLabel = "{feature_label}";\nconst pageSize = {page_size};\n')
     parts.append("""
 let sortDescending = true;
-function updateView() {
+let currentPage = 0;
+function updateView(resetPage = true) {
+  if (resetPage) currentPage = 0;
   const needle = document.getElementById('search').value.toLowerCase();
-  let shown = 0;
-  document.querySelectorAll('#results tbody tr').forEach(row => {
-    const match = row.dataset.search.includes(needle);
-    row.classList.toggle('hidden', !match);
-    if (match) shown += 1;
-  });
-  document.getElementById('status').textContent = shown + ' ' + featureLabel + ' shown';
+  const rows = Array.from(document.querySelectorAll('#results tbody tr'));
+  const matching = rows.filter(row => row.dataset.search.includes(needle));
+  const pageCount = pageSize ? Math.ceil(matching.length / pageSize) : (matching.length ? 1 : 0);
+  currentPage = Math.max(0, Math.min(currentPage, pageCount - 1));
+  const start = pageSize ? currentPage * pageSize : 0;
+  const end = pageSize ? Math.min(start + pageSize, matching.length) : matching.length;
+  const visible = new Set(matching.slice(start, end));
+  rows.forEach(row => row.classList.toggle('hidden', !visible.has(row)));
+  document.getElementById('status').textContent = matching.length
+      ? (start + 1) + '\u2013' + end + ' of ' + matching.length + ' matching ' + featureLabel
+      : '0 matching ' + featureLabel;
+  document.getElementById('page-status').textContent =
+      'Page ' + (matching.length ? currentPage + 1 : 0) + ' of ' + pageCount;
+  document.getElementById('previous-page').disabled = currentPage === 0;
+  document.getElementById('next-page').disabled = currentPage + 1 >= pageCount;
+  document.getElementById('pagination').hidden = !pageSize || pageCount <= 1;
+}
+function changePage(offset) {
+  currentPage += offset;
+  updateView(false);
 }
 function sortTable(key) {
   const tbody = document.querySelector('#results tbody');

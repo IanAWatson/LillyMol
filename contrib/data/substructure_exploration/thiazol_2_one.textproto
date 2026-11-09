@@ -1,0 +1,5 @@
+name: "thiazol_2_one"
+query {
+  smarts: "[OD1]=[/IWfss1cr5](:s):n"
+}
+

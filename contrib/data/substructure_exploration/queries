@@ -44,7 +44,8 @@ sulfoxide.textproto
 sulfone.textproto
 sulfonamide.textproto
 thiol.textproto
-thioether.textproto
+sulphur_carbon_carbon.textproto
+thiazol_2_one.textproto
 
 # Common substituents
 cf3.textproto
@@ -66,7 +67,6 @@ piperidine.textproto
 piperazine.textproto
 morpholine.textproto
 oxetane.textproto
-tetrahydrofuran.textproto
 
 # Unfused aromatic heterocycles
 pyridine.textproto
@@ -79,6 +79,7 @@ triazole.textproto
 oxazole.textproto
 thiazole.textproto
 furan.textproto
+saturated_furan.textproto
 thiophene.textproto
 
 # Ring topology

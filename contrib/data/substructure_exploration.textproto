@@ -35,7 +35,8 @@ query { fname: "substructure_exploration/sulfoxide.textproto" }
 query { fname: "substructure_exploration/sulfone.textproto" }
 query { fname: "substructure_exploration/sulfonamide.textproto" }
 query { fname: "substructure_exploration/thiol.textproto" }
-query { fname: "substructure_exploration/thioether.textproto" }
+query { fname: "substructure_exploration/sulphur_carbon_carbon.textproto" }
+query { fname: "substructure_exploration/thiazol_2_one.textproto" }
 query { fname: "substructure_exploration/cf3.textproto" }
 query { fname: "substructure_exploration/heavy_halogen.textproto" }
 query { fname: "substructure_exploration/fluorine_not_cf3.textproto" }
@@ -53,7 +54,6 @@ query { fname: "substructure_exploration/piperidine.textproto" }
 query { fname: "substructure_exploration/piperazine.textproto" }
 query { fname: "substructure_exploration/morpholine.textproto" }
 query { fname: "substructure_exploration/oxetane.textproto" }
-query { fname: "substructure_exploration/tetrahydrofuran.textproto" }
 query { fname: "substructure_exploration/pyridine.textproto" }
 query { fname: "substructure_exploration/pyrimidine.textproto" }
 query { fname: "substructure_exploration/pyrazine.textproto" }
@@ -64,6 +64,7 @@ query { fname: "substructure_exploration/triazole.textproto" }
 query { fname: "substructure_exploration/oxazole.textproto" }
 query { fname: "substructure_exploration/thiazole.textproto" }
 query { fname: "substructure_exploration/furan.textproto" }
+query { fname: "substructure_exploration/saturated_furan.textproto" }
 query { fname: "substructure_exploration/thiophene.textproto" }
 query { fname: "substructure_exploration/non_fused_phenyl.textproto" }
 query { fname: "substructure_exploration/spiro_centre.textproto" }

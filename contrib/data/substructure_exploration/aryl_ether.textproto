@@ -1,5 +1,5 @@
 # Functional groups
 name: "aryl_ether"
 query {
-  smarts: "a-[OX2;!$(O-C=O)]-[#6]"
+  smarts: "a-[OX2]-[#6]"
 }

@@ -33,13 +33,15 @@ sulfoxide.textproto
 sulfone.textproto
 sulfonamide.textproto
 thiol.textproto
-thioether.textproto
 cf3.textproto
 heavy_halogen.textproto
 fluorine_not_cf3.textproto
 aryl_fluoride.textproto
 difluoromethyl.textproto
 methoxy.textproto
+sulphur_carbon_carbon.textproto
+thiazol_2_one.textproto
+saturated_furan.textproto
 aromatic_methyl.textproto
 biaryl_bond.textproto
 diaryl_ether.textproto

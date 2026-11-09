@@ -1,5 +1,5 @@
 # Functional groups
-name: "thioether"
+name: "sulphur_carbon_carbon"
 query {
   smarts: "[#6]-[SX2]-[#6]"
 }

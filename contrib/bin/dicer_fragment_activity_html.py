@@ -20,6 +20,8 @@ def main(argv=None):
     parser.add_argument('input', help='Activity report JSON, or - for stdin')
     parser.add_argument('-o', '--output', required=True, help='HTML output, or - for stdout')
     parser.add_argument('--top_n', type=nonnegative, default=100, help='Maximum HTML rows (default 100; 0 keeps all)')
+    parser.add_argument('--page_size', type=nonnegative, default=50,
+                        help='Rows per page (default 50; 0 shows all retained rows)')
     parser.add_argument('--sort', choices=SORT_FIELDS, default='abs_median', help='Rank by effect or support (default abs_median)')
     parser.add_argument('--ascending', action='store_true', help='Sort low to high, e.g. most negative median differences first')
     parser.add_argument('--min_matches', type=nonnegative, default=1, help='Minimum matched molecules (default 1)')
@@ -38,7 +40,7 @@ def main(argv=None):
             data = json.loads(Path(args.input).read_text())
         rows = ranked_rows(data, args.sort, args.ascending, args.top_n,
                            args.min_matches, args.min_unmatched)
-        document = build_html(data, args.title, rows=rows)
+        document = build_html(data, args.title, rows=rows, page_size=args.page_size)
         if args.output == '-':
             sys.stdout.write(document)
         else:

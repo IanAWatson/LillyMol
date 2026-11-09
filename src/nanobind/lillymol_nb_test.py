@@ -876,6 +876,44 @@ $$$$
         self.assertAlmostEqual(ethane.x(1), 0.0, delta=1.0e-5)
         self.assertAlmostEqual(ethane.y(1), 1.0, delta=1.0e-5)
 
+    def test_centroid_of_all_atoms_across_fragments(self):
+        mol = lillymol.MolFromSmiles("CC.O disconnected")
+        original = [1.0, 2.0, 3.0, 3.0, 4.0, 5.0, 8.0, 9.0, 10.0]
+        mol.set_coordinates(original)
+        centre = mol.centroid()
+        self.assertIsInstance(centre, lillymol.Coordinates)
+        self.assertEqual((centre.x(), centre.y(), centre.z()), (4.0, 5.0, 6.0))
+        self.assertEqual(mol.get_coordinates(), original)
+
+        displacement = -centre
+        self.assertIsInstance(displacement, lillymol.Coordinates)
+        self.assertEqual((centre.x(), centre.y(), centre.z()), (4.0, 5.0, 6.0))
+        mol.translate_coordinates(displacement)
+        self.assertEqual(mol.get_coordinates(),
+                         [-3.0, -3.0, -3.0, -1.0, -1.0, -1.0, 4.0, 4.0, 4.0])
+        centred = mol.centroid()
+        self.assertEqual((centred.x(), centred.y(), centred.z()), (0.0, 0.0, 0.0))
+
+    def test_centroid_works_with_existing_translate(self):
+        mol = lillymol.MolFromSmiles("CC ethane")
+        mol.set_coordinates([1.0, 2.0, 3.0, 3.0, 4.0, 5.0])
+        mol.translate(mol.centroid())
+        centre = mol.centroid()
+        self.assertEqual((centre.x(), centre.y(), centre.z()), (4.0, 6.0, 8.0))
+
+    def test_centroid_single_atom_and_empty_molecule(self):
+        mol = lillymol.MolFromSmiles("[Na+]")
+        mol.setxyz(0, 1.5, -2.0, 3.0)
+        centre = mol.centroid()
+        self.assertEqual((centre.x(), centre.y(), centre.z()), (1.5, -2.0, 3.0))
+        with self.assertRaisesRegex(ValueError, "non-empty molecule"):
+            lillymol.Molecule().centroid()
+
+    def test_centroid_accumulates_in_double_precision(self):
+        mol = lillymol.MolFromSmiles("CCC propane")
+        mol.set_coordinates([1.0e8, 0.0, 0.0, 1.0, 0.0, 0.0, -1.0e8, 0.0, 0.0])
+        self.assertAlmostEqual(mol.centroid().x(), 1.0 / 3.0, places=6)
+
     def test_coordinates_numpy(self):
         try:
             import gc

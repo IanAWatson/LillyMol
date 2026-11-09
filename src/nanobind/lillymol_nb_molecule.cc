@@ -10,6 +10,21 @@ namespace lillymol_nb {
 
 namespace {
 
+Coordinates
+Centroid(const Molecule& mol) {
+  if (mol.natoms() == 0) {
+    throw std::invalid_argument("centroid requires a non-empty molecule");
+  }
+  // Accumulate in double precision, including all atoms in every fragment.
+  double x = 0.0, y = 0.0, z = 0.0;
+  for (const Atom* atom : mol) {
+    x += atom->x();
+    y += atom->y();
+    z += atom->z();
+  }
+  return Coordinates(x / mol.natoms(), y / mol.natoms(), z / mol.natoms());
+}
+
 bool
 LooksLikeSdfTagRecord(const std::string& line) {
   const size_t open = line.find('<');
@@ -349,6 +364,9 @@ BindMolecule(nb::module_& m) {
       .def("normalise", &Coordinates::normalise)
       .def("norm", &Coordinates::norm)
       .def("length", &Coordinates::length)
+      .def("__neg__", [](const Coordinates& coords) {
+        return Coordinates(-coords.x(), -coords.y(), -coords.z());
+      }, "Return a new Coordinates object with each component negated")
       .def("distance",
            [](const Coordinates& coords, const Coordinates& other) { return coords.distance(other); },
            nb::arg("other"))
@@ -1087,6 +1105,12 @@ BindMolecule(nb::module_& m) {
            },
            nb::arg("a2"), nb::arg("a3"), nb::arg("angle"), nb::arg("bump_check") = 0.0f,
            "Scan around the a2-a3 bond and return flat float32 NumPy coordinate arrays")
+      .def("centroid", &Centroid,
+           "Return the geometric centroid of all atoms, across all fragments, as Coordinates; "
+           "raise ValueError for an empty molecule")
+      .def("translate_coordinates",
+           [](Molecule& mol, const Coordinates& delta) { mol.translate_atoms(delta); },
+           nb::arg("delta"), "Translate all atoms by a Coordinates displacement; alias for translate(delta)")
       .def("translate",
            [](Molecule& mol, coord_t x, coord_t y, coord_t z) {
              mol.translate_atoms(x, y, z);

@@ -508,7 +508,10 @@ The most common methods for a Molecule currently implemented are
 | sety(atom, y) | Set y coordinate of 'atom' |
 | setz(atom, z) | Set z coordinate of 'atom' |
 | setxyz(atom, x, y, z) | Set coordinates of 'atom' |
+| centroid() | Geometric centroid of all atoms as Coordinates; ValueError for an empty molecule |
 | translate(x, y, z) | Translate atoms |
+| translate(delta) | Translate all atoms by a Coordinates displacement |
+| translate_coordinates(delta) | Alias for translate(delta) |
 | highest_coordinate_dimensionality() | Will be 3 of 3D coordinates available |
 | discern_chirality_from_3d_structure() | Use geometry to discern chiral centres |
 | dihedral_scan(a2, a3, angle, bump_check=0.0) | Return a list of flat float32 NumPy coordinate arrays for rotations around the a2-a3 bond |
@@ -534,6 +537,33 @@ The most common methods for a Molecule currently implemented are
 | debug_string() | String representation of internal state: print(m.debug_string())|
 | ----- | ----- |
 
+
+
+## Coordinate geometry
+
+`mol.centroid()` returns a new `Coordinates` object containing the arithmetic
+mean of the stored atom coordinates. Every explicit atom contributes equally,
+across all disconnected fragments; this is not a mass-weighted centre. The
+method does not change the molecule and raises `ValueError` for an empty one.
+
+`Coordinates` provides `x()`, `y()`, and `z()` accessors. Unary negation returns
+a new displacement object without changing the original. To centre a molecule
+at the origin, translate by the **negative** centroid:
+
+```python
+from lillymol import MolFromSmiles
+
+mol = MolFromSmiles("CC.O")
+mol.set_coordinates([1, 2, 3, 3, 4, 5, 8, 9, 10])
+centre = mol.centroid()
+print(centre.x(), centre.y(), centre.z())  # 4.0 5.0 6.0
+mol.translate_coordinates(-centre)
+print(mol.centroid())                     # (0,0,0)
+```
+
+`mol.translate(-centre)` is equivalent. Translation adds the supplied
+displacement to every atom, so passing the positive centroid shifts the
+molecule further in that direction rather than centring it at the origin.
 
 ## Chirality
 

@@ -3,6 +3,7 @@ import base64
 from functools import lru_cache
 import heapq
 import html
+import re
 import sys
 
 
@@ -154,7 +155,10 @@ def depiction_svg(smiles: str, highlight_matches: bool = False) -> str | None:
                              bond.GetEndAtomIdx() in atom_set]
         rdDepictor.Compute2DCoords(molecule)
         drawer = rdMolDraw2D.MolDraw2DSVG(220, 160)
-        colour = (0.65, 0.86, 0.78)
+        options = drawer.drawOptions()
+        options.highlightRadius = 0.4
+        options.highlightBondWidthMultiplier = 16
+        colour = (0.2, 0.8, 0.4)
         drawer.DrawMolecule(
             molecule, highlightAtoms=highlighted, highlightBonds=highlighted_bonds,
             highlightAtomColors={atom: colour for atom in highlighted},
@@ -165,9 +169,82 @@ def depiction_svg(smiles: str, highlight_matches: bool = False) -> str | None:
         return None
 
 
-def examples_html(examples: list[dict[str, object]]) -> str:
+
+@lru_cache(maxsize=1)
+def _fragment_matching_modules():
+    try:
+        from lillymol import MolFromSmiles, SubstructureQuery, SubstructureResults
+    except ImportError:
+        print('LillyMol bindings are unavailable; dicer examples will have no fragment '
+              'highlighting. Use the LillyMol run_python.sh wrapper with staged bindings.',
+              file=sys.stderr)
+        return None
+    return MolFromSmiles, SubstructureQuery, SubstructureResults
+
+
+@lru_cache(maxsize=1)
+def _warn_attachment_binding_unavailable():
+    print('LillyMol bindings lack the isotope-attachment query keyword; rebuild and '
+          'stage the nanobind module to enable dicer fragment highlighting.', file=sys.stderr)
+
+
+@lru_cache(maxsize=128)
+def _fragment_query(smiles: str):
+    modules = _fragment_matching_modules()
+    if modules is None:
+        return None
+    MolFromSmiles, SubstructureQuery, _ = modules
+    fragment = MolFromSmiles(smiles)
+    if fragment is None or not fragment.number_isotopic_atoms():
+        return None
+    query = SubstructureQuery()
+    try:
+        ok = query.build_from_molecule(fragment, substituents_only_at_isotopic_atoms=True)
+    except TypeError:
+        _warn_attachment_binding_unavailable()
+        return None
+    if not ok:
+        return None
+    query.set_find_unique_embeddings_only(True)
+    return query
+
+
+def labelled_fragment_examples(fragment_smiles: str, examples: list[dict]) -> list[dict]:
+    """Label all LillyMol embeddings in retained dicer parents without changing JSON."""
+    # Isotope SMILES start an atom bracket with digits. This cheap gate avoids
+    # loading bindings for fragments that have no attachment labels to interpret.
+    if not re.search(r'\[[0-9]', fragment_smiles) or not any(
+            not example.get('labelled_smiles') for example in examples):
+        return examples
+    query = _fragment_query(fragment_smiles)
+    if query is None:
+        return examples
+    MolFromSmiles, _, SubstructureResults = _fragment_matching_modules()
+    labelled = []
+    for example in examples:
+        if example.get('labelled_smiles'):
+            labelled.append(example)
+            continue
+        parent = MolFromSmiles(str(example.get('smiles', '')))
+        if parent is None or parent.number_isotopic_atoms():
+            # Existing parent isotopes may mean something other than a match.
+            labelled.append(example)
+            continue
+        results = SubstructureResults()
+        if not query.substructure_search(parent, results):
+            labelled.append(dict(example, highlight_note='Fragment match unavailable'))
+            continue
+        for embedding in results:
+            parent.set_isotopes(embedding, 1)
+        labelled.append(dict(example, labelled_smiles=str(parent.aromatic_smiles()), nhits=len(results)))
+    return labelled
+
+
+def examples_html(examples: list[dict[str, object]], fragment_smiles: str | None = None) -> str:
     if not examples:
         return '<span class="muted">No matched examples</span>'
+    if fragment_smiles is not None:
+        examples = labelled_fragment_examples(fragment_smiles, examples)
     parts = ['<div class="examples">']
     for example in examples:
         parts.append('<div class="example">')
@@ -188,6 +265,8 @@ def examples_html(examples: list[dict[str, object]]) -> str:
             f' activity {fmt(example["activity"])}' +
             (f' hits {example["nhits"]}' if 'nhits' in example else '') + '</span>'
         )
+        if example.get('highlight_note'):
+            parts.append('<span class="highlight-note">' + html.escape(example['highlight_note']) + '</span>')
         parts.append('</div>')
     parts.append('</div>')
     return ''.join(parts)
@@ -255,6 +334,7 @@ details summary { cursor: pointer; color: var(--muted); font-size: 12px; margin-
 .example { border: 1px solid #e2e5e9; background: #fff; padding: 6px; }
 .example code { display: block; overflow-wrap: anywhere; }
 .structure { display: block; max-width: 100%; height: auto; }
+.example .highlight-note { color: var(--warn); }
 .example span { display: block; color: var(--muted); font-size: 12px; margin-top: 4px; }
 .hidden { display: none; }
 @media (max-width: 720px) { header, .toolbar, main { padding-left: 12px; padding-right: 12px; } .status { width: 100%; margin-left: 0; } }
@@ -343,7 +423,7 @@ details summary { cursor: pointer; color: var(--muted); font-size: 12px; margin-
         if show_multiplicity:
             parts.append(f'<td class="num">{multi_text}</td>')
         parts.append('<td>' + histogram_svg(row['matched']['histogram'], row['unmatched']['histogram']) + '</td>')
-        parts.append('<td>' + examples_html(row['examples']) + '</td>')
+        parts.append('<td>' + examples_html(row['examples'], row['source'] if fragments else None) + '</td>')
         parts.append('</tr>\n')
     parts.append('</tbody></table></div></main>')
     parts.append(f'<script>const featureLabel = "{feature_label}";\nconst pageSize = {page_size};\n')

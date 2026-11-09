@@ -1093,6 +1093,27 @@ are described in the `trxn` usage document. Here they are just listed
 * set_max_atoms_to_match
 * max_query_atoms_matched_in_search
 
+### Building a query with isotope-defined attachment points
+
+`build_from_molecule` normally retains isotope constraints. To use isotopes
+as allowed attachment points instead:
+
+```python
+fragment = MolFromSmiles("C[1CH2]O")
+query = SubstructureQuery()
+query.build_from_molecule(fragment, substituents_only_at_isotopic_atoms=True)
+parent = MolFromSmiles("CC(O)N")
+results = SubstructureResults()
+if query.substructure_search(parent, results):
+  for embedding in results:
+    parent.set_isotopes(embedding, 1)
+```
+
+Unlabelled fragment atoms retain their connection counts; labelled atoms allow
+additional connections without requiring an isotope on the target atom. Extra
+substituents at labelled positions are allowed, rather than required. The
+keyword defaults to `False`.
+
 ### Examining atoms around a substructure match
 
 A substructure search can populate an explicit `SubstructureResults` object. It

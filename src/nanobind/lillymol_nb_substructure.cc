@@ -40,12 +40,17 @@ BindSubstructure(nb::module_& m) {
       .def(nb::init<>())
       .def("build_from_smarts", &Substructure_Query::CreateFromSmarts, nb::arg("smarts"))
       .def("build_from_molecule",
-           [](Substructure_Query& query, Molecule& mol) {
+           [](Substructure_Query& query, Molecule& mol,
+              bool substituents_only_at_isotopic_atoms) {
              Molecule_to_Query_Specifications mqs;
              mqs.set_make_embedding(1);
+             mqs.set_substituents_only_at_isotopic_atoms(substituents_only_at_isotopic_atoms);
              return static_cast<bool>(query.create_from_molecule(mol, mqs));
            },
-           nb::arg("mol"))
+           nb::arg("mol"), nb::kw_only(),
+           nb::arg("substituents_only_at_isotopic_atoms") = false,
+           "Build a query from a molecule; optionally treat isotopes as the only allowed "
+           "attachment sites rather than isotope constraints")
       .def("number_elements", [](const Substructure_Query& query) { return query.number_elements(); })
       .def("active", &Substructure_Query::active)
       .def("set_only_keep_matches_in_largest_fragment",

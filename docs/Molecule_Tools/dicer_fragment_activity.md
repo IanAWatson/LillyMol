@@ -3,8 +3,8 @@
 `dicer_fragment_activity` associates algorithmically generated dicer fragments
 with activities. It compares molecules that generated a fragment with those
 that did not, then optionally writes a JSON report for an interactive static
-HTML display. Structures are treated as strings; neither the analyzer nor the
-fragment HTML renderer requires LillyMol's Python bindings or RDKit.
+HTML display. The analyzer treats structures as strings. The HTML renderer can
+optionally use LillyMol for fragment matching and RDKit for depiction.
 
 ## Generate, analyze and display
 
@@ -142,16 +142,24 @@ renderer reads the complete JSON; `--top_n` limits rendering, not JSON parsing
 memory. The report uses the same HTML rendering code as
 `substructure_exploration.py`, including text filtering, sortable columns and
 matched/unmatched activity histograms. Parent examples are drawn as embedded
-RDKit SVG images, with expandable SMILES for copying. Dicer parent examples
-without stored match labels are drawn without match highlighting. Long feature
+RDKit SVG images, with expandable SMILES for copying. For an example without isotopes, an isotope-labelled fragment is converted to a
+LillyMol query that permits substitution only at the labelled fragment atoms.
+All matching embeddings are combined and highlighted in prominent green.
+Existing example labels are preserved; parents containing isotopes are left
+unchanged. If the attachment-constrained query does not match, the example is
+shown with a "Fragment match unavailable" note. Long feature
 sources have a 100-character preview and an expandable full definition; text
 filtering still searches the complete source.
 
 RDKit is optional and used only for depiction (`uv pip install rdkit`, or
 `python -m pip install rdkit`). If it is unavailable or cannot depict a SMILES,
 the report displays the SMILES instead. The HTML remains self-contained and
-works offline; neither LillyMol Python bindings nor protobuf are needed by
-this JSON-to-HTML command.
+works offline. LillyMol bindings are optional, but are needed to infer fragment
+highlighting. Rebuild and stage them with `src/copy_shared_libraries.sh`; the
+`dicer_fragment_activity_html.sh` wrapper uses `run_python.sh` when staged
+bindings are available. Without bindings, or without fragment attachment
+isotopes, examples are displayed without inferred highlighting. Protobuf is
+not required by this JSON-to-HTML command.
 
 The report shows 50 retained fragment rows per page by default, with
 Previous/Next buttons and a page count. Use `--page_size 0` to show all retained

@@ -1565,6 +1565,25 @@ $$$$
         self.assertEqual(qry.substructure_search(mol), 1)
         self.assertEqual(len(qry.substructure_search_embeddings(mol)), 1)
 
+    def test_query_attachments_only_at_isotopic_atoms(self):
+        fragment = lillymol.MolFromSmiles("C[1CH2]O")
+        query = lillymol.SubstructureQuery()
+        self.assertTrue(query.build_from_molecule(
+            fragment, substituents_only_at_isotopic_atoms=True))
+        results = lillymol.SubstructureResults()
+        parent = lillymol.MolFromSmiles("CC(O)N")
+        self.assertEqual(query.substructure_search(parent, results), 1)
+        self.assertEqual(results.embeddings(), [[0, 1, 2]])
+        # Extra substitution on either unlabelled endpoint is forbidden.
+        for smiles in ("CCC(O)N", "CC(OC)N"):
+            self.assertEqual(query.substructure_search(lillymol.MolFromSmiles(smiles)), 0)
+
+    def test_query_from_molecule_default_still_matches_isotopes(self):
+        query = lillymol.SubstructureQuery()
+        self.assertTrue(query.build_from_molecule(lillymol.MolFromSmiles("C[1CH2]O")))
+        self.assertEqual(query.substructure_search(lillymol.MolFromSmiles("CCO")), 0)
+        self.assertEqual(query.substructure_search(lillymol.MolFromSmiles("C[1CH2]O")), 1)
+
     def test_substructure_query_from_proto(self):
         mol = lillymol.MolFromSmiles("Oc1ccccc1 phenol")
         proto_string = """

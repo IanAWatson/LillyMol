@@ -99,5 +99,49 @@ class OutputModifiers(unittest.TestCase):
         self.assertIn("separator, not a filename", result.stderr)
 
 
+class ProtoFileQueries(unittest.TestCase):
+    def setUp(self):
+        self._tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self._tmp.cleanup)
+        self._directory = pathlib.Path(self._tmp.name)
+        query_dir = self._directory / "query files"
+        query_dir.mkdir()
+        self._list = query_dir / "queries"
+        (query_dir / "nitrogen#query.textproto").write_text(
+            'name: "nitrogen"\nquery { smarts: "N" }\n')
+        (query_dir / "oxygen query.textproto").write_text(
+            'name: "oxygen"\nquery { smarts: "O" }\n')
+        (self._directory / "input.smi").write_text("CN amine\nCO alcohol\nCC ethane\n")
+
+    def run_list(self, text):
+        self._list.write_text(text)
+        return subprocess.run(
+            [_EXECUTABLE, "-q", "PROTOFILE:" + str(self._list), "-a", "input.smi"],
+            cwd=self._directory, capture_output=True, text=True, timeout=15)
+
+    def test_comments_and_blank_lines_preserve_queries_and_order(self):
+        clean = self.run_list("nitrogen#query.textproto\noxygen query.textproto\n")
+        decorated = self.run_list(
+            "# Heading\n\n  # Indented comment ${UNDEFINED_QUERY_VARIABLE}\n \t\n"
+            "  nitrogen#query.textproto  \n\t# More comments\n"
+            "oxygen query.textproto\n\n# Trailing comment\n")
+        self.assertEqual(clean.returncode, 0, clean.stderr)
+        self.assertEqual(decorated.returncode, 0, decorated.stderr)
+        self.assertEqual(decorated.stdout, clean.stdout)
+        self.assertIn("Name nitrogen oxygen", decorated.stdout)
+        self.assertIn("amine 1 0", decorated.stdout)
+        self.assertIn("alcohol 0 1", decorated.stdout)
+
+    def test_noncomment_missing_file_is_still_an_error(self):
+        result = self.run_list("# Skip this\n\nmissing.textproto\n")
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("no file 'missing.textproto'", result.stderr)
+
+    def test_comment_only_list_has_no_queries(self):
+        result = self.run_list("# No queries\n\n \t\n  # Still no queries\n")
+        self.assertNotEqual(result.returncode, 0)
+        self.assertNotIn("no file", result.stderr)
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -47,6 +47,11 @@ ls *.textproto > all_queries
 tsubstructure -q PROTOFILE:all_queries molecules.smi
 ```
 
+Each line contains one query filename. Blank lines, whitespace-only lines, and
+lines whose first non-whitespace character is `#` are ignored. Leading and
+trailing whitespace is stripped from filenames; internal spaces and `#`
+characters remain part of the filename. Inline comments are not supported.
+
 For very large query collections, serialized
 `SubstructureSearch::SubstructureQuery` protos can be read from TFDataRecord
 files:

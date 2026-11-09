@@ -280,6 +280,11 @@ ReadFileOfProtoQueries(const const_IWSubstring fname, resizable_array_p<T>& quer
 
   IWString line;
   while (input.next_record(line)) {
+    line.strip_leading_blanks();
+    line.strip_trailing_blanks();
+    if (line.empty() || line.starts_with('#')) {
+      continue;
+    }
     // std::cerr << "Reading '" << line << "'\n";
     line.ExpandEnvironmentVariablesInPlace();
     // std::cerr << "After expansion '" << line << "'\n";

@@ -1,0 +1,917 @@
+{
+  "rings_3.smi": {
+    "bytes": 6409,
+    "sha256": "fdab97fb7bfec7635268373c665ae036eb9e66302426f9a312ef993440746bde",
+    "records": 55
+  },
+  "rings_33.smi": {
+    "bytes": 661,
+    "sha256": "344b0baaa6c255074d8a1973efd322e8c2545788b12501f5cb988d339598341d",
+    "records": 5
+  },
+  "rings_333.smi": {
+    "bytes": 318,
+    "sha256": "84fa8cba86c2dba8eb56a1ac1b7e5a65269af2023c24cf456f9b024586c1a494",
+    "records": 2
+  },
+  "rings_334.smi": {
+    "bytes": 625,
+    "sha256": "a0c84480eabe72f9301df8a7b0a0708b634329cb06e5face83f295ce6399a55f",
+    "records": 4
+  },
+  "rings_335.smi": {
+    "bytes": 1564,
+    "sha256": "dec90fd7ff3a781722073d2c517ba47327718daaa9231db09b8fb88962492766",
+    "records": 8
+  },
+  "rings_336.smi": {
+    "bytes": 3928,
+    "sha256": "4b2b461b2c6acd78470a5e0dc8973aa85fbc2b904d1acf30487d500cf01ffeda",
+    "records": 20
+  },
+  "rings_337.smi": {
+    "bytes": 1067,
+    "sha256": "50a54a2cc029d4a9cfbef6f121071260631adacaadf602a42240ddef6d0d93b6",
+    "records": 5
+  },
+  "rings_34.smi": {
+    "bytes": 2122,
+    "sha256": "44e0df7f4f0606af62bac094b81b2383caeba5262b006f00dd2a47f1a120dfff",
+    "records": 14
+  },
+  "rings_344.smi": {
+    "bytes": 370,
+    "sha256": "5d4171256d269890851b71efbcbdab95f874cafeceb57fd7b1859587dc2e7458",
+    "records": 2
+  },
+  "rings_345.smi": {
+    "bytes": 2546,
+    "sha256": "f50e7e3439466395415375a451bdcf7b8ecc448163e11b99c1659e4ce735d97a",
+    "records": 13
+  },
+  "rings_346.smi": {
+    "bytes": 2584,
+    "sha256": "9fb7860a1d30c9d8d46feacfd1d039aaa8c17018f09445614d0ef57ec69e1505",
+    "records": 12
+  },
+  "rings_35.smi": {
+    "bytes": 48799,
+    "sha256": "f6d819b0fae0d43ad8c8e0bec677e55aa601a51e9c117f556385c65396fac0e2",
+    "records": 289
+  },
+  "rings_355.smi": {
+    "bytes": 24646,
+    "sha256": "7df3900b5ffc5d0d042f12384237e58bf530981fd6365c2f252b045c312ecb68",
+    "records": 127
+  },
+  "rings_356.smi": {
+    "bytes": 75338,
+    "sha256": "c2b4d231b8bb8cb69700a9250928c29ab33eee10f1b385b910d3cda7311e1803",
+    "records": 335
+  },
+  "rings_357.smi": {
+    "bytes": 11870,
+    "sha256": "2a1cb80f851c43e5d68581aaa4d5030e304de2c368f092fa90426ec91d75fdf4",
+    "records": 49
+  },
+  "rings_36.smi": {
+    "bytes": 69589,
+    "sha256": "b43b6db51a6da55b4a552aca449e71ee0b75a6bcc2519b593104092d08fbaa1e",
+    "records": 383
+  },
+  "rings_366.smi": {
+    "bytes": 85176,
+    "sha256": "944748a346c7c95ce6d84e388c4b8c5d268bcbeebcefdbd2043f1870c3f09f9b",
+    "records": 362
+  },
+  "rings_367.smi": {
+    "bytes": 12428,
+    "sha256": "b968e36ecce8a4e56c8733d9e600d604499e10619ed7800338b023200607318e",
+    "records": 48
+  },
+  "rings_37.smi": {
+    "bytes": 7472,
+    "sha256": "2c7fc0d4f6011a97a651aff4d50949c06672d73640a29f3ee8dc4bf03af9e90f",
+    "records": 43
+  },
+  "rings_3Al.smi": {
+    "bytes": 6628,
+    "sha256": "4d92cce5b2120c366b021dd11bd4ce9af2a6044b2416221cb50dd3bdf385ce0d",
+    "records": 55
+  },
+  "rings_3Al3Al.smi": {
+    "bytes": 693,
+    "sha256": "f1b2b5c605e903e6d735febc3abf4c0a332514439fe67d4613ce71dbdd0cd858",
+    "records": 5
+  },
+  "rings_3Al3Al3Al.smi": {
+    "bytes": 338,
+    "sha256": "ef0ca92244ead502ae9b8f24c6c29f83f9664fc9e6037b6651dc1a46b139a6ef",
+    "records": 2
+  },
+  "rings_3Al3Al4Al.smi": {
+    "bytes": 661,
+    "sha256": "5d142067b0622a5950c64dbaa085a917e8c79045abaca233fea1ddec7961e491",
+    "records": 4
+  },
+  "rings_3Al3Al5Al.smi": {
+    "bytes": 1648,
+    "sha256": "ec3e7ad4de00139f44e374dccc33845419b6b70b6e6b6122a6036cca2208a670",
+    "records": 8
+  },
+  "rings_3Al3Al6Al.smi": {
+    "bytes": 4160,
+    "sha256": "f46d0d85612defa29fc1cec577fcaa91d107777319cd49581fc8f6ee6ded6ae9",
+    "records": 20
+  },
+  "rings_3Al3Al7Al.smi": {
+    "bytes": 1131,
+    "sha256": "609b8540a8d47e547fb52b4699de43593b946a2024edb716e197083cfc2f8a09",
+    "records": 5
+  },
+  "rings_3Al4Al.smi": {
+    "bytes": 2231,
+    "sha256": "1200a65cd4a90076bb07d44ff1ec28f41b01db25d9248f98cd9eb4c7111d81d3",
+    "records": 14
+  },
+  "rings_3Al4Al4Al.smi": {
+    "bytes": 394,
+    "sha256": "756a6362fdbaeb2afc8630e192b1cf5ce0d57aa5b8fe880a21b33ed06b0ff67f",
+    "records": 2
+  },
+  "rings_3Al4Al5Al.smi": {
+    "bytes": 2693,
+    "sha256": "60586bfb10f983c10be8772a437577d1dc6e8384db82180dc885a3f1aa6227c2",
+    "records": 13
+  },
+  "rings_3Al4Al6Al.smi": {
+    "bytes": 2299,
+    "sha256": "b9b5a31e9828c100655c8006ecf9b2f0bfaada08c2b061f5e15042883b7cae32",
+    "records": 10
+  },
+  "rings_3Al4Al6Ar.smi": {
+    "bytes": 444,
+    "sha256": "ad3e5f0c9ed028be741234c48ce6ea44ab2652f325801f1337d9a9dbb8edc9fa",
+    "records": 2
+  },
+  "rings_3Al5Al.smi": {
+    "bytes": 50587,
+    "sha256": "b0e57734e723f469545f9915e559b2943592dfb1b078ddb43832a48b99110735",
+    "records": 285
+  },
+  "rings_3Al5Al5Al.smi": {
+    "bytes": 17915,
+    "sha256": "577bfc719066fdfa7efbfa709035938dd6666be54f24cfc07845106ea7116ac5",
+    "records": 88
+  },
+  "rings_3Al5Al6Al.smi": {
+    "bytes": 35017,
+    "sha256": "49161c338d2e6afd4912aa8547f0daec5643814061012aac32c525bfb6904937",
+    "records": 148
+  },
+  "rings_3Al5Al6Ar.smi": {
+    "bytes": 33156,
+    "sha256": "51361599115d5e9a030f595302bb2737bb4d20e009037ca766dec217c8b41570",
+    "records": 136
+  },
+  "rings_3Al5Al7Al.smi": {
+    "bytes": 12279,
+    "sha256": "a874a71e1be32fb7f542c40b2968b0f4c9db8d826a2c2f9886a39ea7899c3443",
+    "records": 48
+  },
+  "rings_3Al5Ar.smi": {
+    "bytes": 626,
+    "sha256": "ba9ae8cde096435624dcd4016485b24474eaa444e5469632e53af5a80fea5c1e",
+    "records": 4
+  },
+  "rings_3Al5Ar5Al.smi": {
+    "bytes": 8339,
+    "sha256": "2f6af4396ba5aee5ebcee37c7422ebb451ab6b2df0cd273675070bec5fd2994b",
+    "records": 39
+  },
+  "rings_3Al5Ar6Al.smi": {
+    "bytes": 12237,
+    "sha256": "ff42bf88c1388fa377b7bca5203013eb2f234f4524fef39bdbc67b45bebf2ee1",
+    "records": 51
+  },
+  "rings_3Al5Ar7Al.smi": {
+    "bytes": 283,
+    "sha256": "10ff8c77394f1458ffbdcb759358ec5bd472cec99442f38c674393832161b916",
+    "records": 1
+  },
+  "rings_3Al6Al.smi": {
+    "bytes": 72486,
+    "sha256": "a1bf3109769a1de61e3f74ee976e7c1ff690a8c15501f4f15b54d72279b998d5",
+    "records": 379
+  },
+  "rings_3Al6Al6Al.smi": {
+    "bytes": 43219,
+    "sha256": "a7820fd69aa5d2dbddc71333c11595f6025f5e99df1e0124982acee9316c948a",
+    "records": 174
+  },
+  "rings_3Al6Al7Al.smi": {
+    "bytes": 3433,
+    "sha256": "bcacb907d81db348b5114185a070448a2976d704bf6e661fe1fe8e4e78175981",
+    "records": 13
+  },
+  "rings_3Al6Ar.smi": {
+    "bytes": 731,
+    "sha256": "493b8139b14709ab5429a2ae46096c1ceb2b9e0e3e7d107cd0fc253df2e07ca7",
+    "records": 4
+  },
+  "rings_3Al6Ar6Al.smi": {
+    "bytes": 47712,
+    "sha256": "fb625924d61c7dc82b38569521ae9234b4f1919a3cc8c18d725bd25fc3c3f389",
+    "records": 188
+  },
+  "rings_3Al6Ar7Al.smi": {
+    "bytes": 9853,
+    "sha256": "fc408d9afe468bd75550e3c3fe860d5be3715dadff0a10b81a25ee58ace9df35",
+    "records": 35
+  },
+  "rings_3Al7Al.smi": {
+    "bytes": 7921,
+    "sha256": "18efdc5e1b0c777d9d6a658c8a8e1d737ec9efc779687539b513e5dedf38fe74",
+    "records": 43
+  },
+  "rings_4.smi": {
+    "bytes": 22156,
+    "sha256": "002aa95be1f06a2de9fa946feae53e363268c033dfb013f018d47c815e6e47dd",
+    "records": 156
+  },
+  "rings_44.smi": {
+    "bytes": 11259,
+    "sha256": "f7949620c39da062d9becf6e7d77e49fdb554ab64e5563094036762e51e31b5c",
+    "records": 70
+  },
+  "rings_444.smi": {
+    "bytes": 382,
+    "sha256": "455a0b00bc60ae831493228241a141aa6167c8b19516952bdcc93c58c171c786",
+    "records": 2
+  },
+  "rings_445.smi": {
+    "bytes": 2491,
+    "sha256": "1fcb023c431e1d95f45311039e4fd6b19826d4dd7ddae21b4de6e9b268ec9458",
+    "records": 12
+  },
+  "rings_446.smi": {
+    "bytes": 2217,
+    "sha256": "a138578b6479d9881ebc5090d41df8a77e3f8f9c438e060106a182f6250d0d1e",
+    "records": 10
+  },
+  "rings_45.smi": {
+    "bytes": 67001,
+    "sha256": "6ee74e14e46f944e3f870544d8cc0af78eb819ced108a9f3cf22544c074e4782",
+    "records": 363
+  },
+  "rings_455.smi": {
+    "bytes": 14779,
+    "sha256": "1719476e2fe46197ce19b5042b732197e343bed0613bda6dc3fa477a88ffca8f",
+    "records": 68
+  },
+  "rings_456.smi": {
+    "bytes": 58336,
+    "sha256": "7a1bb79b9f60770cf728d820368664e61a4408eba338b70562b76a3a2a5edec6",
+    "records": 244
+  },
+  "rings_457.smi": {
+    "bytes": 1789,
+    "sha256": "05e219210e7290a6a7d29a87df589c7f6b773960d2f0ea44e9aad0dac50f6470",
+    "records": 7
+  },
+  "rings_46.smi": {
+    "bytes": 88144,
+    "sha256": "fe22606b09d78e74304bd01e7d4aeb823d30a1f35fbc2ed075114e55b29532cf",
+    "records": 461
+  },
+  "rings_466.smi": {
+    "bytes": 45410,
+    "sha256": "b2ede89c25170098746b5e6df8935f3dc49517e5e0994061cdf66a5c0e0ca282",
+    "records": 190
+  },
+  "rings_467.smi": {
+    "bytes": 13586,
+    "sha256": "505e6d1e0155237ced57051ceb46f20dd0a9b9ab985b00fe70fed0146fbbd5ed",
+    "records": 53
+  },
+  "rings_47.smi": {
+    "bytes": 7330,
+    "sha256": "a37c98bb59a3248e8265473165d825dd0644e764cb160abb8f4923cd79ba0246",
+    "records": 38
+  },
+  "rings_477.smi": {
+    "bytes": 1087,
+    "sha256": "b1e3b030fd481e827fb20aa0f3526b23b3ce76ff99e0c292a5a2d8793dba207e",
+    "records": 4
+  },
+  "rings_4Al.smi": {
+    "bytes": 21591,
+    "sha256": "7e2397e94ce0bf9fd66f207c60497c15cfd18c720bfcc46f80179e92097db2e0",
+    "records": 148
+  },
+  "rings_4Al4Al.smi": {
+    "bytes": 11864,
+    "sha256": "aa0d5c1d49479203eb41c0554c90d253baafd3f211ae031d17518a1d65c94ff6",
+    "records": 70
+  },
+  "rings_4Al4Al4Al.smi": {
+    "bytes": 408,
+    "sha256": "297df63661aa5ef720aa56afef00307713f0013b1d0c7cf33087ac7f8c12d56e",
+    "records": 2
+  },
+  "rings_4Al4Al5Al.smi": {
+    "bytes": 2637,
+    "sha256": "07d2a983b67170e146b2602eed287b5a406f14f60cc3959041feb5e40052155f",
+    "records": 12
+  },
+  "rings_4Al4Al6Al.smi": {
+    "bytes": 2345,
+    "sha256": "db146f5c34be5935421d8387785110bdb8bc420b35d40acfc34fa05c5692340e",
+    "records": 10
+  },
+  "rings_4Al5Al.smi": {
+    "bytes": 69385,
+    "sha256": "423ac7c8555a2a9974dde83a9ee88a5ef7617e2849d535593546eb98f0309999",
+    "records": 358
+  },
+  "rings_4Al5Al5Al.smi": {
+    "bytes": 11848,
+    "sha256": "bc42f1178cebbfad06a232f58641ef88f125285e8b98be2a6247b00ea0487324",
+    "records": 51
+  },
+  "rings_4Al5Al6Al.smi": {
+    "bytes": 25824,
+    "sha256": "155cb2794f7e8a6701bda4c7996c81469c7b1ad02bacf07be9d4dc7dcf3f67bd",
+    "records": 101
+  },
+  "rings_4Al5Al6Ar.smi": {
+    "bytes": 22145,
+    "sha256": "ec5ac02158da693effa575e178f22f66a881d19a1f32608f3df17ede33021c0c",
+    "records": 86
+  },
+  "rings_4Al5Al7Al.smi": {
+    "bytes": 699,
+    "sha256": "5b3c63c2151dc6e8bb0ae112b3b18befdd10f295fc0664dc9bc377430ed4f11f",
+    "records": 3
+  },
+  "rings_4Al5Ar.smi": {
+    "bytes": 820,
+    "sha256": "d7e5f9cd040ceb5f94fe81aef1231ec932fcab6c4ed53407a2e5f21136428b04",
+    "records": 4
+  },
+  "rings_4Al5Ar5Al.smi": {
+    "bytes": 3883,
+    "sha256": "a58defde830d849da13754b87e5bd32c49fa8d42ba5918f2e155806ddbd2145e",
+    "records": 17
+  },
+  "rings_4Al5Ar6Al.smi": {
+    "bytes": 12056,
+    "sha256": "a3d5dae0794d478e9a5b2c274de39a2974a8a43a5c2cb18575a0af6ac4b19f0f",
+    "records": 48
+  },
+  "rings_4Al5Ar6Ar.smi": {
+    "bytes": 1498,
+    "sha256": "0a4f0af21c3f935b12d55376442e6afa76e015a3aff17df29c9342af561e53e3",
+    "records": 6
+  },
+  "rings_4Al5Ar7Al.smi": {
+    "bytes": 907,
+    "sha256": "5784f0c0e64a4af806701e14c104dd4b502f5e6f640c71d0093bca9de77c6f2f",
+    "records": 3
+  },
+  "rings_4Al6Al.smi": {
+    "bytes": 86700,
+    "sha256": "c40de905a38c5d7892672f669cc30eea85de46ba329b097ba340cb4372f6b3b0",
+    "records": 430
+  },
+  "rings_4Al6Al6Al.smi": {
+    "bytes": 12870,
+    "sha256": "75dff83773a6ee7aaf02fa2efeba826bed718051ce8331313cf130230a734e21",
+    "records": 53
+  },
+  "rings_4Al6Al7Al.smi": {
+    "bytes": 6365,
+    "sha256": "469d6ec2998783a9a1951381381e24f537f2d65a77271b66249e04c53403ede4",
+    "records": 24
+  },
+  "rings_4Al6Ar.smi": {
+    "bytes": 5941,
+    "sha256": "c6aaf6e21452b30e701a772c4177022b9feabe50756b3402f939787eb6d24b80",
+    "records": 29
+  },
+  "rings_4Al6Ar6Al.smi": {
+    "bytes": 29696,
+    "sha256": "927428101fa599cf7ef15dff5d44291b2a7d48abaa9ad39233b129daa6f4266a",
+    "records": 114
+  },
+  "rings_4Al6Ar6Ar.smi": {
+    "bytes": 5888,
+    "sha256": "17a36ba0f1bc268688d8f75b8e4a06133360019899151eba2ef97571552f81e6",
+    "records": 22
+  },
+  "rings_4Al6Ar7Al.smi": {
+    "bytes": 8141,
+    "sha256": "8cefbb6af2128b198e9dacd840485d8a083679410534571d55493037f0de5902",
+    "records": 29
+  },
+  "rings_4Al7Al.smi": {
+    "bytes": 7284,
+    "sha256": "65f9e9e75b3175519e1e0792be4fd00f0ee4e3cba3352181e41dd8eff64ef1ff",
+    "records": 36
+  },
+  "rings_4Al7Al7Al.smi": {
+    "bytes": 1153,
+    "sha256": "0a54fd064d16c42895f11e455e785d7ccb0853f67186f00bfabfbb708ac5e813",
+    "records": 4
+  },
+  "rings_4Ar.smi": {
+    "bytes": 1356,
+    "sha256": "025e21039c540634e478171565d22039ccce67b6b94d4744892896ff181c1777",
+    "records": 8
+  },
+  "rings_4Ar5Al7Al.smi": {
+    "bytes": 295,
+    "sha256": "0c31c66570542b811fce275f98c6dab8eff5fa0024632bd45e2ee0af7fdee320",
+    "records": 1
+  },
+  "rings_4Ar5Ar.smi": {
+    "bytes": 239,
+    "sha256": "90ffdeb7fddaa77061205820d1348a0343a61fa7e07972c4d397a8f940e4c66b",
+    "records": 1
+  },
+  "rings_4Ar5Ar6Ar.smi": {
+    "bytes": 771,
+    "sha256": "1199bb659cf387d4f9d231f0a474d53498834ca44ccb34a37995b3bb4d5f9c48",
+    "records": 3
+  },
+  "rings_4Ar6Ar.smi": {
+    "bytes": 376,
+    "sha256": "3e5601935e3b3b4dda279ddc23b366fcbbb7a3569f90e9f3c9d7066c1c26ed9b",
+    "records": 2
+  },
+  "rings_4Ar6Ar6Ar.smi": {
+    "bytes": 307,
+    "sha256": "a25007c57a233f528220a97240c4d8229a236aadb89e9a9070595c71fb26699b",
+    "records": 1
+  },
+  "rings_4Ar7Al.smi": {
+    "bytes": 226,
+    "sha256": "da9a8bbcd341be5f67beb60d9910af0942d66d0f4b849db318b81438a86ad329",
+    "records": 1
+  },
+  "rings_4Ar7Ar.smi": {
+    "bytes": 262,
+    "sha256": "7261128cb3a18da9fe749f75565513c2df3dc8a9c6fa01b8625359739fdc9d66",
+    "records": 1
+  },
+  "rings_5.smi": {
+    "bytes": 388058,
+    "sha256": "b90cace155fda58b740befdab67ad748a5ba73d7d220386c943fe87155b330fc",
+    "records": 2512
+  },
+  "rings_55.smi": {
+    "bytes": 512210,
+    "sha256": "ea1fa1b52c8ab143f3387cc808a4579936355e1ae9014525344ec599067e4a79",
+    "records": 2729
+  },
+  "rings_555.smi": {
+    "bytes": 121368,
+    "sha256": "77bd14dfb64fbf09d28712860561b8da211c0c458933666a8ff300e46ba1922f",
+    "records": 548
+  },
+  "rings_556.smi": {
+    "bytes": 1031332,
+    "sha256": "c0b74e7dc38b3c7b512e258f22a496ea3d6575bc2052d2254abaac0dfd1428aa",
+    "records": 4189
+  },
+  "rings_557.smi": {
+    "bytes": 124007,
+    "sha256": "3c9f614445166dce03f5fba564bfe229fe0d4eaa30fb3333d8a7c2d0c29d4c05",
+    "records": 454
+  },
+  "rings_56.smi": {
+    "bytes": 2956473,
+    "sha256": "f79ede53c4cc9ed86d6785858ca09975622e36dbe70da31e6957ada012a0a8eb",
+    "records": 14206
+  },
+  "rings_566.smi": {
+    "bytes": 3370475,
+    "sha256": "679b97227a42de4febece08248f6c9e5f8a8baab730f69ad0973c4878f561d6f",
+    "records": 12935
+  },
+  "rings_567.smi": {
+    "bytes": 597045,
+    "sha256": "819a4c623bda460242966dba84a33b93537c82aefc248e1e848be7d2e7812194",
+    "records": 2230
+  },
+  "rings_57.smi": {
+    "bytes": 252135,
+    "sha256": "149810be091a372ded619c9a4cf657cc9575131b9d740b84213cfbd1091b204b",
+    "records": 1186
+  },
+  "rings_577.smi": {
+    "bytes": 2625,
+    "sha256": "9f8711f1090234061cf3a56a136fb27b7cda2d34da2df6c24bbb6c31f90ed30a",
+    "records": 9
+  },
+  "rings_5Al.smi": {
+    "bytes": 309970,
+    "sha256": "0b0f5d3623631324eebc0a41e6651138489e766f9b9045b829f216861747bd83",
+    "records": 1915
+  },
+  "rings_5Al5Al.smi": {
+    "bytes": 323540,
+    "sha256": "69d4bb115dbb249b50c6c323c94f24c757d3056af13b8fb385901e12083069fe",
+    "records": 1625
+  },
+  "rings_5Al5Al5Al.smi": {
+    "bytes": 105954,
+    "sha256": "52c73a9ee814ed17a56b9eabaa234cef4b875e1aa47b87c0636d462a9d02425a",
+    "records": 451
+  },
+  "rings_5Al5Al6Al.smi": {
+    "bytes": 177297,
+    "sha256": "6fa40d6a047b7c77465290cdcd74f70b1876871056c358dab2f50032442f8b64",
+    "records": 683
+  },
+  "rings_5Al5Al6Ar.smi": {
+    "bytes": 286520,
+    "sha256": "77364c8be004507ac0abb9d74b08ca47ef3d0275ed251827ed720f56abf1bbce",
+    "records": 1052
+  },
+  "rings_5Al5Al7Al.smi": {
+    "bytes": 83667,
+    "sha256": "ded17e4f0451e788e5fc63f3c0994d3ce71b2f4237c757a66df11e2f91b02877",
+    "records": 274
+  },
+  "rings_5Al5Al7Ar.smi": {
+    "bytes": 282,
+    "sha256": "5d1b95cee4170a5444e758b69569f9b579f61bfc77ac8bcb556bee0052bc26ac",
+    "records": 1
+  },
+  "rings_5Al6Al.smi": {
+    "bytes": 872374,
+    "sha256": "cb1dd76360a71f3807e75cba1239c8867fd66f1c05253413976d6854630a9173",
+    "records": 4031
+  },
+  "rings_5Al6Al6Al.smi": {
+    "bytes": 388151,
+    "sha256": "2ba002564b194a35290981dfb09a0e9356bb62bce884da2376c46d2ff312a249",
+    "records": 1377
+  },
+  "rings_5Al6Al7Al.smi": {
+    "bytes": 60761,
+    "sha256": "f05f4e6c163c6921eee20e2fadf11477742e89497c22da9d0d06c3a63b6aed59",
+    "records": 200
+  },
+  "rings_5Al6Al7Ar.smi": {
+    "bytes": 1370,
+    "sha256": "402dbf737aae34c4328a0188c43e5219970ba6253de5a74c0bb299cb960a6e82",
+    "records": 4
+  },
+  "rings_5Al6Ar.smi": {
+    "bytes": 543377,
+    "sha256": "7aef6a3b733f498dee05d54ee55b9f58889b0aca162e2a8b26aff7505fe0cb17",
+    "records": 2408
+  },
+  "rings_5Al6Ar6Al.smi": {
+    "bytes": 822376,
+    "sha256": "fd5cbb9c82d0c0364861f562f91c6cacfc905c5bb3bf4ae65c17beef42222ef0",
+    "records": 2939
+  },
+  "rings_5Al6Ar6Ar.smi": {
+    "bytes": 337871,
+    "sha256": "f15ee4098c6a98a2cebed829b5cde6ad37b9ba47d2af28ea217ce5b1fb27324d",
+    "records": 1189
+  },
+  "rings_5Al6Ar7Al.smi": {
+    "bytes": 151440,
+    "sha256": "a2d14c43d1bc222946299ec0eaf70af830ca2a536d2c26a1874d79992e06287c",
+    "records": 525
+  },
+  "rings_5Al7Al.smi": {
+    "bytes": 115033,
+    "sha256": "e25c11cfb8615802e8455278ca6efd4b1c65fbe0cf0ace14778a2fbae86d226d",
+    "records": 509
+  },
+  "rings_5Al7Al7Al.smi": {
+    "bytes": 2483,
+    "sha256": "cdbe77f3a924a4b41ec33eb46266031087c8860438389a165d6c9c8bc7b8dba7",
+    "records": 8
+  },
+  "rings_5Al7Ar.smi": {
+    "bytes": 1582,
+    "sha256": "ba7fbac5ff4fde8c36dbceb73df3bc27d666458e33d86878dc749ae9625a0ad2",
+    "records": 6
+  },
+  "rings_5Ar.smi": {
+    "bytes": 95153,
+    "sha256": "05c22515ad7c452c889741c8b9ea746fd85ad34d13c873e7330869fc2e75a405",
+    "records": 598
+  },
+  "rings_5Ar5Al.smi": {
+    "bytes": 139082,
+    "sha256": "e7cec7f0b203a09f4aaee092b0fa02734e8dfff32838c39dc2aeeb49e31fefc7",
+    "records": 693
+  },
+  "rings_5Ar5Al5Al.smi": {
+    "bytes": 12771,
+    "sha256": "0b8afef46e406081e671f99c6359d7ae472a1b43de3e2b41528490f2008c3647",
+    "records": 54
+  },
+  "rings_5Ar5Al6Al.smi": {
+    "bytes": 84764,
+    "sha256": "da451af63a517428f8b1f7a4fb93c46d368212090ffcd3681771994d9c7de2be",
+    "records": 318
+  },
+  "rings_5Ar5Al6Ar.smi": {
+    "bytes": 262001,
+    "sha256": "25ecfa02af53dfc61435c2b193fa2283614ac3003f5ac097fa2468363ee1397e",
+    "records": 992
+  },
+  "rings_5Ar5Al7Al.smi": {
+    "bytes": 11729,
+    "sha256": "66ebab5ca64ae8857d1f4bfc8296ee836055c8544bea87b398bac8b81877aecc",
+    "records": 43
+  },
+  "rings_5Ar5Al7Ar.smi": {
+    "bytes": 308,
+    "sha256": "0c8cd745c058eeb330789a526b71431fd7ebff17b167eea96692edf7ff617057",
+    "records": 1
+  },
+  "rings_5Ar5Ar.smi": {
+    "bytes": 81403,
+    "sha256": "dde860d0eadd0f03136cf22c710882b2cc251c1e2d36e83c914f96efa1e36a46",
+    "records": 411
+  },
+  "rings_5Ar5Ar5Al.smi": {
+    "bytes": 7591,
+    "sha256": "95ddd1dd2b05c975ebc1fd89dcde30afd308318b07c22f65ac833c8773942f5b",
+    "records": 31
+  },
+  "rings_5Ar5Ar5Ar.smi": {
+    "bytes": 2886,
+    "sha256": "c05db469e101f5f22c252f0623193566a4cc5b37539eea537d222a80c2e7d992",
+    "records": 12
+  },
+  "rings_5Ar5Ar6Al.smi": {
+    "bytes": 56847,
+    "sha256": "21ab9c20d07f12dd4363434570eec390b812a17ce4aff16806904012f5cec39c",
+    "records": 217
+  },
+  "rings_5Ar5Ar6Ar.smi": {
+    "bytes": 247167,
+    "sha256": "6b6788d5d5fb1955a9941f1c9c84b265d5dca7aa73fa4eb3dfbcebe633d3daf7",
+    "records": 927
+  },
+  "rings_5Ar5Ar7Al.smi": {
+    "bytes": 32894,
+    "sha256": "8db65307b0092dcf122308d2dbf1b23c3f6c028bf224be60299eb44d591e30a9",
+    "records": 123
+  },
+  "rings_5Ar5Ar7Ar.smi": {
+    "bytes": 3311,
+    "sha256": "92ead31df8b2a5aed91aa5709d4d07574b2e5480ec3161a61aee50e94bfd6481",
+    "records": 12
+  },
+  "rings_5Ar6Al.smi": {
+    "bytes": 497244,
+    "sha256": "295722cd3b1f48f57dd39a43cd80091ca39a49b1762b7e125fd69c6fad533bec",
+    "records": 2268
+  },
+  "rings_5Ar6Al6Al.smi": {
+    "bytes": 153641,
+    "sha256": "bca837a6c32414befb4313c210fc80ada0fdae53ec5898e73ad2fbd9967f9189",
+    "records": 565
+  },
+  "rings_5Ar6Al7Al.smi": {
+    "bytes": 18096,
+    "sha256": "1d3637e8ed74e0338479baf11679074d38fa6fe34257a95861afdcfd0c91e6c0",
+    "records": 62
+  },
+  "rings_5Ar6Al7Ar.smi": {
+    "bytes": 340,
+    "sha256": "30e449e2c45add95992f9c6ce807e5304c9785e90de31ad3c24ebdd64bb4f0d3",
+    "records": 1
+  },
+  "rings_5Ar6Ar.smi": {
+    "bytes": 1249414,
+    "sha256": "0be84f72c0e75a775717a25f08084d28680db50fb854de90d3cf8082c2f42a07",
+    "records": 5499
+  },
+  "rings_5Ar6Ar6Al.smi": {
+    "bytes": 852984,
+    "sha256": "e68e3e7ae7312dd976cd472ce8134a42bf32d0a94afb42cbbd3967f3c63dfc10",
+    "records": 3056
+  },
+  "rings_5Ar6Ar6Ar.smi": {
+    "bytes": 1095048,
+    "sha256": "93f1d73d42356d234022bb3870327e2d7fb03e80b8ea302765184e5fc187179d",
+    "records": 3809
+  },
+  "rings_5Ar6Ar7Al.smi": {
+    "bytes": 404098,
+    "sha256": "156ded025839b44bea41f455d79cfbe8e6467ab1d6d1df611a59c27ee9526e91",
+    "records": 1407
+  },
+  "rings_5Ar6Ar7Ar.smi": {
+    "bytes": 9099,
+    "sha256": "5e5772825475ea7ebfc5d5c5510d3fd8a61543d7e0a8710cb38afe880a7193ac",
+    "records": 31
+  },
+  "rings_5Ar7Al.smi": {
+    "bytes": 137761,
+    "sha256": "108509c1733e1cdb6bc3e0f3be2e4becf5d587dca5c84f6bb4af95b9cb19d435",
+    "records": 612
+  },
+  "rings_5Ar7Al7Al.smi": {
+    "bytes": 303,
+    "sha256": "2cc64c0c46dc31fc3217bcc1b014646b0e06ef06d83b32578e9c9cc0d38f62fd",
+    "records": 1
+  },
+  "rings_5Ar7Ar.smi": {
+    "bytes": 14223,
+    "sha256": "5823a1983b7dd256c01d9b0a43cbb0538f09ea1d2d880cdc20d9cb80a980f435",
+    "records": 59
+  },
+  "rings_6.smi": {
+    "bytes": 575458,
+    "sha256": "f7985f5d8fd1c9e597cd46698de37281394517f080a24294fbcf422ada17d4e8",
+    "records": 3454
+  },
+  "rings_66.smi": {
+    "bytes": 2420714,
+    "sha256": "f57723c7a31eade627cb40d0cbf4b4152e1938d55c3a2fa90b7471939821a960",
+    "records": 11205
+  },
+  "rings_666.smi": {
+    "bytes": 2319360,
+    "sha256": "48982dcbf8a3bfe56df9b92cc58a16ae6bf20bfc49af1d3b8838cb087c147ce8",
+    "records": 8637
+  },
+  "rings_667.smi": {
+    "bytes": 592716,
+    "sha256": "dd4313ed56bddf1432caff64a409ad3213acc645c3e95bdf87c617150fcab9c3",
+    "records": 2135
+  },
+  "rings_67.smi": {
+    "bytes": 543490,
+    "sha256": "43e260012db38423a8f4801b21ec8998dde83dc31e786e591372b4c9ef5d4218",
+    "records": 2432
+  },
+  "rings_677.smi": {
+    "bytes": 14299,
+    "sha256": "08b309a65534c6f5f524c0a59c42b711d7ac5a4ad5f23ee72dba267a65e422bf",
+    "records": 51
+  },
+  "rings_6Al.smi": {
+    "bytes": 470838,
+    "sha256": "00ce0d79e7fc1b5aa269256b2629d6d3d151f4c8e37a33f1e2e5b2b28fc62a53",
+    "records": 2730
+  },
+  "rings_6Al6Al.smi": {
+    "bytes": 721506,
+    "sha256": "bceeed68acde2619dfba0284260a833ac60294755e7d3a0e6dfff0afba9fc066",
+    "records": 3254
+  },
+  "rings_6Al6Al6Al.smi": {
+    "bytes": 301138,
+    "sha256": "fef4db2d74d8a97d70bec60571c6a541c269601628023a8cda2a1932a63dfa8a",
+    "records": 1062
+  },
+  "rings_6Al6Al7Al.smi": {
+    "bytes": 28328,
+    "sha256": "c1acebd192a6263685b28c79ff8d3c283debe5379f0c902d2fa8632eca02fa54",
+    "records": 103
+  },
+  "rings_6Al6Al7Ar.smi": {
+    "bytes": 292,
+    "sha256": "915a05f96417bc1970e7802273b666f2b35b45c48cac9c259ae1a93c29ed9ce2",
+    "records": 1
+  },
+  "rings_6Al7Al.smi": {
+    "bytes": 100305,
+    "sha256": "c1e7f653933749b349364135cf80ef736ca700ea4b18d4ca411b749f34c58bb8",
+    "records": 457
+  },
+  "rings_6Al7Al7Al.smi": {
+    "bytes": 2710,
+    "sha256": "23bddb9c017ae54c89246c06b5bc4818a99861f40c1db38404e1dd9e73e13639",
+    "records": 10
+  },
+  "rings_6Al7Ar.smi": {
+    "bytes": 3231,
+    "sha256": "6f04cc7a04ae4715ee24d572f430c3244a06f1471fc201efe7542a81f8886839",
+    "records": 12
+  },
+  "rings_6Al7Ar7Al.smi": {
+    "bytes": 359,
+    "sha256": "75c70db8531b403eb20cb60410c661a65f081ac958234eacb4f99893d0ae48b5",
+    "records": 1
+  },
+  "rings_6Al7Ar7Ar.smi": {
+    "bytes": 689,
+    "sha256": "c237f81808dc944c82e04361ebbda84a0b31cc39e9a9eb18a8933cf4ca14cbfa",
+    "records": 2
+  },
+  "rings_6Ar.smi": {
+    "bytes": 130395,
+    "sha256": "e43e7b75ec622dafc48b1fb89d8ffa8c6fdc88d6cc9288baeb8e0445d8754785",
+    "records": 724
+  },
+  "rings_6Ar6Al.smi": {
+    "bytes": 1143124,
+    "sha256": "e9e99b184c2728e4d219cb49284f9af75be2bc7dce1ce354eb451b6db1a556c3",
+    "records": 4942
+  },
+  "rings_6Ar6Al6Al.smi": {
+    "bytes": 818918,
+    "sha256": "647e6bed82c9a4fd419f6554aa993b40523c5b890c0688456f24d3d66775d9a4",
+    "records": 2865
+  },
+  "rings_6Ar6Al7Al.smi": {
+    "bytes": 185476,
+    "sha256": "ae21be20628038327024e900d6c28696cdb242b5211dc2a9c732aeb34ccd7ccf",
+    "records": 632
+  },
+  "rings_6Ar6Al7Ar.smi": {
+    "bytes": 2339,
+    "sha256": "eee4ab56cd276879702004b8f7541088cc747aa25ed61360b7ab5f1d2e58fa51",
+    "records": 7
+  },
+  "rings_6Ar6Ar.smi": {
+    "bytes": 721832,
+    "sha256": "a686e916ed2a6d3d8a38cd1a76b6b156de8be4f96f8212ee15af4aac97ab7e5c",
+    "records": 3009
+  },
+  "rings_6Ar6Ar6Al.smi": {
+    "bytes": 815408,
+    "sha256": "6e5a705f329fdd99b878249985651fcfdca927ea31dfcadd8888a0778418a885",
+    "records": 2796
+  },
+  "rings_6Ar6Ar6Ar.smi": {
+    "bytes": 573143,
+    "sha256": "3fc3dcdc7dd617d4d126992215f16bc13063a6fc34334ef5a67abdd1adff6b43",
+    "records": 1914
+  },
+  "rings_6Ar6Ar7Al.smi": {
+    "bytes": 406841,
+    "sha256": "3378d0677281617085d90923a50f174e2a31d7d23fae81173e5640c4f8a6f4f3",
+    "records": 1336
+  },
+  "rings_6Ar6Ar7Ar.smi": {
+    "bytes": 17946,
+    "sha256": "419a484792ca9ab355424f53555d53c1c234b9817a4ce88807ece4f1c10c2128",
+    "records": 56
+  },
+  "rings_6Ar7Al.smi": {
+    "bytes": 463649,
+    "sha256": "2aa2b8167fbe497e94b1a96c2d70f63179121de599d7d279da4770600d9a4404",
+    "records": 1915
+  },
+  "rings_6Ar7Al7Al.smi": {
+    "bytes": 5957,
+    "sha256": "3bc0e084a3e2c4dc4e83636d3503fb3603aede13c283d3bf18b67fd3732e5588",
+    "records": 21
+  },
+  "rings_6Ar7Ar.smi": {
+    "bytes": 12961,
+    "sha256": "d81181ef5925c68f8708a448538eb586b6a82ecce326c3676d149ec575dec9f5",
+    "records": 48
+  },
+  "rings_6Ar7Ar7Al.smi": {
+    "bytes": 5727,
+    "sha256": "8424bd90c135b7862642b6eac879ea635604e0a31b4b1f4f8ed23e78aa0eaeed",
+    "records": 17
+  },
+  "rings_7.smi": {
+    "bytes": 121596,
+    "sha256": "5fec70a2a1e2ddc93372ec9213e4d2b628665e83c1f166846c611e302e86fea4",
+    "records": 726
+  },
+  "rings_77.smi": {
+    "bytes": 5804,
+    "sha256": "9ddcefc440c4839924d7183cdc1b2a01f6dcf72fbe61c75e270cb76b4615e0a9",
+    "records": 29
+  },
+  "rings_7Al.smi": {
+    "bytes": 120429,
+    "sha256": "777c0190df16a519c2ca95b1569c0f992a5e33d1a34e5393b0262ca11e3821f4",
+    "records": 691
+  },
+  "rings_7Al7Al.smi": {
+    "bytes": 5661,
+    "sha256": "2636a858f8c48f0115cb91a7cb1e2d6a1a5922b0d45bcd037b0b665d43257fb6",
+    "records": 27
+  },
+  "rings_7Ar.smi": {
+    "bytes": 6702,
+    "sha256": "e81f864683081e56cc90f46cde27c81ae5a7fc94cf07b6fc2712bf75e56d9de4",
+    "records": 35
+  },
+  "rings_7Ar7Al.smi": {
+    "bytes": 513,
+    "sha256": "93352701281bf2414bc08c02ce8a469ba35288636b9ca1a74e3148c0a27655d0",
+    "records": 2
+  }
+}

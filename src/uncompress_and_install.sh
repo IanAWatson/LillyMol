@@ -19,7 +19,5 @@ fi
 ring_replacement="${LILLYMOL_HOME}/data/ring_replacement/"
 
 if [[ -d "${ring_replacement}" ]] ; then
-  if [[ $(uname) == "Linux" ]] ; then
-    (cd ${LILLYMOL_HOME}/data/ring_replacement && ./to_linux.sh)
-  fi
+  "${PYTHON:-python3}" "${ring_replacement}/install.py" || exit $?
 fi

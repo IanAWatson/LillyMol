@@ -1,0 +1,10 @@
+name: "remove_peg"
+scaffold {
+  smarts: "[OD2R0](-[CD2H2])-[CD2]-[CD2]-[OD2]"
+  remove_atom: [0, 2, 3]
+  make_bond {
+    a1: 1
+    a2: 4
+    btype: SS_SINGLE_BOND
+  }
+}

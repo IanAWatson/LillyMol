@@ -81,8 +81,8 @@ Entering `-g help` to most LillyMol tools yields the usage message
  -g arguan      aromatic "gauanidines" - adjacent to =O, better name needed
  -g pyrazolone    convert pyrazolone to keto form
  -g aminothazole  convert -N=c1scc[nH]1 to -[NH]c1sccn1
- -g keto_enol     convert enol to keto forms (no adjacent heteroatoms)
- -g 4-pyridone    convert 4 pyridol to pyridone form
+ -g keto_enol     convert O/S enol to keto forms (no adjacent heteroatoms)
+ -g 4-pyridone    convert 4-pyridol/thiol to pyridone/thione forms
  -g surea         convert S-C(=N)-N to S=C(-N)-N
  -g 124-triazine  convert S-C(=N)-N to S=C(-N)-N
  -g enol-fused    convert [O,S;D1]-c(:n):[aD3x3] to O=C form
@@ -103,6 +103,72 @@ extremely difficult. The lactam/lactim transformation can exist in
 aromatic systems where multiple instances of such groups can
 coexist. At this stage, the tool converts the simple cases, but
 gives up in the face of more complex, possibly linked groups.
+
+### Lactim/lactam and sulfur analogues
+
+`-g ltlt` converts eligible non-ring `N=C-OH` and `N=C-SH` groups to their
+amide and thioamide forms. The terminal oxygen or sulfur must have one
+connection and the central carbon must have three connections. Nitrogen can
+be two-connected, or a neutral terminal `=NH`. Explicit `[OH]`, `[SH]`, and
+`[NH]` hydrogen specifications are supported.
+
+| Input | Standardised form |
+| --- | --- |
+| `CC(O)=NC` | `CC(=O)NC` |
+| `CC(S)=NC` | `CC(=S)NC` |
+| `CC(O)=N` | `CC(=O)N` |
+| `CC(S)=N` | `CC(=S)N` |
+| `NC(S)=N` | `NC(=S)N` |
+
+Terminal `=NH` support broadens equivalence relative to older releases, which
+left these forms unchanged. Charged terminal imines and specified C=N
+stereochemistry remain excluded from this transformation. Two-connected
+central carbons, such as `OC=N`, also remain excluded. Other transformations
+activated by `-g all` can independently affect charges or related groups.
+
+`-g ltltr` handles eligible ring analogues, including oxygen and sulfur forms.
+Both transformations are included in `-g all`. The separate `-g keto_enol`
+option handles carbon-based `C=C-OH`/`C=C-SH` groups and is not the option for
+these nitrogen-adjacent groups.
+
+### Other oxygen/sulfur tautomer rules
+
+The following transformations now also handle the sulfur analogues. This
+broadens standardised equivalence relative to earlier versions.
+
+| Option | Example sulfur transformation |
+| --- | --- |
+| `-g keto_enol` | `CC(S)=CC` → `CC(=S)CC` |
+| `-g 4-pyridone` | `Sc1ccncc1` → `S=C1C=CNC=C1` |
+| `-g oxopyrimidine` | `S=c1cc[nH]c(C)n1` → `S=c1ccnc(C)[nH]1` |
+
+General keto/enol processing retains its conservative restrictions: the central
+carbon is non-ring, its other neighbors are carbons, and interacting groups
+or nearby unsaturation can prevent conversion. Existing C=S groups participate
+in the same interference checks as C=O groups, including mixed oxygen/sulfur
+molecules. Ethers and thioethers are not OH/SH tautomers and are excluded.
+
+The default keto preference can be changed for handlers that support it:
+
+```shell
+fileconv -g keto_enol -g ENOL -S - molecules.smi
+```
+
+For example, `CC(=S)CC` becomes `CC(S)=CC`. `-g KETO` restores the default
+preference. The named `4-pyridone` and `oxopyrimidine` transformations retain
+their own fixed canonical choices. `4-pyridone` remains opt-in and is not
+enabled by `-g all`; use `-g all -g 4-pyridone` to combine it with the default
+transformations.
+
+Oxopyrimidine processing rejects competing C=O **or C=S** groups attached to
+the hydrogen-bearing nitrogen; converting one group must not silently favor
+an incompatible tautomer of another. The existing restrictions on complex
+ring environments remain in place.
+
+Hydrogen counts specified in brackets, such as `[OH]`, `[SH]`, and `[CH2]`, are
+refreshed on atoms whose hydrogen count changes during these conversions. This
+also fixes earlier oxygen cases that could retain an obsolete hydrogen count
+and produce an invalid-valence product.
 
 ### Activation
 The usual way of using chemical standardisation is via `-g all` which turns

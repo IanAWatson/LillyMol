@@ -1,4 +1,5 @@
 #include <algorithm>
+#include <utility>
 #include <vector>
 
 #include "googletest/include/gtest/gtest.h"
@@ -723,6 +724,155 @@ INSTANTIATE_TEST_SUITE_P(TestStandardisationNoChange, TestStandardisationNoChang
   NoChange{{"to2ap"}, "CC=CC1=C(C(=CC(=C1)CC1=CNC(=N)NC1=N)CCC)OC CHEMBL528943"},
   NoChange{{"indoleh"}, "CC1=CC(=O)N2N=CC=C2N1 CHEMBL4525057"},
   NoChange{{"guan"}, "C(=N)(NC1=C2C(=CC=C1)C=CC=C2)N1CCCCC1 CHEMBL91145"}
+));
+
+TEST_F(TestStandardisation, OxygenAndSulphurTautomersWithCombinedTransformations) {
+  _chemical_standardisation.activate_all();
+  // 4-pyridone is opt-in and is deliberately not enabled by activate_all().
+  ASSERT_TRUE(_chemical_standardisation.Activate(CS_4_PYRIDONE, 0));
+  for (const auto& [input, output] : std::vector<std::pair<const char*, const char*>>{
+           {"CC([SH])=NC", "CC(=S)NC"},
+           {"CC([OH])=[NH]", "CC(=O)N"},
+           {"CC([SH])=[NH]", "CC(=S)N"},
+           {"NC(S)=N", "NC(=S)N"},
+           {"SC1=NCCCC1", "S=C1NCCCC1"},
+           {"Sc1ccccn1", "S=C1C=CC=CN1"},
+           {"CC([OH])=CC", "CC(=O)CC"},
+           {"CC([SH])=CC", "CC(=S)CC"},
+           {"[OH]c1cc[n]cc1", "O=C1C=CNC=C1"},
+           {"[SH]c1cc[n]cc1", "S=C1C=CNC=C1"},
+           {"O=c1cc[nH]c(C)n1", "O=c1ccnc(C)[nH]1"},
+           {"S=c1cc[nH]c(C)n1", "S=c1ccnc(C)[nH]1"}}) {
+    Molecule molecule;
+    ASSERT_TRUE(molecule.build_from_smiles(input));
+    Molecule expected;
+    ASSERT_TRUE(expected.build_from_smiles(output));
+    const IWString formula = molecule.molecular_formula();
+    EXPECT_NE(_chemical_standardisation.process(molecule), 0);
+    EXPECT_EQ(molecule.unique_smiles(), expected.unique_smiles()) << input;
+    EXPECT_EQ(molecule.molecular_formula(), formula);
+    EXPECT_TRUE(molecule.valence_ok());
+    EXPECT_EQ(_chemical_standardisation.process(molecule), 0) << input;
+  }
+}
+
+TEST_F(TestStandardisation, FourPyridoneRemainsOptIn) {
+  _chemical_standardisation.activate_all();
+  for (const char* input : {"Oc1ccncc1", "Sc1ccncc1"}) {
+    Molecule molecule;
+    ASSERT_TRUE(molecule.build_from_smiles(input));
+    const IWString before = molecule.unique_smiles();
+    EXPECT_EQ(_chemical_standardisation.process(molecule), 0);
+    EXPECT_EQ(molecule.unique_smiles(), before);
+  }
+}
+
+// Compare oxygen and sulfur tautomer rules, including formula preservation,
+// valid valence, atom-order independence and idempotence.
+struct TautomerCase {
+  const char* directive;
+  const char* input;
+  const char* expected;
+  bool changes;
+  standardisation::KetoEnol preference = standardisation::KetoEnol::kToKeto;
+};
+
+class TestOxygenAndSulphurTautomers : public TestStandardisation,
+                                 public testing::WithParamInterface<TautomerCase> {};
+
+TEST_P(TestOxygenAndSulphurTautomers, CanonicalFormAndAtomOrder) {
+  const TautomerCase& params = GetParam();
+  ASSERT_TRUE(_chemical_standardisation.Activate(params.directive, 0));
+  _chemical_standardisation.set_keto_enol_preference(params.preference);
+  Molecule original;
+  ASSERT_TRUE(original.build_from_smiles(params.input));
+  Molecule expected;
+  ASSERT_TRUE(expected.build_from_smiles(params.expected));
+  const IWString expected_smiles = expected.unique_smiles();
+  const IWString formula = original.molecular_formula();
+
+  for (int i = 0; i < 10; ++i) {
+    Molecule molecule;
+    ASSERT_TRUE(molecule.build_from_smiles(i == 0 ? IWString(params.input) : original.random_smiles()));
+    EXPECT_EQ(_chemical_standardisation.process(molecule) != 0, params.changes)
+        << params.input;
+    EXPECT_EQ(molecule.unique_smiles(), expected_smiles) << params.input;
+    EXPECT_EQ(molecule.molecular_formula(), formula) << params.input;
+    EXPECT_TRUE(molecule.valence_ok()) << molecule.smiles();
+    EXPECT_EQ(_chemical_standardisation.process(molecule), 0)
+        << "Standardisation must be idempotent: " << params.input;
+  }
+}
+
+INSTANTIATE_TEST_SUITE_P(OxygenAndSulphur, TestOxygenAndSulphurTautomers, testing::Values(
+    TautomerCase{CS_LACTIM_LACTAM, "CC(O)=NC", "CC(=O)NC", true},
+    TautomerCase{CS_LACTIM_LACTAM, "CC(S)=NC", "CC(=S)NC", true},
+    TautomerCase{CS_LACTIM_LACTAM, "CC([OH])=NC", "CC(=O)NC", true},
+    TautomerCase{CS_LACTIM_LACTAM, "CC([SH])=NC", "CC(=S)NC", true},
+    TautomerCase{CS_LACTIM_LACTAM, "CC(=O)NC", "CC(=O)NC", false},
+    TautomerCase{CS_LACTIM_LACTAM, "CC(=S)NC", "CC(=S)NC", false},
+    TautomerCase{CS_LACTIM_LACTAM_RING, "OC1=NCCCC1", "O=C1NCCCC1", true},
+    TautomerCase{CS_LACTIM_LACTAM_RING, "SC1=NCCCC1", "S=C1NCCCC1", true},
+    TautomerCase{CS_LACTIM_LACTAM_RING, "Oc1ccccn1", "O=C1C=CC=CN1", true},
+    TautomerCase{CS_LACTIM_LACTAM_RING, "Sc1ccccn1", "S=C1C=CC=CN1", true},
+    // Terminal neutral imine nitrogens are also supported.
+    TautomerCase{CS_LACTIM_LACTAM, "CC(O)=N", "CC(=O)N", true},
+    TautomerCase{CS_LACTIM_LACTAM, "CC(S)=N", "CC(=S)N", true},
+    TautomerCase{CS_LACTIM_LACTAM, "CC([OH])=[NH]", "CC(=O)N", true},
+    TautomerCase{CS_LACTIM_LACTAM, "CC([SH])=[NH]", "CC(=S)N", true},
+    TautomerCase{CS_LACTIM_LACTAM, "NC(O)=N", "NC(=O)N", true},
+    TautomerCase{CS_LACTIM_LACTAM, "NC(S)=N", "NC(=S)N", true},
+    TautomerCase{CS_LACTIM_LACTAM, "CNC(O)=N", "CNC(=O)N", true},
+    TautomerCase{CS_LACTIM_LACTAM, "CNC(S)=N", "CNC(=S)N", true},
+    // Charged terminal imines and specified C=N stereochemistry stay excluded.
+    TautomerCase{CS_LACTIM_LACTAM, "CC(O)=[NH2+]", "CC(O)=[NH2+]", false},
+    TautomerCase{CS_LACTIM_LACTAM, "CC(S)=[NH2+]", "CC(S)=[NH2+]", false},
+    TautomerCase{CS_LACTIM_LACTAM, "C/C(O)=N/C", "C/C(O)=N/C", false},
+    TautomerCase{CS_LACTIM_LACTAM, "C/C(S)=N/C", "C/C(S)=N/C", false},
+    // Two-connected central carbons and ether/thioether groups stay excluded.
+    TautomerCase{CS_LACTIM_LACTAM, "OC=NC", "OC=NC", false},
+    TautomerCase{CS_LACTIM_LACTAM, "SC=NC", "SC=NC", false},
+    TautomerCase{CS_LACTIM_LACTAM, "COC(C)=NC", "COC(C)=NC", false},
+    TautomerCase{CS_LACTIM_LACTAM, "CSC(C)=NC", "CSC(C)=NC", false},
+    TautomerCase{CS_KETO_ENOL, "CC(O)=CC", "CC(=O)CC", true},
+    TautomerCase{CS_KETO_ENOL, "CC(S)=CC", "CC(=S)CC", true},
+    TautomerCase{CS_KETO_ENOL, "CC([OH])=CC", "CC(=O)CC", true},
+    TautomerCase{CS_KETO_ENOL, "CC([SH])=CC", "CC(=S)CC", true},
+    TautomerCase{CS_KETO_ENOL, "CC(=O)CC", "CC(=O)CC", false},
+    TautomerCase{CS_KETO_ENOL, "CC(=S)CC", "CC(=S)CC", false},
+    TautomerCase{CS_KETO_ENOL, "CC(=O)CC", "CC(O)=CC", true,
+                 standardisation::KetoEnol::kToEnol},
+    TautomerCase{CS_KETO_ENOL, "CC(=S)CC", "CC(S)=CC", true,
+                 standardisation::KetoEnol::kToEnol},
+    TautomerCase{CS_KETO_ENOL, "CC(=O)[CH2]C", "CC(O)=CC", true,
+                 standardisation::KetoEnol::kToEnol},
+    TautomerCase{CS_KETO_ENOL, "CC(=S)[CH2]C", "CC(S)=CC", true,
+                 standardisation::KetoEnol::kToEnol},
+    // Interacting keto/enol groups, including mixed O/S cases, remain excluded.
+    TautomerCase{CS_KETO_ENOL, "CC(=O)C=C(S)C", "CC(=O)C=C(S)C", false},
+    TautomerCase{CS_KETO_ENOL, "CC(=S)C=C(O)C", "CC(=S)C=C(O)C", false},
+    TautomerCase{CS_KETO_ENOL, "CC(S)=CN", "CC(S)=CN", false},
+    TautomerCase{CS_KETO_ENOL, "CC(SC)=CC", "CC(SC)=CC", false},
+    TautomerCase{CS_KETO_ENOL, "OC1=CCCCC1", "OC1=CCCCC1", false},
+    TautomerCase{CS_KETO_ENOL, "SC1=CCCCC1", "SC1=CCCCC1", false},
+    TautomerCase{CS_KETO_ENOL, "CC(O)=CC.CC(S)=CC", "CC(=O)CC.CC(=S)CC", true},
+    TautomerCase{CS_4_PYRIDONE, "Oc1ccncc1", "O=C1C=CNC=C1", true},
+    TautomerCase{CS_4_PYRIDONE, "Sc1ccncc1", "S=C1C=CNC=C1", true},
+    TautomerCase{CS_4_PYRIDONE, "[OH]c1cc[n]cc1", "O=C1C=CNC=C1", true},
+    TautomerCase{CS_4_PYRIDONE, "[SH]c1cc[n]cc1", "S=C1C=CNC=C1", true},
+    TautomerCase{CS_4_PYRIDONE, "O=C1C=CNC=C1", "O=C1C=CNC=C1", false},
+    TautomerCase{CS_4_PYRIDONE, "S=C1C=CNC=C1", "S=C1C=CNC=C1", false},
+    TautomerCase{CS_4_PYRIDONE, "CSc1ccncc1", "CSc1ccncc1", false},
+    TautomerCase{CS_4_PYRIDONE, "Sc1cccnc1", "Sc1cccnc1", false},
+    TautomerCase{CS_OXO_PYRIMIDINE, "O=c1cc[nH]c(C)n1", "O=c1ccnc(C)[nH]1", true},
+    TautomerCase{CS_OXO_PYRIMIDINE, "S=c1cc[nH]c(C)n1", "S=c1ccnc(C)[nH]1", true},
+    TautomerCase{CS_OXO_PYRIMIDINE, "O=c1ccnc(C)[nH]1", "O=c1ccnc(C)[nH]1", false},
+    TautomerCase{CS_OXO_PYRIMIDINE, "S=c1ccnc(C)[nH]1", "S=c1ccnc(C)[nH]1", false},
+    // Neither carbonyl nor thiocarbonyl competition may be ignored.
+    TautomerCase{CS_OXO_PYRIMIDINE, "O=C1C2=C(C(=O)N=C(N1)N)N(C=N2)C1OC(CO)C(C1)O", "O=C1C2=C(C(=O)N=C(N1)N)N(C=N2)C1OC(CO)C(C1)O", false},
+    TautomerCase{CS_OXO_PYRIMIDINE, "O=C1C2=C(C(=S)N=C(N1)N)N(C=N2)C1OC(CO)C(C1)O", "O=C1C2=C(C(=S)N=C(N1)N)N(C=N2)C1OC(CO)C(C1)O", false},
+    TautomerCase{CS_OXO_PYRIMIDINE, "S=C1C2=C(C(=O)N=C(N1)N)N(C=N2)C1OC(CO)C(C1)O", "S=C1C2=C(C(=O)N=C(N1)N)N(C=N2)C1OC(CO)C(C1)O", false},
+    TautomerCase{CS_OXO_PYRIMIDINE, "S=C1C2=C(C(=S)N=C(N1)N)N(C=N2)C1OC(CO)C(C1)O", "S=C1C2=C(C(=S)N=C(N1)N)N(C=N2)C1OC(CO)C(C1)O", false}
 ));
 
 }  // namespace

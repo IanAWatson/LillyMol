@@ -135,10 +135,13 @@ Possible_Lactim_Lactam::to_lactam_form(Molecule& m, int check_nitrogen_hcount) {
     return 0;
   }
 
-  if (!check_nitrogen_hcount)
-    ;
-  else if (m.hcount(_nitrogen)) {
-    return 0;
+  if (check_nitrogen_hcount) {
+    // A terminal neutral =NH becomes -NH2; a two-connected =N- becomes
+    // -NH-. Both gain one hydrogen when the double bond becomes single.
+    const int expected_hydrogens = m.ncon(_nitrogen) == 1 ? 1 : 0;
+    if (m.hcount(_nitrogen) != expected_hydrogens) {
+      return 0;
+    }
   }
 
   if (-1 == m.formal_charge(_oxygen)) {
@@ -456,14 +459,16 @@ display_all_chemical_standardisation_options(std::ostream& os, char zoption) {
   os << zopt << CS_ARGUAN << "      aromatic \"gauanidines\" - adjacent to =O, better name needed\n";
   os << zopt << CS_PYRAZOLONE << "    convert pyrazolone to keto form\n";
   os << zopt << CS_AMINO_THIAZOLE << "  convert -N=c1scc[nH]1 to -[NH]c1sccn1\n";
-  os << zopt << CS_KETO_ENOL << "     convert enol to keto forms (no adjacent heteroatoms)\n";
-  os << zopt << CS_4_PYRIDONE << "    convert 4 pyridol to pyridone form\n";
+  os << zopt << CS_KETO_ENOL << "     convert O/S enol to keto forms (no adjacent heteroatoms)\n";
+  os << zopt << CS_4_PYRIDONE << "    convert 4-pyridol/thiol to pyridone/thione forms\n";
   os << zopt << CS_SULFONYL_UREA << "         convert S-C(=N)-N to S=C(-N)-N\n";
   os << zopt << CS_124TRIAZINE << "  convert S-C(=N)-N to S=C(-N)-N\n";
   os << zopt << CS_ENOL_FUSED << "    convert [O,S;D1]-c(:n):[aD3x3] to O=C form\n";
   os << zopt << CS_ISOTOPE << "       convert all isotopic atoms to non isotopic forms\n";
   os << zopt << CS_2AMINO_PYRIDINE << "         convert exocyclic N=C:[nH] to N-c:n (InChI generates these)\n";
 
+  os << zopt << "KETO        prefer keto forms where a tautomer preference is supported (default)\n";
+  os << zopt << "ENOL        prefer enol forms where a tautomer preference is supported\n";
   os << zopt << CS_ALL << "         ALL the above standardistions\n";
   os << zopt << CS_REVERSE_NITRO << "     convert O=N=O nitro groups to charge separated\n";
   os << zopt << CS_REVERSE_NV5 << "       convert all 5 valent N atoms to charge separated\n";
@@ -9417,63 +9422,6 @@ remove_two_lactims_sharing_a_single_nitrogen(
 }
 
 static int
-carbonyl_present(const Molecule& m, const atom_number_t carbon,
-                 const atom_number_t nitrogen) {
-  const Atom* n = m.atomi(nitrogen);
-
-  if (2 != n->ncon()) {
-    return 0;
-  }
-
-  for (int i = 0; i < 2; ++i) {
-    const atom_number_t c2 = n->other(nitrogen, i);
-
-    if (c2 == carbon) {
-      continue;
-    }
-
-    const Atom* ac2 = m.atomi(c2);
-
-    if (3 != ac2->ncon()) {
-      return 0;
-    }
-
-    for (int j = 0; j < 3; ++j) {
-      const Bond* b = ac2->item(j);
-
-      const atom_number_t o = b->other(c2);
-
-      if (b->is_double_bond() && 8 == m.atomic_number(o)) {
-        return 1;
-      }
-    }
-  }
-
-  return 0;
-}
-
-static int
-looks_like_urea(const Molecule& m, const atom_number_t carbon,
-                const resizable_array<const Bond*>& bonds_to_nitrogen) {
-  assert(2 == bonds_to_nitrogen.number_elements());
-
-  if (1 == m.ncon(bonds_to_nitrogen[0]->other(carbon))) {
-    return 1;
-  }
-
-  if (1 == m.ncon(bonds_to_nitrogen[1]->other(carbon))) {
-    return 1;
-  }
-
-  if (carbonyl_present(m, carbon, bonds_to_nitrogen[0]->other(carbon)) ||
-      carbonyl_present(m, carbon, bonds_to_nitrogen[1]->other(carbon))) {
-    return 0;
-  }
-
-  return 1;
-}
-
-static int
 possible_lactam_comparator(const Possible_Lactim_Lactam* pll1,
                            const Possible_Lactim_Lactam* pll2) {
   if (!pll1->is_ring() &&
@@ -9757,11 +9705,6 @@ IWStandard_Current_Molecule::initialise(Molecule& m) {
       continue;
     }
 
-    if (2 == attached_nitrogens && boc->is_double_bond() &&
-        looks_like_urea(m, c, bonds_to_nitrogen)) {
-      continue;
-    }
-
     const Bond* bn1 = nullptr;
     const Bond* bn2 = nullptr;
 
@@ -9776,7 +9719,8 @@ IWStandard_Current_Molecule::initialise(Molecule& m) {
 
       const atom_number_t n = bcn->other(c);
 
-      if (2 != _ncon[n]) {
+      if (_ncon[n] != 2 &&
+          !(_ncon[n] == 1 && bcn->is_double_bond() && m.formal_charge(n) == 0)) {
         continue;
       }
 
@@ -9802,15 +9746,9 @@ IWStandard_Current_Molecule::initialise(Molecule& m) {
 
     const atom_number_t n1 = bn1->other(c);
 
-    Possible_Lactim_Lactam* p = nullptr;
-
-    if (boc->is_double_bond()) {  // already correct - actually, will not happen
-      p = new Possible_Lactim_Lactam(i, c, n1);
-      p->set_lactam_form(1);
-    } else  // single bond from oxygen to carbon, may need changing
-    {
-      p = new Possible_Lactim_Lactam(i, c, n1);
-    }
+    // Only the singly bonded OH/SH form is collected above. Already-keto
+    // C=O/C=S groups are deliberately not candidates for this transformation.
+    Possible_Lactim_Lactam* p = new Possible_Lactim_Lactam(i, c, n1);
 
     if (nullptr != bn2) {
       p->set_second_nitrogen(bn2->other(c));
@@ -9909,41 +9847,116 @@ IWStandard_Current_Molecule::FillExocyclicStatus(Molecule& m) {
 int
 Chemical_Standardisation::_processing_needed(
     const IWStandard_Current_Molecule& current_molecule_data) const {
-  if (current_molecule_data.nneg() || current_molecule_data.npos() ||
-      (current_molecule_data.singly_connected_metal() &&
-       _transform_covalent_metals.active()) ||
-      (current_molecule_data.isolated_metal() && _transform_single_atom_ions.active()) ||
-      (current_molecule_data.isolated_halogen() &&
-       _transform_single_atom_ions.active()) ||
-      current_molecule_data.possible_guanidine().number_elements() ||
-      current_molecule_data.explicit_hydrogen_count() ||
-      current_molecule_data.aromatic_rings_with_multiple_nitrogens() > 0 ||
-      (current_molecule_data.nitrogens() > 1 &&
-       _transform_back_to_nplus_nminus.active()) ||
-      (current_molecule_data.nitrogens() > 1 && current_molecule_data.oxygens() > 0 &&
-       _transform_misdrawn_urea.active()) ||
-      current_molecule_data.possible_lactam().number_elements() > 0 ||
-      current_molecule_data.possible_valence_errors() ||
-      (current_molecule_data.nitrogens() && current_molecule_data.oxygens() &&
-       _transform_isoxazole.active()) ||
-      (current_molecule_data.sulphur() && (_transform_amino_thiazole.active() ||
-                                           _transform_misdrawn_sulfonamide.active())) ||
-      (current_molecule_data.oxygens() && _transform_enol_to_keto.active()) ||
-      (_transform_nitro_reverse.active() && current_molecule_data.oxygens() &&
-       current_molecule_data.nitrogens()) ||
-      _transform_to_4_pyridone.active() ||
-      (_transform_sulfonyl_urea.active() && current_molecule_data.sulphur() > 0) ||
-      (_transform_124_triazine.active() && current_molecule_data.nitrogens() > 2) ||
-      (_transform_charged_non_organic.active() && current_molecule_data.non_organic() &&
-       (current_molecule_data.npos() > 0 || current_molecule_data.nneg() > 0)) ||
-      (_transform_enol_fused.active() && current_molecule_data.nrings() > 1) ||
-      (_transform_to_2_amino_pyridine.active() &&
-       current_molecule_data.nitrogens() > 1) ||
-      (_transform_oxo_pyrimidine.active() && current_molecule_data.nitrogens() > 1) ||
-      (_transform_isotopes.active() && current_molecule_data.isotope() > 0) ||
-      (_transform_indole_hydrogen.active() && current_molecule_data.nitrogens() > 1) ||
-      (_transform_nv5_oxygen_to_charge_separated.active() && current_molecule_data.nitrogens() > 0)
-      ) {
+  // Preserve the short-circuit order: any applicable transformation is enough.
+  if (current_molecule_data.nneg()) {
+    return 1;
+  }
+
+  if (current_molecule_data.npos()) {
+    return 1;
+  }
+
+  if (current_molecule_data.singly_connected_metal() &&
+      _transform_covalent_metals.active()) {
+    return 1;
+  }
+
+  if (current_molecule_data.isolated_metal() && _transform_single_atom_ions.active()) {
+    return 1;
+  }
+
+  if (current_molecule_data.isolated_halogen() && _transform_single_atom_ions.active()) {
+    return 1;
+  }
+
+  if (current_molecule_data.possible_guanidine().number_elements()) {
+    return 1;
+  }
+
+  if (current_molecule_data.explicit_hydrogen_count()) {
+    return 1;
+  }
+
+  if (current_molecule_data.aromatic_rings_with_multiple_nitrogens() > 0) {
+    return 1;
+  }
+
+  if (current_molecule_data.nitrogens() > 1 && _transform_back_to_nplus_nminus.active()) {
+    return 1;
+  }
+
+  if (current_molecule_data.nitrogens() > 1 && current_molecule_data.oxygens() > 0 &&
+      _transform_misdrawn_urea.active()) {
+    return 1;
+  }
+
+  if (current_molecule_data.possible_lactam().number_elements() > 0) {
+    return 1;
+  }
+
+  if (current_molecule_data.possible_valence_errors()) {
+    return 1;
+  }
+
+  if (current_molecule_data.nitrogens() && current_molecule_data.oxygens() &&
+      _transform_isoxazole.active()) {
+    return 1;
+  }
+
+  if (current_molecule_data.sulphur() &&
+      (_transform_amino_thiazole.active() || _transform_misdrawn_sulfonamide.active())) {
+    return 1;
+  }
+
+  if ((current_molecule_data.oxygens() || current_molecule_data.sulphur()) &&
+      _transform_enol_to_keto.active()) {
+    return 1;
+  }
+
+  if (_transform_nitro_reverse.active() && current_molecule_data.oxygens() &&
+      current_molecule_data.nitrogens()) {
+    return 1;
+  }
+
+  if (_transform_to_4_pyridone.active()) {
+    return 1;
+  }
+
+  if (_transform_sulfonyl_urea.active() && current_molecule_data.sulphur() > 0) {
+    return 1;
+  }
+
+  if (_transform_124_triazine.active() && current_molecule_data.nitrogens() > 2) {
+    return 1;
+  }
+
+  if (_transform_charged_non_organic.active() && current_molecule_data.non_organic() &&
+      (current_molecule_data.npos() > 0 || current_molecule_data.nneg() > 0)) {
+    return 1;
+  }
+
+  if (_transform_enol_fused.active() && current_molecule_data.nrings() > 1) {
+    return 1;
+  }
+
+  if (_transform_to_2_amino_pyridine.active() && current_molecule_data.nitrogens() > 1) {
+    return 1;
+  }
+
+  if (_transform_oxo_pyrimidine.active() && current_molecule_data.nitrogens() > 1) {
+    return 1;
+  }
+
+  if (_transform_isotopes.active() && current_molecule_data.isotope() > 0) {
+    return 1;
+  }
+
+  if (_transform_indole_hydrogen.active() && current_molecule_data.nitrogens() > 1) {
+    return 1;
+  }
+
+  if (_transform_nv5_oxygen_to_charge_separated.active() &&
+      current_molecule_data.nitrogens() > 0) {
     return 1;
   }
 
@@ -10256,7 +10269,7 @@ is_part_part_of_enol_form(const atom_number_t carbon,
 int
 Chemical_Standardisation::_do_enol_to_keto(
     Molecule& m, IWStandard_Current_Molecule& current_molecule_data) {
-  if (current_molecule_data.oxygens() == 0) {
+  if (current_molecule_data.oxygens() == 0 && current_molecule_data.sulphur() == 0) {
     return 0;
   }
 
@@ -10317,6 +10330,10 @@ Chemical_Standardisation::_do_enol_to_keto(Molecule& m,
     }
     m.set_bond_type_between_atoms(c1, o, DOUBLE_BOND);
     m.set_bond_type_between_atoms(c1, doubly_bonded_carbon, SINGLE_BOND);
+    // The OH/SH hydrogen moves to the carbon. Bracket-specified counts
+    // must not survive these bond-order changes.
+    m.set_implicit_hydrogens_known(o, 0);
+    m.set_implicit_hydrogens_known(doubly_bonded_carbon, 0);
     rc++;
   }
 
@@ -10451,6 +10468,8 @@ Chemical_Standardisation::_do_keto_to_enol(Molecule& m,
     m.set_bond_type_between_atoms(carbon, o, SINGLE_BOND);
     atom_number_t cx = current_keto_form[i + 2];
     m.set_bond_type_between_atoms(carbon, cx, DOUBLE_BOND);
+    m.set_implicit_hydrogens_known(o, 0);
+    m.set_implicit_hydrogens_known(cx, 0);
     current_keto_form[i] = kInvalidAtomNumber;
     rc++;
   }
@@ -10600,11 +10619,11 @@ accumulate_possible_enol_form(const Molecule& m,
 }
 
 // Fill the current_keto_form and current_enol_form vectors.
-// Each enol form gets 4 atoms: the Oxygen, the Carbon and both
+// Each enol form gets 4 atoms: the terminal O/S, the Carbon and both
 // carbons attached to that.
 // In the case of an enol form, [2] will be the doubly bonded carbon
 // and then the singly bonded carbon in [3]
-// Eath keto for gets 4 atoms: the Oxygen, the Carbon, and then
+// Each keto form gets 4 atoms: the terminal O/S, the Carbon, and then
 // the two carbons attached, in no particular order.
 int
 Chemical_Standardisation::_identify_current_keto_and_enol_forms(
@@ -10619,7 +10638,7 @@ Chemical_Standardisation::_identify_current_keto_and_enol_forms(
 
   const int matoms = m.natoms();
   for (int o = 0; o < matoms; ++o) {
-    if (z[o] != 8) {
+    if (z[o] != 8 && z[o] != 16) {
       continue;
     }
 
@@ -10884,7 +10903,7 @@ Chemical_Standardisation::_do_transform_to_4_pyridone(
       continue;
     }
 
-    // Look for the OH and exocyclic double bonds.
+    // Look for OH/SH and reject existing exocyclic double bonds.
     for (const Bond* b : atom) {
       atom_number_t o = b->other(ring[i]);
       if (ring.contains(o)) {
@@ -10894,7 +10913,7 @@ Chemical_Standardisation::_do_transform_to_4_pyridone(
       if (!b->is_single_bond()) {
         return 0;
       }
-      if (m.atomic_number(o) != 8) {
+      if (m.atomic_number(o) != 8 && m.atomic_number(o) != 16) {
         continue;
       }
       if (m.ncon(o) != 1) {
@@ -10937,6 +10956,9 @@ Chemical_Standardisation::_do_transform_to_4_pyridone(Molecule& m,
     m.set_bond_type_between_atoms(prev, ring[j], btype[i - 1]);
     prev = ring[j];
   }
+
+  m.set_implicit_hydrogens_known(oh, 0);
+  m.set_implicit_hydrogens_known(ring[n_index], 0);
 
   return 1;
 }
@@ -11928,7 +11950,7 @@ Chemical_Standardisation::_do_transform_oxo_pyrimidine(
   resizable_array_p<OxoPyrimidine> candidates;
 
   for (int i = 0; i < matoms; ++i) {
-    if (atomic_number[i] != 8) {
+    if (atomic_number[i] != 8 && atomic_number[i] != 16) {
       continue;
     }
     if (ncon[i] != 1) {
@@ -12037,7 +12059,7 @@ Chemical_Standardisation::_do_transform_oxo_pyrimidine(
       continue;
     }
 
-    // We cannot have a C=O at attached to n2
+    // A competing C=O or C=S attached to n2 prevents this hydrogen shift.
     // O=C1C2=C(C(=O)N=C(N1)N)N(C=N2)C1OC(CO)C(C1)O CHEMBL2115214
     int found_carbonyl = 0;
     for (const Bond* b : m[n2]) {
@@ -12056,8 +12078,8 @@ Chemical_Standardisation::_do_transform_oxo_pyrimidine(
         if (! b->is_double_bond()) {
           continue;
         }
-        atom_number_t oxygen = b->other(o);
-        if (atomic_number[oxygen] == 8) {
+        atom_number_t heteroatom = b->other(o);
+        if (atomic_number[heteroatom] == 8 || atomic_number[heteroatom] == 16) {
           found_carbonyl = 1;
           break;
         }
@@ -12111,6 +12133,8 @@ Chemical_Standardisation::_do_transform_oxo_pyrimidine(
 
     m.set_bond_type_between_atoms(n1, c2, SINGLE_BOND);
     m.set_bond_type_between_atoms(c2, n2, DOUBLE_BOND);
+    m.set_implicit_hydrogens_known(n1, 0);
+    m.set_implicit_hydrogens_known(n2, 0);
 #ifdef DEBUG_DO_TRANSFORM_OXO_PYRIMIDINE
     m.set_isotope(i, 1);
     m.set_isotope(c1, 2);

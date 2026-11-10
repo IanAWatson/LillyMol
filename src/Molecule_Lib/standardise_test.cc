@@ -1,4 +1,5 @@
 #include <algorithm>
+#include <sstream>
 #include <utility>
 #include <vector>
 
@@ -805,6 +806,36 @@ TEST_P(TestOxygenAndSulphurTautomers, CanonicalFormAndAtomOrder) {
 }
 
 INSTANTIATE_TEST_SUITE_P(OxygenAndSulphur, TestOxygenAndSulphurTautomers, testing::Values(
+    TautomerCase{CS_ASCORBATE, "OCC(O)C1OC(O)=C(O)C1=O", "OCC(O)C1OC(=O)C(O)=C1O", true},
+    TautomerCase{CS_ASCORBATE, "OCC(O)C1OC(=O)C(O)=C1O", "OCC(O)C1OC(=O)C(O)=C1O", false},
+    TautomerCase{CS_ASCORBATE, "OCC(O)c1oc(O)c(O)c1O", "OCC(O)C1OC(=O)C(O)=C1O", true},
+    TautomerCase{CS_ASCORBATE, "OCC(O)C1OC(=O)C(O)C1=O", "OCC(O)C1OC(=O)C(O)=C1O", true},
+    TautomerCase{CS_ASCORBATE, "OCC(O)C1OC(O)=C(OP(=O)(O)O)C1=O", "OCC(O)C1OC(=O)C(OP(=O)(O)O)=C1O", true},
+    TautomerCase{CS_ASCORBATE, "OCC(O)c1oc(O)c(OP(=O)(O)O)c1O", "OCC(O)C1OC(=O)C(OP(=O)(O)O)=C1O", true},
+    TautomerCase{CS_ASCORBATE, "OCC(O)C1OC(O)=C(OP(=O)([O-])[O-])C1=O", "OCC(O)C1OC(=O)C(OP(=O)([O-])[O-])=C1O", true},
+    TautomerCase{CS_ASCORBATE, "OCC(O)[CH]1OC([OH])=C([OH])C1=O", "OCC(O)[CH]1OC(=O)C([OH])=C1O", true},
+    TautomerCase{CS_ASCORBATE, "OCC(O)C1OC([18OH])=C(O)C1=O", "OCC(O)C1OC(=[18O])C(O)=C1O", true},
+    TautomerCase{CS_ASCORBATE, "OC[C@H](O)[C@@H]1OC(O)=C(O)C1=O", "OC[C@H](O)[C@@H]1OC(=O)C(O)=C1O", true},
+    TautomerCase{CS_ASCORBATE, "[2H]C1(C(O)CO)OC(O)=C(O)C1=O", "[2H]C1(C(O)CO)OC(=O)C(O)=C1O", true},
+    TautomerCase{CS_ASCORBATE, "OCC(O)C1OC(O)=C(O)C1=O", "OCC(O)C1OC(=O)C(O)=C1O", true,
+                 standardisation::KetoEnol::kToEnol},
+    TautomerCase{CS_ALL, "OCC(O)C1OC(O)=C(O)C1=O", "OCC(O)C1OC(=O)C(O)=C1O", true},
+    TautomerCase{CS_ALL, "OCC(O)c1oc(O)c(O)c1O", "OCC(O)C1OC(=O)C(O)=C1O", true},
+    TautomerCase{CS_ALL, "OCC(O)C1OC(=O)C(O)=C1O", "OCC(O)C1OC(=O)C(O)=C1O", false},
+    // Reduced/oxidised rings, other heteroatoms and protected OH groups are
+    // outside this family. A centre that would become planar is not erased.
+    TautomerCase{CS_ASCORBATE, "OCC(O)C1OC(O)C(O)C1O", "OCC(O)C1OC(O)C(O)C1O", false},
+    TautomerCase{CS_ASCORBATE, "OCC(O)C1OC(=O)C(=O)C1=O", "OCC(O)C1OC(=O)C(=O)C1=O", false},
+    TautomerCase{CS_ASCORBATE, "OCC(O)C1SC(O)=C(O)C1=O", "OCC(O)C1SC(O)=C(O)C1=O", false},
+    TautomerCase{CS_ASCORBATE, "OCC(O)C1OC(O)=CC1=O", "OCC(O)C1OC(O)=CC1=O", false},
+    TautomerCase{CS_ASCORBATE, "OCC(O)C1OC(O)=C(OC)C1=O", "OCC(O)C1OC(O)=C(OC)C1=O", false},
+    TautomerCase{CS_ASCORBATE, "OCC(O)C1OC(OC)=C(O)C1=O", "OCC(O)C1OC(OC)=C(O)C1=O", false},
+    TautomerCase{CS_ASCORBATE, "OCC(O)C1OC([O-])=C(O)C1=O", "OCC(O)C1OC([O-])=C(O)C1=O", false},
+    TautomerCase{CS_ASCORBATE, "C12(CCCCC2)OC(O)=C(O)C1=O", "C12(CCCCC2)OC(O)=C(O)C1=O", false},
+    TautomerCase{CS_ASCORBATE, "OCC(O)C1OC(=O)[C@H](O)C1=O", "OCC(O)C1OC(=O)[C@H](O)C1=O", false},
+    TautomerCase{CS_ASCORBATE, "[2H]OC1=C(O)C(=O)C(C(O)CO)O1", "[2H]OC1=C(O)C(=O)C(C(O)CO)O1", false},
+    TautomerCase{CS_ASCORBATE, "O=CC(O)C(O)C(O)C(O)CO", "O=CC(O)C(O)C(O)C(O)CO", false},
+    TautomerCase{CS_ASCORBATE, "C1(O)(C(F)C(O)C(O)C(=O)C1)C(O)=O", "C1(O)(C(F)C(O)C(O)C(=O)C1)C(O)=O", false},
     TautomerCase{CS_AMIDINE, "CC(N)=NC", "CC(=N)NC", true},
     TautomerCase{CS_AMIDINE, "CC([NH2])=[N]C", "CC(=N)NC", true},
     TautomerCase{CS_AMIDINE, "CC(=N)NC", "CC(=N)NC", false},
@@ -1071,5 +1102,66 @@ TEST_F(TestStandardisation, NegatedHydrogenRepairDoesNotRun) {
   EXPECT_EQ(_chemical_standardisation.process(_m1), 0);
   EXPECT_EQ(_m1.smiles(), before);
 }
+
+TEST_F(TestStandardisation, AscorbateCanBeDisabledAndReenabled) {
+  _chemical_standardisation.activate_all();
+  ASSERT_TRUE(_chemical_standardisation.Activate("-ascorbate", 0));
+  ASSERT_TRUE(_m1.build_from_smiles("OCC(O)C1OC(O)=C(O)C1=O"));
+  const IWString before = _m1.unique_smiles();
+  EXPECT_EQ(_chemical_standardisation.process(_m1), 0);
+  EXPECT_EQ(_m1.unique_smiles(), before);
+  ASSERT_TRUE(_chemical_standardisation.Activate(CS_ASCORBATE, 0));
+  EXPECT_EQ(_chemical_standardisation.process(_m1), 1);
+  ASSERT_TRUE(_m2.build_from_smiles("OCC(O)C1OC(=O)C(O)=C1O"));
+  EXPECT_EQ(_m1.unique_smiles(), _m2.unique_smiles());
+}
+
+TEST_F(TestStandardisation, AscorbateReportsEachRingAndAppendsReason) {
+  ASSERT_TRUE(_chemical_standardisation.Activate(CS_ASCORBATE, 0));
+  _chemical_standardisation.set_append_string_depending_on_what_changed(1);
+  ASSERT_TRUE(_m1.build_from_smiles("OCC(O)C1OC(O)=C(O)C1=O.OCC(O)c1oc(O)c(O)c1O"));
+  _m1.set_name("two_rings");
+  const IWString formula = _m1.molecular_formula();
+  EXPECT_EQ(_chemical_standardisation.process(_m1), 2);
+  EXPECT_EQ(_m1.molecular_formula(), formula);
+  EXPECT_TRUE(_m1.valence_ok());
+  EXPECT_TRUE(_m1.name().contains("STD:ascorbate"));
+  std::ostringstream report;
+  ASSERT_TRUE(_chemical_standardisation.report(report));
+  EXPECT_NE(report.str().find("Ascorbate changed 2 groups in 1 molecules"), std::string::npos);
+  EXPECT_EQ(_chemical_standardisation.process(_m1), 0);
+}
+
+// The seven distinct structures from the five ascorbate pairs in the comparison
+// report, including explicit H atoms and charged phosphate starting forms.
+TEST_F(TestStandardisation, ReportedAscorbateTautomersConverge) {
+  _chemical_standardisation.activate_all();
+  for (const auto& [input, target] : std::vector<std::pair<IWString, IWString>>{
+           {"C1(=C(O)OC([H])(C1=O)C(O)CO)OP(O)(O)=O", "OCC(O)C1OC(=O)C(OP(=O)(O)O)=C1O"},  // CHEMBL1161237
+           {"OC1=C(C(=O)OC1([H])C(O)CO)OP(=O)([O-])[O-]", "OCC(O)C1OC(=O)C(OP(=O)(O)O)=C1O"},  // CHEMBL1923953
+           {"C1(=C(C(=O)OC1([H])C(O)CO)OP(=O)(O)O)O", "OCC(O)C1OC(=O)C(OP(=O)(O)O)=C1O"},  // CHEMBL1963242
+           {"C1(=C(C(=O)OC1([H])C(O)CO)OP(=O)([O-])[O-])O", "OCC(O)C1OC(=O)C(OP(=O)(O)O)=C1O"},  // CHEMBL2087229
+           {"C1(=C(O)C(=O)OC1C(O)CO)O", "OCC(O)C1OC(=O)C(O)=C1O"},  // CHEMBL1161421
+           {"O1C([H])(C(=O)C(=C1O)O)C(O)CO", "OCC(O)C1OC(=O)C(O)=C1O"},  // CHEMBL1253320
+           {"C1(=O)C([H])(C(O)CO)OC(=C1O)O", "OCC(O)C1OC(=O)C(O)=C1O"},  // CHEMBL40274
+       }) {
+    Molecule original;
+    ASSERT_TRUE(original.build_from_smiles(input));
+    Molecule expected;
+    ASSERT_TRUE(expected.build_from_smiles(target));
+    const IWString canonical = expected.unique_smiles();
+    const IWString formula = expected.molecular_formula();
+    for (int i = 0; i < 100; ++i) {
+      Molecule molecule;
+      ASSERT_TRUE(molecule.build_from_smiles(i == 0 ? input : original.random_smiles()));
+      _chemical_standardisation.process(molecule);
+      EXPECT_EQ(molecule.unique_smiles(), canonical) << input;
+      EXPECT_EQ(molecule.molecular_formula(), formula) << input;
+      EXPECT_TRUE(molecule.valence_ok()) << input;
+      EXPECT_EQ(_chemical_standardisation.process(molecule), 0) << input;
+    }
+  }
+}
+
 
 }  // namespace

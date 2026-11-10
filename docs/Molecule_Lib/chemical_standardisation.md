@@ -82,6 +82,7 @@ Entering `-g help` to most LillyMol tools yields the usage message
  -g pyrazolone    convert pyrazolone to keto form
  -g aminothazole  convert -N=c1scc[nH]1 to -[NH]c1sccn1
  -g keto_enol     convert O/S enol to keto forms (no adjacent heteroatoms)
+ -g ascorbate    canonicalise isolated ascorbate rings to lactone/enediol form
  -g 4-pyridone    convert 4-pyridol/thiol to pyridone/thione forms
  -g surea         convert S-C(=N)-N to S=C(-N)-N
  -g 124-triazine  convert S-C(=N)-N to S=C(-N)-N
@@ -229,6 +230,49 @@ SMILES/aromaticity/stereochemistry handling rather than a standardisation rule.
 Use `-f` to stop with a nonzero exit status on a failure. Invalid starting
 valence is distinguished from invalid valence introduced by standardisation;
 the latter is counted as a failure and written to the failure file.
+
+### Ascorbate rings
+
+`-g ascorbate` chooses the conventional lactone/enediol form for a restricted
+family of isolated ascorbic-acid-like rings. It is included in `-g all` and
+therefore broadens default equivalence relative to earlier versions. Disable it
+with `-g all -g -ascorbate`.
+
+```text
+OCC(O)C1OC(O)=C(O)C1=O  ->  OCC(O)C1OC(=O)C(O)=C1O
+OCC(O)c1oc(O)c(O)c1O    ->  OCC(O)C1OC(=O)C(O)=C1O
+```
+
+The aromatic trihydroxyfuran tautomer is converted to the same lactone. Eligible
+diketo forms are also handled. The central enediol oxygen may carry a phosphate
+ester, which is retained:
+
+```text
+OCC(O)C1OC(O)=C(OP(=O)(O)O)C1=O
+  -> OCC(O)C1OC(=O)C(OP(=O)(O)O)=C1O
+```
+
+The ring must contain one oxygen and four carbons, with three consecutive
+oxygen-substituted carbons. The remaining ring carbon must have one carbon
+substituent and one hydrogen in the target. The carbonyl and terminal enediol
+oxygens must be unprotected; the central oxygen can be OH or O-P. Other ether
+and ester substitutions are excluded. Ring atoms and participating exocyclic
+oxygens must be neutral; phosphate charges on other oxygens are preserved by
+this rule. Other options in `-g all` can neutralise those charges independently.
+
+The transformation preserves hydrogen count and isotope labels. Reduced or
+oxidised forms with different hydrogen counts, fused/spiro rings, and sulfur
+analogues are excluded. Unchanged stereocentres are preserved; a conversion
+that changes a bond at a marked chiral centre is skipped. An aromatic starting
+form does not specify the configuration of the newly saturated ring carbon,
+so no configuration is assigned. Explicit hydrogen atoms on oxygens whose
+protons would move are excluded. Ordinary explicit hydrogens are removed
+beforehand by `-g all`; isotopic hydrogens are not moved by this rule.
+
+This is a fixed canonical choice, independent of `-g KETO` or `-g ENOL`.
+It does not enable carbonyl migration in open-chain sugars or cyclic polyols.
+Verbose reports include ascorbate counts, and `-g APP=EACH` appends
+`STD:ascorbate` when this rule changes a molecule.
 
 ### Activation
 The usual way of using chemical standardisation is via `-g all` which turns

@@ -29,6 +29,18 @@ cases = [
     'N1=C(O)C=C(O)N=C1O.O=c1cc[nH]c(C)n1',
     'N1=NC(=NN=C(C2=CC=NC=C2)Br)NN1',
 ]
+ascorbates = [
+    'OCC(O)C1OC(O)=C(O)C1=O', 'OCC(O)C1OC(=O)C(O)=C1O',
+    'OCC(O)c1oc(O)c(O)c1O', 'OCC(O)C1OC(=O)C(O)C1=O',
+    'OCC(O)C1OC(O)=C(OP(=O)(O)O)C1=O',
+    'OCC(O)c1oc(O)c(OP(=O)(O)O)c1O',
+    'OC[C@H](O)[C@@H]1OC(O)=C(O)C1=O',
+    '[2H]C1(C(O)CO)OC(O)=C(O)C1=O',
+]
+check('ascorbate', ['-g', 'ascorbate'], ascorbates)
+check('ascorbate_all', ['-g', 'all'], ascorbates)
+check('ascorbate_disabled', ['-g', 'all', '-g', '-ascorbate'], ascorbates)
+
 check('urea', ['-g', 'msdur'], ['[OH]C(N)=[NH]', 'OC(N)=N'])
 for rule in ['all', 'amidine', 'pyrimidine']:
     check(rule, ['-g', rule], cases)

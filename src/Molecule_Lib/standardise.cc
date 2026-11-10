@@ -378,6 +378,7 @@ Chemical_Standardisation::activate_all() {
   _transform_lactim_lactam_ring.activate();
   _transform_triazole.activate();
   _transform_pyrimidine.activate();
+  _transform_ascorbate.activate();
   _transform_isoxazole.activate();
   _transform_aromatic_guanidine_ring.activate();
   _transform_pyrazolone.activate();
@@ -443,6 +444,7 @@ display_all_chemical_standardisation_options(std::ostream& os, char zoption) {
   os << zopt << CS_GUAND << "        convert guanidines to -N-C(=N)-N form\n";
   os << zopt << CS_AMIDINE << "     canonicalise isolated neutral amidines with a terminal N\n";
   os << zopt << CS_PYRIMIDINE << "  convert isolated O/S pyrimidinetrione tautomers to keto form\n";
+  os << zopt << CS_ASCORBATE << "   canonicalise isolated ascorbate rings to lactone/enediol form\n";
   os << zopt << CS_GUANDR << "        convert Ring type guanidines to -N-C(=N)-N form\n";
   os << zopt << CS_AZID << "        convert charge separated azids [N-]=[N+]=N to N#N=N\n";
   os << zopt << CS_MSDUR << "       convert misdrawn ureas, O-C(=N)-N to O=C(-N)-N\n";
@@ -820,6 +822,12 @@ Chemical_Standardisation::Activate(const IWString& directive, const int verbose)
       _transform_triazole.deactivate();
     } else {
       _transform_triazole.activate();
+    }
+  } else if (tmp == CS_ASCORBATE) {
+    if (negation) {
+      _transform_ascorbate.deactivate();
+    } else {
+      _transform_ascorbate.activate();
     }
   } else if (tmp == CS_PYRIMIDINE) {
     if (negation) {
@@ -4050,6 +4058,10 @@ Chemical_Standardisation::_process(Molecule& m,
     rc += _do_amino_thiazole(m, atom_already_changed, current_molecule_data);
   }
 
+  if (_transform_ascorbate.active() && current_molecule_data.oxygens() >= 4) {
+    rc += _do_ascorbate(m, current_molecule_data);
+  }
+
   if (_transform_enol_to_keto.active()) {
     rc += _do_enol_to_keto(m, current_molecule_data);
   }
@@ -4374,6 +4386,10 @@ Chemical_Standardisation::report(std::ostream& os) const {
   if (_transform_amidine.active()) {
     os << "  Amidine ";
     _transform_amidine.report(os);
+  }
+  if (_transform_ascorbate.active()) {
+    os << "  Ascorbate ";
+    _transform_ascorbate.report(os);
   }
   if (_transform_pyrimidine.active()) {
     os << "  Pyrimidinetrione ";
@@ -10093,6 +10109,11 @@ Chemical_Standardisation::_processing_needed(
     return 1;
   }
 
+  if (_transform_ascorbate.active() && current_molecule_data.nrings() > 0 &&
+      current_molecule_data.oxygens() >= 4) {
+    return 1;
+  }
+
   if (_transform_amidine.active() && current_molecule_data.nitrogens() >= 2) {
     return 1;
   }
@@ -11569,6 +11590,193 @@ Chemical_Standardisation::_do_transform_enol_fused(
   }
 
   return rc;
+}
+
+// Choose the conventional lactone/enediol form for isolated ascorbate-like
+// rings. This is a coordinated ring rule, not general polyol carbonyl migration.
+int
+Chemical_Standardisation::_do_ascorbate(
+    Molecule& m, IWStandard_Current_Molecule& current_molecule_data) {
+  int rc = 0;
+  for (int i = 0; i < current_molecule_data.nrings(); ++i) {
+    if (current_molecule_data.ring_size()[i] != 5 ||
+        current_molecule_data.ring_nitrogen_count()[i] != 0 ||
+        current_molecule_data.ring_is_fused()[i]) {
+      continue;
+    }
+    if (!_do_ascorbate(m, *current_molecule_data.ringi(i), current_molecule_data)) {
+      continue;
+    }
+    current_molecule_data.set_ring_non_aromatic(i);
+    ++rc;
+  }
+  if (rc) {
+    _transform_ascorbate.extra(rc);
+    if (_verbose) {
+      cerr << "Transformed " << rc << " ascorbate rings\n";
+    }
+    if (_append_string_depending_on_what_changed) {
+      _append_to_changed_molecules << " STD:" << CS_ASCORBATE;
+    }
+  }
+  return rc;
+}
+
+int
+Chemical_Standardisation::_do_ascorbate(
+    Molecule& m, const Set_of_Atoms& ring,
+    const IWStandard_Current_Molecule& current_molecule_data) {
+  // Number the target ring O0-C1(=O)-C2(OH)=C3(OH)-C4(R)-O0.
+  // C2 can instead bear O-P. C4 has one carbon substituent and one H.
+  // The side chain distinguishes the two neighbours of O0 without atom-order
+  // tie breaking. All validation precedes changes to the molecule.
+  assert(ring.size() == 5);
+  const atomic_number_t* z = current_molecule_data.atomic_number();
+  const int* ring_membership = current_molecule_data.ring_membership();
+  int oxygen_index = -1;
+  for (int i = 0; i < 5; ++i) {
+    const atom_number_t a = ring[i];
+    if (ring_membership[a] != 1 || m.formal_charge(a)) {
+      return 0;
+    }
+    if (z[a] == 8 && m.ncon(a) == 2 && oxygen_index < 0) {
+      oxygen_index = i;
+    } else if (z[a] != 6) {
+      return 0;
+    }
+  }
+  if (oxygen_index < 0) {
+    return 0;
+  }
+
+  int direction = -1;
+  const atom_number_t next = ring[(oxygen_index + 1) % 5];
+  for (const Bond* b : m[next]) {
+    const atom_number_t outside = b->other(next);
+    if (!ring.contains(outside) && z[outside] == 8) {
+      direction = 1;
+      break;
+    }
+  }
+  std::array<atom_number_t, 5> atom;
+  for (int i = 0; i < 5; ++i) {
+    atom[i] = ring[(oxygen_index + direction * i + 5) % 5];
+  }
+
+  // C4 can retain an explicit H (including an isotope) without moving it.
+  // The side-chain bond must be single; no other external attachments
+  // or additional substituents are accepted here.
+  int carbon_substituents = 0;
+  int hydrogen_substituents = 0;
+  for (const Bond* b : m[atom[4]]) {
+    const atom_number_t outside = b->other(atom[4]);
+    if (ring.contains(outside)) {
+      continue;
+    }
+    if (!b->is_single_bond()) {
+      return 0;
+    }
+    if (z[outside] == 6) {
+      ++carbon_substituents;
+    } else if (z[outside] == 1) {
+      ++hydrogen_substituents;
+    } else {
+      return 0;
+    }
+  }
+  if (carbon_substituents != 1 || hydrogen_substituents > 1) {
+    return 0;
+  }
+
+  std::array<atom_number_t, 3> exocyclic;
+  int target_hydrogens = 2;  // C4-H and C3-OH; add C2-OH if not phosphorylated.
+  int starting_hydrogens = 0;
+  for (atom_number_t a : atom) {
+    starting_hydrogens += m.hcount(a);
+  }
+  for (int i = 1; i <= 3; ++i) {
+    const atom_number_t a = atom[i];
+    if (m.ncon(a) != 3) {
+      return 0;
+    }
+    atom_number_t oxygen = kInvalidAtomNumber;
+    for (const Bond* b : m[a]) {
+      const atom_number_t outside = b->other(a);
+      if (ring.contains(outside)) {
+        continue;
+      }
+      if (z[outside] != 8 || m.formal_charge(outside) ||
+          (!b->is_single_bond() && !b->is_double_bond())) {
+        return 0;
+      }
+      oxygen = outside;
+    }
+    if (oxygen == kInvalidAtomNumber) {
+      return 0;
+    }
+    if (i == 2 && m.ncon(oxygen) == 2) {
+      // Preserve the central phosphate ester; its charge state is handled by
+      // the usual charge rules. Other O-substituted derivatives are excluded.
+      for (const Bond* b : m[oxygen]) {
+        if (!b->is_single_bond() ||
+            (b->other(oxygen) != a && z[b->other(oxygen)] != 15)) {
+          return 0;
+        }
+      }
+    } else if (m.ncon(oxygen) != 1) {
+      return 0;  // Includes explicit H on an oxygen whose proton might move.
+    } else if (i == 2) {
+      ++target_hydrogens;
+    }
+    exocyclic[i - 1] = oxygen;
+    starting_hydrogens += m.hcount(oxygen);
+  }
+  if (starting_hydrogens != target_hydrogens) {
+    return 0;
+  }
+
+  static constexpr std::array<bond_type_t, 5> kRingBonds = {
+      SINGLE_BOND, SINGLE_BOND, DOUBLE_BOND, SINGLE_BOND, SINGLE_BOND};
+  auto matches = [](const Bond& bond, bond_type_t type) {
+    return type == SINGLE_BOND ? bond.is_single_bond() : bond.is_double_bond();
+  };
+  auto can_change = [&](atom_number_t a1, atom_number_t a2, bond_type_t type) {
+    const Bond& bond = *m.bond_between_atoms(a1, a2);
+    if ((!bond.is_single_bond() && !bond.is_double_bond()) ||
+        bond.part_of_cis_trans_grouping()) {
+      return false;
+    }
+    return matches(bond, type) ||
+           (!m.chiral_centre_at_atom(a1) && !m.chiral_centre_at_atom(a2));
+  };
+  for (int i = 0; i < 5; ++i) {
+    if (!can_change(atom[i], atom[(i + 1) % 5], kRingBonds[i])) {
+      return 0;
+    }
+  }
+  for (int i = 0; i < 3; ++i) {
+    if (!can_change(atom[i + 1], exocyclic[i], i == 0 ? DOUBLE_BOND : SINGLE_BOND)) {
+      return 0;
+    }
+  }
+
+  bool changed = false;
+  auto set_bond = [&](atom_number_t a1, atom_number_t a2, bond_type_t type) {
+    if (matches(*m.bond_between_atoms(a1, a2), type)) {
+      return;
+    }
+    m.set_bond_type_between_atoms(a1, a2, type);
+    m.unset_all_implicit_hydrogen_information(a1);
+    m.unset_all_implicit_hydrogen_information(a2);
+    changed = true;
+  };
+  for (int i = 0; i < 5; ++i) {
+    set_bond(atom[i], atom[(i + 1) % 5], kRingBonds[i]);
+  }
+  for (int i = 0; i < 3; ++i) {
+    set_bond(atom[i + 1], exocyclic[i], i == 0 ? DOUBLE_BOND : SINGLE_BOND);
+  }
+  return changed;
 }
 
 int

@@ -187,6 +187,10 @@ tstandardise(Molecule& m, IWString_and_File_Descriptor& output)
   }
 #endif
 
+  // Remember the starting valence, but allow standardisation to repair it.
+  // An invalid product is a failure only when the starting molecule was valid.
+  const bool starting_valence_ok = m.valence_ok();
+
   Molecule mcopy(m);
 
   if (verbose > 1) {
@@ -210,7 +214,19 @@ tstandardise(Molecule& m, IWString_and_File_Descriptor& output)
   }
 
   if (!m.valence_ok()) {
-    cerr << "Abnormal valence in " << m.smiles() << " " << m.name() << ", skipped\n";
+    if (!starting_valence_ok) {
+      cerr << "Abnormal starting valence in " << mcopy.smiles() << " " << m.name()
+           << ", skipped\n";
+      return 1;
+    }
+    cerr << "Valence error introduced by standardisation in " << m.smiles()
+         << " " << m.name() << '\n';
+    ++valence_errors_introduced;
+    ++failures;
+    if (stream_for_failures.is_open()) {
+      stream_for_failures << mcopy.smiles() << ' ' << mcopy.name() << " valence\n";
+      stream_for_failures.flush();
+    }
     return 1;
   }
 

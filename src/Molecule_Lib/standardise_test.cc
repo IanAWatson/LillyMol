@@ -150,7 +150,7 @@ TEST_F(TestStandardisation, TestEnoltKetoNoBecauseAdjacentUnsaturation)
   _smiles = "C(=O)(O)C(=CC(=O)C1=CC=CC=C1OC)O";   //  CHEMBL4171775
   ASSERT_TRUE(_m1.build_from_smiles(_smiles));
   EXPECT_EQ(_chemical_standardisation.process(_m1), 0);
-  _chemical_standardisation.Activate(CS_CHARGED_IMIDAZOLE, /*verbose*/ false);
+  _chemical_standardisation.Activate(CS_KETO_ENOL, /*verbose*/ false);
   EXPECT_EQ(_chemical_standardisation.process(_m1), 0);
 }
 
@@ -159,7 +159,7 @@ TEST_F(TestStandardisation, TestEnoltKetoNoBecauseComplexInterdependency)
   _smiles = "C1=CC(=CC(=C1O)C(=O)CC(=O)C=CC1=CC=C(O)C=C1)Cl"; // CHEMBL4208282
   ASSERT_TRUE(_m1.build_from_smiles(_smiles));
   EXPECT_EQ(_chemical_standardisation.process(_m1), 0);
-  _chemical_standardisation.Activate(CS_CHARGED_IMIDAZOLE, /*verbose*/ false);
+  _chemical_standardisation.Activate(CS_KETO_ENOL, /*verbose*/ false);
   EXPECT_EQ(_chemical_standardisation.process(_m1), 0);
 }
 
@@ -168,7 +168,7 @@ TEST_F(TestStandardisation, TestEnoltKetoNoBecauseAdjacentUnsaturationDoubleBond
   _smiles = "S(C1=NC2=CC(=CC=C2N1)C)CC(O)=C(C(=N)C)C#N"; // CHEMBL3197234
   ASSERT_TRUE(_m1.build_from_smiles(_smiles));
   EXPECT_EQ(_chemical_standardisation.process(_m1), 0);
-  _chemical_standardisation.Activate(CS_CHARGED_IMIDAZOLE, /*verbose*/ false);
+  _chemical_standardisation.Activate(CS_KETO_ENOL, /*verbose*/ false);
   EXPECT_EQ(_chemical_standardisation.process(_m1), 0);
 }
 
@@ -946,6 +946,130 @@ TEST_F(TestStandardisation, NewTautomerRulesCanBeDisabled) {
     EXPECT_EQ(_chemical_standardisation.process(molecule), 0);
     EXPECT_EQ(molecule.unique_smiles(), before);
   }
+}
+
+TEST_F(TestStandardisation, MisdrawnUreaRefreshesBracketHydrogens) {
+  ASSERT_TRUE(_chemical_standardisation.Activate(CS_MSDUR, 0));
+  Molecule expected;
+  ASSERT_TRUE(expected.build_from_smiles("O=C(N)N"));
+  for (const char* smiles : {"OC(N)=N", "[OH]C(N)=[NH]"}) {
+    ASSERT_TRUE(_m1.build_from_smiles(smiles));
+    const IWString formula = _m1.molecular_formula();
+    EXPECT_GT(_chemical_standardisation.process(_m1), 0);
+    EXPECT_TRUE(_m1.valence_ok());
+    EXPECT_EQ(_m1.molecular_formula(), formula);
+    EXPECT_EQ(_m1.unique_smiles(), expected.unique_smiles());
+    EXPECT_EQ(_chemical_standardisation.process(_m1), 0);
+  }
+}
+
+TEST_F(TestStandardisation, NegatedDirectivesDisableTheirTransformations) {
+  for (const auto& [directive, smiles] : std::vector<std::pair<IWString, IWString>>{
+           {CS_MSDUR, "OC(N)=N"}, {CS_MSDSA, "CCS(=O)(O)=NC"},
+           {CS_IMIDAZOLE_EXONH, "N=C1NC=CN1"}, {CS_FCRN, "O=[N+](C)[O-]"}}) {
+    Chemical_Standardisation standardise;
+    ASSERT_TRUE(standardise.Activate(directive, 0));
+    Molecule positive;
+    ASSERT_TRUE(positive.build_from_smiles(smiles));
+    ASSERT_GT(standardise.process(positive), 0) << directive;
+    IWString negative = "-";
+    negative << directive;
+    ASSERT_TRUE(standardise.Activate(negative, 0));
+    Molecule unchanged;
+    ASSERT_TRUE(unchanged.build_from_smiles(smiles));
+    const IWString before = unchanged.unique_smiles();
+    EXPECT_EQ(standardise.process(unchanged), 0) << directive;
+    EXPECT_EQ(unchanged.unique_smiles(), before) << directive;
+  }
+}
+
+TEST_F(TestStandardisation, DisablingUreaDoesNotDisableAzide) {
+  ASSERT_TRUE(_chemical_standardisation.Activate(CS_AZID, 0));
+  ASSERT_TRUE(_chemical_standardisation.Activate("-msdur", 0));
+  ASSERT_TRUE(_m1.build_from_smiles("CN=[N+]=[N-]"));
+  EXPECT_GT(_chemical_standardisation.process(_m1), 0);
+}
+
+TEST_F(TestStandardisation, DisablingExocyclicNHDoesNotDisableChargedImidazole) {
+  ASSERT_TRUE(_chemical_standardisation.Activate(CS_CHARGED_IMIDAZOLE, 0));
+  ASSERT_TRUE(_chemical_standardisation.Activate("-imidazoleNH", 0));
+  ASSERT_TRUE(_m1.build_from_smiles("CCN1C=C[N+](C)=C1"));
+  EXPECT_GT(_chemical_standardisation.process(_m1), 0);
+}
+
+TEST_F(TestStandardisation, CovalentMetalSplittingReportsChanges) {
+  ASSERT_TRUE(_chemical_standardisation.Activate(CS_COVM, 0));
+  for (const char* smiles : {"CO[Na]", "CS[K]"}) {
+    ASSERT_TRUE(_m1.build_from_smiles(smiles));
+    EXPECT_EQ(_chemical_standardisation.process(_m1), 1);
+    EXPECT_EQ(_m1.number_fragments(), 2);
+    EXPECT_EQ(_m1.formal_charge(1), -1);
+    EXPECT_EQ(_m1.formal_charge(2), 1);
+    EXPECT_TRUE(_m1.valence_ok());
+    EXPECT_EQ(_chemical_standardisation.process(_m1), 0);
+  }
+}
+
+TEST_F(TestStandardisation, AminoPyridineFinishesTetrazoleInOnePass) {
+  _chemical_standardisation.activate_all();
+  Molecule input;
+  ASSERT_TRUE(input.build_from_smiles("N1=NC(=NN=C(C2=CC=NC=C2)Br)NN1"));
+  Molecule expected(input);
+  EXPECT_GT(_chemical_standardisation.process(expected), 0);
+  EXPECT_EQ(_chemical_standardisation.process(expected), 0);
+  const IWString canonical = expected.unique_smiles();
+  for (int i = 0; i < 100; ++i) {
+    Molecule molecule;
+    ASSERT_TRUE(molecule.build_from_smiles(input.random_smiles()));
+    const IWString formula = molecule.molecular_formula();
+    EXPECT_GT(_chemical_standardisation.process(molecule), 0);
+    EXPECT_EQ(molecule.unique_smiles(), canonical);
+    EXPECT_EQ(molecule.molecular_formula(), formula);
+    EXPECT_TRUE(molecule.valence_ok());
+    EXPECT_EQ(_chemical_standardisation.process(molecule), 0);
+  }
+}
+
+TEST_F(TestStandardisation, ExternalTemplateCannotExceedQuery) {
+  standardisation::Standardisation proto;
+  proto.set_smarts("C");
+  proto.set_smiles("CC");
+  standardisation::ExternalTransformation transformation;
+  EXPECT_FALSE(transformation.Build(proto, IWString()));
+}
+
+TEST_F(TestStandardisation, ExternalTemplateMissingBondDoesNotPartiallyModify) {
+  standardisation::Standardisation proto;
+  proto.set_smarts("C-C.O");
+  proto.set_smiles("C=C=O");
+  standardisation::ExternalTransformation transformation;
+  ASSERT_TRUE(transformation.Build(proto, IWString()));
+  ASSERT_TRUE(_m1.build_from_smiles("CC.O"));
+  const IWString before = _m1.unique_smiles();
+  EXPECT_EQ(transformation.Process(_m1), 0);
+  EXPECT_EQ(_m1.unique_smiles(), before);
+}
+
+TEST_F(TestStandardisation, ExternalTransformationRefreshesBracketHydrogens) {
+  const IWString proto = R"(smarts: "[ND1H1]=[CD3]-[OD1H]" smiles: "N-C=O")";
+  ASSERT_TRUE(_chemical_standardisation.ReadExternalProto(proto, const_IWSubstring()));
+  ASSERT_TRUE(_m1.build_from_smiles("C(C)(=[NH])[OH]"));
+  const IWString formula = _m1.molecular_formula();
+  EXPECT_GT(_chemical_standardisation.process(_m1), 0);
+  EXPECT_TRUE(_m1.valence_ok());
+  EXPECT_EQ(_m1.molecular_formula(), formula);
+  ASSERT_TRUE(_m2.build_from_smiles("CC(=O)N"));
+  EXPECT_EQ(_m1.unique_smiles(), _m2.unique_smiles());
+  EXPECT_EQ(_chemical_standardisation.process(_m1), 0);
+}
+
+TEST_F(TestStandardisation, NegatedHydrogenRepairDoesNotRun) {
+  ASSERT_TRUE(_chemical_standardisation.Activate(CS_FWIH, 0));
+  ASSERT_TRUE(_chemical_standardisation.Activate("-fwih", 0));
+  ASSERT_TRUE(_m1.build_from_smiles("[CH5]"));
+  const IWString before = _m1.smiles();
+  EXPECT_EQ(_chemical_standardisation.process(_m1), 0);
+  EXPECT_EQ(_m1.smiles(), before);
 }
 
 }  // namespace

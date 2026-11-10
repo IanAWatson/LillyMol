@@ -216,12 +216,19 @@ left for a subsequent pass. Interacting groups remain excluded.
 Use `tstandardise` to check random atom orderings and repeated processing:
 
 ```shell
-tstandardise -g all -n 100 -v -F failures.smi molecules.smi
+tstandardise -g all -u -n 100 -v -F failures.smi molecules.smi
 ```
+
+`-u` removes marked centres that LillyMol does not consider actually chiral.
+This avoids failures caused by such annotations on symmetric rings. Omit it
+when those annotations are part of what you want to test.
 
 Inspect the reported failure count and `failures.smi`; the tester can return
 success even when it reports inconsistencies. A failure can also originate in
 SMILES/aromaticity/stereochemistry handling rather than a standardisation rule.
+Use `-f` to stop with a nonzero exit status on a failure. Invalid starting
+valence is distinguished from invalid valence introduced by standardisation;
+the latter is counted as a failure and written to the failure file.
 
 ### Activation
 The usual way of using chemical standardisation is via `-g all` which turns
@@ -244,7 +251,7 @@ While it has been desirable to handle many cases in c++, there are often ad-hoc
 cases where on a project specific basis, certain groups need to be transformed, in
 on way or another.
 
-The Standardisation [proto](/src/MoleculeLib/standise.proto) allows specification of
+The Standardisation [proto](../../src/Molecule_Lib/standardise.proto) allows specification of
 a smarts to identify the atoms to be changed, and a smiles that specifies how the
 bonds should be changed. For example, a transformation to charged acids might look
 like
@@ -260,9 +267,33 @@ need that. For example
 smarts: "[NR0]=c1:[cD2]:[cD2]:[nH]:c:c1" smiles: "N-C=CC=N" name: "para-amino"
 ```
 specifies a full ring in the query (7 query atoms), but the smiles only matches the first 
-5 matched atoms, with no ring information.
+6 matched atoms, with no ring information.
 
 Multiple protos can be in a file and the transformations added to the standardisation via
 ```
 -g EXT:/path/to/file.textproto
 ```
+
+An external directive can be used on its own or together with built-in options.
+Each proto must occupy one line in the external file.
+
+Instead of inline SMARTS, use a query file:
+
+```text
+query_file: "amide.textproto" smiles: "N-C=O" name: "amide"
+```
+
+Relative query paths are resolved against the external standardisation file's
+location. Environment variables such as `${LILLYMOL_HOME}` are expanded first.
+Both textproto queries and legacy MSI queries are accepted; their contents
+identify the format, independently of filename suffix.
+
+External transformations require one query component with usable embeddings.
+Template atom `i` corresponds to initial query atom number `i`; a template may
+cover a prefix of the query, but every template atom must exist in the query.
+Template bonds must already exist in the target: this facility changes bond
+orders and formal charges, and does not add or remove atoms or bonds. Invalid
+mappings are diagnosed and skipped before any part of that embedding is changed.
+The query must constrain the target sufficiently for the imposed bonds and
+charges to give chemically valid products. Test external rules with
+`tstandardise` before applying them to a large collection.

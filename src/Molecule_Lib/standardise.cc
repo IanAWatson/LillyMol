@@ -4,6 +4,7 @@
 
 #include <algorithm>
 #include <array>
+#include <filesystem>
 #include <iostream>
 #include <memory>
 #include <vector>
@@ -739,7 +740,11 @@ Chemical_Standardisation::Activate(const IWString& directive, const int verbose)
   }
 #endif
   else if (CS_FWIH == tmp) {
-    _transform_obvious_implicit_hydrogen_errors.activate();
+    if (negation) {
+      _transform_obvious_implicit_hydrogen_errors.deactivate();
+    } else {
+      _transform_obvious_implicit_hydrogen_errors.activate();
+    }
   } else if (CS_AZID == tmp) {
     if (negation) {
       _transform_azid.deactivate();
@@ -754,18 +759,26 @@ Chemical_Standardisation::Activate(const IWString& directive, const int verbose)
     }
   } else if (CS_MSDUR == tmp) {
     if (negation) {
-      _transform_azid.deactivate();
+      _transform_misdrawn_urea.deactivate();
     } else {
       _transform_misdrawn_urea.activate();
     }
-  }
-  // TODO:ianwatson finish up the negations...
-  else if (CS_MSDSA == tmp) {
-    _transform_misdrawn_sulfonamide.activate();
+  } else if (CS_MSDSA == tmp) {
+    if (negation) {
+      _transform_misdrawn_sulfonamide.deactivate();
+    } else {
+      _transform_misdrawn_sulfonamide.activate();
+    }
   } else if (CS_FCRN == tmp) {
-    _transform_nitro.activate();
-    _transform_azid.activate();
-    _transform_nplus_ominus.activate();
+    if (negation) {
+      _transform_nitro.deactivate();
+      _transform_azid.deactivate();
+      _transform_nplus_ominus.deactivate();
+    } else {
+      _transform_nitro.activate();
+      _transform_azid.activate();
+      _transform_nplus_ominus.activate();
+    }
   } else if (CS_IMIDAZOLE == tmp) {
     if (negation) {
       _transform_imidazole.deactivate();
@@ -786,7 +799,7 @@ Chemical_Standardisation::Activate(const IWString& directive, const int verbose)
     }
   } else if (tmp == CS_IMIDAZOLE_EXONH) {
     if (negation) {
-      _transform_charged_imidazole.deactivate();
+      _transform_imidazole_exocyclic_nh.deactivate();
     } else {
       _transform_imidazole_exocyclic_nh.activate();
     }
@@ -1016,6 +1029,7 @@ Chemical_Standardisation::construct_from_command_line(Command_Line& cl, int verb
              << tmp << '\n';
         return 0;
       }
+      ++rc;
       continue;
     }
 
@@ -4041,7 +4055,16 @@ Chemical_Standardisation::_process(Molecule& m,
   }
 
   if (_transform_to_2_amino_pyridine.active()) {
-    rc += _do_transform_to_2_amino_pyridine(m, _keto_enol, current_molecule_data);
+    if (int changed = _do_transform_to_2_amino_pyridine(m, _keto_enol,
+                                                       current_molecule_data);
+        changed > 0) {
+      rc += changed;
+      // This can expose a tetrazole carbon that was previously exocyclic =N.
+      // Finish that group's canonicalisation without repeating unrelated rules.
+      if (_transform_tetrazole.active()) {
+        rc += _do_tetrazole(m, current_molecule_data);
+      }
+    }
   }
 
   if (_transform_oxo_pyrimidine.active()) {
@@ -4164,7 +4187,7 @@ Chemical_Standardisation::_process(Molecule& m) {
   }
 
   if (_transform_covalent_metals.active()) {
-    _do_transform_covalent_metals(m);
+    rc += _do_transform_covalent_metals(m);
   }
 
   if (_convert_to_canonical_order != Canonicalise::kNone) {
@@ -7601,6 +7624,8 @@ Chemical_Standardisation::_do_transform_misdrawn_urea(
 
     m.set_bond_type_between_atoms(i, carbon, DOUBLE_BOND);
     m.set_bond_type_between_atoms(carbon, doubly_bonded_nitrogen, SINGLE_BOND);
+    m.unset_all_implicit_hydrogen_information(i);
+    m.unset_all_implicit_hydrogen_information(doubly_bonded_nitrogen);
     rc++;
   }
 
@@ -11779,13 +11804,40 @@ ExternalTransformation::Build(const standardisation::Standardisation& proto,
       return 0;
     }
   } else if (proto.has_query_file()) {
+    IWString query_file(proto.query_file());
+    if (query_file.empty() || !query_file.ExpandEnvironmentVariablesInPlace()) {
+      cerr << "ExternalTransformation::Build:invalid query filename\n";
+      return 0;
+    }
+    std::filesystem::path path(query_file.AsString());
+    if (path.is_relative() && !fname.empty()) {
+      path = std::filesystem::path(fname.AsString()).parent_path() / path;
+    }
+    query_file = path.string();
+    iwstring_data_source input(query_file);
+    if (!input.good()) {
+      cerr << "ExternalTransformation::Build:cannot open query '" << query_file << "'\n";
+      return 0;
+    }
+    // Both legacy MSI queries and textproto queries are accepted, independent
+    // of filename suffix. Skip comments and blank lines when detecting MSI.
+    const_IWSubstring line;
+    bool msi = false;
+    while (input.next_record(line)) {
+      line.strip_leading_blanks();
+      if (line.empty() || line.starts_with('#')) {
+        continue;
+      }
+      msi = line.starts_with('(');
+      break;
+    }
+    input.seekg(0);
+    if (msi ? !_query.read(input) : !_query.ReadProto(query_file)) {
+      cerr << "ExternalTransformation::Build:cannot read query '" << query_file << "'\n";
+      return 0;
+    }
   } else {
     cerr << "ExternalTransformation::Build:no query\n";
-    return 0;
-  }
-
-  if (!proto.has_smiles()) {
-    cerr << "ExternalTransformation::Build:no smiles\n";
     return 0;
   }
 
@@ -11794,6 +11846,22 @@ ExternalTransformation::Build(const standardisation::Standardisation& proto,
          << '\n';
     return 0;
   }
+
+  // A composite query need not return usable embeddings. The template uses
+  // initial query atom numbers and may describe only a prefix of the query.
+  if (_query.number_elements() != 1 || _molecule.empty()) {
+    cerr << "ExternalTransformation::Build:requires one query and a nonempty template\n";
+    return 0;
+  }
+  for (int i = 0; i < _molecule.natoms(); ++i) {
+    if (_query.query_atom_with_initial_atom_number(i) == nullptr) {
+      cerr << "ExternalTransformation::Build:template atom " << i
+           << " has no corresponding query atom\n";
+      return 0;
+    }
+  }
+  _query.set_respect_initial_atom_numbering(1);
+  _query.set_save_matched_atoms(1);
 
   _query.set_find_unique_embeddings_only(1);
   _query.set_find_one_embedding_per_atom(1);
@@ -11837,42 +11905,63 @@ ExternalTransformation::Process(Molecule& m) {
 int
 ExternalTransformation::Process(Molecule& m, const Set_of_Atoms& embedding) {
   // cerr << "Processing embedding " << embedding << '\n';
+  // Validate the entire mapping before changing any bonds or charges. Queries
+  // can omit atoms from embeddings, so construction-time checks alone are not
+  // sufficient.
+  const int matoms = _molecule.natoms();
+  if (embedding.number_elements() < matoms) {
+    cerr << "ExternalTransformation::Process:embedding shorter than template\n";
+    return 0;
+  }
+  for (int i = 0; i < matoms; ++i) {
+    if (!m.ok_atom_number(embedding[i])) {
+      cerr << "ExternalTransformation::Process:invalid template atom mapping\n";
+      return 0;
+    }
+  }
+  for (const Bond* b : _molecule.bond_list()) {
+    if (!m.are_bonded(embedding[b->a1()], embedding[b->a2()])) {
+      cerr << "ExternalTransformation::Process:template bond absent in target\n";
+      return 0;
+    }
+  }
+
   int rc = 0;
   for (const Bond* b : _molecule.bond_list()) {
     atom_number_t a1 = embedding[b->a1()];
     atom_number_t a2 = embedding[b->a2()];
 
     const Bond* b2 = m.bond_between_atoms(a1, a2);
-    if (b2 == nullptr) {
-      cerr << "ExternalTransformation::Process:no bond btw atoms "
-           << _standardisation.ShortDebugString() << '\n';
-      continue;
-    }
-
     if (b->is_single_bond()) {
       if (!b2->is_single_bond()) {
         m.set_bond_type_between_atoms(a1, a2, SINGLE_BOND);
+        m.unset_all_implicit_hydrogen_information(a1);
+        m.unset_all_implicit_hydrogen_information(a2);
         ++rc;
       }
     } else if (b->is_double_bond()) {
       if (!b2->is_double_bond()) {
         m.set_bond_type_between_atoms(a1, a2, DOUBLE_BOND);
+        m.unset_all_implicit_hydrogen_information(a1);
+        m.unset_all_implicit_hydrogen_information(a2);
         ++rc;
       }
     } else if (b->is_triple_bond()) {
       if (!b2->is_triple_bond()) {
         m.set_bond_type_between_atoms(a1, a2, TRIPLE_BOND);
+        m.unset_all_implicit_hydrogen_information(a1);
+        m.unset_all_implicit_hydrogen_information(a2);
         ++rc;
       }
     }
   }
 
   // and formal charges.
-  const int matoms = _molecule.natoms();
   for (int i = 0; i < matoms; ++i) {
     atom_number_t x = embedding[i];
     if (_molecule.formal_charge(i) != m.formal_charge(x)) {
       m.set_formal_charge(x, _molecule.formal_charge(i));
+      m.unset_all_implicit_hydrogen_information(x);
       ++rc;
     }
   }
@@ -11911,12 +12000,8 @@ Chemical_Standardisation::_do_unset_isotopes(Molecule& m) {
 // N=C(N)Nc1sc(c2c(C)cccc2)[n][n]1 CHEMBL1188079
 // N=C(N)N=c1sc([n][nH]1)c1c(C)cccc1 CHEMBL1188079
 
-// Note that with tstandardise this molecule
-// N1=NC(=NN=C(C2=CC=NC=C2)Br)NN1 CHEMBL1971689
-// fails on repeated standardisation. The reson for this is that
-// our change perturbs the tetrazole, which then gets standardised
-// differently. This may be a largely intractible problem with
-// the ordering in which transformations are applied.
+// N1=NC(=NN=C(C2=CC=NC=C2)Br)NN1 CHEMBL1971689 also enables a tetrazole
+// transformation. The caller revisits tetrazole processing after a change.
 
 struct Possible2AP {
   atom_number_t nitrogen;
@@ -12053,6 +12138,8 @@ Chemical_Standardisation::_do_transform_to_2_amino_pyridine(
     m.set_bond_type_between_atoms(nitrogen, carbon, SINGLE_BOND);
 
     m.set_bond_type_between_atoms(carbon, n1, DOUBLE_BOND);
+    m.unset_all_implicit_hydrogen_information(nitrogen);
+    m.unset_all_implicit_hydrogen_information(n1);
     ++rc;
   }
 

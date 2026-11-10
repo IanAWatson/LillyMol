@@ -27,7 +27,9 @@ cases = [
     'N1=C(S)C=C(S)N=C1S', 'CN1C(O)=CC(=O)N(C)C1=O',
     'N1=C(O)C(C)(C)C(O)=NC1=O', 'N1C(O)CC(O)NC1O',
     'N1=C(O)C=C(O)N=C1O.O=c1cc[nH]c(C)n1',
+    'N1=NC(=NN=C(C2=CC=NC=C2)Br)NN1',
 ]
+check('urea', ['-g', 'msdur'], ['[OH]C(N)=[NH]', 'OC(N)=N'])
 for rule in ['all', 'amidine', 'pyrimidine']:
     check(rule, ['-g', rule], cases)
 check('independent_enols', ['-g', 'keto_enol', '-g', 'ENOL'], [

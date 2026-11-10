@@ -364,6 +364,7 @@ Chemical_Standardisation::activate_all() {
   _transform_nminus.activate();
   _transform_covalent_metals.activate();
   _transform_guanidine.activate();
+  _transform_amidine.activate();
   _transform_guanidine_ring.activate();
   _transform_tetrazole.activate();
   _transform_azid.activate();
@@ -439,6 +440,8 @@ display_all_chemical_standardisation_options(std::ostream& os, char zoption) {
   os << zopt << CS_COVM << "        break covalent bonds between Oxygen and Na,K\n";
   os << zopt << CS_ISOLC << "       assign formal charges to isolated Na, K, .. and Halogens\n";
   os << zopt << CS_GUAND << "        convert guanidines to -N-C(=N)-N form\n";
+  os << zopt << CS_AMIDINE << "     canonicalise isolated neutral amidines with a terminal N\n";
+  os << zopt << CS_PYRIMIDINE << "  convert isolated O/S pyrimidinetrione tautomers to keto form\n";
   os << zopt << CS_GUANDR << "        convert Ring type guanidines to -N-C(=N)-N form\n";
   os << zopt << CS_AZID << "        convert charge separated azids [N-]=[N+]=N to N#N=N\n";
   os << zopt << CS_MSDUR << "       convert misdrawn ureas, O-C(=N)-N to O=C(-N)-N\n";
@@ -655,6 +658,12 @@ Chemical_Standardisation::Activate(const IWString& directive, const int verbose)
       if (verbose) {
         cerr << "Guanidines will be transformed\n";
       }
+    }
+  } else if (CS_AMIDINE == tmp) {
+    if (negation) {
+      _transform_amidine.deactivate();
+    } else {
+      _transform_amidine.activate();
     }
   } else if (CS_GUANDR == tmp) {
     if (negation) {
@@ -3049,6 +3058,90 @@ ResolveGuanidineByConnectivity(Molecule& m,
   return 1;
 }
 
+// Canonicalise isolated neutral amidines that have a terminal nitrogen to
+// R-C(=NH)-NHR. Shared/conjugated nitrogens need a coordinated tautomer rule.
+int
+Chemical_Standardisation::_do_transform_amidine(
+    Molecule& m, IWStandard_Current_Molecule& current_molecule_data) {
+  const atomic_number_t* z = current_molecule_data.atomic_number();
+  const int* ring_membership = current_molecule_data.ring_membership();
+  int rc = 0;
+  for (atom_number_t carbon = 0; carbon < m.natoms(); ++carbon) {
+    if (z[carbon] != 6 || ring_membership[carbon] || m.formal_charge(carbon)) {
+      continue;
+    }
+    const Atom& c = m[carbon];
+    if ((c.ncon() != 2 && c.ncon() != 3) || c.nbonds() != c.ncon() + 1) {
+      continue;
+    }
+
+    atom_number_t imine = kInvalidAtomNumber;
+    atom_number_t amine = kInvalidAtomNumber;
+    bool eligible = true;
+    for (const Bond* b : c) {
+      const atom_number_t n = b->other(carbon);
+      if (z[n] == 6 && b->is_single_bond()) {
+        continue;
+      }
+      if (z[n] != 7 || ring_membership[n] || m.formal_charge(n) ||
+          b->part_of_cis_trans_grouping()) {
+        eligible = false;
+        break;
+      }
+      if (b->is_double_bond() && imine == kInvalidAtomNumber) {
+        imine = n;
+      } else if (b->is_single_bond() && amine == kInvalidAtomNumber) {
+        amine = n;
+      } else {
+        eligible = false;
+        break;
+      }
+    }
+    if (!eligible || imine == kInvalidAtomNumber || amine == kInvalidAtomNumber) {
+      continue;
+    }
+    // Already canonical when the double bond is to a terminal =NH.
+    if (m.ncon(imine) == 1) {
+      continue;
+    }
+    if (m.ncon(amine) != 1 || m.ncon(imine) != 2 ||
+        m.hcount(amine) != 2 || m.hcount(imine) != 0) {
+      continue;
+    }
+    // Avoid moving a proton in a shared amidine/guanidine or through an
+    // aromatic, unsaturated, acylated or N-O/N-N substituent.
+    for (const Bond* b : m[imine]) {
+      const atom_number_t other = b->other(imine);
+      if (other == carbon) {
+        continue;
+      }
+      if (!b->is_single_bond() || z[other] != 6 || m.unsaturation(other) ||
+          m.is_aromatic(other)) {
+        eligible = false;
+      }
+    }
+    if (!eligible) {
+      continue;
+    }
+
+    m.set_bond_type_between_atoms(carbon, imine, SINGLE_BOND);
+    m.set_bond_type_between_atoms(carbon, amine, DOUBLE_BOND);
+    m.unset_all_implicit_hydrogen_information(imine);
+    m.unset_all_implicit_hydrogen_information(amine);
+    ++rc;
+  }
+  if (rc) {
+    _transform_amidine.extra(rc);
+    if (_verbose) {
+      cerr << "Transformed " << rc << " isolated amidines\n";
+    }
+    if (_append_string_depending_on_what_changed) {
+      _append_to_changed_molecules << " STD:amidine";
+    }
+  }
+  return rc;
+}
+
 /*
   We convert -N=C(-NH2)-NH2  to -N-C(=NH)-NH2
 
@@ -3838,6 +3931,12 @@ Chemical_Standardisation::_process(Molecule& m,
     rc += _do_transform_amines(m, atoms_to_be_removed, current_molecule_data);
   }
 
+  // Neutralise protonated amidines before choosing their tautomer.
+  if (_transform_amidine.active() && current_molecule_data.nitrogens() >= 2) {
+    rc += _do_transform_amidine(m, current_molecule_data);
+  }
+
+
 
   // Desirable to do this before pyrazolones because that transformation ignores
   // charged exocyclic atoms
@@ -4247,6 +4346,15 @@ Chemical_Standardisation::report(std::ostream& os) const {
   if (_transform_guanidine.active()) {
     os << "  Guanidine ";
     _transform_guanidine.report(os);
+  }
+
+  if (_transform_amidine.active()) {
+    os << "  Amidine ";
+    _transform_amidine.report(os);
+  }
+  if (_transform_pyrimidine.active()) {
+    os << "  Pyrimidinetrione ";
+    _transform_pyrimidine.report(os);
   }
 
   if (_transform_guanidine_ring.active()) {
@@ -9960,6 +10068,15 @@ Chemical_Standardisation::_processing_needed(
     return 1;
   }
 
+  if (_transform_amidine.active() && current_molecule_data.nitrogens() >= 2) {
+    return 1;
+  }
+  if (_transform_pyrimidine.active() && current_molecule_data.nrings() > 0 &&
+      current_molecule_data.nitrogens() >= 2 &&
+      current_molecule_data.oxygens() + current_molecule_data.sulphur() >= 3) {
+    return 1;
+  }
+
   if (_external_transformation.size() > 0) {
     return 1;
   }
@@ -10223,17 +10340,14 @@ is_part_part_of_keto_form(const atom_number_t c, const Set_of_Atoms& current_ket
 
 // Check to see if either `c1` or `c2` are part of any of the 
 // keto groups in `current_keto_form` - 4 atoms per group.
-// Same as above, except that keto form `skip` is not checked.
+// Same as above, except that the group beginning at `skip_offset` is not checked.
 static int
-is_part_part_of_keto_form(int skip, const atom_number_t c1,
+is_part_part_of_keto_form(int skip_offset, const atom_number_t c1,
                 const atom_number_t c2, const Set_of_Atoms& current_keto_form) {
-  int ndx = 0;
   for (int i = 0; i < current_keto_form.number_elements(); i += 4) {
-    if (ndx == skip) {
-      ++ndx;
+    if (i == skip_offset) {
       continue;
     }
-    ++ndx;
 
     if (c1 == current_keto_form[i + 2] || c1 == current_keto_form[i + 3]) {
       return 1;
@@ -10412,80 +10526,49 @@ DifferentiateDoubleBondSites(Molecule& m, atom_number_t zatom,
 // ones can be done without impacting any others.
 int
 Chemical_Standardisation::_do_keto_to_enol(Molecule& m,
-                Set_of_Atoms& current_keto_form,
+                const Set_of_Atoms& current_keto_form,
                 const Set_of_Atoms& current_enol_form,
                 IWStandard_Current_Molecule& current_molecule_data) {
   int rc = 0;
-
   const int nketo = current_keto_form.number_elements();
 
-  // For those groups that cannot be processed, set their first atom to kInvalidAtomNumber.
   for (int i = 0; i < nketo; i += 4) {
     const atom_number_t o = current_keto_form[i];
     const atom_number_t carbon = current_keto_form[i + 1];
-    // We need to figure out if either of the two attached carbons can
-    // take a double bond.
     const atom_number_t cx1 = current_keto_form[i + 2];
     const atom_number_t cx2 = current_keto_form[i + 3];
 
-    int okcx1 = OkGetDoubleBond(m, cx1, current_molecule_data);
-    int okcx2 = OkGetDoubleBond(m, cx2, current_molecule_data);
-
-#ifdef DEBUG_KETO_TO_ENOL
-    cerr << "OKCX1 " << okcx1 << " OKCX2 " << okcx2 << '\n';
-#endif
-    if (! okcx1 && ! okcx2) {
-      current_keto_form[i] = kInvalidAtomNumber;
-      continue;
-    }
-
-    // At least one of okcx1 or okcx2 is true. Make sure that the
-    // one to receive the double bond is current_keto_form[i + 2];
-    if (okcx1 && ! okcx2) {  // Correct order
-    } else if (! okcx1 && okcx2) {  // Swap order
-      current_keto_form[i + 2] = current_keto_form[i + 3];
-      current_keto_form[i + 3] = kInvalidAtomNumber;
-    } else {  // Both are possible, can they be (cheaply) differentiated.
-      int x = DifferentiateDoubleBondSites(m, carbon, cx1, cx2);
-      // We could theoretically do a more expensive search...
-      if (x == 0) {
-        current_keto_form[i] = kInvalidAtomNumber;
-        continue;
-      } else if (x < 0) {
-        current_keto_form[i + 3] = kInvalidAtomNumber;
-      } else {
-        current_keto_form[i + 2] = current_keto_form[i + 3];
-        current_keto_form[i + 3] = kInvalidAtomNumber;
-      }
-    }
-
-    // Leave adjacent existing keto forms for now.
-    // It is OK if this keto form is adjacent to an existing enol.
+    // Check the original, unmodified candidate list. Processing one group must
+    // not hide an interfering group from later checks or create order dependence.
     if (is_part_part_of_keto_form(i, cx1, cx2, current_keto_form)) {
       continue;
     }
 
-    m.set_bond_type_between_atoms(carbon, o, SINGLE_BOND);
-    atom_number_t cx = current_keto_form[i + 2];
-    m.set_bond_type_between_atoms(carbon, cx, DOUBLE_BOND);
-    m.set_implicit_hydrogens_known(o, 0);
-    m.set_implicit_hydrogens_known(cx, 0);
-    current_keto_form[i] = kInvalidAtomNumber;
-    rc++;
-  }
-
-  // For now we deliberately do not process adjacent groups.
-  // It seens undesirable to form such groupings of [OH] atoms.
-  // Revisit if ever anyone cares - might be complex too.
-
-#ifdef IMPLEMENT_IF_EVER_NEEDED
-  for (int i = 0; i < nketo; i += 4) {
-    if (current_keto_form[i] == kInvalidAtomNumber) {
+    const int okcx1 = OkGetDoubleBond(m, cx1, current_molecule_data);
+    const int okcx2 = OkGetDoubleBond(m, cx2, current_molecule_data);
+    atom_number_t acceptor = kInvalidAtomNumber;
+    if (okcx1 && !okcx2) {
+      acceptor = cx1;
+    } else if (!okcx1 && okcx2) {
+      acceptor = cx2;
+    } else if (okcx1 && okcx2) {
+      const int preference = DifferentiateDoubleBondSites(m, carbon, cx1, cx2);
+      if (preference < 0) {
+        acceptor = cx1;
+      } else if (preference > 0) {
+        acceptor = cx2;
+      }
+    }
+    if (acceptor == kInvalidAtomNumber) {
       continue;
     }
-    // Implement here if ever needed.
+
+    m.set_bond_type_between_atoms(carbon, o, SINGLE_BOND);
+    m.set_bond_type_between_atoms(carbon, acceptor, DOUBLE_BOND);
+    m.set_implicit_hydrogens_known(o, 0);
+    m.set_implicit_hydrogens_known(acceptor, 0);
+    ++rc;
   }
-#endif
 
   if (rc) {
     _transform_enol_to_keto.extra(rc);
@@ -11466,77 +11549,143 @@ Chemical_Standardisation::_do_transform_enol_fused(
 int
 Chemical_Standardisation::_do_pyrimidine(
     Molecule& m, IWStandard_Current_Molecule& current_molecule_data) {
-  int rc = 0;
-
-  for (int i = 0; i < current_molecule_data.nrings(); ++i) {
-    if (current_molecule_data.ring_size()[i] != 6) {
-      continue;
-    }
-    if (!current_molecule_data.ring_is_aromatic()[i]) {
-      continue;
-    }
-    if (current_molecule_data.ring_nitrogen_count()[i] < 2) {
-      continue;
-    }
-
-    rc += _do_pyrimidine(m, current_molecule_data, *current_molecule_data.ringi(i));
-  }
-
-  if (rc == 0) {
+  // The first supported family has an unambiguous all-keto form. General
+  // enol-preferred pyrimidine canonicalisation remains a separate problem.
+  if (_keto_enol != standardisation::KetoEnol::kToKeto) {
     return 0;
   }
-
-  _transform_pyrimidine.extra(rc);
-
-  if (_verbose) {
-    cerr << "Transformed " << rc << " pyrimidine\n";
+  int rc = 0;
+  for (int i = 0; i < current_molecule_data.nrings(); ++i) {
+    if (current_molecule_data.ring_size()[i] != 6 ||
+        current_molecule_data.ring_nitrogen_count()[i] != 2 ||
+        current_molecule_data.ring_is_fused()[i]) {
+      continue;
+    }
+    if (_do_pyrimidine(m, current_molecule_data, *current_molecule_data.ringi(i))) {
+      // Later rules consult this snapshot. These isolated rings are now
+      // non-aromatic regardless of the incoming tautomer's aromaticity.
+      current_molecule_data.set_ring_non_aromatic(i);
+      ++rc;
+    }
   }
-
-  if (_append_string_depending_on_what_changed) {
-    _append_to_changed_molecules << " STD:pyrimidine";
+  if (rc) {
+    _transform_pyrimidine.extra(rc);
+    if (_verbose) {
+      cerr << "Transformed " << rc << " pyrimidinetrione systems\n";
+    }
+    if (_append_string_depending_on_what_changed) {
+      _append_to_changed_molecules << " STD:pyrimidine";
+    }
   }
-
   return rc;
 }
 
-// First task is to identify the atoms in the ring that comprise the pyrimidine nitrogen
-// pair. Note that there might be two of these. Give up in that case.
+// Recognise the entire isolated N-C(X)-C-C(X)-N-C(X) ring (X = O or S).
+// All ring bonds become single and all three C-X bonds become double. This
+// gives one result without choosing among overlapping local proton shifts.
 int
 Chemical_Standardisation::_do_pyrimidine(
     Molecule& m, IWStandard_Current_Molecule& current_molecule_data,
     const Set_of_Atoms& ring) {
   assert(ring.size() == 6);
-
   const atomic_number_t* z = current_molecule_data.atomic_number();
-
-  resizable_array<int> n_indices;
-  n_indices.reserve(6);
+  const int* ring_membership = current_molecule_data.ring_membership();
+  static constexpr std::array<atomic_number_t, 6> pattern = {7, 6, 6, 6, 7, 6};
+  int start = -1;
   for (int i = 0; i < 6; ++i) {
-    if (z[ring[i]] == 7) {
-      n_indices << i;
+    bool matches = true;
+    for (int j = 0; j < 6; ++j) {
+      if (z[ring[(i + j) % 6]] != pattern[j]) {
+        matches = false;
+        break;
+      }
+    }
+    if (matches) {
+      start = i;
+      break;
     }
   }
-
-  const int nn = n_indices.number_elements();
-
-  if (nn < 2) {  // should not happen.
+  if (start < 0) {
+    return 0;
+  }
+  auto atom = [&](int offset) { return ring[(start + offset) % 6]; };
+  const atom_number_t free_carbon = atom(2);
+  if (m.chiral_centre_at_atom(free_carbon) != nullptr) {
     return 0;
   }
 
-#ifdef TODO_FINIS_THIS
-
-  // Look for indices separated by 2.
-  for (int i = 1; i < nn; ++i) {
-    int prev = nn[i - 1];
-    if ((prev + 2) % 6 == nn[i]) {
+  int starting_hydrogens = 0;
+  int target_hydrogens = 0;
+  bool changed = false;
+  std::array<atom_number_t, 3> exocyclic;
+  int nexocyclic = 0;
+  for (int i = 0; i < 6; ++i) {
+    const atom_number_t a = atom(i);
+    if (ring_membership[a] != 1 || m.formal_charge(a)) {
+      return 0;
     }
-    if ((nn[i - 1] + 2) % 6 == nn[i]) {
+    const Bond* ring_bond = m.bond_between_atoms(a, atom((i + 1) % 6));
+    if ((!ring_bond->is_single_bond() && !ring_bond->is_double_bond()) ||
+        ring_bond->part_of_cis_trans_grouping()) {
+      return 0;
     }
+    changed = changed || !ring_bond->is_single_bond();
+    starting_hydrogens += m.hcount(a);
+    const Atom& aa = m[a];
+    if (i == 0 || i == 4 || i == 2) {
+      const int valence = (i == 2 ? 4 : 3);
+      if (aa.ncon() < 2 || aa.ncon() > valence) {
+        return 0;
+      }
+      target_hydrogens += valence - aa.ncon();
+      for (const Bond* b : aa) {
+        const atom_number_t outside = b->other(a);
+        if (ring.contains(outside)) {
+          continue;
+        }
+        // Explicit H atoms, including isotopic H, cannot be reassigned here.
+        if (!b->is_single_bond() || z[outside] == 1) {
+          return 0;
+        }
+      }
+      continue;
+    }
+    if (aa.ncon() != 3) {
+      return 0;
+    }
+    atom_number_t heteroatom = kInvalidAtomNumber;
+    for (const Bond* b : aa) {
+      const atom_number_t outside = b->other(a);
+      if (ring.contains(outside)) {
+        continue;
+      }
+      if ((z[outside] != 8 && z[outside] != 16) || m.ncon(outside) != 1 ||
+          m.formal_charge(outside) ||
+          (!b->is_single_bond() && !b->is_double_bond())) {
+        return 0;
+      }
+      heteroatom = outside;
+      changed = changed || !b->is_double_bond();
+    }
+    if (heteroatom == kInvalidAtomNumber) {
+      return 0;
+    }
+    exocyclic[nexocyclic++] = heteroatom;
+    starting_hydrogens += m.hcount(heteroatom);
+  }
+  if (!changed || starting_hydrogens != target_hydrogens) {
+    return 0;
   }
 
+  for (int i = 0; i < 6; ++i) {
+    m.set_bond_type_between_atoms(atom(i), atom((i + 1) % 6), SINGLE_BOND);
+    m.unset_all_implicit_hydrogen_information(atom(i));
+  }
+  for (int i = 0; i < 3; ++i) {
+    m.set_bond_type_between_atoms(atom(2 * i + 1), exocyclic[i], DOUBLE_BOND);
+    m.unset_all_implicit_hydrogen_information(exocyclic[i]);
+  }
   return 1;
-#endif
-  return 0;
 }
 
 int

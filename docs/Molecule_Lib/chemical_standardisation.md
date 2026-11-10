@@ -170,6 +170,59 @@ refreshed on atoms whose hydrogen count changes during these conversions. This
 also fixes earlier oxygen cases that could retain an obsolete hydrogen count
 and produce an invalid-valence product.
 
+### Isolated amidines and pyrimidinetriones
+
+`-g amidine` chooses the terminal-imine form of eligible isolated amidines:
+
+```text
+CC(N)=NC  ->  CC(=N)NC
+C(N)=NC   ->  C(=N)NC
+```
+
+The initial rule requires a terminal nitrogen and an unsubstituted or
+carbon-substituted amidine carbon. When the imine nitrogen has a substituent,
+that substituent must be a saturated, non-aromatic carbon. Ring nitrogens,
+shared/conjugated amidine systems, N-aryl and N-acyl groups, N-N/N-O
+substituents, and specified C=N stereochemistry are excluded. With `-g all`,
+normal amine neutralisation runs first, so an eligible protonated amidine
+also reaches its neutral canonical form in one pass. `-g amidine` alone does
+not neutralise charged groups.
+
+`-g pyrimidine` now handles isolated pyrimidine-2,4,6-trione systems and their
+oxygen/sulfur analogues. This option previously had no implemented conversion.
+It considers the whole ring together, avoiding competing local proton shifts:
+
+```text
+N1=C(O)C=C(O)N=C1O  ->  N1C(=O)CC(=O)NC1=O
+```
+
+Partially keto starting forms, N-alkyl substitution, substitution at position
+5, and mixed oxygen/sulfur systems are supported. The conversion conserves
+hydrogen count. Fused/spiro systems, charged participating atoms, explicit
+hydrogen attachments, and a specified chiral centre at position 5 are excluded.
+The rule is skipped with the `ENOL` preference; it does not implement a general
+enol-preferred pyrimidine canonicalisation.
+
+Both options are included in `-g all` and broaden the equivalence of structures
+relative to earlier versions. They can be disabled with
+`-g all -g -amidine -g -pyrimidine`. These are deliberately restricted rules;
+general heteroatom-rich and ring-conjugated tautomer systems remain outside
+their scope.
+
+For enol-preferred processing, independent eligible keto groups are now all
+converted in one pass. An indexing error previously caused some groups to be
+left for a subsequent pass. Interacting groups remain excluded.
+
+Use `tstandardise` to check random atom orderings and repeated processing:
+
+```shell
+tstandardise -g all -n 100 -v -F failures.smi molecules.smi
+```
+
+Inspect the reported failure count and `failures.smi`; the tester can return
+success even when it reports inconsistencies. A failure can also originate in
+SMILES/aromaticity/stereochemistry handling rather than a standardisation rule.
+
 ### Activation
 The usual way of using chemical standardisation is via `-g all` which turns
 on all default transformations. It is also possible to activate individual

@@ -287,6 +287,15 @@ class IWStandard_Current_Molecule
 
     int *  ncon () { return _ncon;}
 
+    // Only isolated rings may use this after conversion to a non-aromatic form.
+    void set_ring_non_aromatic(int ring_number) {
+      _ring_is_aromatic[ring_number] = 0;
+      for (atom_number_t a : *_rings[ring_number]) {
+        _atom_is_aromatic[a] = 0;
+        _exocyclic_status[a] = ExocyclicStatus();
+      }
+    }
+
     int nrings () const { return _nrings;}
 
     int aromatic_rings_with_multiple_nitrogens () const;
@@ -401,6 +410,7 @@ class IWStandard_Current_Molecule
 #define CS_TRIAZOLE  "triazole"
 #define CS_TETRAZOLE  "tetrazole"
 #define CS_PYRIMIDINE "pyrimidine"
+#define CS_AMIDINE "amidine"
 #define CS_LACTIM_LACTAM "ltlt"
 #define CS_LACTIM_LACTAM_RING "ltltr"
 #define CS_REVERSE_NITRO "rvnitro"
@@ -476,6 +486,7 @@ class Chemical_Standardisation
     Chemical_Transformation _transform_covalent_metals;
     Chemical_Transformation _transform_single_atom_ions;
     Chemical_Transformation _transform_guanidine;
+    Chemical_Transformation _transform_amidine;
     Chemical_Transformation _transform_guanidine_ring;
     Chemical_Transformation _protonate_sulfur_acids;
     Chemical_Transformation _protonate_phosphorous_acids;
@@ -595,6 +606,7 @@ class Chemical_Standardisation
                 atom_number_t nh1);
     int _do_pyrazole (Molecule &, int * atom_already_changed, IWStandard_Current_Molecule & current_molecule_data);
     int _do_pyrazole (Molecule &, int * atom_already_changed, const int, IWStandard_Current_Molecule & current_molecule_data);
+    int _do_transform_amidine(Molecule& m, IWStandard_Current_Molecule& current_molecule_data);
     int  _do_pyrimidine(Molecule& m, IWStandard_Current_Molecule& current_molecule_data);
     int  _do_pyrimidine(Molecule& m, IWStandard_Current_Molecule& current_molecule_data,
                 const Set_of_Atoms& ring);
@@ -627,7 +639,7 @@ class Chemical_Standardisation
                 const Set_of_Atoms& current_keto_form,
                 IWStandard_Current_Molecule& current_molecule_data);
     int _do_keto_to_enol(Molecule& m,
-                Set_of_Atoms& current_keto_form,
+                const Set_of_Atoms& current_keto_form,
                 const Set_of_Atoms& current_enol_form,
                 IWStandard_Current_Molecule& current_molecule_data);
     int  _do_transform_diketo_to_enol(Molecule & m,

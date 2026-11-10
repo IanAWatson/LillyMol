@@ -1,0 +1,4 @@
+{
+  "executable": "tstandardise",
+  "test": [{"name": "tautomer_groups", "shell_script": {"script_name": "run_test.py"}}]
+}

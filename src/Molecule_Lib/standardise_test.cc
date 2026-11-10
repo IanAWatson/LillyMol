@@ -805,6 +805,44 @@ TEST_P(TestOxygenAndSulphurTautomers, CanonicalFormAndAtomOrder) {
 }
 
 INSTANTIATE_TEST_SUITE_P(OxygenAndSulphur, TestOxygenAndSulphurTautomers, testing::Values(
+    TautomerCase{CS_AMIDINE, "CC(N)=NC", "CC(=N)NC", true},
+    TautomerCase{CS_AMIDINE, "CC([NH2])=[N]C", "CC(=N)NC", true},
+    TautomerCase{CS_AMIDINE, "CC(=N)NC", "CC(=N)NC", false},
+    TautomerCase{CS_AMIDINE, "C(N)=NC", "C(=N)NC", true},
+    TautomerCase{CS_AMIDINE, "N=C(N)C", "N=C(N)C", false},
+    TautomerCase{CS_AMIDINE, "CC(N)=NC1CCCCC1", "CC(=N)NC1CCCCC1", true},
+    TautomerCase{CS_AMIDINE, "CC(N)=Nc1ccccc1", "CC(N)=Nc1ccccc1", false},
+    TautomerCase{CS_AMIDINE, "CC(N)=NC(=N)N", "CC(N)=NC(=N)N", false},
+    TautomerCase{CS_AMIDINE, "CC(N)=NNC", "CC(N)=NNC", false},
+    TautomerCase{CS_AMIDINE, "CC(N)=NOC", "CC(N)=NOC", false},
+    TautomerCase{CS_AMIDINE, "CC(N)=[NH+]C", "CC(N)=[NH+]C", false},
+    TautomerCase{CS_AMIDINE, "C/C(N)=N/C", "C/C(N)=N/C", false},
+    TautomerCase{CS_PYRIMIDINE, "N1=C(O)C=C(O)N=C1O", "N1C(=O)CC(=O)NC1=O", true},
+    TautomerCase{CS_PYRIMIDINE, "N1C(=O)CC(=O)NC1=O", "N1C(=O)CC(=O)NC1=O", false},
+    TautomerCase{CS_PYRIMIDINE, "N1C(=O)C=C(O)N=C1O", "N1C(=O)CC(=O)NC1=O", true},
+    TautomerCase{CS_PYRIMIDINE, "N1=C(S)C=C(O)N=C1O", "N1C(=S)CC(=O)NC1=O", true},
+    TautomerCase{CS_PYRIMIDINE, "N1=C(S)C=C(S)N=C1S", "N1C(=S)CC(=S)NC1=S", true},
+    TautomerCase{CS_PYRIMIDINE, "CN1C(O)=CC(O)=NC1=O", "CN1C(=O)CC(=O)NC1=O", true},
+    TautomerCase{CS_PYRIMIDINE, "CN1C(O)=CC(=O)N(C)C1=O", "CN1C(=O)CC(=O)N(C)C1=O", true},
+    TautomerCase{CS_PYRIMIDINE, "N1=C(O)C(C)=C(O)N=C1O", "N1C(=O)C(C)C(=O)NC1=O", true},
+    TautomerCase{CS_PYRIMIDINE, "N1=C(O)C(C)(C)C(O)=NC1=O", "N1C(=O)C(C)(C)C(=O)NC1=O", true},
+    // Other ring arrangements, missing carbonyls, explicit isotope H and spiro
+    // or marked chiral centers remain outside the coordinated family rule.
+    TautomerCase{CS_PYRIMIDINE, "Oc1cc(O)ncn1", "Oc1cc(O)ncn1", false},
+    TautomerCase{CS_PYRIMIDINE, "N1C(O)CC(O)NC1O", "N1C(O)CC(O)NC1O", false},
+    TautomerCase{CS_PYRIMIDINE, "[2H]N1C(O)=CC(O)=NC1=O", "[2H]N1C(O)=CC(O)=NC1=O", false},
+    TautomerCase{CS_PYRIMIDINE, "[NH2+]1C(=O)CC(=O)NC1=O", "[NH2+]1C(=O)CC(=O)NC1=O", false},
+    TautomerCase{CS_PYRIMIDINE, "Oc1ncc(O)nc1O", "Oc1ncc(O)nc1O", false},
+    TautomerCase{CS_PYRIMIDINE, "N1=C(O)C2(CC2)C(O)=NC1=O", "N1=C(O)C2(CC2)C(O)=NC1=O", false},
+    TautomerCase{CS_PYRIMIDINE, "N1=C(O)[C@H](C)C(S)=NC1=O", "N1=C(O)[C@H](C)C(S)=NC1=O", false},
+    TautomerCase{CS_PYRIMIDINE, "N1=C(O)C=C(O)N=C1O", "N1=C(O)C=C(O)N=C1O", false,
+                 standardisation::KetoEnol::kToEnol},
+    TautomerCase{CS_ALL, "CC(N)=NC", "CC(=N)NC", true},
+    TautomerCase{CS_ALL, "N1=C(O)C=C(O)N=C1O", "N1C(=O)CC(=O)NC1=O", true},
+    TautomerCase{CS_ALL, "N1=C(O)C=C(O)N=C1O.O=c1cc[nH]c(C)n1",
+                 "N1C(=O)CC(=O)NC1=O.O=c1ccnc(C)[nH]1", true},
+    TautomerCase{CS_ALL, "N1C(=O)CC(=O)NC1=O.O=c1cc[nH]c(C)n1",
+                 "N1C(=O)CC(=O)NC1=O.O=c1ccnc(C)[nH]1", true},
     TautomerCase{CS_LACTIM_LACTAM, "CC(O)=NC", "CC(=O)NC", true},
     TautomerCase{CS_LACTIM_LACTAM, "CC(S)=NC", "CC(=S)NC", true},
     TautomerCase{CS_LACTIM_LACTAM, "CC([OH])=NC", "CC(=O)NC", true},
@@ -848,6 +886,12 @@ INSTANTIATE_TEST_SUITE_P(OxygenAndSulphur, TestOxygenAndSulphurTautomers, testin
                  standardisation::KetoEnol::kToEnol},
     TautomerCase{CS_KETO_ENOL, "CC(=S)[CH2]C", "CC(S)=CC", true,
                  standardisation::KetoEnol::kToEnol},
+    TautomerCase{CS_KETO_ENOL, "CC(=O)CC.CC(=O)CC", "CC(O)=CC.CC(O)=CC", true,
+                 standardisation::KetoEnol::kToEnol},
+    TautomerCase{CS_KETO_ENOL, "CC(=O)CC.CC(=S)CC", "CC(O)=CC.CC(S)=CC", true,
+                 standardisation::KetoEnol::kToEnol},
+    TautomerCase{CS_KETO_ENOL, "CC(=O)CCCCC(=S)C", "CC(O)=CCCC=C(S)C", true,
+                 standardisation::KetoEnol::kToEnol},
     // Interacting keto/enol groups, including mixed O/S cases, remain excluded.
     TautomerCase{CS_KETO_ENOL, "CC(=O)C=C(S)C", "CC(=O)C=C(S)C", false},
     TautomerCase{CS_KETO_ENOL, "CC(=S)C=C(O)C", "CC(=S)C=C(O)C", false},
@@ -874,5 +918,34 @@ INSTANTIATE_TEST_SUITE_P(OxygenAndSulphur, TestOxygenAndSulphurTautomers, testin
     TautomerCase{CS_OXO_PYRIMIDINE, "S=C1C2=C(C(=O)N=C(N1)N)N(C=N2)C1OC(CO)C(C1)O", "S=C1C2=C(C(=O)N=C(N1)N)N(C=N2)C1OC(CO)C(C1)O", false},
     TautomerCase{CS_OXO_PYRIMIDINE, "S=C1C2=C(C(=S)N=C(N1)N)N(C=N2)C1OC(CO)C(C1)O", "S=C1C2=C(C(=S)N=C(N1)N)N(C=N2)C1OC(CO)C(C1)O", false}
 ));
+
+TEST_F(TestStandardisation, ProtonatedAmidineIsStableAfterOnePass) {
+  _chemical_standardisation.activate_all();
+  Molecule expected;
+  ASSERT_TRUE(expected.build_from_smiles("CC(=N)NC"));
+  for (int i = 0; i < 100; ++i) {
+    Molecule initial;
+    ASSERT_TRUE(initial.build_from_smiles("CC(N)=[NH+]C"));
+    Molecule molecule;
+    ASSERT_TRUE(molecule.build_from_smiles(initial.random_smiles()));
+    EXPECT_GT(_chemical_standardisation.process(molecule), 0);
+    EXPECT_EQ(molecule.unique_smiles(), expected.unique_smiles());
+    EXPECT_TRUE(molecule.valence_ok());
+    EXPECT_EQ(_chemical_standardisation.process(molecule), 0);
+  }
+}
+
+TEST_F(TestStandardisation, NewTautomerRulesCanBeDisabled) {
+  _chemical_standardisation.activate_all();
+  ASSERT_TRUE(_chemical_standardisation.Activate("-amidine", 0));
+  ASSERT_TRUE(_chemical_standardisation.Activate("-pyrimidine", 0));
+  for (const char* input : {"CC(N)=NC", "N1=C(O)C=C(O)N=C1O"}) {
+    Molecule molecule;
+    ASSERT_TRUE(molecule.build_from_smiles(input));
+    const IWString before = molecule.unique_smiles();
+    EXPECT_EQ(_chemical_standardisation.process(molecule), 0);
+    EXPECT_EQ(molecule.unique_smiles(), before);
+  }
+}
 
 }  // namespace

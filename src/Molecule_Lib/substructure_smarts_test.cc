@@ -492,4 +492,11 @@ TEST_F(TestSubstructureSmarts, EmbeddingExclusionDirectivePlacement) {
   }
 }
 
+TEST(TestBadSmarts, BadSmartsShouldNotCrash) {
+
+  IWString bad_smarts = "O1C(=O[C@@H]2[C@H]3C)=CC[C@@H]211=O) p3";
+  Substructure_Query query;
+  EXPECT_FALSE(query.create_from_smarts(bad_smarts));
+}
+
 }  // namespace

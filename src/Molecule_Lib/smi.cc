@@ -1876,7 +1876,11 @@ Molecule::_build_from_smiles(const char* smiles, int characters_to_process,
 #endif
         Chiral_Centre* c = chiral_centre_at_atom(previous_atom);
         assert(c);
-        c->got_ring_opening_bond(ring_number, previous_atom_chiral_count);
+        if (!c->got_ring_opening_bond(ring_number, previous_atom_chiral_count)) {
+          smiles_error_message(smiles, characters_to_process, characters_processed,
+                               "Invalid ring opening at chiral centre");
+          return 0;
+        }
       }
 #ifdef DEBUG_BUILD_FROM_SMILES
       else {

@@ -718,6 +718,56 @@
     },
 
     {
+      "name": "smiles_query",
+      "args": [
+        "-o usmi -q 'SMILES:Oc1ccccc1' -m out -i ICTE #{indir}/in.smi"
+      ]
+    },
+
+    {
+      "name": "smiles_query_onlysubiso",
+      "args": [
+        "-o usmi -q 'SMILES:Oc1cc[1cH]cc1' -M onlysubiso -m out -i ICTE #{indir}/in.smi"
+      ]
+    },
+
+    {
+      "name": "smiles_query_ring_closure",
+      "args": [
+        "-o usmi -q 'SMILES:C%10CCCC%10' -m out -i ICTE #{indir}/in.smi"
+      ]
+    },
+
+    {
+      "name": "smiles_query_deprecated_lowercase",
+      "args": [
+        "-o usmi -q 'smiles:Oc1ccccc1' -m out -i ICTE #{indir}/in.smi"
+      ]
+    },
+
+    {
+      "name": "smiles_query_invalid",
+      "args": [
+        "-q 'SMILES:C1(CC' -m out #{indir}/in.smi"
+      ],
+      "ignore_file": [
+        "stderr"
+      ],
+      "non_zero_rc_expected": true
+    },
+
+    {
+      "name": "smiles_query_empty",
+      "args": [
+        "-q 'SMILES:' -m out #{indir}/in.smi"
+      ],
+      "ignore_file": [
+        "stderr"
+      ],
+      "non_zero_rc_expected": true
+    },
+
+    {
       "name": "reaction_queries",
       "difftool": "diff",
       "shell_script": {

@@ -344,35 +344,6 @@ ReadQueriesFromTFDataRecordProtoFile(const const_IWSubstring& fname,
 
 template <typename T>
 int
-build_query_from_smiles(const const_IWSubstring& smiles, resizable_array_p<T>& queries,
-                        int verbose) {
-  Molecule m;
-
-  set_input_aromatic_structures(1);  // don't bother saving and resetting
-
-  if (!m.build_from_smiles(smiles)) {
-    std::cerr << "build_query_from_smiles:invalid smiles '" << smiles << "'\n";
-    return 0;
-  }
-
-  Molecule_to_Query_Specifications mqs;
-  mqs.set_make_embedding(1);
-
-  T* q = new T;
-
-  if (!q->create_from_molecule(m, mqs)) {
-    std::cerr << "build_query_from_smiles:invalid molecule?? '" << smiles << "'\n";
-    delete q;
-    return 0;
-  }
-
-  queries.add(q);
-
-  return 1;
-}
-
-template <typename T>
-int
 query_from_molecule(MDL_Molecule& m, Molecule_to_Query_Specifications& mqs,
                                resizable_array_p<T>& queries) {
   std::unique_ptr<T> q = std::make_unique<T>();
@@ -384,6 +355,43 @@ query_from_molecule(MDL_Molecule& m, Molecule_to_Query_Specifications& mqs,
   }
 
   queries << q.release();
+
+  return 1;
+}
+
+// Build a query from a single smiles, in the same way as `-q M:file.smi` would if
+// the file contained just that smiles. The Molecule_to_Query_Specifications are
+// those established by the -M option(s). Note that, unlike M:, there is no
+// processing of directives following DIRECTIVE_SEPARATOR_TOKEN because that
+// character is valid within a smiles (ring closures such as %10).
+template <typename T>
+int
+query_from_smiles_as_molecule(const const_IWSubstring& smiles,
+                              Molecule_to_Query_Specifications* mqs,
+                              resizable_array_p<T>& queries, int verbose) {
+  std::unique_ptr<Molecule_to_Query_Specifications> maybe_needed;
+  if (mqs == nullptr) {
+    maybe_needed = std::make_unique<Molecule_to_Query_Specifications>();
+    mqs = maybe_needed.get();
+  }
+
+  set_input_aromatic_structures(1);
+
+  MDL_Molecule m;
+  if (!m.build_from_smiles(smiles)) {
+    std::cerr << "query_from_smiles_as_molecule:invalid smiles '" << smiles << "'\n";
+    return 0;
+  }
+
+  if (!query_from_molecule(m, *mqs, queries)) {
+    std::cerr << "query_from_smiles_as_molecule:cannot create query from '" << smiles
+              << "'\n";
+    return 0;
+  }
+
+  if (verbose > 1) {
+    std::cerr << "Created query from smiles '" << smiles << "'\n";
+  }
 
   return 1;
 }
@@ -1235,16 +1243,20 @@ process_cmdline_token(char option, const const_IWSubstring& token,
           << mytoken << "'\n";
       return 0;
     }
-  } else if (mytoken.starts_with("smiles:")) {
+  } else if (mytoken.starts_with("SMILES:") || mytoken.starts_with("smiles:")) {
+    // Lowercase was an undocumented, limited form that ignored -M options.
+    if (mytoken.starts_with("smiles:")) {
+      std::cerr << "Warning: 'smiles:' is deprecated, use 'SMILES:'\n";
+    }
     mytoken.remove_leading_chars(7);
 
-    if (0 == mytoken.length()) {
-      std::cerr << "Must follow smiles: specification with smiles\n";
+    if (mytoken.empty()) {
+      std::cerr << "Must follow SMILES: specification with a smiles\n";
       return 0;
     }
 
-    if (!build_query_from_smiles(mytoken, queries, verbose)) {
-      std::cerr << "process_queries:cannot build query from 'smiles:" << mytoken << "'\n";
+    if (!query_from_smiles_as_molecule(mytoken, mqs, queries, verbose)) {
+      std::cerr << "process_queries:cannot build query from 'SMILES:" << mytoken << "'\n";
       return 0;
     }
   } else if (mytoken.starts_with("I:")) {
@@ -1282,6 +1294,7 @@ process_cmdline_token(char option, const const_IWSubstring& token,
     std::cerr << " -" << option <<" S:file                 file of smarts queries\n";
     std::cerr << " -" << option <<" Q:file                 file of query object queries (also F: recognised)\n";
     std::cerr << " -" << option <<" M:file                 file of molecules that will be converted to query objects\n";
+    std::cerr << " -" << option <<" SMILES:smiles          a single smiles, converted as if it were in an M: file\n";
     std::cerr << " -" << option <<" I:file                 an ISIS query file\n";
     std::cerr << " -" << option <<" proto:proto            inline proto 'proto:query{nrings:3}'\n";
     std::cerr << " -" << option <<" PROTO:file             a query in text proto form\n";

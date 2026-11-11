@@ -74,6 +74,7 @@ queries (see [Several queries](#several-queries)). For more than a few queries, 
 | `-q S:<file>` | a file of SMARTS, one per line, each optionally followed by a name |
 | `-q F:<file>` | a file that contains the names of query files |
 | `-q M:<file>` | a file of molecules. Each molecule becomes a query |
+| `-q SMILES:<smiles>` | a single smiles, converted to a query exactly as if it were the only molecule in an `M:` file. Honours `-M` options. Quote it in the shell, and note it cannot take `%` directives |
 | `-q PROTO:<file>` | a file containing a textproto query |
 | `-q RXN:<file>` | scaffold queries from a reaction textproto |
 | `-q RXN:<file>,sidechain=N` | queries from sidechain N (zero-based position) |

@@ -45,7 +45,3 @@ template int queries_from_ISIS_query_file<Query_and_Charge_Stats>(data_source_an
 template int queries_from_ISIS_query_file<Query_and_Charge_Stats>(const_IWSubstring const&, resizable_array_p<Query_and_Charge_Stats>&, int);
 template int query_from_ISIS_query_file<Query_and_Charge_Stats>(MDL_Molecule&, Molecule_to_Query_Specifications&, resizable_array_p<Query_and_Charge_Stats>&, int);
 
-template int
-build_query_from_smiles (const const_IWSubstring & smiles,
-                         resizable_array_p<Query_and_Charge_Stats> & queries,
-                         int verbose);

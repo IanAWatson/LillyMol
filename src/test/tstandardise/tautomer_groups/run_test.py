@@ -29,6 +29,16 @@ cases = [
     'N1=C(O)C=C(O)N=C1O.O=c1cc[nH]c(C)n1',
     'N1=NC(=NN=C(C2=CC=NC=C2)Br)NN1',
 ]
+beta_ketoesters = [
+    'COC(=O)C=C(O)C', 'CCOC(=O)C=C(O)C',
+    'COC(=O)C=C(O)c1ccccc1', 'COC(=O)[CH]=C([OH])C',
+    'C[18O]C(=O)C=C(O)C', 'C[C@H](F)OC(=O)C=C(O)C',
+    'COC(=O)C=C(O)C=C(O)C', 'COC(=O)/C=C(/O)C',
+]
+check('beta_ketoester', ['-g', 'beta-ketoester'], beta_ketoesters)
+check('beta_ketoester_all', ['-g', 'all'], beta_ketoesters)
+check('beta_ketoester_disabled', ['-g', 'all', '-g', '-beta-ketoester'], beta_ketoesters)
+
 nitroso = [
     'CN=O', 'CCN=O', 'CC(C)N=O', 'O=NC1CCCCC1',
     'C[N+]1=CC=CC=C1CN=O', 'C[CH2][N]=[O]',

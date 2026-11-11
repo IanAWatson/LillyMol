@@ -381,6 +381,7 @@ Chemical_Standardisation::activate_all() {
   _transform_pyrimidine.activate();
   _transform_ascorbate.activate();
   _transform_beta_diketone.activate();
+  _transform_beta_ketoester.activate();
   _transform_phosphorus_tautomer.activate();
   _transform_nitroso_to_oxime.activate();
   _transform_isoxazole.activate();
@@ -450,6 +451,7 @@ display_all_chemical_standardisation_options(std::ostream& os, char zoption) {
   os << zopt << CS_PYRIMIDINE << "  convert isolated O/S pyrimidinetrione tautomers to keto form\n";
   os << zopt << CS_NITROSO_OXIME << "      convert neutral aliphatic C-N=O to C=N-OH\n";
   os << zopt << CS_PHOSPHORUS_TAUTOMER << "  convert neutral P-OH tautomers to P(=O)H\n";
+  os << zopt << CS_BETA_KETOESTER << " canonicalise acyclic beta-ketoester enols\n";
   os << zopt << CS_BETA_DIKETONE << " canonicalise beta-diketone enols to diketo form\n";
   os << zopt << CS_ASCORBATE << "   canonicalise isolated ascorbate rings to lactone/enediol form\n";
   os << zopt << CS_GUANDR << "        convert Ring type guanidines to -N-C(=N)-N form\n";
@@ -841,6 +843,12 @@ Chemical_Standardisation::Activate(const IWString& directive, const int verbose)
       _transform_phosphorus_tautomer.deactivate();
     } else {
       _transform_phosphorus_tautomer.activate();
+    }
+  } else if (tmp == CS_BETA_KETOESTER) {
+    if (negation) {
+      _transform_beta_ketoester.deactivate();
+    } else {
+      _transform_beta_ketoester.activate();
     }
   } else if (tmp == CS_BETA_DIKETONE) {
     if (negation) {
@@ -4091,6 +4099,12 @@ Chemical_Standardisation::_process(Molecule& m,
     rc += _do_ascorbate(m, current_molecule_data);
   }
 
+  // Ester conversion can expose a ketone needed by the beta-diketone rule.
+  if (_transform_beta_ketoester.active() && current_molecule_data.oxygens() >= 3 &&
+      _keto_enol == standardisation::KetoEnol::kToKeto) {
+    rc += _do_beta_ketoester(m, current_molecule_data);
+  }
+
   if (_transform_beta_diketone.active() && current_molecule_data.oxygens() >= 2 &&
       _keto_enol == standardisation::KetoEnol::kToKeto) {
     rc += _do_beta_diketone(m, current_molecule_data);
@@ -4435,6 +4449,10 @@ Chemical_Standardisation::report(std::ostream& os) const {
   if (_transform_phosphorus_tautomer.active()) {
     os << "  Phosphorus tautomer ";
     _transform_phosphorus_tautomer.report(os);
+  }
+  if (_transform_beta_ketoester.active()) {
+    os << "  Beta ketoester ";
+    _transform_beta_ketoester.report(os);
   }
   if (_transform_beta_diketone.active()) {
     os << "Beta diketone ";
@@ -10171,6 +10189,11 @@ Chemical_Standardisation::_processing_needed(
     return 1;
   }
 
+  if (_transform_beta_ketoester.active() && current_molecule_data.oxygens() >= 3 &&
+      _keto_enol == standardisation::KetoEnol::kToKeto) {
+    return 1;
+  }
+
   if (_transform_beta_diketone.active() && current_molecule_data.oxygens() >= 2 &&
       _keto_enol == standardisation::KetoEnol::kToKeto) {
     return 1;
@@ -11780,12 +11803,17 @@ Chemical_Standardisation::_do_phosphorus_tautomer(
   return rc;
 }
 
+enum class BetaCarbonyl {
+  kKetone,
+  kEster,
+};
+
 // Convert O=C-C=C-OH to the diketo form. The central carbon can carry
 // a carbon substituent in an isolated carbocycle. Any newly formed
 // stereocentre remains unspecified.
 static bool
-ConvertBetaDiketoneEnol(Molecule& m, const IWStandard_Current_Molecule& data,
-                       atom_number_t o) {
+ConvertBetaCarbonylEnol(Molecule& m, const IWStandard_Current_Molecule& data,
+                       atom_number_t o, BetaCarbonyl carbonyl_type) {
   const auto* z = data.atomic_number();
   const auto* rings = data.ring_membership();
   const auto* aromatic = data.atom_is_aromatic();
@@ -11867,18 +11895,45 @@ ConvertBetaDiketoneEnol(Molecule& m, const IWStandard_Current_Molecule& data,
       aromatic[keto] || m.formal_charge(keto)) {
     return false;
   }
+  if (carbonyl_type == BetaCarbonyl::kEster &&
+      (rings[keto] || rings[middle] || rings[enol])) {
+    return false;
+  }
   bool carbonyl = false;
+  bool ester = false;
   for (const Bond* b : m[keto]) {
     const atom_number_t other = b->other(keto);
     if (z[other] == 8 && b->is_double_bond() && m.ncon(other) == 1 &&
         !m.formal_charge(other)) {
       carbonyl = true;
-    } else if (z[other] != 6 || !b->is_single_bond()) {
+    } else if (other == middle && b->is_single_bond()) {
+      continue;
+    } else if (carbonyl_type == BetaCarbonyl::kKetone &&
+               z[other] == 6 && b->is_single_bond()) {
+      continue;
+    } else if (carbonyl_type == BetaCarbonyl::kEster &&
+               z[other] == 8 && b->is_single_bond() &&
+               !m.formal_charge(other) && m.ncon(other) == 2 &&
+               m.nbonds(other) == 2 && m.hcount(other) == 0) {
+      const Bond* alkoxy = m[other][0];
+      if (alkoxy->other(other) == keto) {
+        alkoxy = m[other][1];
+      }
+      const atom_number_t alkoxy_carbon = alkoxy->other(other);
+      if (!alkoxy->is_single_bond() || z[alkoxy_carbon] != 6 ||
+          (!aromatic[alkoxy_carbon] && m.multiple_bond_to_heteroatom(alkoxy_carbon))) {
+        eligible = false;  // Excludes acid anhydrides and related O-acyl groups.
+        break;
+      }
+      ester = true;
+    } else {
       eligible = false;
       break;
     }
   }
-  if (!eligible || !carbonyl || m.chiral_centre_at_atom(enol) ||
+  if (!eligible || !carbonyl ||
+      (carbonyl_type == BetaCarbonyl::kEster && !ester) ||
+      m.chiral_centre_at_atom(enol) ||
       m.chiral_centre_at_atom(o)) {
     return false;
   }
@@ -11901,9 +11956,9 @@ ConvertBetaDiketoneEnol(Molecule& m, const IWStandard_Current_Molecule& data,
   return true;
 }
 
-int
-Chemical_Standardisation::_do_beta_diketone(
-    Molecule& m, const IWStandard_Current_Molecule& data) {
+static int
+ConvertBetaCarbonylEnols(Molecule& m, const IWStandard_Current_Molecule& data,
+                        BetaCarbonyl carbonyl_type) {
   int rc = 0;
   int previous;
   // A newly formed ketone can make an adjacent enol eligible. Each
@@ -11911,10 +11966,32 @@ Chemical_Standardisation::_do_beta_diketone(
   do {
     previous = rc;
     for (atom_number_t o = 0; o < m.natoms(); ++o) {
-      rc += ConvertBetaDiketoneEnol(m, data, o);
+      rc += ConvertBetaCarbonylEnol(m, data, o, carbonyl_type);
     }
   } while (rc != previous);
+  return rc;
+}
 
+int
+Chemical_Standardisation::_do_beta_ketoester(
+    Molecule& m, const IWStandard_Current_Molecule& data) {
+  const int rc = ConvertBetaCarbonylEnols(m, data, BetaCarbonyl::kEster);
+  if (rc) {
+    _transform_beta_ketoester.extra(rc);
+    if (_verbose) {
+      cerr << "Transformed " << rc << " beta-ketoester enols\n";
+    }
+    if (_append_string_depending_on_what_changed) {
+      _append_to_changed_molecules << " STD:" << CS_BETA_KETOESTER;
+    }
+  }
+  return rc;
+}
+
+int
+Chemical_Standardisation::_do_beta_diketone(
+    Molecule& m, const IWStandard_Current_Molecule& data) {
+  const int rc = ConvertBetaCarbonylEnols(m, data, BetaCarbonyl::kKetone);
   if (rc) {
     _transform_beta_diketone.extra(rc);
     if (_verbose) {

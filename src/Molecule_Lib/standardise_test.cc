@@ -865,6 +865,33 @@ INSTANTIATE_TEST_SUITE_P(OxygenAndSulphur, TestOxygenAndSulphurTautomers, testin
                  standardisation::KetoEnol::kToEnol},
     TautomerCase{CS_ALL, "P(O)(O)C(N)C", "P(=O)(O)C(N)C", true},
     TautomerCase{CS_ALL, "CP(C)=O", "CP(C)=O", false},
+    TautomerCase{CS_BETA_KETOESTER, "COC(=O)C=C(O)C", "COC(=O)CC(C)=O", true},
+    TautomerCase{CS_BETA_KETOESTER, "CCOC(=O)C=C(O)C", "CCOC(=O)CC(C)=O", true},
+    TautomerCase{CS_BETA_KETOESTER, "COC(=O)C=C(O)c1ccccc1", "COC(=O)CC(=O)c1ccccc1", true},
+    TautomerCase{CS_BETA_KETOESTER, "O=C(Oc1ccccc1)C=C(O)C", "O=C(Oc1ccccc1)CC(C)=O", true},
+    TautomerCase{CS_BETA_KETOESTER, "C=COC(=O)C=C(O)C", "C=COC(=O)CC(C)=O", true},
+    TautomerCase{CS_BETA_KETOESTER, "C1CCCCC1OC(=O)C=C(O)C", "C1CCCCC1OC(=O)CC(C)=O", true},
+    TautomerCase{CS_BETA_KETOESTER, "COC(=O)[CH]=C([OH])C", "COC(=O)CC(C)=O", true},
+    TautomerCase{CS_BETA_KETOESTER, "C[18O]C(=O)C=C(O)C", "C[18O]C(=O)CC(C)=O", true},
+    TautomerCase{CS_BETA_KETOESTER, "COC(=O)C=C([18OH])C", "COC(=O)CC(=[18O])C", true},
+    TautomerCase{CS_BETA_KETOESTER, "C[C@H](F)OC(=O)C=C(O)C", "C[C@H](F)OC(=O)CC(C)=O", true},
+    TautomerCase{CS_BETA_KETOESTER, "COC(=O)CC(C)=O", "COC(=O)CC(C)=O", false},
+    TautomerCase{CS_BETA_KETOESTER, "CC(=O)C=C(O)C", "CC(=O)C=C(O)C", false},
+    TautomerCase{CS_BETA_KETOESTER, "OC(=O)C=C(O)C", "OC(=O)C=C(O)C", false},
+    TautomerCase{CS_BETA_KETOESTER, "NC(=O)C=C(O)C", "NC(=O)C=C(O)C", false},
+    TautomerCase{CS_BETA_KETOESTER, "CSC(=O)C=C(O)C", "CSC(=O)C=C(O)C", false},
+    TautomerCase{CS_BETA_KETOESTER, "CC(=O)OC(=O)C=C(O)C", "CC(=O)OC(=O)C=C(O)C", false},
+    TautomerCase{CS_BETA_KETOESTER, "O=C1OCCC(O)=C1", "O=C1OCCC(O)=C1", false},
+    TautomerCase{CS_BETA_KETOESTER, "COC(=O)C1=C(O)CCC1", "COC(=O)C1=C(O)CCC1", false},
+    TautomerCase{CS_BETA_KETOESTER, "COC(=O)C(C)=C(O)C", "COC(=O)C(C)=C(O)C", false},
+    TautomerCase{CS_BETA_KETOESTER, "COC(O)=CC(C)=O", "COC(O)=CC(C)=O", false},
+    TautomerCase{CS_BETA_KETOESTER, "COC(=O)/C=C(/O)C", "COC(=O)/C=C(/O)C", false},
+    TautomerCase{CS_BETA_KETOESTER, "COC(=O)C=C(O[2H])C", "COC(=O)C=C(O[2H])C", false},
+    TautomerCase{CS_BETA_KETOESTER, "COC(=O)C=C(O)C", "COC(=O)C=C(O)C", false,
+                 standardisation::KetoEnol::kToEnol},
+    TautomerCase{CS_ALL, "COC(=O)C=C(O)C", "COC(=O)CC(C)=O", true},
+    TautomerCase{CS_ALL, "COC(=O)C=C(O)C=C(O)C", "COC(=O)CC(=O)CC(C)=O", true},
+    TautomerCase{CS_BETA_KETOESTER, "COC(=O)C=C(O)C=C(O)C", "COC(=O)CC(=O)C=C(O)C", true},
     TautomerCase{CS_BETA_DIKETONE, "CC(=O)C=C(O)C=Cc1cc(O)c(O)cc1",
                  "CC(=O)CC(=O)C=Cc1cc(O)c(O)cc1", true},
     TautomerCase{CS_BETA_DIKETONE, "OC1=C(c2ccccc2)C(=O)CCC1", "O=C1C(c2ccccc2)C(=O)CCC1", true},
@@ -1384,6 +1411,26 @@ TEST_F(TestStandardisation, NitrosoOximePreservesRemotePyridiniumCharge) {
   EXPECT_EQ(_m1.number_formally_charged_atoms(), 1);
   EXPECT_EQ(_m1.net_formal_charge(), 1);
   EXPECT_TRUE(_m1.valence_ok());
+}
+
+TEST_F(TestStandardisation, BetaKetoesterCanBeDisabledAndReportsIndependently) {
+  _chemical_standardisation.activate_all();
+  ASSERT_TRUE(_chemical_standardisation.Activate("-beta-ketoester", 0));
+  ASSERT_TRUE(_m1.build_from_smiles("COC(=O)C=C(O)C"));
+  const IWString before = _m1.unique_smiles();
+  EXPECT_EQ(_chemical_standardisation.process(_m1), 0);
+  EXPECT_EQ(_m1.unique_smiles(), before);
+  ASSERT_TRUE(_chemical_standardisation.Activate(CS_BETA_KETOESTER, 0));
+  ASSERT_TRUE(_chemical_standardisation.Activate("-beta-diketone", 0));
+  _chemical_standardisation.set_append_string_depending_on_what_changed(1);
+  EXPECT_EQ(_chemical_standardisation.process(_m1), 1);
+  EXPECT_TRUE(_m1.name().contains("STD:beta-ketoester"));
+  std::ostringstream report;
+  ASSERT_TRUE(_chemical_standardisation.report(report));
+  EXPECT_NE(report.str().find("Beta ketoester changed 1 groups"), std::string::npos);
+  EXPECT_EQ(_m1.number_formally_charged_atoms(), 0);
+  EXPECT_EQ(_m1.chiral_centres(), 0);
+  EXPECT_EQ(_chemical_standardisation.process(_m1), 0);
 }
 
 }  // namespace

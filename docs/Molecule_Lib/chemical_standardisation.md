@@ -84,6 +84,7 @@ Entering `-g help` to most LillyMol tools yields the usage message
  -g keto_enol     convert O/S enol to keto forms (no adjacent heteroatoms)
  -g nitroso      convert neutral aliphatic C-N=O groups to C=N-OH
  -g phosphorus   convert neutral P-OH tautomers to P(=O)H
+ -g beta-ketoester canonicalise acyclic beta-ketoester enols
  -g beta-diketone canonicalise beta-diketone enols to diketo form
  -g ascorbate    canonicalise isolated ascorbate rings to lactone/enediol form
  -g 4-pyridone    convert 4-pyridol/thiol to pyridone/thione forms
@@ -285,6 +286,29 @@ chosen if multiple OH groups are eligible. Existing P=O groups are left as read.
 
 Reports include phosphorus tautomer counts. `-g APP=EACH` appends
 `STD:phosphorus` when this transformation changes a molecule.
+
+### Acyclic beta-ketoester enols
+
+`-g beta-ketoester` converts eligible `RO-C(=O)-CH=C(OH)-R` motifs to
+`RO-C(=O)-CH2-C(=O)-R`. For example, `COC(=O)C=C(O)C` becomes
+`COC(=O)CC(C)=O`. The ester bonds are retained. This broadens default
+equivalence because the rule is included in `-g all`. Disable it with
+`-g all -g -beta-ketoester`; the beta-diketone rule remains independently
+selectable. The ester rule is skipped with the `ENOL` preference.
+
+The ester carbonyl, central carbon and enol carbon must be acyclic. The central
+carbon must have one hydrogen and no additional substituent in the starting
+enol. The ester oxygen must be neutral and bonded to another carbon. Alkyl,
+aryl and vinyl esters are supported. Carboxylic acids, anhydrides, amides,
+thioesters, lactones and cyclic beta-ketoesters are excluded from this initial
+rule. Enolisation at the ester end is also outside its scope.
+
+Formula, isotope labels and unaffected stereocentres are preserved. Conversions
+that touch a marked chiral centre or remove specified alkene geometry are
+skipped. The rule precedes beta-diketone processing so a newly formed ketone
+can enable another local enol conversion in the same standardisation pass.
+Reports include beta-ketoester counts, and `-g APP=EACH` appends
+`STD:beta-ketoester` when this rule changes a molecule.
 
 ### Beta-diketone enols
 

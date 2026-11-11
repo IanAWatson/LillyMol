@@ -2589,6 +2589,127 @@ sidechain {
         self.assertEqual(len(mixed.tags()), 3)
         mixed.fingerprint(mol)
 
+    def test_gfp_tversky_parameters(self):
+        tv = lillymol.Tversky()
+        self.assertEqual((tv.query, tv.candidate), (1.0, 1.0))
+        # By default the pair is rescaled to sum to 2, as for the -V option.
+        tv = lillymol.Tversky(query=1.0, candidate=0.0)
+        self.assertEqual((tv.query, tv.candidate), (2.0, 0.0))
+        tv = lillymol.Tversky(query=3.0, candidate=1.0)
+        self.assertEqual((tv.query, tv.candidate), (1.5, 0.5))
+        tv = lillymol.Tversky(query=1.0, candidate=0.0, scale=False)
+        self.assertEqual((tv.query, tv.candidate), (1.0, 0.0))
+        self.assertIn("Tversky(query=", repr(tv))
+        for query, candidate in ((-1.0, 1.0), (1.0, -1.0), (0.0, 0.0),
+                                 (float("nan"), 1.0)):
+            with self.assertRaises(ValueError):
+                lillymol.Tversky(query=query, candidate=candidate)
+
+    def _gfp_formula_list(self):
+        context = lillymol.GFPContext.from_specs([lillymol.GFP.formula()])
+        gfp = lillymol.GFPList(context)
+        gfp.add_molecules(lillymol.MolFromSmiles(
+            ["CO methanol", "CCCCCO pentanol", "CCCO propanol"]), store_metadata=True)
+        return context, gfp
+
+    def test_gfp_tversky_direction_with_formula_fingerprint(self):
+        context, gfp = self._gfp_formula_list()
+        query = context.fingerprint(lillymol.MolFromSmiles("CCCO query"))
+
+        # Weight on features only in the query: candidates that contain every
+        # feature of the query are at zero distance.
+        contains_query = lillymol.Tversky(query=2.0, candidate=0.0)
+        found = {gfp.id(hit.index): hit.distance
+                 for hit in gfp.nearest_neighbours(query, 3, tversky=contains_query)}
+        self.assertAlmostEqual(found["pentanol"], 0.0, places=6)
+        self.assertAlmostEqual(found["propanol"], 0.0, places=6)
+        self.assertGreater(found["methanol"], 0.1)
+
+        # Weight on features only in the candidate: candidates that are contained
+        # in the query are at zero distance.
+        inside_query = lillymol.Tversky(query=0.0, candidate=2.0)
+        found = {gfp.id(hit.index): hit.distance
+                 for hit in gfp.nearest_neighbours(query, 3, tversky=inside_query)}
+        self.assertAlmostEqual(found["methanol"], 0.0, places=6)
+        self.assertAlmostEqual(found["propanol"], 0.0, places=6)
+        self.assertGreater(found["pentanol"], 0.1)
+
+        # Without Tversky only the identical molecule is at zero distance.
+        found = {gfp.id(hit.index): hit.distance
+                 for hit in gfp.nearest_neighbours(query, 3)}
+        self.assertGreater(found["pentanol"], 0.1)
+        self.assertGreater(found["methanol"], 0.1)
+
+        # Tversky with equal weights is Tanimoto.
+        equal = lillymol.Tversky()
+        for j in range(len(gfp)):
+            self.assertAlmostEqual(gfp.distance(query, j, tversky=equal),
+                                   gfp.distance(query, j), places=6)
+
+    def test_gfp_tversky_all_search_methods(self):
+        context, gfp = self._gfp_formula_list()
+        contains_query = lillymol.Tversky(query=2.0, candidate=0.0)
+        inside_query = lillymol.Tversky(query=0.0, candidate=2.0)
+        propanol = 2
+        query = context.fingerprint(lillymol.MolFromSmiles("CCCO query"))
+
+        # Row and fingerprint queries agree; swapping the rows together with
+        # the weights gives the same answer.
+        for j in range(len(gfp)):
+            self.assertAlmostEqual(gfp.distance(propanol, j, tversky=contains_query),
+                                   gfp.distance(query, j, tversky=contains_query),
+                                   places=6)
+            self.assertAlmostEqual(gfp.distance(propanol, j, contains_query),
+                                   gfp.distance(j, propanol, inside_query), places=6)
+
+        within = gfp.nearest_neighbours_within_distance(query, 0.0, tversky=contains_query)
+        self.assertEqual(sorted(gfp.id(hit.index) for hit in within),
+                         ["pentanol", "propanol"])
+        within = gfp.nearest_neighbours_within_distance(propanol, 0.0,
+                                                         tversky=contains_query)
+        self.assertEqual([gfp.id(hit.index) for hit in within], ["pentanol"])
+        hits = gfp.nearest_neighbours(propanol, 2, tversky=contains_query)
+        self.assertEqual(gfp.id(hits[0].index), "pentanol")
+        self.assertAlmostEqual(hits[0].distance, 0.0, places=6)
+
+        self.assertAlmostEqual(context.distance(query, query, tversky=contains_query),
+                               0.0, places=6)
+
+        # tversky=None is the default behaviour.
+        self.assertEqual(gfp.distance(propanol, 0, tversky=None), gfp.distance(propanol, 0))
+
+        with self.assertRaises(TypeError):
+            gfp.nearest_neighbours(query, 3, tversky="a=2,b=0")
+
+        other = lillymol.GFPContext.from_specs([lillymol.GFP.ec()]).fingerprint(
+            lillymol.MolFromSmiles("CCCO"))
+        with self.assertRaises(ValueError):
+            gfp.distance(other, 0, tversky=contains_query)
+
+    def test_gfp_tversky_matches_command_line(self):
+        # Values from the command line: gfp_make.sh -IW on the needle butanol and
+        # a haystack, then gfp_lnearneighbours -p needle.gfp -V a=.. -V b=..
+        context = lillymol.GFPContext.from_specs([lillymol.GFP.iw()])
+        gfp = lillymol.GFPList(context)
+        gfp.add_molecules(lillymol.MolFromSmiles(
+            ["OCC ethanol", "OCCCCCCCC octanol", "OCCCC butanol", "c1ccccc1 benzene"]),
+            store_metadata=True)
+        query = context.fingerprint(lillymol.MolFromSmiles("OCCCC needle"))
+
+        def distances(tversky):
+            return {gfp.id(hit.index): hit.distance
+                    for hit in gfp.nearest_neighbours(query, 4, tversky=tversky)}
+
+        for tversky, expected in (
+                (None, dict(butanol=0.0, octanol=0.538, ethanol=0.583, benzene=1.0)),
+                (lillymol.Tversky(query=2, candidate=0),
+                 dict(butanol=0.0, octanol=0.0, ethanol=0.737, benzene=1.0)),
+                (lillymol.Tversky(query=0, candidate=2),
+                 dict(butanol=0.0, octanol=0.7, ethanol=0.0, benzene=1.0))):
+            found = distances(tversky)
+            for name, value in expected.items():
+                self.assertAlmostEqual(found[name], value, places=3, msg=name)
+
     def test_gfp_generator_specs_and_errors(self):
         self.assertEqual(lillymol.GFP.maccs(level2=False).components(), ["FPMK<"])
         self.assertEqual(lillymol.GFP.formula().components(), ["FCFML<"])

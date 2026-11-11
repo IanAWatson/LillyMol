@@ -12,6 +12,7 @@
 
 #include "Utilities/GFP_Tools/fixed_size_counted_fingerprint.h"
 #include "Utilities/GFP_Tools/sparsefp.h"
+#include "Utilities/GFP_Tools/tversky.h"
 
 class IW_TDT;
 class Molecule;
@@ -251,6 +252,10 @@ class FixedBitVector {
   }
 
   float Tanimoto(const FixedBitVector& rhs) const;
+
+  // Tversky similarity. `this` is the query, so tv.a() weights bits only in
+  // this fingerprint, and tv.b() bits only in `rhs`.
+  float TverskySimilarity(const FixedBitVector& rhs, const Tversky& tv) const;
 };
 
 class GFPContext;
@@ -399,7 +404,10 @@ class GFPContext {
   void UseAll();
 
   int Fingerprint(Molecule& m, GFPFingerprint& result);
-  float Distance(const GFPFingerprint& lhs, const GFPFingerprint& rhs) const;
+  // If `tversky` is not null, Tversky distances are computed in place of Tanimoto.
+  // `lhs` is the query: tversky->a() weights features only in `lhs`.
+  float Distance(const GFPFingerprint& lhs, const GFPFingerprint& rhs,
+                 const Tversky* tversky = nullptr) const;
 };
 
 class GFPList {
@@ -469,15 +477,21 @@ class GFPList {
     return _ids[i];
   }
 
-  float Distance(int i, int j) const;
-  float Distance(const GFPFingerprint& fp, int j) const;
-  std::vector<NearestNeighbour> NearestNeighbours(int query, int k) const;
-  std::vector<NearestNeighbour> NearestNeighbours(const GFPFingerprint& query,
-                                                  int k) const;
-  std::vector<NearestNeighbour> NearestNeighboursWithinDistance(int query,
-                                                                float max_distance) const;
+  // If `tversky` is not null, Tversky distances are computed in place of
+  // Tanimoto. The query (row `i`, or `fp`) is always the left hand side, so
+  // tversky->a() weights features that are only in the query, and tversky->b()
+  // features that are only in the list entry.
+  float Distance(int i, int j, const Tversky* tversky = nullptr) const;
+  float Distance(const GFPFingerprint& fp, int j, const Tversky* tversky = nullptr) const;
+  std::vector<NearestNeighbour> NearestNeighbours(int query, int k,
+                                                  const Tversky* tversky = nullptr) const;
+  std::vector<NearestNeighbour> NearestNeighbours(const GFPFingerprint& query, int k,
+                                                  const Tversky* tversky = nullptr) const;
   std::vector<NearestNeighbour> NearestNeighboursWithinDistance(
-      const GFPFingerprint& query, float max_distance) const;
+      int query, float max_distance, const Tversky* tversky = nullptr) const;
+  std::vector<NearestNeighbour> NearestNeighboursWithinDistance(
+      const GFPFingerprint& query, float max_distance,
+      const Tversky* tversky = nullptr) const;
 };
 
 }  // namespace gfp_context

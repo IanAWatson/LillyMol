@@ -126,6 +126,10 @@ See the GFP section of [LillyMolPython.md](LillyMolPython.md#gfp-fingerprint-fil
 for the supported generators, file reading, metadata storage, and compatibility
 rules between contexts.
 
+Searches can use Tversky similarity instead of Tanimoto by passing a `Tversky`
+object, for example to find molecules that contain everything in a query. See
+[Tversky searching](LillyMolPython.md#tversky-searching).
+
 ## Similarity
 There is no best similarity measure. The best similarity measure would
 likely be one that accurately mapped to changes in Biological activity.

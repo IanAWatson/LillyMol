@@ -44,6 +44,12 @@ class Tversky
 
     int active () const { return _active;}
 
+//  Set the parameters directly, without a command line. The weights must be
+//  non-negative, and not both zero. If `scale_to_2` the values are rescaled so
+//  that a+b=2, as happens with the -V option, so a=b=1 is Tanimoto and only the
+//  ratio matters. Returns 0 if the values are invalid.
+    int Set (float a, float b, bool scale_to_2 = true);
+
     int parse_command_line (Command_Line &, char, char, int);
     int parse_command_line (Command_Line &, char, int);
 

@@ -310,18 +310,20 @@ GFPListAddSmiles(gfp_context::GFPList& gfp, const std::vector<std::string>& smil
 }
 
 float
-GFPListDistanceIndices(const gfp_context::GFPList& gfp, int i, int j) {
+GFPListDistanceIndices(const gfp_context::GFPList& gfp, int i, int j,
+                       const Tversky* tversky) {
   CheckGFPListIndex(gfp, i, "i");
   CheckGFPListIndex(gfp, j, "j");
-  return gfp.Distance(i, j);
+  return gfp.Distance(i, j, tversky);
 }
 
 float
 GFPListDistanceFingerprint(const gfp_context::GFPList& gfp,
-                           const gfp_context::GFPFingerprint& fingerprint, int j) {
+                           const gfp_context::GFPFingerprint& fingerprint, int j,
+                           const Tversky* tversky) {
   CheckCompatibleFingerprint(gfp, fingerprint);
   CheckGFPListIndex(gfp, j, "j");
-  const float result = gfp.Distance(fingerprint, j);
+  const float result = gfp.Distance(fingerprint, j, tversky);
   if (!std::isfinite(result)) {
     throw std::runtime_error("GFP distance calculation failed");
   }
@@ -329,37 +331,40 @@ GFPListDistanceFingerprint(const gfp_context::GFPList& gfp,
 }
 
 std::vector<gfp_context::NearestNeighbour>
-GFPListNearestNeighboursIndex(const gfp_context::GFPList& gfp, int query, int k) {
+GFPListNearestNeighboursIndex(const gfp_context::GFPList& gfp, int query, int k,
+                              const Tversky* tversky) {
   CheckGFPListIndex(gfp, query, "query");
-  return gfp.NearestNeighbours(query, k);
+  return gfp.NearestNeighbours(query, k, tversky);
 }
 
 std::vector<gfp_context::NearestNeighbour>
 GFPListNearestNeighboursFingerprint(const gfp_context::GFPList& gfp,
-                                    const gfp_context::GFPFingerprint& query, int k) {
+                                    const gfp_context::GFPFingerprint& query, int k,
+                                    const Tversky* tversky) {
   CheckCompatibleFingerprint(gfp, query);
-  return gfp.NearestNeighbours(query, k);
+  return gfp.NearestNeighbours(query, k, tversky);
 }
 
 std::vector<gfp_context::NearestNeighbour>
 GFPListNearestNeighboursWithinDistanceIndex(const gfp_context::GFPList& gfp,
-                                            int query, float max_distance) {
+                                            int query, float max_distance,
+                                            const Tversky* tversky) {
   CheckGFPListIndex(gfp, query, "query");
   if (max_distance < 0.0f) {
     throw std::invalid_argument("max_distance must be non-negative");
   }
-  return gfp.NearestNeighboursWithinDistance(query, max_distance);
+  return gfp.NearestNeighboursWithinDistance(query, max_distance, tversky);
 }
 
 std::vector<gfp_context::NearestNeighbour>
 GFPListNearestNeighboursWithinDistanceFingerprint(
     const gfp_context::GFPList& gfp, const gfp_context::GFPFingerprint& query,
-    float max_distance) {
+    float max_distance, const Tversky* tversky) {
   CheckCompatibleFingerprint(gfp, query);
   if (max_distance < 0.0f) {
     throw std::invalid_argument("max_distance must be non-negative");
   }
-  return gfp.NearestNeighboursWithinDistance(query, max_distance);
+  return gfp.NearestNeighboursWithinDistance(query, max_distance, tversky);
 }
 
 void
@@ -559,6 +564,33 @@ BindTools(nb::module_& m) {
            nb::arg("smarts"), nb::arg("radius") = 0,
            nb::arg("atom_type") = "UST:ARY", nb::arg("no_match") = "empty");
 
+  nb::class_<Tversky>(m, "Tversky")
+      .def(
+          "__init__",
+          [](Tversky* self, float query, float candidate, bool scale) {
+            new (self) Tversky();
+            if (!self->Set(query, candidate, scale)) {
+              throw std::invalid_argument(
+                  "Tversky weights must be finite, non-negative and not both zero");
+            }
+          },
+          nb::arg("query") = 1.0f, nb::arg("candidate") = 1.0f, nb::arg("scale") = true,
+          "Tversky similarity parameters for GFP searching. `query` weights features "
+          "that are only in the query, `candidate` weights features that are only in "
+          "the fingerprint being compared with it. With scale=True the pair is "
+          "rescaled so query+candidate=2, so only the ratio matters and 1,1 is "
+          "Tanimoto. A weight of zero means that kind of difference is not penalised. "
+          "query=1, candidate=0 gives zero distance to candidates that contain every "
+          "feature of the query.")
+      .def_prop_ro("query", [](const Tversky& tv) { return tv.a(); },
+                   "Effective weight on features only in the query (after scaling)")
+      .def_prop_ro("candidate", [](const Tversky& tv) { return tv.b(); },
+                   "Effective weight on features only in the candidate (after scaling)")
+      .def("__repr__", [](const Tversky& tv) {
+        return "Tversky(query=" + std::to_string(tv.a()) +
+               ", candidate=" + std::to_string(tv.b()) + ")";
+      });
+
   nb::class_<gfp_context::GFPContext>(m, "GFPContext")
       .def(nb::init<>())
       .def_static("standard", &StandardGFPContext, nb::arg("preprocess") = true,
@@ -570,8 +602,15 @@ BindTools(nb::module_& m) {
       .def("can_generate_fingerprints",
            &gfp_context::GFPContext::can_generate_fingerprints)
       .def("fingerprint", &GFPContextFingerprint, nb::arg("mol"))
-      .def("distance", &gfp_context::GFPContext::Distance,
-           nb::arg("lhs"), nb::arg("rhs"))
+      .def("distance",
+           [](const gfp_context::GFPContext& context,
+              const gfp_context::GFPFingerprint& lhs,
+              const gfp_context::GFPFingerprint& rhs, const Tversky* tversky) {
+             return context.Distance(lhs, rhs, tversky);
+           },
+           nb::arg("lhs"), nb::arg("rhs"), nb::arg("tversky").none() = nb::none(),
+           "Distance between two fingerprints. With a Tversky object, lhs is the "
+           "query and rhs the candidate.")
       .def("set_weight", &GFPContextSetWeight, nb::arg("tag"), nb::arg("weight"))
       .def("use_only", &GFPContextUseOnly, nb::arg("tags"))
       .def("use_all", &gfp_context::GFPContext::UseAll);
@@ -608,18 +647,25 @@ BindTools(nb::module_& m) {
            nb::arg("store_metadata") = false)
       .def("add_smiles", &GFPListAddSmiles, nb::arg("smiles"),
            "Add fingerprints generated from a list of SMILES strings without storing metadata")
-      .def("distance", &GFPListDistanceIndices, nb::arg("i"), nb::arg("j"))
-      .def("distance", &GFPListDistanceFingerprint, nb::arg("fp"), nb::arg("j"))
+      .def("distance", &GFPListDistanceIndices, nb::arg("i"), nb::arg("j"),
+           nb::arg("tversky").none() = nb::none(),
+           "Distance between rows i and j. With a Tversky object, row i is the query.")
+      .def("distance", &GFPListDistanceFingerprint, nb::arg("fp"), nb::arg("j"),
+           nb::arg("tversky").none() = nb::none(),
+           "Distance between a fingerprint and row j. With a Tversky object, fp is "
+           "the query.")
       .def("nearest_neighbours", &GFPListNearestNeighboursIndex,
-           nb::arg("query"), nb::arg("k"))
+           nb::arg("query"), nb::arg("k"), nb::arg("tversky").none() = nb::none())
       .def("nearest_neighbours", &GFPListNearestNeighboursFingerprint,
-           nb::arg("query"), nb::arg("k"))
+           nb::arg("query"), nb::arg("k"), nb::arg("tversky").none() = nb::none())
       .def("nearest_neighbours_within_distance",
            &GFPListNearestNeighboursWithinDistanceIndex,
-           nb::arg("query"), nb::arg("max_distance"))
+           nb::arg("query"), nb::arg("max_distance"),
+           nb::arg("tversky").none() = nb::none())
       .def("nearest_neighbours_within_distance",
            &GFPListNearestNeighboursWithinDistanceFingerprint,
-           nb::arg("query"), nb::arg("max_distance"))
+           nb::arg("query"), nb::arg("max_distance"),
+           nb::arg("tversky").none() = nb::none())
       .def("set_weight", &GFPListSetWeight, nb::arg("tag"), nb::arg("weight"))
       .def("use_only", &GFPListUseOnly, nb::arg("tags"))
       .def("use_all", [](gfp_context::GFPList& gfp) {

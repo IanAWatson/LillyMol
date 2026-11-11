@@ -207,6 +207,18 @@ py_test(
 )
 
 py_test(
+    name = "gfp_formula_tversky_example_test",
+    size = "small",
+    srcs = ["examples/gfp/formula_tversky.py"],
+    main = "examples/gfp/formula_tversky.py",
+    imports = ["."],
+    data = [
+        ":lillymol",
+        "examples/gfp/molecules.smi",
+    ],
+)
+
+py_test(
     name = "reaction_enumerate_reagents_example_test",
     size = "small",
     srcs = ["examples/reactions/enumerate_reagents.py"],

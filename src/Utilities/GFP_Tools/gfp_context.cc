@@ -163,6 +163,19 @@ FixedBinaryTanimoto(const FixedBitVector& lhs, const FixedBitVector& rhs) {
   return static_cast<float>(bic) / static_cast<float>(denom);
 }
 
+// Similarity of query `q` to candidate `c`: Tanimoto, or Tversky if `tv` is set.
+// `q` is always the left hand side, so tv->a() weights features only in `q`.
+float
+ComponentSimilarity(const FixedBitVector& q, const FixedBitVector& c, const Tversky* tv) {
+  return tv ? q.TverskySimilarity(c, *tv) : q.Tanimoto(c);
+}
+
+template <typename T>
+float
+ComponentSimilarity(const T& q, const T& c, const Tversky* tv) {
+  return tv ? q.tversky(c, *tv) : q.tanimoto(c);
+}
+
 int
 ALogPToPositiveInt(float value) {
   if (value <= -5.0f) {
@@ -1597,6 +1610,11 @@ FixedBitVector::Tanimoto(const FixedBitVector& rhs) const {
   return FixedBinaryTanimoto(*this, rhs);
 }
 
+float
+FixedBitVector::TverskySimilarity(const FixedBitVector& rhs, const Tversky& tv) const {
+  return tv.tanimoto(_nset, rhs._nset, _bits.BitsInCommon(rhs._bits));
+}
+
 void
 GFPFingerprint::FreeArrays() {
   delete[] _fixed_binary;
@@ -2187,7 +2205,8 @@ GFPContext::Fingerprint(Molecule& m, GFPFingerprint& result) {
 }
 
 float
-GFPContext::Distance(const GFPFingerprint& lhs, const GFPFingerprint& rhs) const {
+GFPContext::Distance(const GFPFingerprint& lhs, const GFPFingerprint& rhs,
+                     const Tversky* tversky) const {
   if (lhs.context_hash() != _context_hash || rhs.context_hash() != _context_hash) {
     return std::numeric_limits<float>::quiet_NaN();
   }
@@ -2200,18 +2219,18 @@ GFPContext::Distance(const GFPFingerprint& lhs, const GFPFingerprint& rhs) const
                       lhs.molecular_properties().Similarity(rhs.molecular_properties());
         break;
       case ComponentKind::kFixedBinary:
-        similarity +=
-            active.weight *
-            lhs.fixed_binary(active.index).Tanimoto(rhs.fixed_binary(active.index));
+        similarity += active.weight * ComponentSimilarity(lhs.fixed_binary(active.index),
+                                                          rhs.fixed_binary(active.index),
+                                                          tversky);
         break;
       case ComponentKind::kSparse:
-        similarity +=
-            active.weight * lhs.sparse(active.index).tanimoto(rhs.sparse(active.index));
+        similarity += active.weight * ComponentSimilarity(lhs.sparse(active.index),
+                                                          rhs.sparse(active.index), tversky);
         break;
       case ComponentKind::kFixedCounted:
-        similarity +=
-            active.weight *
-            lhs.fixed_counted(active.index).tanimoto(rhs.fixed_counted(active.index));
+        similarity += active.weight * ComponentSimilarity(lhs.fixed_counted(active.index),
+                                                          rhs.fixed_counted(active.index),
+                                                          tversky);
         break;
     }
   }
@@ -2503,7 +2522,7 @@ GFPList::ReadFile(const char* fname, int size_hint) {
 }
 
 float
-GFPList::Distance(int i, int j) const {
+GFPList::Distance(int i, int j, const Tversky* tversky) const {
   float similarity = 0.0f;
   for (const ActiveComponent& active : _context->active_components()) {
     switch (active.kind) {
@@ -2513,20 +2532,23 @@ GFPList::Distance(int i, int j) const {
         break;
       case ComponentKind::kFixedBinary: {
         const int nfixed = _context->nfixed_binary();
-        similarity += active.weight * _fixed_binary[i * nfixed + active.index].Tanimoto(
-                                          _fixed_binary[j * nfixed + active.index]);
+        similarity += active.weight * ComponentSimilarity(_fixed_binary[i * nfixed + active.index],
+                                                          _fixed_binary[j * nfixed + active.index],
+                                                          tversky);
         break;
       }
       case ComponentKind::kSparse: {
         const int nsparse = _context->nsparse();
-        similarity += active.weight * _sparse[i * nsparse + active.index].tanimoto(
-                                          _sparse[j * nsparse + active.index]);
+        similarity += active.weight * ComponentSimilarity(_sparse[i * nsparse + active.index],
+                                                          _sparse[j * nsparse + active.index],
+                                                          tversky);
         break;
       }
       case ComponentKind::kFixedCounted: {
         const int nfc = _context->nfixed_counted();
-        similarity += active.weight * _fixed_counted[i * nfc + active.index].tanimoto(
-                                          _fixed_counted[j * nfc + active.index]);
+        similarity += active.weight * ComponentSimilarity(_fixed_counted[i * nfc + active.index],
+                                                          _fixed_counted[j * nfc + active.index],
+                                                          tversky);
         break;
       }
     }
@@ -2540,7 +2562,7 @@ GFPList::Distance(int i, int j) const {
 }
 
 float
-GFPList::Distance(const GFPFingerprint& fp, int j) const {
+GFPList::Distance(const GFPFingerprint& fp, int j, const Tversky* tversky) const {
   if (fp.context_hash() != _context->context_hash()) {
     return std::numeric_limits<float>::quiet_NaN();
   }
@@ -2554,23 +2576,23 @@ GFPList::Distance(const GFPFingerprint& fp, int j) const {
         break;
       case ComponentKind::kFixedBinary: {
         const int nfixed = _context->nfixed_binary();
-        similarity +=
-            active.weight * fp.fixed_binary(active.index)
-                                .Tanimoto(_fixed_binary[j * nfixed + active.index]);
+        similarity += active.weight * ComponentSimilarity(fp.fixed_binary(active.index),
+                                                          _fixed_binary[j * nfixed + active.index],
+                                                          tversky);
         break;
       }
       case ComponentKind::kSparse: {
         const int nsparse = _context->nsparse();
-        similarity +=
-            active.weight *
-            fp.sparse(active.index).tanimoto(_sparse[j * nsparse + active.index]);
+        similarity += active.weight * ComponentSimilarity(fp.sparse(active.index),
+                                                          _sparse[j * nsparse + active.index],
+                                                          tversky);
         break;
       }
       case ComponentKind::kFixedCounted: {
         const int nfc = _context->nfixed_counted();
-        similarity +=
-            active.weight * fp.fixed_counted(active.index)
-                                .tanimoto(_fixed_counted[j * nfc + active.index]);
+        similarity += active.weight * ComponentSimilarity(fp.fixed_counted(active.index),
+                                                          _fixed_counted[j * nfc + active.index],
+                                                          tversky);
         break;
       }
     }
@@ -2584,7 +2606,7 @@ GFPList::Distance(const GFPFingerprint& fp, int j) const {
 }
 
 std::vector<NearestNeighbour>
-GFPList::NearestNeighbours(int query, int k) const {
+GFPList::NearestNeighbours(int query, int k, const Tversky* tversky) const {
   if (k <= 0 || query < 0 || query >= size()) {
     return {};
   }
@@ -2595,28 +2617,30 @@ GFPList::NearestNeighbours(int query, int k) const {
       continue;
     }
 
-    MaybeAddNearestNeighbour(heap, k, NearestNeighbour{i, Distance(query, i)});
+    MaybeAddNearestNeighbour(heap, k, NearestNeighbour{i, Distance(query, i, tversky)});
   }
 
   return SortedNearestNeighbours(heap);
 }
 
 std::vector<NearestNeighbour>
-GFPList::NearestNeighbours(const GFPFingerprint& query, int k) const {
+GFPList::NearestNeighbours(const GFPFingerprint& query, int k,
+                           const Tversky* tversky) const {
   if (k <= 0 || query.context_hash() != _context->context_hash()) {
     return {};
   }
 
   NearestNeighbourMaxHeap heap;
   for (int i = 0; i < size(); ++i) {
-    MaybeAddNearestNeighbour(heap, k, NearestNeighbour{i, Distance(query, i)});
+    MaybeAddNearestNeighbour(heap, k, NearestNeighbour{i, Distance(query, i, tversky)});
   }
 
   return SortedNearestNeighbours(heap);
 }
 
 std::vector<NearestNeighbour>
-GFPList::NearestNeighboursWithinDistance(int query, float max_distance) const {
+GFPList::NearestNeighboursWithinDistance(int query, float max_distance,
+                                         const Tversky* tversky) const {
   std::vector<NearestNeighbour> result;
   if (query < 0 || query >= size() || max_distance < 0.0f) {
     return result;
@@ -2627,7 +2651,7 @@ GFPList::NearestNeighboursWithinDistance(int query, float max_distance) const {
       continue;
     }
 
-    const float distance = Distance(query, i);
+    const float distance = Distance(query, i, tversky);
     if (distance <= max_distance) {
       result.push_back(NearestNeighbour{i, distance});
     }
@@ -2646,14 +2670,15 @@ GFPList::NearestNeighboursWithinDistance(int query, float max_distance) const {
 
 std::vector<NearestNeighbour>
 GFPList::NearestNeighboursWithinDistance(const GFPFingerprint& query,
-                                         float max_distance) const {
+                                         float max_distance,
+                                         const Tversky* tversky) const {
   std::vector<NearestNeighbour> result;
   if (query.context_hash() != _context->context_hash() || max_distance < 0.0f) {
     return result;
   }
 
   for (int i = 0; i < size(); ++i) {
-    const float distance = Distance(query, i);
+    const float distance = Distance(query, i, tversky);
     if (distance <= max_distance) {
       result.push_back(NearestNeighbour{i, distance});
     }

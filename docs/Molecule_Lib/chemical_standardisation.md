@@ -82,6 +82,7 @@ Entering `-g help` to most LillyMol tools yields the usage message
  -g pyrazolone    convert pyrazolone to keto form
  -g aminothazole  convert -N=c1scc[nH]1 to -[NH]c1sccn1
  -g keto_enol     convert O/S enol to keto forms (no adjacent heteroatoms)
+ -g beta-diketone canonicalise beta-diketone enols to diketo form
  -g ascorbate    canonicalise isolated ascorbate rings to lactone/enediol form
  -g 4-pyridone    convert 4-pyridol/thiol to pyridone/thione forms
  -g surea         convert S-C(=N)-N to S=C(-N)-N
@@ -230,6 +231,19 @@ SMILES/aromaticity/stereochemistry handling rather than a standardisation rule.
 Use `-f` to stop with a nonzero exit status on a failure. Invalid starting
 valence is distinguished from invalid valence introduced by standardisation;
 the latter is counted as a failure and written to the failure file.
+
+### Beta-diketone enols
+
+`-g beta-diketone` converts eligible `O=C–CH=C(OH)–` motifs to the
+diketo form. The central carbon becomes a methylene. The rule applies to
+acyclic motifs and isolated non-aromatic carbocycles. For example,
+`CC(=O)C=C(O)C` becomes `CC(=O)CC(C)=O`.
+
+The rule requires a ketone at one end and an unprotected enol at the other.
+It skips substituted central carbons, specified alkene geometry, and fused
+rings. These restrictions avoid assigning stereochemistry during conversion.
+It is enabled by `-g all`, skipped with the `ENOL` preference, and can be
+disabled with `-g all -g -beta-diketone`.
 
 ### Ascorbate rings
 

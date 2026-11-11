@@ -806,6 +806,18 @@ TEST_P(TestOxygenAndSulphurTautomers, CanonicalFormAndAtomOrder) {
 }
 
 INSTANTIATE_TEST_SUITE_P(OxygenAndSulphur, TestOxygenAndSulphurTautomers, testing::Values(
+    TautomerCase{CS_BETA_DIKETONE, "CC(=O)C=C(O)C=Cc1cc(O)c(O)cc1",
+                 "CC(=O)CC(=O)C=Cc1cc(O)c(O)cc1", true},
+    TautomerCase{CS_BETA_DIKETONE, "OC1=CC(=O)CCC1", "O=C1CC(=O)CCC1", true},
+    TautomerCase{CS_BETA_DIKETONE, "CC(O)=CC(O)=CC(C)=O", "CC(=O)CC(=O)CC(C)=O", true},
+    TautomerCase{CS_BETA_DIKETONE, "CC([OH])=[CH]C(C)=O", "CC(=O)CC(C)=O", true},
+    TautomerCase{CS_BETA_DIKETONE, "COC(=O)C=C(O)C", "COC(=O)C=C(O)C", false},
+    TautomerCase{CS_BETA_DIKETONE, "CC(=O)C(O)CC", "CC(=O)C(O)CC", false},
+    TautomerCase{CS_BETA_DIKETONE, "CC(=O)C(C)=C(O)C", "CC(=O)C(C)=C(O)C", false},
+    TautomerCase{CS_BETA_DIKETONE, "C/C(O)=C/C(C)=O", "C/C(O)=C/C(C)=O", false},
+    TautomerCase{CS_BETA_DIKETONE, "CC(=O)C=C(O)C", "CC(=O)C=C(O)C", false,
+                 standardisation::KetoEnol::kToEnol},
+    TautomerCase{CS_ALL, "CC(=O)C=C(O)C", "CC(=O)CC(C)=O", true},
     TautomerCase{CS_ASCORBATE, "OCC(O)C1OC(O)=C(O)C1=O", "OCC(O)C1OC(=O)C(O)=C1O", true},
     TautomerCase{CS_ASCORBATE, "OCC(O)C1OC(=O)C(O)=C1O", "OCC(O)C1OC(=O)C(O)=C1O", false},
     TautomerCase{CS_ASCORBATE, "OCC(O)c1oc(O)c(O)c1O", "OCC(O)C1OC(=O)C(O)=C1O", true},
@@ -1163,5 +1175,14 @@ TEST_F(TestStandardisation, ReportedAscorbateTautomersConverge) {
   }
 }
 
+
+TEST_F(TestStandardisation, BetaDiketoneCanBeDisabled) {
+  _chemical_standardisation.activate_all();
+  ASSERT_TRUE(_chemical_standardisation.Activate("-beta-diketone", 0));
+  ASSERT_TRUE(_m1.build_from_smiles("CC(=O)C=C(O)C"));
+  const IWString before = _m1.unique_smiles();
+  EXPECT_EQ(_chemical_standardisation.process(_m1), 0);
+  EXPECT_EQ(_m1.unique_smiles(), before);
+}
 
 }  // namespace

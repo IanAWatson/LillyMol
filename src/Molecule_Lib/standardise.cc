@@ -379,6 +379,7 @@ Chemical_Standardisation::activate_all() {
   _transform_triazole.activate();
   _transform_pyrimidine.activate();
   _transform_ascorbate.activate();
+  _transform_beta_diketone.activate();
   _transform_isoxazole.activate();
   _transform_aromatic_guanidine_ring.activate();
   _transform_pyrazolone.activate();
@@ -444,6 +445,7 @@ display_all_chemical_standardisation_options(std::ostream& os, char zoption) {
   os << zopt << CS_GUAND << "        convert guanidines to -N-C(=N)-N form\n";
   os << zopt << CS_AMIDINE << "     canonicalise isolated neutral amidines with a terminal N\n";
   os << zopt << CS_PYRIMIDINE << "  convert isolated O/S pyrimidinetrione tautomers to keto form\n";
+  os << zopt << CS_BETA_DIKETONE << " canonicalise beta-diketone enols to diketo form\n";
   os << zopt << CS_ASCORBATE << "   canonicalise isolated ascorbate rings to lactone/enediol form\n";
   os << zopt << CS_GUANDR << "        convert Ring type guanidines to -N-C(=N)-N form\n";
   os << zopt << CS_AZID << "        convert charge separated azids [N-]=[N+]=N to N#N=N\n";
@@ -822,6 +824,12 @@ Chemical_Standardisation::Activate(const IWString& directive, const int verbose)
       _transform_triazole.deactivate();
     } else {
       _transform_triazole.activate();
+    }
+  } else if (tmp == CS_BETA_DIKETONE) {
+    if (negation) {
+      _transform_beta_diketone.deactivate();
+    } else {
+      _transform_beta_diketone.activate();
     }
   } else if (tmp == CS_ASCORBATE) {
     if (negation) {
@@ -4062,6 +4070,11 @@ Chemical_Standardisation::_process(Molecule& m,
     rc += _do_ascorbate(m, current_molecule_data);
   }
 
+  if (_transform_beta_diketone.active() && current_molecule_data.oxygens() >= 2 &&
+      _keto_enol == standardisation::KetoEnol::kToKeto) {
+    rc += _do_beta_diketone(m, current_molecule_data);
+  }
+
   if (_transform_enol_to_keto.active()) {
     rc += _do_enol_to_keto(m, current_molecule_data);
   }
@@ -4386,6 +4399,10 @@ Chemical_Standardisation::report(std::ostream& os) const {
   if (_transform_amidine.active()) {
     os << "  Amidine ";
     _transform_amidine.report(os);
+  }
+  if (_transform_beta_diketone.active()) {
+    os << "Beta diketone ";
+    _transform_beta_diketone.report(os);
   }
   if (_transform_ascorbate.active()) {
     os << "  Ascorbate ";
@@ -10109,6 +10126,11 @@ Chemical_Standardisation::_processing_needed(
     return 1;
   }
 
+  if (_transform_beta_diketone.active() && current_molecule_data.oxygens() >= 2 &&
+      _keto_enol == standardisation::KetoEnol::kToKeto) {
+    return 1;
+  }
+
   if (_transform_ascorbate.active() && current_molecule_data.nrings() > 0 &&
       current_molecule_data.oxygens() >= 4) {
     return 1;
@@ -11589,6 +11611,118 @@ Chemical_Standardisation::_do_transform_enol_fused(
     _append_to_changed_molecules << " STD::enol_fused";
   }
 
+  return rc;
+}
+
+// Convert O=C-C=C-OH to O=C-CH2-C=O. Restrict the central carbon to
+// two neighbours so the conversion does not create a stereocentre.
+static bool
+ConvertBetaDiketoneEnol(Molecule& m, const IWStandard_Current_Molecule& data,
+                       atom_number_t o) {
+  const auto* z = data.atomic_number();
+  const auto* rings = data.ring_membership();
+  const auto* aromatic = data.atom_is_aromatic();
+  if (z[o] != 8 || m.ncon(o) != 1 || m.formal_charge(o) || m.hcount(o) != 1) {
+    return false;
+  }
+  const Bond* oh = m[o][0];
+  const atom_number_t enol = oh->other(o);
+  if (!oh->is_single_bond() || z[enol] != 6 || m.ncon(enol) != 3 ||
+      aromatic[enol] || m.formal_charge(enol) || m.hcount(enol) != 0) {
+    return false;
+  }
+  atom_number_t middle = kInvalidAtomNumber;
+  bool eligible = true;
+  for (const Bond* b : m[enol]) {
+    const atom_number_t other = b->other(enol);
+    if (other == o) {
+      continue;
+    }
+    if (z[other] != 6 || b->part_of_cis_trans_grouping()) {
+      eligible = false;
+      break;
+    }
+    if (b->is_double_bond()) {
+      if (middle != kInvalidAtomNumber) {
+        eligible = false;
+        break;
+      }
+      middle = other;
+    } else if (!b->is_single_bond()) {
+      eligible = false;
+      break;
+    }
+  }
+  if (!eligible || middle == kInvalidAtomNumber || aromatic[middle] ||
+      m.ncon(middle) != 2 || m.formal_charge(middle) || m.hcount(middle) != 1) {
+    return false;
+  }
+  const Bond* link = m[middle][0];
+  if (link->other(middle) == enol) {
+    link = m[middle][1];
+  }
+  const atom_number_t keto = link->other(middle);
+  if (!link->is_single_bond() || z[keto] != 6 || m.ncon(keto) != 3 ||
+      aromatic[keto] || m.formal_charge(keto)) {
+    return false;
+  }
+  bool carbonyl = false;
+  for (const Bond* b : m[keto]) {
+    const atom_number_t other = b->other(keto);
+    if (z[other] == 8 && b->is_double_bond() && m.ncon(other) == 1 &&
+        !m.formal_charge(other)) {
+      carbonyl = true;
+    } else if (z[other] != 6 || !b->is_single_bond()) {
+      eligible = false;
+      break;
+    }
+  }
+  if (!eligible || !carbonyl || m.chiral_centre_at_atom(enol) ||
+      m.chiral_centre_at_atom(middle)) {
+    return false;
+  }
+  if (rings[enol] || rings[middle] || rings[keto]) {
+    if (rings[enol] != 1 || rings[middle] != 1 || rings[keto] != 1) {
+      return false;
+    }
+    const Set_of_Atoms* ring = data.ring_containing_atom(middle);
+    if (!ring || !ring->contains(enol) || !ring->contains(keto) ||
+        std::any_of(ring->begin(), ring->end(), [&](atom_number_t a) {
+          return z[a] != 6 || rings[a] != 1 || aromatic[a];
+        })) {
+      return false;
+    }
+  }
+  m.set_bond_type_between_atoms(enol, o, DOUBLE_BOND);
+  m.set_bond_type_between_atoms(enol, middle, SINGLE_BOND);
+  m.unset_all_implicit_hydrogen_information(o);
+  m.unset_all_implicit_hydrogen_information(middle);
+  return true;
+}
+
+int
+Chemical_Standardisation::_do_beta_diketone(
+    Molecule& m, const IWStandard_Current_Molecule& data) {
+  int rc = 0;
+  int previous;
+  // A newly formed ketone can make an adjacent enol eligible. Each
+  // conversion consumes one OH, so repeat until there are no more changes.
+  do {
+    previous = rc;
+    for (atom_number_t o = 0; o < m.natoms(); ++o) {
+      rc += ConvertBetaDiketoneEnol(m, data, o);
+    }
+  } while (rc != previous);
+
+  if (rc) {
+    _transform_beta_diketone.extra(rc);
+    if (_verbose) {
+      cerr << "Transformed " << rc << " beta-diketone enols\n";
+    }
+    if (_append_string_depending_on_what_changed) {
+      _append_to_changed_molecules << " STD:" << CS_BETA_DIKETONE;
+    }
+  }
   return rc;
 }
 

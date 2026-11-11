@@ -115,6 +115,13 @@ copy_optional_glob "bazel-bin/nanobind/lillymol_gfp_server.so"
 
 copy_if_newer "bazel-bin/nanobind/lillymol.so.soabi"
 
+# run_python.sh uses this file to check the Python ABI. It is built with
+# //nanobind:lillymol, but an older bazel-bin may lack it.
+if [[ ! -s "${destdir}/lillymol.so.soabi" ]] ; then
+  echo "Warning: ${destdir}/lillymol.so.soabi not staged; build //nanobind:lillymol_soabi" \
+       "(or //nanobind:all) and rerun, otherwise run_python.sh cannot verify the Python ABI" >&2
+fi
+
 copy_optional_glob "bazel-bin/Molecule_Lib/lib*.so"
 copy_optional_glob "bazel-bin/Molecule_Tools/lib*.so"
 copy_optional_glob "bazel-bin/Molecule_Tools_Bdb/lib*.so"

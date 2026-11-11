@@ -30,6 +30,9 @@ nanobind_extension(
         "lillymol_nb_tools.cc",
         "lillymol_nb_tsubstructure.cc",
     ],
+    # Building lillymol also builds the file recording the Python ABI it was
+    # built for, which copy_shared_libraries.sh stages and run_python.sh checks.
+    data = [":lillymol_soabi"],
     dynamic_deps = ["//Molecule_Lib:molecule_lib_shared"],
     deps = [
         "//Molecule_Lib:atom_pair_fingerprint",

@@ -1246,6 +1246,13 @@ heteroatoms, aromatic carbons and other carbons), and the number of ring atoms.
 It is therefore a little richer than an element count, which matters when
 searching with Tversky similarity (see below).
 
+Files of formula fingerprints can be written by `formula_fingerprint` or
+`gfp_make.sh -FORMULA`, whose default is the same fixed counted form (tag `FCFML<`)
+with the same log scaling; see [formula_fingerprint](/docs/Molecule_Tools/formula_fingerprint.md).
+They can be read with `GFPList.from_file()` and searched with fingerprints generated
+here. The sparse form (`NCFML<`, from `-FORMULA,sparse`) has a different tag and
+cannot be compared with these fingerprints.
+
 `GFP.cats(max_path_length=10, include_hydrophobic_pairs=True)` adds the sparse
 counted CATS pharmacophore-pair fingerprint. The tag is `NCCATS10<` when
 hydrophobic-hydrophobic pairs are included and `NCCATSP10<` when they are

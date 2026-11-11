@@ -1001,6 +1001,7 @@ cc_binary(
         "//Foundational/cmdline:iwcmdline",
         "//Molecule_Lib:iwmolecule",
         "//Molecule_Lib:moleculeio",
+        "//Utilities/GFP_Tools:gfp",
     ],
 )
 

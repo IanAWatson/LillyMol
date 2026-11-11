@@ -1,0 +1,40 @@
+{
+  "executable": "formula_fingerprint",
+  "difftool": "diff",
+  "test": [
+    {
+      "name": "sparse_default",
+      "args": [
+        "-J NCFML #{indir}/in.smi"
+      ]
+    },
+    {
+      "name": "sparse_unscaled",
+      "args": [
+        "-J NCFML -L none #{indir}/in.smi"
+      ]
+    },
+    {
+      "name": "fixed_counted",
+      "args": [
+        "#{indir}/in.smi"
+      ]
+    },
+    {
+      "name": "fixed_counted_tag",
+      "args": [
+        "-J FCTEST #{indir}/in.smi"
+      ]
+    },
+    {
+      "name": "invalid_tag",
+      "args": [
+        "-J XXFML #{indir}/in.smi"
+      ],
+      "ignore_file": [
+        "stderr"
+      ],
+      "non_zero_rc_expected": true
+    }
+  ]
+}

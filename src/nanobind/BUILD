@@ -72,6 +72,8 @@ py_test(
     srcs = ["lillymol_nb_doc_test.py"],
     main = "lillymol_nb_doc_test.py",
     data = [":lillymol"] + glob(["examples/reactions/*.py"]),
+    # The test locates the docs directory from LILLYMOL_HOME.
+    env_inherit = ["LILLYMOL_HOME"],
 )
 
 py_test(

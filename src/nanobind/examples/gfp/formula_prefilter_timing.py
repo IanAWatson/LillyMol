@@ -84,15 +84,21 @@ def main():
   query_fp = context.fingerprint(MolFromSmiles(args.query + " query"))
   contains_query = Tversky(query=2.0, candidate=0.0)
 
+  # The scan itself. Asking for the one nearest neighbour compares the query with every
+  # molecule, but builds almost no list of results.
+  _, scan_time = timed(lambda: gfp.nearest_neighbours(query_fp, 1, tversky=contains_query),
+                       repeats=3)
+
   # The filter: everything with at least the counts of the query. The time includes
-  # making the list of results.
+  # making the list of results, which is most of it when many molecules pass.
   hits, filter_time = timed(
       lambda: gfp.nearest_neighbours_within_distance(query_fp, 1.0e-6, tversky=contains_query),
       repeats=3)
   passed = {hit.index for hit in hits}
   print(f"\nFilter, Tversky(query=2, candidate=0) at distance 0, query {args.query}")
-  print(f"  time      {format_time(filter_time)}  ({filter_time / n * 1.0e9:.0f} ns per molecule)")
-  print(f"  passing   {len(passed)} of {n} molecules ({100.0 * len(passed) / n:.1f}%)")
+  print(f"  scan only        {format_time(scan_time)}  ({scan_time / n * 1.0e9:.0f} ns per molecule)")
+  print(f"  scan and results {format_time(filter_time)}  ({filter_time / n * 1.0e9:.0f} ns per molecule)")
+  print(f"  passing          {len(passed)} of {n} molecules ({100.0 * len(passed) / n:.1f}%)")
 
   # The precise search, timed on a sample, since it is much slower per molecule.
   substructure = SubstructureQuery()
@@ -116,13 +122,17 @@ def main():
   rejected = [i for i in contain if i not in passed]
   print(f"  rejected by the filter  {len(rejected)} of those that contain the query")
 
-  # Estimates for the whole collection.
+  # Estimates for the whole collection. The filter time is the one that includes the
+  # list of results, which is what is needed to know which molecules to search.
   without_filter = per_molecule * n
   with_filter = filter_time + per_molecule * len(passed)
   print(f"\nEstimated time to search all {n} molecules")
   print(f"  precise search only          {format_time(without_filter)}")
   print(f"  filter, then precise search  {format_time(with_filter)}  "
         f"({without_filter / with_filter:.1f} times faster)")
+  print(f"The filter cannot make it more than {n / max(len(passed), 1):.1f} times faster, "
+        f"however slow the precise search is, since the molecules that pass still have to be "
+        f"searched.")
   print("These are estimates from the sample. The filter is not selective, so how much "
         "it saves depends on the query.")
 

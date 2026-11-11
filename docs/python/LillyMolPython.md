@@ -1539,6 +1539,15 @@ fingerprint (`GFP.iw()`) is much more selective for the same purpose, at the cos
 slower comparison, so the two can be used one after the other. Measure the recall on
 your own data and queries before relying on any filter.
 
+The saving cannot be more than one over the fraction of molecules that pass, because those
+still have to be searched, however slow the precise method is. For the 2.7 million molecules of
+ChEMBL a phenol query passes 84%, so at best the filter makes the whole job 1.2 times faster
+(measured 1.18), whereas chlorobenzene and a sulfonamide pass 17% (5.7 times faster). Scanning
+all 2.7 million fingerprints takes about 75 ms, 27 ns per molecule, about half the cost of
+scanning stored path fingerprints, but building the list of the molecules that pass takes
+more than the scan when many pass. See the
+[example README](/src/nanobind/examples/gfp/README.md) for the measurements.
+
 Two complete, tested examples are in [src/nanobind/examples/gfp](/src/nanobind/examples/gfp/README.md).
 [formula_tversky.py](/src/nanobind/examples/gfp/formula_tversky.py) shows how the
 distances change with the Tversky weights, and checks the fingerprint as a filter against

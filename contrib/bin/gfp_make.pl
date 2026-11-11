@@ -3540,8 +3540,9 @@ if ($formula)
   }
   else
   {
-    # dash_g is deliberately omitted.
-    $formula_first = "${formula_cmd} ${seek_stop} FILE";
+    # dash_g is deliberately omitted. The input qualifiers contain the -i seek= and
+    # -i stop= options that gfp_make_parallel uses to give each process a slice.
+    $formula_first = "${formula_cmd} ${seek_stop} ${input_qualifiers} FILE";
   }
 
   $formula_cmd_pipe = "${formula_cmd} -f -";

@@ -5670,16 +5670,19 @@ Single_Substructure_Query::create_from_smiles(const IWString &smiles) {
   // The more complex case of multiple components
 
   int i = 0;
-  const_IWSubstring token;
-  while (smiles.nextword(token, i)) {
-    Substructure_Atom *a = new Substructure_Atom;
+  IWString component;
+  while (smiles.nextword(component, i, '.')) {
+    if (component.empty()) {  // "C." or "C..O"
+      continue;
+    }
 
-    if (!a->parse_smiles_specifier(smiles)) {
-      delete a;
+    auto a = std::make_unique<Substructure_Atom>();
+
+    if (!a->parse_smiles_specifier(component)) {
       return 0;
     }
 
-    _root_atoms.add(a);
+    _root_atoms.add(a.release());
   }
 
   return _root_atoms.number_elements();

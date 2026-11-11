@@ -773,17 +773,20 @@ read_one_or_more_queries_from_file(resizable_array_p<T>& queries,
   input.set_skip_blank_lines(1);
 
   while (msi.read(input)) {
-    T* tmp = new T();
+    auto tmp = std::make_unique<T>();
     if (!tmp->construct_from_msi_object(msi)) {
       std::cerr << "process_queries: cannot build query from '" << msi << "'\n";
       return 0;
     }
 
     assert(tmp->ok());
-    queries.add(tmp);
+
+    // Ownership passes to `queries`.
+    T* q = tmp.release();
+    queries.add(q);
 
     if (verbose) {
-      std::cerr << "Created query " << (queries.size() - 1) << " '" << tmp->comment()
+      std::cerr << "Created query " << (queries.size() - 1) << " '" << q->comment()
                 << "'\n";
     }
 
@@ -794,7 +797,7 @@ read_one_or_more_queries_from_file(resizable_array_p<T>& queries,
     }
   }
 
-  return rc++;
+  return rc;
 }
 
 template <typename T>

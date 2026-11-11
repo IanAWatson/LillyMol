@@ -219,6 +219,18 @@ py_test(
 )
 
 py_test(
+    name = "gfp_formula_prefilter_timing_example_test",
+    size = "small",
+    srcs = ["examples/gfp/formula_prefilter_timing.py"],
+    main = "examples/gfp/formula_prefilter_timing.py",
+    imports = ["."],
+    data = [
+        ":lillymol",
+        "examples/gfp/molecules.formula_nh.gfp",
+    ],
+)
+
+py_test(
     name = "reaction_enumerate_reagents_example_test",
     size = "small",
     srcs = ["examples/reactions/enumerate_reagents.py"],

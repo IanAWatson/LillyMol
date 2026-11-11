@@ -1539,9 +1539,11 @@ fingerprint (`GFP.iw()`) is much more selective for the same purpose, at the cos
 slower comparison, so the two can be used one after the other. Measure the recall on
 your own data and queries before relying on any filter.
 
-A complete, tested example that searches a file of molecules with the formula
-fingerprint is [formula_tversky.py](/src/nanobind/examples/gfp/formula_tversky.py).
-Run it with `$LILLYMOL_HOME/run_python.sh formula_tversky.py [file.smi]`.
+Two complete, tested examples are in [src/nanobind/examples/gfp](/src/nanobind/examples/gfp/README.md).
+[formula_tversky.py](/src/nanobind/examples/gfp/formula_tversky.py) shows how the
+distances change with the Tversky weights, and checks the fingerprint as a filter against
+real substructure searching. [formula_prefilter_timing.py](/src/nanobind/examples/gfp/formula_prefilter_timing.py)
+times the filter followed by substructure searching on a large collection.
 
 ### Component selection and weights
 

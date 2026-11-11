@@ -350,8 +350,16 @@ end
 def command_successful?(cmd, non_zero_rc_expected, verbose)
   $stderr << "Executing #{cmd}\n" if verbose
 
-  return true if system(cmd)
-  return true if non_zero_rc_expected
+  succeeded = system(cmd)
+
+  if non_zero_rc_expected
+    return true unless succeeded
+
+    $stderr << "Warning: #{cmd} succeeded but a non-zero return code was expected\n"
+    return false
+  end
+
+  return true if succeeded
 
   $stderr << "Warning: #{cmd} failed rc #{$?}\n"
   false

@@ -226,6 +226,12 @@ The script will
 Step 5 is done via the [copy_shared_libraries.sh](/src/copy_shared_libraries.sh)
 script. It also copies some python compiled protos. Adjust as needed.
 
+The script [output_user_root.sh](/src/output_user_root.sh) prints the
+`--output_user_root` option appropriate for the current host (empty if the
+default is fine), and is what `build_linux.sh` uses. For hand-run Bazel commands
+from `src` you can use it directly, for example
+`bazelisk $(./output_user_root.sh) build -c opt Molecule_Tools:all`.
+
 For anyone interested in doing their own development, a typical build
 inside Lilly might be (change the path for test_env)
 

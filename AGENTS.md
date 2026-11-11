@@ -58,6 +58,19 @@ it as starting context and verify details locally before changing behavior.
   compilation mode before concluding anything. For the same reason, regenerate
   expected outputs only from an optimised build.
 
+- **Bazel and NFS.** Bazel will not work reliably with its cache on an NFS file
+  system, and builds there are slow. `src/output_user_root.sh` prints a suitable
+  `--output_user_root=...` option for the current host (or nothing if the
+  default is fine). For manual runs from `src`, use it like this:
+
+  ```shell
+  bazelisk $(./output_user_root.sh) test -c opt --config=native //nanobind:all
+  ```
+
+  A sign that you need it is odd failures such as `Directory not empty` while a
+  test cleans up a temporary directory. Changing the output root means the
+  first build starts from scratch, so it is slow.
+
 - Executable tests are usually run with:
 
   ```shell
@@ -67,7 +80,10 @@ it as starting context and verify details locally before changing behavior.
   When using Bazel-built tools from `src/`, a typical `-bindir` is
   `/path/to/LillyMol/src/bazel-bin/Molecule_Tools`.
 
-- Most executable tests live under `test/<tool>/<case>/` with:
+- Most executable tests live under `src/test/<tool>/<case>/` (the top level
+  `test` is a symlink to `src/test`, kept for compatibility). The tests moved
+  under `src` so that Bazel can compile the protos they use, so for git use
+  paths starting `src/test/`. Each test directory has:
   - `in/` for inputs;
   - `out/` for expected outputs;
   - `tests.json` at the tool directory level.

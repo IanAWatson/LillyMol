@@ -382,6 +382,7 @@ Chemical_Standardisation::activate_all() {
   _transform_ascorbate.activate();
   _transform_beta_diketone.activate();
   _transform_phosphorus_tautomer.activate();
+  _transform_nitroso_to_oxime.activate();
   _transform_isoxazole.activate();
   _transform_aromatic_guanidine_ring.activate();
   _transform_pyrazolone.activate();
@@ -447,6 +448,7 @@ display_all_chemical_standardisation_options(std::ostream& os, char zoption) {
   os << zopt << CS_GUAND << "        convert guanidines to -N-C(=N)-N form\n";
   os << zopt << CS_AMIDINE << "     canonicalise isolated neutral amidines with a terminal N\n";
   os << zopt << CS_PYRIMIDINE << "  convert isolated O/S pyrimidinetrione tautomers to keto form\n";
+  os << zopt << CS_NITROSO_OXIME << "      convert neutral aliphatic C-N=O to C=N-OH\n";
   os << zopt << CS_PHOSPHORUS_TAUTOMER << "  convert neutral P-OH tautomers to P(=O)H\n";
   os << zopt << CS_BETA_DIKETONE << " canonicalise beta-diketone enols to diketo form\n";
   os << zopt << CS_ASCORBATE << "   canonicalise isolated ascorbate rings to lactone/enediol form\n";
@@ -827,6 +829,12 @@ Chemical_Standardisation::Activate(const IWString& directive, const int verbose)
       _transform_triazole.deactivate();
     } else {
       _transform_triazole.activate();
+    }
+  } else if (tmp == CS_NITROSO_OXIME) {
+    if (negation) {
+      _transform_nitroso_to_oxime.deactivate();
+    } else {
+      _transform_nitroso_to_oxime.activate();
     }
   } else if (tmp == CS_PHOSPHORUS_TAUTOMER) {
     if (negation) {
@@ -4113,6 +4121,13 @@ Chemical_Standardisation::_process(Molecule& m,
     rc += _do_transform_indole_hydrogen(m, current_molecule_data);
   }
 
+  // Run after rules that consult the initial aromaticity snapshot, since
+  // forming an exocyclic oxime can change the aromaticity of a ring.
+  if (_transform_nitroso_to_oxime.active() && current_molecule_data.nitrogens() &&
+      current_molecule_data.oxygens()) {
+    rc += _do_nitroso_to_oxime(m, current_molecule_data);
+  }
+
   if (_external_transformation.size() > 0) {
     rc += DoExternalTransformations(m);
   }
@@ -4412,6 +4427,10 @@ Chemical_Standardisation::report(std::ostream& os) const {
   if (_transform_amidine.active()) {
     os << "  Amidine ";
     _transform_amidine.report(os);
+  }
+  if (_transform_nitroso_to_oxime.active()) {
+    os << "  Nitroso to oxime ";
+    _transform_nitroso_to_oxime.report(os);
   }
   if (_transform_phosphorus_tautomer.active()) {
     os << "  Phosphorus tautomer ";
@@ -10143,6 +10162,11 @@ Chemical_Standardisation::_processing_needed(
     return 1;
   }
 
+  if (_transform_nitroso_to_oxime.active() && current_molecule_data.nitrogens() &&
+      current_molecule_data.oxygens()) {
+    return 1;
+  }
+
   if (_transform_phosphorus_tautomer.active() && current_molecule_data.phosphorus()) {
     return 1;
   }
@@ -11632,6 +11656,71 @@ Chemical_Standardisation::_do_transform_enol_fused(
     _append_to_changed_molecules << " STD::enol_fused";
   }
 
+  return rc;
+}
+
+// Convert a neutral aliphatic C-N=O group to C=N-OH. A hydrogen moves
+// implicitly from carbon to oxygen, retaining neutral N and O atoms.
+int
+Chemical_Standardisation::_do_nitroso_to_oxime(
+    Molecule& m, const IWStandard_Current_Molecule& data) {
+  const atomic_number_t* z = data.atomic_number();
+  int rc = 0;
+  for (atom_number_t oxygen = 0; oxygen < m.natoms(); ++oxygen) {
+    if (z[oxygen] != 8 || m.ncon(oxygen) != 1 || m.formal_charge(oxygen) ||
+        m.hcount(oxygen) || m.chiral_centre_at_atom(oxygen)) {
+      continue;
+    }
+    const Bond* no = m[oxygen][0];
+    const atom_number_t nitrogen = no->other(oxygen);
+    if (!no->is_double_bond() || no->part_of_cis_trans_grouping() ||
+        z[nitrogen] != 7 || m.ncon(nitrogen) != 2 || m.nbonds(nitrogen) != 3 ||
+        m.formal_charge(nitrogen) || m.hcount(nitrogen) ||
+        m.chiral_centre_at_atom(nitrogen)) {
+      continue;
+    }
+    const Bond* cn = m[nitrogen][0];
+    if (cn->other(nitrogen) == oxygen) {
+      cn = m[nitrogen][1];
+    }
+    const atom_number_t carbon = cn->other(nitrogen);
+    if (!cn->is_single_bond() || cn->part_of_cis_trans_grouping() ||
+        z[carbon] != 6 || m.formal_charge(carbon) || m.is_aromatic(carbon) ||
+        m.nbonds(carbon) != m.ncon(carbon) ||
+        m.implicit_hydrogens(carbon) < 1 ||
+        m.nbonds(carbon) + m.implicit_hydrogens(carbon) != 4 ||
+        m.chiral_centre_at_atom(carbon)) {
+      continue;
+    }
+    // Keep this first rule local to simple C-nitroso compounds. Additional
+    // heteroatoms at carbon can introduce competing tautomeric sites.
+    bool eligible = true;
+    for (const Bond* b : m[carbon]) {
+      const atom_number_t other = b->other(carbon);
+      if (other != nitrogen && z[other] != 6 && z[other] != 1) {
+        eligible = false;
+        break;
+      }
+    }
+    if (!eligible) {
+      continue;
+    }
+    m.set_bond_type_between_atoms(carbon, nitrogen, DOUBLE_BOND);
+    m.set_bond_type_between_atoms(nitrogen, oxygen, SINGLE_BOND);
+    m.unset_all_implicit_hydrogen_information(carbon);
+    m.unset_all_implicit_hydrogen_information(nitrogen);
+    m.unset_all_implicit_hydrogen_information(oxygen);
+    ++rc;
+  }
+  if (rc) {
+    _transform_nitroso_to_oxime.extra(rc);
+    if (_verbose) {
+      cerr << "Transformed " << rc << " nitroso groups to oximes\n";
+    }
+    if (_append_string_depending_on_what_changed) {
+      _append_to_changed_molecules << " STD:" << CS_NITROSO_OXIME;
+    }
+  }
   return rc;
 }
 

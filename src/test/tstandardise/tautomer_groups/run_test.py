@@ -29,6 +29,17 @@ cases = [
     'N1=C(O)C=C(O)N=C1O.O=c1cc[nH]c(C)n1',
     'N1=NC(=NN=C(C2=CC=NC=C2)Br)NN1',
 ]
+nitroso = [
+    'CN=O', 'CCN=O', 'CC(C)N=O', 'O=NC1CCCCC1',
+    'C[N+]1=CC=CC=C1CN=O', 'C[CH2][N]=[O]',
+    'CCN=[18O]', 'CC([2H])N=O', 'CC([2H])([2H])N=O',
+    'C[C@H](F)CN=O', 'C[C@H](N=O)CC', 'C/C=C/CN=O',
+    'N1C=CC(N=O)C=C1',
+]
+check('nitroso', ['-g', 'nitroso'], nitroso)
+check('nitroso_all', ['-g', 'all'], nitroso)
+check('nitroso_disabled', ['-g', 'all', '-g', '-nitroso'], nitroso)
+
 substituted_cyclic_diketones = [
     'OC1=C(c2ccccc2)C(=O)CCC1',
     'O=C1C(c2ccccc2)=C(O)CCC1',

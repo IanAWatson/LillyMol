@@ -807,6 +807,38 @@ TEST_P(TestOxygenAndSulphurTautomers, CanonicalFormAndAtomOrder) {
 }
 
 INSTANTIATE_TEST_SUITE_P(OxygenAndSulphur, TestOxygenAndSulphurTautomers, testing::Values(
+    TautomerCase{CS_NITROSO_OXIME, "CN=O", "C=NO", true},
+    TautomerCase{CS_NITROSO_OXIME, "CCN=O", "CC=NO", true},
+    TautomerCase{CS_NITROSO_OXIME, "CC(C)N=O", "CC(C)=NO", true},
+    TautomerCase{CS_NITROSO_OXIME, "O=NC1CCCCC1", "ON=C1CCCCC1", true},
+    TautomerCase{CS_NITROSO_OXIME, "C[N+]1=CC=CC=C1CN=O", "C[N+]1=CC=CC=C1C=NO", true},
+    TautomerCase{CS_NITROSO_OXIME, "C[CH2][N]=[O]", "CC=NO", true},
+    TautomerCase{CS_NITROSO_OXIME, "C[13CH2]N=O", "C[13CH]=NO", true},
+    TautomerCase{CS_NITROSO_OXIME, "CC[15N]=O", "CC=[15N]O", true},
+    TautomerCase{CS_NITROSO_OXIME, "CCN=[18O]", "CC=N[18OH]", true},
+    TautomerCase{CS_NITROSO_OXIME, "CC([2H])N=O", "CC([2H])=NO", true},
+    TautomerCase{CS_NITROSO_OXIME, "C[C@H](F)CN=O", "C[C@H](F)C=NO", true},
+    TautomerCase{CS_NITROSO_OXIME, "C/C=C/CN=O", "C/C=C/C=NO", true},
+    TautomerCase{CS_NITROSO_OXIME, "CC=NO", "CC=NO", false},
+    TautomerCase{CS_NITROSO_OXIME, "C/C=N/O", "C/C=N/O", false},
+    TautomerCase{CS_NITROSO_OXIME, "CC(C)(C)N=O", "CC(C)(C)N=O", false},
+    TautomerCase{CS_NITROSO_OXIME, "C=CN=O", "C=CN=O", false},
+    TautomerCase{CS_NITROSO_OXIME, "CC(O)N=O", "CC(O)N=O", false},
+    TautomerCase{CS_NITROSO_OXIME, "CN(C)N=O", "CN(C)N=O", false},
+    TautomerCase{CS_NITROSO_OXIME, "O=Nc1ccc(O)cc1", "O=Nc1ccc(O)cc1", false},
+    TautomerCase{CS_NITROSO_OXIME, "CN(=O)=O", "CN(=O)=O", false},
+    TautomerCase{CS_NITROSO_OXIME, "C[N+](=O)[O-]", "C[N+](=O)[O-]", false},
+    TautomerCase{CS_NITROSO_OXIME, "C[N+]([O-])=C", "C[N+]([O-])=C", false},
+    TautomerCase{CS_NITROSO_OXIME, "CC([2H])([2H])N=O", "CC([2H])([2H])N=O", false},
+    TautomerCase{CS_NITROSO_OXIME, "CC([H])([H])N=O", "CC([H])([H])N=O", false},
+    TautomerCase{CS_NITROSO_OXIME, "C[C@H](N=O)CC", "C[C@H](N=O)CC", false},
+    TautomerCase{CS_NITROSO_OXIME, "CCN=O", "CC=NO", true,
+                 standardisation::KetoEnol::kToEnol},
+    TautomerCase{CS_ALL, "CCN=O", "CC=NO", true},
+    TautomerCase{CS_ALL, "C[N+]1=CC=CC=C1CN=O", "C[N+]1=CC=CC=C1C=NO", true},
+    TautomerCase{CS_ALL, "CC([H])([H])N=O", "CC=NO", true},
+    TautomerCase{CS_ALL, "N1C=CC(N=O)C=C1", "N1C=CC(=NO)C=C1", true},
+    TautomerCase{CS_ALL, "C[N+](=O)[O-].CCN=O", "CN(=O)=O.CC=NO", true},
     TautomerCase{CS_PHOSPHORUS_TAUTOMER, "C12(C)C(=CCC3=C1C=CC(Cl)=C3)C=C(CC2)P(O)O", "C12=CCC3=C(C1(C)CCC(=C2)P(=O)O)C=CC(Cl)=C3", true},
     TautomerCase{CS_PHOSPHORUS_TAUTOMER, "P(O)(O)[C@H](N)C", "P(=O)(O)[C@H](N)C", true},
     TautomerCase{CS_PHOSPHORUS_TAUTOMER, "P(O)(O)C(N)C", "P(=O)(O)C(N)C", true},
@@ -1305,6 +1337,53 @@ TEST_F(TestStandardisation, SubstitutedCyclicDiketoneSkipsExplicitCentralAnnotat
   EXPECT_EQ(_m1.chiral_centre_at_atom(2), saved);
   EXPECT_TRUE(_m1.bond_between_atoms(1, 2)->is_double_bond());
   EXPECT_TRUE(_m1.bond_between_atoms(0, 1)->is_single_bond());
+}
+
+TEST_F(TestStandardisation, NitrosoOximeRemainsNeutralAndLeavesGeometryUnspecified) {
+  ASSERT_TRUE(_chemical_standardisation.Activate(CS_NITROSO_OXIME, 0));
+  _chemical_standardisation.set_append_string_depending_on_what_changed(1);
+  ASSERT_TRUE(_m1.build_from_smiles("CCN=O"));
+  EXPECT_EQ(_chemical_standardisation.process(_m1), 1);
+  EXPECT_EQ(_m1.number_formally_charged_atoms(), 0);
+  EXPECT_EQ(_m1.formal_charge(2), 0);
+  EXPECT_EQ(_m1.formal_charge(3), 0);
+  EXPECT_EQ(_m1.hcount(1), 1);
+  EXPECT_EQ(_m1.hcount(2), 0);
+  EXPECT_EQ(_m1.hcount(3), 1);
+  EXPECT_EQ(_m1.chiral_centres(), 0);
+  EXPECT_TRUE(_m1.bond_between_atoms(1, 2)->is_double_bond());
+  EXPECT_FALSE(_m1.bond_between_atoms(1, 2)->part_of_cis_trans_grouping());
+  for (const Bond* b : _m1.bond_list()) {
+    EXPECT_FALSE(b->is_directional());
+  }
+  EXPECT_TRUE(_m1.name().contains("STD:nitroso"));
+  std::ostringstream report;
+  ASSERT_TRUE(_chemical_standardisation.report(report));
+  EXPECT_NE(report.str().find("Nitroso to oxime changed 1 groups"), std::string::npos);
+  EXPECT_EQ(_chemical_standardisation.process(_m1), 0);
+}
+
+TEST_F(TestStandardisation, NitrosoOximeCanBeDisabledAndReenabled) {
+  _chemical_standardisation.activate_all();
+  ASSERT_TRUE(_chemical_standardisation.Activate("-nitroso", 0));
+  ASSERT_TRUE(_m1.build_from_smiles("CCN=O"));
+  const IWString before = _m1.unique_smiles();
+  EXPECT_EQ(_chemical_standardisation.process(_m1), 0);
+  EXPECT_EQ(_m1.unique_smiles(), before);
+  ASSERT_TRUE(_chemical_standardisation.Activate(CS_NITROSO_OXIME, 0));
+  EXPECT_EQ(_chemical_standardisation.process(_m1), 1);
+}
+
+TEST_F(TestStandardisation, NitrosoOximePreservesRemotePyridiniumCharge) {
+  ASSERT_TRUE(_chemical_standardisation.Activate(CS_NITROSO_OXIME, 0));
+  // CHEMBL4303284 and CHEMBL1420 from the comparison archive.
+  ASSERT_TRUE(_m1.build_from_smiles("C[N+]1=CC=CC=C1CN=O"));
+  ASSERT_TRUE(_m2.build_from_smiles("[N+]1(=C(C=NO)C=CC=C1)C"));
+  EXPECT_EQ(_chemical_standardisation.process(_m1), 1);
+  EXPECT_EQ(_m1.unique_smiles(), _m2.unique_smiles());
+  EXPECT_EQ(_m1.number_formally_charged_atoms(), 1);
+  EXPECT_EQ(_m1.net_formal_charge(), 1);
+  EXPECT_TRUE(_m1.valence_ok());
 }
 
 }  // namespace

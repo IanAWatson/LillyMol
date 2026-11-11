@@ -411,6 +411,7 @@ class IWStandard_Current_Molecule
 #define CS_TETRAZOLE  "tetrazole"
 #define CS_PYRIMIDINE "pyrimidine"
 #define CS_AMIDINE "amidine"
+#define CS_NITROSO_OXIME "nitroso"
 #define CS_PHOSPHORUS_TAUTOMER "phosphorus"
 #define CS_BETA_DIKETONE "beta-diketone"
 #define CS_ASCORBATE "ascorbate"
@@ -509,6 +510,7 @@ class Chemical_Standardisation
     Chemical_Transformation _transform_ascorbate;
     Chemical_Transformation _transform_beta_diketone;
     Chemical_Transformation _transform_phosphorus_tautomer;
+    Chemical_Transformation _transform_nitroso_to_oxime;
     Chemical_Transformation _transform_lactim_lactam;
     Chemical_Transformation _transform_lactim_lactam_ring;
     Chemical_Transformation _transform_aromatic_guanidine_ring;
@@ -613,6 +615,7 @@ class Chemical_Standardisation
     int _do_pyrazole (Molecule &, int * atom_already_changed, IWStandard_Current_Molecule & current_molecule_data);
     int _do_pyrazole (Molecule &, int * atom_already_changed, const int, IWStandard_Current_Molecule & current_molecule_data);
     int _do_transform_amidine(Molecule& m, IWStandard_Current_Molecule& current_molecule_data);
+    int _do_nitroso_to_oxime(Molecule& m, const IWStandard_Current_Molecule& data);
     int _do_phosphorus_tautomer(Molecule& m, const IWStandard_Current_Molecule& data);
     int _do_beta_diketone(Molecule& m, const IWStandard_Current_Molecule& data);
     int _do_ascorbate(Molecule& m, IWStandard_Current_Molecule& current_molecule_data);

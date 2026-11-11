@@ -82,6 +82,7 @@ Entering `-g help` to most LillyMol tools yields the usage message
  -g pyrazolone    convert pyrazolone to keto form
  -g aminothazole  convert -N=c1scc[nH]1 to -[NH]c1sccn1
  -g keto_enol     convert O/S enol to keto forms (no adjacent heteroatoms)
+ -g nitroso      convert neutral aliphatic C-N=O groups to C=N-OH
  -g phosphorus   convert neutral P-OH tautomers to P(=O)H
  -g beta-diketone canonicalise beta-diketone enols to diketo form
  -g ascorbate    canonicalise isolated ascorbate rings to lactone/enediol form
@@ -232,6 +233,35 @@ SMILES/aromaticity/stereochemistry handling rather than a standardisation rule.
 Use `-f` to stop with a nonzero exit status on a failure. Invalid starting
 valence is distinguished from invalid valence introduced by standardisation;
 the latter is counted as a failure and written to the failure file.
+
+### Aliphatic nitroso groups
+
+`-g nitroso` converts eligible aliphatic C-nitroso groups to oximes. For
+example, `CCN=O` becomes `CC=NO`. It is enabled by `-g all`, broadening
+default tautomer equivalence, and can be disabled with `-g all -g -nitroso`.
+The oxime is the fixed choice, independently of `KETO` or `ENOL`.
+
+Nitrogen and oxygen remain neutral throughout the conversion. The rule does
+not introduce charge-separated representations. Persistent charges elsewhere,
+such as a pyridinium group, are retained by this transformation.
+
+The carbon must be neutral, non-aromatic and fully saturated, with at least
+one implicit hydrogen. Its other neighbours must be carbon or hydrogen. The
+nitroso nitrogen must be neutral and two-connected, with one single bond to
+carbon and one double bond to a neutral terminal oxygen. Aromatic nitroso
+compounds, nitro groups, N-nitroso compounds, and additional heteroatom
+substituents on the reacting carbon are excluded from this initial rule.
+
+The hydrogen moves implicitly from carbon to oxygen. Isotope labels and
+explicit hydrogen atoms are retained. If no implicit carbon hydrogen is
+available, the conversion is skipped. The ordinary explicit-hydrogen removal
+in `-g all` runs beforehand, while isotopic hydrogen atoms remain explicit.
+
+A conversion touching a marked chiral centre is skipped. Unaffected
+stereocentres are retained, and the newly formed C=N geometry is unspecified.
+Existing oxime geometry is preserved. Processing is gated by the existing
+nitrogen and oxygen counts. Reports include nitroso-to-oxime counts, and
+`-g APP=EACH` appends `STD:nitroso` when this rule changes a molecule.
 
 ### Phosphorus OH tautomers
 

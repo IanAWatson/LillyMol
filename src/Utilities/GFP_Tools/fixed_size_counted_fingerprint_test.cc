@@ -1,5 +1,9 @@
 #include "Utilities/GFP_Tools/fixed_size_counted_fingerprint.h"
 
+#include "Foundational/iwstring/iwstring.h"
+
+#include <sstream>
+#include <string>
 #include <vector>
 
 #include "gmock/gmock.h"
@@ -71,6 +75,32 @@ TEST(TestFixedSizeCountedFingerprint, VectorReallocation) {
   EXPECT_FLOAT_EQ(fingerprints[0].tanimoto(expected0), 1.0f);
   EXPECT_FLOAT_EQ(fingerprints[1].tanimoto(expected1), 1.0f);
   EXPECT_FLOAT_EQ(fingerprints[2].tanimoto(expected2), 1.0f);
+}
+
+// Counts larger than one, and a size that is not a multiple of 8. The
+// fingerprint is built as the formula fingerprint generator does, so that nset is
+// the sum of the counts, which is also what reading a record computes.
+TEST(TestFixedSizeCountedFingerprint, WriteAndReadPreservesCounts) {
+  const std::vector<int> counts = {0, 5, 255, 37, 124, 0, 1, 2, 3, 99, 0, 0, 7, 200, 0, 1, 129, 64};
+  Fixed_Size_Counted_Fingerprint_uchar fp;
+  ASSERT_TRUE(fp.construct_from_array_of_ints(counts.data(), counts.size()));
+  ASSERT_EQ(fp.nset(), 927);
+
+  std::ostringstream output;
+  const const_IWSubstring tag("FCT<");
+  ASSERT_TRUE(fp.write_daylight_ascii_representation(output, tag, 1));
+
+  std::string record = output.str();
+  ASSERT_EQ(record.back(), '\n');
+  record.pop_back();
+
+  Fixed_Size_Counted_Fingerprint_uchar read;
+  ASSERT_TRUE(read.construct_from_tdt_record(const_IWSubstring(record.c_str(), record.size())));
+
+  EXPECT_EQ(read.size(), fp.size());
+  EXPECT_EQ(read.nset(), fp.nset());
+  EXPECT_EQ(read.bits_in_common(fp), fp.nset());  // equal counts in every position
+  EXPECT_FLOAT_EQ(read.tanimoto(fp), 1.0f);
 }
 
 }  // namespace

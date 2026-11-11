@@ -113,7 +113,8 @@ Fixed_Size_Counted_Fingerprint_uchar::write_daylight_ascii_representation (std::
 
   IW_Bits_Base b;
 
-  if (! b.construct_from_array_of_bits (_count, _n))
+//  Each count is a byte, so there are _n * 8 bits. The reader assumes this.
+  if (! b.construct_from_array_of_bits (_count, _n * IW_BITS_PER_BYTE))
   {
     cerr << "Fixed_Size_Counted_Fingerprint_uchar::write_daylight_ascii_representation:cannot allocate bits for n = " << _n << endl;
     return 0;

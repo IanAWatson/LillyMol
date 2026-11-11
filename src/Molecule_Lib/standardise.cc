@@ -7,6 +7,7 @@
 #include <filesystem>
 #include <iostream>
 #include <memory>
+#include <utility>
 #include <vector>
 
 #define RESIZABLE_ARRAY_IMPLEMENTATION
@@ -380,6 +381,7 @@ Chemical_Standardisation::activate_all() {
   _transform_pyrimidine.activate();
   _transform_ascorbate.activate();
   _transform_beta_diketone.activate();
+  _transform_phosphorus_tautomer.activate();
   _transform_isoxazole.activate();
   _transform_aromatic_guanidine_ring.activate();
   _transform_pyrazolone.activate();
@@ -445,6 +447,7 @@ display_all_chemical_standardisation_options(std::ostream& os, char zoption) {
   os << zopt << CS_GUAND << "        convert guanidines to -N-C(=N)-N form\n";
   os << zopt << CS_AMIDINE << "     canonicalise isolated neutral amidines with a terminal N\n";
   os << zopt << CS_PYRIMIDINE << "  convert isolated O/S pyrimidinetrione tautomers to keto form\n";
+  os << zopt << CS_PHOSPHORUS_TAUTOMER << "  convert neutral P-OH tautomers to P(=O)H\n";
   os << zopt << CS_BETA_DIKETONE << " canonicalise beta-diketone enols to diketo form\n";
   os << zopt << CS_ASCORBATE << "   canonicalise isolated ascorbate rings to lactone/enediol form\n";
   os << zopt << CS_GUANDR << "        convert Ring type guanidines to -N-C(=N)-N form\n";
@@ -824,6 +827,12 @@ Chemical_Standardisation::Activate(const IWString& directive, const int verbose)
       _transform_triazole.deactivate();
     } else {
       _transform_triazole.activate();
+    }
+  } else if (tmp == CS_PHOSPHORUS_TAUTOMER) {
+    if (negation) {
+      _transform_phosphorus_tautomer.deactivate();
+    } else {
+      _transform_phosphorus_tautomer.activate();
     }
   } else if (tmp == CS_BETA_DIKETONE) {
     if (negation) {
@@ -4066,6 +4075,10 @@ Chemical_Standardisation::_process(Molecule& m,
     rc += _do_amino_thiazole(m, atom_already_changed, current_molecule_data);
   }
 
+  if (_transform_phosphorus_tautomer.active() && current_molecule_data.phosphorus()) {
+    rc += _do_phosphorus_tautomer(m, current_molecule_data);
+  }
+
   if (_transform_ascorbate.active() && current_molecule_data.oxygens() >= 4) {
     rc += _do_ascorbate(m, current_molecule_data);
   }
@@ -4399,6 +4412,10 @@ Chemical_Standardisation::report(std::ostream& os) const {
   if (_transform_amidine.active()) {
     os << "  Amidine ";
     _transform_amidine.report(os);
+  }
+  if (_transform_phosphorus_tautomer.active()) {
+    os << "  Phosphorus tautomer ";
+    _transform_phosphorus_tautomer.report(os);
   }
   if (_transform_beta_diketone.active()) {
     os << "Beta diketone ";
@@ -10126,6 +10143,10 @@ Chemical_Standardisation::_processing_needed(
     return 1;
   }
 
+  if (_transform_phosphorus_tautomer.active() && current_molecule_data.phosphorus()) {
+    return 1;
+  }
+
   if (_transform_beta_diketone.active() && current_molecule_data.oxygens() >= 2 &&
       _keto_enol == standardisation::KetoEnol::kToKeto) {
     return 1;
@@ -11611,6 +11632,62 @@ Chemical_Standardisation::_do_transform_enol_fused(
     _append_to_changed_molecules << " STD::enol_fused";
   }
 
+  return rc;
+}
+
+// Transfer an implicit OH hydrogen to a neutral, three-coordinate P(III),
+// choosing the P(=O)H form. Only carbon and oxygen substituents are supported.
+int
+Chemical_Standardisation::_do_phosphorus_tautomer(
+    Molecule& m, const IWStandard_Current_Molecule& data) {
+  const atomic_number_t* z = data.atomic_number();
+  int rc = 0;
+  for (atom_number_t phosphorus = 0; phosphorus < m.natoms(); ++phosphorus) {
+    if (z[phosphorus] != 15 || m.formal_charge(phosphorus) ||
+        m.ncon(phosphorus) != 3 || m.nbonds(phosphorus) != 3 ||
+        m.hcount(phosphorus) != 0 || m.chiral_centre_at_atom(phosphorus)) {
+      continue;
+    }
+    atom_number_t hydroxyl = kInvalidAtomNumber;
+    bool eligible = true;
+    // Equivalent OH groups must be chosen independently of atom order. Prefer
+    // the lowest oxygen isotope. Within an isotope, consume bracket-specified
+    // OH first so its hydrogen specification is cleared during conversion.
+    auto priority = [&](atom_number_t oxygen) {
+      return std::make_pair(m.isotope(oxygen), !m.implicit_hydrogens_known(oxygen));
+    };
+    for (const Bond* b : m[phosphorus]) {
+      const atom_number_t other = b->other(phosphorus);
+      if (!b->is_single_bond() || (z[other] != 6 && z[other] != 8) ||
+          m.formal_charge(other)) {
+        eligible = false;
+        break;
+      }
+      if (z[other] != 8 || m.ncon(other) != 1 || m.hcount(other) != 1) {
+        continue;
+      }
+      if (hydroxyl == kInvalidAtomNumber || priority(other) < priority(hydroxyl)) {
+        hydroxyl = other;
+      }
+    }
+    if (!eligible || hydroxyl == kInvalidAtomNumber) {
+      continue;
+    }
+    // A terminal OH has no explicit hydrogen atom to move or renumber.
+    m.set_bond_type_between_atoms(phosphorus, hydroxyl, DOUBLE_BOND);
+    m.unset_all_implicit_hydrogen_information(phosphorus);
+    m.unset_all_implicit_hydrogen_information(hydroxyl);
+    ++rc;
+  }
+  if (rc) {
+    _transform_phosphorus_tautomer.extra(rc);
+    if (_verbose) {
+      cerr << "Transformed " << rc << " phosphorus OH tautomers\n";
+    }
+    if (_append_string_depending_on_what_changed) {
+      _append_to_changed_molecules << " STD:" << CS_PHOSPHORUS_TAUTOMER;
+    }
+  }
   return rc;
 }
 

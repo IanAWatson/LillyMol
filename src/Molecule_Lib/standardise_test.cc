@@ -806,6 +806,32 @@ TEST_P(TestOxygenAndSulphurTautomers, CanonicalFormAndAtomOrder) {
 }
 
 INSTANTIATE_TEST_SUITE_P(OxygenAndSulphur, TestOxygenAndSulphurTautomers, testing::Values(
+    TautomerCase{CS_PHOSPHORUS_TAUTOMER, "C12(C)C(=CCC3=C1C=CC(Cl)=C3)C=C(CC2)P(O)O", "C12=CCC3=C(C1(C)CCC(=C2)P(=O)O)C=CC(Cl)=C3", true},
+    TautomerCase{CS_PHOSPHORUS_TAUTOMER, "P(O)(O)[C@H](N)C", "P(=O)(O)[C@H](N)C", true},
+    TautomerCase{CS_PHOSPHORUS_TAUTOMER, "P(O)(O)C(N)C", "P(=O)(O)C(N)C", true},
+    TautomerCase{CS_PHOSPHORUS_TAUTOMER, "CP(C)O", "CP(C)=O", true},
+    TautomerCase{CS_PHOSPHORUS_TAUTOMER, "COP(C)O", "COP(C)=O", true},
+    TautomerCase{CS_PHOSPHORUS_TAUTOMER, "P(O)(O)O", "P(=O)(O)O", true},
+    TautomerCase{CS_PHOSPHORUS_TAUTOMER, "C[P](C)[OH]", "CP(C)=O", true},
+    TautomerCase{CS_PHOSPHORUS_TAUTOMER, "CP(C)[18OH]", "CP(C)=[18O]", true},
+    TautomerCase{CS_PHOSPHORUS_TAUTOMER, "CP(O)[18OH]", "CP(=O)[18OH]", true},
+    TautomerCase{CS_PHOSPHORUS_TAUTOMER, "CP([OH])O", "CP(=O)O", true},
+    TautomerCase{CS_PHOSPHORUS_TAUTOMER, "CP(O)O[2H]", "CP(=O)O[2H]", true},
+    TautomerCase{CS_PHOSPHORUS_TAUTOMER, "CP(C)=O", "CP(C)=O", false},
+    TautomerCase{CS_PHOSPHORUS_TAUTOMER, "C[PH](C)=O", "C[PH](C)=O", false},
+    TautomerCase{CS_PHOSPHORUS_TAUTOMER, "CP(C)OC", "CP(C)OC", false},
+    TautomerCase{CS_PHOSPHORUS_TAUTOMER, "CP(C)O[2H]", "CP(C)O[2H]", false},
+    TautomerCase{CS_PHOSPHORUS_TAUTOMER, "CP(C)O[H]", "CP(C)O[H]", false},
+    TautomerCase{CS_PHOSPHORUS_TAUTOMER, "CP([O-])O", "CP([O-])O", false},
+    TautomerCase{CS_PHOSPHORUS_TAUTOMER, "C[P+](C)(C)O", "C[P+](C)(C)O", false},
+    TautomerCase{CS_PHOSPHORUS_TAUTOMER, "CP(N)O", "CP(N)O", false},
+    TautomerCase{CS_PHOSPHORUS_TAUTOMER, "CP(S)O", "CP(S)O", false},
+    TautomerCase{CS_PHOSPHORUS_TAUTOMER, "C[P@](O)c1ccccc1", "C[P@](O)c1ccccc1", false},
+    TautomerCase{CS_PHOSPHORUS_TAUTOMER, "CC(O)O", "CC(O)O", false},
+    TautomerCase{CS_PHOSPHORUS_TAUTOMER, "CP(C)O", "CP(C)=O", true,
+                 standardisation::KetoEnol::kToEnol},
+    TautomerCase{CS_ALL, "P(O)(O)C(N)C", "P(=O)(O)C(N)C", true},
+    TautomerCase{CS_ALL, "CP(C)=O", "CP(C)=O", false},
     TautomerCase{CS_BETA_DIKETONE, "CC(=O)C=C(O)C=Cc1cc(O)c(O)cc1",
                  "CC(=O)CC(=O)C=Cc1cc(O)c(O)cc1", true},
     TautomerCase{CS_BETA_DIKETONE, "OC1=CC(=O)CCC1", "O=C1CC(=O)CCC1", true},
@@ -1183,6 +1209,45 @@ TEST_F(TestStandardisation, BetaDiketoneCanBeDisabled) {
   const IWString before = _m1.unique_smiles();
   EXPECT_EQ(_chemical_standardisation.process(_m1), 0);
   EXPECT_EQ(_m1.unique_smiles(), before);
+}
+
+TEST_F(TestStandardisation, PhosphorusTautomerAssignsHydrogenAndReports) {
+  ASSERT_TRUE(_chemical_standardisation.Activate(CS_PHOSPHORUS_TAUTOMER, 0));
+  _chemical_standardisation.set_append_string_depending_on_what_changed(1);
+  ASSERT_TRUE(_m1.build_from_smiles("CP(C)O"));
+  EXPECT_EQ(_m1.hcount(1), 0);
+  EXPECT_EQ(_chemical_standardisation.process(_m1), 1);
+  EXPECT_EQ(_m1.hcount(1), 1);
+  EXPECT_EQ(_m1.hcount(3), 0);
+  EXPECT_TRUE(_m1.name().contains("STD:phosphorus"));
+  std::ostringstream report;
+  ASSERT_TRUE(_chemical_standardisation.report(report));
+  EXPECT_NE(report.str().find("Phosphorus tautomer changed 1 groups"), std::string::npos);
+  EXPECT_EQ(_chemical_standardisation.process(_m1), 0);
+}
+
+TEST_F(TestStandardisation, PhosphorusTautomerCanBeDisabled) {
+  _chemical_standardisation.activate_all();
+  ASSERT_TRUE(_chemical_standardisation.Activate("-phosphorus", 0));
+  for (const char* smiles : {"CP(C)O", "CP([OH])O"}) {
+    ASSERT_TRUE(_m1.build_from_smiles(smiles));
+    const IWString before = _m1.unique_smiles();
+    EXPECT_EQ(_chemical_standardisation.process(_m1), 0);
+    EXPECT_EQ(_m1.unique_smiles(), before);
+  }
+  ASSERT_TRUE(_chemical_standardisation.Activate(CS_PHOSPHORUS_TAUTOMER, 0));
+  EXPECT_EQ(_chemical_standardisation.process(_m1), 1);
+}
+
+TEST_F(TestStandardisation, PhosphorusTautomerAfterOtherPhosphorusAcidProtonation) {
+  _chemical_standardisation.activate_all();
+  ASSERT_TRUE(_chemical_standardisation.Activate(CS_ACID, 0));
+  ASSERT_TRUE(_m1.build_from_smiles("CP(=O)([O-])O.CP(C)O"));
+  ASSERT_TRUE(_m2.build_from_smiles("CP(=O)(O)O.CP(C)=O"));
+  EXPECT_GT(_chemical_standardisation.process(_m1), 0);
+  EXPECT_EQ(_m1.unique_smiles(), _m2.unique_smiles());
+  EXPECT_TRUE(_m1.valence_ok());
+  EXPECT_EQ(_chemical_standardisation.process(_m1), 0);
 }
 
 }  // namespace

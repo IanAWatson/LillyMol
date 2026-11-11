@@ -29,6 +29,18 @@ cases = [
     'N1=C(O)C=C(O)N=C1O.O=c1cc[nH]c(C)n1',
     'N1=NC(=NN=C(C2=CC=NC=C2)Br)NN1',
 ]
+phosphorus = [
+    'P(O)(O)C(N)C', 'P(=O)(O)C(N)C', 'CP(C)O',
+    'COP(C)O', 'P(O)(O)O', 'CP(O)[18OH]', 'CP([OH])O',
+    'CP(C)O[2H]', 'CP(O)O[2H]',
+]
+check('phosphorus', ['-g', 'phosphorus'], phosphorus)
+check('phosphorus_all', ['-g', 'all'], phosphorus)
+# CP([OH])O has a pre-existing unique-SMILES ordering inconsistency when no
+# transformation runs. Its disabled behavior is checked directly in unit tests.
+check('phosphorus_disabled', ['-g', 'all', '-g', '-phosphorus'],
+      [smiles for smiles in phosphorus if smiles != 'CP([OH])O'])
+
 ascorbates = [
     'OCC(O)C1OC(O)=C(O)C1=O', 'OCC(O)C1OC(=O)C(O)=C1O',
     'OCC(O)c1oc(O)c(O)c1O', 'OCC(O)C1OC(=O)C(O)C1=O',

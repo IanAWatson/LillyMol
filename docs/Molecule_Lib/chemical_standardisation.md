@@ -82,6 +82,7 @@ Entering `-g help` to most LillyMol tools yields the usage message
  -g pyrazolone    convert pyrazolone to keto form
  -g aminothazole  convert -N=c1scc[nH]1 to -[NH]c1sccn1
  -g keto_enol     convert O/S enol to keto forms (no adjacent heteroatoms)
+ -g phosphorus   convert neutral P-OH tautomers to P(=O)H
  -g beta-diketone canonicalise beta-diketone enols to diketo form
  -g ascorbate    canonicalise isolated ascorbate rings to lactone/enediol form
  -g 4-pyridone    convert 4-pyridol/thiol to pyridone/thione forms
@@ -231,6 +232,29 @@ SMILES/aromaticity/stereochemistry handling rather than a standardisation rule.
 Use `-f` to stop with a nonzero exit status on a failure. Invalid starting
 valence is distinguished from invalid valence introduced by standardisation;
 the latter is counted as a failure and written to the failure file.
+
+### Phosphorus OH tautomers
+
+`-g phosphorus` converts neutral, three-coordinate P(III) groups bearing an OH
+substituent to the P(=O)H form. For example, `P(O)(O)C(N)C` becomes
+`P(=O)(O)C(N)C`. LillyMol supplies the implicit hydrogen on phosphorus after
+the conversion, preserving molecular formula.
+
+The rule is enabled by `-g all` and can be disabled with
+`-g all -g -phosphorus`. The existing phosphorus count guards both the processing
+check and the rule invocation. Molecules without phosphorus incur no additional
+atom scan from this rule. The P=O choice is independent of `KETO`/`ENOL`.
+
+This first implementation supports carbon and oxygen substituents on neutral
+phosphorus. It skips marked phosphorus stereochemistry and charged neighbours.
+A hydrogen attached explicitly to oxygen is not moved. Other implicit OH groups
+on the same phosphorus remain eligible, including when an isotopic hydrogen is
+attached elsewhere. `-g all` removes ordinary explicit hydrogens before applying
+this rule. Oxygen isotope labels are retained; the lowest oxygen isotope is
+chosen if multiple OH groups are eligible. Existing P=O groups are left as read.
+
+Reports include phosphorus tautomer counts. `-g APP=EACH` appends
+`STD:phosphorus` when this transformation changes a molecule.
 
 ### Beta-diketone enols
 

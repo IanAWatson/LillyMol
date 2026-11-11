@@ -11691,8 +11691,9 @@ Chemical_Standardisation::_do_phosphorus_tautomer(
   return rc;
 }
 
-// Convert O=C-C=C-OH to O=C-CH2-C=O. Restrict the central carbon to
-// two neighbours so the conversion does not create a stereocentre.
+// Convert O=C-C=C-OH to the diketo form. The central carbon can carry
+// a carbon substituent in an isolated carbocycle. Any newly formed
+// stereocentre remains unspecified.
 static bool
 ConvertBetaDiketoneEnol(Molecule& m, const IWStandard_Current_Molecule& data,
                        atom_number_t o) {
@@ -11731,12 +11732,46 @@ ConvertBetaDiketoneEnol(Molecule& m, const IWStandard_Current_Molecule& data,
     }
   }
   if (!eligible || middle == kInvalidAtomNumber || aromatic[middle] ||
-      m.ncon(middle) != 2 || m.formal_charge(middle) || m.hcount(middle) != 1) {
+      m.formal_charge(middle) || m.chiral_centre_at_atom(middle)) {
     return false;
   }
-  const Bond* link = m[middle][0];
-  if (link->other(middle) == enol) {
-    link = m[middle][1];
+  const int middle_ncon = m.ncon(middle);
+  if ((middle_ncon != 2 && middle_ncon != 3) ||
+      m.hcount(middle) != 3 - middle_ncon) {
+    return false;
+  }
+  const Set_of_Atoms* substituted_ring = nullptr;
+  if (middle_ncon == 3) {
+    if (rings[middle] != 1) {
+      return false;
+    }
+    substituted_ring = data.ring_containing_atom(middle);
+    if (!substituted_ring || !substituted_ring->contains(enol)) {
+      return false;
+    }
+  }
+  // A substituted ring atom has two other neighbours: the ketone carbon
+  // in the ring and an external carbon substituent. Identify them by ring
+  // membership, independently of the bond-list order.
+  const Bond* link = nullptr;
+  for (const Bond* b : m[middle]) {
+    const atom_number_t other = b->other(middle);
+    if (other == enol) {
+      continue;
+    }
+    if (!b->is_single_bond() || z[other] != 6) {
+      return false;
+    }
+    if (substituted_ring && !substituted_ring->contains(other)) {
+      continue;
+    }
+    if (link != nullptr) {
+      return false;
+    }
+    link = b;
+  }
+  if (link == nullptr) {
+    return false;
   }
   const atom_number_t keto = link->other(middle);
   if (!link->is_single_bond() || z[keto] != 6 || m.ncon(keto) != 3 ||
@@ -11755,7 +11790,7 @@ ConvertBetaDiketoneEnol(Molecule& m, const IWStandard_Current_Molecule& data,
     }
   }
   if (!eligible || !carbonyl || m.chiral_centre_at_atom(enol) ||
-      m.chiral_centre_at_atom(middle)) {
+      m.chiral_centre_at_atom(o)) {
     return false;
   }
   if (rings[enol] || rings[middle] || rings[keto]) {

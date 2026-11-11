@@ -6,6 +6,7 @@
 #include "googletest/include/gtest/gtest.h"
 
 #include "aromatic.h"
+#include "chiral_centre.h"
 #include "molecule.h"
 #include "smiles.h"
 #include "standardise.h"
@@ -834,6 +835,11 @@ INSTANTIATE_TEST_SUITE_P(OxygenAndSulphur, TestOxygenAndSulphurTautomers, testin
     TautomerCase{CS_ALL, "CP(C)=O", "CP(C)=O", false},
     TautomerCase{CS_BETA_DIKETONE, "CC(=O)C=C(O)C=Cc1cc(O)c(O)cc1",
                  "CC(=O)CC(=O)C=Cc1cc(O)c(O)cc1", true},
+    TautomerCase{CS_BETA_DIKETONE, "OC1=C(c2ccccc2)C(=O)CCC1", "O=C1C(c2ccccc2)C(=O)CCC1", true},
+    TautomerCase{CS_BETA_DIKETONE, "OC1=C(C)C(=O)CCCC1", "O=C1C(C)C(=O)CCCC1", true},
+    TautomerCase{CS_BETA_DIKETONE, "OC1=C(C)C(=O)CCO1", "OC1=C(C)C(=O)CCO1", false},
+    TautomerCase{CS_BETA_DIKETONE, "OC1=C(O)C(=O)CCC1", "OC1=C(O)C(=O)CCC1", false},
+    TautomerCase{CS_ALL, "OC1=C(c2ccccc2)C(=O)CCC1", "O=C1C(c2ccccc2)C(=O)CCC1", true},
     TautomerCase{CS_BETA_DIKETONE, "OC1=CC(=O)CCC1", "O=C1CC(=O)CCC1", true},
     TautomerCase{CS_BETA_DIKETONE, "CC(O)=CC(O)=CC(C)=O", "CC(=O)CC(=O)CC(C)=O", true},
     TautomerCase{CS_BETA_DIKETONE, "CC([OH])=[CH]C(C)=O", "CC(=O)CC(C)=O", true},
@@ -1248,6 +1254,57 @@ TEST_F(TestStandardisation, PhosphorusTautomerAfterOtherPhosphorusAcidProtonatio
   EXPECT_EQ(_m1.unique_smiles(), _m2.unique_smiles());
   EXPECT_TRUE(_m1.valence_ok());
   EXPECT_EQ(_chemical_standardisation.process(_m1), 0);
+}
+
+TEST_F(TestStandardisation, SubstitutedCyclicDiketonePreservesMarkedCentres) {
+  ASSERT_TRUE(_chemical_standardisation.Activate(CS_BETA_DIKETONE, 0));
+  Molecule expected;
+  ASSERT_TRUE(expected.build_from_smiles("O=C1C(c2ccccc2)C(=O)[C@H](C)CC1"));
+  const IWString target = expected.unique_smiles();
+  for (const char* smiles : {"OC1=C(c2ccccc2)C(=O)[C@H](C)CC1",
+                             "O=C1C(c2ccccc2)=C(O)[C@H](C)CC1"}) {
+    Molecule input;
+    ASSERT_TRUE(input.build_from_smiles(smiles));
+    for (int i = 0; i < 100; ++i) {
+      Molecule molecule;
+      ASSERT_TRUE(molecule.build_from_smiles(input.random_smiles()));
+      const IWString formula = molecule.molecular_formula();
+      ASSERT_EQ(molecule.chiral_centres(), 1);
+      EXPECT_EQ(_chemical_standardisation.process(molecule), 1);
+      EXPECT_EQ(molecule.chiral_centres(), 1);
+      EXPECT_EQ(molecule.unique_smiles(), target);
+      EXPECT_EQ(molecule.molecular_formula(), formula);
+      EXPECT_TRUE(molecule.valence_ok());
+      EXPECT_EQ(_chemical_standardisation.process(molecule), 0);
+    }
+  }
+}
+
+TEST_F(TestStandardisation, SubstitutedCyclicDiketoneDoesNotAssignChirality) {
+  ASSERT_TRUE(_chemical_standardisation.Activate(CS_BETA_DIKETONE, 0));
+  ASSERT_TRUE(_m1.build_from_smiles("OC1=C(c2ccccc2)C(=O)C(C)CC1"));
+  EXPECT_EQ(_m1.chiral_centres(), 0);
+  EXPECT_EQ(_chemical_standardisation.process(_m1), 1);
+  EXPECT_EQ(_m1.chiral_centres(), 0);
+  EXPECT_TRUE(_m1.valence_ok());
+}
+
+TEST_F(TestStandardisation, SubstitutedCyclicDiketoneSkipsExplicitCentralAnnotation) {
+  ASSERT_TRUE(_chemical_standardisation.Activate(CS_BETA_DIKETONE, 0));
+  ASSERT_TRUE(_m1.build_from_smiles("OC1=C(C)C(=O)CCC1"));
+  // Preserve even an inconsistent annotation on the enol's planar carbon.
+  // Construct it directly so the test is independent of SMILES validation.
+  auto marked = std::make_unique<Chiral_Centre>(2);
+  marked->set_top_front(_m1[2].other(2, 0));
+  marked->set_top_back(_m1[2].other(2, 1));
+  marked->set_left_down(_m1[2].other(2, 2));
+  marked->set_right_down(kChiralConnectionIsImplicitHydrogen);
+  ASSERT_TRUE(_m1.add_chiral_centre(marked.get()));
+  const Chiral_Centre* saved = marked.release();
+  EXPECT_EQ(_chemical_standardisation.process(_m1), 0);
+  EXPECT_EQ(_m1.chiral_centre_at_atom(2), saved);
+  EXPECT_TRUE(_m1.bond_between_atoms(1, 2)->is_double_bond());
+  EXPECT_TRUE(_m1.bond_between_atoms(0, 1)->is_single_bond());
 }
 
 }  // namespace

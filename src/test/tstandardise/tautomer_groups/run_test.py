@@ -29,6 +29,18 @@ cases = [
     'N1=C(O)C=C(O)N=C1O.O=c1cc[nH]c(C)n1',
     'N1=NC(=NN=C(C2=CC=NC=C2)Br)NN1',
 ]
+substituted_cyclic_diketones = [
+    'OC1=C(c2ccccc2)C(=O)CCC1',
+    'O=C1C(c2ccccc2)=C(O)CCC1',
+    'OC1=C(c2ccccc2)C(=O)[C@H](C)CC1',
+    'O=C1C(c2ccccc2)=C(O)[C@H](C)CC1',
+    'OC1=C(C)C(=O)CCCC1',
+]
+check('substituted_cyclic', ['-g', 'beta-diketone'], substituted_cyclic_diketones)
+check('substituted_cyclic_all', ['-g', 'all'], substituted_cyclic_diketones)
+check('substituted_cyclic_disabled', ['-g', 'all', '-g', '-beta-diketone'],
+      substituted_cyclic_diketones)
+
 phosphorus = [
     'P(O)(O)C(N)C', 'P(=O)(O)C(N)C', 'CP(C)O',
     'COP(C)O', 'P(O)(O)O', 'CP(O)[18OH]', 'CP([OH])O',

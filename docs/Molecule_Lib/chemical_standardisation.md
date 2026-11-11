@@ -259,15 +259,22 @@ Reports include phosphorus tautomer counts. `-g APP=EACH` appends
 ### Beta-diketone enols
 
 `-g beta-diketone` converts eligible `O=C–CH=C(OH)–` motifs to the
-diketo form. The central carbon becomes a methylene. The rule applies to
-acyclic motifs and isolated non-aromatic carbocycles. For example,
-`CC(=O)C=C(O)C` becomes `CC(=O)CC(C)=O`.
+diketo form. The rule applies to acyclic motifs and isolated non-aromatic
+carbocycles. For example, `CC(=O)C=C(O)C` becomes `CC(=O)CC(C)=O`.
+
+In an isolated carbocycle, the central carbon may also have a carbon
+substituent, including an aryl group. For example,
+`OC1=C(c2ccccc2)C(=O)CCC1` becomes `O=C1C(c2ccccc2)C(=O)CCC1`.
+Both eligible enol orientations converge to the same diketo form. This
+extends the equivalence of structures under default standardisation.
 
 The rule requires a ketone at one end and an unprotected enol at the other.
-It skips substituted central carbons, specified alkene geometry, and fused
-rings. These restrictions avoid assigning stereochemistry during conversion.
-It is enabled by `-g all`, skipped with the `ENOL` preference, and can be
-disabled with `-g all -g -beta-diketone`.
+It skips substituted acyclic central carbons, specified alkene geometry,
+and fused rings. A conversion that would modify an atom with a marked
+chiral centre is skipped. Existing centres at unaffected atoms are retained.
+Newly formed stereocentres remain unspecified, with no `Chiral_Centre`
+object created. It is enabled by `-g all`, skipped with the `ENOL`
+preference, and can be disabled with `-g all -g -beta-diketone`.
 
 ### Ascorbate rings
 

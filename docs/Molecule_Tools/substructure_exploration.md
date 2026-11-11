@@ -212,22 +212,24 @@ images remain embedded in a single offline HTML file. Use `--top_n` when
 rendering existing JSON to limit total output size and depiction-generation
 work, independently of `--page_size`.
 
-### Hide median statistics
+### Median statistics
 
-Use `--nomedian` to suppress median activity values and the Delta Median column
-in HTML reports. It also hides the global median and median sorting controls;
-the global summary, sorting control and multiplicity profiles use means instead.
-The JSON still contains all computed median statistics, so it can be rendered
-again with medians later.
+HTML reports show means only by default: the Matched and Unmatched columns each
+hold a single mean, and both (like Matched N, Delta Mean and Multiple) can be
+sorted by clicking the column header. Use `--median` to add median activity
+values, the Delta Median column, the global median and median sorting controls.
+In that mode the Matched and Unmatched columns show both median and mean and
+are not sortable. The JSON always contains all computed median statistics, so
+it can be rendered again with or without medians later.
 
 ```shell
-substructure_exploration.sh analyse --nomedian -A activity.txt --html report.html molecules.smi
-substructure_exploration.sh html exploration.json --nomedian -o report.html
+substructure_exploration.sh analyse --median -A activity.txt --html report.html molecules.smi
+substructure_exploration.sh html exploration.json --median -o report.html
 ```
 
-With `--nomedian`, ranking requested through `--top_n` defaults to `abs_mean`
-instead of `abs_median`. An explicit `--sort` choice is still respected. Without
-a ranking request, the stored row order is preserved as usual.
+Ranking requested through `--top_n` defaults to `abs_mean`, or `abs_median`
+with `--median`. An explicit `--sort` choice is always respected. Without a
+ranking request, the stored row order is preserved as usual.
 
 ### Structure examples and long queries
 

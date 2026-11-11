@@ -1578,6 +1578,32 @@ $$$$
         for smiles in ("CCC(O)N", "CC(OC)N"):
             self.assertEqual(query.substructure_search(lillymol.MolFromSmiles(smiles)), 0)
 
+    def test_query_conserve_ring_membership(self):
+        benzene = lillymol.MolFromSmiles("c1ccccc1")
+        naphthalene = lillymol.MolFromSmiles("c1ccc2ccccc2c1")
+        plain = lillymol.SubstructureQuery()
+        self.assertTrue(plain.build_from_molecule(benzene))
+        self.assertGreater(plain.substructure_search(naphthalene), 0)
+        conserved = lillymol.SubstructureQuery()
+        self.assertTrue(conserved.build_from_molecule(
+            benzene, atoms_conserve_ring_membership=True))
+        self.assertEqual(conserved.substructure_search(naphthalene), 0)
+        self.assertGreater(conserved.substructure_search(
+            lillymol.MolFromSmiles("Cc1ccccc1")), 0)
+
+    def test_query_non_ring_atoms_become_nrings_0(self):
+        propane = lillymol.MolFromSmiles("CCC")
+        cyclohexane = lillymol.MolFromSmiles("C1CCCCC1")
+        plain = lillymol.SubstructureQuery()
+        self.assertTrue(plain.build_from_molecule(propane))
+        self.assertGreater(plain.substructure_search(cyclohexane), 0)
+        acyclic = lillymol.SubstructureQuery()
+        self.assertTrue(acyclic.build_from_molecule(
+            propane, non_ring_atoms_become_nrings_0=True))
+        self.assertEqual(acyclic.substructure_search(cyclohexane), 0)
+        self.assertGreater(acyclic.substructure_search(
+            lillymol.MolFromSmiles("CCCC")), 0)
+
     def test_query_from_molecule_default_still_matches_isotopes(self):
         query = lillymol.SubstructureQuery()
         self.assertTrue(query.build_from_molecule(lillymol.MolFromSmiles("C[1CH2]O")))

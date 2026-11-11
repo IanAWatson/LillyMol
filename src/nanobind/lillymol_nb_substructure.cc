@@ -41,16 +41,26 @@ BindSubstructure(nb::module_& m) {
       .def("build_from_smarts", &Substructure_Query::CreateFromSmarts, nb::arg("smarts"))
       .def("build_from_molecule",
            [](Substructure_Query& query, Molecule& mol,
-              bool substituents_only_at_isotopic_atoms) {
+              bool substituents_only_at_isotopic_atoms,
+              bool atoms_conserve_ring_membership,
+              bool non_ring_atoms_become_nrings_0) {
              Molecule_to_Query_Specifications mqs;
              mqs.set_make_embedding(1);
+             mqs.set_atoms_conserve_ring_membership(atoms_conserve_ring_membership);
+             mqs.set_non_ring_atoms_become_nrings_0(non_ring_atoms_become_nrings_0);
              mqs.set_substituents_only_at_isotopic_atoms(substituents_only_at_isotopic_atoms);
              return static_cast<bool>(query.create_from_molecule(mol, mqs));
            },
            nb::arg("mol"), nb::kw_only(),
            nb::arg("substituents_only_at_isotopic_atoms") = false,
+           nb::arg("atoms_conserve_ring_membership") = false,
+           nb::arg("non_ring_atoms_become_nrings_0") = false,
            "Build a query from a molecule; optionally treat isotopes as the only allowed "
-           "attachment sites rather than isotope constraints")
+           "attachment sites rather than isotope constraints. With "
+           "atoms_conserve_ring_membership, each ring atom must have exactly the ring bond "
+           "count it has in the molecule, so a benzene query does not match the fusion "
+           "atoms of naphthalene. With non_ring_atoms_become_nrings_0, non-ring atoms of the "
+           "molecule only match non-ring atoms")
       .def("number_elements", [](const Substructure_Query& query) { return query.number_elements(); })
       .def("active", &Substructure_Query::active)
       .def("set_only_keep_matches_in_largest_fragment",

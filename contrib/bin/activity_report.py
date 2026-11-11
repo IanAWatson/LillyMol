@@ -41,6 +41,11 @@ def ranked_rows(data, sort_by='abs_median', ascending=False, top_n=100,
     return sorted(eligible(), key=key)
 
 
+def sort_value(value) -> float:
+    """Numeric sort key for HTML data attributes; missing values sort last when descending."""
+    return -1e99 if value is None else value
+
+
 def fmt(value, digits: int = 3) -> str:
     if value is None:
         return ''
@@ -199,7 +204,11 @@ def _fragment_query(smiles: str):
         return None
     query = SubstructureQuery()
     try:
-        ok = query.build_from_molecule(fragment, substituents_only_at_isotopic_atoms=True)
+        # Dicer never breaks a ring bond, so ring membership is conserved: a
+        # benzene fragment must not match naphthalene, nor propane cyclohexane.
+        ok = query.build_from_molecule(fragment, substituents_only_at_isotopic_atoms=True,
+                                       atoms_conserve_ring_membership=True,
+                                       non_ring_atoms_become_nrings_0=True)
     except TypeError:
         _warn_attachment_binding_unavailable()
         return None
@@ -377,7 +386,12 @@ details summary { cursor: pointer; color: var(--muted); font-size: 12px; margin-
 <thead><tr>
 """)
     parts.append('<th>Fragment</th>' if fragments else '<th>Query</th>')
-    parts.append("""<th class="sortable" onclick="sortTable('matched_n')">Matched N</th><th>Matched</th><th>Unmatched</th>""")
+    parts.append("""<th class="sortable" onclick="sortTable('matched_n')">Matched N</th>""")
+    if show_median:
+        parts.append('<th>Matched</th><th>Unmatched</th>')
+    else:
+        parts.append("""<th class="sortable" onclick="sortTable('matched_mean')">Matched Mean</th>"""
+                     """<th class="sortable" onclick="sortTable('unmatched_mean')">Unmatched Mean</th>""")
     if show_median:
         parts.append("""<th class="sortable" onclick="sortTable('delta_median')">Delta Median</th>""")
     parts.append("""<th class="sortable" onclick="sortTable('delta_mean')">Delta Mean</th>""")
@@ -402,6 +416,8 @@ details summary { cursor: pointer; color: var(--muted); font-size: 12px; margin-
         parts.append(
             f'<tr data-search="{html.escape(searchable, quote=True)}" '
             f'data-matched_n="{matched["n"]}" {median_attribute}'
+            f'data-matched_mean="{sort_value(matched["mean"])}" '
+            f'data-unmatched_mean="{sort_value(unmatched["mean"])}" '
             f'data-delta_mean="{row["delta_mean"] if row["delta_mean"] is not None else -1e99}" data-multi="{multi}">'
         )
         parts.append('<td class="name">')
@@ -410,8 +426,10 @@ details summary { cursor: pointer; color: var(--muted); font-size: 12px; margin-
         parts.append('</td>')
         parts.append(f'<td class="num">{matched["n"]}</td>')
         for summary in (matched, unmatched):
-            median = f'median {fmt(summary["median"])}<br>' if show_median else ''
-            parts.append(f'<td class="num">{median}mean {fmt(summary["mean"])}</td>')
+            if show_median:
+                parts.append(f'<td class="num">median {fmt(summary["median"])}<br>mean {fmt(summary["mean"])}</td>')
+            else:
+                parts.append(f'<td class="num">{fmt(summary["mean"])}</td>')
         if show_median:
             parts.append(f'<td class="num">{fmt(row["delta_median"])}</td>')
         parts.append(f'<td class="num">{fmt(row["delta_mean"])}</td>')

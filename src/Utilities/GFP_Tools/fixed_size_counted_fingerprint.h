@@ -57,6 +57,10 @@ class Fixed_Size_Counted_Fingerprint_Base
 
     void set (int i, T v) { _count[i] = static_cast<T> (v);}    // no checking, just fast. _nset not changed!
 
+//  The count in position `i`. No checking.
+
+    T count (int i) const { return _count[i];}
+
     int resize (int s);
 
     int compute_nset ();

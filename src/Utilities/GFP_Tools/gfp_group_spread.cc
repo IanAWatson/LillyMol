@@ -565,10 +565,11 @@ Options::Initialise(const Command_Line& cl) {
       if (! GroupsFromNameToken()) {
         cerr << "Options::Initialise:cannot initialise group membership from column " <<
                  (_group_is_column + 1) << " of the name\n";
+        return 0;
       }
     } else if (! ReadGroupMembership(fname)) {
       cerr << "Options::Initialise:cannot read group membership '" << fname << "'\n";
-      return 1;
+      return 0;
     }
   }
 

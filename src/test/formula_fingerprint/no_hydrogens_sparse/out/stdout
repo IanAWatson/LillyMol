@@ -1,0 +1,16 @@
+$SMI<CC(=O)NC1=CC=C(O)C=C1>
+PCN<paracetamol>
+NCFMLNH<..........2....0....+1hc7Hg....EO.......1>
+|
+$SMI<C1=CC=NC=C1>
+PCN<pyridine>
+NCFMLNH<.....E....A....EM0Jc....1>
+|
+$SMI<ClCCBr>
+PCN<dihalide>
+NCFMLNH<..........c....9CmIZ....1>
+|
+$SMI<OC(=O)CS(=O)(=O)N>
+PCN<sulfonamide_acid>
+NCFMLNH<..........6....2....01gZJWI.2>
+|

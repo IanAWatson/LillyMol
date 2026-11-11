@@ -30,6 +30,9 @@ nanobind_extension(
         "lillymol_nb_tools.cc",
         "lillymol_nb_tsubstructure.cc",
     ],
+    # Building lillymol also builds the file recording the Python ABI it was
+    # built for, which copy_shared_libraries.sh stages and run_python.sh checks.
+    data = [":lillymol_soabi"],
     dynamic_deps = ["//Molecule_Lib:molecule_lib_shared"],
     deps = [
         "//Molecule_Lib:atom_pair_fingerprint",
@@ -69,6 +72,8 @@ py_test(
     srcs = ["lillymol_nb_doc_test.py"],
     main = "lillymol_nb_doc_test.py",
     data = [":lillymol"] + glob(["examples/reactions/*.py"]),
+    # The test locates the docs directory from LILLYMOL_HOME.
+    env_inherit = ["LILLYMOL_HOME"],
 )
 
 py_test(
@@ -198,6 +203,30 @@ py_test(
         "examples/reactions/chlorine_to_fluorine.textproto",
         "examples/reactions/amide.textproto",
         "examples/reactions/amines.smi",
+    ],
+)
+
+py_test(
+    name = "gfp_formula_tversky_example_test",
+    size = "small",
+    srcs = ["examples/gfp/formula_tversky.py"],
+    main = "examples/gfp/formula_tversky.py",
+    imports = ["."],
+    data = [
+        ":lillymol",
+        "examples/gfp/molecules.smi",
+    ],
+)
+
+py_test(
+    name = "gfp_formula_prefilter_timing_example_test",
+    size = "small",
+    srcs = ["examples/gfp/formula_prefilter_timing.py"],
+    main = "examples/gfp/formula_prefilter_timing.py",
+    imports = ["."],
+    data = [
+        ":lillymol",
+        "examples/gfp/molecules.formula_nh.gfp",
     ],
 )
 

@@ -344,35 +344,6 @@ ReadQueriesFromTFDataRecordProtoFile(const const_IWSubstring& fname,
 
 template <typename T>
 int
-build_query_from_smiles(const const_IWSubstring& smiles, resizable_array_p<T>& queries,
-                        int verbose) {
-  Molecule m;
-
-  set_input_aromatic_structures(1);  // don't bother saving and resetting
-
-  if (!m.build_from_smiles(smiles)) {
-    std::cerr << "build_query_from_smiles:invalid smiles '" << smiles << "'\n";
-    return 0;
-  }
-
-  Molecule_to_Query_Specifications mqs;
-  mqs.set_make_embedding(1);
-
-  T* q = new T;
-
-  if (!q->create_from_molecule(m, mqs)) {
-    std::cerr << "build_query_from_smiles:invalid molecule?? '" << smiles << "'\n";
-    delete q;
-    return 0;
-  }
-
-  queries.add(q);
-
-  return 1;
-}
-
-template <typename T>
-int
 query_from_molecule(MDL_Molecule& m, Molecule_to_Query_Specifications& mqs,
                                resizable_array_p<T>& queries) {
   std::unique_ptr<T> q = std::make_unique<T>();
@@ -384,6 +355,43 @@ query_from_molecule(MDL_Molecule& m, Molecule_to_Query_Specifications& mqs,
   }
 
   queries << q.release();
+
+  return 1;
+}
+
+// Build a query from a single smiles, in the same way as `-q M:file.smi` would if
+// the file contained just that smiles. The Molecule_to_Query_Specifications are
+// those established by the -M option(s). Note that, unlike M:, there is no
+// processing of directives following DIRECTIVE_SEPARATOR_TOKEN because that
+// character is valid within a smiles (ring closures such as %10).
+template <typename T>
+int
+query_from_smiles_as_molecule(const const_IWSubstring& smiles,
+                              Molecule_to_Query_Specifications* mqs,
+                              resizable_array_p<T>& queries, int verbose) {
+  std::unique_ptr<Molecule_to_Query_Specifications> maybe_needed;
+  if (mqs == nullptr) {
+    maybe_needed = std::make_unique<Molecule_to_Query_Specifications>();
+    mqs = maybe_needed.get();
+  }
+
+  set_input_aromatic_structures(1);
+
+  MDL_Molecule m;
+  if (!m.build_from_smiles(smiles)) {
+    std::cerr << "query_from_smiles_as_molecule:invalid smiles '" << smiles << "'\n";
+    return 0;
+  }
+
+  if (!query_from_molecule(m, *mqs, queries)) {
+    std::cerr << "query_from_smiles_as_molecule:cannot create query from '" << smiles
+              << "'\n";
+    return 0;
+  }
+
+  if (verbose > 1) {
+    std::cerr << "Created query from smiles '" << smiles << "'\n";
+  }
 
   return 1;
 }
@@ -469,7 +477,8 @@ queries_from_file_of_molecules(const const_IWSubstring& fname,
   data_source_and_type<MDL_Molecule> input(input_type, fname);
   if (!input.good()) {
     std::cerr << "cannot open '" << fname << "'\n";
-    return 1;
+    moleculeio::set_seek_to(o);
+    return 0;
   }
 
   int rc = queries_from_file_of_molecules(input, mqs, queries, verbose);
@@ -586,8 +595,6 @@ queries_from_ISIS_query_file(const const_IWSubstring& fname,
     const_IWSubstring fname2, directives;
 
     fname.split(fname2, DIRECTIVE_SEPARATOR_TOKEN, directives);
-
-    std::cerr << "Split into '" << fname2 << "' and '" << directives << "'\n";
 
     if (!mqs.parse_directives(directives)) {
       std::cerr << "INvalid molecule to query directives '" << directives << "'\n";
@@ -766,17 +773,20 @@ read_one_or_more_queries_from_file(resizable_array_p<T>& queries,
   input.set_skip_blank_lines(1);
 
   while (msi.read(input)) {
-    T* tmp = new T();
+    auto tmp = std::make_unique<T>();
     if (!tmp->construct_from_msi_object(msi)) {
       std::cerr << "process_queries: cannot build query from '" << msi << "'\n";
       return 0;
     }
 
     assert(tmp->ok());
-    queries.add(tmp);
+
+    // Ownership passes to `queries`.
+    T* q = tmp.release();
+    queries.add(q);
 
     if (verbose) {
-      std::cerr << "Created query " << (queries.size() - 1) << " '" << tmp->comment()
+      std::cerr << "Created query " << (queries.size() - 1) << " '" << q->comment()
                 << "'\n";
     }
 
@@ -787,7 +797,7 @@ read_one_or_more_queries_from_file(resizable_array_p<T>& queries,
     }
   }
 
-  return rc++;
+  return rc;
 }
 
 template <typename T>
@@ -1082,8 +1092,8 @@ AllQueriesInDir(const_IWSubstring& dirname, int verbose,
       continue;
     }
 
-    fs::path fullpath = path / entry;
-    const std::string& fname = fullpath;
+    // entry.path() already includes the directory, so do not join it onto path again.
+    const std::string fname = entry.path().string();
     const const_IWSubstring tmp(fname);
 
     if (fname.ends_with(".qry")) {
@@ -1149,13 +1159,15 @@ AllGlobMatches(const const_IWSubstring& pattern, int verbose,
       continue;
     }
 
-    const_IWSubstring as_string(entry.path().filename());
+    // The std::string must outlive the const_IWSubstring that refers to it.
+    const std::string filename = entry.path().filename().string();
+    const const_IWSubstring as_string(filename);
     if (! iwre2::RE2PartialMatch(as_string, *rx)) {
       continue;
     }
 
-    fs::path fullpath = path / entry;
-    const std::string& fname = fullpath;
+    // entry.path() already includes the directory, so do not join it onto path again.
+    const std::string fname = entry.path().string();
     const const_IWSubstring tmp(fname);
     if (fname.ends_with(".qry")) {
       if (!read_one_or_more_queries_from_file(queries, tmp, verbose)) {
@@ -1235,16 +1247,20 @@ process_cmdline_token(char option, const const_IWSubstring& token,
           << mytoken << "'\n";
       return 0;
     }
-  } else if (mytoken.starts_with("smiles:")) {
+  } else if (mytoken.starts_with("SMILES:") || mytoken.starts_with("smiles:")) {
+    // Lowercase was an undocumented, limited form that ignored -M options.
+    if (mytoken.starts_with("smiles:")) {
+      std::cerr << "Warning: 'smiles:' is deprecated, use 'SMILES:'\n";
+    }
     mytoken.remove_leading_chars(7);
 
-    if (0 == mytoken.length()) {
-      std::cerr << "Must follow smiles: specification with smiles\n";
+    if (mytoken.empty()) {
+      std::cerr << "Must follow SMILES: specification with a smiles\n";
       return 0;
     }
 
-    if (!build_query_from_smiles(mytoken, queries, verbose)) {
-      std::cerr << "process_queries:cannot build query from 'smiles:" << mytoken << "'\n";
+    if (!query_from_smiles_as_molecule(mytoken, mqs, queries, verbose)) {
+      std::cerr << "process_queries:cannot build query from 'SMILES:" << mytoken << "'\n";
       return 0;
     }
   } else if (mytoken.starts_with("I:")) {
@@ -1282,6 +1298,7 @@ process_cmdline_token(char option, const const_IWSubstring& token,
     std::cerr << " -" << option <<" S:file                 file of smarts queries\n";
     std::cerr << " -" << option <<" Q:file                 file of query object queries (also F: recognised)\n";
     std::cerr << " -" << option <<" M:file                 file of molecules that will be converted to query objects\n";
+    std::cerr << " -" << option <<" SMILES:smiles          a single smiles, converted as if it were in an M: file\n";
     std::cerr << " -" << option <<" I:file                 an ISIS query file\n";
     std::cerr << " -" << option <<" proto:proto            inline proto 'proto:query{nrings:3}'\n";
     std::cerr << " -" << option <<" PROTO:file             a query in text proto form\n";

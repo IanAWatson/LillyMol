@@ -43,6 +43,11 @@ FormMask(std::unordered_set<uint32_t>& subset,
 
 int
 BitSubset::InitialiseGfpKnown(const IW_General_Fingerprint& gfp) {
+  if (number_fixed_size_counted_fingerprints() > 0) {
+    cerr << "BitSubset::InitialiseGfpKnown:fixed size counted fingerprints are not supported\n";
+    return 0;
+  }
+
   _nfixed = number_fingerprints();
   _nsparse = number_sparse_fingerprints();
   if (_nfixed == 0 && _nsparse == 0) {
@@ -114,6 +119,12 @@ BitXref::BitXref() {
   _nsparse = 0;
   _sparse = nullptr;
 
+  _nfixed_counted = 0;
+  _fixed_counted = nullptr;
+
+  _has_properties = false;
+  _properties = nullptr;
+
   _highest_feature_number = 0;
 }
 
@@ -126,6 +137,11 @@ BitXref::~BitXref() {
   if (_sparse != nullptr) {
     delete [] _sparse;
     _nsparse = 0;
+  }
+
+  if (_fixed_counted != nullptr) {
+    delete [] _fixed_counted;
+    _nfixed_counted = 0;
   }
 }
 
@@ -174,6 +190,14 @@ NumberFeatures(const IW_General_Fingerprint& gfp) {
     nfeatures += gfp.sparse_fingerprint(i).nset();
   }
 
+  // An upper bound, positions with a count of zero are not features.
+  const int nfixed_counted = number_fixed_size_counted_fingerprints();
+  for (int i = 0; i < nfixed_counted; ++i) {
+    nfeatures += gfp.fixed_size_counted_fingerprint(i).size();
+  }
+
+  nfeatures += gfp.molecular_properties_integer().nproperties();
+
   return nfeatures;
 }
 
@@ -206,7 +230,8 @@ BitSubset::MakeSubset(IW_General_Fingerprint& gfp) {
 int
 BitXref::WriteSvmlFeatures(const IW_General_Fingerprint& gfp,
                         IWString_and_File_Descriptor& output) {
-  if (_nfixed == 0 && _nsparse == 0 && ! InitialiseGfpKnown(gfp)) {
+  if (_nfixed == 0 && _nsparse == 0 && _nfixed_counted == 0 && ! _has_properties &&
+      ! InitialiseGfpKnown(gfp)) {
     cerr << "BitXref::WriteSvmlFeatures:cannot initialise\n";
     return -1;  // Special return value indicating fatal error.
   }
@@ -218,6 +243,23 @@ BitXref::WriteSvmlFeatures(const IW_General_Fingerprint& gfp,
 
   int ndx = 0;
   std::unique_ptr<FeatureCount[]> feature_counts(new FeatureCount[nfeatures]);
+
+  if (_has_properties) {
+    const Molecular_Properties_Integer& mpi = gfp.molecular_properties_integer();
+    const uint8_t* values = mpi.rawdata();
+    for (int i = 0; i < mpi.nproperties(); ++i) {
+      if (values[i] == 0) {
+        continue;
+      }
+      const auto iter = _properties->find(i);
+      if (iter == _properties->cend()) {
+        continue;
+      }
+      feature_counts[ndx].feature = iter->second;
+      feature_counts[ndx].count = values[i];
+      ndx++;
+    }
+  }
 
   for (int i = 0; i < _nfixed; ++i) {
     const BitToFeature* b2f = _fixed[i];
@@ -252,6 +294,24 @@ BitXref::WriteSvmlFeatures(const IW_General_Fingerprint& gfp,
     }
   }
 
+  for (int i = 0; i < _nfixed_counted; ++i) {
+    const BitToFeature* b2f = _fixed_counted[i];
+    const auto& fp = gfp.fixed_size_counted_fingerprint(i);
+    for (int j = 0; j < fp.size(); ++j) {
+      const uint32_t c = fp.count(j);
+      if (c == 0) {
+        continue;
+      }
+      const auto iter = b2f->find(j);
+      if (iter == b2f->cend()) {
+        continue;
+      }
+      feature_counts[ndx].feature = iter->second;
+      feature_counts[ndx].count = c;
+      ndx++;
+    }
+  }
+
   std::sort(feature_counts.get(), feature_counts.get() + ndx,
             [](const FeatureCount& fc1, const FeatureCount& fc2) {
     return fc1.feature < fc2.feature;
@@ -268,8 +328,11 @@ int
 BitXref::InitialiseGfpKnown(const IW_General_Fingerprint& gfp) {
   _nfixed = number_fingerprints();
   _nsparse = number_sparse_fingerprints();
+  _nfixed_counted = number_fixed_size_counted_fingerprints();
+  _has_properties = gfp.molecular_properties_integer().active();
   _fixed = new BitToFeature*[_nfixed];
   _sparse = new BitToFeature*[_nsparse];
+  _fixed_counted = new BitToFeature*[_nfixed_counted];
   for (int i = 0; i < _nfixed; ++i) {
     const IWString tag = fixed_fingerprint_tag(i);
     const auto iter = _tag_to_bit_to_feature.find(tag);
@@ -293,7 +356,55 @@ BitXref::InitialiseGfpKnown(const IW_General_Fingerprint& gfp) {
     _sparse[i] = &(iter->second);
   }
 
-  return _nfixed + _nsparse;
+  for (int i = 0; i < _nfixed_counted; ++i) {
+    const IWString tag = fixed_size_counted_fingerprint_tag(i);
+    const auto iter = _tag_to_bit_to_feature.find(tag);
+    if (iter == _tag_to_bit_to_feature.cend()) {
+      cerr << "BitXref::InitialiseGfpKnown:no fixed counted '" << tag << "' fingerprint in input\n";
+      return 0;
+    }
+    _fixed_counted[i] = &(iter->second);
+  }
+
+  if (_has_properties) {
+    const IWString tag = property_tag();
+    const auto iter = _tag_to_bit_to_feature.find(tag);
+    if (iter == _tag_to_bit_to_feature.cend()) {
+      cerr << "BitXref::InitialiseGfpKnown:no molecular properties '" << tag << "' in input\n";
+      return 0;
+    }
+    _properties = &(iter->second);
+  }
+
+  // Every fingerprint in the input is known. The cross reference must not
+  // contain any others, or features that were used to build the model will
+  // be silently absent from the output.
+  const int nfingerprints = _nfixed + _nsparse + _nfixed_counted + (_has_properties ? 1 : 0);
+  if (_tag_to_bit_to_feature.size() != static_cast<size_t>(nfingerprints)) {
+    cerr << "BitXref::InitialiseGfpKnown:cross reference contains "
+         << _tag_to_bit_to_feature.size() << " fingerprints, but the input has "
+         << nfingerprints << '\n';
+    for (const auto& [tag, _] : _tag_to_bit_to_feature) {
+      bool in_input = false;
+      for (int i = 0; i < _nfixed; ++i) {
+        in_input = in_input || (tag == fixed_fingerprint_tag(i));
+      }
+      for (int i = 0; i < _nsparse; ++i) {
+        in_input = in_input || (tag == sparse_fingerprint_tag(i));
+      }
+      for (int i = 0; i < _nfixed_counted; ++i) {
+        in_input = in_input || (tag == fixed_size_counted_fingerprint_tag(i));
+      }
+      in_input = in_input || (_has_properties && tag == property_tag());
+      if (!in_input) {
+        cerr << "BitXref::InitialiseGfpKnown:fingerprint '" << tag
+             << "' is in the cross reference, but not in the input\n";
+      }
+    }
+    return 0;
+  }
+
+  return nfingerprints;
 }
 
 uint32_t
@@ -316,6 +427,24 @@ BitXref::PopulateFeatureVector(const IW_General_Fingerprint& gfp,
                                std::vector<T>& features) const {
   std::fill(features.begin(), features.end(), 0.0);
   int rc = 0;
+
+  if (_has_properties) {
+    const Molecular_Properties_Integer& mpi = gfp.molecular_properties_integer();
+    const uint8_t* values = mpi.rawdata();
+    for (int i = 0; i < mpi.nproperties(); ++i) {
+      if (values[i] == 0) {
+        continue;
+      }
+      const auto iter = _properties->find(i);
+      if (iter == _properties->end()) {
+        continue;
+      }
+      assert(iter->second < features.size());
+      features[iter->second] = static_cast<float>(values[i]);
+      rc++;
+    }
+  }
+
   for (int i = 0; i < _nfixed; ++i) {
     IWDYFP& fp = gfp[i];
     int j = 0;
@@ -347,6 +476,23 @@ BitXref::PopulateFeatureVector(const IW_General_Fingerprint& gfp,
     }
   }
 
+  for (int i = 0; i < _nfixed_counted; ++i) {
+    const auto& fp = gfp.fixed_size_counted_fingerprint(i);
+    for (int j = 0; j < fp.size(); ++j) {
+      const int count = fp.count(j);
+      if (count == 0) {
+        continue;
+      }
+      const auto iter = _fixed_counted[i]->find(j);
+      if (iter == _fixed_counted[i]->end()) {
+        continue;
+      }
+      assert(iter->second < features.size());
+      features[iter->second] = static_cast<float>(count);
+      rc++;
+    }
+  }
+
   return rc;
 }
 template int BitXref::PopulateFeatureVector(const IW_General_Fingerprint& gfp, std::vector<float>&) const;
@@ -358,7 +504,7 @@ BitXref::WriteDsv(const IW_General_Fingerprint& gfp, char output_separator,
     _highest_feature_number = HighestFeatureNumber();
     if (_highest_feature_number <= 0) {
       cerr << "BitXref::WriteDsv:highest feature number not discerned\n";
-      return 0;
+      return -1;  // Special return value indicating fatal error.
     }
   }
 

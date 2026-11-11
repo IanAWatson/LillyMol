@@ -1,8 +1,11 @@
 #include "Utilities/GFP_Tools/gfp_context.h"
 
+#include <cmath>
 #include <cstdlib>
 #include <filesystem>
 #include <fstream>
+#include <limits>
+#include <memory>
 #include <sstream>
 #include <string>
 
@@ -821,6 +824,200 @@ TEST(TestGFPContext, FoldedFormulaDropsCountsAndWorksInLists) {
   ASSERT_TRUE(list.Add(propane));
   EXPECT_FLOAT_EQ(list.Distance(0, 1), context->Distance(a, b));
   EXPECT_FLOAT_EQ(list.Distance(a, 1), context->Distance(a, b));
+}
+
+TEST(TestTversky, SetValidatesAndScales) {
+  Tversky tv;
+  EXPECT_FALSE(tv.Set(-1.0f, 1.0f));
+  EXPECT_FALSE(tv.Set(1.0f, -0.5f));
+  EXPECT_FALSE(tv.Set(0.0f, 0.0f));
+  EXPECT_FALSE(tv.Set(std::numeric_limits<float>::quiet_NaN(), 1.0f));
+  EXPECT_FALSE(tv.active());
+
+  ASSERT_TRUE(tv.Set(1.0f, 0.0f));
+  EXPECT_TRUE(tv.active());
+  EXPECT_FLOAT_EQ(tv.a(), 2.0f);
+  EXPECT_FLOAT_EQ(tv.b(), 0.0f);
+
+  ASSERT_TRUE(tv.Set(1.0f, 0.0f, false));
+  EXPECT_FLOAT_EQ(tv.a(), 1.0f);
+  EXPECT_FLOAT_EQ(tv.b(), 0.0f);
+
+  ASSERT_TRUE(tv.Set(3.0f, 1.0f));
+  EXPECT_FLOAT_EQ(tv.a(), 1.5f);
+  EXPECT_FLOAT_EQ(tv.b(), 0.5f);
+}
+
+std::shared_ptr<GFPList>
+ListFromSmiles(std::shared_ptr<gfp_context::GFPContext> context,
+               const std::vector<std::string>& smiles) {
+  auto list = std::make_shared<GFPList>(context);
+  for (const std::string& s : smiles) {
+    Molecule m;
+    EXPECT_TRUE(m.build_from_smiles(s.c_str()));
+    EXPECT_TRUE(list->Add(m)) << s;
+  }
+  return list;
+}
+
+// Tversky with equal weights is Tanimoto for every component kind: fixed binary
+// (IW, MACCS), sparse (EC), fixed counted (formula), and molecular properties,
+// which are not affected by Tversky.
+TEST(TestTversky, EqualWeightsAreTanimotoForAllComponentKinds) {
+  auto context = std::make_shared<gfp_context::GFPContext>();
+  ASSERT_TRUE(context->BuildFromSpecs({gfp_context::GFPGeneratorSpec::IWMFingerprint(),
+                                       gfp_context::GFPGeneratorSpec::MACCSKeys(),
+                                       gfp_context::GFPGeneratorSpec::ECFingerprint(),
+                                       gfp_context::GFPGeneratorSpec::FormulaFingerprint(),
+                                       gfp_context::GFPGeneratorSpec::MolecularProperties()}));
+  ASSERT_GT(context->nfixed_binary(), 0);
+  ASSERT_GT(context->nsparse(), 0);
+  ASSERT_GT(context->nfixed_counted(), 0);
+  ASSERT_TRUE(context->has_molecular_properties());
+
+  auto list = ListFromSmiles(context, {"OCC ethanol", "OCCCC butanol", "OCCCCCCCC octanol",
+                                       "c1ccccc1O phenol", "CC(=O)Nc1ccccc1 acetanilide"});
+
+  Tversky tv;
+  ASSERT_TRUE(tv.Set(1.0f, 1.0f));
+  for (int i = 0; i < list->size(); ++i) {
+    for (int j = 0; j < list->size(); ++j) {
+      EXPECT_THAT(list->Distance(i, j, &tv), FloatNear(list->Distance(i, j), 1.0e-5f))
+          << i << ' ' << j;
+    }
+  }
+}
+
+// The query is on the left: weight a applies to features only in the query.
+TEST(TestTversky, QueryWeightPenalisesFeaturesMissingFromCandidate) {
+  auto context = std::make_shared<gfp_context::GFPContext>();
+  ASSERT_TRUE(context->BuildFromSpecs({gfp_context::GFPGeneratorSpec::FormulaFingerprint()}));
+
+  auto list = ListFromSmiles(context, {"CO methanol", "CCCCCO pentanol", "CCCO propanol"});
+
+  gfp_context::GFPFingerprint query;
+  {
+    Molecule propanol;
+    ASSERT_TRUE(propanol.build_from_smiles("CCCO propanol"));
+    ASSERT_TRUE(context->Fingerprint(propanol, query));
+  }
+
+  // Candidates that contain everything in the query, such as pentanol.
+  Tversky query_features;
+  ASSERT_TRUE(query_features.Set(2.0f, 0.0f));
+  EXPECT_THAT(list->Distance(query, 1, &query_features), FloatNear(0.0f, 1.0e-6f));  // pentanol
+  EXPECT_THAT(list->Distance(query, 2, &query_features), FloatNear(0.0f, 1.0e-6f));  // propanol
+  EXPECT_GT(list->Distance(query, 0, &query_features), 0.1f);                        // methanol
+
+  // Candidates that are contained in the query, such as methanol.
+  Tversky candidate_features;
+  ASSERT_TRUE(candidate_features.Set(0.0f, 2.0f));
+  EXPECT_THAT(list->Distance(query, 0, &candidate_features), FloatNear(0.0f, 1.0e-6f));
+  EXPECT_THAT(list->Distance(query, 2, &candidate_features), FloatNear(0.0f, 1.0e-6f));
+  EXPECT_GT(list->Distance(query, 1, &candidate_features), 0.1f);
+
+  // Row indices and standalone fingerprints agree, and swapping the roles of
+  // the two rows together with the weights gives the same answer.
+  for (int j = 0; j < 3; ++j) {
+    EXPECT_THAT(list->Distance(2, j, &query_features),
+                FloatNear(list->Distance(query, j, &query_features), 1.0e-6f));
+    EXPECT_THAT(list->Distance(2, j, &query_features),
+                FloatNear(list->Distance(j, 2, &candidate_features), 1.0e-6f));
+  }
+
+  EXPECT_THAT(context->Distance(query, query, &query_features), FloatNear(0.0f, 1.0e-6f));
+}
+
+TEST(TestTversky, NearestNeighboursUseTversky) {
+  auto context = std::make_shared<gfp_context::GFPContext>();
+  ASSERT_TRUE(context->BuildFromSpecs({gfp_context::GFPGeneratorSpec::FormulaFingerprint()}));
+
+  auto list = ListFromSmiles(context, {"CO methanol", "CCCCCO pentanol", "CCCO propanol"});
+
+  gfp_context::GFPFingerprint query;
+  {
+    Molecule propanol;
+    ASSERT_TRUE(propanol.build_from_smiles("CCCO propanol"));
+    ASSERT_TRUE(context->Fingerprint(propanol, query));
+  }
+
+  Tversky tv;
+  ASSERT_TRUE(tv.Set(2.0f, 0.0f));
+
+  const auto hits = list->NearestNeighbours(query, 3, &tv);
+  ASSERT_EQ(hits.size(), 3u);
+  EXPECT_THAT(hits[0].distance, FloatNear(0.0f, 1.0e-6f));
+  EXPECT_THAT(hits[1].distance, FloatNear(0.0f, 1.0e-6f));
+  EXPECT_EQ(hits[2].index, 0);  // methanol
+
+  const auto within = list->NearestNeighboursWithinDistance(query, 0.0f, &tv);
+  EXPECT_EQ(within.size(), 2u);
+
+  // Searching by row excludes the query row itself.
+  const auto by_row = list->NearestNeighbours(2, 2, &tv);
+  ASSERT_EQ(by_row.size(), 2u);
+  EXPECT_EQ(by_row[0].index, 1);  // pentanol
+  EXPECT_THAT(by_row[0].distance, FloatNear(0.0f, 1.0e-6f));
+  EXPECT_EQ(list->NearestNeighboursWithinDistance(2, 0.0f, &tv).size(), 1u);
+
+  // Without Tversky nothing but the identical molecule is at zero distance.
+  EXPECT_EQ(list->NearestNeighboursWithinDistance(query, 0.0f).size(), 1u);
+}
+
+TEST(TestGFPContext, FormulaWithoutHydrogensSpec) {
+  EXPECT_EQ(gfp_context::GFPGeneratorSpec::FormulaFingerprint().Components()[0].tag,
+            "FCFML<");
+
+  auto spec = gfp_context::GFPGeneratorSpec::FormulaFingerprint(false);
+  EXPECT_FALSE(spec.include_hydrogens());
+  EXPECT_EQ(spec.Components()[0].tag, "FCFMLNH<");
+  EXPECT_EQ(spec.Repr(), "GFP.formula(hydrogens=False)");
+
+  spec.set_fixed_width(128);
+  EXPECT_EQ(spec.Components()[0].tag, "FPFMLNHFW128<");
+  EXPECT_EQ(spec.Repr(), "GFP.formula(hydrogens=False, fixed_width=128)");
+
+  // Both forms can be in one context since their tags differ.
+  gfp_context::GFPContext context;
+  ASSERT_TRUE(context.BuildFromSpecs({gfp_context::GFPGeneratorSpec::FormulaFingerprint(),
+                                      gfp_context::GFPGeneratorSpec::FormulaFingerprint(false)}));
+  EXPECT_EQ(context.nfixed_counted(), 2);
+}
+
+// A molecule that contains the query, but with substituted atoms, has at least
+// every count of the query only if the counts of atoms bearing hydrogens are left out.
+TEST(TestTversky, FormulaWithoutHydrogensFindsSubstitutedSuperset) {
+  auto without = std::make_shared<gfp_context::GFPContext>();
+  ASSERT_TRUE(without->BuildFromSpecs({gfp_context::GFPGeneratorSpec::FormulaFingerprint(false)}));
+  auto with = std::make_shared<gfp_context::GFPContext>();
+  ASSERT_TRUE(with->BuildFromSpecs({gfp_context::GFPGeneratorSpec::FormulaFingerprint()}));
+  EXPECT_NE(without->context_hash(), with->context_hash());
+
+  const std::vector<std::string> smiles = {"Cc1ccccc1O cresol", "c1ccccc1 benzene",
+                                           "Oc1ccccc1 phenol"};
+  auto list_without = ListFromSmiles(without, smiles);
+  auto list_with = ListFromSmiles(with, smiles);
+
+  Molecule phenol;
+  ASSERT_TRUE(phenol.build_from_smiles("Oc1ccccc1 query"));
+  gfp_context::GFPFingerprint query_without, query_with;
+  ASSERT_TRUE(without->Fingerprint(phenol, query_without));
+  ASSERT_TRUE(with->Fingerprint(phenol, query_with));
+
+  Tversky tv;
+  ASSERT_TRUE(tv.Set(2.0f, 0.0f));
+
+  EXPECT_THAT(list_without->Distance(query_without, 0, &tv), FloatNear(0.0f, 1.0e-6f));  // cresol
+  EXPECT_THAT(list_without->Distance(query_without, 2, &tv), FloatNear(0.0f, 1.0e-6f));  // phenol
+  EXPECT_GT(list_without->Distance(query_without, 1, &tv), 0.1f);                        // benzene
+
+  // With the hydrogen counts the cresol has fewer aromatic CH atoms than the query.
+  EXPECT_GT(list_with->Distance(query_with, 0, &tv), 0.05f);
+  EXPECT_THAT(list_with->Distance(query_with, 2, &tv), FloatNear(0.0f, 1.0e-6f));
+
+  // The two forms cannot be compared with each other.
+  EXPECT_TRUE(std::isnan(list_without->Distance(query_with, 0, &tv)));
+  EXPECT_TRUE(std::isnan(list_with->Distance(query_without, 0, &tv)));
 }
 
 }  // namespace

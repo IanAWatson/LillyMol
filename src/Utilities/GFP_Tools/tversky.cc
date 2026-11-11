@@ -50,6 +50,29 @@ display_standard_tversky_options(std::ostream & os, char flag)
 // clang-format on
 
 int
+Tversky::Set(float a, float b, bool scale_to_2) {
+  if (!(a >= 0.0f) || !(b >= 0.0f)) {  // also rejects NaN
+    return 0;
+  }
+
+  if (a + b <= 0.0f) {
+    return 0;
+  }
+
+  if (scale_to_2) {
+    const float sum = a + b;
+    a = a / sum * 2.0f;
+    b = b / sum * 2.0f;
+  }
+
+  _a = a;
+  _b = b;
+  _active = 1;
+
+  return 1;
+}
+
+int
 Tversky::parse_command_line(Command_Line& cl, char aflag, char bflag, int verbose) {
   if (!cl.option_present(aflag) && !cl.option_present(bflag))  // nothing specified
   {

@@ -88,6 +88,9 @@ class ActivityReportTest(unittest.TestCase):
         self.assertIn('Global activity mean', rendered)
         self.assertIn('Sort delta mean', rendered)
         self.assertIn('Delta Mean', rendered)
+        self.assertIn("sortTable('matched_mean')", rendered)
+        self.assertIn("sortTable('unmatched_mean')", rendered)
+        self.assertNotIn("sortTable('matched_mean')", standard)
         self.assertIn('n 2 mean 8', rendered)
         self.assertEqual(data, before)
 

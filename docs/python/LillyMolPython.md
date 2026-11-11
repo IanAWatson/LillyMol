@@ -1239,6 +1239,27 @@ differences among more abundant elements. The change going from one Oxygen
 atom to two Oxygen atoms is much more important than going from 15 to 16
 Carbon atoms.
 
+The fingerprint has 18 counted positions: carbon, nitrogen, oxygen and sulphur
+(each counted separately when aromatic), fluorine, phosphorus, chlorine, bromine,
+iodine, other elements, the number of atoms bearing a hydrogen (separately for
+heteroatoms, aromatic carbons and other carbons), and the number of ring atoms.
+It is therefore a little richer than an element count, which matters when
+searching with Tversky similarity (see below).
+
+`GFP.formula(hydrogens=False)` leaves out the three counts of atoms bearing hydrogens,
+which are then zero, and uses the tag `FCFMLNH<`. A query written as a fragment has
+hydrogens on atoms that are substituted in a molecule that contains it, so with those
+counts a molecule that contains the query can have fewer counts than the query and
+will not be found by a Tversky search that requires at least the counts of the
+query. The two forms have different tags, so they cannot be compared.
+
+Files of formula fingerprints can be written by `formula_fingerprint` or
+`gfp_make.sh -FORMULA`, whose default is the same fixed counted form (tag `FCFML<`)
+with the same log scaling; see [formula_fingerprint](/docs/Molecule_Tools/formula_fingerprint.md).
+They can be read with `GFPList.from_file()` and searched with fingerprints generated
+here. The sparse form (`NCFML<`, from `-FORMULA,sparse`) has a different tag and
+cannot be compared with these fingerprints.
+
 `GFP.cats(max_path_length=10, include_hydrophobic_pairs=True)` adds the sparse
 counted CATS pharmacophore-pair fingerprint. The tag is `NCCATS10<` when
 hydrophobic-hydrophobic pairs are included and `NCCATSP10<` when they are
@@ -1426,6 +1447,112 @@ neighbours within the threshold, also sorted by increasing distance. When
 `query` is a row number, the query fingerprint itself is not included in either
 result. When `query` is a standalone `GFPFingerprint`, all list entries are
 eligible neighbours.
+
+### Tversky searching
+
+Tanimoto distance treats the two fingerprints equally. Tversky similarity does
+not, which makes it possible to ask questions such as "which molecules have at
+least everything my query has?". For a query and a candidate, the similarity is
+
+```
+common / (query_weight * only_in_query + candidate_weight * only_in_candidate + common)
+```
+
+where `only_in_query` is what the query has that the candidate lacks, and
+`only_in_candidate` is what the candidate has that the query lacks. Pass a
+`Tversky` object to any of the distance and nearest-neighbour methods with the
+`tversky=` argument:
+
+```python
+from lillymol import GFP, GFPContext, GFPList, MolFromSmiles, Tversky, slurp
+
+ctx = GFPContext.from_specs([GFP.formula()])
+gfp = GFPList(ctx)
+gfp.add_molecules(slurp("haystack.smi"), store_metadata=True)
+
+query_fp = ctx.fingerprint(MolFromSmiles("CC(=O)Nc1ccc(O)cc1 query"))
+
+# Everything in the query is wanted, anything extra in the candidate is free.
+contains_query = Tversky(query=2.0, candidate=0.0)
+for hit in gfp.nearest_neighbours(query_fp, 10, tversky=contains_query):
+  print(hit.distance, gfp.id(hit.index))
+```
+
+`Tversky(query=1.0, candidate=1.0, scale=True)` takes the two weights. They must
+be non-negative and not both zero, otherwise `ValueError` is raised. A weight of
+zero means that kind of difference is not penalised at all.
+
+| Settings | Distance 0 for candidates that... |
+| --- | --- |
+| `query=1, candidate=1` | are identical to the query (this is Tanimoto) |
+| `query=2, candidate=0` | contain everything the query has |
+| `query=0, candidate=2` | have nothing that the query lacks |
+
+By default the two weights are rescaled so that they sum to 2, so only their
+ratio matters: `Tversky(query=1, candidate=0)` is the same as
+`Tversky(query=2, candidate=0)`. Set `scale=False` to use the values as given.
+The `query` and `candidate` properties report the values in effect.
+
+The `tversky=` argument is accepted by `GFPList.distance` (both forms),
+`GFPList.nearest_neighbours`, `GFPList.nearest_neighbours_within_distance` and
+`GFPContext.distance`. Without it, behaviour is unchanged. Some things to know:
+
+- The query is always the first argument: `fp` or row `i` in `distance`, the
+  `query` in a neighbour search, and `lhs` in `GFPContext.distance`. A Tversky
+  distance is not symmetric, so `gfp.distance(i, j, tversky=Tversky(2, 0))` equals
+  `gfp.distance(j, i, tversky=Tversky(0, 2))`, not `gfp.distance(j, i, tversky=Tversky(2, 0))`.
+- It applies to every component of the context, including binary, sparse counted
+  and fixed counted components, and the per-component results are combined with
+  the usual component weights. Molecular properties components are not affected
+  by Tversky.
+- For counted fingerprints, such as the formula fingerprint, the counts are
+  used, so "contains" means at least as large a count in every position.
+- It does not change the context identity, so it never affects compatibility.
+- This is the same convention as the `-V a=.. b=..` option of the command line
+  tools: `a` is `query` and `b` is `candidate`. See the Tversky section of
+  [gfp.md](/docs/GFP/gfp.md). The command line options `optimistic`, `nc01` and
+  `nset0s` are not available from Python.
+
+#### Approximate substructure searching and pre-filtering
+
+`Tversky(query=2, candidate=0)` on the formula fingerprint can be used to find
+molecules that might contain a query as a substructure, very quickly, so that a more
+precise method such as substructure searching need only be applied to the
+candidates. Use `GFP.formula(hydrogens=False)` for this. The formula fingerprint is not
+selective: it knows only about counts of atoms, so many molecules that do not contain
+the query will also be found. Its advantage is speed.
+
+With the hydrogen counts omitted, a molecule that contains the query as a SMARTS
+substructure always has at least the counts of the query, so no molecules that contain
+it are lost (apart from the effect of a tolerance on the distance, if one is used).
+As a guide, for ten fragment queries (benzene, phenol, acetanilide, pyridine,
+a carboxylic acid, naphthalene, a sulfonamide, chlorobenzene, indole and piperazine)
+and 2000 ChEMBL molecules, at distance zero:
+
+| `GFP.formula(...)` | molecules found that contain the query | molecules passing the filter |
+| --- | --- | --- |
+| `hydrogens=False` | 100% | 59% on average, from 15% (chlorobenzene) to 91% (benzene) |
+| `hydrogens=True` | 71% (from 34% for piperazine) | 39% on average |
+
+The filter removes most molecules only when the query has rarer elements. The path
+fingerprint (`GFP.iw()`) is much more selective for the same purpose, at the cost of a
+slower comparison, so the two can be used one after the other. Measure the recall on
+your own data and queries before relying on any filter.
+
+The saving cannot be more than one over the fraction of molecules that pass, because those
+still have to be searched, however slow the precise method is. For the 2.7 million molecules of
+ChEMBL a phenol query passes 84%, so at best the filter makes the whole job 1.2 times faster
+(measured 1.18), whereas chlorobenzene and a sulfonamide pass 17% (5.7 times faster). Scanning
+all 2.7 million fingerprints takes about 75 ms, 27 ns per molecule, about half the cost of
+scanning stored path fingerprints, but building the list of the molecules that pass takes
+more than the scan when many pass. See the
+[example README](/src/nanobind/examples/gfp/README.md) for the measurements.
+
+Two complete, tested examples are in [src/nanobind/examples/gfp](/src/nanobind/examples/gfp/README.md).
+[formula_tversky.py](/src/nanobind/examples/gfp/formula_tversky.py) shows how the
+distances change with the Tversky weights, and checks the fingerprint as a filter against
+real substructure searching. [formula_prefilter_timing.py](/src/nanobind/examples/gfp/formula_prefilter_timing.py)
+times the filter followed by substructure searching on a large collection.
 
 ### Component selection and weights
 

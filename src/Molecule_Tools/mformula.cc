@@ -107,13 +107,15 @@ MFormula::Build(Molecule& m, atom_number_t i) {
     ++_count[kMFOther];
   }
 
-  if (int hcount = m.hcount(i); hcount > 0) {
-    if (z != 6) {
-      ++_count[kHydrogenOnHeteroatom];
-    } else if (_consider_aromatic && m.is_aromatic(i)) {
-      ++_count[kHydrogenAromatic];
-    } else {
-      ++_count[kHydrogen];
+  if (_include_hydrogens) {
+    if (int hcount = m.hcount(i); hcount > 0) {
+      if (z != 6) {
+        ++_count[kHydrogenOnHeteroatom];
+      } else if (_consider_aromatic && m.is_aromatic(i)) {
+        ++_count[kHydrogenAromatic];
+      } else {
+        ++_count[kHydrogen];
+      }
     }
   }
 

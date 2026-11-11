@@ -42,5 +42,4 @@ template int queries_from_ISIS_query_file<Substructure_Hit_Statistics>(const_IWS
 template int queries_from_ISIS_query_file<Substructure_Hit_Statistics>(const_IWSubstring const&, Molecule_to_Query_Specifications&, resizable_array_p<Substructure_Hit_Statistics>&, int);
 template int queries_from_ISIS_query_file<Substructure_Hit_Statistics>(data_source_and_type<MDL_Molecule>&, Molecule_to_Query_Specifications&, resizable_array_p<Substructure_Hit_Statistics>&, int);
 template int query_from_ISIS_query_file<Substructure_Hit_Statistics>(MDL_Molecule&, Molecule_to_Query_Specifications&, resizable_array_p<Substructure_Hit_Statistics>&, int);
-template int build_query_from_smiles(const const_IWSubstring & smiles, resizable_array_p<Substructure_Hit_Statistics> & queries, int verbose);
 

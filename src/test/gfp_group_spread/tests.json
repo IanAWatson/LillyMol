@@ -18,7 +18,7 @@
     {
       "name": "default_2_groups",
       "args": [
-         "-G #{indir}/in.gfp #{indir}/in.gfp"
+         "-G #{indir}/group.txt #{indir}/in.gfp"
       ]
     },
     {

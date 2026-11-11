@@ -506,7 +506,7 @@ def command_analyse(args: argparse.Namespace) -> int:
     data = analyse(args)
     write_json(data, args.output)
     if args.html:
-        Path(args.html).write_text(build_html(data, args.title, show_median=not args.nomedian, page_size=args.page_size))
+        Path(args.html).write_text(build_html(data, args.title, show_median=args.median, page_size=args.page_size))
     return 0
 
 
@@ -518,13 +518,13 @@ def command_html(args: argparse.Namespace) -> int:
     except json.JSONDecodeError as exc:
         die(f"Cannot parse JSON '{args.input}': {exc}")
     if args.sort is not None or args.top_n:
-        rows = ranked_rows(data, args.sort or ('abs_mean' if args.nomedian else 'abs_median'), args.ascending,
+        rows = ranked_rows(data, args.sort or ('abs_median' if args.median else 'abs_mean'), args.ascending,
                            args.top_n, args.min_matches, args.min_unmatched)
     else:
         rows = [row for row in data['queries']
                 if row['matched']['summary']['n'] >= args.min_matches and
                 row['unmatched']['summary']['n'] >= args.min_unmatched]
-    Path(args.output).write_text(build_html(data, args.title, rows=rows, show_median=not args.nomedian, page_size=args.page_size))
+    Path(args.output).write_text(build_html(data, args.title, rows=rows, show_median=args.median, page_size=args.page_size))
     return 0
 
 
@@ -545,8 +545,8 @@ def add_analyse_args(parser: argparse.ArgumentParser) -> None:
     parser.add_argument('--html', help='Optional HTML report written from the same analysis')
     parser.add_argument('--page_size', type=nonnegative_integer, default=50,
                         help='HTML rows per page (default 50; 0 shows all retained rows)')
-    parser.add_argument('--nomedian', action='store_true',
-                        help='Hide median statistics in HTML; JSON statistics are unchanged')
+    parser.add_argument('--median', action='store_true',
+                        help='Show median statistics in HTML (default: means only); JSON statistics are unchanged')
     parser.add_argument('--title', default='Substructure Activity Exploration', help='HTML report title')
     parser.add_argument('--bins', type=int, default=20, help='Number of common histogram bins')
     parser.add_argument('--min_matches', type=nonnegative_integer, default=1,
@@ -570,14 +570,14 @@ def main(argv: list[str] | None = None) -> int:
     html_parser.add_argument('input', help='Analysis JSON')
     html_parser.add_argument('-o', '--output', required=True, help='Output HTML file')
     html_parser.add_argument('--title', default='Substructure Activity Exploration', help='HTML report title')
-    html_parser.add_argument('--nomedian', action='store_true',
-                             help='Hide median statistics; implicit ranking uses abs_mean')
+    html_parser.add_argument('--median', action='store_true',
+                             help='Show median statistics; implicit ranking then uses abs_median instead of abs_mean')
     html_parser.add_argument('--page_size', type=nonnegative_integer, default=50,
                              help='Rows per page (default 50; 0 shows all retained rows)')
     html_parser.add_argument('--top_n', type=nonnegative_integer, default=0,
                              help='Limit HTML rows after ranking (default 0: all)')
     html_parser.add_argument('--sort', choices=SORT_FIELDS,
-                             help='Rank by effect or support; --top_n defaults to abs_median (abs_mean with --nomedian)')
+                             help='Rank by effect or support; --top_n defaults to abs_mean (abs_median with --median)')
     html_parser.add_argument('--ascending', action='store_true', help='Rank low to high')
     html_parser.add_argument('--min_matches', type=nonnegative_integer, default=0,
                              help='Minimum matched molecules when rendering existing JSON')

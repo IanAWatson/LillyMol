@@ -2232,4 +2232,24 @@ TEST_F(TestSubstructure, TestLinkAtomsNoMatches)
   EXPECT_TRUE(_DoPerumationsTests(0));
 }
 
+TEST_F(TestSubstructure, SmilesSingleComponent) {
+  ASSERT_TRUE(_query.create_from_smiles("C"));
+
+  ASSERT_TRUE(_m.build_from_smiles("CC"));
+  EXPECT_GT(_query.substructure_search(_m, _sresults), 0u);
+}
+
+// Each '.' separated component of the smiles is a separate root atom, and
+// all of them must match. Previously only the first component was used, so a
+// molecule with no oxygen matched.
+TEST_F(TestSubstructure, SmilesMultipleComponentsAllMustMatch) {
+  ASSERT_TRUE(_query.create_from_smiles("C.O"));
+
+  ASSERT_TRUE(_m.build_from_smiles("CC"));
+  EXPECT_EQ(_query.substructure_search(_m, _sresults), 0u);
+
+  ASSERT_TRUE(_m.build_from_smiles("CCO"));
+  EXPECT_GT(_query.substructure_search(_m, _sresults), 0u);
+}
+
 }  // namespace

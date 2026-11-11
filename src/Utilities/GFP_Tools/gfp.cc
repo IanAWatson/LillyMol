@@ -480,6 +480,11 @@ number_sparse_fingerprints() {
   return _number_sparse_fingerprints;
 }
 
+int
+number_fixed_size_counted_fingerprints() {
+  return number_fixed_size_counted_fingerprints_in_file;
+}
+
 static IWString identifier_tag("PCN<");
 
 void
@@ -2188,6 +2193,12 @@ IW_General_Fingerprint::_construct_from_tdt(IW_TDT& tdt, int& fatal) {
            << _fixed_size_counted_fingerprint_tag[i] << "'\n";
       fatal = 1;
       return 0;
+    }
+
+    // The record parser expects no trailing newline, which is present unless the
+    // tool has called set_include_newlines_in_tdt(0).
+    if (fp.ends_with('\n')) {
+      fp.chop();
     }
 
     if (!_fixed_size_counted_fingerprint[i].construct_from_tdt_record(fp)) {
@@ -3930,6 +3941,11 @@ fixed_fingerprint_tag(int i) {
 const IWString&
 sparse_fingerprint_tag(int i) {
   return _sparse_fingerprint_tag[i];
+}
+
+const IWString&
+fixed_size_counted_fingerprint_tag(int i) {
+  return _fixed_size_counted_fingerprint_tag[i];
 }
 
 int

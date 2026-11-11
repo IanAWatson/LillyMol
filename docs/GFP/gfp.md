@@ -418,18 +418,45 @@ slow compared with bit comparison operations.
 
 ### Tversky
 Many tools support a '-V' option, which allows specification of Tversky
-parameters. It is always super confusing which way the parameters go, and
-it is often easiest to try to both ways and see.
+parameters. The similarity between two fingerprints is
 
-For example, start with aspirin and do a similarity search into a larger
-set with the opposite Tversky settings.
+    bits_in_common / (a * bits_only_in_needle + b * bits_only_in_haystack + bits_in_common)
+
+where the *needle* is the fingerprint given with the `-p` option (the query) and the
+*haystack* molecule is the one read from the input file. Note the direction:
+
+* `a` weights features that are in the needle but missing from the haystack molecule.
+* `b` weights features that are in the haystack molecule but missing from the needle.
+
+By default the two values are rescaled so that `a+b=2`, so only their ratio matters,
+and `a=1 b=1` is Tanimoto. A weight of zero means that kind of difference is not
+penalised at all.
+
+This gives two useful special cases. Start with aspirin and do a similarity search
+into a larger set.
 ```
 gfp_make -NCIW aspirin.smi > aspirin.gfp
 gfp_make -NCIW haystack.smi > haystack.gfp
 gfp_lnearneighbours -n 10 -p aspirin.gfp -V a=2 -V b=0 haystack.gfp > aspirin.nn
 ```
-we find molecules that are subsets of aspirin at zero distance. These might
-include
+With `a=2 b=0`, features of aspirin that are missing from the haystack molecule are
+penalised, but extra features in the haystack molecule are free. Molecules that
+*contain* all the features of aspirin are therefore found at zero distance. These
+might include
+
+![CHEMBL228226](Images/CHEMBL228226.png)
+
+![CHEMBL246709](Images/CHEMBL246709.png)
+
+![CHEMBL4907684](Images/CHEMBL4907684.png)
+
+These contain aspirin embedded within them, or approximately embedded - the last
+example.
+
+If on the other hand we reverse the parameters, `-V a=0 -V b=2`, features of
+aspirin that are missing from the haystack molecule are free, but extra features
+in the haystack molecule are penalised. We find molecules whose features are all
+present in aspirin, that is, molecules that are subsets of aspirin, such as
 
 ![aspirin](Images/aspirin.png)
 
@@ -439,19 +466,8 @@ include
 
 ![CHEMBL2105241](Images/CHEMBL2105241.png)
 
-Essentially we are looking for molecules that are subsets of aspirin.
-
-If on the other hand when we reverse the parameters, `-V a=0 -V b=2`, we find
-matches such as
-
-![CHEMBL228226](Images/CHEMBL228226.png)
-
-![CHEMBL246709](Images/CHEMBL246709.png)
-
-![CHEMBL4907684](Images/CHEMBL4907684.png)
-
-where we are finding molecules that contain aspirin embedded within them, or
-approximately embedded - the last example.
+If you are unsure, it is easy to check the direction on two or three molecules
+where you know the answer.
 
 ## Tools
 All programmes that deal with gfp fingerprint files are prefixed with 'gfp_',

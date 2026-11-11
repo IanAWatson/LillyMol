@@ -1,0 +1,7 @@
+Name act
+paracetamol 1.5
+pyridine 2
+dihalide 0
+sulfonamide_acid 3
+indole 1
+octane 0.5

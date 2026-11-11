@@ -39,4 +39,3 @@ template int queries_from_ISIS_query_file<Substructure_Query>(const_IWSubstring 
 template int queries_from_ISIS_query_file<Substructure_Query>(data_source_and_type<MDL_Molecule>&, Molecule_to_Query_Specifications&, resizable_array_p<Substructure_Query>&, int);
 template int queries_from_ISIS_query_file<Substructure_Query>(const_IWSubstring const&, resizable_array_p<Substructure_Query>&, int);
 template int query_from_ISIS_query_file<Substructure_Query>(MDL_Molecule&, Molecule_to_Query_Specifications&, resizable_array_p<Substructure_Query>&, int);
-template int build_query_from_smiles<Substructure_Query>(const const_IWSubstring & smiles, resizable_array_p<Substructure_Query> & queries, int verbose);

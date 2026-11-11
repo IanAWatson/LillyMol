@@ -273,7 +273,7 @@ class QuerySelectionTest(unittest.TestCase):
         self.assertEqual({q.name for q in functional} | {q.name for q in rings},
                          {q.name for q in complete})
 
-    def test_nomedian_analysis_and_html_commands(self):
+    def test_median_option_analysis_and_html_commands(self):
         self.write_query('n.textproto', 'nitrogen', 'N')
         self.write_query('o.textproto', 'oxygen', 'O')
         selection = self._directory / 'queries'
@@ -288,9 +288,11 @@ class QuerySelectionTest(unittest.TestCase):
         env = dict(os.environ, PYTHON=sys.executable)
         analysed = subprocess.run(command + ['analyse', '--config', str(selection),
             '-A', str(activity), '-o', str(output), '--html', str(document),
-            '--nomedian', '--page_size', '1', str(source)], env=env, capture_output=True, text=True, timeout=20)
+            '--page_size', '1', str(source)], env=env, capture_output=True, text=True, timeout=20)
         self.assertEqual(analysed.returncode, 0, analysed.stderr)
         self.assertNotIn('median', document.read_text().lower())
+        self.assertIn("sortTable('matched_mean')", document.read_text())
+        self.assertIn("sortTable('unmatched_mean')", document.read_text())
         self.assertIn('const pageSize = 1;', document.read_text())
         data = json.loads(output.read_text())
         self.assertIn('median', data['global']['summary'])
@@ -304,8 +306,9 @@ class QuerySelectionTest(unittest.TestCase):
         output.write_text(json.dumps(data))
         original = output.read_bytes()
         for extra, expected in (([], 'oxygen'), (['--sort', 'abs_median'], 'nitrogen')):
+            # --median is not given: medians stay hidden even when ranking by them.
             rendered = subprocess.run(command + ['html', str(output), '-o', str(document),
-                '--nomedian', '--page_size', '0', '--top_n', '1', *extra], env=env,
+                '--page_size', '0', '--top_n', '1', *extra], env=env,
                 capture_output=True, text=True, timeout=20)
             self.assertEqual(rendered.returncode, 0, rendered.stderr)
             text = document.read_text()

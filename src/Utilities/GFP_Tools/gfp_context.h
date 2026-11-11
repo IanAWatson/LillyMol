@@ -12,6 +12,7 @@
 
 #include "Utilities/GFP_Tools/fixed_size_counted_fingerprint.h"
 #include "Utilities/GFP_Tools/sparsefp.h"
+#include "Utilities/GFP_Tools/tversky.h"
 
 class IW_TDT;
 class Molecule;
@@ -66,6 +67,8 @@ class GFPGeneratorSpec {
   bool _include_out_of_range = false;
   bool _label_join_points = false;
   bool _no_match_is_empty = true;
+  // Only used by the formula fingerprint.
+  bool _include_hydrogens = true;
   IWString _atom_type;
   IWString _smarts;
 
@@ -89,7 +92,11 @@ class GFPGeneratorSpec {
   static GFPGeneratorSpec ALogP(int replicates = 9);
   static GFPGeneratorSpec XLogP(int replicates = 9);
   static GFPGeneratorSpec TPSA(int replicates = 9);
-  static GFPGeneratorSpec FormulaFingerprint();
+  // The formula fingerprint counts atoms bearing hydrogens. Those counts prevent
+  // a molecule from having at least the counts of a query that has hydrogens on
+  // atoms that are substituted in the molecule, so they can be left out, in which
+  // case the tag is different, so the two forms cannot be compared.
+  static GFPGeneratorSpec FormulaFingerprint(bool include_hydrogens = true);
   static GFPGeneratorSpec CATS(int max_path_length = 10,
                                bool include_hydrophobic_pairs = true);
   static GFPGeneratorSpec AtomPair(int min_separation = 1, int max_separation = 10,
@@ -175,6 +182,11 @@ class GFPGeneratorSpec {
     return _no_match_is_empty;
   }
 
+  bool
+  include_hydrogens() const {
+    return _include_hydrogens;
+  }
+
   const IWString&
   smarts() const {
     return _smarts;
@@ -251,6 +263,10 @@ class FixedBitVector {
   }
 
   float Tanimoto(const FixedBitVector& rhs) const;
+
+  // Tversky similarity. `this` is the query, so tv.a() weights bits only in
+  // this fingerprint, and tv.b() bits only in `rhs`.
+  float TverskySimilarity(const FixedBitVector& rhs, const Tversky& tv) const;
 };
 
 class GFPContext;
@@ -399,7 +415,10 @@ class GFPContext {
   void UseAll();
 
   int Fingerprint(Molecule& m, GFPFingerprint& result);
-  float Distance(const GFPFingerprint& lhs, const GFPFingerprint& rhs) const;
+  // If `tversky` is not null, Tversky distances are computed in place of Tanimoto.
+  // `lhs` is the query: tversky->a() weights features only in `lhs`.
+  float Distance(const GFPFingerprint& lhs, const GFPFingerprint& rhs,
+                 const Tversky* tversky = nullptr) const;
 };
 
 class GFPList {
@@ -469,15 +488,21 @@ class GFPList {
     return _ids[i];
   }
 
-  float Distance(int i, int j) const;
-  float Distance(const GFPFingerprint& fp, int j) const;
-  std::vector<NearestNeighbour> NearestNeighbours(int query, int k) const;
-  std::vector<NearestNeighbour> NearestNeighbours(const GFPFingerprint& query,
-                                                  int k) const;
-  std::vector<NearestNeighbour> NearestNeighboursWithinDistance(int query,
-                                                                float max_distance) const;
+  // If `tversky` is not null, Tversky distances are computed in place of
+  // Tanimoto. The query (row `i`, or `fp`) is always the left hand side, so
+  // tversky->a() weights features that are only in the query, and tversky->b()
+  // features that are only in the list entry.
+  float Distance(int i, int j, const Tversky* tversky = nullptr) const;
+  float Distance(const GFPFingerprint& fp, int j, const Tversky* tversky = nullptr) const;
+  std::vector<NearestNeighbour> NearestNeighbours(int query, int k,
+                                                  const Tversky* tversky = nullptr) const;
+  std::vector<NearestNeighbour> NearestNeighbours(const GFPFingerprint& query, int k,
+                                                  const Tversky* tversky = nullptr) const;
   std::vector<NearestNeighbour> NearestNeighboursWithinDistance(
-      const GFPFingerprint& query, float max_distance) const;
+      int query, float max_distance, const Tversky* tversky = nullptr) const;
+  std::vector<NearestNeighbour> NearestNeighboursWithinDistance(
+      const GFPFingerprint& query, float max_distance,
+      const Tversky* tversky = nullptr) const;
 };
 
 }  // namespace gfp_context

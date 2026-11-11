@@ -2589,6 +2589,49 @@ sidechain {
         self.assertEqual(len(mixed.tags()), 3)
         mixed.fingerprint(mol)
 
+    def test_gfp_formula_without_hydrogens(self):
+        self.assertEqual(lillymol.GFP.formula().components(), ["FCFML<"])
+        spec = lillymol.GFP.formula(hydrogens=False)
+        self.assertEqual(spec.components(), ["FCFMLNH<"])
+        self.assertEqual(repr(spec), "GFP.formula(hydrogens=False)")
+        self.assertEqual(
+            lillymol.GFP.formula(fixed_width=128, hydrogens=False).components(),
+            ["FPFMLNHFW128<"])
+
+        # Fingerprints with and without the hydrogen counts cannot be compared.
+        without = lillymol.GFPContext.from_specs([spec])
+        with_h = lillymol.GFPContext.from_specs([lillymol.GFP.formula()])
+        self.assertNotEqual(without.fingerprint(lillymol.MolFromSmiles("CC")).context_hash(),
+                            with_h.fingerprint(lillymol.MolFromSmiles("CC")).context_hash())
+
+    def test_gfp_formula_without_hydrogens_finds_substituted_molecules(self):
+        # Approximate substructure searching: the molecule must have at least the
+        # counts of the query. A query has hydrogens on atoms that a molecule that
+        # contains it has substituted, so the hydrogen counts prevent matches.
+        smiles = ["Cc1ccccc1O cresol", "c1ccccc1 benzene", "Oc1ccccc1 phenol"]
+        contains_query = lillymol.Tversky(query=2.0, candidate=0.0)
+        results = {}
+        for hydrogens in (True, False):
+            context = lillymol.GFPContext.from_specs([lillymol.GFP.formula(hydrogens=hydrogens)])
+            gfp = lillymol.GFPList(context)
+            gfp.add_molecules(lillymol.MolFromSmiles(smiles), store_metadata=True)
+            query = context.fingerprint(lillymol.MolFromSmiles("Oc1ccccc1 query"))
+            results[hydrogens] = {
+                gfp.id(h.index): h.distance
+                for h in gfp.nearest_neighbours(query, 3, tversky=contains_query)}
+            if hydrogens:
+                other = lillymol.GFPContext.from_specs(
+                    [lillymol.GFP.formula(hydrogens=False)]).fingerprint(
+                        lillymol.MolFromSmiles("Oc1ccccc1"))
+                with self.assertRaises(ValueError):
+                    gfp.distance(other, 0)
+
+        self.assertAlmostEqual(results[False]["cresol"], 0.0, places=6)
+        self.assertAlmostEqual(results[False]["phenol"], 0.0, places=6)
+        self.assertGreater(results[False]["benzene"], 0.1)
+        self.assertGreater(results[True]["cresol"], 0.05)
+        self.assertAlmostEqual(results[True]["phenol"], 0.0, places=6)
+
     def test_gfp_tversky_parameters(self):
         tv = lillymol.Tversky()
         self.assertEqual((tv.query, tv.candidate), (1.0, 1.0))

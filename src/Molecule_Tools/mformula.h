@@ -53,6 +53,14 @@ class MFormula {
     float _log_s = 0.0f;
     float _log_d = 0.0f;
 
+    // The counts of atoms bearing hydrogens (3 of the counts) are not part of the
+    // formula in any strict sense. They are included by default.
+    // A substructure query written as a fragment has hydrogens on atoms that are
+    // substituted in a molecule that contains it, so for approximate substructure
+    // searching, where a molecule must have at least the counts of the query,
+    // the hydrogen counts prevent matches.
+    int _include_hydrogens = 1;
+
     // Some tools may need lazy evaluation.
     int _initialised;
 
@@ -72,6 +80,13 @@ class MFormula {
     void
     set_consider_aromatic(int s) {
       _consider_aromatic = s;
+    }
+
+    // Whether the counts of atoms bearing a hydrogen are generated. This should be
+    // called before any calls to Build. If not, those counts are zero.
+    void
+    set_include_hydrogens(int s) {
+      _include_hydrogens = s;
     }
 
     // See formula above.

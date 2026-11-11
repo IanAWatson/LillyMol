@@ -1,5 +1,6 @@
 #include "Utilities/GFP_Tools/gfp_context.h"
 
+#include <cmath>
 #include <cstdlib>
 #include <filesystem>
 #include <fstream>
@@ -961,6 +962,62 @@ TEST(TestTversky, NearestNeighboursUseTversky) {
 
   // Without Tversky nothing but the identical molecule is at zero distance.
   EXPECT_EQ(list->NearestNeighboursWithinDistance(query, 0.0f).size(), 1u);
+}
+
+TEST(TestGFPContext, FormulaWithoutHydrogensSpec) {
+  EXPECT_EQ(gfp_context::GFPGeneratorSpec::FormulaFingerprint().Components()[0].tag,
+            "FCFML<");
+
+  auto spec = gfp_context::GFPGeneratorSpec::FormulaFingerprint(false);
+  EXPECT_FALSE(spec.include_hydrogens());
+  EXPECT_EQ(spec.Components()[0].tag, "FCFMLNH<");
+  EXPECT_EQ(spec.Repr(), "GFP.formula(hydrogens=False)");
+
+  spec.set_fixed_width(128);
+  EXPECT_EQ(spec.Components()[0].tag, "FPFMLNHFW128<");
+  EXPECT_EQ(spec.Repr(), "GFP.formula(hydrogens=False, fixed_width=128)");
+
+  // Both forms can be in one context since their tags differ.
+  gfp_context::GFPContext context;
+  ASSERT_TRUE(context.BuildFromSpecs({gfp_context::GFPGeneratorSpec::FormulaFingerprint(),
+                                      gfp_context::GFPGeneratorSpec::FormulaFingerprint(false)}));
+  EXPECT_EQ(context.nfixed_counted(), 2);
+}
+
+// A molecule that contains the query, but with substituted atoms, has at least
+// every count of the query only if the counts of atoms bearing hydrogens are left out.
+TEST(TestTversky, FormulaWithoutHydrogensFindsSubstitutedSuperset) {
+  auto without = std::make_shared<gfp_context::GFPContext>();
+  ASSERT_TRUE(without->BuildFromSpecs({gfp_context::GFPGeneratorSpec::FormulaFingerprint(false)}));
+  auto with = std::make_shared<gfp_context::GFPContext>();
+  ASSERT_TRUE(with->BuildFromSpecs({gfp_context::GFPGeneratorSpec::FormulaFingerprint()}));
+  EXPECT_NE(without->context_hash(), with->context_hash());
+
+  const std::vector<std::string> smiles = {"Cc1ccccc1O cresol", "c1ccccc1 benzene",
+                                           "Oc1ccccc1 phenol"};
+  auto list_without = ListFromSmiles(without, smiles);
+  auto list_with = ListFromSmiles(with, smiles);
+
+  Molecule phenol;
+  ASSERT_TRUE(phenol.build_from_smiles("Oc1ccccc1 query"));
+  gfp_context::GFPFingerprint query_without, query_with;
+  ASSERT_TRUE(without->Fingerprint(phenol, query_without));
+  ASSERT_TRUE(with->Fingerprint(phenol, query_with));
+
+  Tversky tv;
+  ASSERT_TRUE(tv.Set(2.0f, 0.0f));
+
+  EXPECT_THAT(list_without->Distance(query_without, 0, &tv), FloatNear(0.0f, 1.0e-6f));  // cresol
+  EXPECT_THAT(list_without->Distance(query_without, 2, &tv), FloatNear(0.0f, 1.0e-6f));  // phenol
+  EXPECT_GT(list_without->Distance(query_without, 1, &tv), 0.1f);                        // benzene
+
+  // With the hydrogen counts the cresol has fewer aromatic CH atoms than the query.
+  EXPECT_GT(list_with->Distance(query_with, 0, &tv), 0.05f);
+  EXPECT_THAT(list_with->Distance(query_with, 2, &tv), FloatNear(0.0f, 1.0e-6f));
+
+  // The two forms cannot be compared with each other.
+  EXPECT_TRUE(std::isnan(list_without->Distance(query_with, 0, &tv)));
+  EXPECT_TRUE(std::isnan(list_with->Distance(query_without, 0, &tv)));
 }
 
 }  // namespace

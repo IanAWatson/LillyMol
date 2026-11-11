@@ -34,6 +34,11 @@ Usage(int rc) {
  -f             function as a TDT filter.
  -L s,d         log scaling of counts. Emphasises rarer elements, see header file
                 for discussion. The default is -L 200,41, as in Python. Use -L none for raw counts.
+ -H             do not count atoms bearing hydrogens. For approximate substructure searching a
+                molecule must have at least the counts of the query, but a query has hydrogens on
+                atoms that are substituted in a molecule that contains it. The default tag
+                becomes FCFMLNH, as in Python GFP.formula(hydrogens=False), so these cannot be
+                compared with fingerprints that include the hydrogen counts.
  -i ...         standard input       control options.
  -E ....        standard Element     control options.
  -A ....        standard Aromaticity control options.
@@ -56,6 +61,9 @@ class Options {
 
     // Determined by the tag prefix. FC fixed size counted, otherwise sparse (NC).
     int _fixed_counted = 1;
+
+    // The -H option turns this off.
+    int _include_hydrogens = 1;
 
     // The -L option
     // The default is the same as the Python GFP.formula().
@@ -101,9 +109,27 @@ Options::Initialise(Command_Line& cl) {
     }
   }
 
+  if (cl.option_present('H')) {
+    _include_hydrogens = 0;
+    _tag = "FCFMLNH<";
+  }
+
   if (cl.option_present('J')) {
     cl.value('J', _tag);
     _tag.EnsureEndsWith('<');
+  }
+
+  // The tags used by the Python GFP.formula() must mean the same thing here, or
+  // fingerprints that cannot be compared would carry the same tag.
+  if (_tag == "FCFML<" && ! _include_hydrogens) {
+    cerr << "Options::Initialise:tag FCFML is for fingerprints that include the hydrogen counts, "
+            "use FCFMLNH with -H\n";
+    return 0;
+  }
+  if (_tag == "FCFMLNH<" && _include_hydrogens) {
+    cerr << "Options::Initialise:tag FCFMLNH is for fingerprints without the hydrogen counts, "
+            "specify -H\n";
+    return 0;
   }
 
   // The tag prefix determines what kind of fingerprint is written, so the tag
@@ -169,6 +195,7 @@ Options::WriteFingerprint(Molecule& m,
                           IWString_and_File_Descriptor& output) {
   
   MFormula mf;
+  mf.set_include_hydrogens(_include_hydrogens);
   if (_log_s > 0.0f) {
     mf.set_log_scaling_factors(_log_s, _log_d);
   }
@@ -326,7 +353,7 @@ FormulaFingerprint(const char* fname,
 
 int
 Main(int argc, char** argv) {
-  Command_Line cl(argc, argv, "vA:EJ:fi:L:");
+  Command_Line cl(argc, argv, "vA:EJ:fi:L:H");
 
   if (cl.unrecognised_options_encountered()) {
     cerr << "unrecognised_options_encountered\n";

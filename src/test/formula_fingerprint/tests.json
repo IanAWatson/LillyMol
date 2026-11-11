@@ -35,6 +35,38 @@
         "stderr"
       ],
       "non_zero_rc_expected": true
+    },
+    {
+      "name": "no_hydrogens",
+      "args": [
+        "-H #{indir}/in.smi"
+      ]
+    },
+    {
+      "name": "no_hydrogens_sparse",
+      "args": [
+        "-H -J NCFMLNH #{indir}/in.smi"
+      ]
+    },
+    {
+      "name": "hydrogen_tag_without_option",
+      "args": [
+        "-J FCFMLNH #{indir}/in.smi"
+      ],
+      "ignore_file": [
+        "stderr"
+      ],
+      "non_zero_rc_expected": true
+    },
+    {
+      "name": "no_hydrogens_with_hydrogen_tag",
+      "args": [
+        "-H -J FCFML #{indir}/in.smi"
+      ],
+      "ignore_file": [
+        "stderr"
+      ],
+      "non_zero_rc_expected": true
     }
   ]
 }

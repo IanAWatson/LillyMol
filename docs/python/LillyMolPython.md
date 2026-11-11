@@ -1246,6 +1246,13 @@ heteroatoms, aromatic carbons and other carbons), and the number of ring atoms.
 It is therefore a little richer than an element count, which matters when
 searching with Tversky similarity (see below).
 
+`GFP.formula(hydrogens=False)` leaves out the three counts of atoms bearing hydrogens,
+which are then zero, and uses the tag `FCFMLNH<`. A query written as a fragment has
+hydrogens on atoms that are substituted in a molecule that contains it, so with those
+counts a molecule that contains the query can have fewer counts than the query and
+will not be found by a Tversky search that requires at least the counts of the
+query. The two forms have different tags, so they cannot be compared.
+
 Files of formula fingerprints can be written by `formula_fingerprint` or
 `gfp_make.sh -FORMULA`, whose default is the same fixed counted form (tag `FCFML<`)
 with the same log scaling; see [formula_fingerprint](/docs/Molecule_Tools/formula_fingerprint.md).
@@ -1505,6 +1512,32 @@ The `tversky=` argument is accepted by `GFPList.distance` (both forms),
   tools: `a` is `query` and `b` is `candidate`. See the Tversky section of
   [gfp.md](/docs/GFP/gfp.md). The command line options `optimistic`, `nc01` and
   `nset0s` are not available from Python.
+
+#### Approximate substructure searching and pre-filtering
+
+`Tversky(query=2, candidate=0)` on the formula fingerprint can be used to find
+molecules that might contain a query as a substructure, very quickly, so that a more
+precise method such as substructure searching need only be applied to the
+candidates. Use `GFP.formula(hydrogens=False)` for this. The formula fingerprint is not
+selective: it knows only about counts of atoms, so many molecules that do not contain
+the query will also be found. Its advantage is speed.
+
+With the hydrogen counts omitted, a molecule that contains the query as a SMARTS
+substructure always has at least the counts of the query, so no molecules that contain
+it are lost (apart from the effect of a tolerance on the distance, if one is used).
+As a guide, for ten fragment queries (benzene, phenol, acetanilide, pyridine,
+a carboxylic acid, naphthalene, a sulfonamide, chlorobenzene, indole and piperazine)
+and 2000 ChEMBL molecules, at distance zero:
+
+| `GFP.formula(...)` | molecules found that contain the query | molecules passing the filter |
+| --- | --- | --- |
+| `hydrogens=False` | 100% | 59% on average, from 15% (chlorobenzene) to 91% (benzene) |
+| `hydrogens=True` | 71% (from 34% for piperazine) | 39% on average |
+
+The filter removes most molecules only when the query has rarer elements. The path
+fingerprint (`GFP.iw()`) is much more selective for the same purpose, at the cost of a
+slower comparison, so the two can be used one after the other. Measure the recall on
+your own data and queries before relying on any filter.
 
 A complete, tested example that searches a file of molecules with the formula
 fingerprint is [formula_tversky.py](/src/nanobind/examples/gfp/formula_tversky.py).

@@ -232,8 +232,8 @@ TPSATag(int replicates) {
 }
 
 IWString
-FormulaTag() {
-  return IWString("FCFML<");
+FormulaTag(bool include_hydrogens) {
+  return IWString(include_hydrogens ? "FCFML<" : "FCFMLNH<");
 }
 
 IWString
@@ -401,8 +401,10 @@ GFPGeneratorSpec::TPSA(int replicates) {
 }
 
 GFPGeneratorSpec
-GFPGeneratorSpec::FormulaFingerprint() {
-  return GFPGeneratorSpec(GeneratorKind::kFormula);
+GFPGeneratorSpec::FormulaFingerprint(bool include_hydrogens) {
+  GFPGeneratorSpec result(GeneratorKind::kFormula);
+  result._include_hydrogens = include_hydrogens;
+  return result;
 }
 
 GFPGeneratorSpec
@@ -508,7 +510,8 @@ GFPGeneratorSpec::NativeComponents() const {
     case GeneratorKind::kTPSA:
       return {Component{ComponentKind::kSparse, TPSATag(_replicates), 0, 1.0f}};
     case GeneratorKind::kFormula:
-      return {Component{ComponentKind::kFixedCounted, FormulaTag(), 0, 1.0f}};
+      return {Component{ComponentKind::kFixedCounted, FormulaTag(_include_hydrogens), 0,
+                        1.0f}};
     case GeneratorKind::kCATS:
       return {Component{ComponentKind::kSparse,
                         CATSTag(_max_path_length, _include_hydrophobic_pairs), 0, 1.0f}};
@@ -551,7 +554,7 @@ GFPGeneratorSpec::NativeRepr() const {
     case GeneratorKind::kTPSA:
       return "GFP.tpsa(replicates=" + std::to_string(_replicates) + ")";
     case GeneratorKind::kFormula:
-      return "GFP.formula()";
+      return _include_hydrogens ? "GFP.formula()" : "GFP.formula(hydrogens=False)";
     case GeneratorKind::kCATS:
       return "GFP.cats(max_path_length=" + std::to_string(_max_path_length) +
              ", include_hydrophobic_pairs=" +
@@ -888,8 +891,13 @@ TPSAFingerprintGenerator::Count(Molecule& m) {
 class FormulaFingerprintGenerator : public FingerprintGeneratorImplementation {
  private:
   int _count[kFormulaFingerprintNbits];
+  bool _include_hydrogens;
 
  public:
+  explicit FormulaFingerprintGenerator(bool include_hydrogens)
+      : _include_hydrogens(include_hydrogens) {
+  }
+
   std::vector<Component> Components() const override;
   int Generate(Molecule& m, const std::vector<GeneratorComponentAssignment>& slots,
                GFPFingerprint& destination) override;
@@ -897,7 +905,8 @@ class FormulaFingerprintGenerator : public FingerprintGeneratorImplementation {
 
 std::vector<Component>
 FormulaFingerprintGenerator::Components() const {
-  return {Component{ComponentKind::kFixedCounted, FormulaTag(), 0, 1.0f}};
+  return {Component{ComponentKind::kFixedCounted, FormulaTag(_include_hydrogens), 0,
+                    1.0f}};
 }
 
 int
@@ -913,6 +922,7 @@ FormulaFingerprintGenerator::Generate(
 
   mformula::MFormula formula;
   formula.set_log_scaling_factors(kDefaultFormulaLogS, kDefaultFormulaLogD);
+  formula.set_include_hydrogens(_include_hydrogens);
   if (!formula.Build(m)) {
     return 0;
   }
@@ -1806,7 +1816,7 @@ MakeGenerator(const GFPGeneratorSpec& spec) {
     case GeneratorKind::kTPSA:
       return std::make_unique<TPSAFingerprintGenerator>(spec.replicates());
     case GeneratorKind::kFormula:
-      return std::make_unique<FormulaFingerprintGenerator>();
+      return std::make_unique<FormulaFingerprintGenerator>(spec.include_hydrogens());
     case GeneratorKind::kCATS:
       return std::make_unique<CATSFingerprintGenerator>(spec.max_path_length(),
                                                         spec.include_hydrophobic_pairs());

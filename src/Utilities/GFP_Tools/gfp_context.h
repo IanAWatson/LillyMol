@@ -67,6 +67,8 @@ class GFPGeneratorSpec {
   bool _include_out_of_range = false;
   bool _label_join_points = false;
   bool _no_match_is_empty = true;
+  // Only used by the formula fingerprint.
+  bool _include_hydrogens = true;
   IWString _atom_type;
   IWString _smarts;
 
@@ -90,7 +92,11 @@ class GFPGeneratorSpec {
   static GFPGeneratorSpec ALogP(int replicates = 9);
   static GFPGeneratorSpec XLogP(int replicates = 9);
   static GFPGeneratorSpec TPSA(int replicates = 9);
-  static GFPGeneratorSpec FormulaFingerprint();
+  // The formula fingerprint counts atoms bearing hydrogens. Those counts prevent
+  // a molecule from having at least the counts of a query that has hydrogens on
+  // atoms that are substituted in the molecule, so they can be left out, in which
+  // case the tag is different, so the two forms cannot be compared.
+  static GFPGeneratorSpec FormulaFingerprint(bool include_hydrogens = true);
   static GFPGeneratorSpec CATS(int max_path_length = 10,
                                bool include_hydrophobic_pairs = true);
   static GFPGeneratorSpec AtomPair(int min_separation = 1, int max_separation = 10,
@@ -174,6 +180,11 @@ class GFPGeneratorSpec {
   bool
   no_match_is_empty() const {
     return _no_match_is_empty;
+  }
+
+  bool
+  include_hydrogens() const {
+    return _include_hydrogens;
   }
 
   const IWString&

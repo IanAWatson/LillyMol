@@ -462,9 +462,13 @@ BindTools(nb::module_& m) {
       .def_static("iw", &gfp_context::GFPGeneratorSpec::IWMFingerprint)
       .def_static("maccs", &gfp_context::GFPGeneratorSpec::MACCSKeys,
                   nb::arg("level2") = true)
-      .def_static("formula", [](int fixed_width) {
-        return WithFixedWidth(gfp_context::GFPGeneratorSpec::FormulaFingerprint(), fixed_width);
-      }, nb::arg("fixed_width") = 0)
+      .def_static("formula", [](int fixed_width, bool hydrogens) {
+        return WithFixedWidth(gfp_context::GFPGeneratorSpec::FormulaFingerprint(hydrogens),
+                              fixed_width);
+      }, nb::arg("fixed_width") = 0, nb::arg("hydrogens") = true,
+         "Molecular formula fingerprint. With hydrogens=False the counts of atoms "
+         "bearing hydrogens are zero, which is better for approximate substructure "
+         "searching, and the tag is FCFMLNH<, so it cannot be compared with the default.")
       .def_static("cats",
            [](int max_path_length, bool include_hydrophobic_pairs, int fixed_width) {
              if (max_path_length < 1) {

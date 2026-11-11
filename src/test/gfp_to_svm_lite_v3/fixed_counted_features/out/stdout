@@ -1,0 +1,50 @@
+fixed counted
+paracetamol 1.5 37 37 59 59 59 86 104 104 
+pyridine 2 37 96 96 104 
+dihalide 0 37 37 59 59 
+sulfonamide_acid 3 37 37 37 59 59 86 
+indole 1 37 37 104 118 124 
+octane 0.5 118 118 
+sparse counted
+paracetamol 1.5 37 37 59 59 59 86 104 104 
+pyridine 2 37 96 96 104 
+dihalide 0 37 37 59 59 
+sulfonamide_acid 3 37 37 37 59 59 86 
+indole 1 37 37 104 118 124 
+octane 0.5 118 118 
+fixed counted and sparse counted agree
+mismatched cross reference: failed as expected
+applied rows 6
+unwritable output: failed as expected
+unwritable proto: failed as expected
+gfp output not implemented: failed as expected
+support removes everything: failed as expected
+empty input: failed as expected
+cross reference from stdin: failed as expected
+record with no identifier: failed as expected
+cross reference has an extra fingerprint: failed as expected
+applied from stdin rows 6
+features per molecule, support 1 then 2
+paracetamol 8 8
+pyridine 4 4
+dihalide 4 2
+sulfonamide_acid 6 5
+indole 5 5
+octane 2 2
+with molecular properties
+paracetamol 1.5 1 2 3 6 6 6 11 37 37 59 59 59 86 104 104 
+pyridine 2 1 1 6 6 6 6 37 96 96 104 
+dihalide 0 2 4 37 37 59 59 
+sulfonamide_acid 3 5 6 8 37 37 37 59 59 86 
+indole 1 1 2 2 6 9 9 9 37 37 104 118 124 
+octane 0.5 8 118 118 
+with molecular properties only, support 100
+paracetamol 1.5 1 2 3 6 6 6 11 
+pyridine 2 1 1 6 6 6 6 
+dihalide 0 2 4 
+sulfonamide_acid 3 5 6 8 
+indole 1 1 2 2 6 9 9 9 
+octane 0.5 8 
+cross reference with properties, input without: failed as expected
+cross reference without properties, input with: failed as expected
+applied with properties rows 6

@@ -260,6 +260,8 @@ class IW_General_Fingerprint
     const Sparse_Fingerprint & sparse_fingerprint (int i) const { return _sparse_fingerprint[i];}
     Sparse_Fingerprint & sparse_fingerprint (int i) { return _sparse_fingerprint[i];}
 
+    const Fixed_Size_Counted_Fingerprint & fixed_size_counted_fingerprint (int i) const { return _fixed_size_counted_fingerprint[i];}
+
     IW_General_Fingerprint & operator = (const IW_General_Fingerprint &);
 
 //  Once things are initialised, we can change the fingerprint tags.
@@ -351,6 +353,7 @@ extern int initialise_fingerprints (Command_Line & cl, int);
 
 extern int number_fingerprints ();
 extern int number_sparse_fingerprints ();
+extern int number_fixed_size_counted_fingerprints ();
 
 /*
   Allows us to control what similarity function to use
@@ -400,6 +403,7 @@ extern void set_report_fingerprint_status (int s);
 
 extern const IWString & fixed_fingerprint_tag (int i);
 extern const IWString & sparse_fingerprint_tag (int i);
+extern const IWString & fixed_size_counted_fingerprint_tag (int i);
 
 extern const IWString & property_tag();
 

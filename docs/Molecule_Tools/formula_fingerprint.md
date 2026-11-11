@@ -70,8 +70,8 @@ options for `formula_fingerprint` can be passed with a `-formula ... -formula` g
 Earlier versions of `gfp_make` wrote the sparse form (`NCFML<`) for `-FORMULA`. Files
 written then are still valid, but gfp tools need the same fingerprint tags on both sides
 of a comparison, so they must be regenerated, or regenerated with `-FORMULA,sparse`, to
-be compared with files made now. `gfp_to_svm_lite_v3` does not currently handle fixed
-size counted fingerprints, so use `-FORMULA,sparse` when building SVM models.
+be compared with files made now. `gfp_to_svm_lite_v3` handles both forms, treating each
+position of a fixed size counted fingerprint as a counted feature.
 
 See also the [Python Tversky searching](/docs/python/LillyMolPython.md#tversky-searching)
 documentation.

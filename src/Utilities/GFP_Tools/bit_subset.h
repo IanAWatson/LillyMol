@@ -93,6 +93,16 @@ class BitXref {
     int _nsparse;
     BitToFeature** _sparse;
 
+    // Fixed size counted fingerprints are treated like sparse counted ones. The
+    // `bit` is the position in the fingerprint and the count is the value.
+    int _nfixed_counted;
+    BitToFeature** _fixed_counted;
+
+    // The integer molecular properties (MPR). The `bit` is the position of the
+    // property and the count is the property value. Only present if the input has them.
+    bool _has_properties;
+    BitToFeature* _properties;
+
     // when doing tsv output, we need to know the highest feature number.
     uint32_t _highest_feature_number;
 
@@ -140,6 +150,7 @@ class BitXref {
     // Write the bits in `gfp` in tabular form to `output`.
     // The number of columns is _highest_feature_number.
     // Note there is no leading `output_separator` written. No newline.
+    // Returns the number of features set, which may be zero, or -1 for a fatal error.
     int WriteDsv(const IW_General_Fingerprint& gfp, char output_separator,
                  IWString_and_File_Descriptor& output);
 };

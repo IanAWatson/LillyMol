@@ -477,7 +477,8 @@ queries_from_file_of_molecules(const const_IWSubstring& fname,
   data_source_and_type<MDL_Molecule> input(input_type, fname);
   if (!input.good()) {
     std::cerr << "cannot open '" << fname << "'\n";
-    return 1;
+    moleculeio::set_seek_to(o);
+    return 0;
   }
 
   int rc = queries_from_file_of_molecules(input, mqs, queries, verbose);
@@ -594,8 +595,6 @@ queries_from_ISIS_query_file(const const_IWSubstring& fname,
     const_IWSubstring fname2, directives;
 
     fname.split(fname2, DIRECTIVE_SEPARATOR_TOKEN, directives);
-
-    std::cerr << "Split into '" << fname2 << "' and '" << directives << "'\n";
 
     if (!mqs.parse_directives(directives)) {
       std::cerr << "INvalid molecule to query directives '" << directives << "'\n";
@@ -1090,8 +1089,8 @@ AllQueriesInDir(const_IWSubstring& dirname, int verbose,
       continue;
     }
 
-    fs::path fullpath = path / entry;
-    const std::string& fname = fullpath;
+    // entry.path() already includes the directory, so do not join it onto path again.
+    const std::string fname = entry.path().string();
     const const_IWSubstring tmp(fname);
 
     if (fname.ends_with(".qry")) {
@@ -1157,13 +1156,15 @@ AllGlobMatches(const const_IWSubstring& pattern, int verbose,
       continue;
     }
 
-    const_IWSubstring as_string(entry.path().filename());
+    // The std::string must outlive the const_IWSubstring that refers to it.
+    const std::string filename = entry.path().filename().string();
+    const const_IWSubstring as_string(filename);
     if (! iwre2::RE2PartialMatch(as_string, *rx)) {
       continue;
     }
 
-    fs::path fullpath = path / entry;
-    const std::string& fname = fullpath;
+    // entry.path() already includes the directory, so do not join it onto path again.
+    const std::string fname = entry.path().string();
     const const_IWSubstring tmp(fname);
     if (fname.ends_with(".qry")) {
       if (!read_one_or_more_queries_from_file(queries, tmp, verbose)) {

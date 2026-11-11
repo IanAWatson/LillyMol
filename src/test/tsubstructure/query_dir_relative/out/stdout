@@ -1,0 +1,16 @@
+DIR relative
+C1=CC=CC=C1 benzene
+CC1=CC=CC=C1 toluene
+O=N(=O)C1=CC=CC=C1 nitrobenzene
+GLOB relative
+C1=CC=CC=C1 benzene
+CC1=CC=CC=C1 toluene
+O=N(=O)C1=CC=CC=C1 nitrobenzene
+GLOB selecting one file
+O=N(=O)C1=CC=CC=C1 nitrobenzene
+GLOB in current directory
+C1=CC=CC=C1 benzene
+CC1=CC=CC=C1 toluene
+O=N(=O)C1=CC=CC=C1 nitrobenzene
+missing M: file after a good query
+failed as expected

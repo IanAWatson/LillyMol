@@ -12324,7 +12324,7 @@ Chemical_Standardisation::_do_nitroso_to_oxime(
     }
     const atom_number_t carbon = cn->other(nitrogen);
     if (!cn->is_single_bond() || cn->part_of_cis_trans_grouping() ||
-        z[carbon] != 6 || m.formal_charge(carbon) || m.is_aromatic(carbon) ||
+        z[carbon] != 6 || m.formal_charge(carbon) || data.atom_is_aromatic()[carbon] ||
         m.nbonds(carbon) != m.ncon(carbon) ||
         m.implicit_hydrogens(carbon) < 1 ||
         m.nbonds(carbon) + m.implicit_hydrogens(carbon) != 4 ||
@@ -14574,9 +14574,10 @@ struct BiguanideSide {
 // Accept ordinary amino/imino N valences and their protonated precursors.
 // Explicit H/D, N-O/N-N substituents and participating stereocentres are excluded.
 bool
-BiguanideNitrogen(Molecule& m, atom_number_t n) {
+BiguanideNitrogen(Molecule& m, const IWStandard_Current_Molecule& data,
+                   atom_number_t n) {
   const int charge = m.formal_charge(n);
-  return m.atomic_number(n) == 7 && m.ncon(n) <= 3 && !m.is_aromatic(n) &&
+  return data.atomic_number()[n] == 7 && m.ncon(n) <= 3 && !data.atom_is_aromatic()[n] &&
          (charge == 0 || charge == 1) && !m.chiral_centre_at_atom(n) &&
          m.nbonds(n) <= 3 + charge &&
          m.hcount(n) == 3 + charge - m.nbonds(n);
@@ -14601,7 +14602,7 @@ BuildBiguanideSide(Molecule& m, const IWStandard_Current_Molecule& data,
     if (n == bridge) {
       continue;
     }
-    if (found == 2 || !BiguanideNitrogen(m, n)) {
+    if (found == 2 || !BiguanideNitrogen(m, data, n)) {
       return false;
     }
     side._outer_n[found++] = n;
@@ -14613,7 +14614,7 @@ BuildBiguanideSide(Molecule& m, const IWStandard_Current_Molecule& data,
       if (!nb->is_single_bond() || nb->is_directional() ||
           m.atomic_number(other) != 6 || m.formal_charge(other) ||
           data.possible_guanidine().contains(other) ||
-          (!m.is_aromatic(other) && m.nbonds(other) != m.ncon(other))) {
+          (!data.atom_is_aromatic()[other] && m.nbonds(other) != m.ncon(other))) {
         return false;  // Excludes larger shared units and N-acyl/conjugated groups.
       }
       ++side._substituents;
@@ -14692,7 +14693,7 @@ int
 CanonicaliseBiguanide(Molecule& m, IWStandard_Current_Molecule& data,
                        atom_number_t bridge) {
   if (data.atomic_number()[bridge] != 7 || m.ncon(bridge) != 2 ||
-      data.ring_membership()[bridge] || !BiguanideNitrogen(m, bridge)) {
+      data.ring_membership()[bridge] || !BiguanideNitrogen(m, data, bridge)) {
     return 0;
   }
   std::array<BiguanideSide, 2> sides;
@@ -14773,11 +14774,11 @@ Chemical_Standardisation::_do_biguanide(Molecule& m, IWStandard_Current_Molecule
 // Restrict the amide N to H/carbon substituents to exclude hydroxamates,
 // hydrazides and imides, whose other tautomer rules need separate assessment.
 static bool
-IsOrdinaryAmideCarbonyl(Molecule& m, atom_number_t carbonyl,
-                         atom_number_t beta) {
+IsOrdinaryAmideCarbonyl(Molecule& m, const IWStandard_Current_Molecule& data,
+                       atom_number_t carbonyl, atom_number_t beta) {
   if (m.atomic_number(carbonyl) != 6 || m.ncon(carbonyl) != 3 ||
       m.nbonds(carbonyl) != 4 || m.formal_charge(carbonyl) ||
-      m.is_ring_atom(carbonyl) || m.is_aromatic(carbonyl) ||
+      data.ring_membership()[carbonyl] ||
       m.chiral_centre_at_atom(carbonyl)) {
     return false;
   }
@@ -14794,7 +14795,7 @@ IsOrdinaryAmideCarbonyl(Molecule& m, atom_number_t carbonyl,
       continue;
     }
     if (!b->is_single_bond() || m.atomic_number(other) != 7 ||
-        m.formal_charge(other) || m.is_aromatic(other) ||
+        m.formal_charge(other) || data.atom_is_aromatic()[other] ||
         m.nbonds(other) != m.ncon(other) ||
         m.ncon(other) + m.hcount(other) != 3) {
       return false;
@@ -14869,14 +14870,14 @@ ConvertAlphaKetoEnol(Molecule& m, const IWStandard_Current_Molecule& data,
     }
     if (!b->is_single_bond() || b->is_directional() ||
         b->part_of_cis_trans_grouping() || z[other] != 6 || m.formal_charge(other) ||
-        (!m.is_aromatic(other) && m.nbonds(other) != m.ncon(other) &&
+        (!data.atom_is_aromatic()[other] && m.nbonds(other) != m.ncon(other) &&
          (kind != AlphaKetoCarbonyl::kAcid ||
-          !IsOrdinaryAmideCarbonyl(m, other, beta)))) {
+          !IsOrdinaryAmideCarbonyl(m, data, other, beta)))) {
       return false;  // Other carbonyls and aliphatic conjugation remain excluded.
     }
   }
   if (kind == AlphaKetoCarbonyl::kAmide) {
-    if (!IsOrdinaryAmideCarbonyl(m, carboxyl, enol)) {
+    if (!IsOrdinaryAmideCarbonyl(m, data, carboxyl, enol)) {
       return false;
     }
   } else {
@@ -14901,7 +14902,7 @@ ConvertAlphaKetoEnol(Molecule& m, const IWStandard_Current_Molecule& data,
           }
           // Ordinary alkyl/aryl esters only: exclude anhydrides and enol esters.
           if (!ob->is_single_bond() || z[alkoxy] != 6 || m.formal_charge(alkoxy) ||
-              (!m.is_aromatic(alkoxy) && m.nbonds(alkoxy) != m.ncon(alkoxy))) {
+              (!data.atom_is_aromatic()[alkoxy] && m.nbonds(alkoxy) != m.ncon(alkoxy))) {
             return false;
           }
         }

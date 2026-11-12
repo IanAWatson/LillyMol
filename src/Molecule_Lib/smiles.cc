@@ -1936,7 +1936,8 @@ Molecule::_identify_first_smiles_bond(atom_number_t zatom, const int* zorder) {
 
 int
 Molecule::_construct_smiles(const Fragment_Information& frag_info,
-                            Smiles_Information& smi_info, const int* include_atom) {
+                            Smiles_Information& smi_info, const int* include_atom,
+                            bool canonical) {
   int* already_done = new_int(_number_elements);
   std::unique_ptr<int[]> free_already_done(already_done);
 
@@ -2011,6 +2012,7 @@ Molecule::_construct_smiles(const Fragment_Information& frag_info,
 #endif
 
     Smiles_Formation_Info sfi(_number_elements, nr);
+    sfi.set_canonical_smiles(canonical);
     //  cerr << "Doing smarts? " << smi_info.smiles_is_smarts() << '\n';
 
     if (nullptr != smi_info.user_specified_atomic_smarts()) {
@@ -2300,7 +2302,7 @@ Molecule::_unique_smiles(const Fragment_Information& frag_info,
   }
 #endif
 
-  _construct_smiles(frag_info, smi_info, include_atom);
+  _construct_smiles(frag_info, smi_info, include_atom, true);
 
   return smi_info.smiles();
 }
@@ -2377,7 +2379,7 @@ Molecule::_unique_smiles(const Fragment_Information& frag_info,
   }
 #endif
 
-  _construct_smiles(frag_info, smi_info, include_atom);
+  _construct_smiles(frag_info, smi_info, include_atom, true);
 
   return smi_info.smiles();
 }

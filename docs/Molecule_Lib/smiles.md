@@ -3,6 +3,23 @@
 Smiles in LillyMol are mostly standard, and can be consumed by many
 other software packages.
 
+## Bracket-specified hydrogen counts and canonical SMILES
+
+Unique SMILES omits a redundant bracket hydrogen specification when the count
+matches the count inferred from the atom's valence. For example, `C[CH2]C`
+and `CCC` have the same unique SMILES. This also prevents specified versus
+inferred hydrogen counts on symmetric atoms from changing the canonical text.
+
+Hydrogen specifications needed for radicals or unusual hydrogen counts are
+retained. Brackets required for aromatic `[nH]`, charge, isotopes, atom maps
+or stereochemistry are retained as well. Generating unique SMILES does not
+clear the molecule's stored hydrogen specifications, and ordinary/random
+SMILES retain their existing emission behaviour.
+
+Canonical strings previously containing redundant `[NH]`, `[OH]`, `[CH2]`
+or similar annotations may therefore change. Stored keys made by older
+versions should be regenerated together before comparing them with new keys.
+
 ## Aromaticity
 Different software tools may make differing assessments of what is
 aromatic. When presented with aromatic smiles from package `A`, package

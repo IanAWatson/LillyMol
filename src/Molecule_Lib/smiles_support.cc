@@ -570,6 +570,26 @@ append_permanent_aromatic(IWString& smiles, const Atom* a) {
   ring closures
 */
 
+// Ranking uses the H count, not whether it was specified in brackets. In
+// canonical output, redundant bracket annotations must therefore disappear:
+// otherwise equivalent atoms can emit different text depending on input order.
+// This only affects emission; retain the stored H count and its sticky flag.
+static int
+HydrogenSpecificationNeedsBrackets(Atom& atom, bool canonical) {
+  if (!atom.implicit_hydrogens_known()) {
+    return 0;
+  }
+  if (!canonical || !atom.element()->organic() || atom.is_radical() ||
+      atom.formal_charge() || atom.isotope()) {
+    return 1;
+  }
+  int inferred;
+  if (!atom.compute_implicit_hydrogens(inferred)) {
+    return 1;
+  }
+  return inferred != atom.implicit_hydrogens();
+}
+
 int
 Molecule::_process_atom_for_smiles(Smiles_Formation_Info& sfi, const int* zorder,
                                    const resizable_array<const Bond*>& ring_opening_bonds,
@@ -691,7 +711,7 @@ Molecule::_process_atom_for_smiles(Smiles_Formation_Info& sfi, const int* zorder
   // nullptr if we are excluding chirality from smiles, so we need to fetch the value
   // again
 
-  int ihknown = a->implicit_hydrogens_known();
+  int ihknown = HydrogenSpecificationNeedsBrackets(*a, sfi.canonical_smiles());
   if (!_include_chiral_info_in_smiles && ihknown &&
       (nullptr != chiral_centre_at_atom(zatom)) && hcount < 0 &&
       0 == a->formal_charge() && 0 == a->isotope() && e->organic()) {
@@ -824,7 +844,8 @@ Molecule::_process_atom_for_smiles(Smiles_Formation_Info& sfi, IWString& smiles)
   // Whenever a square bracket atom is encountered, the H count must always be explicit.
 
   if (hcount >= 0 || 0 != fc || e->needs_square_brackets() || a->isotope() ||
-      a->implicit_hydrogens_known() || (a->atom_map() && _include_atom_map_with_smiles)) {
+      HydrogenSpecificationNeedsBrackets(*a, sfi.canonical_smiles()) ||
+      (a->atom_map() && _include_atom_map_with_smiles)) {
     smiles += '[';
     need_to_close_square_bracket = 1;
     if (hcount < 0) {

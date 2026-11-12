@@ -39,3 +39,13 @@ py_test(
     srcs = ["lillymol_tests_proto_test.py"],
     deps = [":lillymol_tests_py_proto"],
 )
+
+py_test(
+    name = "compare_descriptor_files_test",
+    size = "small",
+    imports = ["."],
+    srcs = [
+        "compare_descriptor_files.py",
+        "compare_descriptor_files_test.py",
+    ],
+)

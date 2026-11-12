@@ -40,11 +40,8 @@ phosphorus_oxo = [
 check('phosphorus_oxo', ['-g', 'phosphorus-oxo'], phosphorus_oxo)
 check('phosphorus_oxo_all', ['-g', 'all'], phosphorus_oxo)
 check('phosphorus_oxo_enol', ['-g', 'all', '-g', 'ENOL'], phosphorus_oxo)
-# Mixed specified/inferred H on equivalent OH groups has an existing
-# unique-SMILES inconsistency when this normalisation is disabled.
-# Keep that case in all enabled-rule checks above.
 check('phosphorus_oxo_disabled', ['-g', 'all', '-g', '-phosphorus-oxo'],
-      [smi for smi in phosphorus_oxo if smi != 'C[P+](O)([OH])OC'])
+      phosphorus_oxo)
 
 oxo_ring_guanidines = [
     'O=C1NC(=N)N(C)C1',
@@ -93,11 +90,8 @@ local_ring_guanidines = [
 ]
 check('local_ring_guanidine', ['-g', 'Rguan'], local_ring_guanidines)
 check('local_ring_guanidine_all', ['-g', 'all'], local_ring_guanidines)
-# With the rule disabled, a bracket-specified H on just one of two
-# symmetry-equivalent N atoms exposes an existing unique-SMILES inconsistency.
-# The enabled-rule checks above include that input and reset its H specification.
 check('local_ring_guanidine_disabled', ['-g', 'all', '-g', '-Rguan'],
-      [smi for smi in local_ring_guanidines if not smi.startswith('[NH]')])
+      local_ring_guanidines)
 
 alpha_ketoamides = [
     'NC(=O)C(O)=C',

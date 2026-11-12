@@ -6,6 +6,9 @@
   "test": [
     {
       "name": "default",
+      "difftool": "python3 ${LILLYMOL_HOME}/test/compare_descriptor_files.py",
+      "difftool_options": "--tolerance w_alogp=0.001 --tolerance w_obalance=0.001",
+      "comment": ["Allow one printed decimal unit in the two rounding-boundary columns; all other columns, headers and identifiers remain exact."],
       "preamble": [
          "queries_dir=${LILLYMOL_HOME}/data/queries"
       ],

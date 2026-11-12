@@ -1,5 +1,7 @@
 // Tester for unique smiles generation.
 
+#include <vector>
+
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
@@ -114,5 +116,90 @@ INSTANTIATE_TEST_SUITE_P(KekuleForms, TestUniqueKekuleSmilesRandom, testing::Val
   SmilesAndExpected{"C1=CC=CC2=C1CC3=C(O2)C=CC=C3", "O1c2=c(Cc3=cc=cc=c13)c=cc=c2"},  // xanthene
   SmilesAndExpected{"C1=CC=CC2=C1NC3=C2C=CC=C3", "[nH]1c2=c(c=cc=c2)c2=c1c=cc=c2"}  // carbazole
 ));
+
+// Bracket-specified and inferred H counts must give the same canonical text
+// when the specified count equals the normal valence-derived count. Ranking
+// already considers those atoms equivalent; emission must agree with ranking.
+class TestRedundantBracketHydrogens : public TestUniqueSmiles {};
+
+TEST_P(TestRedundantBracketHydrogens, CanonicalAndRoundTrip) {
+  const auto params = GetParam();
+  Molecule reference;
+  ASSERT_TRUE(reference.build_from_smiles(params.expected));
+  const IWString expected = reference.unique_smiles();
+  Molecule original;
+  ASSERT_TRUE(original.build_from_smiles(params.smiles));
+  const IWString formula = original.molecular_formula();
+  std::vector<int> known(original.natoms());
+  for (atom_number_t a = 0; a < original.natoms(); ++a) {
+    known[a] = original.implicit_hydrogens_known(a);
+  }
+  EXPECT_EQ(original.unique_smiles(), expected);
+  // Canonical output must not change the stored hydrogen specifications.
+  for (atom_number_t a = 0; a < original.natoms(); ++a) {
+    EXPECT_EQ(original.implicit_hydrogens_known(a), known[a]);
+  }
+  for (int i = 0; i < 100; ++i) {
+    Molecule molecule;
+    ASSERT_TRUE(molecule.build_from_smiles(original.random_smiles()));
+    EXPECT_EQ(molecule.unique_smiles(), expected);
+    EXPECT_EQ(molecule.molecular_formula(), formula);
+    Molecule roundtrip;
+    ASSERT_TRUE(roundtrip.build_from_smiles(molecule.unique_smiles()));
+    EXPECT_EQ(roundtrip.unique_smiles(), expected);
+    EXPECT_EQ(roundtrip.molecular_formula(), formula);
+  }
+}
+
+INSTANTIATE_TEST_SUITE_P(BracketHydrogens, TestRedundantBracketHydrogens, testing::Values(
+    SmilesAndExpected{"[NH]1C(=Nc2ccccc2)NCC1", "N1C(=Nc2ccccc2)NCC1"},
+    SmilesAndExpected{"C[P+](O)([OH])OC", "C[P+](O)(O)OC"},
+    SmilesAndExpected{"[CH4]", "C"},
+    SmilesAndExpected{"[NH3]", "N"},
+    SmilesAndExpected{"[OH2]", "O"},
+    SmilesAndExpected{"[SH2]", "S"},
+    SmilesAndExpected{"C[OH]", "CO"},
+    SmilesAndExpected{"C[NH2]", "CN"},
+    SmilesAndExpected{"C[CH2]C", "CCC"},
+    SmilesAndExpected{"[cH]1ccccc1", "c1ccccc1"},
+    SmilesAndExpected{"[nH]1cccc1", "[nH]1cccc1"},
+    SmilesAndExpected{"C[13CH2]C", "C[13CH2]C"},
+    SmilesAndExpected{"[NH4+]", "[NH4+]"},
+    SmilesAndExpected{"F[C@H](Cl)C", "F[C@H](Cl)C"},
+    SmilesAndExpected{"C[CH2:17]C", "C[CH2:17]C"},
+    SmilesAndExpected{"O[2H]", "O[2H]"},
+    SmilesAndExpected{"[CH2]", "[CH2]"},
+    SmilesAndExpected{"[C]C", "[C]C"},
+    SmilesAndExpected{"C[N]C", "C[N]C"}
+));
+
+TEST(UniqueSmilesHydrogens, CanonicalSubsetOmitsRedundantBrackets) {
+  Molecule m;
+  ASSERT_TRUE(m.build_from_smiles("C[CH2]C"));
+  Smiles_Information subset;
+  const int include[] = {1, 1, 1};
+  EXPECT_EQ(m.unique_smiles(subset, include), "CCC");
+  EXPECT_TRUE(m.implicit_hydrogens_known(1));
+}
+
+TEST(UniqueSmilesHydrogens, OrdinarySmilesRetainsSpecifiedHydrogens) {
+  Molecule m;
+  ASSERT_TRUE(m.build_from_smiles("C[CH2]C"));
+  EXPECT_TRUE(m.smiles().contains("[CH2]"));
+  m.unique_smiles();
+  const IWString random = m.random_smiles();
+  EXPECT_TRUE(random.contains("[CH2]"));
+  EXPECT_TRUE(m.implicit_hydrogens_known(1));
+}
+
+TEST(UniqueSmilesHydrogens, RadicalsRemainDistinctFromNormalValence) {
+  for (const auto& [radical, saturated] : std::vector<std::pair<const char*, const char*>>{
+      {"[CH2]", "C"}, {"C[N]C", "CNC"}, {"[C]C", "CC"}}) {
+    Molecule r, s;
+    ASSERT_TRUE(r.build_from_smiles(radical));
+    ASSERT_TRUE(s.build_from_smiles(saturated));
+    EXPECT_NE(r.unique_smiles(), s.unique_smiles());
+  }
+}
 
 }  // namespace

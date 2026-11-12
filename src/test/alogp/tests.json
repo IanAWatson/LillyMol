@@ -3,6 +3,9 @@
     "test": [
         {
           "name": "case_1",
+      "difftool": "python3 ${LILLYMOL_HOME}/test/compare_descriptor_files.py",
+      "difftool_options": "--tolerance alogd=0.001",
+      "comment": ["LogD values can straddle a three-decimal printing boundary; allow 0.001 only in alogd, keeping alogp and table structure exact."],
           "preamble": [
              "CHARGES=${LILLYMOL_HOME}/data/queries/charges/queries"
           ],

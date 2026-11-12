@@ -39,7 +39,7 @@
 
     int _construct_smiles_for_fragment (Smiles_Formation_Info &, Smiles_Information & smi_info);
     int _construct_smiles (const int *, int *, Smiles_Information &, const int *);
-    int _construct_smiles (const Fragment_Information &, Smiles_Information &, const int * include_atom);
+    int _construct_smiles (const Fragment_Information &, Smiles_Information &, const int * include_atom, bool canonical = false);
 
     template <typename N> int _build_smiles_ordering_fctr (N next_atom_selector,
                                        const int * include_atom,

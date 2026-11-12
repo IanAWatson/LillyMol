@@ -145,6 +145,8 @@ class Smiles_Formation_Info
 
     int _write_smiles;    // are we writing smiles or smarts
 
+    bool _canonical_smiles = false;
+
 //  The per-atom create embedding information comes from
 //  the Smiles_Information object
 
@@ -179,6 +181,9 @@ class Smiles_Formation_Info
 
     void set_write_smiles(int s) { _write_smiles = s;}
     int  write_smiles() const { return _write_smiles;}
+
+    void set_canonical_smiles(bool s) { _canonical_smiles = s; }
+    bool canonical_smiles() const { return _canonical_smiles; }
 
     void set_make_smarts_embedding(const int * s) { _make_smarts_embedding = s;}
     int make_smarts_embedding(atom_number_t) const;

@@ -807,6 +807,29 @@ TEST_P(TestOxygenAndSulphurTautomers, CanonicalFormAndAtomOrder) {
 }
 
 INSTANTIATE_TEST_SUITE_P(OxygenAndSulphur, TestOxygenAndSulphurTautomers, testing::Values(
+    TautomerCase{CS_ALPHA_KETOESTER, "COC(=O)C(O)=C", "COC(=O)C(=O)C", true},
+    TautomerCase{CS_ALPHA_KETOESTER, "CCOC(=O)C(O)=CC", "CCOC(=O)C(=O)CC", true},
+    TautomerCase{CS_ALPHA_KETOESTER, "COC(=O)C(O)=Cc1ccccc1", "COC(=O)C(=O)Cc1ccccc1", true},
+    TautomerCase{CS_ALPHA_KETOESTER, "c1ccccc1OC(=O)C(O)=CC", "c1ccccc1OC(=O)C(=O)CC", true},
+    TautomerCase{CS_ALPHA_KETOESTER, "COC(=O)C([18OH])=[13CH]C", "COC(=O)C(=[18O])[13CH2]C", true},
+    TautomerCase{CS_ALPHA_KETOESTER, "C[C@H](F)COC(=O)C(O)=CC", "C[C@H](F)COC(=O)C(=O)CC", true},
+    TautomerCase{CS_ALPHA_KETOESTER, "COC(=O)C(=O)CC", "COC(=O)C(=O)CC", false},
+    TautomerCase{CS_ALPHA_KETOESTER, "OC(=O)C(O)=CC", "OC(=O)C(O)=CC", false},
+    TautomerCase{CS_ALPHA_KETOESTER, "NC(=O)C(O)=CC", "NC(=O)C(O)=CC", false},
+    TautomerCase{CS_ALPHA_KETOESTER, "CC(=O)OC(=O)C(O)=CC", "CC(=O)OC(=O)C(O)=CC", false},
+    TautomerCase{CS_ALPHA_KETOESTER, "C=COC(=O)C(O)=CC", "C=COC(=O)C(O)=CC", false},
+    TautomerCase{CS_ALPHA_KETOESTER, "COC(=O)C(O)=CC=C", "COC(=O)C(O)=CC=C", false},
+    TautomerCase{CS_ALPHA_KETOESTER, "COC(=O)C(O)=CC(=O)N", "COC(=O)C(O)=CC(=O)N", false},
+    TautomerCase{CS_ALPHA_KETOESTER, "COC(=O)C(O)=CC(=O)C", "COC(=O)C(O)=CC(=O)C", false},
+    TautomerCase{CS_ALPHA_KETOESTER, "COC(=O)C(O)=C(C)C", "COC(=O)C(O)=C(C)C", false},
+    TautomerCase{CS_ALPHA_KETOESTER, "COC(=O)C1=C(O)CCC1", "COC(=O)C1=C(O)CCC1", false},
+    TautomerCase{CS_ALPHA_KETOESTER, "O=C1OC(O)=CCC1", "O=C1OC(O)=CCC1", false},
+    TautomerCase{CS_ALPHA_KETOESTER, "COC(=O)/C(O)=C/C", "COC(=O)/C(O)=C/C", false},
+    TautomerCase{CS_ALPHA_KETOESTER, "COC(=O)C(O[2H])=CC", "COC(=O)C(O[2H])=CC", false},
+    TautomerCase{CS_ALPHA_KETOESTER, "COC(=O)C(O)=C([2H])C", "COC(=O)C(O)=C([2H])C", false},
+    TautomerCase{CS_ALPHA_KETOESTER, "COC(=O)C([O-])=CC", "COC(=O)C([O-])=CC", false},
+    TautomerCase{CS_ALPHA_KETOESTER, "COC(=O)C(O)=CC", "COC(=O)C(O)=CC", false,
+                 standardisation::KetoEnol::kToEnol},
     TautomerCase{CS_ALPHA_KETOACID, "O=C(O)C(O)=Cc1ccccc1", "O=C(O)C(=O)Cc1ccccc1", true},
     TautomerCase{CS_ALPHA_KETOACID, "O=C(O)C(O)=CC", "O=C(O)C(=O)CC", true},
     TautomerCase{CS_ALPHA_KETOACID, "O=C(O)C(O)=C", "O=C(O)C(=O)C", true},
@@ -819,6 +842,15 @@ INSTANTIATE_TEST_SUITE_P(OxygenAndSulphur, TestOxygenAndSulphurTautomers, testin
     TautomerCase{CS_ALPHA_KETOACID, "OC(=O)C(O)=[13CH]C", "OC(=O)C(=O)[13CH2]C", true},
     TautomerCase{CS_ALPHA_KETOACID, "OC(=O)C(O)=C[C@H](F)C", "OC(=O)C(=O)C[C@H](F)C", true},
     TautomerCase{CS_ALPHA_KETOACID, "OC(=O)C(O)=CC[N+](C)(C)C", "OC(=O)C(=O)CC[N+](C)(C)C", true},
+    TautomerCase{CS_ALPHA_KETOACID, "O=C(O)C(O)=CC(=O)N", "O=C(O)C(=O)CC(=O)N", true},
+    TautomerCase{CS_ALPHA_KETOACID, "O=C(O)C(O)=CC(=O)Nc1ccccc1", "O=C(O)C(=O)CC(=O)Nc1ccccc1", true},
+    TautomerCase{CS_ALPHA_KETOACID, "O=C(O)C(O)=CC(=O)N(C)C", "O=C(O)C(=O)CC(=O)N(C)C", true},
+    TautomerCase{CS_ALPHA_KETOACID, "O=C(O)C(O)=CC(=O)N1CCCC1", "O=C(O)C(=O)CC(=O)N1CCCC1", true},
+    TautomerCase{CS_ALPHA_KETOACID, "O=C(O)C(O)=CC(=O)NO", "O=C(O)C(O)=CC(=O)NO", false},
+    TautomerCase{CS_ALPHA_KETOACID, "O=C(O)C(O)=CC(=O)NN", "O=C(O)C(O)=CC(=O)NN", false},
+    TautomerCase{CS_ALPHA_KETOACID, "O=C(O)C(O)=CC(=O)NC(=O)C", "O=C(O)C(O)=CC(=O)NC(=O)C", false},
+    TautomerCase{CS_ALPHA_KETOACID, "O=C(O)C(O)=CC(=O)OC", "O=C(O)C(O)=CC(=O)OC", false},
+    TautomerCase{CS_ALPHA_KETOACID, "O=C(O)/C(O)=C/C(=O)N", "O=C(O)/C(O)=C/C(=O)N", false},
     TautomerCase{CS_ALPHA_KETOACID, "O=C(O)C(=O)Cc1ccccc1", "O=C(O)C(=O)Cc1ccccc1", false},
     TautomerCase{CS_ALPHA_KETOACID, "COC(=O)C(O)=CC", "COC(=O)C(O)=CC", false},
     TautomerCase{CS_ALPHA_KETOACID, "NC(=O)C(O)=CC", "NC(=O)C(O)=CC", false},
@@ -2143,6 +2175,63 @@ TEST_F(TestStandardisation, BiguanidePreservesParticipatingChiralAnnotations) {
     EXPECT_EQ(_m1.chiral_centre_at_atom(a), saved);
     EXPECT_TRUE(_m1.bond_between_atoms(3, 4)->is_double_bond());
     EXPECT_TRUE(_m1.bond_between_atoms(3, 5)->is_single_bond());
+  }
+}
+
+TEST_F(TestStandardisation, AlphaKetoesterConvergesAndCanBeDisabled) {
+  _chemical_standardisation.activate_all();
+  for (const char* smiles : {"COC(=O)C(O)=C", "CCOC(=O)C(O)=CC",
+                              "COC(=O)C(O)=Cc1ccccc1"}) {
+    ASSERT_TRUE(_m1.build_from_smiles(smiles));
+    ASSERT_TRUE(_chemical_standardisation.Activate("-alpha-ketoester", 0));
+    const IWString original = _m1.unique_smiles();
+    EXPECT_EQ(_chemical_standardisation.process(_m1), 0);
+    EXPECT_EQ(_m1.unique_smiles(), original);
+    ASSERT_TRUE(_chemical_standardisation.Activate(CS_ALPHA_KETOESTER, 0));
+    _chemical_standardisation.set_append_string_depending_on_what_changed(1);
+    EXPECT_EQ(_chemical_standardisation.process(_m1), 1);
+    EXPECT_TRUE(_m1.name().contains("STD:alpha-ketoester"));
+    const IWString expected = _m1.unique_smiles();
+    EXPECT_EQ(_chemical_standardisation.process(_m1), 0);
+    for (int i = 0; i < 100; ++i) {
+      Molecule molecule;
+      ASSERT_TRUE(molecule.build_from_smiles(smiles));
+      const IWString reordered = molecule.random_smiles();
+      ASSERT_TRUE(molecule.build_from_smiles(reordered));
+      EXPECT_EQ(_chemical_standardisation.process(molecule), 1);
+      EXPECT_EQ(molecule.unique_smiles(), expected);
+      EXPECT_TRUE(molecule.valence_ok());
+      EXPECT_EQ(_chemical_standardisation.process(molecule), 0);
+    }
+  }
+  std::ostringstream report;
+  ASSERT_TRUE(_chemical_standardisation.report(report));
+  EXPECT_NE(report.str().find("Alpha ketoester changed"), std::string::npos);
+}
+
+TEST_F(TestStandardisation, AlphaKetoacidAmideConvergesWithAllRules) {
+  _chemical_standardisation.activate_all();
+  for (const char* amide : {"N", "NC", "Nc1ccccc1", "N(C)C", "N1CCCC1"}) {
+    IWString enol("O=C(O)C(O)=CC(=O)");
+    enol << amide;
+    IWString keto("O=C(O)C(=O)CC(=O)");
+    keto << amide;
+    ASSERT_TRUE(_m2.build_from_smiles(keto));
+    const IWString expected = _m2.unique_smiles();
+    ASSERT_TRUE(_m1.build_from_smiles(enol));
+    const IWString formula = _m1.molecular_formula();
+    for (int i = 0; i < 100; ++i) {
+      Molecule molecule;
+      ASSERT_TRUE(molecule.build_from_smiles(_m1.random_smiles()));
+      EXPECT_GT(_chemical_standardisation.process(molecule), 0);
+      EXPECT_EQ(molecule.unique_smiles(), expected) << enol;
+      EXPECT_EQ(molecule.molecular_formula(), formula);
+      EXPECT_TRUE(molecule.valence_ok());
+      EXPECT_EQ(_chemical_standardisation.process(molecule), 0);
+      ASSERT_TRUE(molecule.build_from_smiles(_m2.random_smiles()));
+      EXPECT_EQ(_chemical_standardisation.process(molecule), 0);
+      EXPECT_EQ(molecule.unique_smiles(), expected);
+    }
   }
 }
 

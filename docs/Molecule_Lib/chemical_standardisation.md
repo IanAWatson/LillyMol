@@ -90,6 +90,7 @@ Entering `-g help` to most LillyMol tools yields the usage message
  -g beta-enaminone convert eligible acyclic beta-ketoimines to enaminones
  -g beta-hydrazone prefer acyclic beta-keto hydrazones (included in all)
  -g beta-enehydrazine prefer acyclic beta-enehydrazines (alternative preference)
+ -g alpha-ketoester canonicalise simple acyclic alpha-ketoester enols
  -g alpha-ketoacid canonicalise simple acyclic alpha-ketoacid enols
  -g beta-ketoester canonicalise acyclic beta-ketoester enols
  -g beta-diketone canonicalise beta-diketone enols to diketo form
@@ -386,6 +387,34 @@ this rule.
 Reports count amidoxime conversions separately. `-g APP=EACH` appends
 `STD:amidoxime` when this rule changes a molecule.
 
+### Simple alpha-ketoesters
+
+`-g alpha-ketoester` selects the keto form of eligible neutral, acyclic
+alpha-ketoester enols:
+
+```text
+COC(=O)C(O)=C          -> COC(=O)C(=O)C
+CCOC(=O)C(O)=Cc1ccccc1 -> CCOC(=O)C(=O)Cc1ccccc1
+```
+
+This rule is included in `-g all`, broadening default tautomer equivalence.
+Disable it with `-g all -g -alpha-ketoester`. It is skipped with `ENOL`.
+The ester must be an ordinary alkyl or aryl ester. The reacting chain must
+be acyclic, with a terminal enol OH and a CH2 or CH carbon at the other end
+of the double bond; that carbon can have a saturated or aromatic carbon
+substituent. Anhydrides, enol esters, cyclic reacting chains, additional
+aliphatic conjugation and adjacent carbonyl branches are excluded.
+
+Specified geometry, marked chiral centres on reacting atoms, and explicit
+hydrogen neighbours on the enol OH or reacting carbon prevent conversion.
+Heavy-atom isotopes and remote stereochemistry are preserved. The ester
+carbonyl is unchanged, no charges are introduced, and no new chiral-centre
+annotations are created. This is a canonicalisation preference, not a
+prediction of solution tautomer populations.
+
+Conversions are reported separately; `-g APP=EACH` appends
+`STD:alpha-ketoester` to changed molecules.
+
 ### Simple alpha-ketoacids
 
 `-g alpha-ketoacid` chooses the keto representative of eligible neutral,
@@ -406,8 +435,20 @@ adjacent to the enol explicitly. The initial scope requires a neutral COOH,
 a terminal enol OH, and a non-ring C=C whose other carbon is CH2 or CH attached
 to a saturated or aromatic carbon. This includes pyruvic-acid and
 phenylpyruvic-acid forms. Substituted enol carbons, cyclic reacting chains,
-additional aliphatic conjugation or adjacent carbonyl branches, esters,
-amides, sulfur replacements, and hydrates are excluded. Existing beta-diketone
+additional aliphatic conjugation and most adjacent carbonyl branches are
+excluded, as are replacement of the COOH by an ester or amide, sulfur
+replacements, and hydrates.
+
+One additional carbonyl branch is supported explicitly:
+
+```text
+O=C(O)C(O)=CC(=O)NR2 -> O=C(O)C(=O)CC(=O)NR2
+```
+
+Here `NR2` denotes a neutral amide nitrogen with hydrogen and/or carbon
+substituents, including cyclic amines. Hydroxamates, hydrazides and imides
+are excluded. This broadens the equivalence classes formed by `-g all`;
+the amide carbonyl remains unchanged. Existing beta-diketone
 handling remains responsible for its own more complex cases.
 
 The isolated rule accepts only neutral participating atoms. With `-g all`,

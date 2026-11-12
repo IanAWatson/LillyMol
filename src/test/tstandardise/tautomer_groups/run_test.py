@@ -29,7 +29,42 @@ cases = [
     'N1=C(O)C=C(O)N=C1O.O=c1cc[nH]c(C)n1',
     'N1=NC(=NN=C(C2=CC=NC=C2)Br)NN1',
 ]
+alpha_ketoesters = [
+    'COC(=O)C(O)=C',
+    'CCOC(=O)C(O)=CC',
+    'COC(=O)C(O)=Cc1ccccc1',
+    'c1ccccc1OC(=O)C(O)=CC',
+    'COC(=O)C([18OH])=[13CH]C',
+    'C[C@H](F)COC(=O)C(O)=CC',
+    'COC(=O)C(=O)CC',
+    'OC(=O)C(O)=CC',
+    'NC(=O)C(O)=CC',
+    'CC(=O)OC(=O)C(O)=CC',
+    'C=COC(=O)C(O)=CC',
+    'COC(=O)C(O)=CC=C',
+    'COC(=O)C(O)=CC(=O)N',
+    'COC(=O)C(O)=CC(=O)C',
+    'COC(=O)C(O)=C(C)C',
+    'COC(=O)C1=C(O)CCC1',
+    'O=C1OC(O)=CCC1',
+    'COC(=O)/C(O)=C/C',
+    'COC(=O)C(O[2H])=CC',
+    'COC(=O)C(O)=C([2H])C',
+    'COC(=O)C([O-])=CC',
+]
+check('alpha_ketoester', ['-g', 'alpha-ketoester'], alpha_ketoesters)
+check('alpha_ketoester_all', ['-g', 'all'], alpha_ketoesters)
+check('alpha_ketoester_disabled', ['-g', 'all', '-g', '-alpha-ketoester'],
+      alpha_ketoesters)
+check('alpha_ketoester_enol_preference', ['-g', 'all', '-g', 'ENOL'],
+      alpha_ketoesters)
+
 alpha_ketoacids = [
+    'O=C(O)C(O)=CC(=O)N', 'O=C(O)C(=O)CC(=O)N',
+    'O=C(O)C(O)=CC(=O)Nc1ccccc1', 'O=C(O)C(=O)CC(=O)Nc1ccccc1',
+    'O=C(O)C(O)=CC(=O)N(C)C', 'O=C(O)C(=O)CC(=O)N(C)C',
+    'O=C(O)C(O)=CC(=O)N1CCCC1', 'O=C(O)C(=O)CC(=O)N1CCCC1',
+
     'O=C(O)C(O)=Cc1ccccc1', 'O=C(O)C(=O)Cc1ccccc1',
     'O=C(O)C(O)=CC', 'O=C(O)C(O)=C', 'O=C(O)C(O)=Cc1ccncc1',
     '[OH]C(=O)[C]([OH])=[CH]C', '[18OH]C(=O)C(O)=CC',

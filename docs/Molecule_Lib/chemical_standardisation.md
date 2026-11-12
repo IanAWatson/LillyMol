@@ -62,6 +62,7 @@ Entering `-g help` to most LillyMol tools yields the usage message
  -g covm        break covalent bonds between Oxygen and Na,K
  -g isolc       assign formal charges to isolated Na, K, .. and Halogens
  -g guan        convert guanidines to -N-C(=N)-N form
+ -g biguanide   canonicalise eligible adjacent guanidines together
  -g Rguan        convert Ring type guanidines to -N-C(=N)-N form
  -g azid        convert charge separated azids [N-]=[N+]=N to N#N=N
  -g msdur       convert misdrawn ureas, O-C(=N)-N to O=C(-N)-N
@@ -179,6 +180,56 @@ Hydrogen counts specified in brackets, such as `[OH]`, `[SH]`, and `[CH2]`, are
 refreshed on atoms whose hydrogen count changes during these conversions. This
 also fixes earlier oxygen cases that could retain an obsolete hydrogen count
 and produce an invalid-valence product.
+
+### Coordinated biguanide standardisation
+
+`-g biguanide`, included in `-g all`, handles eligible pairs of guanidine
+centres joined through a two-connected nitrogen. It chooses a neutral form
+with one C=N bond to that bridging nitrogen and one terminal imine:
+
+```text
+CN(C)C(=N)NC(=N)N -> CN(C)C(N)=NC(=N)N
+```
+
+This broadens default tautomer equivalence. Disable it with
+`-g all -g -biguanide` to retain the individual guanidine rules. The preference
+is independent of `KETO`/`ENOL`. Reports count changed biguanide units, and
+`-g APP=EACH` appends `STD:biguanide`. Chemical-standardisation verbose output (for example,
+`fileconv -v -v`) distinguishes units handled from units
+changed, including canonical units protected from individual processing.
+
+The coordinated rule runs before the individual guanidine rules. Both carbon
+centres are removed from their shared candidate list whenever a unit is
+handled, including when it already has the preferred bonds. This prevents the
+individual rules from undoing the coordinated choice on either half.
+
+The initial scope requires two non-ring guanidine carbons, a non-ring
+2-connected bridging nitrogen, and ordinary amino/imino valences. External
+nitrogens may carry saturated carbon or aromatic carbon substituents, including
+membership in an external saturated ring. Neutral and protonated N precursors
+are accepted; positive core charges are neutralised together with bond changes
+and hydrogen reassignment. Charges elsewhere are unaffected by this rule.
+Explicit H/D neighbours, participating chiral annotations, specified geometry,
+heteroatom substitutions on the external nitrogens, N-acyl/conjugated substituents, four-connected
+nitrogens, and larger overlapping guanidine chains are excluded.
+
+At least one centre must have an unsubstituted terminal nitrogen for the
+terminal C=N bond. When both bridge orientations are possible, the bridge
+double bond is placed on the side with more external carbon substituent bonds.
+Equal, nonzero substitution counts are outside this initial rule: resolving
+those cases requires a more general comparison of their substituents. Parent
+biguanide is supported; isotope labels distinguish its otherwise equivalent
+ends and terminal nitrogens where necessary. Existing double bonds between
+chemically equivalent atoms are retained where possible to avoid spurious
+changes. Unsupported units remain subject to the existing individual rules.
+
+The choice of a bridge-imine form is supported by the experimental and
+computational evidence discussed in
+[Fraczkiewicz et al., 2024](https://doi.org/10.1002/minf.202400088).
+The orientation tie-breaks are canonicalisation conventions, not predictions
+of solution populations for every substituted biguanide. No E/Z geometry or
+new chiral-centre annotations are assigned. Heavy-atom isotope labels and
+remote stereochemistry are retained.
 
 ### Completing lactim conversion after fused-ring enol changes
 

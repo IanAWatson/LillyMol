@@ -392,6 +392,7 @@ class IWStandard_Current_Molecule
 #define CS_COVM  "covm"
 #define CS_ISOLC "isolc"
 #define CS_GUAND "guan"
+#define CS_BIGUANIDE "biguanide"
 #define CS_GUANDR "Rguan"
 #define CS_SPOM  "s+o-"
 #define CS_ACID  "acid"
@@ -496,6 +497,7 @@ class Chemical_Standardisation
     Chemical_Transformation _transform_covalent_metals;
     Chemical_Transformation _transform_single_atom_ions;
     Chemical_Transformation _transform_guanidine;
+    Chemical_Transformation _transform_biguanide;
     Chemical_Transformation _transform_amidine;
     Chemical_Transformation _transform_amidoxime;
     Chemical_Transformation _transform_cyclic_amidine;
@@ -628,6 +630,7 @@ class Chemical_Standardisation
     int _do_pyrazole (Molecule &, int * atom_already_changed, const int, IWStandard_Current_Molecule & current_molecule_data);
     int _do_cyclic_amidine(Molecule& m, const IWStandard_Current_Molecule& data);
     int _do_amidoxime(Molecule& m, const IWStandard_Current_Molecule& data);
+    int _do_biguanide(Molecule& m, IWStandard_Current_Molecule& data);
     int _do_transform_amidine(Molecule& m, IWStandard_Current_Molecule& current_molecule_data);
     int _do_nitroso_to_oxime(Molecule& m, const IWStandard_Current_Molecule& data);
     int _do_phosphorus_tautomer(Molecule& m, const IWStandard_Current_Molecule& data);

@@ -29,6 +29,22 @@ cases = [
     'N1=C(O)C=C(O)N=C1O.O=c1cc[nH]c(C)n1',
     'N1=NC(=NN=C(C2=CC=NC=C2)Br)NN1',
 ]
+biguanides = [
+    'CN(C)C(=N)NC(=N)N', 'CN(C)C(N)=NC(=N)N',
+    'CN(C)C(=N)N=C(N)N', 'NC(=N)NC(=N)N', 'NC(N)=NC(=N)N',
+    'O1CCN(C(=N)NC(=N)N)CC1', 'O1CCN(C(=NC(=N)N)N)CC1',
+    'CCNC(=N)NC(=N)N', 'C[C@H](F)NC(=N)NC(=N)N',
+    'CN(C)[13C](=N)NC(=N)N', 'CN(C)C(=N)[15NH]C(=N)N',
+    'CN(C)C(=N)NC(=[15NH])N', 'CN(C)C(=[NH2+])NC(=N)N',
+    'CN(C)C(=N)[NH2+]C(=N)N', 'CN(C)C(N)=[N+]=C(N)N',
+    'CN(C)C(=N)N([2H])C(=N)N', 'CCNC(=N)NC(=N)NCC',
+    'CN(C)C(=N)NC(=N)N.CN(C)C(=N)NC(=N)N',
+]
+check('biguanide', ['-g', 'biguanide'], biguanides)
+check('biguanide_all', ['-g', 'all'], biguanides)
+# Disabled behaviour is covered by the same structural consistency check.
+check('biguanide_disabled', ['-g', 'all', '-g', '-biguanide'], biguanides)
+
 fused_lactims = [
     'OC1=NC(O)=CC2=NN(C(N)=C12)c1ccccc1',
     'O=C1NC(O)=CC2=NN(C(N)=C12)c1ccccc1',

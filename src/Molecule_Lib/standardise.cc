@@ -371,6 +371,7 @@ Chemical_Standardisation::activate_all() {
   _transform_nminus.activate();
   _transform_covalent_metals.activate();
   _transform_guanidine.activate();
+  _transform_biguanide.activate();
   _transform_amidine.activate();
   _transform_amidoxime.activate();
   _transform_cyclic_amidine.activate();
@@ -456,6 +457,7 @@ display_all_chemical_standardisation_options(std::ostream& os, char zoption) {
   os << zopt << CS_COVM << "        break covalent bonds between Oxygen and Na,K\n";
   os << zopt << CS_ISOLC << "       assign formal charges to isolated Na, K, .. and Halogens\n";
   os << zopt << CS_GUAND << "        convert guanidines to -N-C(=N)-N form\n";
+  os << zopt << CS_BIGUANIDE << " canonicalise eligible adjacent guanidines together\n";
   os << zopt << CS_CYCLIC_AMIDINE << " canonicalise isolated neutral cyclic amidines\n";
   os << zopt << CS_AMIDINE << "     canonicalise isolated neutral amidines with a terminal N\n";
   os << zopt << CS_AMIDOXIME << "   convert neutral acyclic N-hydroxyamidines to amino-oximes\n";
@@ -672,6 +674,12 @@ Chemical_Standardisation::Activate(const IWString& directive, const int verbose)
       if (verbose) {
         cerr << "Isolated metals and halogens will be assigned charges\n";
       }
+    }
+  } else if (CS_BIGUANIDE == tmp) {
+    if (negation) {
+      _transform_biguanide.deactivate();
+    } else {
+      _transform_biguanide.activate();
     }
   } else if (CS_GUAND == tmp) {
     if (negation) {
@@ -4099,6 +4107,13 @@ Chemical_Standardisation::_process(Molecule& m,
     rc += _do_transform_splus_cminus(m, current_molecule_data);
   }
 
+  // Reserve both centres of a handled biguanide before individual guanidine
+  // rules can change either half, including when the unit is already canonical.
+  if (_transform_biguanide.active() && current_molecule_data.nitrogens() >= 5 &&
+      current_molecule_data.possible_guanidine().number_elements() >= 2) {
+    rc += _do_biguanide(m, current_molecule_data);
+  }
+
   if (_transform_guanidine.active() &&
       current_molecule_data.possible_guanidine().number_elements()) {
     rc += _do_transform_guanidine(m, current_molecule_data);
@@ -4637,6 +4652,10 @@ Chemical_Standardisation::report(std::ostream& os) const {
     _transform_pyrazole.report(os);
   }
 
+  if (_transform_biguanide.active()) {
+    os << "  Biguanide ";
+    _transform_biguanide.report(os);
+  }
   if (_transform_guanidine.active()) {
     os << "  Guanidine ";
     _transform_guanidine.report(os);
@@ -14135,6 +14154,211 @@ Chemical_Standardisation::_do_amidoxime(
     }
     if (_append_string_depending_on_what_changed) {
       _append_to_changed_molecules << " STD:" << CS_AMIDOXIME;
+    }
+  }
+  return rc;
+}
+
+namespace {
+
+struct BiguanideSide {
+  atom_number_t _carbon;
+  std::array<atom_number_t, 2> _outer_n;
+  int _substituents = 0;
+};
+
+// Accept ordinary amino/imino N valences and their protonated precursors.
+// Explicit H/D, N-O/N-N substituents and participating stereocentres are excluded.
+bool
+BiguanideNitrogen(Molecule& m, atom_number_t n) {
+  const int charge = m.formal_charge(n);
+  return m.atomic_number(n) == 7 && m.ncon(n) <= 3 && !m.is_aromatic(n) &&
+         (charge == 0 || charge == 1) && !m.chiral_centre_at_atom(n) &&
+         m.nbonds(n) <= 3 + charge &&
+         m.hcount(n) == 3 + charge - m.nbonds(n);
+}
+
+bool
+BuildBiguanideSide(Molecule& m, const IWStandard_Current_Molecule& data,
+                   atom_number_t bridge, BiguanideSide& side) {
+  const atom_number_t carbon = side._carbon;
+  if (!data.possible_guanidine().contains(carbon) || m.atomic_number(carbon) != 6 ||
+      m.ncon(carbon) != 3 || m.nbonds(carbon) != 4 || data.ring_membership()[carbon] || m.formal_charge(carbon) ||
+      m.hcount(carbon) || m.chiral_centre_at_atom(carbon)) {
+    return false;
+  }
+  int found = 0;
+  for (const Bond* b : m[carbon]) {
+    if ((!b->is_single_bond() && !b->is_double_bond()) ||
+        b->is_directional() || b->part_of_cis_trans_grouping()) {
+      return false;
+    }
+    const atom_number_t n = b->other(carbon);
+    if (n == bridge) {
+      continue;
+    }
+    if (found == 2 || !BiguanideNitrogen(m, n)) {
+      return false;
+    }
+    side._outer_n[found++] = n;
+    for (const Bond* nb : m[n]) {
+      const atom_number_t other = nb->other(n);
+      if (other == carbon) {
+        continue;
+      }
+      if (!nb->is_single_bond() || nb->is_directional() ||
+          m.atomic_number(other) != 6 || m.formal_charge(other) ||
+          data.possible_guanidine().contains(other) ||
+          (!m.is_aromatic(other) && m.nbonds(other) != m.ncon(other))) {
+        return false;  // Excludes larger shared units and N-acyl/conjugated groups.
+      }
+      ++side._substituents;
+    }
+  }
+  return found == 2;
+}
+
+atom_number_t
+BiguanideTerminalImine(Molecule& m, const BiguanideSide& side) {
+  atom_number_t result = kInvalidAtomNumber;
+  for (atom_number_t n : side._outer_n) {
+    if (m.ncon(n) != 1) {
+      continue;
+    }
+    // The two terminal Ns are otherwise equivalent; use isotope to distinguish
+    // labelled atoms without allowing input atom order to decide the tautomer.
+    if (result == kInvalidAtomNumber || m.isotope(n) < m.isotope(result) ||
+        (m.isotope(n) == m.isotope(result) &&
+         m.bond_between_atoms(side._carbon, n)->is_double_bond())) {
+      result = n;
+    }
+  }
+  return result;
+}
+
+// Return the side whose carbon will have C=N to the bridge. Prefer the more
+// substituted side when both orientations are possible. Equal substituted
+// sides need a more general comparison and are outside this initial rule.
+int
+BiguanideOrientation(Molecule& m, atom_number_t bridge,
+                     const std::array<BiguanideSide, 2>& sides,
+                     const std::array<atom_number_t, 2>& terminal) {
+  if (terminal[0] == kInvalidAtomNumber && terminal[1] == kInvalidAtomNumber) {
+    return -1;
+  }
+  if (terminal[0] == kInvalidAtomNumber) {
+    return 0;
+  }
+  if (terminal[1] == kInvalidAtomNumber) {
+    return 1;
+  }
+  if (sides[0]._substituents != sides[1]._substituents) {
+    return sides[0]._substituents > sides[1]._substituents ? 0 : 1;
+  }
+  if (sides[0]._substituents != 0) {
+    return -1;
+  }
+  // With no external substituents these are the two ends of parent biguanide.
+  // Isotopes are the only possible chemical distinction between the ends.
+  auto key = [&](const BiguanideSide& side) {
+    isotope_t n0 = m.isotope(side._outer_n[0]);
+    isotope_t n1 = m.isotope(side._outer_n[1]);
+    if (n1 < n0) {
+      std::swap(n0, n1);
+    }
+    return std::array<isotope_t, 3>{m.isotope(side._carbon), n0, n1};
+  };
+  const auto k0 = key(sides[0]);
+  const auto k1 = key(sides[1]);
+  if (k0 != k1) {
+    return k0 > k1 ? 0 : 1;
+  }
+  // Truly equivalent ends give the same structural identity either way. Keep
+  // an existing bridge double bond to avoid reporting a change for a canonical
+  // parent biguanide merely because its atoms or equivalent Ns were reordered.
+  const bool d0 = m.bond_between_atoms(bridge, sides[0]._carbon)->is_double_bond();
+  const bool d1 = m.bond_between_atoms(bridge, sides[1]._carbon)->is_double_bond();
+  if (d0 != d1) {
+    return d0 ? 0 : 1;
+  }
+  return sides[0]._carbon < sides[1]._carbon ? 0 : 1;
+}
+
+int
+CanonicaliseBiguanide(Molecule& m, IWStandard_Current_Molecule& data,
+                       atom_number_t bridge) {
+  if (data.atomic_number()[bridge] != 7 || m.ncon(bridge) != 2 ||
+      data.ring_membership()[bridge] || !BiguanideNitrogen(m, bridge)) {
+    return 0;
+  }
+  std::array<BiguanideSide, 2> sides;
+  for (int i = 0; i < 2; ++i) {
+    sides[i]._carbon = m[bridge].other(bridge, i);
+    if (!BuildBiguanideSide(m, data, bridge, sides[i])) {
+      return 0;
+    }
+  }
+  const std::array<atom_number_t, 2> terminal = {
+      BiguanideTerminalImine(m, sides[0]), BiguanideTerminalImine(m, sides[1])};
+  const int preferred = BiguanideOrientation(m, bridge, sides, terminal);
+  if (preferred < 0) {
+    return 0;
+  }
+
+  bool changed = false;
+  for (int i = 0; i < 2; ++i) {
+    const atom_number_t double_n = i == preferred ? bridge : terminal[i];
+    for (const Bond* b : m[sides[i]._carbon]) {
+      const atom_number_t n = b->other(sides[i]._carbon);
+      if (m.formal_charge(n) || (n == double_n ? !b->is_double_bond() : !b->is_single_bond())) {
+        changed = true;
+      }
+    }
+  }
+  if (changed) {
+    for (int i = 0; i < 2; ++i) {
+      const atom_number_t carbon = sides[i]._carbon;
+      const atom_number_t double_n = i == preferred ? bridge : terminal[i];
+      // Connectivity does not change, so iterating the atom's bonds is safe.
+      for (const Bond* b : m[carbon]) {
+        const atom_number_t n = b->other(carbon);
+        const bond_type_t desired = n == double_n ? DOUBLE_BOND : SINGLE_BOND;
+        if (b->btype() != desired) {
+          m.set_bond_type_between_atoms(carbon, n, desired);
+        }
+        if (m.formal_charge(n) == 1) {
+          m.set_formal_charge(n, 0);
+          data.change_nplus(-1);
+          data.change_npos(-1);
+        }
+        m.unset_all_implicit_hydrogen_information(n);
+      }
+      m.unset_all_implicit_hydrogen_information(carbon);
+    }
+  }
+  // Reserve canonical units too: an individual rule must not undo this choice.
+  data.remove_possible_guanidine(sides[0]._carbon);
+  data.remove_possible_guanidine(sides[1]._carbon);
+  return changed;
+}
+
+}  // namespace
+
+int
+Chemical_Standardisation::_do_biguanide(Molecule& m, IWStandard_Current_Molecule& data) {
+  const int candidates_before = data.possible_guanidine().number_elements();
+  int rc = 0;
+  for (atom_number_t n = 0; n < m.natoms(); ++n) {
+    rc += CanonicaliseBiguanide(m, data, n);
+  }
+  const int handled = (candidates_before - data.possible_guanidine().number_elements()) / 2;
+  if (_verbose && handled) {
+    cerr << "Biguanide: handled " << handled << " units, changed " << rc << '\n';
+  }
+  if (rc) {
+    _transform_biguanide.extra(rc);
+    if (_append_string_depending_on_what_changed) {
+      _append_to_changed_molecules << " STD:" << CS_BIGUANIDE;
     }
   }
   return rc;

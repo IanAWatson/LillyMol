@@ -807,6 +807,34 @@ TEST_P(TestOxygenAndSulphurTautomers, CanonicalFormAndAtomOrder) {
 }
 
 INSTANTIATE_TEST_SUITE_P(OxygenAndSulphur, TestOxygenAndSulphurTautomers, testing::Values(
+    TautomerCase{CS_BIGUANIDE, "N[13C](=N)NC(=N)N", "N[13C](N)=NC(=N)N", true},
+    TautomerCase{CS_BIGUANIDE, "[15NH]=C(N)NC(=N)N", "[15NH2]C(N)=NC(=N)N", true},
+    TautomerCase{CS_BIGUANIDE, "CN(C)C(=N)NC(=N)N", "CN(C)C(N)=NC(=N)N", true},
+    TautomerCase{CS_BIGUANIDE, "CN(C)C(=N)N=C(N)N", "CN(C)C(N)=NC(=N)N", true},
+    TautomerCase{CS_BIGUANIDE, "O1CCN(C(=N)NC(=N)N)CC1", "O1CCN(C(N)=NC(=N)N)CC1", true},
+    TautomerCase{CS_BIGUANIDE, "CCNC(=N)NC(=N)N", "CCNC(N)=NC(=N)N", true},
+    TautomerCase{CS_BIGUANIDE, "c1ccccc1NC(=N)NC(=N)N", "c1ccccc1NC(N)=NC(=N)N", true},
+    TautomerCase{CS_BIGUANIDE, "NC(=N)NC(=N)N", "NC(N)=NC(=N)N", true},
+    TautomerCase{CS_BIGUANIDE, "C[C@H](F)NC(=N)NC(=N)N", "C[C@H](F)NC(N)=NC(=N)N", true},
+    TautomerCase{CS_BIGUANIDE, "CN(C)[13C](=N)NC(=N)N", "CN(C)[13C](N)=NC(=N)N", true},
+    TautomerCase{CS_BIGUANIDE, "CN(C)C(=N)[15NH]C(=N)N", "CN(C)C(N)=[15N]C(=N)N", true},
+    TautomerCase{CS_BIGUANIDE, "CN(C)C(=N)NC(=[15NH])N", "CN(C)C(N)=NC([15NH2])=N", true},
+    TautomerCase{CS_BIGUANIDE, "CN(C)C(N)=NC(=N)N", "CN(C)C(N)=NC(=N)N", false},
+    TautomerCase{CS_BIGUANIDE, "NC(N)=NC(=N)N", "NC(N)=NC(=N)N", false},
+    TautomerCase{CS_BIGUANIDE, "CCNC(=N)NC(=N)NCC", "CCNC(=N)NC(=N)NCC", false},
+    TautomerCase{CS_BIGUANIDE, "CC(=O)NC(=N)NC(=N)N", "CC(=O)NC(=N)NC(=N)N", false},
+    TautomerCase{CS_BIGUANIDE, "ONC(=N)NC(=N)N", "ONC(=N)NC(=N)N", false},
+    TautomerCase{CS_BIGUANIDE, "NC(=N)NC(=N)NC(=N)N", "NC(=N)NC(=N)NC(=N)N", false},
+    TautomerCase{CS_BIGUANIDE, "CN(C)C(=N)N(C)C(=N)N", "CN(C)C(=N)N(C)C(=N)N", false},
+    TautomerCase{CS_BIGUANIDE, "CN(C)C(=N)N([2H])C(=N)N", "CN(C)C(=N)N([2H])C(=N)N", false},
+    TautomerCase{CS_BIGUANIDE, "CN(C)C(=N)NC(=N[2H])N", "CN(C)C(=N)NC(=N[2H])N", false},
+    TautomerCase{CS_BIGUANIDE, "C/N=C(/N)NC(=N)N", "C/N=C(/N)NC(=N)N", false},
+    TautomerCase{CS_BIGUANIDE, "NC(=N)N1CCNC1=N", "NC(=N)N1CCNC1=N", false},
+    TautomerCase{CS_BIGUANIDE, "C[N+](C)(C)C(=N)NC(=N)N", "C[N+](C)(C)C(=N)NC(=N)N", false},
+    TautomerCase{CS_ALL, "CN(C)C(=N)NC(=N)N", "CN(C)C(N)=NC(=N)N", true},
+    TautomerCase{CS_ALL, "CN(C)C(N)=NC(=N)N", "CN(C)C(N)=NC(=N)N", false},
+    TautomerCase{CS_BIGUANIDE, "CN(C)C(=N)NC(=N)N", "CN(C)C(N)=NC(=N)N", true,
+                 standardisation::KetoEnol::kToEnol},
     TautomerCase{CS_AMIDOXIME, "CC(=N)NO", "CC(N)=NO", true},
     TautomerCase{CS_AMIDOXIME, "ONC(=N)C(N)C", "ON=C(N)C(N)C", true},
     TautomerCase{CS_AMIDOXIME, "ONC(=N)[C@H](N)C", "ON=C(N)[C@H](N)C", true},
@@ -2016,6 +2044,73 @@ TEST_F(TestStandardisation, FusedLactimCompletionReportsTheExistingRule) {
   std::ostringstream report;
   ASSERT_TRUE(_chemical_standardisation.report(report));
   EXPECT_NE(report.str().find("Lactim_lactam ring changed 1 groups"), std::string::npos);
+}
+
+TEST_F(TestStandardisation, BiguanideReservesBothCentresEvenWithoutBondChanges) {
+  _chemical_standardisation.activate_all();
+  ASSERT_TRUE(_m1.build_from_smiles("NC(N)=NC(=N)N"));
+  const IWString preferred = _m1.unique_smiles();
+  EXPECT_EQ(_chemical_standardisation.process(_m1), 0);
+  EXPECT_EQ(_m1.unique_smiles(), preferred);
+  ASSERT_TRUE(_chemical_standardisation.Activate("-biguanide", 0));
+  EXPECT_GT(_chemical_standardisation.process(_m1), 0);
+  ASSERT_TRUE(_m2.build_from_smiles("NC(=N)NC(=N)N"));
+  EXPECT_EQ(_m1.unique_smiles(), _m2.unique_smiles());
+  ASSERT_TRUE(_chemical_standardisation.Activate(CS_BIGUANIDE, 0));
+  _chemical_standardisation.set_append_string_depending_on_what_changed(1);
+  EXPECT_EQ(_chemical_standardisation.process(_m1), 1);
+  EXPECT_EQ(_m1.unique_smiles(), preferred);
+  EXPECT_TRUE(_m1.name().contains("STD:biguanide"));
+  std::ostringstream report;
+  ASSERT_TRUE(_chemical_standardisation.report(report));
+  EXPECT_NE(report.str().find("Biguanide changed 1 groups"), std::string::npos);
+  EXPECT_EQ(_chemical_standardisation.process(_m1), 0);
+}
+
+TEST_F(TestStandardisation, BiguanideNeutralisesChargedPrecursorsTogether) {
+  ASSERT_TRUE(_m2.build_from_smiles("CN(C)C(N)=NC(=N)N"));
+  const IWString expected = _m2.unique_smiles();
+  for (const char* smiles : {"CN(C)C(=[NH2+])NC(=N)N", "CN(C)C(=N)[NH2+]C(=N)N",
+                             "CN(C)C(=N)NC(=[NH2+])N", "C[N+](C)=C(N)NC(=N)N",
+                             "CN(C)C(N)=[N+]=C(N)N"}) {
+    Molecule original;
+    ASSERT_TRUE(original.build_from_smiles(smiles));
+    for (int i = 0; i < 100; ++i) {
+      Chemical_Standardisation standardisation;
+      standardisation.activate_all();
+      Molecule molecule;
+      ASSERT_TRUE(molecule.build_from_smiles(original.random_smiles()));
+      EXPECT_GT(standardisation.process(molecule), 0) << smiles;
+      EXPECT_EQ(molecule.unique_smiles(), expected) << smiles;
+      EXPECT_EQ(molecule.molecular_formula(), _m2.molecular_formula());
+      EXPECT_EQ(molecule.number_formally_charged_atoms(), 0);
+      EXPECT_TRUE(molecule.valence_ok()) << molecule.smiles();
+      EXPECT_EQ(standardisation.process(molecule), 0);
+    }
+  }
+}
+
+TEST_F(TestStandardisation, BiguanidePreservesParticipatingChiralAnnotations) {
+  ASSERT_TRUE(_chemical_standardisation.Activate(CS_BIGUANIDE, 0));
+  for (atom_number_t a : {1, 3, 5}) {
+    ASSERT_TRUE(_m1.build_from_smiles("CN(C)C(=N)NC(=N)N"));
+    auto marked = std::make_unique<Chiral_Centre>(a);
+    marked->set_top_front(_m1[a].other(a, 0));
+    marked->set_top_back(_m1[a].other(a, 1));
+    if (_m1.ncon(a) == 3) {
+      marked->set_left_down(_m1[a].other(a, 2));
+      marked->set_right_down(kChiralConnectionIsImplicitHydrogen);
+    } else {
+      marked->set_left_down(kChiralConnectionIsImplicitHydrogen);
+      marked->set_right_down(kChiralConnectionIsLonePair);
+    }
+    ASSERT_TRUE(_m1.add_chiral_centre(marked.get()));
+    const Chiral_Centre* saved = marked.release();
+    EXPECT_EQ(_chemical_standardisation.process(_m1), 0);
+    EXPECT_EQ(_m1.chiral_centre_at_atom(a), saved);
+    EXPECT_TRUE(_m1.bond_between_atoms(3, 4)->is_double_bond());
+    EXPECT_TRUE(_m1.bond_between_atoms(3, 5)->is_single_bond());
+  }
 }
 
 }  // namespace

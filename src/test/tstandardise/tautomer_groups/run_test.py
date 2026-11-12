@@ -29,6 +29,25 @@ cases = [
     'N1=C(O)C=C(O)N=C1O.O=c1cc[nH]c(C)n1',
     'N1=NC(=NN=C(C2=CC=NC=C2)Br)NN1',
 ]
+fused_lactims = [
+    'OC1=NC(O)=CC2=NN(C(N)=C12)c1ccccc1',
+    'O=C1NC(O)=CC2=NN(C(N)=C12)c1ccccc1',
+    'O=C1NC(=O)C=C2NN(C(N)=C12)c1ccccc1',
+    '[18OH]C1=NC(O)=CC2=NN(C(N)=C12)c1ccccc1',
+    'OC1=NC([18OH])=CC2=NN(C(N)=C12)c1ccccc1',
+    'SC1=NC(S)=CC2=NN(C(N)=C12)c1ccccc1',
+    'SC1=NC(O)=CC2=NN(C(N)=C12)c1ccccc1',
+    'OC1=NC(S)=CC2=NN(C(N)=C12)c1ccccc1',
+    'OC1=NC(O)=CC2=NN(C(N)=C12)[C@H](F)C',
+    'OC1=NC(O)=CC2=NN(C(N)=C12)c1ccccc1.CC(O)=NC',
+    'OC1=NC(O)=CC2=NN(C(N)=C12)c1ccccc1.'
+    'OC1=NC(O)=CC2=NN(C(N)=C12)c1ccccc1',
+]
+check('fused_lactim', ['-g', 'enol-fused', '-g', 'ltltr'], fused_lactims)
+check('fused_lactim_all', ['-g', 'all'], fused_lactims)
+check('fused_lactim_disabled', ['-g', 'all', '-g', '-ltltr'], fused_lactims)
+check('fused_enol_disabled', ['-g', 'all', '-g', '-enol-fused'], fused_lactims)
+
 guanidines = [
     '[N+]1(=C(N)N)CC2=C(CC1)C=CC=C2',
     '[N+]1(=C(N)N)CCCCC1', 'N=C(N)N1CCCCC1',

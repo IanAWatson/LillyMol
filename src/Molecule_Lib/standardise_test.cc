@@ -1927,4 +1927,95 @@ TEST_F(TestStandardisation, GuanidineLeavesUnsafeThreeConnectedImineChoiceIntact
   EXPECT_TRUE(_m1.valence_ok());
 }
 
+TEST_F(TestStandardisation, FusedEnolExposesPreviouslyExcludedRingLactim) {
+  ASSERT_TRUE(_m1.build_from_smiles("OC1=NC(O)=CC2=NN(C(N)=C12)c1ccccc1"));
+  IWStandard_Current_Molecule initial;
+  ASSERT_TRUE(initial.initialise(_m1));
+  // Both OH groups share a nitrogen, so neither is initially a safe lactim.
+  EXPECT_TRUE(initial.possible_lactam().empty());
+  ASSERT_TRUE(_chemical_standardisation.Activate(CS_ENOL_FUSED, 0));
+  EXPECT_EQ(_chemical_standardisation.process(_m1), 1);
+  IWStandard_Current_Molecule after_enol_fused;
+  ASSERT_TRUE(after_enol_fused.initialise(_m1));
+  ASSERT_EQ(after_enol_fused.possible_lactam().number_elements(), 1);
+  ASSERT_TRUE(_m2.build_from_smiles("O=C1NC(O)=CC2=NN(C(N)=C12)c1ccccc1"));
+  EXPECT_EQ(_m1.unique_smiles(), _m2.unique_smiles());
+}
+
+TEST_F(TestStandardisation, FusedEnolAndLactimFinishInOnePass) {
+  const std::vector<std::pair<const char*, const char*>> cases = {
+      {"OC1=NC(O)=CC2=NN(C(N)=C12)c1ccccc1",
+       "O=C1NC(=O)C=C2NN(C(N)=C12)c1ccccc1"},
+      {"O=C1NC(O)=CC2=NN(C(N)=C12)c1ccccc1",
+       "O=C1NC(=O)C=C2NN(C(N)=C12)c1ccccc1"},
+      {"[18OH]C1=NC(O)=CC2=NN(C(N)=C12)c1ccccc1",
+       "[18O]=C1NC(=O)C=C2NN(C(N)=C12)c1ccccc1"},
+      {"OC1=NC([18OH])=CC2=NN(C(N)=C12)c1ccccc1",
+       "O=C1NC(=[18O])C=C2NN(C(N)=C12)c1ccccc1"},
+      {"SC1=NC(S)=CC2=NN(C(N)=C12)c1ccccc1",
+       "S=C1NC(=S)C=C2NN(C(N)=C12)c1ccccc1"},
+      {"SC1=NC(O)=CC2=NN(C(N)=C12)c1ccccc1",
+       "S=C1NC(=O)C=C2NN(C(N)=C12)c1ccccc1"},
+      {"OC1=NC(S)=CC2=NN(C(N)=C12)c1ccccc1",
+       "O=C1NC(=S)C=C2NN(C(N)=C12)c1ccccc1"},
+      {"OC1=NC(O)=CC2=NN(C(N)=C12)[C@H](F)C",
+       "O=C1NC(=O)C=C2NN(C(N)=C12)[C@H](F)C"},
+  };
+  for (bool all : {false, true}) {
+    for (const auto& [input, output] : cases) {
+      Molecule original;
+      ASSERT_TRUE(original.build_from_smiles(input));
+      Molecule expected;
+      ASSERT_TRUE(expected.build_from_smiles(output));
+      const IWString key = expected.unique_smiles();
+      for (int i = 0; i < 100; ++i) {
+        Chemical_Standardisation standardisation;
+        if (all) {
+          standardisation.activate_all();
+        } else {
+          ASSERT_TRUE(standardisation.Activate(CS_ENOL_FUSED, 0));
+          ASSERT_TRUE(standardisation.Activate(CS_LACTIM_LACTAM_RING, 0));
+        }
+        Molecule molecule;
+        ASSERT_TRUE(molecule.build_from_smiles(original.random_smiles()));
+        const IWString formula = molecule.molecular_formula();
+        EXPECT_GT(standardisation.process(molecule), 0) << input;
+        EXPECT_EQ(molecule.unique_smiles(), key) << input;
+        EXPECT_EQ(molecule.molecular_formula(), formula) << input;
+        EXPECT_EQ(molecule.number_formally_charged_atoms(), 0);
+        EXPECT_TRUE(molecule.valence_ok()) << molecule.smiles();
+        EXPECT_EQ(standardisation.process(molecule), 0) << input;
+        EXPECT_EQ(molecule.unique_smiles(), key);
+      }
+    }
+  }
+}
+
+TEST_F(TestStandardisation, FusedLactimCompletionRespectsDisabledRules) {
+  ASSERT_TRUE(_m1.build_from_smiles("OC1=NC(O)=CC2=NN(C(N)=C12)c1ccccc1"));
+  const IWString original = _m1.unique_smiles();
+  _chemical_standardisation.activate_all();
+  ASSERT_TRUE(_chemical_standardisation.Activate("-enol-fused", 0));
+  EXPECT_EQ(_chemical_standardisation.process(_m1), 0);
+  EXPECT_EQ(_m1.unique_smiles(), original);
+  ASSERT_TRUE(_chemical_standardisation.Activate(CS_ENOL_FUSED, 0));
+  ASSERT_TRUE(_chemical_standardisation.Activate("-ltltr", 0));
+  EXPECT_EQ(_chemical_standardisation.process(_m1), 1);
+  ASSERT_TRUE(_m2.build_from_smiles("O=C1NC(O)=CC2=NN(C(N)=C12)c1ccccc1"));
+  EXPECT_EQ(_m1.unique_smiles(), _m2.unique_smiles());
+  EXPECT_EQ(_chemical_standardisation.process(_m1), 0);
+}
+
+TEST_F(TestStandardisation, FusedLactimCompletionReportsTheExistingRule) {
+  _chemical_standardisation.activate_all();
+  _chemical_standardisation.set_append_string_depending_on_what_changed(1);
+  ASSERT_TRUE(_m1.build_from_smiles("OC1=NC(O)=CC2=NN(C(N)=C12)c1ccccc1"));
+  EXPECT_EQ(_chemical_standardisation.process(_m1), 2);
+  EXPECT_TRUE(_m1.name().contains("enol_fused"));
+  EXPECT_TRUE(_m1.name().contains("STD:LTLTR"));
+  std::ostringstream report;
+  ASSERT_TRUE(_chemical_standardisation.report(report));
+  EXPECT_NE(report.str().find("Lactim_lactam ring changed 1 groups"), std::string::npos);
+}
+
 }  // namespace

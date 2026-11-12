@@ -180,6 +180,34 @@ refreshed on atoms whose hydrogen count changes during these conversions. This
 also fixes earlier oxygen cases that could retain an obsolete hydrogen count
 and produce an invalid-valence product.
 
+### Completing lactim conversion after fused-ring enol changes
+
+`-g enol-fused` can expose a ring lactim that was excluded during initial
+perception. When two OH/SH lactims share one nitrogen, both are initially
+excluded to avoid competing conversions. Converting one with `enol-fused`
+can make the other eligible for `-g ltltr`.
+
+For example, CHEMBL1899721 previously needed two standardisation passes:
+
+```text
+OC1=NC(O)=CC2=NN(C(N)=C12)c1ccccc1
+  -> O=C1NC(O)=CC2=NN(C(N)=C12)c1ccccc1
+  -> O=C1NC(=O)C=C2NN(C(N)=C12)c1ccccc1
+```
+
+With both rules enabled (as in `-g all`), an actual `enol-fused` change now
+triggers fresh lactim perception and one completion of the existing ring
+lactim rule after the normal transformations. This preserves the initial
+snapshot for other rules and avoids repeating the entire standardisation
+pipeline. The additional perception is limited to molecules changed by
+`enol-fused`; it does not copy the molecule. Disabling either rule retains
+that rule's usual scope. Completion is reported as `STD:LTLTR` with
+`-g APP=EACH` and counted by the ring lactim rule.
+
+The fused-ring enol conversion also clears bracket-specified hydrogen counts
+on atoms whose bonds change. This prevents a labelled `[18OH]` becoming an
+invalid `[18OH]=C` instead of `[18O]=C`. Heavy-atom isotope labels are retained.
+
 ### Guanidine charge and valence handling
 
 `-g guan`, included in `-g all`, relocates eligible guanidine C=N bonds.

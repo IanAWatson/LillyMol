@@ -4121,13 +4121,16 @@ Chemical_Standardisation::_process(Molecule& m,
     // cerr << "After _do_transform_124_triazine " << m.aromatic_smiles() << '\n';
   }
 
+  int enol_fused_changes = 0;
   if (_transform_enol_fused.active()) {
-    rc += _do_transform_enol_fused(m, current_molecule_data);
+    enol_fused_changes = _do_transform_enol_fused(m, current_molecule_data);
+    rc += enol_fused_changes;
 #ifdef DEBUG_TRANSFORM_ENOL_FUSED
     int xyz = _do_transform_enol_fused(m, current_molecule_data);
     cerr << "_do_transform_enol_fused returned " << xyz << " " << m.aromatic_smiles()
          << '\n';
     rc += xyz;
+    enol_fused_changes += xyz;
 #endif
   }
 
@@ -4326,6 +4329,18 @@ Chemical_Standardisation::_process(Molecule& m,
   if (_transform_nitroso_to_oxime.active() && current_molecule_data.nitrogens() &&
       current_molecule_data.oxygens()) {
     rc += _do_nitroso_to_oxime(m, current_molecule_data);
+  }
+
+  // Two OH/SH lactims sharing one N are excluded during initial perception.
+  // enol-fused can convert one of them, exposing a now-unambiguous remaining
+  // lactim (CHEMBL1899721). Re-perceive only after an actual enol-fused change,
+  // and finish the existing ring-lactim rule once, without iterating all rules.
+  // Keep the initial snapshot intact until its other users have finished.
+  if (enol_fused_changes && _transform_lactim_lactam_ring.active()) {
+    IWStandard_Current_Molecule refreshed;
+    if (refreshed.initialise(m) && !refreshed.possible_lactam().empty()) {
+      rc += _do_transform_ring_lactim(m, atom_already_changed, refreshed);
+    }
   }
 
   if (_external_transformation.size() > 0) {
@@ -11881,7 +11896,11 @@ Chemical_Standardisation::_do_transform_enol_fused(
     if (m.bond_between_atoms(j, nitrogen)->is_double_bond()) {
       m.set_bond_type_between_atoms(i, j, DOUBLE_BOND);
       m.set_bond_type_between_atoms(j, nitrogen, SINGLE_BOND);
-      m.set_implicit_hydrogens_known(nitrogen, 0);
+      // OH/SH becomes a carbonyl/thione; discard bracket-specified H counts
+      // as well as cached values on both ends of the hydrogen transfer.
+      m.unset_all_implicit_hydrogen_information(i);
+      m.unset_all_implicit_hydrogen_information(j);
+      m.unset_all_implicit_hydrogen_information(nitrogen);
       ++rc;
       continue;
     }
@@ -11895,7 +11914,9 @@ Chemical_Standardisation::_do_transform_enol_fused(
     }
     m.set_bond_type_between_atoms(i, j, DOUBLE_BOND);
     m.set_bond_type_between_atoms(j, nitrogen, SINGLE_BOND);
-    m.set_implicit_hydrogens_known(nitrogen, 0);
+    m.unset_all_implicit_hydrogen_information(i);
+    m.unset_all_implicit_hydrogen_information(j);
+    m.unset_all_implicit_hydrogen_information(nitrogen);
     ++rc;
   }
 

@@ -1140,6 +1140,15 @@ INSTANTIATE_TEST_SUITE_P(OxygenAndSulphur, TestOxygenAndSulphurTautomers, testin
     TautomerCase{CS_ALL, "CC([H])([H])N=O", "CC=NO", true},
     TautomerCase{CS_ALL, "N1C=CC(N=O)C=C1", "N1C=CC(=NO)C=C1", true},
     TautomerCase{CS_ALL, "C[N+](=O)[O-].CCN=O", "CN(=O)=O.CC=NO", true},
+    TautomerCase{CS_PHOSPHORUS_OXO, "CP(=O)(C)C", "CP(=O)(C)C", false},
+    TautomerCase{CS_PHOSPHORUS_OXO, "C[P+](C)(C)C", "C[P+](C)(C)C", false},
+    TautomerCase{CS_PHOSPHORUS_OXO, "CP(C)O", "CP(C)O", false},
+    TautomerCase{CS_PHOSPHORUS_OXO, "C[P+](C)(C)O[2H]", "C[P+](C)(C)O[2H]", false},
+    TautomerCase{CS_PHOSPHORUS_OXO, "C[P+](C)(C)O[H]", "C[P+](C)(C)O[H]", false},
+    TautomerCase{CS_PHOSPHORUS_OXO, "C[P+](O)(S)C", "C[P+](O)(S)C", false},
+    TautomerCase{CS_PHOSPHORUS_OXO, "C[P+](O)([O-])OC", "C[P+](O)([O-])OC", false},
+    TautomerCase{CS_PHOSPHORUS_OXO, "C[P@+](O)(N)OC", "C[P@+](O)(N)OC", false},
+    TautomerCase{CS_PHOSPHORUS_OXO, "CC(O)O", "CC(O)O", false},
     TautomerCase{CS_PHOSPHORUS_TAUTOMER, "C12(C)C(=CCC3=C1C=CC(Cl)=C3)C=C(CC2)P(O)O", "C12=CCC3=C(C1(C)CCC(=C2)P(=O)O)C=CC(Cl)=C3", true},
     TautomerCase{CS_PHOSPHORUS_TAUTOMER, "P(O)(O)[C@H](N)C", "P(=O)(O)[C@H](N)C", true},
     TautomerCase{CS_PHOSPHORUS_TAUTOMER, "P(O)(O)C(N)C", "P(=O)(O)C(N)C", true},
@@ -1575,6 +1584,74 @@ TEST_F(TestStandardisation, BetaDiketoneCanBeDisabled) {
   const IWString before = _m1.unique_smiles();
   EXPECT_EQ(_chemical_standardisation.process(_m1), 0);
   EXPECT_EQ(_m1.unique_smiles(), before);
+}
+
+TEST_F(TestStandardisation, PhosphorusOxoNeutralisesAndLosesOneHydrogen) {
+  for (const char* directive : {CS_PHOSPHORUS_OXO, CS_ALL}) {
+    Chemical_Standardisation standardisation;
+    ASSERT_TRUE(standardisation.Activate(directive, 0));
+    for (const auto& [input, expected] : std::vector<std::pair<const char*, const char*>>{
+        {"C[P+](C)(C)O", "CP(=O)(C)C"},
+        {"CO[P+](N)(N)O", "COP(=O)(N)N"},
+        {"[P+]1(O)(NCC(Cl)CO1)N(CCCl)CCCl", "P1(=O)(NCC(Cl)CO1)N(CCCl)CCCl"},
+        {"C[P+](O)([18OH])OC", "CP(=O)([18OH])OC"},
+        {"C[P+](O)([OH])OC", "CP(=O)(O)OC"},
+        {"[13CH3][P+](C)(C)[18OH]", "[13CH3]P(=[18O])(C)C"},
+        {"C[P+](O)(O[2H])OC", "CP(=O)(O[2H])OC"},
+        {"C[P+](O)(N)[C@H](F)C", "CP(=O)(N)[C@H](F)C"}}) {
+      Molecule original;
+      ASSERT_TRUE(original.build_from_smiles(input));
+      ASSERT_TRUE(_m2.build_from_smiles(expected));
+      const IWString key = _m2.unique_smiles();
+      auto hydrogens = [](Molecule& m) {
+        int result = m.natoms(1);
+        for (atom_number_t a = 0; a < m.natoms(); ++a) {
+          result += m.implicit_hydrogens(a);
+        }
+        return result;
+      };
+      const int hydrogen_count = hydrogens(original);
+      for (int i = 0; i < 100; ++i) {
+        Molecule molecule;
+        ASSERT_TRUE(molecule.build_from_smiles(original.random_smiles()));
+        EXPECT_EQ(standardisation.process(molecule), 1) << input;
+        EXPECT_EQ(molecule.unique_smiles(), key) << input;
+        EXPECT_EQ(molecule.molecular_formula(), _m2.molecular_formula());
+        EXPECT_EQ(hydrogens(molecule), hydrogen_count - 1);
+        EXPECT_EQ(molecule.net_formal_charge(), 0);
+        EXPECT_TRUE(molecule.valence_ok());
+        EXPECT_EQ(standardisation.process(molecule), 0);
+      }
+    }
+  }
+}
+
+TEST_F(TestStandardisation, PhosphorusOxoCanBeDisabledAndReports) {
+  _chemical_standardisation.activate_all();
+  ASSERT_TRUE(_chemical_standardisation.Activate("-phosphorus-oxo", 0));
+  ASSERT_TRUE(_m1.build_from_smiles("C[P+](C)(C)O"));
+  const IWString before = _m1.unique_smiles();
+  EXPECT_EQ(_chemical_standardisation.process(_m1), 0);
+  EXPECT_EQ(_m1.unique_smiles(), before);
+  ASSERT_TRUE(_chemical_standardisation.Activate(CS_PHOSPHORUS_OXO, 0));
+  _chemical_standardisation.set_append_string_depending_on_what_changed(1);
+  EXPECT_EQ(_chemical_standardisation.process(_m1), 1);
+  EXPECT_TRUE(_m1.name().contains("STD:phosphorus-oxo"));
+  std::ostringstream report;
+  ASSERT_TRUE(_chemical_standardisation.report(report));
+  EXPECT_NE(report.str().find("Phosphorus oxo changed 1 groups"), std::string::npos);
+  EXPECT_EQ(_chemical_standardisation.process(_m1), 0);
+}
+
+TEST_F(TestStandardisation, PhosphorusOxoCountsMultipleCentresAndKeepsOtherCharges) {
+  ASSERT_TRUE(_chemical_standardisation.Activate(CS_PHOSPHORUS_OXO, 0));
+  ASSERT_TRUE(_m1.build_from_smiles("C[P+](C)(C)O.C[P+](C)(C)O.C[NH2+]C"));
+  ASSERT_TRUE(_m2.build_from_smiles("CP(=O)(C)C.CP(=O)(C)C.C[NH2+]C"));
+  EXPECT_EQ(_chemical_standardisation.process(_m1), 2);
+  EXPECT_EQ(_m1.unique_smiles(), _m2.unique_smiles());
+  EXPECT_EQ(_m1.net_formal_charge(), 1);
+  EXPECT_TRUE(_m1.valence_ok());
+  EXPECT_EQ(_chemical_standardisation.process(_m1), 0);
 }
 
 TEST_F(TestStandardisation, PhosphorusTautomerAssignsHydrogenAndReports) {

@@ -87,6 +87,7 @@ Entering `-g help` to most LillyMol tools yields the usage message
  -g cyclic-amidine canonicalise isolated neutral cyclic amidines
  -g nitroso      convert neutral aliphatic C-N=O groups to C=N-OH
  -g phosphorus   convert neutral P-OH tautomers to P(=O)H
+ -g phosphorus-oxo neutralise four-coordinate [P+]-OH to P=O
  -g beta-enaminone convert eligible acyclic beta-ketoimines to enaminones
  -g beta-hydrazone prefer acyclic beta-keto hydrazones (included in all)
  -g beta-enehydrazine prefer acyclic beta-enehydrazines (alternative preference)
@@ -739,6 +740,38 @@ stereocentres are retained, and the newly formed C=N geometry is unspecified.
 Existing oxime geometry is preserved. Processing is gated by the existing
 nitrogen and oxygen counts. Reports include nitroso-to-oxime counts, and
 `-g APP=EACH` appends `STD:nitroso` when this rule changes a molecule.
+
+### Charged phosphorus OH normalisation
+
+`-g phosphorus-oxo` neutralises eligible four-coordinate phosphorus:
+
+```text
+C[P+](C)(C)O           -> CP(=O)(C)C
+[P+]1(O)(NCCCO1)N(C)C -> P1(=O)(NCCCO1)N(C)C
+```
+
+Included in `-g all`; disable with `-g all -g -phosphorus-oxo`. Both the
+processing-needed check and the invocation are guarded by the cached
+phosphorus count. The atom scan is skipped for molecules without phosphorus.
+
+P must have charge +1, four single bonds, no hydrogen and no marked
+stereocentre. Its neighbours must be neutral carbon, nitrogen or oxygen,
+including a terminal OH with an implicit hydrogen. The OH loses its proton
+while P loses its positive charge and gains P=O. Thus hydrogen count and
+net charge each decrease by one; this is charge normalisation, not a
+formula-preserving tautomer conversion. It is independent of `ENOL` and
+of the separate `phosphorus` tautomer option.
+
+Marked phosphorus stereochemistry, explicit hydrogen neighbours on P,
+charged neighbouring atoms, sulfur neighbours, and an OH whose hydrogen
+is an explicit atom prevent the corresponding conversion. Other eligible
+OH groups on the same P can still be used. Among multiple OH candidates,
+the lowest oxygen isotope is preferred, then a bracket-specified hydrogen
+is consumed before an inferred one. Isotopes and remote stereochemistry
+are retained. No P hydrogen or new stereocentre is introduced.
+
+Reports count these conversions separately; `-g APP=EACH` appends
+`STD:phosphorus-oxo`.
 
 ### Phosphorus OH tautomers
 

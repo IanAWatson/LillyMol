@@ -416,6 +416,7 @@ class IWStandard_Current_Molecule
 #define CS_CYCLIC_AMIDINE "cyclic-amidine"
 #define CS_NITROSO_OXIME "nitroso"
 #define CS_PHOSPHORUS_TAUTOMER "phosphorus"
+#define CS_PHOSPHORUS_OXO "phosphorus-oxo"
 #define CS_BETA_ENAMINONE "beta-enaminone"
 #define CS_BETA_ENEHYDRAZINE "beta-enehydrazine"
 #define CS_BETA_HYDRAZONE "beta-hydrazone"
@@ -530,6 +531,7 @@ class Chemical_Standardisation
     Chemical_Transformation _transform_alpha_ketoamide;
     Chemical_Transformation _transform_beta_ketoester;
     Chemical_Transformation _transform_phosphorus_tautomer;
+    Chemical_Transformation _transform_phosphorus_oxo;
     Chemical_Transformation _transform_nitroso_to_oxime;
     Chemical_Transformation _transform_lactim_lactam;
     Chemical_Transformation _transform_lactim_lactam_ring;
@@ -640,6 +642,7 @@ class Chemical_Standardisation
     int _do_transform_amidine(Molecule& m, IWStandard_Current_Molecule& current_molecule_data);
     int _do_nitroso_to_oxime(Molecule& m, const IWStandard_Current_Molecule& data);
     int _do_phosphorus_tautomer(Molecule& m, const IWStandard_Current_Molecule& data);
+    int _do_phosphorus_oxo(Molecule& m, IWStandard_Current_Molecule& data);
     int _do_beta_enaminone(Molecule& m, const IWStandard_Current_Molecule& data);
     int _do_beta_hydrazone(Molecule& m, const IWStandard_Current_Molecule& data,
                            bool to_hydrazone);

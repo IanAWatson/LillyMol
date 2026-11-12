@@ -29,6 +29,23 @@ cases = [
     'N1=C(O)C=C(O)N=C1O.O=c1cc[nH]c(C)n1',
     'N1=NC(=NN=C(C2=CC=NC=C2)Br)NN1',
 ]
+phosphorus_oxo = [
+    'C[P+](C)(C)O', 'CO[P+](N)(N)O', 'C[P+](O)([18OH])OC',
+    'C[P+](O)([OH])OC', 'C[P+](O)(O[2H])OC',
+    'C[P@+](O)(N)OC', 'C[P+](C)(C)O[2H]', 'C[P+](C)(C)C',
+    'C[P+](C)(C)O.C[P+](C)(C)O.C[NH2+]C',
+    '[P+]1(O)(NCC(Cl)CO1)N(CCCl)CCCl',
+    'C[P+](O)(N)[C@H](F)C',
+]
+check('phosphorus_oxo', ['-g', 'phosphorus-oxo'], phosphorus_oxo)
+check('phosphorus_oxo_all', ['-g', 'all'], phosphorus_oxo)
+check('phosphorus_oxo_enol', ['-g', 'all', '-g', 'ENOL'], phosphorus_oxo)
+# Mixed specified/inferred H on equivalent OH groups has an existing
+# unique-SMILES inconsistency when this normalisation is disabled.
+# Keep that case in all enabled-rule checks above.
+check('phosphorus_oxo_disabled', ['-g', 'all', '-g', '-phosphorus-oxo'],
+      [smi for smi in phosphorus_oxo if smi != 'C[P+](O)([OH])OC'])
+
 oxo_ring_guanidines = [
     'O=C1NC(=N)N(C)C1',
     'O=C1NC(=N)NC1',

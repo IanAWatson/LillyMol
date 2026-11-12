@@ -397,6 +397,7 @@ Chemical_Standardisation::activate_all() {
   _transform_alpha_ketoamide.activate();
   _transform_beta_ketoester.activate();
   _transform_phosphorus_tautomer.activate();
+  _transform_phosphorus_oxo.activate();
   _transform_nitroso_to_oxime.activate();
   _transform_isoxazole.activate();
   _transform_aromatic_guanidine_ring.activate();
@@ -468,6 +469,7 @@ display_all_chemical_standardisation_options(std::ostream& os, char zoption) {
   os << zopt << CS_PYRIMIDINE << "  convert isolated O/S pyrimidinetrione tautomers to keto form\n";
   os << zopt << CS_NITROSO_OXIME << "      convert neutral aliphatic C-N=O to C=N-OH\n";
   os << zopt << CS_PHOSPHORUS_TAUTOMER << "  convert neutral P-OH tautomers to P(=O)H\n";
+  os << zopt << CS_PHOSPHORUS_OXO << " neutralise four-coordinate [P+]-OH to P=O\n";
   os << zopt << CS_BETA_ENAMINONE << " convert eligible acyclic beta-ketoimines to enaminones\n";
   os << zopt << CS_BETA_HYDRAZONE << " prefer acyclic beta-keto hydrazones (default with all)\n";
   os << zopt << CS_BETA_ENEHYDRAZINE << " prefer acyclic beta-enehydrazines (disable beta-hydrazone first)\n";
@@ -884,6 +886,12 @@ Chemical_Standardisation::Activate(const IWString& directive, const int verbose)
       _transform_phosphorus_tautomer.deactivate();
     } else {
       _transform_phosphorus_tautomer.activate();
+    }
+  } else if (tmp == CS_PHOSPHORUS_OXO) {
+    if (negation) {
+      _transform_phosphorus_oxo.deactivate();
+    } else {
+      _transform_phosphorus_oxo.activate();
     }
   } else if (tmp == CS_BETA_ENAMINONE) {
     if (negation) {
@@ -4565,6 +4573,10 @@ Chemical_Standardisation::_process(Molecule& m,
     rc += _do_phosphorus_tautomer(m, current_molecule_data);
   }
 
+  if (_transform_phosphorus_oxo.active() && current_molecule_data.phosphorus()) {
+    rc += _do_phosphorus_oxo(m, current_molecule_data);
+  }
+
   if (_transform_ascorbate.active() && current_molecule_data.oxygens() >= 4) {
     rc += _do_ascorbate(m, current_molecule_data);
   }
@@ -4983,6 +4995,10 @@ Chemical_Standardisation::report(std::ostream& os) const {
   if (_transform_phosphorus_tautomer.active()) {
     os << "  Phosphorus tautomer ";
     _transform_phosphorus_tautomer.report(os);
+  }
+  if (_transform_phosphorus_oxo.active()) {
+    os << "  Phosphorus oxo ";
+    _transform_phosphorus_oxo.report(os);
   }
   if (_transform_beta_enaminone.active()) {
     os << "  Beta enaminone ";
@@ -10743,7 +10759,8 @@ Chemical_Standardisation::_processing_needed(
     return 1;
   }
 
-  if (_transform_phosphorus_tautomer.active() && current_molecule_data.phosphorus()) {
+  if ((_transform_phosphorus_tautomer.active() || _transform_phosphorus_oxo.active()) &&
+      current_molecule_data.phosphorus()) {
     return 1;
   }
 
@@ -12397,6 +12414,66 @@ Chemical_Standardisation::_do_phosphorus_tautomer(
     }
     if (_append_string_depending_on_what_changed) {
       _append_to_changed_molecules << " STD:" << CS_PHOSPHORUS_TAUTOMER;
+    }
+  }
+  return rc;
+}
+
+// Neutralise [P+](OH)(X)(Y)(Z) to P(=O)(X)(Y)(Z), where X/Y/Z
+// are neutral C, N or O neighbours. Marked P stereochemistry is left intact.
+int
+Chemical_Standardisation::_do_phosphorus_oxo(
+    Molecule& m, IWStandard_Current_Molecule& data) {
+  const atomic_number_t* z = data.atomic_number();
+  int rc = 0;
+  for (atom_number_t phosphorus = 0; phosphorus < m.natoms(); ++phosphorus) {
+    if (z[phosphorus] != 15 || m.formal_charge(phosphorus) != 1 ||
+        m.ncon(phosphorus) != 4 || m.nbonds(phosphorus) != 4 ||
+        m.hcount(phosphorus) != 0 || m.chiral_centre_at_atom(phosphorus)) {
+      continue;
+    }
+    atom_number_t hydroxyl = kInvalidAtomNumber;
+    bool eligible = true;
+    // Equivalent OH groups must be chosen independently of atom order. Prefer
+    // the lowest oxygen isotope. Within an isotope, consume bracket-specified
+    // OH first so its hydrogen specification is cleared during conversion.
+    auto priority = [&](atom_number_t oxygen) {
+      return std::make_pair(m.isotope(oxygen), !m.implicit_hydrogens_known(oxygen));
+    };
+    for (const Bond* b : m[phosphorus]) {
+      const atom_number_t other = b->other(phosphorus);
+      if (!b->is_single_bond() || (z[other] != 6 && z[other] != 7 && z[other] != 8) ||
+          m.formal_charge(other)) {
+        eligible = false;
+        break;
+      }
+      if (z[other] != 8 || m.ncon(other) != 1 || m.hcount(other) != 1 ||
+          m.chiral_centre_at_atom(other)) {
+        continue;
+      }
+      if (hydroxyl == kInvalidAtomNumber || priority(other) < priority(hydroxyl)) {
+        hydroxyl = other;
+      }
+    }
+    if (!eligible || hydroxyl == kInvalidAtomNumber) {
+      continue;
+    }
+    // Lose the OH proton and the positive charge together. This is charge
+    // normalisation, not the formula-preserving P(III)-OH tautomer rule.
+    m.set_bond_type_between_atoms(phosphorus, hydroxyl, DOUBLE_BOND);
+    m.set_formal_charge(phosphorus, 0);
+    data.change_npos(-1);  // This phosphorus is not part of the N+ count.
+    m.unset_all_implicit_hydrogen_information(phosphorus);
+    m.unset_all_implicit_hydrogen_information(hydroxyl);
+    ++rc;
+  }
+  if (rc) {
+    _transform_phosphorus_oxo.extra(rc);
+    if (_verbose) {
+      cerr << "Transformed " << rc << " charged phosphorus OH groups to P=O\n";
+    }
+    if (_append_string_depending_on_what_changed) {
+      _append_to_changed_molecules << " STD:" << CS_PHOSPHORUS_OXO;
     }
   }
   return rc;

@@ -85,7 +85,9 @@ Entering `-g help` to most LillyMol tools yields the usage message
  -g cyclic-amidine canonicalise isolated neutral cyclic amidines
  -g nitroso      convert neutral aliphatic C-N=O groups to C=N-OH
  -g phosphorus   convert neutral P-OH tautomers to P(=O)H
- -g beta-hydrazone canonicalise acyclic beta-keto hydrazone/enamine tautomers
+ -g beta-enaminone convert eligible acyclic beta-ketoimines to enaminones
+ -g beta-hydrazone prefer acyclic beta-keto hydrazones (included in all)
+ -g beta-enehydrazine prefer acyclic beta-enehydrazines (alternative preference)
  -g beta-ketoester canonicalise acyclic beta-ketoester enols
  -g beta-diketone canonicalise beta-diketone enols to diketo form
  -g ascorbate    canonicalise isolated ascorbate rings to lactone/enediol form
@@ -237,6 +239,46 @@ Use `-f` to stop with a nonzero exit status on a failure. Invalid starting
 valence is distinguished from invalid valence introduced by standardisation;
 the latter is counted as a failure and written to the failure file.
 
+### Acyclic beta-enaminones
+
+`-g beta-enaminone` chooses the conjugated keto–enamine representative of
+eligible acyclic beta-ketoimines:
+
+```text
+CC(=O)CC(C)=NCC -> CC(=O)C=C(C)NCC
+```
+
+Both sides retain a ketone C=O. A hydrogen moves from CH2 to nitrogen, forming
+the conjugated `O=C-C=C-NH` chain. Experimental solution NMR supports this
+choice for closely related compounds, including an ethylene-linked
+bis-enaminone with the same connectivity as the archive example
+CHEMBL3211628/CHEMBL4752297. See [Eshghi et al., 2014](https://doi.org/10.1016/j.crci.2014.01.004)
+and the acyclic N-aryl study by
+[Darugar et al., 2021](https://doi.org/10.1016/j.molliq.2021.116035).
+This is a canonicalisation preference, not a prediction of solution populations
+for arbitrary substituents, solvents, or pH.
+
+The rule is included in `-g all`, broadening default equivalence. Disable it
+with `-g all -g -beta-enaminone`. It is skipped with `ENOL`. The initial scope
+requires an acyclic ketone–CH2–C=N chain, a carbon substituent on the imine
+carbon, and a carbon substituent on the neutral, two-connected imine nitrogen.
+Non-aromatic carbon substituents at the ends of the reacting chain and at
+nitrogen must be saturated; aromatic substituents are allowed. N-acyl,
+N-hydrazone, cyclic reacting chains, acids/esters/amides in place of the ketone,
+and substituted CH2 linkers are excluded. If both sides of the imine carbon
+provide an eligible CH2–ketone group, conversion is skipped rather than making
+an atom-order-dependent choice.
+
+Specified geometry on the reacting bonds and marked chiral centres at
+participating atoms prevent conversion. Explicit hydrogen neighbours on the
+CH2 linker are excluded, preserving isotopic hydrogen. Heavy-atom isotope
+labels and remote stereochemistry are retained. No double-bond geometry or
+chiral-centre annotations are assigned to the product. Ordinary explicit
+hydrogens can first be removed by `-g all`.
+
+Reports count conversions separately; `-g APP=EACH` appends
+`STD:beta-enaminone` for changed molecules.
+
 ### Acyclic beta-keto hydrazones
 
 `-g beta-hydrazone` chooses the keto–hydrazone representative of eligible
@@ -248,9 +290,44 @@ CC(=O)C=C(C)NNC(=O)c1ccncc1 -> CC(=O)CC(C)=NNC(=O)c1ccncc1
 
 A hydrogen moves from the nitrogen next to the alkene onto the intervening
 carbon, replacing C=C–NH with C–C=N. No charges or stereocentre annotations
-are introduced. This broadens default tautomer equivalence because the rule is
-included in `-g all`; disable it with `-g all -g -beta-hydrazone`. It is skipped
-with the `ENOL` preference.
+are introduced. `-g beta-hydrazone` is included in `-g all`. The aim is consistent grouping
+for modelling; this choice does not predict the dominant solution tautomer.
+Disable it with `-g all -g -beta-hydrazone`.
+
+The alternative `-g beta-enehydrazine` chooses the reverse representative:
+
+```text
+CC(=O)CC(C)=NNC(=O)c1ccncc1 -> CC(=O)C=C(C)NNC(=O)c1ccncc1
+```
+
+To use this preference with ordinary standardisation:
+
+```shell
+fileconv -g all -g -beta-hydrazone -g beta-enehydrazine -S standardised input.smi
+```
+
+The two options are mutually exclusive. Enabling both produces an error before
+molecules are read; validation uses the final command-line configuration, so
+`-g beta-enehydrazine -g all -g -beta-hydrazone` is also valid. C++ callers
+configuring the object directly can use `ok()` to validate the final state;
+`process()` refuses to modify molecules while both preferences are active.
+Both directions are skipped with `ENOL`.
+
+The same structural restrictions apply in both directions. A second eligible
+CH2–ketone branch at the hydrazone carbon makes the reverse choice ambiguous;
+such structures are left unchanged in both preferences, including the
+corresponding enehydrazine forms. Defined geometry is preserved rather than
+assigned or discarded during conversion. Newly generated double bonds have
+unspecified geometry.
+
+Solution preferences in related hydrazone systems vary. See
+[Ahlbrecht and Henk, 1976](https://doi.org/10.1002/cber.19761090438)
+for beta-ketoester/beta-ketonitrile derivatives and
+[Sergienko et al., 2022](https://new.ras.ru/upload/iblock/0e3/jo4dmafqp2gg7krd57kz5l3xo1uer33z.pdf)
+for related beta-dicarbonyl acylhydrazone solid structures. These do not
+establish a universal solution preference for the ketone subset handled here.
+The N-carbon enaminone preference described above cannot simply be extended
+to N–N systems.
 
 The initial scope requires an acyclic ketone, an unsubstituted CH between the
 ketone and enamine carbon, a carbon substituent on the enamine carbon, and two
@@ -269,7 +346,8 @@ As usual, `-g all` can first remove ordinary explicit hydrogen atoms and
 neutralise charged amines; the isolated rule only accepts neutral groups.
 
 Reports count these conversions separately. `-g APP=EACH` appends
-`STD:beta-hydrazone` when this rule changes a molecule.
+`STD:beta-hydrazone` or `STD:beta-enehydrazine`, according to the selected
+preference, when the rule changes a molecule.
 
 ### Isolated cyclic amidines
 

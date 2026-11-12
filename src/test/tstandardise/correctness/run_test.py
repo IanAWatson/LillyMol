@@ -85,3 +85,12 @@ assert '0 valence errors introduced' in result.stderr, result.stderr
 assert Path('repaired_start.fail.smi').read_text() == '', result.stderr
 
 print('Standardisation correctness tests passed')
+
+# Opposite hydrazone preferences must be resolved before reading molecules.
+for name, options in [
+    ('hydrazone_conflict_all', ['-g', 'all', '-g', 'beta-enehydrazine']),
+    ('hydrazone_conflict_explicit', ['-g', 'beta-enehydrazine', '-g', 'beta-hydrazone']),
+]:
+    result = run(name, options, 'CC(=O)CC(C)=NNC', success=False)
+    assert 'mutually exclusive' in result.stderr, result.stderr
+    assert '-g all -g -beta-hydrazone -g beta-enehydrazine' in result.stderr, result.stderr

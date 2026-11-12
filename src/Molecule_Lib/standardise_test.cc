@@ -807,6 +807,55 @@ TEST_P(TestOxygenAndSulphurTautomers, CanonicalFormAndAtomOrder) {
 }
 
 INSTANTIATE_TEST_SUITE_P(OxygenAndSulphur, TestOxygenAndSulphurTautomers, testing::Values(
+    TautomerCase{CS_BETA_ENAMINONE, "CC(=O)CC(C)=NCC", "CC(=O)C=C(C)NCC", true},
+    TautomerCase{CS_BETA_ENAMINONE, "O=C(C)CC(=NCCN=C(C)CC(=O)C)C", "CC(=O)C=C(C)NCCNC(C)=CC(C)=O", true},
+    TautomerCase{CS_BETA_ENAMINONE, "O=C(c1ccccc1)CC(=Nc1ccccc1)c1ccccc1", "O=C(c1ccccc1)C=C(Nc1ccccc1)c1ccccc1", true},
+    TautomerCase{CS_BETA_ENAMINONE, "CC(=O)[13CH2]C(C)=[15N]CC", "CC(=O)[13CH]=C(C)[15NH]CC", true},
+    TautomerCase{CS_BETA_ENAMINONE, "CC(=O)CC(C)=N[C@H](F)C", "CC(=O)C=C(C)N[C@H](F)C", true},
+    TautomerCase{CS_BETA_ENAMINONE, "CC(=O)[CH2][C](C)=[N]CC", "CC(=O)C=C(C)NCC", true},
+    TautomerCase{CS_BETA_ENAMINONE, "CC(=O)C=C(C)NCC", "CC(=O)C=C(C)NCC", false},
+    TautomerCase{CS_BETA_ENAMINONE, "CCC(C)=NCC", "CCC(C)=NCC", false},
+    TautomerCase{CS_BETA_ENAMINONE, "COC(=O)CC(C)=NCC", "COC(=O)CC(C)=NCC", false},
+    TautomerCase{CS_BETA_ENAMINONE, "NC(=O)CC(C)=NCC", "NC(=O)CC(C)=NCC", false},
+    TautomerCase{CS_BETA_ENAMINONE, "CC(=S)CC(C)=NCC", "CC(=S)CC(C)=NCC", false},
+    TautomerCase{CS_BETA_ENAMINONE, "CC(=O)C(C)C(C)=NCC", "CC(=O)C(C)C(C)=NCC", false},
+    TautomerCase{CS_BETA_ENAMINONE, "CC(=O)CC(C)=NNCC", "CC(=O)CC(C)=NNCC", false},
+    TautomerCase{CS_BETA_ENAMINONE, "CC(=O)CC(C)=NC(=O)C", "CC(=O)CC(C)=NC(=O)C", false},
+    TautomerCase{CS_BETA_ENAMINONE, "CC(=O)CC(C)=N", "CC(=O)CC(C)=N", false},
+    TautomerCase{CS_BETA_ENAMINONE, "CC(=O)CC(C)=[NH+]CC", "CC(=O)CC(C)=[NH+]CC", false},
+    TautomerCase{CS_BETA_ENAMINONE, "CC(=O)C([2H])C(C)=NCC", "CC(=O)C([2H])C(C)=NCC", false},
+    TautomerCase{CS_BETA_ENAMINONE, "CC(=O)CC(C)=N[2H]", "CC(=O)CC(C)=N[2H]", false},
+    TautomerCase{CS_BETA_ENAMINONE, "CC(=O)C/C(C)=N/CC", "CC(=O)C/C(C)=N/CC", false},
+    TautomerCase{CS_BETA_ENAMINONE, "O=C1CC(=NCC)CCC1", "O=C1CC(=NCC)CCC1", false},
+    TautomerCase{CS_BETA_ENAMINONE, "CC(=O)CC(CC(C)=O)=NCC", "CC(=O)CC(CC(C)=O)=NCC", false},
+    TautomerCase{CS_BETA_ENAMINONE, "CC(=O)CC(C=C)=NCC", "CC(=O)CC(C=C)=NCC", false},
+    TautomerCase{CS_BETA_ENAMINONE, "CC(=O)CC(C)=NCC", "CC(=O)CC(C)=NCC", false,
+                 standardisation::KetoEnol::kToEnol},
+    TautomerCase{CS_ALL, "CC(=O)CC(C)=NCC", "CC(=O)C=C(C)NCC", true},
+    TautomerCase{CS_BETA_ENEHYDRAZINE, "CC(=O)CC(C)=NNC", "CC(=O)C=C(C)NNC", true},
+    TautomerCase{CS_BETA_ENEHYDRAZINE, "CC(=O)CC(C)=NNC(=O)c1ccncc1", "CC(=O)C=C(C)NNC(=O)c1ccncc1", true},
+    TautomerCase{CS_BETA_ENEHYDRAZINE, "O=C(c1ccccc1)CC(=NNc1ccccc1)c1ccccc1", "O=C(c1ccccc1)C=C(c1ccccc1)NNc1ccccc1", true},
+    TautomerCase{CS_BETA_ENEHYDRAZINE, "CC(=O)[13CH2]C(C)=[15N]NC", "CC(=O)[13CH]=C(C)[15NH]NC", true},
+    TautomerCase{CS_BETA_ENEHYDRAZINE, "CC(=O)CC(C)=NN[C@H](F)C", "CC(=O)C=C(C)NN[C@H](F)C", true},
+    TautomerCase{CS_BETA_ENEHYDRAZINE, "CC(=O)C=C(C)NNC", "CC(=O)C=C(C)NNC", false},
+    TautomerCase{CS_BETA_ENEHYDRAZINE, "CCC(C)=NNC", "CCC(C)=NNC", false},
+    TautomerCase{CS_BETA_ENEHYDRAZINE, "COC(=O)CC(C)=NNC", "COC(=O)CC(C)=NNC", false},
+    TautomerCase{CS_BETA_ENEHYDRAZINE, "NC(=O)CC(C)=NNC", "NC(=O)CC(C)=NNC", false},
+    TautomerCase{CS_BETA_ENEHYDRAZINE, "CC(=S)CC(C)=NNC", "CC(=S)CC(C)=NNC", false},
+    TautomerCase{CS_BETA_ENEHYDRAZINE, "CC(=O)C(C)C(C)=NNC", "CC(=O)C(C)C(C)=NNC", false},
+    TautomerCase{CS_BETA_ENEHYDRAZINE, "CC(=O)CC(C)=NCC", "CC(=O)CC(C)=NCC", false},
+    TautomerCase{CS_BETA_ENEHYDRAZINE, "CC(=O)CC(C)=NN", "CC(=O)CC(C)=NN", false},
+    TautomerCase{CS_BETA_ENEHYDRAZINE, "CC(=O)CC(C)=NN(C)C", "CC(=O)CC(C)=NN(C)C", false},
+    TautomerCase{CS_BETA_ENEHYDRAZINE, "CC(=O)CC(C)=NN([2H])C", "CC(=O)CC(C)=NN([2H])C", false},
+    TautomerCase{CS_BETA_ENEHYDRAZINE, "CC(=O)C([2H])C(C)=NNC", "CC(=O)C([2H])C(C)=NNC", false},
+    TautomerCase{CS_BETA_ENEHYDRAZINE, "CC(=O)CC(C)=[NH+]NC", "CC(=O)CC(C)=[NH+]NC", false},
+    TautomerCase{CS_BETA_ENEHYDRAZINE, "CC(=O)C/C(C)=N/NC", "CC(=O)C/C(C)=N/NC", false},
+    TautomerCase{CS_BETA_ENEHYDRAZINE, "O=C1CC(=NNC)CCC1", "O=C1CC(=NNC)CCC1", false},
+    TautomerCase{CS_BETA_ENEHYDRAZINE, "CC(=O)CC(CC(C)=O)=NNC", "CC(=O)CC(CC(C)=O)=NNC", false},
+    TautomerCase{CS_BETA_ENEHYDRAZINE, "CC(=O)CC(C=C)=NNC", "CC(=O)CC(C=C)=NNC", false},
+    TautomerCase{CS_BETA_HYDRAZONE, "CC(=O)C=C(CC(C)=O)NNC", "CC(=O)C=C(CC(C)=O)NNC", false},
+    TautomerCase{CS_BETA_ENEHYDRAZINE, "CC(=O)CC(C)=NNC", "CC(=O)CC(C)=NNC", false,
+                 standardisation::KetoEnol::kToEnol},
     TautomerCase{CS_BETA_HYDRAZONE, "CC(=O)C=C(C)NNC", "CC(=O)CC(C)=NNC", true},
     TautomerCase{CS_BETA_HYDRAZONE, "CC(=O)C=C(C)NNC(=O)c1ccncc1", "CC(=O)CC(C)=NNC(=O)c1ccncc1", true},
     TautomerCase{CS_BETA_HYDRAZONE, "O=C(c1ccccc1)C=C(c1ccccc1)NNc1ccccc1", "O=C(c1ccccc1)CC(=NNc1ccccc1)c1ccccc1", true},
@@ -1577,6 +1626,108 @@ TEST_F(TestStandardisation, BetaHydrazonePreservesMarkedParticipatingAtoms) {
   // but must not be silently removed by this rule.
   for (atom_number_t a : {3, 4, 6}) {
     ASSERT_TRUE(_m1.build_from_smiles("CC(=O)C=C(C)NNC"));
+    auto marked = std::make_unique<Chiral_Centre>(a);
+    marked->set_top_front(_m1[a].other(a, 0));
+    marked->set_top_back(_m1[a].other(a, 1));
+    if (_m1.ncon(a) == 3) {
+      marked->set_left_down(_m1[a].other(a, 2));
+      marked->set_right_down(kChiralConnectionIsImplicitHydrogen);
+    } else {
+      marked->set_left_down(kChiralConnectionIsImplicitHydrogen);
+      marked->set_right_down(kChiralConnectionIsLonePair);
+    }
+    ASSERT_TRUE(_m1.add_chiral_centre(marked.get()));
+    const Chiral_Centre* saved = marked.release();
+    EXPECT_EQ(_chemical_standardisation.process(_m1), 0);
+    EXPECT_EQ(_m1.chiral_centre_at_atom(a), saved);
+  }
+}
+
+TEST_F(TestStandardisation, BetaEnaminoneCanBeDisabledAndReportsNeutralChanges) {
+  _chemical_standardisation.activate_all();
+  ASSERT_TRUE(_chemical_standardisation.Activate("-beta-enaminone", 0));
+  ASSERT_TRUE(_m1.build_from_smiles("CC(=O)CC(C)=NCC"));
+  const IWString before = _m1.unique_smiles();
+  EXPECT_EQ(_chemical_standardisation.process(_m1), 0);
+  EXPECT_EQ(_m1.unique_smiles(), before);
+  ASSERT_TRUE(_chemical_standardisation.Activate(CS_BETA_ENAMINONE, 0));
+  _chemical_standardisation.set_append_string_depending_on_what_changed(1);
+  EXPECT_EQ(_chemical_standardisation.process(_m1), 1);
+  EXPECT_TRUE(_m1.name().contains("STD:beta-enaminone"));
+  EXPECT_EQ(_m1.number_formally_charged_atoms(), 0);
+  EXPECT_EQ(_m1.chiral_centres(), 0);
+  EXPECT_EQ(_m1.hcount(3), 1);
+  EXPECT_EQ(_m1.hcount(6), 1);
+  std::ostringstream report;
+  ASSERT_TRUE(_chemical_standardisation.report(report));
+  EXPECT_NE(report.str().find("Beta enaminone changed 1 groups"), std::string::npos);
+  EXPECT_EQ(_chemical_standardisation.process(_m1), 0);
+}
+
+TEST_F(TestStandardisation, BetaHydrazoneDefaultAndReversePreference) {
+  _chemical_standardisation.activate_all();
+  ASSERT_TRUE(_m1.build_from_smiles("CC(=O)C=C(C)NNC(=O)c1ccncc1"));
+  const IWString enehydrazine = _m1.unique_smiles();
+  EXPECT_EQ(_chemical_standardisation.process(_m1), 1);
+  ASSERT_TRUE(_m2.build_from_smiles("CC(=O)CC(C)=NNC(=O)c1ccncc1"));
+  EXPECT_EQ(_m1.unique_smiles(), _m2.unique_smiles());
+  EXPECT_EQ(_chemical_standardisation.process(_m1), 0);
+  ASSERT_TRUE(_chemical_standardisation.Activate("-beta-hydrazone", 0));
+  ASSERT_TRUE(_chemical_standardisation.Activate(CS_BETA_ENEHYDRAZINE, 0));
+  _chemical_standardisation.set_append_string_depending_on_what_changed(1);
+  EXPECT_EQ(_chemical_standardisation.process(_m1), 1);
+  EXPECT_EQ(_m1.unique_smiles(), enehydrazine);
+  EXPECT_TRUE(_m1.name().contains("STD:beta-enehydrazine"));
+  EXPECT_EQ(_m1.number_formally_charged_atoms(), 0);
+  EXPECT_EQ(_chemical_standardisation.process(_m1), 0);
+  std::ostringstream report;
+  ASSERT_TRUE(_chemical_standardisation.report(report));
+  EXPECT_NE(report.str().find("Beta enehydrazine changed 1 groups"), std::string::npos);
+}
+
+TEST_F(TestStandardisation, ConflictingHydrazonePreferencesDoNotProcessMolecules) {
+  _chemical_standardisation.activate_all();
+  ASSERT_TRUE(_chemical_standardisation.Activate(CS_BETA_ENEHYDRAZINE, 0));
+  EXPECT_FALSE(_chemical_standardisation.ok());
+  ASSERT_TRUE(_m1.build_from_smiles("CC(=O)C=C(C)NNC"));
+  const IWString before = _m1.unique_smiles();
+  EXPECT_EQ(_chemical_standardisation.process(_m1), 0);
+  EXPECT_EQ(_m1.unique_smiles(), before);
+  ASSERT_TRUE(_chemical_standardisation.Activate("-beta-hydrazone", 0));
+  EXPECT_TRUE(_chemical_standardisation.ok());
+  // Restoring the default conflicts in the other activation order as well.
+  _chemical_standardisation.activate_all();
+  EXPECT_FALSE(_chemical_standardisation.ok());
+  ASSERT_TRUE(_chemical_standardisation.Activate("-beta-enehydrazine", 0));
+  EXPECT_TRUE(_chemical_standardisation.ok());
+}
+
+TEST_F(TestStandardisation, BetaEnaminonePreservesMarkedParticipatingAtoms) {
+  ASSERT_TRUE(_chemical_standardisation.Activate(CS_BETA_ENAMINONE, 0));
+  for (atom_number_t a : {3, 4, 6}) {
+    ASSERT_TRUE(_m1.build_from_smiles("CC(=O)CC(C)=NCC"));
+    auto marked = std::make_unique<Chiral_Centre>(a);
+    marked->set_top_front(_m1[a].other(a, 0));
+    marked->set_top_back(_m1[a].other(a, 1));
+    if (_m1.ncon(a) == 3) {
+      marked->set_left_down(_m1[a].other(a, 2));
+      marked->set_right_down(kChiralConnectionIsImplicitHydrogen);
+    } else {
+      // Deliberately inconsistent annotations must also be left untouched.
+      marked->set_left_down(kChiralConnectionIsImplicitHydrogen);
+      marked->set_right_down(kChiralConnectionIsLonePair);
+    }
+    ASSERT_TRUE(_m1.add_chiral_centre(marked.get()));
+    const Chiral_Centre* saved = marked.release();
+    EXPECT_EQ(_chemical_standardisation.process(_m1), 0);
+    EXPECT_EQ(_m1.chiral_centre_at_atom(a), saved);
+  }
+}
+
+TEST_F(TestStandardisation, BetaEnehydrazinePreservesMarkedParticipatingAtoms) {
+  ASSERT_TRUE(_chemical_standardisation.Activate(CS_BETA_ENEHYDRAZINE, 0));
+  for (atom_number_t a : {3, 4, 6}) {
+    ASSERT_TRUE(_m1.build_from_smiles("CC(=O)CC(C)=NNC"));
     auto marked = std::make_unique<Chiral_Centre>(a);
     marked->set_top_front(_m1[a].other(a, 0));
     marked->set_top_back(_m1[a].other(a, 1));

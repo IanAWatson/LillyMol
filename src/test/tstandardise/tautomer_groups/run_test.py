@@ -29,6 +29,42 @@ cases = [
     'N1=C(O)C=C(O)N=C1O.O=c1cc[nH]c(C)n1',
     'N1=NC(=NN=C(C2=CC=NC=C2)Br)NN1',
 ]
+alpha_ketoamides = [
+    'NC(=O)C(O)=C',
+    'CNC(=O)C(O)=CC',
+    'CN(C)C(=O)C(O)=Cc1ccccc1',
+    'O=C(N1CCOCC1)C(O)=CC',
+    'c1ccccc1NC(=O)C(O)=CC',
+    'NC(=O)C([18OH])=[13CH]C',
+    'C[C@H](F)NC(=O)C(O)=CC',
+    'NC(=O)C(=O)CC',
+    'ONC(=O)C(O)=CC',
+    'NNC(=O)C(O)=CC',
+    'CC(=O)NC(=O)C(O)=CC',
+    'CC(=S)NC(=O)C(O)=CC',
+    'CNC(=N)C(O)=CC',
+    'C[NH2+]C(=O)C(O)=CC',
+    'COC(=O)C(O)=CC',
+    'OC(=O)C(O)=CC',
+    'CSC(=O)C(O)=CC',
+    'NC(=O)C(O)=CC=C',
+    'NC(=O)C(O)=CC(=O)N',
+    'NC(=O)C(O)=CC(=O)C',
+    'NC(=O)C(O)=C(C)C',
+    'NC(=O)C1=C(O)CCC1',
+    'O=C1NC(O)=CCC1',
+    'NC(=O)/C(O)=C/C',
+    'NC(=O)C(O[2H])=CC',
+    'NC(=O)C(O)=C([2H])C',
+    'NC(=O)C([O-])=CC',
+]
+check('alpha_ketoamide', ['-g', 'alpha-ketoamide'], alpha_ketoamides)
+check('alpha_ketoamide_all', ['-g', 'all'], alpha_ketoamides)
+check('alpha_ketoamide_disabled', ['-g', 'all', '-g', '-alpha-ketoamide'],
+      alpha_ketoamides)
+check('alpha_ketoamide_enol_preference', ['-g', 'all', '-g', 'ENOL'],
+      alpha_ketoamides)
+
 alpha_ketoesters = [
     'COC(=O)C(O)=C',
     'CCOC(=O)C(O)=CC',

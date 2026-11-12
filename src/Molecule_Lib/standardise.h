@@ -421,6 +421,7 @@ class IWStandard_Current_Molecule
 #define CS_BETA_HYDRAZONE "beta-hydrazone"
 #define CS_ALPHA_KETOACID "alpha-ketoacid"
 #define CS_ALPHA_KETOESTER "alpha-ketoester"
+#define CS_ALPHA_KETOAMIDE "alpha-ketoamide"
 #define CS_BETA_KETOESTER "beta-ketoester"
 #define CS_BETA_DIKETONE "beta-diketone"
 #define CS_ASCORBATE "ascorbate"
@@ -526,6 +527,7 @@ class Chemical_Standardisation
     Chemical_Transformation _transform_beta_hydrazone;
     Chemical_Transformation _transform_alpha_ketoacid;
     Chemical_Transformation _transform_alpha_ketoester;
+    Chemical_Transformation _transform_alpha_ketoamide;
     Chemical_Transformation _transform_beta_ketoester;
     Chemical_Transformation _transform_phosphorus_tautomer;
     Chemical_Transformation _transform_nitroso_to_oxime;
@@ -643,6 +645,7 @@ class Chemical_Standardisation
                            bool to_hydrazone);
     int _do_alpha_ketoacid(Molecule& m, const IWStandard_Current_Molecule& data);
     int _do_alpha_ketoester(Molecule& m, const IWStandard_Current_Molecule& data);
+    int _do_alpha_ketoamide(Molecule& m, const IWStandard_Current_Molecule& data);
     int _do_beta_ketoester(Molecule& m, const IWStandard_Current_Molecule& data);
     int _do_beta_diketone(Molecule& m, const IWStandard_Current_Molecule& data);
     int _do_ascorbate(Molecule& m, IWStandard_Current_Molecule& current_molecule_data);

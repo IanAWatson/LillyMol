@@ -807,6 +807,35 @@ TEST_P(TestOxygenAndSulphurTautomers, CanonicalFormAndAtomOrder) {
 }
 
 INSTANTIATE_TEST_SUITE_P(OxygenAndSulphur, TestOxygenAndSulphurTautomers, testing::Values(
+    TautomerCase{CS_ALPHA_KETOAMIDE, "NC(=O)C(O)=C", "NC(=O)C(=O)C", true},
+    TautomerCase{CS_ALPHA_KETOAMIDE, "CNC(=O)C(O)=CC", "CNC(=O)C(=O)CC", true},
+    TautomerCase{CS_ALPHA_KETOAMIDE, "CN(C)C(=O)C(O)=Cc1ccccc1", "CN(C)C(=O)C(=O)Cc1ccccc1", true},
+    TautomerCase{CS_ALPHA_KETOAMIDE, "O=C(N1CCOCC1)C(O)=CC", "O=C(N1CCOCC1)C(=O)CC", true},
+    TautomerCase{CS_ALPHA_KETOAMIDE, "c1ccccc1NC(=O)C(O)=CC", "c1ccccc1NC(=O)C(=O)CC", true},
+    TautomerCase{CS_ALPHA_KETOAMIDE, "NC(=O)C([18OH])=[13CH]C", "NC(=O)C(=[18O])[13CH2]C", true},
+    TautomerCase{CS_ALPHA_KETOAMIDE, "C[C@H](F)NC(=O)C(O)=CC", "C[C@H](F)NC(=O)C(=O)CC", true},
+    TautomerCase{CS_ALPHA_KETOAMIDE, "NC(=O)C(=O)CC", "NC(=O)C(=O)CC", false},
+    TautomerCase{CS_ALPHA_KETOAMIDE, "ONC(=O)C(O)=CC", "ONC(=O)C(O)=CC", false},
+    TautomerCase{CS_ALPHA_KETOAMIDE, "NNC(=O)C(O)=CC", "NNC(=O)C(O)=CC", false},
+    TautomerCase{CS_ALPHA_KETOAMIDE, "CC(=O)NC(=O)C(O)=CC", "CC(=O)NC(=O)C(O)=CC", false},
+    TautomerCase{CS_ALPHA_KETOAMIDE, "CC(=S)NC(=O)C(O)=CC", "CC(=S)NC(=O)C(O)=CC", false},
+    TautomerCase{CS_ALPHA_KETOAMIDE, "CNC(=N)C(O)=CC", "CNC(=N)C(O)=CC", false},
+    TautomerCase{CS_ALPHA_KETOAMIDE, "C[NH2+]C(=O)C(O)=CC", "C[NH2+]C(=O)C(O)=CC", false},
+    TautomerCase{CS_ALPHA_KETOAMIDE, "COC(=O)C(O)=CC", "COC(=O)C(O)=CC", false},
+    TautomerCase{CS_ALPHA_KETOAMIDE, "OC(=O)C(O)=CC", "OC(=O)C(O)=CC", false},
+    TautomerCase{CS_ALPHA_KETOAMIDE, "CSC(=O)C(O)=CC", "CSC(=O)C(O)=CC", false},
+    TautomerCase{CS_ALPHA_KETOAMIDE, "NC(=O)C(O)=CC=C", "NC(=O)C(O)=CC=C", false},
+    TautomerCase{CS_ALPHA_KETOAMIDE, "NC(=O)C(O)=CC(=O)N", "NC(=O)C(O)=CC(=O)N", false},
+    TautomerCase{CS_ALPHA_KETOAMIDE, "NC(=O)C(O)=CC(=O)C", "NC(=O)C(O)=CC(=O)C", false},
+    TautomerCase{CS_ALPHA_KETOAMIDE, "NC(=O)C(O)=C(C)C", "NC(=O)C(O)=C(C)C", false},
+    TautomerCase{CS_ALPHA_KETOAMIDE, "NC(=O)C1=C(O)CCC1", "NC(=O)C1=C(O)CCC1", false},
+    TautomerCase{CS_ALPHA_KETOAMIDE, "O=C1NC(O)=CCC1", "O=C1NC(O)=CCC1", false},
+    TautomerCase{CS_ALPHA_KETOAMIDE, "NC(=O)/C(O)=C/C", "NC(=O)/C(O)=C/C", false},
+    TautomerCase{CS_ALPHA_KETOAMIDE, "NC(=O)C(O[2H])=CC", "NC(=O)C(O[2H])=CC", false},
+    TautomerCase{CS_ALPHA_KETOAMIDE, "NC(=O)C(O)=C([2H])C", "NC(=O)C(O)=C([2H])C", false},
+    TautomerCase{CS_ALPHA_KETOAMIDE, "NC(=O)C([O-])=CC", "NC(=O)C([O-])=CC", false},
+    TautomerCase{CS_ALPHA_KETOAMIDE, "NC(=O)C(O)=CC", "NC(=O)C(O)=CC", false,
+                 standardisation::KetoEnol::kToEnol},
     TautomerCase{CS_ALPHA_KETOESTER, "COC(=O)C(O)=C", "COC(=O)C(=O)C", true},
     TautomerCase{CS_ALPHA_KETOESTER, "CCOC(=O)C(O)=CC", "CCOC(=O)C(=O)CC", true},
     TautomerCase{CS_ALPHA_KETOESTER, "COC(=O)C(O)=Cc1ccccc1", "COC(=O)C(=O)Cc1ccccc1", true},
@@ -2176,6 +2205,42 @@ TEST_F(TestStandardisation, BiguanidePreservesParticipatingChiralAnnotations) {
     EXPECT_TRUE(_m1.bond_between_atoms(3, 4)->is_double_bond());
     EXPECT_TRUE(_m1.bond_between_atoms(3, 5)->is_single_bond());
   }
+}
+
+TEST_F(TestStandardisation, AlphaKetoamideConvergesAndCanBeDisabled) {
+  _chemical_standardisation.activate_all();
+  for (const char* amide : {"N", "NC", "Nc1ccccc1", "N(C)C", "N1CCOCC1"}) {
+    IWString enol("OC(=CC)C(=O)");
+    enol << amide;
+    IWString keto("O=C(CC)C(=O)");
+    keto << amide;
+    ASSERT_TRUE(_m1.build_from_smiles(enol));
+    const IWString original = _m1.unique_smiles();
+    const IWString formula = _m1.molecular_formula();
+    ASSERT_TRUE(_m2.build_from_smiles(keto));
+    const IWString expected = _m2.unique_smiles();
+    ASSERT_TRUE(_chemical_standardisation.Activate("-alpha-ketoamide", 0));
+    EXPECT_EQ(_chemical_standardisation.process(_m1), 0);
+    EXPECT_EQ(_m1.unique_smiles(), original);
+    ASSERT_TRUE(_chemical_standardisation.Activate(CS_ALPHA_KETOAMIDE, 0));
+    _chemical_standardisation.set_append_string_depending_on_what_changed(1);
+    for (int i = 0; i < 100; ++i) {
+      Molecule molecule;
+      ASSERT_TRUE(molecule.build_from_smiles(_m1.random_smiles()));
+      EXPECT_EQ(_chemical_standardisation.process(molecule), 1);
+      EXPECT_EQ(molecule.unique_smiles(), expected) << enol;
+      EXPECT_EQ(molecule.molecular_formula(), formula);
+      EXPECT_TRUE(molecule.valence_ok());
+      EXPECT_TRUE(molecule.name().contains("STD:alpha-ketoamide"));
+      EXPECT_EQ(_chemical_standardisation.process(molecule), 0);
+      ASSERT_TRUE(molecule.build_from_smiles(_m2.random_smiles()));
+      EXPECT_EQ(_chemical_standardisation.process(molecule), 0);
+      EXPECT_EQ(molecule.unique_smiles(), expected);
+    }
+  }
+  std::ostringstream report;
+  ASSERT_TRUE(_chemical_standardisation.report(report));
+  EXPECT_NE(report.str().find("Alpha ketoamide changed"), std::string::npos);
 }
 
 TEST_F(TestStandardisation, AlphaKetoesterConvergesAndCanBeDisabled) {

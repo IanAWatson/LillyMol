@@ -393,6 +393,7 @@ Chemical_Standardisation::activate_all() {
   _transform_beta_enaminone.activate();
   _transform_alpha_ketoacid.activate();
   _transform_alpha_ketoester.activate();
+  _transform_alpha_ketoamide.activate();
   _transform_beta_ketoester.activate();
   _transform_phosphorus_tautomer.activate();
   _transform_nitroso_to_oxime.activate();
@@ -471,6 +472,7 @@ display_all_chemical_standardisation_options(std::ostream& os, char zoption) {
   os << zopt << CS_BETA_ENEHYDRAZINE << " prefer acyclic beta-enehydrazines (disable beta-hydrazone first)\n";
   os << zopt << CS_ALPHA_KETOACID << " canonicalise simple acyclic alpha-ketoacid enols\n";
   os << zopt << CS_ALPHA_KETOESTER << " canonicalise simple acyclic alpha-ketoester enols\n";
+  os << zopt << CS_ALPHA_KETOAMIDE << " canonicalise simple acyclic alpha-ketoamide enols\n";
   os << zopt << CS_BETA_KETOESTER << " canonicalise acyclic beta-ketoester enols\n";
   os << zopt << CS_BETA_DIKETONE << " canonicalise beta-diketone enols to diketo form\n";
   os << zopt << CS_ASCORBATE << "   canonicalise isolated ascorbate rings to lactone/enediol form\n";
@@ -911,6 +913,12 @@ Chemical_Standardisation::Activate(const IWString& directive, const int verbose)
       _transform_alpha_ketoester.deactivate();
     } else {
       _transform_alpha_ketoester.activate();
+    }
+  } else if (tmp == CS_ALPHA_KETOAMIDE) {
+    if (negation) {
+      _transform_alpha_ketoamide.deactivate();
+    } else {
+      _transform_alpha_ketoamide.activate();
     }
   } else if (tmp == CS_BETA_KETOESTER) {
     if (negation) {
@@ -4308,6 +4316,12 @@ Chemical_Standardisation::_process(Molecule& m,
     rc += _do_alpha_ketoester(m, current_molecule_data);
   }
 
+  if (_transform_alpha_ketoamide.active() && current_molecule_data.oxygens() >= 2 &&
+      current_molecule_data.nitrogens() &&
+      _keto_enol == standardisation::KetoEnol::kToKeto) {
+    rc += _do_alpha_ketoamide(m, current_molecule_data);
+  }
+
   // Ester conversion can expose a ketone needed by the beta-diketone rule.
   if (_transform_beta_ketoester.active() && current_molecule_data.oxygens() >= 3 &&
       _keto_enol == standardisation::KetoEnol::kToKeto) {
@@ -4726,6 +4740,10 @@ Chemical_Standardisation::report(std::ostream& os) const {
   if (_transform_alpha_ketoester.active()) {
     os << "  Alpha ketoester ";
     _transform_alpha_ketoester.report(os);
+  }
+  if (_transform_alpha_ketoamide.active()) {
+    os << "  Alpha ketoamide ";
+    _transform_alpha_ketoamide.report(os);
   }
   if (_transform_beta_ketoester.active()) {
     os << "  Beta ketoester ";
@@ -10479,6 +10497,12 @@ Chemical_Standardisation::_processing_needed(
     return 1;
   }
 
+  if (_transform_alpha_ketoamide.active() && current_molecule_data.oxygens() >= 2 &&
+      current_molecule_data.nitrogens() &&
+      _keto_enol == standardisation::KetoEnol::kToKeto) {
+    return 1;
+  }
+
   if ((_transform_alpha_ketoacid.active() || _transform_alpha_ketoester.active()) &&
       current_molecule_data.oxygens() >= 3 &&
       _keto_enol == standardisation::KetoEnol::kToKeto) {
@@ -14404,12 +14428,12 @@ Chemical_Standardisation::_do_biguanide(Molecule& m, IWStandard_Current_Molecule
   return rc;
 }
 
-// Recognise the one additional conjugated branch admitted by alpha-ketoacid:
-// -CH=C(OH)-COOH attached to an ordinary neutral amide carbonyl.
+// Recognise an ordinary neutral amide carbonyl. Used for alpha-ketoamides
+// and the additional amide carbonyl branch admitted by alpha-ketoacid.
 // Restrict the amide N to H/carbon substituents to exclude hydroxamates,
 // hydrazides and imides, whose other tautomer rules need separate assessment.
 static bool
-AlphaKetoacidAmideBranch(Molecule& m, atom_number_t carbonyl,
+IsOrdinaryAmideCarbonyl(Molecule& m, atom_number_t carbonyl,
                          atom_number_t beta) {
   if (m.atomic_number(carbonyl) != 6 || m.ncon(carbonyl) != 3 ||
       m.nbonds(carbonyl) != 4 || m.formal_charge(carbonyl) ||
@@ -14448,12 +14472,14 @@ AlphaKetoacidAmideBranch(Molecule& m, atom_number_t carbonyl,
   return oxygen && nitrogen;
 }
 
-// O=C(OR)-C(OH)=CH-R' -> O=C(OR)-C(=O)-CH2-R' (also R'=H).
-// Share the reacting-chain guards for acids and esters. Only acids admit
+enum class AlphaKetoCarbonyl { kAcid, kEster, kAmide };
+
+// O=C(X)-C(OH)=CH-R -> O=C(X)-C(=O)-CH2-R (also R=H).
+// X is OH, OR or NR2. Share the reacting-chain guards, but only acids admit
 // the additional, explicitly recognised amide carbonyl branch.
 static bool
 ConvertAlphaKetoEnol(Molecule& m, const IWStandard_Current_Molecule& data,
-                    atom_number_t oxygen, bool ester) {
+                    atom_number_t oxygen, AlphaKetoCarbonyl kind) {
   const auto* z = data.atomic_number();
   auto eligible = [&](atom_number_t a, atomic_number_t element, int ncon,
                       int nbonds, int hydrogen) {
@@ -14470,7 +14496,7 @@ ConvertAlphaKetoEnol(Molecule& m, const IWStandard_Current_Molecule& data,
     return false;
   }
   atom_number_t beta = kInvalidAtomNumber;
-  atom_number_t acid = kInvalidAtomNumber;
+  atom_number_t carboxyl = kInvalidAtomNumber;
   for (const Bond* b : m[enol]) {
     if (b->is_directional() || b->part_of_cis_trans_grouping()) {
       return false;
@@ -14482,13 +14508,13 @@ ConvertAlphaKetoEnol(Molecule& m, const IWStandard_Current_Molecule& data,
     if (b->is_double_bond() && z[other] == 6) {
       beta = other;
     } else if (b->is_single_bond() && z[other] == 6) {
-      acid = other;
+      carboxyl = other;
     } else {
       return false;
     }
   }
-  if (beta == kInvalidAtomNumber || acid == kInvalidAtomNumber ||
-      !eligible(acid, 6, 3, 4, 0)) {
+  if (beta == kInvalidAtomNumber || carboxyl == kInvalidAtomNumber ||
+      !eligible(carboxyl, 6, 3, 4, 0)) {
     return false;
   }
   const int connections = m.ncon(beta);
@@ -14504,40 +14530,49 @@ ConvertAlphaKetoEnol(Molecule& m, const IWStandard_Current_Molecule& data,
     if (!b->is_single_bond() || b->is_directional() ||
         b->part_of_cis_trans_grouping() || z[other] != 6 || m.formal_charge(other) ||
         (!m.is_aromatic(other) && m.nbonds(other) != m.ncon(other) &&
-         (ester || !AlphaKetoacidAmideBranch(m, other, beta)))) {
+         (kind != AlphaKetoCarbonyl::kAcid ||
+          !IsOrdinaryAmideCarbonyl(m, other, beta)))) {
       return false;  // Other carbonyls and aliphatic conjugation remain excluded.
     }
   }
-  bool carbonyl = false;
-  bool acid_or_ester = false;
-  for (const Bond* b : m[acid]) {
-    const atom_number_t other = b->other(acid);
-    if (other == enol) {
-      continue;
-    }
-    if (b->is_double_bond() && eligible(other, 8, 1, 2, 0)) {
-      carbonyl = true;
-    } else if (!ester && b->is_single_bond() && eligible(other, 8, 1, 1, 1)) {
-      acid_or_ester = true;
-    } else if (ester && b->is_single_bond() && eligible(other, 8, 2, 2, 0)) {
-      for (const Bond* ob : m[other]) {
-        const atom_number_t alkoxy = ob->other(other);
-        if (alkoxy == acid) {
-          continue;
-        }
-        // Ordinary alkyl/aryl esters only: exclude anhydrides and enol esters.
-        if (!ob->is_single_bond() || z[alkoxy] != 6 || m.formal_charge(alkoxy) ||
-            (!m.is_aromatic(alkoxy) && m.nbonds(alkoxy) != m.ncon(alkoxy))) {
-          return false;
-        }
-      }
-      acid_or_ester = true;
-    } else {
+  if (kind == AlphaKetoCarbonyl::kAmide) {
+    if (!IsOrdinaryAmideCarbonyl(m, carboxyl, enol)) {
       return false;
     }
-  }
-  if (!carbonyl || !acid_or_ester) {
-    return false;
+  } else {
+    bool carbonyl = false;
+    bool acid_or_ester = false;
+    for (const Bond* b : m[carboxyl]) {
+      const atom_number_t other = b->other(carboxyl);
+      if (other == enol) {
+        continue;
+      }
+      if (b->is_double_bond() && eligible(other, 8, 1, 2, 0)) {
+        carbonyl = true;
+      } else if (kind == AlphaKetoCarbonyl::kAcid && b->is_single_bond() &&
+                 eligible(other, 8, 1, 1, 1)) {
+        acid_or_ester = true;
+      } else if (kind == AlphaKetoCarbonyl::kEster && b->is_single_bond() &&
+                 eligible(other, 8, 2, 2, 0)) {
+        for (const Bond* ob : m[other]) {
+          const atom_number_t alkoxy = ob->other(other);
+          if (alkoxy == carboxyl) {
+            continue;
+          }
+          // Ordinary alkyl/aryl esters only: exclude anhydrides and enol esters.
+          if (!ob->is_single_bond() || z[alkoxy] != 6 || m.formal_charge(alkoxy) ||
+              (!m.is_aromatic(alkoxy) && m.nbonds(alkoxy) != m.ncon(alkoxy))) {
+            return false;
+          }
+        }
+        acid_or_ester = true;
+      } else {
+        return false;
+      }
+    }
+    if (!carbonyl || !acid_or_ester) {
+      return false;
+    }
   }
   m.set_bond_type_between_atoms(enol, oxygen, DOUBLE_BOND);
   m.set_bond_type_between_atoms(enol, beta, SINGLE_BOND);
@@ -14552,7 +14587,7 @@ Chemical_Standardisation::_do_alpha_ketoacid(
     Molecule& m, const IWStandard_Current_Molecule& data) {
   int rc = 0;
   for (atom_number_t oxygen = 0; oxygen < m.natoms(); ++oxygen) {
-    rc += ConvertAlphaKetoEnol(m, data, oxygen, false);
+    rc += ConvertAlphaKetoEnol(m, data, oxygen, AlphaKetoCarbonyl::kAcid);
   }
   if (rc) {
     _transform_alpha_ketoacid.extra(rc);
@@ -14571,7 +14606,7 @@ Chemical_Standardisation::_do_alpha_ketoester(
     Molecule& m, const IWStandard_Current_Molecule& data) {
   int rc = 0;
   for (atom_number_t oxygen = 0; oxygen < m.natoms(); ++oxygen) {
-    rc += ConvertAlphaKetoEnol(m, data, oxygen, true);
+    rc += ConvertAlphaKetoEnol(m, data, oxygen, AlphaKetoCarbonyl::kEster);
   }
   if (rc) {
     _transform_alpha_ketoester.extra(rc);
@@ -14580,6 +14615,25 @@ Chemical_Standardisation::_do_alpha_ketoester(
     }
     if (_append_string_depending_on_what_changed) {
       _append_to_changed_molecules << " STD:" << CS_ALPHA_KETOESTER;
+    }
+  }
+  return rc;
+}
+
+int
+Chemical_Standardisation::_do_alpha_ketoamide(
+    Molecule& m, const IWStandard_Current_Molecule& data) {
+  int rc = 0;
+  for (atom_number_t oxygen = 0; oxygen < m.natoms(); ++oxygen) {
+    rc += ConvertAlphaKetoEnol(m, data, oxygen, AlphaKetoCarbonyl::kAmide);
+  }
+  if (rc) {
+    _transform_alpha_ketoamide.extra(rc);
+    if (_verbose) {
+      cerr << "Transformed " << rc << " alpha-ketoamide enols\n";
+    }
+    if (_append_string_depending_on_what_changed) {
+      _append_to_changed_molecules << " STD:" << CS_ALPHA_KETOAMIDE;
     }
   }
   return rc;

@@ -90,6 +90,7 @@ Entering `-g help` to most LillyMol tools yields the usage message
  -g beta-enaminone convert eligible acyclic beta-ketoimines to enaminones
  -g beta-hydrazone prefer acyclic beta-keto hydrazones (included in all)
  -g beta-enehydrazine prefer acyclic beta-enehydrazines (alternative preference)
+ -g alpha-ketoamide canonicalise simple acyclic alpha-ketoamide enols
  -g alpha-ketoester canonicalise simple acyclic alpha-ketoester enols
  -g alpha-ketoacid canonicalise simple acyclic alpha-ketoacid enols
  -g beta-ketoester canonicalise acyclic beta-ketoester enols
@@ -386,6 +387,37 @@ this rule.
 
 Reports count amidoxime conversions separately. `-g APP=EACH` appends
 `STD:amidoxime` when this rule changes a molecule.
+
+### Simple alpha-ketoamides
+
+`-g alpha-ketoamide` selects the keto form of eligible neutral, acyclic
+alpha-ketoamide enols:
+
+```text
+NC(=O)C(O)=C             -> NC(=O)C(=O)C
+CN(C)C(=O)C(O)=Cc1ccccc1 -> CN(C)C(=O)C(=O)Cc1ccccc1
+```
+
+Included in `-g all`, this broadens default tautomer equivalence. Disable it
+with `-g all -g -alpha-ketoamide`. The rule is skipped with `ENOL`.
+Primary, secondary and tertiary amides are accepted, including amides whose
+nitrogen belongs to a saturated ring. The amide nitrogen must be neutral,
+with only single bonds and hydrogen/carbon substituents. Hydroxamates,
+hydrazides, imides and related additional N-acyl/N-thioacyl groups are excluded.
+The amide carbonyl is retained unchanged.
+
+The reacting chain must be acyclic, with a terminal enol OH and a CH2 or CH
+carbon at the other end of the double bond. That carbon can have a saturated
+or aromatic carbon substituent. Additional aliphatic conjugation, adjacent
+carbonyl branches, cyclic reacting chains and more substituted double bonds
+are excluded. Specified geometry, marked chiral centres on reacting atoms,
+and explicit hydrogen neighbours on the enol OH or reacting carbon prevent
+conversion. Heavy-atom isotope labels and remote stereochemistry are retained;
+no charges or new chiral-centre annotations are introduced. The chosen form
+is a canonicalisation preference, not a prediction of solution populations.
+
+Reports count this rule separately; `-g APP=EACH` appends
+`STD:alpha-ketoamide` to changed molecules.
 
 ### Simple alpha-ketoesters
 

@@ -219,7 +219,6 @@ class IWStandard_Current_Molecule
     int * _ring_is_fused;
     int * _atom_is_aromatic;
     int * _ring_is_aromatic;
-    int * _ring_bond_count;
     int * _fsid;
     const Atom ** _atom;
 
@@ -265,6 +264,9 @@ class IWStandard_Current_Molecule
 
   public:
     IWStandard_Current_Molecule();
+    // Owns per-molecule arrays; copying would duplicate their ownership.
+    IWStandard_Current_Molecule(const IWStandard_Current_Molecule&) = delete;
+    IWStandard_Current_Molecule& operator=(const IWStandard_Current_Molecule&) = delete;
     ~IWStandard_Current_Molecule();
 
     int initialise (Molecule &);
@@ -280,7 +282,6 @@ class IWStandard_Current_Molecule
     const int *  ring_is_aromatic () const { return _ring_is_aromatic;}
     const int *  atom_is_aromatic () const { return _atom_is_aromatic;}
     const int *  ring_nitrogen_count () const { return _ring_nitrogen_count;}
-    const int *  ring_bond_count() const { return _ring_bond_count;}
     const ExocyclicStatus* exocyclic_status() const { return _exocyclic_status;}
 
 //  Some methods are non const

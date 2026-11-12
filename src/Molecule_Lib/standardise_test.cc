@@ -1,4 +1,7 @@
 #include <algorithm>
+#include <cstring>
+#include <new>
+#include <type_traits>
 #include <sstream>
 #include <utility>
 #include <vector>
@@ -13,6 +16,34 @@
 
 namespace {
 
+
+static_assert(!std::is_copy_constructible_v<IWStandard_Current_Molecule>);
+static_assert(!std::is_copy_assignable_v<IWStandard_Current_Molecule>);
+
+TEST(StandardisationCache, SafeBeforeInitialisationAndAfterEmptyInput) {
+  for (bool initialise_empty : {false, true}) {
+    // Do not let zero-filled storage conceal a missing constructor initialiser.
+    alignas(IWStandard_Current_Molecule) unsigned char storage[sizeof(IWStandard_Current_Molecule)];
+    std::memset(storage, 0xa5, sizeof(storage));
+    auto* cache = new (storage) IWStandard_Current_Molecule;
+    if (initialise_empty) {
+      Molecule empty;
+      EXPECT_EQ(cache->initialise(empty), 0);
+    }
+    EXPECT_EQ(cache->nrings(), 0);
+    EXPECT_EQ(cache->non_organic(), 0);
+    EXPECT_EQ(cache->atomic_number(), nullptr);
+    EXPECT_EQ(cache->ncon(), nullptr);
+    EXPECT_EQ(cache->ring_membership(), nullptr);
+    EXPECT_EQ(cache->ring_size(), nullptr);
+    EXPECT_EQ(cache->ring_is_fused(), nullptr);
+    EXPECT_EQ(cache->ring_is_aromatic(), nullptr);
+    EXPECT_EQ(cache->atom_is_aromatic(), nullptr);
+    EXPECT_EQ(cache->ring_nitrogen_count(), nullptr);
+    EXPECT_EQ(cache->exocyclic_status(), nullptr);
+    cache->~IWStandard_Current_Molecule();
+  }
+}
 
 class TestStandardisation : public testing::Test
 {

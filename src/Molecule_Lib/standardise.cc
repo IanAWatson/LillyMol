@@ -9983,12 +9983,15 @@ Chemical_Standardisation::_do_p_minus(
 #endif
 
 IWStandard_Current_Molecule::IWStandard_Current_Molecule() {
+  _matoms = 0;
+  _nrings = 0;
   _atomic_number = nullptr;
   _ncon = nullptr;
   _ring_membership = nullptr;
   _ring_size = nullptr;
   _ring_is_fused = nullptr;
   _atom_is_aromatic = nullptr;
+  _ring_is_aromatic = nullptr;
   _atom = nullptr;
   _ring_nitrogen_count = nullptr;
   _fsid = nullptr;
@@ -10003,11 +10006,11 @@ IWStandard_Current_Molecule::IWStandard_Current_Molecule() {
   _cminus = 0;
   _phosphorus = 0;
   _sulphur = 0;
+  _non_organic = 0;
   _isolated_metal = 0;
   _isolated_halogen = 0;
   _singly_connected_metal = 0;
   _possible_guanidine = 0;
-  _phosphorus = 0;
   _explicit_hydrogen_count = 0;
   _possible_valence_errors = 0;
 

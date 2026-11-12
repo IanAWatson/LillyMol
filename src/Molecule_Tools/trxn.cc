@@ -11,6 +11,7 @@
 #include "Foundational/cmdline/cmdline.h"
 #include "Foundational/data_source/iwstring_data_source.h"
 #include "Foundational/iw_tdt/iw_tdt.h"
+#include "Foundational/iwmisc/misc.h"
 #include "Foundational/iwmisc/iwre2.h"
 #include "Foundational/iwmisc/proto_support.h"
 #include "Foundational/iwmisc/report_progress.h"
@@ -1617,6 +1618,8 @@ trxn(int argc, char** argv) {
   }
 
   verbose = cl.option_count('v');
+
+  DisplayDashHelpIfRequested(cl, 'z', DisplayDashzOptions);
 
   if (!process_elements(cl)) {
     usage(2);

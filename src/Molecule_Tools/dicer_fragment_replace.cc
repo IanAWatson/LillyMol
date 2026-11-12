@@ -16,6 +16,7 @@
 #include "Foundational/data_source/tfdatarecord.h"
 #include "Foundational/iwaray/iwaray.h"
 #include "Foundational/iwmisc/combinations.h"
+#include "Foundational/iwmisc/misc.h"
 #include "Foundational/iwmisc/iwre2.h"
 #include "Foundational/iwmisc/misc.h"
 
@@ -2125,6 +2126,8 @@ Main(int argc, char** argv) {
     cerr << "Unrecognised options encountered\n";
     Usage(1);
   }
+
+  DisplayDashHelpIfRequested(cl, 'Y', DisplayDashYOptions);
 
   int verbose = cl.option_count('v');
 

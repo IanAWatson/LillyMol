@@ -326,10 +326,11 @@ Options::Options() {
 }
 
 void
-DisplayDashtOptions(std::ostream& output) {
-  output << " -t dist=<n>           generate truncated fragments to <n> bonds\n";
-  output << " -t file=<fname>       write the resulting summary textproto to 'fname'\n";
-  ::exit(0);
+DisplayDashtOptions(int rc) {
+  cerr << " -t dist=<n>           generate truncated fragments to <n> bonds\n";
+  cerr << " -t file=<fname>       write the resulting summary textproto to 'fname'\n";
+
+  ::exit(rc);
 }
 
 int
@@ -588,10 +589,10 @@ Options::Initialise(Command_Line& cl) {
         _subset_fname = t;
         _subset_fname.EnsureEndsWith(".textproto");
       } else if (t == "help") {
-        DisplayDashtOptions(cerr);
+        DisplayDashtOptions(0);
       } else {
         cerr << "Unrecognised -t qualifier '" << t << "'\n";
-        DisplayDashtOptions(cerr);
+        DisplayDashtOptions(1);
       }
     }
 
@@ -1498,6 +1499,8 @@ Main(int argc, char** argv) {
     cerr << "Unrecognised options encountered\n";
     Usage(1);
   }
+
+  DisplayDashHelpIfRequested(cl, 't', DisplayDashtOptions);
 
   int verbose = cl.option_count('v');
 

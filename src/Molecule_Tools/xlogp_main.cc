@@ -162,17 +162,19 @@ Options::Options() {
 }
 
 void
-DisplayDashJOptions(std::ostream& output) {
-  output << " -J <tag>          tag for fingerprints\n";
-  output << " -J rep=<n>        number of bit replicates\n";
-  ::exit(0);
+DisplayDashJOptions(int rc) {
+  cerr << " -J <tag>          tag for fingerprints\n";
+  cerr << " -J rep=<n>        number of bit replicates\n";
+
+  ::exit(rc);
 }
 
 void
-DisplayDashYOptions(std::ostream& output) {
-  output << " -Y flush          flush output after each molecule\n";
-  output << " -Y nocorrections  do not apply xlogp corrections, atomic assignments only\n";
-  ::exit(0);
+DisplayDashYOptions(int rc) {
+  cerr << " -Y flush          flush output after each molecule\n";
+  cerr << " -Y nocorrections  do not apply xlogp corrections, atomic assignments only\n";
+
+  ::exit(rc);
 }
 
 int
@@ -270,7 +272,7 @@ Options::Initialise(Command_Line& cl) {
     const_IWSubstring y;
     for (int i = 0; cl.value('Y', y, i); ++i) {
       if (y == "help") {
-        DisplayDashYOptions(cerr);
+        DisplayDashYOptions(0);
       } else if (y == "nocorrections") {
         _xlogp.ForTestingSetApplyCorrections(false);
       } else if (y == "flush") {
@@ -280,7 +282,7 @@ Options::Initialise(Command_Line& cl) {
         }
       } else {
         cerr << "Unrecognised -Y qualifier '" << y << "'\n";
-        DisplayDashYOptions(cerr);
+        DisplayDashYOptions(1);
       }
     }
   }
@@ -688,6 +690,9 @@ Main(int argc, char** argv) {
     cerr << "Unrecognised options encountered\n";
     Usage(1);
   }
+
+  DisplayDashHelpIfRequested(cl, 'Y', DisplayDashYOptions);
+  DisplayDashHelpIfRequested(cl, 'J', DisplayDashJOptions);
 
   const int verbose = cl.option_count('v');
 

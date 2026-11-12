@@ -7,6 +7,7 @@
 
 #include "Foundational/accumulator/accumulator.h"
 #include "Foundational/cmdline/cmdline.h"
+#include "Foundational/iwmisc/misc.h"
 #include "Foundational/data_source/iwstring_data_source.h"
 #include "Foundational/iwmisc/sparse_fp_creator.h"
 #include "Foundational/iwstring/iwstring.h"
@@ -234,20 +235,24 @@ Options::~Options() {
 }
 
 void
-DisplayPartialChargeSpecifiers(std::ostream& output) {
-  output << "The following partial charge specifications are supported\n";
-  output << " -Q Abraham\n";
-  output << " -Q Gasteiger\n";
-  output << " -Q Huckel\n";
-  output << " -Q GasteigerHuckel\n";
-//output << " -Q DelRe\n";
-//output << " -Q Pullman\n";
+DisplayPartialChargeSpecifiers(int rc) {
+  cerr << "The following partial charge specifications are supported\n";
+  cerr << " -Q Abraham\n";
+  cerr << " -Q Gasteiger\n";
+  cerr << " -Q Huckel\n";
+  cerr << " -Q GasteigerHuckel\n";
+//cerr << " -Q DelRe\n";
+//cerr << " -Q Pullman\n";
+
+  ::exit(rc);
 }
 
 int
 Options::Initialise(Command_Line& cl) {
 
   _verbose = cl.option_count('v');
+
+  DisplayDashHelpIfRequested(cl, 'Q', DisplayPartialChargeSpecifiers);
 
   if (cl.option_present('g')) {
     if (!_chemical_standardisation.construct_from_command_line(cl, _verbose > 1, 'g')) {
@@ -299,11 +304,11 @@ Options::Initialise(Command_Line& cl) {
 //  } else if (q == "Pullman") {
 //    _partial_charge = PartialChargeType::kPullman;
     } else if (q == "help") {
-      DisplayPartialChargeSpecifiers(cerr);
+      DisplayPartialChargeSpecifiers(0);
       return 1;
     } else {
       cerr << "Unrecognised partial charge specification '" << q << "'\n";
-      DisplayPartialChargeSpecifiers(cerr);
+      DisplayPartialChargeSpecifiers(1);
       return 0;
     }
   } else {

@@ -29,6 +29,20 @@ cases = [
     'N1=C(O)C=C(O)N=C1O.O=c1cc[nH]c(C)n1',
     'N1=NC(=NN=C(C2=CC=NC=C2)Br)NN1',
 ]
+beta_hydrazones = [
+    'CC(=O)C=C(C)NNC', 'CC(=O)CC(C)=NNC',
+    'CC(=O)C=C(C)NNC(=O)c1ccncc1',
+    'O=C(c1ccccc1)C=C(c1ccccc1)NNc1ccccc1',
+    'CC(=O)[13CH]=C(C)[15NH]NC', 'CC(=O)C=C(C)NN[C@H](F)C',
+    'CC(=O)/C=C(/C)NNC', 'CC(=O)C=C(C)N([2H])NC',
+    'CC(=O)C=C(C)NN(C)C', 'O=C1C=C(NNC)CCC1',
+    'CC(=O)C=C(C)NNC.CC(=O)C=C(C)NNC',
+]
+check('beta_hydrazone', ['-g', 'beta-hydrazone'], beta_hydrazones)
+check('beta_hydrazone_all', ['-g', 'all'], beta_hydrazones)
+check('beta_hydrazone_disabled', ['-g', 'all', '-g', '-beta-hydrazone'],
+      beta_hydrazones)
+
 cyclic_amidines = [
     'N=C1NCCC1', 'NC1=NCCC1', 'N=C1NCCCC1', 'NC1=NCCCC1',
     'N1C(=N)C(O)C(C)C1CCCCC', '[15NH]=C1NCCC1',

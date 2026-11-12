@@ -382,6 +382,7 @@ Chemical_Standardisation::activate_all() {
   _transform_pyrimidine.activate();
   _transform_ascorbate.activate();
   _transform_beta_diketone.activate();
+  _transform_beta_hydrazone.activate();
   _transform_beta_ketoester.activate();
   _transform_phosphorus_tautomer.activate();
   _transform_nitroso_to_oxime.activate();
@@ -453,6 +454,7 @@ display_all_chemical_standardisation_options(std::ostream& os, char zoption) {
   os << zopt << CS_PYRIMIDINE << "  convert isolated O/S pyrimidinetrione tautomers to keto form\n";
   os << zopt << CS_NITROSO_OXIME << "      convert neutral aliphatic C-N=O to C=N-OH\n";
   os << zopt << CS_PHOSPHORUS_TAUTOMER << "  convert neutral P-OH tautomers to P(=O)H\n";
+  os << zopt << CS_BETA_HYDRAZONE << " canonicalise acyclic beta-keto hydrazone/enamine tautomers\n";
   os << zopt << CS_BETA_KETOESTER << " canonicalise acyclic beta-ketoester enols\n";
   os << zopt << CS_BETA_DIKETONE << " canonicalise beta-diketone enols to diketo form\n";
   os << zopt << CS_ASCORBATE << "   canonicalise isolated ascorbate rings to lactone/enediol form\n";
@@ -851,6 +853,12 @@ Chemical_Standardisation::Activate(const IWString& directive, const int verbose)
       _transform_phosphorus_tautomer.deactivate();
     } else {
       _transform_phosphorus_tautomer.activate();
+    }
+  } else if (tmp == CS_BETA_HYDRAZONE) {
+    if (negation) {
+      _transform_beta_hydrazone.deactivate();
+    } else {
+      _transform_beta_hydrazone.activate();
     }
   } else if (tmp == CS_BETA_KETOESTER) {
     if (negation) {
@@ -4215,6 +4223,12 @@ Chemical_Standardisation::_process(Molecule& m,
     rc += _do_beta_diketone(m, current_molecule_data);
   }
 
+  if (_transform_beta_hydrazone.active() && current_molecule_data.oxygens() &&
+      current_molecule_data.nitrogens() >= 2 &&
+      _keto_enol == standardisation::KetoEnol::kToKeto) {
+    rc += _do_beta_hydrazone(m, current_molecule_data);
+  }
+
   if (_transform_enol_to_keto.active()) {
     rc += _do_enol_to_keto(m, current_molecule_data);
   }
@@ -4558,6 +4572,10 @@ Chemical_Standardisation::report(std::ostream& os) const {
   if (_transform_phosphorus_tautomer.active()) {
     os << "  Phosphorus tautomer ";
     _transform_phosphorus_tautomer.report(os);
+  }
+  if (_transform_beta_hydrazone.active()) {
+    os << "  Beta hydrazone ";
+    _transform_beta_hydrazone.report(os);
   }
   if (_transform_beta_ketoester.active()) {
     os << "  Beta ketoester ";
@@ -10298,6 +10316,12 @@ Chemical_Standardisation::_processing_needed(
     return 1;
   }
 
+  if (_transform_beta_hydrazone.active() && current_molecule_data.oxygens() &&
+      current_molecule_data.nitrogens() >= 2 &&
+      _keto_enol == standardisation::KetoEnol::kToKeto) {
+    return 1;
+  }
+
   if (_transform_beta_ketoester.active() && current_molecule_data.oxygens() >= 3 &&
       _keto_enol == standardisation::KetoEnol::kToKeto) {
     return 1;
@@ -13680,5 +13704,123 @@ Chemical_Standardisation::_do_transform_indole_hydrogen(Molecule& m,
     _append_to_changed_molecules << " STD:" << CS_INDOLEH;
   }
 
+  return rc;
+}
+
+// R-C(=O)-CH=C(R')-NH-NH-R'' -> R-C(=O)-CH2-C(R')=N-NH-R''.
+// The initial scope is an acyclic CH linker, a ketone, and two NH nitrogens.
+// All eligibility checks precede mutation so an excluded group stays intact.
+static bool
+ConvertBetaHydrazone(Molecule& m, const IWStandard_Current_Molecule& data,
+                     atom_number_t nitrogen) {
+  const auto* z = data.atomic_number();
+  const auto* rings = data.ring_membership();
+  const auto* aromatic = data.atom_is_aromatic();
+  auto eligible = [&](atom_number_t a, atomic_number_t element, int ncon,
+                      int nbonds, int hydrogen) {
+    return z[a] == element && !rings[a] && !aromatic[a] &&
+           !m.formal_charge(a) && m.ncon(a) == ncon && m.nbonds(a) == nbonds &&
+           m.hcount(a) == hydrogen && !m.chiral_centre_at_atom(a);
+  };
+  if (!eligible(nitrogen, 7, 2, 2, 1)) {
+    return false;
+  }
+  atom_number_t beta = kInvalidAtomNumber;
+  atom_number_t distal_nitrogen = kInvalidAtomNumber;
+  for (const Bond* b : m[nitrogen]) {
+    const atom_number_t other = b->other(nitrogen);
+    if (!b->is_single_bond() || b->part_of_cis_trans_grouping()) {
+      return false;
+    }
+    if (z[other] == 6) {
+      beta = other;
+    } else if (z[other] == 7) {
+      distal_nitrogen = other;
+    } else {
+      return false;
+    }
+  }
+  if (beta == kInvalidAtomNumber || distal_nitrogen == kInvalidAtomNumber ||
+      !eligible(beta, 6, 3, 4, 0) ||
+      !eligible(distal_nitrogen, 7, 2, 2, 1)) {
+    return false;
+  }
+  // The distal NH may be acylated (as in the archive example), alkylated,
+  // or arylated, but exclude further N/O chains and charged substituents.
+  for (const Bond* b : m[distal_nitrogen]) {
+    const atom_number_t other = b->other(distal_nitrogen);
+    if (other != nitrogen && (z[other] != 6 || m.formal_charge(other))) {
+      return false;
+    }
+  }
+  atom_number_t alpha = kInvalidAtomNumber;
+  for (const Bond* b : m[beta]) {
+    const atom_number_t other = b->other(beta);
+    if (other == nitrogen) {
+      continue;
+    }
+    if (z[other] != 6 || m.formal_charge(other) || b->part_of_cis_trans_grouping()) {
+      return false;
+    }
+    if (b->is_double_bond()) {
+      alpha = other;
+    } else if (!b->is_single_bond() ||
+               (!aromatic[other] && m.nbonds(other) != m.ncon(other))) {
+      return false;  // Exclude competing conjugated branches.
+    }
+  }
+  if (alpha == kInvalidAtomNumber || !eligible(alpha, 6, 2, 3, 1)) {
+    return false;
+  }
+  const Bond* link = m[alpha][0];
+  if (link->other(alpha) == beta) {
+    link = m[alpha][1];
+  }
+  const atom_number_t keto = link->other(alpha);
+  if (!link->is_single_bond() || link->part_of_cis_trans_grouping() ||
+      !eligible(keto, 6, 3, 4, 0)) {
+    return false;
+  }
+  bool carbonyl = false;
+  for (const Bond* b : m[keto]) {
+    const atom_number_t other = b->other(keto);
+    if (other == alpha) {
+      continue;
+    }
+    if (z[other] == 8 && b->is_double_bond() && m.ncon(other) == 1 &&
+        !m.formal_charge(other)) {
+      carbonyl = true;
+    } else if (z[other] != 6 || !b->is_single_bond() || m.formal_charge(other) ||
+               (!aromatic[other] && m.nbonds(other) != m.ncon(other))) {
+      return false;
+    }
+  }
+  if (!carbonyl) {
+    return false;
+  }
+  m.set_bond_type_between_atoms(alpha, beta, SINGLE_BOND);
+  m.set_bond_type_between_atoms(beta, nitrogen, DOUBLE_BOND);
+  m.unset_all_implicit_hydrogen_information(alpha);
+  m.unset_all_implicit_hydrogen_information(beta);
+  m.unset_all_implicit_hydrogen_information(nitrogen);
+  return true;
+}
+
+int
+Chemical_Standardisation::_do_beta_hydrazone(
+    Molecule& m, const IWStandard_Current_Molecule& data) {
+  int rc = 0;
+  for (atom_number_t a = 0; a < m.natoms(); ++a) {
+    rc += ConvertBetaHydrazone(m, data, a);
+  }
+  if (rc) {
+    _transform_beta_hydrazone.extra(rc);
+    if (_verbose) {
+      cerr << "Transformed " << rc << " beta-keto hydrazone/enamine groups\n";
+    }
+    if (_append_string_depending_on_what_changed) {
+      _append_to_changed_molecules << " STD:" << CS_BETA_HYDRAZONE;
+    }
+  }
   return rc;
 }

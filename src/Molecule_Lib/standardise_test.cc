@@ -807,6 +807,32 @@ TEST_P(TestOxygenAndSulphurTautomers, CanonicalFormAndAtomOrder) {
 }
 
 INSTANTIATE_TEST_SUITE_P(OxygenAndSulphur, TestOxygenAndSulphurTautomers, testing::Values(
+    TautomerCase{CS_BETA_HYDRAZONE, "CC(=O)C=C(C)NNC", "CC(=O)CC(C)=NNC", true},
+    TautomerCase{CS_BETA_HYDRAZONE, "CC(=O)C=C(C)NNC(=O)c1ccncc1", "CC(=O)CC(C)=NNC(=O)c1ccncc1", true},
+    TautomerCase{CS_BETA_HYDRAZONE, "O=C(c1ccccc1)C=C(c1ccccc1)NNc1ccccc1", "O=C(c1ccccc1)CC(=NNc1ccccc1)c1ccccc1", true},
+    TautomerCase{CS_BETA_HYDRAZONE, "CC(=O)[13CH]=C(C)[15NH]NC", "CC(=O)[13CH2]C(C)=[15N]NC", true},
+    TautomerCase{CS_BETA_HYDRAZONE, "CC(=O)C=C(C)NN[C@H](F)C", "CC(=O)CC(C)=NN[C@H](F)C", true},
+    TautomerCase{CS_BETA_HYDRAZONE, "CC(=O)CC(C)=NNC", "CC(=O)CC(C)=NNC", false},
+    TautomerCase{CS_BETA_HYDRAZONE, "CCC=C(C)NNC", "CCC=C(C)NNC", false},
+    TautomerCase{CS_BETA_HYDRAZONE, "COC(=O)C=C(C)NNC", "COC(=O)C=C(C)NNC", false},
+    TautomerCase{CS_BETA_HYDRAZONE, "NC(=O)C=C(C)NNC", "NC(=O)C=C(C)NNC", false},
+    TautomerCase{CS_BETA_HYDRAZONE, "CC(=S)C=C(C)NNC", "CC(=S)C=C(C)NNC", false},
+    TautomerCase{CS_BETA_HYDRAZONE, "CC(=O)C(C)=C(C)NNC", "CC(=O)C(C)=C(C)NNC", false},
+    TautomerCase{CS_BETA_HYDRAZONE, "CC(=O)C=C(C)NC", "CC(=O)C=C(C)NC", false},
+    TautomerCase{CS_BETA_HYDRAZONE, "CC(=O)C=C(C)NN", "CC(=O)C=C(C)NN", false},
+    TautomerCase{CS_BETA_HYDRAZONE, "CC(=O)C=C(C)N(C)NC", "CC(=O)C=C(C)N(C)NC", false},
+    TautomerCase{CS_BETA_HYDRAZONE, "CC(=O)C=C(C)NN(C)C", "CC(=O)C=C(C)NN(C)C", false},
+    TautomerCase{CS_BETA_HYDRAZONE, "CC(=O)/C=C(/C)NNC", "CC(=O)/C=C(/C)NNC", false},
+    TautomerCase{CS_BETA_HYDRAZONE, "CC(=O)C=C(C)N([2H])NC", "CC(=O)C=C(C)N([2H])NC", false},
+    TautomerCase{CS_BETA_HYDRAZONE, "CC(=O)C=C(C)NN([2H])C", "CC(=O)C=C(C)NN([2H])C", false},
+    TautomerCase{CS_BETA_HYDRAZONE, "CC(=O)C([2H])=C(C)NNC", "CC(=O)C([2H])=C(C)NNC", false},
+    TautomerCase{CS_BETA_HYDRAZONE, "CC(=O)C=C(C)[NH2+]NC", "CC(=O)C=C(C)[NH2+]NC", false},
+    TautomerCase{CS_BETA_HYDRAZONE, "CC(=O)C=C(C)NN[NH2]", "CC(=O)C=C(C)NN[NH2]", false},
+    TautomerCase{CS_BETA_HYDRAZONE, "O=C1C=C(NNC)CCC1", "O=C1C=C(NNC)CCC1", false},
+    TautomerCase{CS_BETA_HYDRAZONE, "CC(=O)C=C(C=C)NNC", "CC(=O)C=C(C=C)NNC", false},
+    TautomerCase{CS_BETA_HYDRAZONE, "CC(=O)C=C(C)NNC", "CC(=O)C=C(C)NNC", false,
+                 standardisation::KetoEnol::kToEnol},
+    TautomerCase{CS_ALL, "CC(=O)C=C(C)NNC(=O)c1ccncc1", "CC(=O)CC(C)=NNC(=O)c1ccncc1", true},
     TautomerCase{CS_CYCLIC_AMIDINE, "N=C1NCCC1", "NC1=NCCC1", true},
     TautomerCase{CS_CYCLIC_AMIDINE, "N=C1NCCCC1", "NC1=NCCCC1", true},
     TautomerCase{CS_CYCLIC_AMIDINE, "N1C(=N)C(O)C(C)C1CCCCC", "C1(=NC(CCCCC)C(C)C1O)N", true},
@@ -1524,6 +1550,48 @@ TEST_F(TestStandardisation, CyclicAmidinePreservesExplicitCentralAnnotation) {
   EXPECT_EQ(_m1.chiral_centre_at_atom(1), saved);
   EXPECT_TRUE(_m1.bond_between_atoms(0, 1)->is_double_bond());
   EXPECT_TRUE(_m1.bond_between_atoms(1, 2)->is_single_bond());
+}
+
+TEST_F(TestStandardisation, BetaHydrazoneCanBeDisabledAndReportsNeutralChanges) {
+  _chemical_standardisation.activate_all();
+  ASSERT_TRUE(_chemical_standardisation.Activate("-beta-hydrazone", 0));
+  ASSERT_TRUE(_m1.build_from_smiles("CC(=O)C=C(C)NNC"));
+  const IWString before = _m1.unique_smiles();
+  EXPECT_EQ(_chemical_standardisation.process(_m1), 0);
+  EXPECT_EQ(_m1.unique_smiles(), before);
+  ASSERT_TRUE(_chemical_standardisation.Activate(CS_BETA_HYDRAZONE, 0));
+  _chemical_standardisation.set_append_string_depending_on_what_changed(1);
+  EXPECT_EQ(_chemical_standardisation.process(_m1), 1);
+  EXPECT_TRUE(_m1.name().contains("STD:beta-hydrazone"));
+  EXPECT_EQ(_m1.number_formally_charged_atoms(), 0);
+  EXPECT_EQ(_m1.chiral_centres(), 0);
+  std::ostringstream report;
+  ASSERT_TRUE(_chemical_standardisation.report(report));
+  EXPECT_NE(report.str().find("Beta hydrazone changed 1 groups"), std::string::npos);
+  EXPECT_EQ(_chemical_standardisation.process(_m1), 0);
+}
+
+TEST_F(TestStandardisation, BetaHydrazonePreservesMarkedParticipatingAtoms) {
+  ASSERT_TRUE(_chemical_standardisation.Activate(CS_BETA_HYDRAZONE, 0));
+  // Such annotations are chemically inconsistent at the starting planar atoms,
+  // but must not be silently removed by this rule.
+  for (atom_number_t a : {3, 4, 6}) {
+    ASSERT_TRUE(_m1.build_from_smiles("CC(=O)C=C(C)NNC"));
+    auto marked = std::make_unique<Chiral_Centre>(a);
+    marked->set_top_front(_m1[a].other(a, 0));
+    marked->set_top_back(_m1[a].other(a, 1));
+    if (_m1.ncon(a) == 3) {
+      marked->set_left_down(_m1[a].other(a, 2));
+      marked->set_right_down(kChiralConnectionIsImplicitHydrogen);
+    } else {
+      marked->set_left_down(kChiralConnectionIsImplicitHydrogen);
+      marked->set_right_down(kChiralConnectionIsLonePair);
+    }
+    ASSERT_TRUE(_m1.add_chiral_centre(marked.get()));
+    const Chiral_Centre* saved = marked.release();
+    EXPECT_EQ(_chemical_standardisation.process(_m1), 0);
+    EXPECT_EQ(_m1.chiral_centre_at_atom(a), saved);
+  }
 }
 
 }  // namespace

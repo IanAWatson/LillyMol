@@ -85,6 +85,7 @@ Entering `-g help` to most LillyMol tools yields the usage message
  -g cyclic-amidine canonicalise isolated neutral cyclic amidines
  -g nitroso      convert neutral aliphatic C-N=O groups to C=N-OH
  -g phosphorus   convert neutral P-OH tautomers to P(=O)H
+ -g beta-hydrazone canonicalise acyclic beta-keto hydrazone/enamine tautomers
  -g beta-ketoester canonicalise acyclic beta-ketoester enols
  -g beta-diketone canonicalise beta-diketone enols to diketo form
  -g ascorbate    canonicalise isolated ascorbate rings to lactone/enediol form
@@ -235,6 +236,40 @@ SMILES/aromaticity/stereochemistry handling rather than a standardisation rule.
 Use `-f` to stop with a nonzero exit status on a failure. Invalid starting
 valence is distinguished from invalid valence introduced by standardisation;
 the latter is counted as a failure and written to the failure file.
+
+### Acyclic beta-keto hydrazones
+
+`-g beta-hydrazone` chooses the keto–hydrazone representative of eligible
+hydrazine-substituted enamines:
+
+```text
+CC(=O)C=C(C)NNC(=O)c1ccncc1 -> CC(=O)CC(C)=NNC(=O)c1ccncc1
+```
+
+A hydrogen moves from the nitrogen next to the alkene onto the intervening
+carbon, replacing C=C–NH with C–C=N. No charges or stereocentre annotations
+are introduced. This broadens default tautomer equivalence because the rule is
+included in `-g all`; disable it with `-g all -g -beta-hydrazone`. It is skipped
+with the `ENOL` preference.
+
+The initial scope requires an acyclic ketone, an unsubstituted CH between the
+ketone and enamine carbon, a carbon substituent on the enamine carbon, and two
+neutral NH nitrogens. The distal NH must have a carbon substituent; alkyl,
+aryl, and acyl substituents are supported. Non-aromatic carbon substituents
+at the two ends of the carbon chain must be saturated, excluding competing
+conjugated branches. Acids, esters, amides in place of the ketone, thiones,
+cyclic reacting chains, substituted linker carbons, and substituted or terminal
+NH2 nitrogens are excluded. This is not a general imine/enamine rule.
+
+Specified geometry on the reacting chain and marked chiral centres at
+participating atoms prevent conversion. Heavy-atom isotope labels and remote
+stereocentres are preserved. Explicit hydrogen attachments on either nitrogen
+or the CH linker prevent conversion, so isotopic hydrogen is not transferred.
+As usual, `-g all` can first remove ordinary explicit hydrogen atoms and
+neutralise charged amines; the isolated rule only accepts neutral groups.
+
+Reports count these conversions separately. `-g APP=EACH` appends
+`STD:beta-hydrazone` when this rule changes a molecule.
 
 ### Isolated cyclic amidines
 

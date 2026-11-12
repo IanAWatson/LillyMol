@@ -372,6 +372,7 @@ Chemical_Standardisation::activate_all() {
   _transform_covalent_metals.activate();
   _transform_guanidine.activate();
   _transform_amidine.activate();
+  _transform_amidoxime.activate();
   _transform_cyclic_amidine.activate();
   _transform_guanidine_ring.activate();
   _transform_tetrazole.activate();
@@ -457,6 +458,7 @@ display_all_chemical_standardisation_options(std::ostream& os, char zoption) {
   os << zopt << CS_GUAND << "        convert guanidines to -N-C(=N)-N form\n";
   os << zopt << CS_CYCLIC_AMIDINE << " canonicalise isolated neutral cyclic amidines\n";
   os << zopt << CS_AMIDINE << "     canonicalise isolated neutral amidines with a terminal N\n";
+  os << zopt << CS_AMIDOXIME << "   convert neutral acyclic N-hydroxyamidines to amino-oximes\n";
   os << zopt << CS_PYRIMIDINE << "  convert isolated O/S pyrimidinetrione tautomers to keto form\n";
   os << zopt << CS_NITROSO_OXIME << "      convert neutral aliphatic C-N=O to C=N-OH\n";
   os << zopt << CS_PHOSPHORUS_TAUTOMER << "  convert neutral P-OH tautomers to P(=O)H\n";
@@ -688,6 +690,12 @@ Chemical_Standardisation::Activate(const IWString& directive, const int verbose)
       _transform_cyclic_amidine.deactivate();
     } else {
       _transform_cyclic_amidine.activate();
+    }
+  } else if (CS_AMIDOXIME == tmp) {
+    if (negation) {
+      _transform_amidoxime.deactivate();
+    } else {
+      _transform_amidoxime.activate();
     }
   } else if (CS_AMIDINE == tmp) {
     if (negation) {
@@ -4286,6 +4294,13 @@ Chemical_Standardisation::_process(Molecule& m,
     rc += _do_transform_indole_hydrogen(m, current_molecule_data);
   }
 
+  // Neutralisation runs first so eligible charged precursors do not require
+  // a second standardisation pass to choose their neutral amidoxime tautomer.
+  if (_transform_amidoxime.active() && current_molecule_data.nitrogens() >= 2 &&
+      current_molecule_data.oxygens()) {
+    rc += _do_amidoxime(m, current_molecule_data);
+  }
+
   // Run after rules that consult the initial aromaticity snapshot, since
   // forming an exocyclic oxime can change the aromaticity of a ring.
   if (_transform_nitroso_to_oxime.active() && current_molecule_data.nitrogens() &&
@@ -4595,6 +4610,10 @@ Chemical_Standardisation::report(std::ostream& os) const {
   if (_transform_cyclic_amidine.active()) {
     os << "  Cyclic amidine ";
     _transform_cyclic_amidine.report(os);
+  }
+  if (_transform_amidoxime.active()) {
+    os << "  Amidoxime ";
+    _transform_amidoxime.report(os);
   }
   if (_transform_amidine.active()) {
     os << "  Amidine ";
@@ -10392,6 +10411,11 @@ Chemical_Standardisation::_processing_needed(
     return 1;
   }
 
+  if (_transform_amidoxime.active() && current_molecule_data.nitrogens() >= 2 &&
+      current_molecule_data.oxygens()) {
+    return 1;
+  }
+
   if (_transform_amidine.active() && current_molecule_data.nitrogens() >= 2) {
     return 1;
   }
@@ -13991,6 +14015,85 @@ Chemical_Standardisation::_do_beta_enaminone(
     }
     if (_append_string_depending_on_what_changed) {
       _append_to_changed_molecules << " STD:" << CS_BETA_ENAMINONE;
+    }
+  }
+  return rc;
+}
+
+// R-C(=NH)-NH-OH -> R-C(NH2)=N-OH. The oxygen identifies the N whose
+// double bond is preferred, without reference to atom ordering. Both forms
+// remain neutral, and no C=N geometry is assigned to the product.
+static bool
+ConvertAmidoxime(Molecule& m, const IWStandard_Current_Molecule& data,
+                 atom_number_t oxygen) {
+  const auto* z = data.atomic_number();
+  auto eligible = [&](atom_number_t a, atomic_number_t element, int ncon,
+                      int nbonds, int hydrogen) {
+    return z[a] == element && !data.ring_membership()[a] &&
+           !data.atom_is_aromatic()[a] && !m.formal_charge(a) &&
+           m.ncon(a) == ncon && m.nbonds(a) == nbonds &&
+           m.hcount(a) == hydrogen && !m.chiral_centre_at_atom(a);
+  };
+  // Connection counts also exclude explicit H/D neighbours: hydrogen
+  // transfers are restricted to implicit hydrogens on the two nitrogens.
+  if (!eligible(oxygen, 8, 1, 1, 1)) {
+    return false;
+  }
+  const Bond* no = m[oxygen][0];
+  const atom_number_t hydroxy_n = no->other(oxygen);
+  if (!no->is_single_bond() || no->part_of_cis_trans_grouping() ||
+      !eligible(hydroxy_n, 7, 2, 2, 1)) {
+    return false;
+  }
+  const Bond* cn = m[hydroxy_n][0];
+  if (cn->other(hydroxy_n) == oxygen) {
+    cn = m[hydroxy_n][1];
+  }
+  const atom_number_t carbon = cn->other(hydroxy_n);
+  if (!cn->is_single_bond() || cn->part_of_cis_trans_grouping() ||
+      !eligible(carbon, 6, 3, 4, 0)) {
+    return false;
+  }
+  atom_number_t imine_n = kInvalidAtomNumber;
+  for (const Bond* b : m[carbon]) {
+    const atom_number_t other = b->other(carbon);
+    if (other == hydroxy_n) {
+      continue;
+    }
+    if (b->part_of_cis_trans_grouping()) {
+      return false;
+    }
+    if (b->is_double_bond() && eligible(other, 7, 1, 2, 1)) {
+      imine_n = other;
+    } else if (z[other] != 6 || !b->is_single_bond() || m.formal_charge(other)) {
+      return false;
+    }
+  }
+  if (imine_n == kInvalidAtomNumber) {
+    return false;
+  }
+  m.set_bond_type_between_atoms(carbon, imine_n, SINGLE_BOND);
+  m.set_bond_type_between_atoms(carbon, hydroxy_n, DOUBLE_BOND);
+  m.unset_all_implicit_hydrogen_information(carbon);
+  m.unset_all_implicit_hydrogen_information(imine_n);
+  m.unset_all_implicit_hydrogen_information(hydroxy_n);
+  return true;
+}
+
+int
+Chemical_Standardisation::_do_amidoxime(
+    Molecule& m, const IWStandard_Current_Molecule& data) {
+  int rc = 0;
+  for (atom_number_t a = 0; a < m.natoms(); ++a) {
+    rc += ConvertAmidoxime(m, data, a);
+  }
+  if (rc) {
+    _transform_amidoxime.extra(rc);
+    if (_verbose) {
+      cerr << "Transformed " << rc << " N-hydroxyamidines to amidoximes\n";
+    }
+    if (_append_string_depending_on_what_changed) {
+      _append_to_changed_molecules << " STD:" << CS_AMIDOXIME;
     }
   }
   return rc;

@@ -411,6 +411,7 @@ class IWStandard_Current_Molecule
 #define CS_TETRAZOLE  "tetrazole"
 #define CS_PYRIMIDINE "pyrimidine"
 #define CS_AMIDINE "amidine"
+#define CS_AMIDOXIME "amidoxime"
 #define CS_CYCLIC_AMIDINE "cyclic-amidine"
 #define CS_NITROSO_OXIME "nitroso"
 #define CS_PHOSPHORUS_TAUTOMER "phosphorus"
@@ -496,6 +497,7 @@ class Chemical_Standardisation
     Chemical_Transformation _transform_single_atom_ions;
     Chemical_Transformation _transform_guanidine;
     Chemical_Transformation _transform_amidine;
+    Chemical_Transformation _transform_amidoxime;
     Chemical_Transformation _transform_cyclic_amidine;
     Chemical_Transformation _transform_guanidine_ring;
     Chemical_Transformation _protonate_sulfur_acids;
@@ -625,6 +627,7 @@ class Chemical_Standardisation
     int _do_pyrazole (Molecule &, int * atom_already_changed, IWStandard_Current_Molecule & current_molecule_data);
     int _do_pyrazole (Molecule &, int * atom_already_changed, const int, IWStandard_Current_Molecule & current_molecule_data);
     int _do_cyclic_amidine(Molecule& m, const IWStandard_Current_Molecule& data);
+    int _do_amidoxime(Molecule& m, const IWStandard_Current_Molecule& data);
     int _do_transform_amidine(Molecule& m, IWStandard_Current_Molecule& current_molecule_data);
     int _do_nitroso_to_oxime(Molecule& m, const IWStandard_Current_Molecule& data);
     int _do_phosphorus_tautomer(Molecule& m, const IWStandard_Current_Molecule& data);

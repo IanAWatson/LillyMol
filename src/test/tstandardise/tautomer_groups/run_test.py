@@ -29,6 +29,20 @@ cases = [
     'N1=C(O)C=C(O)N=C1O.O=c1cc[nH]c(C)n1',
     'N1=NC(=NN=C(C2=CC=NC=C2)Br)NN1',
 ]
+amidoximes = [
+    'CC(=N)NO', 'CC(N)=NO', 'ONC(=N)C(N)C',
+    'ONC(=N)[C@H](N)C', 'ONC(=N)c1ccccc1',
+    '[18OH]NC(=N)C', 'O[15NH]C(=N)C', 'ONC(=[15NH])C',
+    'ONC(=N)CCC(=N)NO', 'ONC(=N)CCC(=NO)N',
+    'ONC(=N)C[N+](C)(C)C', 'CC(=[NH2+])NO',
+    'CC(=N)[NH2+]O', 'CC(=N)N[O-]',
+    'ON([2H])C(=N)C', 'ONC(=N[2H])C', '[2H]ONC(=N)C',
+    'CC(=N)NO.CC(=N)NO',
+]
+check('amidoxime', ['-g', 'amidoxime'], amidoximes)
+check('amidoxime_all', ['-g', 'all'], amidoximes)
+check('amidoxime_disabled', ['-g', 'all', '-g', '-amidoxime'], amidoximes)
+
 beta_enaminones = [
     'CC(=O)CC(C)=NCC', 'CC(=O)C=C(C)NCC',
     'O=C(C)CC(=NCCN=C(C)CC(=O)C)C',

@@ -807,6 +807,41 @@ TEST_P(TestOxygenAndSulphurTautomers, CanonicalFormAndAtomOrder) {
 }
 
 INSTANTIATE_TEST_SUITE_P(OxygenAndSulphur, TestOxygenAndSulphurTautomers, testing::Values(
+    TautomerCase{CS_AMIDOXIME, "CC(=N)NO", "CC(N)=NO", true},
+    TautomerCase{CS_AMIDOXIME, "ONC(=N)C(N)C", "ON=C(N)C(N)C", true},
+    TautomerCase{CS_AMIDOXIME, "ONC(=N)[C@H](N)C", "ON=C(N)[C@H](N)C", true},
+    TautomerCase{CS_AMIDOXIME, "ONC(=N)c1ccccc1", "ON=C(N)c1ccccc1", true},
+    TautomerCase{CS_AMIDOXIME, "ONC(=N)C[N+](C)(C)C", "ON=C(N)C[N+](C)(C)C", true},
+    TautomerCase{CS_AMIDOXIME, "[OH][NH][C](=[NH])C", "[OH]N=C(N)C", true},
+    TautomerCase{CS_AMIDOXIME, "[18OH]NC(=N)C", "[18OH]N=C(N)C", true},
+    TautomerCase{CS_AMIDOXIME, "O[15NH]C(=N)C", "O[15N]=C(N)C", true},
+    TautomerCase{CS_AMIDOXIME, "ONC(=[15NH])C", "ON=C([15NH2])C", true},
+    TautomerCase{CS_AMIDOXIME, "ON[13C](=N)C", "ON=[13C](N)C", true},
+    TautomerCase{CS_AMIDOXIME, "ONC(=N)CCC(=NO)N", "ON=C(N)CCC(=NO)N", true},
+    TautomerCase{CS_AMIDOXIME, "ONC(=N)CCC(=N)NO", "ON=C(N)CCC(N)=NO", true},
+    TautomerCase{CS_AMIDOXIME, "CC(N)=NO", "CC(N)=NO", false},
+    TautomerCase{CS_AMIDOXIME, "ONC=N", "ONC=N", false},
+    TautomerCase{CS_AMIDOXIME, "ONC(=N)N", "ONC(=N)N", false},
+    TautomerCase{CS_AMIDOXIME, "ONC(=N)O", "ONC(=N)O", false},
+    TautomerCase{CS_AMIDOXIME, "ONC(=N)S", "ONC(=N)S", false},
+    TautomerCase{CS_AMIDOXIME, "CONC(=N)C", "CONC(=N)C", false},
+    TautomerCase{CS_AMIDOXIME, "ON(C)C(=N)C", "ON(C)C(=N)C", false},
+    TautomerCase{CS_AMIDOXIME, "ONC(=NC)C", "ONC(=NC)C", false},
+    TautomerCase{CS_AMIDOXIME, "ON1C(=N)CCC1", "ON1C(=N)CCC1", false},
+    TautomerCase{CS_AMIDOXIME, "ONC(=NO)C", "ONC(=NO)C", false},
+    TautomerCase{CS_AMIDOXIME, "ONC(=[NH2+])C", "ONC(=[NH2+])C", false},
+    TautomerCase{CS_AMIDOXIME, "O[NH2+]C(=N)C", "O[NH2+]C(=N)C", false},
+    TautomerCase{CS_AMIDOXIME, "[O-]NC(=N)C", "[O-]NC(=N)C", false},
+    TautomerCase{CS_AMIDOXIME, "CC(=O)NO", "CC(=O)NO", false},
+    TautomerCase{CS_AMIDOXIME, "CC(C)=NO", "CC(C)=NO", false},
+    TautomerCase{CS_AMIDOXIME, "ON([2H])C(=N)C", "ON([2H])C(=N)C", false},
+    TautomerCase{CS_AMIDOXIME, "ONC(=N[2H])C", "ONC(=N[2H])C", false},
+    TautomerCase{CS_AMIDOXIME, "[2H]ONC(=N)C", "[2H]ONC(=N)C", false},
+    TautomerCase{CS_AMIDOXIME, "[H]ONC(=N)C", "[H]ONC(=N)C", false},
+    TautomerCase{CS_AMIDOXIME, "CC(=N)NO", "CC(N)=NO", true,
+                 standardisation::KetoEnol::kToEnol},
+    TautomerCase{CS_ALL, "CC(=N)NO", "CC(N)=NO", true},
+    TautomerCase{CS_ALL, "CC(=N)N([H])O", "CC(N)=NO", true},
     TautomerCase{CS_BETA_ENAMINONE, "CC(=O)CC(C)=NCC", "CC(=O)C=C(C)NCC", true},
     TautomerCase{CS_BETA_ENAMINONE, "O=C(C)CC(=NCCN=C(C)CC(=O)C)C", "CC(=O)C=C(C)NCCNC(C)=CC(C)=O", true},
     TautomerCase{CS_BETA_ENAMINONE, "O=C(c1ccccc1)CC(=Nc1ccccc1)c1ccccc1", "O=C(c1ccccc1)C=C(Nc1ccccc1)c1ccccc1", true},
@@ -1744,5 +1779,80 @@ TEST_F(TestStandardisation, BetaEnehydrazinePreservesMarkedParticipatingAtoms) {
     EXPECT_EQ(_m1.chiral_centre_at_atom(a), saved);
   }
 }
+
+TEST_F(TestStandardisation, AmidoximeCanBeDisabledAndReportsIndependently) {
+  _chemical_standardisation.activate_all();
+  ASSERT_TRUE(_chemical_standardisation.Activate("-amidoxime", 0));
+  ASSERT_TRUE(_m1.build_from_smiles("CC(=N)NO"));
+  const IWString before = _m1.unique_smiles();
+  EXPECT_EQ(_chemical_standardisation.process(_m1), 0);
+  EXPECT_EQ(_m1.unique_smiles(), before);
+  ASSERT_TRUE(_chemical_standardisation.Activate(CS_AMIDOXIME, 0));
+  ASSERT_TRUE(_chemical_standardisation.Activate("-amidine", 0));
+  _chemical_standardisation.set_append_string_depending_on_what_changed(1);
+  EXPECT_EQ(_chemical_standardisation.process(_m1), 1);
+  EXPECT_TRUE(_m1.name().contains("STD:amidoxime"));
+  EXPECT_EQ(_m1.number_formally_charged_atoms(), 0);
+  EXPECT_EQ(_m1.chiral_centres(), 0);
+  EXPECT_EQ(_m1.hcount(2), 2);
+  EXPECT_EQ(_m1.hcount(3), 0);
+  EXPECT_EQ(_m1.hcount(4), 1);
+  EXPECT_TRUE(_m1.bond_between_atoms(1, 2)->is_single_bond());
+  EXPECT_TRUE(_m1.bond_between_atoms(1, 3)->is_double_bond());
+  std::ostringstream report;
+  ASSERT_TRUE(_chemical_standardisation.report(report));
+  EXPECT_NE(report.str().find("Amidoxime changed 1 groups"), std::string::npos);
+  EXPECT_EQ(_chemical_standardisation.process(_m1), 0);
+}
+
+TEST_F(TestStandardisation, AmidoximeNeutralisedPrecursorsAreStable) {
+  _chemical_standardisation.activate_all();
+  ASSERT_TRUE(_m2.build_from_smiles("CC(N)=NO"));
+  const IWString expected = _m2.unique_smiles();
+  for (const char* smiles : {"CC(=[NH2+])NO", "CC(=N)[NH2+]O", "CC(=N)N[O-]"}) {
+    Molecule original;
+    ASSERT_TRUE(original.build_from_smiles(smiles));
+    for (int i = 0; i < 100; ++i) {
+      Molecule molecule;
+      ASSERT_TRUE(molecule.build_from_smiles(original.random_smiles()));
+      EXPECT_GT(_chemical_standardisation.process(molecule), 0);
+      EXPECT_EQ(molecule.unique_smiles(), expected) << smiles;
+      EXPECT_TRUE(molecule.valence_ok());
+      EXPECT_EQ(molecule.number_formally_charged_atoms(), 0);
+      EXPECT_EQ(_chemical_standardisation.process(molecule), 0);
+    }
+  }
+}
+
+TEST_F(TestStandardisation, AmidoximePreservesParticipatingAnnotationsAndGeometry) {
+  ASSERT_TRUE(_chemical_standardisation.Activate(CS_AMIDOXIME, 0));
+  for (atom_number_t a : {1, 3}) {
+    ASSERT_TRUE(_m1.build_from_smiles("CC(=N)NO"));
+    auto marked = std::make_unique<Chiral_Centre>(a);
+    marked->set_top_front(_m1[a].other(a, 0));
+    marked->set_top_back(_m1[a].other(a, 1));
+    if (_m1.ncon(a) == 3) {
+      marked->set_left_down(_m1[a].other(a, 2));
+      marked->set_right_down(kChiralConnectionIsImplicitHydrogen);
+    } else {
+      marked->set_left_down(kChiralConnectionIsImplicitHydrogen);
+      marked->set_right_down(kChiralConnectionIsLonePair);
+    }
+    ASSERT_TRUE(_m1.add_chiral_centre(marked.get()));
+    const Chiral_Centre* saved = marked.release();
+    EXPECT_EQ(_chemical_standardisation.process(_m1), 0);
+    EXPECT_EQ(_m1.chiral_centre_at_atom(a), saved);
+  }  // Exercise the double-bond geometry guard directly; a terminal imine NH
+  // has limited SMILES representations for this without explicit hydrogen.
+  ASSERT_TRUE(_m1.build_from_smiles("CC(=N)NO"));
+  Bond* bond = const_cast<Bond*>(_m1.bond_between_atoms(1, 2));
+  ASSERT_NE(bond, nullptr);
+  ASSERT_TRUE(bond->set_part_of_cis_trans_grouping(1));
+  EXPECT_EQ(_chemical_standardisation.process(_m1), 0);
+  EXPECT_TRUE(bond->part_of_cis_trans_grouping());
+  EXPECT_TRUE(_m1.bond_between_atoms(1, 2)->is_double_bond());
+  EXPECT_TRUE(_m1.bond_between_atoms(1, 3)->is_single_bond());
+}
+
 
 }  // namespace

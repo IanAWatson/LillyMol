@@ -82,6 +82,7 @@ Entering `-g help` to most LillyMol tools yields the usage message
  -g pyrazolone    convert pyrazolone to keto form
  -g aminothazole  convert -N=c1scc[nH]1 to -[NH]c1sccn1
  -g keto_enol     convert O/S enol to keto forms (no adjacent heteroatoms)
+ -g amidoxime    convert neutral acyclic N-hydroxyamidines to amino-oximes
  -g cyclic-amidine canonicalise isolated neutral cyclic amidines
  -g nitroso      convert neutral aliphatic C-N=O groups to C=N-OH
  -g phosphorus   convert neutral P-OH tautomers to P(=O)H
@@ -238,6 +239,49 @@ SMILES/aromaticity/stereochemistry handling rather than a standardisation rule.
 Use `-f` to stop with a nonzero exit status on a failure. Invalid starting
 valence is distinguished from invalid valence introduced by standardisation;
 the latter is counted as a failure and written to the failure file.
+
+### Amidoximes
+
+`-g amidoxime` chooses the neutral amino–oxime representative of eligible
+N-hydroxyamidines:
+
+```text
+CC(=N)NO       -> CC(N)=NO
+ONC(=N)C(N)C   -> ON=C(N)C(N)C
+```
+
+A hydrogen moves from the hydroxylamine nitrogen to the terminal imine
+nitrogen. The OH hydrogen stays on oxygen. This option is included in `-g all`
+and broadens default tautomer equivalence. Disable it with
+`-g all -g -amidoxime`. The preference is independent of `KETO`/`ENOL` because
+it selects a nitrogen tautomer without changing the OH bond.
+
+The initial scope requires a neutral, acyclic `R-C(=NH)-NH-OH` group, with a
+carbon atom for R, a terminal imine NH and a terminal OH. Aromatic carbon
+substituents are allowed, but the participating atoms cannot be aromatic or
+in rings. Formamidoxime (R = H), guanidine analogues (R = N), N-substituted
+nitrogens, O-alkyl/O-acyl groups, and charged participating atoms are excluded
+by the isolated rule. With `-g all`, ordinary charge neutralisation and explicit
+hydrogen removal run first, so eligible charged precursors can also reach the
+neutral representative in one pass.
+
+Explicit hydrogen atoms attached to either nitrogen or oxygen prevent the
+isolated conversion, protecting isotopic hydrogen. Heavy-atom isotope labels
+and remote stereochemistry are retained. Marked chiral centres on participating
+atoms and specified geometry on the group prevent conversion. No C=N geometry
+or chiral-centre annotations are assigned to the product. Multiple eligible
+groups are processed in the same pass.
+
+The preference agrees with IR/NMR evidence for amino–oxime structures in
+solution reported by [Bell, Nambury and Bauer, 1964](https://doi.org/10.1021/jo01033a016).
+Calculations by [Tavakol and Arshadi, 2009](https://doi.org/10.1007/s00894-008-0435-4)
+also favour amidoxime over imino–hydroxylamine. This is a supported
+canonicalisation preference, not a prediction of populations for arbitrary
+substituents, pH, or solvent. Charge-separated aminonitrone forms are outside
+this rule.
+
+Reports count amidoxime conversions separately. `-g APP=EACH` appends
+`STD:amidoxime` when this rule changes a molecule.
 
 ### Acyclic beta-enaminones
 

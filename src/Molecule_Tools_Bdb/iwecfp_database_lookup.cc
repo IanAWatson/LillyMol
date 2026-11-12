@@ -133,59 +133,49 @@ class SF_Results {
   SF_Results();
 
   int
-  accumulate_rejected_molecules() const
-  {
+  accumulate_rejected_molecules() const {
     return _accumulate_rejected_molecules;
   }
 
   void
-  set_accumulate_rejected_molecules(int s)
-  {
+  set_accumulate_rejected_molecules(int s) {
     _accumulate_rejected_molecules = s;
   }
 
-  void
-  reset();
+  void reset();
 
   double
-  score() const
-  {
+  score() const {
     return _score;
   }
 
   void
-  set_score(double s)
-  {
+  set_score(double s) {
     _score = s;
   }
 
   IWString&
-  to_stdout()
-  {
+  to_stdout() {
     return _to_stdout;
   }
 
   const IWString&
-  to_stdout() const
-  {
+  to_stdout() const {
     return _to_stdout;
   }
 
   IWString&
-  to_rejected_stream()
-  {
+  to_rejected_stream() {
     return _to_rejected_stream;
   }
 
   const IWString&
-  to_rejected_stream() const
-  {
+  to_rejected_stream() const {
     return _to_rejected_stream;
   }
 };
 
-SF_Results::SF_Results()
-{
+SF_Results::SF_Results() {
   _score = -9.0;
   _accumulate_rejected_molecules = 0;
 
@@ -193,16 +183,14 @@ SF_Results::SF_Results()
 }
 
 void
-SF_Results::reset()
-{
+SF_Results::reset() {
   _to_stdout.resize_keep_storage(0);
   _to_rejected_stream.resize_keep_storage(0);
 
   return;
 }
 
-class Score_Related
-{
+class Score_Related {
  private:
   double _minimum_score_needed;
 
@@ -218,8 +206,7 @@ class Score_Related
 
   //  private functions
 
-  int
-  _okscore_mutex_protected(const double score);
+  int _okscore_mutex_protected(const double score);
 
  public:
   Score_Related();
@@ -231,8 +218,7 @@ class Score_Related
   int okscore(const double score);
 };
 
-Score_Related::Score_Related()
-{
+Score_Related::Score_Related() {
   _minimum_score_needed = -std::numeric_limits<double>::max();
 
   _min_examples = -1;
@@ -245,8 +231,7 @@ Score_Related::Score_Related()
 }
 
 static double
-mylog10(const int x)
-{
+mylog10(const int x) {
   if (0 == x) {
     return 0.0;
   }
@@ -260,8 +245,7 @@ mylog10(const int x)
 }
 
 int
-Score_Related::build(const Command_Line& cl, const char u1, const int verbose)
-{
+Score_Related::build(const Command_Line& cl, const char u1, const int verbose) {
   if (!cl.option_present(u1)) {  // nothing to do
     return 1;
   }
@@ -298,8 +282,7 @@ Score_Related::build(const Command_Line& cl, const char u1, const int verbose)
 }
 
 int
-Score_Related::report(std::ostream& output) const
-{
+Score_Related::report(std::ostream& output) const {
   output << "Score_Related::report:examined " << _acc_score.n() << " molecules\n";
 
   if (0 == _acc_score.n()) {
@@ -329,8 +312,7 @@ Score_Related::report(std::ostream& output) const
 template <typename T>
 int
 write_smiles_and_id(Molecule& m, const int max_shell_radius, const int* min_each_shell,
-                    const Set_of_Atoms* rarest_atom, T& output)
-{
+                    const Set_of_Atoms* rarest_atom, T& output) {
   if (create_descriptor_file) {
     output << m.name();
     return 1;
@@ -353,8 +335,7 @@ write_smiles_and_id(Molecule& m, const int max_shell_radius, const int* min_each
 }
 
 int
-Score_Related::okscore(const double score)
-{
+Score_Related::okscore(const double score) {
   _mutex.lock();
 
   int rc = _okscore_mutex_protected(score);
@@ -365,8 +346,7 @@ Score_Related::okscore(const double score)
 }
 
 int
-Score_Related::_okscore_mutex_protected(const double score)
-{
+Score_Related::_okscore_mutex_protected(const double score) {
   _acc_score.extra(score);
 
   if (score <= 0.0) {
@@ -392,8 +372,7 @@ static Score_Related score_related;
 typedef std::unordered_map<DBKey, int, IWdbkeyHash> Subtract;
 
 static int
-preprocess_molecule(Molecule& m)
-{
+preprocess_molecule(Molecule& m) {
   m.remove_all(1);
 
   m.reduce_to_largest_fragment();  // always reduce to largest fragment
@@ -410,8 +389,7 @@ preprocess_molecule(Molecule& m)
 }
 
 static void
-usage(int rc)
-{
+usage(int rc) {
 // clang-format off
 #if defined(GIT_HASH) && defined(TODAY)
   cerr << __FILE__ << " compiled " << TODAY << " git hash " << GIT_HASH << '\n';
@@ -464,8 +442,7 @@ usage(int rc)
 */
 
 template <typename I>
-class Bit_Produced_CE : public Bit_Produced
-{
+class Bit_Produced_CE : public Bit_Produced {
  private:
   //  This will get populated when we do the lookup
 
@@ -479,13 +456,13 @@ class Bit_Produced_CE : public Bit_Produced
     _count++;
   }
 
-  void set_fromdb(const I* s)
-  {
+  void
+  set_fromdb(const I* s) {
     _fromdb = s;
   }
 
-  const I* fromdb() const
-  {
+  const I*
+  fromdb() const {
     return _fromdb;
   }
 };
@@ -493,27 +470,23 @@ class Bit_Produced_CE : public Bit_Produced
 template <typename I>
 Bit_Produced_CE<I>::Bit_Produced_CE(unsigned int b, atom_number_t c, unsigned int cat,
                                     unsigned int r)
-    : Bit_Produced(b, c, cat, r)
-{
+    : Bit_Produced(b, c, cat, r) {
   _fromdb = nullptr;
 
   return;
 }
 
 template <typename I>
-class Bit_Produced_Comparator
-{
+class Bit_Produced_Comparator {
  private:
  public:
-  int
-  operator()(const Bit_Produced_CE<I>*, const Bit_Produced_CE<I>*) const;
+  int operator()(const Bit_Produced_CE<I>*, const Bit_Produced_CE<I>*) const;
 };
 
 template <typename I>
 int
 Bit_Produced_Comparator<I>::operator()(const Bit_Produced_CE<I>* bp1,
-                                       const Bit_Produced_CE<I>* bp2) const
-{
+                                       const Bit_Produced_CE<I>* bp2) const {
   const I* ce1 = bp1->fromdb();
   const I* ce2 = bp2->fromdb();
 
@@ -537,8 +510,7 @@ Bit_Produced_Comparator<I>::operator()(const Bit_Produced_CE<I>* bp1,
 
 static Bit_Produced_Comparator<Count_Example> bpc;
 
-class Lookup_Results
-{
+class Lookup_Results {
  private:
   int _nbits;
   Accumulator_Int<int> _found;
@@ -549,50 +521,41 @@ class Lookup_Results
   //  void increment_nbits () { _nbits++;}
 
   int
-  nbits() const
-  {
+  nbits() const {
     return _nbits;
   }
 
-  void
-  reset();
+  void reset();
 
-  void
-  extra(int c);
+  void extra(int c);
 
   int
-  n() const
-  {
+  n() const {
     return _found.n();
   }
 
   template <typename O>
-  int
-  report(O&) const;
+  int report(O&) const;
 
   int
-  bits_missing() const
-  {
+  bits_missing() const {
     return _nbits - _found.n();
   }
 
   int
-  min_examples() const
-  {
+  min_examples() const {
     return _found.minval();
   }
 };
 
-Lookup_Results::Lookup_Results()
-{
+Lookup_Results::Lookup_Results() {
   _nbits = 0;
 
   return;
 }
 
 void
-Lookup_Results::reset()
-{
+Lookup_Results::reset() {
   _nbits = 0;
 
   _found.reset();
@@ -602,8 +565,7 @@ Lookup_Results::reset()
 
 template <typename O>
 int
-Lookup_Results::report(O& output) const
-{
+Lookup_Results::report(O& output) const {
   output << ' ' << _nbits;
 
   if (0 == _found.n()) {
@@ -624,8 +586,7 @@ Lookup_Results::report(O& output) const
 }
 
 void
-Lookup_Results::extra(int c)
-{
+Lookup_Results::extra(int c) {
   _nbits++;
 
   if (c > 0) {
@@ -637,8 +598,7 @@ Lookup_Results::extra(int c)
 
 static int
 do_check_monotonicity_bits_found(const IWString& mname, Lookup_Results* lkrs,
-                                 const int min_shell_radius, const int max_shell_radius)
-{
+                                 const int min_shell_radius, const int max_shell_radius) {
   int rc = 1;
 
   for (auto r = min_shell_radius + 1; r <= max_shell_radius; ++r) {
@@ -662,8 +622,7 @@ do_check_monotonicity_bits_found(const IWString& mname, Lookup_Results* lkrs,
 template <typename T>
 int
 write_smiles_and_id(Molecule& m, const int radius, const Set_of_Atoms& rarest_atom,
-                    T& output)
-{
+                    T& output) {
   // cerr << "write_smiles_and_id:rarest_atom " << rarest_atom << '\n';
   for (int i = 0; i < rarest_atom.number_elements(); ++i) {
     const auto j = rarest_atom[i];
@@ -679,8 +638,7 @@ write_smiles_and_id(Molecule& m, const int radius, const Set_of_Atoms& rarest_at
 template <typename T>
 int
 do_write_per_radius_data(const Lookup_Results* lkrs,
-                         const Fingerprint_Characteristics& fpc, T& output)
-{
+                         const Fingerprint_Characteristics& fpc, T& output) {
   for (int i = fpc.min_shell_radius(); i <= fpc.max_shell_radius(); i++) {
     output << descriptor_file_output_separator << i << descriptor_file_output_separator;
 
@@ -699,8 +657,7 @@ do_write_per_radius_data(const Lookup_Results* lkrs,
 }
 
 static double
-do_log10_outer_shell_score(const Lookup_Results* lkrs, const int max_shell_radius)
-{
+do_log10_outer_shell_score(const Lookup_Results* lkrs, const int max_shell_radius) {
   const Lookup_Results& l = lkrs[max_shell_radius];
 
   // cerr << "Max radius " << max_shell_radius << " missing " << l.bits_missing() << " min
@@ -727,8 +684,7 @@ do_log10_outer_shell_score(const Lookup_Results* lkrs, const int max_shell_radiu
 
 static int
 write_smiles_with_isotope(Molecule& m, atom_number_t centre_atom, int radius,
-                          IWString_and_File_Descriptor& output)
-{
+                          IWString_and_File_Descriptor& output) {
   if (create_descriptor_file) {
     output << m.name();
     return 1;
@@ -750,8 +706,7 @@ template <typename I>
 int
 do_isotopically_label_most_difficult_atoms(Molecule& m,
                                            const resizable_array<Bit_Produced_CE<I>*>& bp,
-                                           int n, IWString_and_File_Descriptor& output)
-{
+                                           int n, IWString_and_File_Descriptor& output) {
   // cerr << "do_isotopically_label_most_difficult_atoms, n = " << n << '\n';
   const auto* bpi = bp[0];  // first database only
 
@@ -792,8 +747,7 @@ do_isotopically_label_most_difficult_atoms(Molecule& m,
   Object that does most of the work
 */
 
-class Lookup_Calculation_Results
-{
+class Lookup_Calculation_Results {
  private:
   int _min_shell_radius;
   int _max_shell_radius;
@@ -817,57 +771,45 @@ class Lookup_Calculation_Results
   //  private functions
 
   template <typename T>
-  int
-  _do_write_per_radius_data(T& output) const;
+  int _do_write_per_radius_data(T& output) const;
   template <typename T>
-  int
-  _write_smiles_and_id(Molecule& m, T& output) const;
-  void
-  _adjust_per_shell_arrays(const int nexamples, const int r, const atom_number_t a);
+  int _write_smiles_and_id(Molecule& m, T& output) const;
+  void _adjust_per_shell_arrays(const int nexamples, const int r, const atom_number_t a);
 
  public:
   Lookup_Calculation_Results();
   ~Lookup_Calculation_Results();
 
-  int
-  initialise(const Fingerprint_Characteristics& fpc);
+  int initialise(const Fingerprint_Characteristics& fpc);
 
   void
-  set_include_nbits_in_normal_output(int s)
-  {
+  set_include_nbits_in_normal_output(int s) {
     _include_nbits_in_normal_output = s;
   }
 
   Lookup_Results*
-  lookup_results_array()
-  {
+  lookup_results_array() {
     return _lkrs;
   }
 
-  int
-  do_lookups_calculate_score(Molecule& m, Fingerprint_Characteristics& rpc,
-                             Set_of_Databases& sodb);
+  int do_lookups_calculate_score(Molecule& m, Fingerprint_Characteristics& rpc,
+                                 Set_of_Databases& sodb);
 
   double
-  score() const
-  {
+  score() const {
     return _score;
   }
 
   template <typename T>
-  int
-  normal_output(Molecule& m, T& output) const;
+  int normal_output(Molecule& m, T& output) const;
 
-  int
-  handle_failed_molecule(Molecule& m, SF_Results& res) const;
+  int handle_failed_molecule(Molecule& m, SF_Results& res) const;
 
   template <typename T>
-  int
-  handle_failed_molecule(Molecule& m, T& stream_for_too_hard) const;
+  int handle_failed_molecule(Molecule& m, T& stream_for_too_hard) const;
 };
 
-Lookup_Calculation_Results::Lookup_Calculation_Results()
-{
+Lookup_Calculation_Results::Lookup_Calculation_Results() {
   _max_shell_radius = 0;
   _min_shell_radius = 0;
 
@@ -884,8 +826,7 @@ Lookup_Calculation_Results::Lookup_Calculation_Results()
   return;
 }
 
-Lookup_Calculation_Results::~Lookup_Calculation_Results()
-{
+Lookup_Calculation_Results::~Lookup_Calculation_Results() {
   if (nullptr != _lkrs) {
     delete[] _lkrs;
     delete[] _min_each_shell;
@@ -900,8 +841,7 @@ Lookup_Calculation_Results::~Lookup_Calculation_Results()
 }
 
 int
-Lookup_Calculation_Results::initialise(const Fingerprint_Characteristics& fpc)
-{
+Lookup_Calculation_Results::initialise(const Fingerprint_Characteristics& fpc) {
   assert(0 == _min_shell_radius);
   assert(0 == _max_shell_radius);
 
@@ -915,13 +855,12 @@ Lookup_Calculation_Results::initialise(const Fingerprint_Characteristics& fpc)
   return 1;
 }
 
-//#define DEBUG_DO_LOOKUP_NO_EXAMPLES
+// #define DEBUG_DO_LOOKUP_NO_EXAMPLES
 
 int
 Lookup_Calculation_Results::do_lookups_calculate_score(Molecule& m,
                                                        Fingerprint_Characteristics& fpc,
-                                                       Set_of_Databases& sodb)
-{
+                                                       Set_of_Databases& sodb) {
   std::fill_n(_min_each_shell, _max_shell_radius + 1, std::numeric_limits<int>::max());
 
   // cerr << "_max_shell_radius " << _max_shell_radius << '\n';
@@ -941,7 +880,7 @@ Lookup_Calculation_Results::do_lookups_calculate_score(Molecule& m,
 
   int max_radius = 0;
 
-  //int nbits = 0;
+  // int nbits = 0;
   for (auto i : _sob) {
     const auto& k = i.first;
 
@@ -953,7 +892,7 @@ Lookup_Calculation_Results::do_lookups_calculate_score(Molecule& m,
 
     //  cerr << "Processing bit at radius " << static_cast<int>(r) << '\n';
 
-   // nbits++;
+    // nbits++;
 
 #ifdef DEBUG_DO_LOOKUP_NO_EXAMPLES
     cerr << "Looking up bit " << k._bit << ", radius " << static_cast<int>(k._radius)
@@ -996,8 +935,7 @@ Lookup_Calculation_Results::do_lookups_calculate_score(Molecule& m,
 
 void
 Lookup_Calculation_Results::_adjust_per_shell_arrays(const int nexamples, const int r,
-                                                     const atom_number_t a)
-{
+                                                     const atom_number_t a) {
   // cerr << "Lookup_Calculation_Results:_adjust_per_shell_arrays:compare " << nexamples
   // << " with " << _min_each_shell[r] << " radius " << r << '\n';
   if (nexamples > _min_each_shell[r]) {
@@ -1020,8 +958,7 @@ Lookup_Calculation_Results::_adjust_per_shell_arrays(const int nexamples, const 
 
 template <typename T>
 int
-Lookup_Calculation_Results::_write_smiles_and_id(Molecule& m, T& output) const
-{
+Lookup_Calculation_Results::_write_smiles_and_id(Molecule& m, T& output) const {
   if (create_descriptor_file) {
     output << m.name();
     return 1;
@@ -1047,8 +984,7 @@ Lookup_Calculation_Results::_write_smiles_and_id(Molecule& m, T& output) const
 
 template <typename T>
 int
-Lookup_Calculation_Results::normal_output(Molecule& m, T& output) const
-{
+Lookup_Calculation_Results::normal_output(Molecule& m, T& output) const {
   _write_smiles_and_id(m, output);
 
   if (_include_nbits_in_normal_output) {
@@ -1084,8 +1020,7 @@ Lookup_Calculation_Results::normal_output(Molecule& m, T& output) const
 
 template <typename T>
 int
-Lookup_Calculation_Results::_do_write_per_radius_data(T& output) const
-{
+Lookup_Calculation_Results::_do_write_per_radius_data(T& output) const {
   for (int i = _min_shell_radius; i <= _max_shell_radius; i++) {
     output << descriptor_file_output_separator;
 
@@ -1108,8 +1043,7 @@ Lookup_Calculation_Results::_do_write_per_radius_data(T& output) const
 }
 
 int
-Lookup_Calculation_Results::handle_failed_molecule(Molecule& m, SF_Results& res) const
-{
+Lookup_Calculation_Results::handle_failed_molecule(Molecule& m, SF_Results& res) const {
   if (!res.accumulate_rejected_molecules()) {
     return 0;
   }
@@ -1121,8 +1055,7 @@ Lookup_Calculation_Results::handle_failed_molecule(Molecule& m, SF_Results& res)
 
 template <typename T>
 int
-Lookup_Calculation_Results::handle_failed_molecule(Molecule& m, T& output) const
-{
+Lookup_Calculation_Results::handle_failed_molecule(Molecule& m, T& output) const {
   _write_smiles_and_id(m, output);
 
   if (write_per_shell_data) {
@@ -1141,8 +1074,7 @@ Lookup_Calculation_Results::handle_failed_molecule(Molecule& m, T& output) const
 static int
 do_lookup_no_examples(Molecule& m, Set_of_Databases& sodb,
                       Fingerprint_Characteristics& fpc, Lookup_Calculation_Results& lcr,
-                      IWString_and_File_Descriptor& output)
-{
+                      IWString_and_File_Descriptor& output) {
   lcr.do_lookups_calculate_score(m, fpc, sodb);
 
   const double score = lcr.score();
@@ -1176,8 +1108,7 @@ do_lookup_no_examples (Molecule & m,
 static int
 do_lookup_with_examples(Molecule& m, Set_of_Databases& sodb,
                         Fingerprint_Characteristics& fpc, Lookup_Calculation_Results& lcr,
-                        IWString_and_File_Descriptor& output)
-{
+                        IWString_and_File_Descriptor& output) {
   Lookup_Results* lkrs = lcr.lookup_results_array();
   for (int i = 0; i <= fpc.max_shell_radius(); ++i) {
     lkrs[i].reset();
@@ -1265,7 +1196,7 @@ do_lookup_with_examples(Molecule& m, Set_of_Databases& sodb,
   }
 
   output << '\n';
-  if (! isotopically_label_most_difficult_atoms) {
+  if (!isotopically_label_most_difficult_atoms) {
     return 1;
   }
 
@@ -1366,8 +1297,7 @@ static const Element* sulphur = nullptr;
 static resizable_array<const Element*> elements_to_add;
 
 static void
-initialise_substituent_elements()
-{
+initialise_substituent_elements() {
   assert(nullptr == aromatic_carbon);
 
   aromatic_carbon = create_element_with_symbol("c");
@@ -1403,8 +1333,7 @@ template <typename T>
 double
 determine_difficulty_score(Molecule& m, Set_of_Databases& sodb,
                            Fingerprint_Characteristics& fpc, Set_of_Bits<T>& sob,
-                           Lookup_Calculation_Results& lcr)
-{
+                           Lookup_Calculation_Results& lcr) {
   lcr.do_lookups_calculate_score(m, fpc, sodb);
 
   return lcr.score();
@@ -1417,8 +1346,7 @@ determine_difficulty_score(Molecule& m, Set_of_Databases& sodb,
 static int
 analyse_ring_system(Molecule& m, int atoms_to_check, Set_of_Databases& sodb,
                     Fingerprint_Characteristics& fpc, Lookup_Calculation_Results& lcr,
-                    IWString_and_File_Descriptor& output)
-{
+                    IWString_and_File_Descriptor& output) {
   int n = elements_to_add.number_elements();
 
   resizable_array<double> difficulty_score;
@@ -1453,8 +1381,7 @@ analyse_ring_system(Molecule& m, int atoms_to_check, Set_of_Databases& sodb,
 
 static void
 add_connected_atoms(const Molecule& m, const int* in_subset, const int* xref,
-                    Molecule& subset)
-{
+                    Molecule& subset) {
   int matoms = m.natoms();
 
   for (int i = 0; i < matoms; i++) {
@@ -1493,8 +1420,7 @@ static int
 ring_system_desirability(Molecule& m, Set_of_Databases& sodb,
                          Fingerprint_Characteristics& fpc,
                          Lookup_Calculation_Results& lcr,
-                         IWString_and_File_Descriptor& output)
-{
+                         IWString_and_File_Descriptor& output) {
   int matoms = m.natoms();
   int* ring_membership = new int[matoms];
   std::unique_ptr<int[]> free_ring_membership(ring_membership);
@@ -1563,8 +1489,7 @@ iwecfp(Molecule& m, Set_of_Databases& sodb, Fingerprint_Characteristics& fpc,
 
 static int
 iwecfp(data_source_and_type<Molecule>& input, Set_of_Databases& sodb,
-       Fingerprint_Characteristics& fpc, IWString_and_File_Descriptor& output)
-{
+       Fingerprint_Characteristics& fpc, IWString_and_File_Descriptor& output) {
   Lookup_Calculation_Results lcr;
 
   lcr.initialise(fpc);
@@ -1606,8 +1531,7 @@ iwecfp(data_source_and_type<Molecule>& input, Set_of_Databases& sodb,
 static int
 iwecfp_single_molecule(Molecule& m, Set_of_Databases& sodb,
                        Fingerprint_Characteristics& fpc, Lookup_Calculation_Results& lcr,
-                       SF_Results& res)
-{
+                       SF_Results& res) {
   lcr.do_lookups_calculate_score(m, fpc, sodb);
 
   res.reset();
@@ -1623,8 +1547,7 @@ iwecfp_single_molecule(Molecule& m, Set_of_Databases& sodb,
 
 static int
 get_next_group_of_molecules(data_source_and_type<Molecule>& input,
-                            resizable_array_p<Molecule>& mgrp, const int nget)
-{
+                            resizable_array_p<Molecule>& mgrp, const int nget) {
   mgrp.resize_keep_storage(0);
 
   int rc = 0;
@@ -1652,8 +1575,7 @@ get_next_group_of_molecules(data_source_and_type<Molecule>& input,
 static int
 transfer_to_output_streams(const SF_Results* res, const int n,
                            IWString_and_File_Descriptor& output,
-                           IWString_and_File_Descriptor& stream_for_too_hard)
-{
+                           IWString_and_File_Descriptor& stream_for_too_hard) {
   for (int i = 0; i < n; ++i) {
     const IWString& s = res[i].to_stdout();
     if (s.length()) {
@@ -1680,8 +1602,7 @@ transfer_to_output_streams(const SF_Results* res, const int n,
 
 static int
 iwecfp_chunked(data_source_and_type<Molecule>& input, Set_of_Databases& sodb,
-               Fingerprint_Characteristics& fpc, IWString_and_File_Descriptor& output)
-{
+               Fingerprint_Characteristics& fpc, IWString_and_File_Descriptor& output) {
   // cerr << "Running chunked " << parallel_group_size << '\n';
 
   SF_Results* res = new SF_Results[parallel_group_size];
@@ -1719,8 +1640,7 @@ iwecfp_chunked(data_source_and_type<Molecule>& input, Set_of_Databases& sodb,
 
 static int
 iwecfp(const char* fname, FileType input_type, Set_of_Databases& sodb,
-       Fingerprint_Characteristics& fpc, IWString_and_File_Descriptor& output)
-{
+       Fingerprint_Characteristics& fpc, IWString_and_File_Descriptor& output) {
   data_source_and_type<Molecule> input(input_type, fname);
 
   if (!input.ok()) {
@@ -1736,30 +1656,30 @@ iwecfp(const char* fname, FileType input_type, Set_of_Databases& sodb,
 }
 
 static void
-display_dash_m_options(std::ostream& os)
-{
-  os << " -M mult       multiplicative bit formation\n";
-  os << " -M mb0        display missing bits as '0' rather than number missing\n";
-  os << " -M isomd      isotopically label the most difficult atom\n";
-  os << " -M isomd=<n>  isotopically label the most difficult atoms\n";
-  os << " -M noex       databases do not contain examples, binary count and rad only\n";
-  os << " -M dbcache=<n> set database cache size (bytes)\n";
-  os << " -M bcache=<n>  set bit hash cache size (bytes)\n";
-  os << " -M ckmt        check that the number of bits found decreases with radius\n";
-  os << " -M pref        prefetch bits from the database - helps speed\n";
+display_dash_m_options(int rc) {
+  cerr << " -M mult       multiplicative bit formation\n";
+  cerr << " -M mb0        display missing bits as '0' rather than number missing\n";
+  cerr << " -M isomd      isotopically label the most difficult atom\n";
+  cerr << " -M isomd=<n>  isotopically label the most difficult atoms\n";
+  cerr << " -M noex       databases do not contain examples, binary count and rad only\n";
+  cerr << " -M dbcache=<n> set database cache size (bytes)\n";
+  cerr << " -M bcache=<n>  set bit hash cache size (bytes)\n";
+  cerr << " -M ckmt        check that the number of bits found decreases with radius\n";
+  cerr << " -M pref        prefetch bits from the database - helps speed\n";
 
   exit(1);
 }
 
 static int
-iwecfp(int argc, char** argv)
-{
+iwecfp(int argc, char** argv) {
   Command_Line cl(argc, argv, "vE:A:g:i:r:R:ld:e:t:z:w:u:U:H:S:M:n:IL:");
 
   if (cl.unrecognised_options_encountered()) {
     cerr << "Unrecognised options encountered\n";
     usage(1);
   }
+
+  DisplayDashHelpIfRequested(cl, 'm', display_dash_m_options);
 
   verbose = cl.option_count('v');
   if (verbose) {
@@ -1992,10 +1912,10 @@ iwecfp(int argc, char** argv)
           cerr << "output flushed each molecule\n";
         }
       } else if ("help" == m) {
-        display_dash_m_options(cerr);
+        display_dash_m_options(0);
       } else {
         cerr << "Unrecognised -M qualifier '" << m << "'\n";
-        display_dash_m_options(cerr);
+        display_dash_m_options(1);
       }
     }
   }
@@ -2090,7 +2010,7 @@ iwecfp(int argc, char** argv)
   if (cl.option_present('S')) {
     IWString fname;
     for (int i = 0; cl.value('S', fname, i); ++i) {
-      if (! sodb.BuildSubtractionDatabase(fname, fpc, preprocess_molecule)) {
+      if (!sodb.BuildSubtractionDatabase(fname, fpc, preprocess_molecule)) {
         cerr << "Cannot read subtraction set from '" << fname << "'\n";
         return 1;
       }
@@ -2149,8 +2069,7 @@ iwecfp(int argc, char** argv)
 }
 
 int
-main(int argc, char** argv)
-{
+main(int argc, char** argv) {
   int rc = iwecfp(argc, argv);
   return rc;
 }

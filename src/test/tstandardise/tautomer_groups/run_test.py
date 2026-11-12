@@ -29,6 +29,30 @@ cases = [
     'N1=C(O)C=C(O)N=C1O.O=c1cc[nH]c(C)n1',
     'N1=NC(=NN=C(C2=CC=NC=C2)Br)NN1',
 ]
+oxo_ring_guanidines = [
+    'O=C1NC(=N)N(C)C1',
+    'O=C1NC(=N)NC1',
+    'O=C1NC(N)=NC1',
+    'O=C1NC(=N)N(c2ccccc2)C1',
+    'O=C1NC(=N)N(C)C(C)1',
+    'O=C1NC(=N)N(C)[C@H]1C',
+    'O=C1[15NH]C(=[15NH])N(C)[13CH2]1',
+    'O=C1N=C(N)N(C)C1',
+    'O=C1N=C(N)NC1',
+    'O=C1NC(=N)NCC1',
+    'S=C1NC(=N)NC1',
+    'O=C1NC(=N)NNC1',
+    'O=C1N=C(N)N(C(=O)C)C1',
+    'O=C1N=C(N)N(O)C1',
+    'O=C1NC(=N)NC1=O',
+    'O=C1NC(=N[2H])NC1',
+    'O=C1N([2H])C(=N)NC1',
+]
+check('oxo_ring_guanidine', ['-g', 'Rguan'], oxo_ring_guanidines)
+check('oxo_ring_guanidine_all', ['-g', 'all'], oxo_ring_guanidines)
+check('oxo_ring_guanidine_disabled', ['-g', 'all', '-g', '-Rguan'],
+      oxo_ring_guanidines)
+
 local_ring_guanidines = [
     'N1C(=Nc2ccccc2)NCC1',
     'N1C(=NC)NCC1',

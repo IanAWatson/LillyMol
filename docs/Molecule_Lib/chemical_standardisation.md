@@ -388,6 +388,39 @@ this rule.
 Reports count amidoxime conversions separately. `-g APP=EACH` appends
 `STD:amidoxime` when this rule changes a molecule.
 
+### Creatinine-like cyclic guanidines
+
+`-g Rguan`, included in `-g all`, also selects the amino representative of
+eligible neutral, isolated five-membered carbonyl-containing guanidine rings:
+
+```text
+O=C1NC(=N)N(C)C1 -> O=C1N=C(N)N(C)C1
+```
+
+The C=N bond is placed at the carbonyl-adjacent ring nitrogen, leaving a
+terminal exocyclic NH2 group. This fixed choice also resolves the alternative
+endocyclic tautomer when the other ring nitrogen can carry C=N. Already
+canonical centres are reserved from the older ring-guanidine handling.
+
+The ring must contain exactly two nitrogens, the guanidine carbon, one
+unchanged C=O group and one saturated carbon. The carbonyl-adjacent nitrogen
+must have two connections; the other ring nitrogen may have hydrogen, alkyl
+or aryl substitution. Additional N-acyl or conjugated aliphatic substituents,
+fused rings, sulfur replacements and additional ring unsaturation are outside
+this extension. Existing handling of other ring guanidines is retained.
+Marked chiral centres on reacting atoms, specified geometry and explicit
+hydrogen neighbours on reacting nitrogens prevent this additional conversion.
+Isotopes and stereochemistry at the unchanged saturated carbon are preserved.
+No charges or new chiral-centre annotations are introduced.
+
+The amino preference is supported for creatinine by
+[aqueous-solution spectroscopy](https://pmc.ncbi.nlm.nih.gov/articles/PMC8519097/)
+and [DMSO NMR](https://pubmed.ncbi.nlm.nih.gov/15389919/). Applying it to the
+eligible substituted rings is a canonicalisation convention, not a prediction
+of their solution populations. Disable it together with other ring-guanidine
+handling using `-g all -g -Rguan`; reports and `-g APP=EACH` use the existing
+ring-guanidine counter and `STD:Rguanidine` annotation.
+
 ### Locally resolved cyclic guanidines
 
 `-g Rguan`, included in `-g all`, also handles neutral guanidines in isolated,

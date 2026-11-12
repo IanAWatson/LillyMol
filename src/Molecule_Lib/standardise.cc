@@ -3675,6 +3675,132 @@ CanonicaliseLocalRingGuanidine(Molecule& m, atom_number_t carbon,
   return 1;
 }
 
+// Creatinine-like five-membered rings prefer the amino form with C=N to
+// the carbonyl-adjacent N. The carbonyl makes this choice unambiguous; no
+// canonical ranking is needed. Return -1 outside scope, 0 if canonical,
+// or 1 if changed, so the caller can reserve even unchanged centres.
+static int
+CanonicaliseOxoRingGuanidine(Molecule& m, atom_number_t carbon,
+                             const IWStandard_Current_Molecule& data) {
+  const int* membership = data.ring_membership();
+  if (membership[carbon] != 1 || m.formal_charge(carbon) ||
+      m.ncon(carbon) != 3 || m.nbonds(carbon) != 4 || m.hcount(carbon) ||
+      m.chiral_centre_at_atom(carbon)) {
+    return -1;
+  }
+  const Set_of_Atoms* ring = data.ring_containing_atom(carbon);
+  if (ring == nullptr || ring->number_elements() != 5) {
+    return -1;
+  }
+  atom_number_t carbonyl = kInvalidAtomNumber;
+  atom_number_t saturated = kInvalidAtomNumber;
+  atom_number_t n1 = kInvalidAtomNumber;
+  atom_number_t n2 = kInvalidAtomNumber;
+  for (atom_number_t a : *ring) {
+    if (membership[a] != 1 || data.atom_is_aromatic()[a] || m.formal_charge(a)) {
+      return -1;
+    }
+    if (a == carbon) {
+      continue;
+    }
+    if (m.atomic_number(a) == 7) {
+      if (m.chiral_centre_at_atom(a) || m.ncon(a) < 2 || m.ncon(a) > 3 ||
+          m.nbonds(a) + m.hcount(a) != 3) {
+        return -1;
+      }
+      if (n1 == kInvalidAtomNumber) {
+        n1 = a;
+      } else if (n2 == kInvalidAtomNumber) {
+        n2 = a;
+      } else {
+        return -1;
+      }
+    } else if (m.atomic_number(a) != 6) {
+      return -1;
+    } else if (m.ncon(a) == 3 && m.nbonds(a) == 4 && !m.hcount(a)) {
+      if (carbonyl != kInvalidAtomNumber || m.chiral_centre_at_atom(a)) {
+        return -1;
+      }
+      carbonyl = a;
+    } else if (m.nbonds(a) == m.ncon(a) && m.nbonds(a) + m.hcount(a) == 4) {
+      if (saturated != kInvalidAtomNumber) {
+        return -1;
+      }
+      saturated = a;  // Its bonds and any stereocentre remain unchanged.
+    } else {
+      return -1;
+    }
+  }
+  if (n2 == kInvalidAtomNumber || carbonyl == kInvalidAtomNumber ||
+      saturated == kInvalidAtomNumber || !m.are_bonded(carbon, n1) ||
+      !m.are_bonded(carbon, n2) || !m.are_bonded(carbonyl, saturated)) {
+    return -1;
+  }
+  if (!m.are_bonded(carbonyl, n1)) {
+    std::swap(n1, n2);
+  }
+  if (!m.are_bonded(carbonyl, n1) || !m.are_bonded(saturated, n2) ||
+      m.ncon(n1) != 2) {
+    return -1;
+  }
+  bool oxygen_found = false;
+  for (const Bond* b : m[carbonyl]) {
+    const atom_number_t other = b->other(carbonyl);
+    if (other == n1 || other == saturated) {
+      if (!b->is_single_bond()) {
+        return -1;
+      }
+    } else if (b->is_double_bond() && m.atomic_number(other) == 8 &&
+               m.ncon(other) == 1 && !m.formal_charge(other)) {
+      oxygen_found = true;
+    } else {
+      return -1;
+    }
+  }
+  if (!oxygen_found) {
+    return -1;
+  }
+  for (const Bond* b : m[n2]) {
+    if (b->is_directional() || b->part_of_cis_trans_grouping()) {
+      return -1;
+    }
+    const atom_number_t other = b->other(n2);
+    if (other == carbon || other == saturated) {
+      continue;
+    }
+    if (!b->is_single_bond() || m.atomic_number(other) != 6 ||
+        m.formal_charge(other) ||
+        (!m.is_aromatic(other) && m.nbonds(other) != m.ncon(other))) {
+      return -1;  // Excludes additional N-acyl and conjugated aliphatic groups.
+    }
+  }
+  atom_number_t exocyclic = kInvalidAtomNumber;
+  for (const Bond* b : m[carbon]) {
+    if ((!b->is_single_bond() && !b->is_double_bond()) ||
+        b->is_directional() || b->part_of_cis_trans_grouping()) {
+      return -1;
+    }
+    const atom_number_t other = b->other(carbon);
+    if (other != n1 && other != n2) {
+      exocyclic = other;
+    }
+  }
+  if (exocyclic == kInvalidAtomNumber || m.atomic_number(exocyclic) != 7 ||
+      membership[exocyclic] || m.ncon(exocyclic) != 1 ||
+      m.formal_charge(exocyclic) || m.chiral_centre_at_atom(exocyclic) ||
+      m.nbonds(exocyclic) + m.hcount(exocyclic) != 3) {
+    return -1;
+  }
+  if (m.bond_between_atoms(carbon, n1)->is_double_bond()) {
+    return 0;
+  }
+  for (atom_number_t n : {n1, n2, exocyclic}) {
+    m.set_bond_type_between_atoms(carbon, n, n == n1 ? DOUBLE_BOND : SINGLE_BOND);
+    m.unset_all_implicit_hydrogen_information(n);
+  }
+  return 1;
+}
+
 // #define DEBUG_RING_GUANIDINE_STANDARDISE
 
 /*
@@ -3724,6 +3850,15 @@ Chemical_Standardisation::_do_transform_ring_guanidine(
 
     if (0 == ring_membership[c]) {
       continue;
+    }
+
+    if (current_molecule_data.oxygens()) {
+      if (int oxo = CanonicaliseOxoRingGuanidine(m, c, current_molecule_data);
+          oxo >= 0) {
+        rc += oxo;
+        current_molecule_data.remove_possible_guanidine(c);
+        continue;
+      }
     }
 
     if (int local = CanonicaliseLocalRingGuanidine(m, c, current_molecule_data);

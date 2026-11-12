@@ -807,6 +807,23 @@ TEST_P(TestOxygenAndSulphurTautomers, CanonicalFormAndAtomOrder) {
 }
 
 INSTANTIATE_TEST_SUITE_P(OxygenAndSulphur, TestOxygenAndSulphurTautomers, testing::Values(
+    TautomerCase{CS_GUANDR, "O=C1NC(=N)N(C)C1", "O=C1N=C(N)N(C)C1", true},
+    TautomerCase{CS_GUANDR, "O=C1NC(=N)NC1", "O=C1N=C(N)NC1", true},
+    TautomerCase{CS_GUANDR, "O=C1NC(N)=NC1", "O=C1N=C(N)NC1", true},
+    TautomerCase{CS_GUANDR, "O=C1NC(=N)N(c2ccccc2)C1", "O=C1N=C(N)N(c2ccccc2)C1", true},
+    TautomerCase{CS_GUANDR, "O=C1NC(=N)N(C)C(C)1", "O=C1N=C(N)N(C)C(C)1", true},
+    TautomerCase{CS_GUANDR, "O=C1NC(=N)N(C)[C@H]1C", "O=C1N=C(N)N(C)[C@H]1C", true},
+    TautomerCase{CS_GUANDR, "O=C1[15NH]C(=[15NH])N(C)[13CH2]1", "O=C1[15N]=C([15NH2])N(C)[13CH2]1", true},
+    TautomerCase{CS_GUANDR, "O=C1N=C(N)N(C)C1", "O=C1N=C(N)N(C)C1", false},
+    TautomerCase{CS_GUANDR, "O=C1N=C(N)NC1", "O=C1N=C(N)NC1", false},
+    TautomerCase{CS_GUANDR, "O=C1NC(=N)NCC1", "O=C1NC(=N)NCC1", false},
+    TautomerCase{CS_GUANDR, "S=C1NC(=N)NC1", "S=C1NC(=N)NC1", false},
+    TautomerCase{CS_GUANDR, "O=C1NC(=N)NNC1", "O=C1NC(=N)NNC1", false},
+    TautomerCase{CS_GUANDR, "O=C1N=C(N)N(C(=O)C)C1", "O=C1N=C(N)N(C(=O)C)C1", false},
+    TautomerCase{CS_GUANDR, "O=C1N=C(N)N(O)C1", "O=C1N=C(N)N(O)C1", false},
+    TautomerCase{CS_GUANDR, "O=C1NC(=N)NC1=O", "O=C1NC(=N)NC1=O", false},
+    TautomerCase{CS_GUANDR, "O=C1NC(=N[2H])NC1", "O=C1NC(=N[2H])NC1", false},
+    TautomerCase{CS_GUANDR, "O=C1N([2H])C(=N)NC1", "O=C1N([2H])C(=N)NC1", false},
     TautomerCase{CS_GUANDR, "N1C(=Nc2ccccc2)NCC1", "N1=C(Nc2ccccc2)NCC1", true},
     TautomerCase{CS_GUANDR, "N1C(=NC)NCC1", "N1=C(NC)NCC1", true},
     TautomerCase{CS_GUANDR, "N1C(=Nc2ccccc2)NCCC1", "N1=C(Nc2ccccc2)NCCC1", true},
@@ -2224,6 +2241,42 @@ TEST_F(TestStandardisation, BiguanidePreservesParticipatingChiralAnnotations) {
     EXPECT_TRUE(_m1.bond_between_atoms(3, 4)->is_double_bond());
     EXPECT_TRUE(_m1.bond_between_atoms(3, 5)->is_single_bond());
   }
+}
+
+TEST_F(TestStandardisation, OxoRingGuanidineConvergesWithAllRules) {
+  _chemical_standardisation.activate_all();
+  for (const char* input : {"O=C1NC(=N)N(C)C1", "O=C1N=C(N)N(C)C1",
+                            "O=C1NC(=N)NC1", "O=C1NC(N)=NC1"}) {
+    Molecule original;
+    ASSERT_TRUE(original.build_from_smiles(input));
+    ASSERT_TRUE(_m2.build_from_smiles(original.ncon(5) == 3 ?
+        "O=C1N=C(N)N(C)C1" : "O=C1N=C(N)NC1"));
+    const IWString expected = _m2.unique_smiles();
+    const IWString formula = original.molecular_formula();
+    for (int i = 0; i < 100; ++i) {
+      Molecule molecule;
+      ASSERT_TRUE(molecule.build_from_smiles(original.random_smiles()));
+      _chemical_standardisation.process(molecule);
+      EXPECT_EQ(molecule.unique_smiles(), expected) << input;
+      EXPECT_EQ(molecule.molecular_formula(), formula);
+      EXPECT_TRUE(molecule.valence_ok());
+      EXPECT_EQ(_chemical_standardisation.process(molecule), 0);
+    }
+  }
+}
+
+TEST_F(TestStandardisation, OxoRingGuanidineRespectsDisabledRuleAndReports) {
+  _chemical_standardisation.activate_all();
+  ASSERT_TRUE(_chemical_standardisation.Activate("-Rguan", 0));
+  ASSERT_TRUE(_m1.build_from_smiles("O=C1NC(=N)N(C)C1"));
+  const IWString before = _m1.unique_smiles();
+  EXPECT_EQ(_chemical_standardisation.process(_m1), 0);
+  EXPECT_EQ(_m1.unique_smiles(), before);
+  ASSERT_TRUE(_chemical_standardisation.Activate(CS_GUANDR, 0));
+  _chemical_standardisation.set_append_string_depending_on_what_changed(1);
+  EXPECT_EQ(_chemical_standardisation.process(_m1), 1);
+  EXPECT_TRUE(_m1.name().contains("STD:Rguanidine"));
+  EXPECT_EQ(_chemical_standardisation.process(_m1), 0);
 }
 
 TEST_F(TestStandardisation, LocalRingGuanidineConvergesWithAllRules) {

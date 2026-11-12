@@ -180,6 +180,29 @@ refreshed on atoms whose hydrogen count changes during these conversions. This
 also fixes earlier oxygen cases that could retain an obsolete hydrogen count
 and produce an invalid-valence product.
 
+### Guanidine charge and valence handling
+
+`-g guan`, included in `-g all`, relocates eligible guanidine C=N bonds.
+When a positively charged iminium nitrogen loses its double bond, charge and
+implicit-hydrogen information are now updated consistently in both the
+terminal-nitrogen shortcut and general conversion path. For example:
+
+```text
+[N+]1(=C(N)N)CCCCC1 -> N=C(N)N1CCCCC1
+```
+
+Previously, the shortcut could leave a three-single-bond `[N+]` with no
+hydrogen. This introduced invalid valence, and the later amine neutralisation
+could not repair it because that rule requires a hydrogen on the charged
+nitrogen. Resetting the hydrogen counts also handles bracket-specified NH
+counts correctly. Explicit isotope-labelled hydrogen atoms are retained.
+
+Charge counters are updated for the actual charged nitrogens, even when the
+general resolver has permuted its nitrogen variables. If that resolver selects
+a three-connected nitrogen to carry the neutral C=N bond, the unresolved group
+is left unchanged rather than introducing invalid valence. This guard does
+not provide a new canonicalisation strategy for those substituted groups.
+
 ### Isolated amidines and pyrimidinetriones
 
 `-g amidine` chooses the terminal-imine form of eligible isolated amidines:

@@ -1855,4 +1855,76 @@ TEST_F(TestStandardisation, AmidoximePreservesParticipatingAnnotationsAndGeometr
 }
 
 
+TEST_F(TestStandardisation, ChargedGuanidineTerminalShortcutPreservesValence) {
+  const std::vector<std::pair<const char*, const char*>> cases = {
+      {"[N+]1(=C(N)N)CC2=C(CC1)C=CC=C2", "N1(C(=N)N)CC2=C(CC1)C=CC=C2"},
+      {"[N+]1(=C(N)N)CCCCC1", "N=C(N)N1CCCCC1"},
+      {"C[N+](C)=C(N)N", "CN(C)C(N)=N"},
+      {"C[NH+]=C(N)N", "CNC(N)=N"},
+      {"[15N+]1(=C(N)N)CCCCC1", "N=C(N)[15N]1CCCCC1"},
+      {"[N+]1(=[13C](N)N)CCCCC1", "N=[13C](N)N1CCCCC1"},
+      {"[2H][N+](C)=C(N)N", "[2H]N(C)C(N)=N"},
+      {"[N+]1(=C([NH2])[NH2])CCCCC1", "N=C(N)N1CCCCC1"},
+      {"C[N+]([C@H](F)C)=C(N)N", "CN([C@H](F)C)C(N)=N"},
+  };
+  for (const char* directive : {CS_GUAND, CS_ALL}) {
+    for (const auto& [input, output] : cases) {
+      Molecule original;
+      ASSERT_TRUE(original.build_from_smiles(input));
+      Molecule expected;
+      ASSERT_TRUE(expected.build_from_smiles(output));
+      const IWString key = expected.unique_smiles();
+      for (int i = 0; i < 100; ++i) {
+        Chemical_Standardisation standardisation;
+        ASSERT_TRUE(standardisation.Activate(directive, 0));
+        Molecule molecule;
+        ASSERT_TRUE(molecule.build_from_smiles(original.random_smiles()));
+        ASSERT_TRUE(molecule.valence_ok()) << input;
+        const int hydrogens = molecule.natoms(1);
+        EXPECT_GT(standardisation.process(molecule), 0);
+        EXPECT_EQ(molecule.unique_smiles(), key) << input;
+        EXPECT_EQ(molecule.molecular_formula(), expected.molecular_formula()) << input;
+        EXPECT_EQ(molecule.net_formal_charge(), 0);
+        EXPECT_EQ(molecule.natoms(1), hydrogens);  // Do not remove explicit D.
+        EXPECT_TRUE(molecule.valence_ok()) << molecule.smiles();
+        EXPECT_EQ(standardisation.process(molecule), 0) << input;
+      }
+    }
+  }
+}
+
+TEST_F(TestStandardisation, GuanidineGeneralPathNeutralisesTheActualChargedNitrogen) {
+  // Shell resolution can permute the output N variables; the originally
+  // charged N need not still be in the doubly_bonded_n variable afterwards.
+  ASSERT_TRUE(_m2.build_from_smiles("CN=C(NCC)NCCC"));
+  const IWString expected = _m2.unique_smiles();
+  for (int i = 0; i < 100; ++i) {
+    Molecule original;
+    ASSERT_TRUE(original.build_from_smiles("C[NH+]=C(NCC)NCCC"));
+    Molecule molecule;
+    ASSERT_TRUE(molecule.build_from_smiles(original.random_smiles()));
+    Chemical_Standardisation standardisation;
+    ASSERT_TRUE(standardisation.Activate(CS_ALL, 0));
+    EXPECT_GT(standardisation.process(molecule), 0);
+    EXPECT_EQ(molecule.unique_smiles(), expected);
+    EXPECT_EQ(molecule.molecular_formula(), _m2.molecular_formula());
+    EXPECT_TRUE(molecule.valence_ok());
+    EXPECT_EQ(molecule.net_formal_charge(), 0);
+    // Existing shell resolution may report a conversion for an equivalent
+    // N choice; the structural representative must nevertheless be stable.
+    standardisation.process(molecule);
+    EXPECT_EQ(molecule.unique_smiles(), expected);
+    EXPECT_TRUE(molecule.valence_ok());
+  }
+}
+
+TEST_F(TestStandardisation, GuanidineLeavesUnsafeThreeConnectedImineChoiceIntact) {
+  ASSERT_TRUE(_chemical_standardisation.Activate(CS_GUAND, 0));
+  ASSERT_TRUE(_m1.build_from_smiles("C[N+](C)=C(NC)NC"));
+  const IWString before = _m1.unique_smiles();
+  EXPECT_EQ(_chemical_standardisation.process(_m1), 0);
+  EXPECT_EQ(_m1.unique_smiles(), before);
+  EXPECT_TRUE(_m1.valence_ok());
+}
+
 }  // namespace

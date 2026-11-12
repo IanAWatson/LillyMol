@@ -29,6 +29,20 @@ cases = [
     'N1=C(O)C=C(O)N=C1O.O=c1cc[nH]c(C)n1',
     'N1=NC(=NN=C(C2=CC=NC=C2)Br)NN1',
 ]
+guanidines = [
+    '[N+]1(=C(N)N)CC2=C(CC1)C=CC=C2',
+    '[N+]1(=C(N)N)CCCCC1', 'N=C(N)N1CCCCC1',
+    'C[N+](C)=C(N)N', 'C[NH+]=C(N)N',
+    '[15N+]1(=C(N)N)CCCCC1', '[N+]1(=[13C](N)N)CCCCC1',
+    '[2H][N+](C)=C(N)N', '[N+]1(=C([NH2])[NH2])CCCCC1',
+    'C[N+]([C@H](F)C)=C(N)N', 'C[NH+]=C(NCC)NCCC',
+    'C[N+](C)=C(NC)NC',
+    '[N+]1(=C(N)N)CCCCC1.[N+]1(=C(N)N)CCCCC1',
+    '[N+]1(=C(N)N)CCCCC1.C[NH3+]',
+]
+check('guanidine_charge', ['-g', 'guan'], guanidines)
+check('guanidine_charge_all', ['-g', 'all'], guanidines)
+
 amidoximes = [
     'CC(=N)NO', 'CC(N)=NO', 'ONC(=N)C(N)C',
     'ONC(=N)[C@H](N)C', 'ONC(=N)c1ccccc1',

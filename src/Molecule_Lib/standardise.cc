@@ -3356,11 +3356,29 @@ Chemical_Standardisation::_do_transform_amidine(
   less ambiguity.
 */
 
+// Finish both guanidine bond-relocation paths consistently. In particular,
+// a formerly iminium N+ can now have three single bonds and no hydrogen, so
+// the later amine rule (which requires a hydrogen on N+) cannot neutralise it.
+// The resolver can permute the three N variables; inspect all three rather
+// than assuming one variable still denotes the originally charged nitrogen.
+static void
+FinishGuanidineTransformation(Molecule& m, IWStandard_Current_Molecule& data,
+                              atom_number_t n1, atom_number_t n2, atom_number_t n3) {
+  for (atom_number_t n : {n1, n2, n3}) {
+    if (m.formal_charge(n) == 1) {
+      m.set_formal_charge(n, 0);
+      data.change_nplus(-1);
+      data.change_npos(-1);
+    }
+    // Bond changes and neutralisation invalidate even bracket-specified H counts.
+    m.unset_all_implicit_hydrogen_information(n);
+  }
+}
+
 int
 Chemical_Standardisation::_do_transform_guanidine(
     Molecule& m, IWStandard_Current_Molecule& current_molecule_data) {
   const int* ncon = current_molecule_data.ncon();
-  const Atom* const* atoms = current_molecule_data.atoms();
   const int* ring_membership = current_molecule_data.ring_membership();
 
   // This is a little risky. We do call remove_possible_guanidine
@@ -3403,6 +3421,8 @@ Chemical_Standardisation::_do_transform_guanidine(
       m.set_bond_type_between_atoms(c, first_nh, SINGLE_BOND);
       m.set_bond_type_between_atoms(c, second_nh, DOUBLE_BOND);
       m.set_bond_type_between_atoms(c, doubly_bonded_n, SINGLE_BOND);
+      FinishGuanidineTransformation(m, current_molecule_data, first_nh, second_nh,
+                                    doubly_bonded_n);
       current_molecule_data.remove_possible_guanidine(c);
       ++rc;
     }
@@ -3452,18 +3472,18 @@ Chemical_Standardisation::_do_transform_guanidine(
 
     ResolveGuanidineByConnectivity(m, c, first_nh, second_nh, doubly_bonded_n, current_molecule_data);
 
+    // The connectivity resolver can move the old iminium N into first_nh.
+    // A three-connected N cannot carry C=N in a neutral guanidine. Leave such
+    // unresolved groups intact rather than introducing invalid valence.
+    if (ncon[first_nh] > 2) {
+      continue;
+    }
+
     m.set_bond_type_between_atoms(c, doubly_bonded_n, SINGLE_BOND);
     m.set_bond_type_between_atoms(c, second_nh, SINGLE_BOND);
     m.set_bond_type_between_atoms(c, first_nh, DOUBLE_BOND);
-    m.set_implicit_hydrogens_known(first_nh, 0);
-    m.set_implicit_hydrogens_known(second_nh, 0);
-    m.set_implicit_hydrogens_known(doubly_bonded_n, 0);
-
-    //  Lose any formal charge already applied
-
-    if (1 == atoms[doubly_bonded_n]->formal_charge()) {
-      m.set_formal_charge(doubly_bonded_n, 0);
-    }
+    FinishGuanidineTransformation(m, current_molecule_data, first_nh, second_nh,
+                                  doubly_bonded_n);
 
     current_molecule_data.remove_possible_guanidine(c);
 

@@ -90,6 +90,7 @@ Entering `-g help` to most LillyMol tools yields the usage message
  -g beta-enaminone convert eligible acyclic beta-ketoimines to enaminones
  -g beta-hydrazone prefer acyclic beta-keto hydrazones (included in all)
  -g beta-enehydrazine prefer acyclic beta-enehydrazines (alternative preference)
+ -g alpha-ketoacid canonicalise simple acyclic alpha-ketoacid enols
  -g beta-ketoester canonicalise acyclic beta-ketoester enols
  -g beta-diketone canonicalise beta-diketone enols to diketo form
  -g ascorbate    canonicalise isolated ascorbate rings to lactone/enediol form
@@ -384,6 +385,49 @@ this rule.
 
 Reports count amidoxime conversions separately. `-g APP=EACH` appends
 `STD:amidoxime` when this rule changes a molecule.
+
+### Simple alpha-ketoacids
+
+`-g alpha-ketoacid` chooses the keto representative of eligible neutral,
+acyclic alpha-ketoacid enols:
+
+```text
+O=C(O)C(O)=Cc1ccccc1 -> O=C(O)C(=O)Cc1ccccc1
+O=C(O)C(O)=C         -> O=C(O)C(=O)C
+```
+
+This option is included in `-g all` and broadens default tautomer equivalence.
+Disable it with `-g all -g -alpha-ketoacid`. The rule is skipped with `ENOL`;
+other enabled keto/enol rules retain their existing behaviour.
+
+The general `keto_enol` rule excludes unsaturated neighbouring groups. Those
+safeguards remain intact; the specialised rule recognises a carboxylic acid
+adjacent to the enol explicitly. The initial scope requires a neutral COOH,
+a terminal enol OH, and a non-ring C=C whose other carbon is CH2 or CH attached
+to a saturated or aromatic carbon. This includes pyruvic-acid and
+phenylpyruvic-acid forms. Substituted enol carbons, cyclic reacting chains,
+additional aliphatic conjugation or adjacent carbonyl branches, esters,
+amides, sulfur replacements, and hydrates are excluded. Existing beta-diketone
+handling remains responsible for its own more complex cases.
+
+The isolated rule accepts only neutral participating atoms. With `-g all`,
+carboxylate/enolate neutralisation can run first so eligible anionic precursors
+reach the neutral keto representative in one pass. No charges are introduced.
+The OH hydrogen transfers to the carbon, and bracket-specified hydrogen counts
+on changed atoms are reset. Explicit hydrogen neighbours on the enol OH,
+carboxyl OH, or reacting carbon prevent conversion, protecting isotope-labelled
+hydrogen. Heavy-atom isotope labels and remote stereochemistry are retained.
+Specified geometry and marked chiral centres on participating atoms prevent
+conversion; no new stereocentre annotations are created.
+
+The representative is a canonicalisation preference. For phenylpyruvic acid,
+[solution NMR work](https://doi.org/10.1515/znc-1976-1-204) reports keto favoured
+in water, while a [DMSO study](https://doi.org/10.2116/analsci.34.235) measured
+93.5% enol at room temperature. The rule does not predict solvent-specific
+populations and does not equate hydrated and non-hydrated structures.
+
+Reports count conversions separately; `-g APP=EACH` appends
+`STD:alpha-ketoacid` when the rule changes a molecule.
 
 ### Acyclic beta-enaminones
 

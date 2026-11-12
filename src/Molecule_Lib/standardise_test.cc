@@ -807,6 +807,39 @@ TEST_P(TestOxygenAndSulphurTautomers, CanonicalFormAndAtomOrder) {
 }
 
 INSTANTIATE_TEST_SUITE_P(OxygenAndSulphur, TestOxygenAndSulphurTautomers, testing::Values(
+    TautomerCase{CS_ALPHA_KETOACID, "O=C(O)C(O)=Cc1ccccc1", "O=C(O)C(=O)Cc1ccccc1", true},
+    TautomerCase{CS_ALPHA_KETOACID, "O=C(O)C(O)=CC", "O=C(O)C(=O)CC", true},
+    TautomerCase{CS_ALPHA_KETOACID, "O=C(O)C(O)=C", "O=C(O)C(=O)C", true},
+    TautomerCase{CS_ALPHA_KETOACID, "O=C(O)C(O)=Cc1ccncc1", "O=C(O)C(=O)Cc1ccncc1", true},
+    TautomerCase{CS_ALPHA_KETOACID, "O=C(O)C(O)=Cc1ccc(O)cc1", "O=C(O)C(=O)Cc1ccc(O)cc1", true},
+    TautomerCase{CS_ALPHA_KETOACID, "[OH]C(=O)[C]([OH])=[CH]C", "[OH]C(=O)C(=O)CC", true},
+    TautomerCase{CS_ALPHA_KETOACID, "[18OH]C(=O)C(O)=CC", "[18OH]C(=O)C(=O)CC", true},
+    TautomerCase{CS_ALPHA_KETOACID, "OC(=O)C([18OH])=CC", "OC(=O)C(=[18O])CC", true},
+    TautomerCase{CS_ALPHA_KETOACID, "OC(=O)[13C](O)=CC", "OC(=O)[13C](=O)CC", true},
+    TautomerCase{CS_ALPHA_KETOACID, "OC(=O)C(O)=[13CH]C", "OC(=O)C(=O)[13CH2]C", true},
+    TautomerCase{CS_ALPHA_KETOACID, "OC(=O)C(O)=C[C@H](F)C", "OC(=O)C(=O)C[C@H](F)C", true},
+    TautomerCase{CS_ALPHA_KETOACID, "OC(=O)C(O)=CC[N+](C)(C)C", "OC(=O)C(=O)CC[N+](C)(C)C", true},
+    TautomerCase{CS_ALPHA_KETOACID, "O=C(O)C(=O)Cc1ccccc1", "O=C(O)C(=O)Cc1ccccc1", false},
+    TautomerCase{CS_ALPHA_KETOACID, "COC(=O)C(O)=CC", "COC(=O)C(O)=CC", false},
+    TautomerCase{CS_ALPHA_KETOACID, "NC(=O)C(O)=CC", "NC(=O)C(O)=CC", false},
+    TautomerCase{CS_ALPHA_KETOACID, "CSC(=O)C(O)=CC", "CSC(=O)C(O)=CC", false},
+    TautomerCase{CS_ALPHA_KETOACID, "O=C([O-])C(O)=CC", "O=C([O-])C(O)=CC", false},
+    TautomerCase{CS_ALPHA_KETOACID, "O=C(O)C([O-])=CC", "O=C(O)C([O-])=CC", false},
+    TautomerCase{CS_ALPHA_KETOACID, "O=C(O)C(S)=CC", "O=C(O)C(S)=CC", false},
+    TautomerCase{CS_ALPHA_KETOACID, "O=C(O)C(O)=C(C)C", "O=C(O)C(O)=C(C)C", false},
+    TautomerCase{CS_ALPHA_KETOACID, "O=C(O)C(O)=CN", "O=C(O)C(O)=CN", false},
+    TautomerCase{CS_ALPHA_KETOACID, "O=C(O)C(O)=CC(=O)C", "O=C(O)C(O)=CC(=O)C", false},
+    TautomerCase{CS_ALPHA_KETOACID, "O=C(O)C(O)=CC=C", "O=C(O)C(O)=CC=C", false},
+    TautomerCase{CS_ALPHA_KETOACID, "O=C1OC(O)=CCC1", "O=C1OC(O)=CCC1", false},
+    TautomerCase{CS_ALPHA_KETOACID, "O=C(O)C1=C(O)CCC1", "O=C(O)C1=C(O)CCC1", false},
+    TautomerCase{CS_ALPHA_KETOACID, "O=C(O)/C(O)=C/C", "O=C(O)/C(O)=C/C", false},
+    TautomerCase{CS_ALPHA_KETOACID, "O=C(O)C(O[2H])=CC", "O=C(O)C(O[2H])=CC", false},
+    TautomerCase{CS_ALPHA_KETOACID, "O=C(O[2H])C(O)=CC", "O=C(O[2H])C(O)=CC", false},
+    TautomerCase{CS_ALPHA_KETOACID, "O=C(O)C(O)=C([2H])C", "O=C(O)C(O)=C([2H])C", false},
+    TautomerCase{CS_ALPHA_KETOACID, "O=C(O)C(OC)=CC", "O=C(O)C(OC)=CC", false},
+    TautomerCase{CS_ALPHA_KETOACID, "O=C(O)C(O)=CC", "O=C(O)C(O)=CC", false,
+                 standardisation::KetoEnol::kToEnol},
+    TautomerCase{CS_ALL, "O=C(O)C(O)=Cc1ccccc1", "O=C(O)C(=O)Cc1ccccc1", true},
     TautomerCase{CS_BIGUANIDE, "N[13C](=N)NC(=N)N", "N[13C](N)=NC(=N)N", true},
     TautomerCase{CS_BIGUANIDE, "[15NH]=C(N)NC(=N)N", "[15NH2]C(N)=NC(=N)N", true},
     TautomerCase{CS_BIGUANIDE, "CN(C)C(=N)NC(=N)N", "CN(C)C(N)=NC(=N)N", true},
@@ -2110,6 +2143,68 @@ TEST_F(TestStandardisation, BiguanidePreservesParticipatingChiralAnnotations) {
     EXPECT_EQ(_m1.chiral_centre_at_atom(a), saved);
     EXPECT_TRUE(_m1.bond_between_atoms(3, 4)->is_double_bond());
     EXPECT_TRUE(_m1.bond_between_atoms(3, 5)->is_single_bond());
+  }
+}
+
+TEST_F(TestStandardisation, AlphaKetoacidCanBeDisabledAndReportsIndependently) {
+  _chemical_standardisation.activate_all();
+  ASSERT_TRUE(_chemical_standardisation.Activate("-alpha-ketoacid", 0));
+  ASSERT_TRUE(_m1.build_from_smiles("O=C(O)C(O)=Cc1ccccc1"));
+  const IWString before = _m1.unique_smiles();
+  EXPECT_EQ(_chemical_standardisation.process(_m1), 0);
+  EXPECT_EQ(_m1.unique_smiles(), before);
+  ASSERT_TRUE(_chemical_standardisation.Activate(CS_ALPHA_KETOACID, 0));
+  _chemical_standardisation.set_append_string_depending_on_what_changed(1);
+  EXPECT_EQ(_chemical_standardisation.process(_m1), 1);
+  EXPECT_TRUE(_m1.name().contains("STD:alpha-ketoacid"));
+  EXPECT_EQ(_m1.number_formally_charged_atoms(), 0);
+  EXPECT_EQ(_m1.chiral_centres(), 0);
+  std::ostringstream report;
+  ASSERT_TRUE(_chemical_standardisation.report(report));
+  EXPECT_NE(report.str().find("Alpha ketoacid changed 1 groups"), std::string::npos);
+  EXPECT_EQ(_chemical_standardisation.process(_m1), 0);
+}
+
+TEST_F(TestStandardisation, AlphaKetoacidNeutralisedPrecursorsAreStable) {
+  _chemical_standardisation.activate_all();
+  ASSERT_TRUE(_m2.build_from_smiles("O=C(O)C(=O)CC"));
+  const IWString expected = _m2.unique_smiles();
+  for (const char* smiles : {"O=C([O-])C(O)=CC", "O=C(O)C([O-])=CC",
+                             "O=C([O-])C([O-])=CC"}) {
+    Molecule original;
+    ASSERT_TRUE(original.build_from_smiles(smiles));
+    for (int i = 0; i < 100; ++i) {
+      Molecule molecule;
+      ASSERT_TRUE(molecule.build_from_smiles(original.random_smiles()));
+      EXPECT_GT(_chemical_standardisation.process(molecule), 0);
+      EXPECT_EQ(molecule.unique_smiles(), expected) << smiles;
+      EXPECT_EQ(molecule.molecular_formula(), _m2.molecular_formula());
+      EXPECT_TRUE(molecule.valence_ok());
+      EXPECT_EQ(molecule.number_formally_charged_atoms(), 0);
+      EXPECT_EQ(_chemical_standardisation.process(molecule), 0);
+    }
+  }
+}
+
+TEST_F(TestStandardisation, AlphaKetoacidPreservesParticipatingChiralAnnotations) {
+  ASSERT_TRUE(_chemical_standardisation.Activate(CS_ALPHA_KETOACID, 0));
+  for (atom_number_t a : {3, 5}) {
+    ASSERT_TRUE(_m1.build_from_smiles("O=C(O)C(O)=CC"));
+    auto marked = std::make_unique<Chiral_Centre>(a);
+    marked->set_top_front(_m1[a].other(a, 0));
+    marked->set_top_back(_m1[a].other(a, 1));
+    if (_m1.ncon(a) == 3) {
+      marked->set_left_down(_m1[a].other(a, 2));
+      marked->set_right_down(kChiralConnectionIsImplicitHydrogen);
+    } else {
+      marked->set_left_down(kChiralConnectionIsImplicitHydrogen);
+      marked->set_right_down(kChiralConnectionIsLonePair);
+    }
+    ASSERT_TRUE(_m1.add_chiral_centre(marked.get()));
+    const Chiral_Centre* saved = marked.release();
+    EXPECT_EQ(_chemical_standardisation.process(_m1), 0);
+    EXPECT_EQ(_m1.chiral_centre_at_atom(a), saved);
+    EXPECT_TRUE(_m1.bond_between_atoms(3, 5)->is_double_bond());
   }
 }
 

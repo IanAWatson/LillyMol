@@ -391,6 +391,7 @@ Chemical_Standardisation::activate_all() {
   _transform_beta_diketone.activate();
   _transform_beta_hydrazone.activate();
   _transform_beta_enaminone.activate();
+  _transform_alpha_ketoacid.activate();
   _transform_beta_ketoester.activate();
   _transform_phosphorus_tautomer.activate();
   _transform_nitroso_to_oxime.activate();
@@ -467,6 +468,7 @@ display_all_chemical_standardisation_options(std::ostream& os, char zoption) {
   os << zopt << CS_BETA_ENAMINONE << " convert eligible acyclic beta-ketoimines to enaminones\n";
   os << zopt << CS_BETA_HYDRAZONE << " prefer acyclic beta-keto hydrazones (default with all)\n";
   os << zopt << CS_BETA_ENEHYDRAZINE << " prefer acyclic beta-enehydrazines (disable beta-hydrazone first)\n";
+  os << zopt << CS_ALPHA_KETOACID << " canonicalise simple acyclic alpha-ketoacid enols\n";
   os << zopt << CS_BETA_KETOESTER << " canonicalise acyclic beta-ketoester enols\n";
   os << zopt << CS_BETA_DIKETONE << " canonicalise beta-diketone enols to diketo form\n";
   os << zopt << CS_ASCORBATE << "   canonicalise isolated ascorbate rings to lactone/enediol form\n";
@@ -895,6 +897,12 @@ Chemical_Standardisation::Activate(const IWString& directive, const int verbose)
       _transform_beta_hydrazone.deactivate();
     } else {
       _transform_beta_hydrazone.activate();
+    }
+  } else if (tmp == CS_ALPHA_KETOACID) {
+    if (negation) {
+      _transform_alpha_ketoacid.deactivate();
+    } else {
+      _transform_alpha_ketoacid.activate();
     }
   } else if (tmp == CS_BETA_KETOESTER) {
     if (negation) {
@@ -4282,6 +4290,11 @@ Chemical_Standardisation::_process(Molecule& m,
     rc += _do_ascorbate(m, current_molecule_data);
   }
 
+  if (_transform_alpha_ketoacid.active() && current_molecule_data.oxygens() >= 3 &&
+      _keto_enol == standardisation::KetoEnol::kToKeto) {
+    rc += _do_alpha_ketoacid(m, current_molecule_data);
+  }
+
   // Ester conversion can expose a ketone needed by the beta-diketone rule.
   if (_transform_beta_ketoester.active() && current_molecule_data.oxygens() >= 3 &&
       _keto_enol == standardisation::KetoEnol::kToKeto) {
@@ -4692,6 +4705,10 @@ Chemical_Standardisation::report(std::ostream& os) const {
   if (_transform_beta_hydrazone.active()) {
     os << "  Beta hydrazone ";
     _transform_beta_hydrazone.report(os);
+  }
+  if (_transform_alpha_ketoacid.active()) {
+    os << "  Alpha ketoacid ";
+    _transform_alpha_ketoacid.report(os);
   }
   if (_transform_beta_ketoester.active()) {
     os << "  Beta ketoester ";
@@ -10445,6 +10462,11 @@ Chemical_Standardisation::_processing_needed(
     return 1;
   }
 
+  if (_transform_alpha_ketoacid.active() && current_molecule_data.oxygens() >= 3 &&
+      _keto_enol == standardisation::KetoEnol::kToKeto) {
+    return 1;
+  }
+
   if (_transform_beta_ketoester.active() && current_molecule_data.oxygens() >= 3 &&
       _keto_enol == standardisation::KetoEnol::kToKeto) {
     return 1;
@@ -14359,6 +14381,110 @@ Chemical_Standardisation::_do_biguanide(Molecule& m, IWStandard_Current_Molecule
     _transform_biguanide.extra(rc);
     if (_append_string_depending_on_what_changed) {
       _append_to_changed_molecules << " STD:" << CS_BIGUANIDE;
+    }
+  }
+  return rc;
+}
+
+// O=C(O)-C(OH)=CH-R -> O=C(O)-C(=O)-CH2-R (also R=H).
+// Keep the general keto/enol guards intact. This exception requires a neutral
+// acid, an acyclic unsubstituted chain, and no additional conjugated branch.
+static bool
+ConvertAlphaKetoacidEnol(Molecule& m, const IWStandard_Current_Molecule& data,
+                         atom_number_t oxygen) {
+  const auto* z = data.atomic_number();
+  auto eligible = [&](atom_number_t a, atomic_number_t element, int ncon,
+                      int nbonds, int hydrogen) {
+    return z[a] == element && !data.ring_membership()[a] &&
+           !data.atom_is_aromatic()[a] && !m.formal_charge(a) &&
+           m.ncon(a) == ncon && m.nbonds(a) == nbonds &&
+           m.hcount(a) == hydrogen && !m.chiral_centre_at_atom(a);
+  };
+  if (!eligible(oxygen, 8, 1, 1, 1)) {
+    return false;
+  }
+  const atom_number_t enol = m[oxygen].other(oxygen, 0);
+  if (!eligible(enol, 6, 3, 4, 0)) {
+    return false;
+  }
+  atom_number_t beta = kInvalidAtomNumber;
+  atom_number_t acid = kInvalidAtomNumber;
+  for (const Bond* b : m[enol]) {
+    if (b->is_directional() || b->part_of_cis_trans_grouping()) {
+      return false;
+    }
+    const atom_number_t other = b->other(enol);
+    if (other == oxygen) {
+      continue;
+    }
+    if (b->is_double_bond() && z[other] == 6) {
+      beta = other;
+    } else if (b->is_single_bond() && z[other] == 6) {
+      acid = other;
+    } else {
+      return false;
+    }
+  }
+  if (beta == kInvalidAtomNumber || acid == kInvalidAtomNumber ||
+      !eligible(acid, 6, 3, 4, 0)) {
+    return false;
+  }
+  const int connections = m.ncon(beta);
+  if ((connections != 1 && connections != 2) ||
+      !eligible(beta, 6, connections, connections + 1, 3 - connections)) {
+    return false;
+  }
+  for (const Bond* b : m[beta]) {
+    const atom_number_t other = b->other(beta);
+    if (other == enol) {
+      continue;
+    }
+    if (!b->is_single_bond() || b->is_directional() ||
+        b->part_of_cis_trans_grouping() || z[other] != 6 || m.formal_charge(other) ||
+        (!m.is_aromatic(other) && m.nbonds(other) != m.ncon(other))) {
+      return false;  // Excludes additional carbonyls and aliphatic conjugation.
+    }
+  }
+  bool carbonyl = false;
+  bool acid_oh = false;
+  for (const Bond* b : m[acid]) {
+    const atom_number_t other = b->other(acid);
+    if (other == enol) {
+      continue;
+    }
+    if (b->is_double_bond() && eligible(other, 8, 1, 2, 0)) {
+      carbonyl = true;
+    } else if (b->is_single_bond() && eligible(other, 8, 1, 1, 1)) {
+      acid_oh = true;
+    } else {
+      return false;  // Excludes esters, amides and explicit H/D on the acid OH.
+    }
+  }
+  if (!carbonyl || !acid_oh) {
+    return false;
+  }
+  m.set_bond_type_between_atoms(enol, oxygen, DOUBLE_BOND);
+  m.set_bond_type_between_atoms(enol, beta, SINGLE_BOND);
+  m.unset_all_implicit_hydrogen_information(oxygen);
+  m.unset_all_implicit_hydrogen_information(enol);
+  m.unset_all_implicit_hydrogen_information(beta);
+  return true;
+}
+
+int
+Chemical_Standardisation::_do_alpha_ketoacid(
+    Molecule& m, const IWStandard_Current_Molecule& data) {
+  int rc = 0;
+  for (atom_number_t oxygen = 0; oxygen < m.natoms(); ++oxygen) {
+    rc += ConvertAlphaKetoacidEnol(m, data, oxygen);
+  }
+  if (rc) {
+    _transform_alpha_ketoacid.extra(rc);
+    if (_verbose) {
+      cerr << "Transformed " << rc << " alpha-ketoacid enols\n";
+    }
+    if (_append_string_depending_on_what_changed) {
+      _append_to_changed_molecules << " STD:" << CS_ALPHA_KETOACID;
     }
   }
   return rc;

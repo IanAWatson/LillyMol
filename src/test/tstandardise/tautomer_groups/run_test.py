@@ -29,6 +29,24 @@ cases = [
     'N1=C(O)C=C(O)N=C1O.O=c1cc[nH]c(C)n1',
     'N1=NC(=NN=C(C2=CC=NC=C2)Br)NN1',
 ]
+alpha_ketoacids = [
+    'O=C(O)C(O)=Cc1ccccc1', 'O=C(O)C(=O)Cc1ccccc1',
+    'O=C(O)C(O)=CC', 'O=C(O)C(O)=C', 'O=C(O)C(O)=Cc1ccncc1',
+    '[OH]C(=O)[C]([OH])=[CH]C', '[18OH]C(=O)C(O)=CC',
+    'OC(=O)C([18OH])=CC', 'OC(=O)C(O)=[13CH]C',
+    'OC(=O)C(O)=C[C@H](F)C', 'O=C([O-])C(O)=CC',
+    'O=C(O)C([O-])=CC', 'O=C([O-])C([O-])=CC',
+    'O=C(O)/C(O)=C/C', 'O=C(O)C(O[2H])=CC',
+    'O=C(O)C(O)=CC(=O)C', 'O=C(O)C(O)=C(C)C',
+    'O=C(O)C(O)=CC.O=C(O)C(O)=Cc1ccccc1',
+]
+check('alpha_ketoacid', ['-g', 'alpha-ketoacid'], alpha_ketoacids)
+check('alpha_ketoacid_all', ['-g', 'all'], alpha_ketoacids)
+check('alpha_ketoacid_disabled', ['-g', 'all', '-g', '-alpha-ketoacid'],
+      alpha_ketoacids)
+check('alpha_ketoacid_enol_preference', ['-g', 'all', '-g', 'ENOL'],
+      alpha_ketoacids)
+
 biguanides = [
     'CN(C)C(=N)NC(=N)N', 'CN(C)C(N)=NC(=N)N',
     'CN(C)C(=N)N=C(N)N', 'NC(=N)NC(=N)N', 'NC(N)=NC(=N)N',

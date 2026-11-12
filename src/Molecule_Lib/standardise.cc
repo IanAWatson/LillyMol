@@ -367,6 +367,7 @@ Chemical_Standardisation::activate_all() {
   _transform_covalent_metals.activate();
   _transform_guanidine.activate();
   _transform_amidine.activate();
+  _transform_cyclic_amidine.activate();
   _transform_guanidine_ring.activate();
   _transform_tetrazole.activate();
   _transform_azid.activate();
@@ -447,6 +448,7 @@ display_all_chemical_standardisation_options(std::ostream& os, char zoption) {
   os << zopt << CS_COVM << "        break covalent bonds between Oxygen and Na,K\n";
   os << zopt << CS_ISOLC << "       assign formal charges to isolated Na, K, .. and Halogens\n";
   os << zopt << CS_GUAND << "        convert guanidines to -N-C(=N)-N form\n";
+  os << zopt << CS_CYCLIC_AMIDINE << " canonicalise isolated neutral cyclic amidines\n";
   os << zopt << CS_AMIDINE << "     canonicalise isolated neutral amidines with a terminal N\n";
   os << zopt << CS_PYRIMIDINE << "  convert isolated O/S pyrimidinetrione tautomers to keto form\n";
   os << zopt << CS_NITROSO_OXIME << "      convert neutral aliphatic C-N=O to C=N-OH\n";
@@ -670,6 +672,12 @@ Chemical_Standardisation::Activate(const IWString& directive, const int verbose)
       if (verbose) {
         cerr << "Guanidines will be transformed\n";
       }
+    }
+  } else if (CS_CYCLIC_AMIDINE == tmp) {
+    if (negation) {
+      _transform_cyclic_amidine.deactivate();
+    } else {
+      _transform_cyclic_amidine.activate();
     }
   } else if (CS_AMIDINE == tmp) {
     if (negation) {
@@ -3113,6 +3121,99 @@ ResolveGuanidineByConnectivity(Molecule& m,
   return 1;
 }
 
+// Choose an endocyclic C=N bond and a terminal exocyclic NH2 group in an
+// otherwise saturated cyclic amidine. No charges or stereocentres are added.
+static bool
+ConvertCyclicAmidine(Molecule& m, const Set_of_Atoms& ring,
+                     const IWStandard_Current_Molecule& data) {
+  const atomic_number_t* z = data.atomic_number();
+  const int* membership = data.ring_membership();
+  atom_number_t ring_nitrogen = kInvalidAtomNumber;
+  for (atom_number_t a : ring) {
+    if (membership[a] != 1 || m.formal_charge(a)) {
+      return false;
+    }
+    if (z[a] == 7 && ring_nitrogen == kInvalidAtomNumber) {
+      ring_nitrogen = a;
+    } else if (z[a] != 6) {
+      return false;
+    }
+  }
+  if (ring_nitrogen == kInvalidAtomNumber || m.ncon(ring_nitrogen) != 2 ||
+      m.nbonds(ring_nitrogen) != 2 || m.hcount(ring_nitrogen) != 1 ||
+      m.chiral_centre_at_atom(ring_nitrogen)) {
+    return false;
+  }
+
+  atom_number_t carbon = kInvalidAtomNumber;
+  atom_number_t exocyclic_nitrogen = kInvalidAtomNumber;
+  for (const Bond* cn : m[ring_nitrogen]) {
+    const atom_number_t c = cn->other(ring_nitrogen);
+    if (!cn->is_single_bond() || cn->part_of_cis_trans_grouping() ||
+        m.ncon(c) != 3 || m.nbonds(c) != 4 || m.hcount(c) != 0) {
+      continue;
+    }
+    for (const Bond* b : m[c]) {
+      const atom_number_t outside = b->other(c);
+      if (ring.contains(outside)) {
+        continue;
+      }
+      if (z[outside] != 7 || !b->is_double_bond() ||
+          b->part_of_cis_trans_grouping() || m.ncon(outside) != 1 ||
+          m.formal_charge(outside) || m.hcount(outside) != 1) {
+        continue;
+      }
+      if (carbon != kInvalidAtomNumber) {
+        return false;  // Shared amidines need a coordinated choice.
+      }
+      carbon = c;
+      exocyclic_nitrogen = outside;
+    }
+  }
+  if (carbon == kInvalidAtomNumber || m.chiral_centre_at_atom(carbon) ||
+      m.chiral_centre_at_atom(exocyclic_nitrogen)) {
+    return false;
+  }
+  // Exclude conjugated and N-acyl systems. Remaining ring carbons can carry
+  // single-bonded substituents, including the OH groups in the archive examples.
+  for (atom_number_t a : ring) {
+    if (a != carbon && a != ring_nitrogen && m.nbonds(a) != m.ncon(a)) {
+      return false;
+    }
+  }
+
+  m.set_bond_type_between_atoms(carbon, ring_nitrogen, DOUBLE_BOND);
+  m.set_bond_type_between_atoms(carbon, exocyclic_nitrogen, SINGLE_BOND);
+  m.unset_all_implicit_hydrogen_information(carbon);
+  m.unset_all_implicit_hydrogen_information(ring_nitrogen);
+  m.unset_all_implicit_hydrogen_information(exocyclic_nitrogen);
+  return true;
+}
+
+int
+Chemical_Standardisation::_do_cyclic_amidine(
+    Molecule& m, const IWStandard_Current_Molecule& data) {
+  int rc = 0;
+  for (int i = 0; i < data.nrings(); ++i) {
+    if ((data.ring_size()[i] != 5 && data.ring_size()[i] != 6) ||
+        data.ring_nitrogen_count()[i] != 1 || data.ring_is_fused()[i] ||
+        data.ring_is_aromatic()[i]) {
+      continue;
+    }
+    rc += ConvertCyclicAmidine(m, *data.ringi(i), data);
+  }
+  if (rc) {
+    _transform_cyclic_amidine.extra(rc);
+    if (_verbose) {
+      cerr << "Transformed " << rc << " neutral cyclic amidines\n";
+    }
+    if (_append_string_depending_on_what_changed) {
+      _append_to_changed_molecules << " STD:" << CS_CYCLIC_AMIDINE;
+    }
+  }
+  return rc;
+}
+
 // Canonicalise isolated neutral amidines that have a terminal nitrogen to
 // R-C(=NH)-NHR. Shared/conjugated nitrogens need a coordinated tautomer rule.
 int
@@ -3990,6 +4091,10 @@ Chemical_Standardisation::_process(Molecule& m,
   if (_transform_amidine.active() && current_molecule_data.nitrogens() >= 2) {
     rc += _do_transform_amidine(m, current_molecule_data);
   }
+  if (_transform_cyclic_amidine.active() && current_molecule_data.nitrogens() >= 2 &&
+      current_molecule_data.nrings()) {
+    rc += _do_cyclic_amidine(m, current_molecule_data);
+  }
 
 
 
@@ -4438,6 +4543,10 @@ Chemical_Standardisation::report(std::ostream& os) const {
     _transform_guanidine.report(os);
   }
 
+  if (_transform_cyclic_amidine.active()) {
+    os << "  Cyclic amidine ";
+    _transform_cyclic_amidine.report(os);
+  }
   if (_transform_amidine.active()) {
     os << "  Amidine ";
     _transform_amidine.report(os);
@@ -10201,6 +10310,11 @@ Chemical_Standardisation::_processing_needed(
 
   if (_transform_ascorbate.active() && current_molecule_data.nrings() > 0 &&
       current_molecule_data.oxygens() >= 4) {
+    return 1;
+  }
+
+  if (_transform_cyclic_amidine.active() && current_molecule_data.nitrogens() >= 2 &&
+      current_molecule_data.nrings()) {
     return 1;
   }
 

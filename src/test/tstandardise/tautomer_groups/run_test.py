@@ -29,6 +29,21 @@ cases = [
     'N1=C(O)C=C(O)N=C1O.O=c1cc[nH]c(C)n1',
     'N1=NC(=NN=C(C2=CC=NC=C2)Br)NN1',
 ]
+cyclic_amidines = [
+    'N=C1NCCC1', 'NC1=NCCC1', 'N=C1NCCCC1', 'NC1=NCCCC1',
+    'N1C(=N)C(O)C(C)C1CCCCC', '[15NH]=C1NCCC1',
+    'N=C1[15NH]CCC1', 'N=[13C]1NCCC1', 'N=C1N[C@H](C)CC1',
+    '[NH2+]=C1NCCC1', '[NH2+]1C(=N)CCC1', '[NH+]1=C(N)CCC1',
+    'N=C1NCC1', 'N=C1NCCCCC1', 'N=C1NCCN1', 'N=C1NCCO1',
+    'N=C1NCC=C1', 'N=C1NC(=O)CC1', 'N1C(=N)CCCC1=N',
+    'N=C1NC2CCCCC2C1', 'N=C1NCCC12CCCC2', 'N=C1N(C)CCC1',
+    'CN=C1NCCC1', '[2H]N1C(=N)CCC1', 'N1C(=N[2H])CCC1',
+]
+check('cyclic_amidine', ['-g', 'cyclic-amidine'], cyclic_amidines)
+check('cyclic_amidine_all', ['-g', 'all'], cyclic_amidines)
+check('cyclic_amidine_disabled', ['-g', 'all', '-g', '-cyclic-amidine'],
+      cyclic_amidines)
+
 beta_ketoesters = [
     'COC(=O)C=C(O)C', 'CCOC(=O)C=C(O)C',
     'COC(=O)C=C(O)c1ccccc1', 'COC(=O)[CH]=C([OH])C',

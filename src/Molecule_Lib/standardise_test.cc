@@ -807,6 +807,39 @@ TEST_P(TestOxygenAndSulphurTautomers, CanonicalFormAndAtomOrder) {
 }
 
 INSTANTIATE_TEST_SUITE_P(OxygenAndSulphur, TestOxygenAndSulphurTautomers, testing::Values(
+    TautomerCase{CS_CYCLIC_AMIDINE, "N=C1NCCC1", "NC1=NCCC1", true},
+    TautomerCase{CS_CYCLIC_AMIDINE, "N=C1NCCCC1", "NC1=NCCCC1", true},
+    TautomerCase{CS_CYCLIC_AMIDINE, "N1C(=N)C(O)C(C)C1CCCCC", "C1(=NC(CCCCC)C(C)C1O)N", true},
+    TautomerCase{CS_CYCLIC_AMIDINE, "[NH]=[C]1[NH]CCC1", "NC1=NCCC1", true},
+    TautomerCase{CS_CYCLIC_AMIDINE, "[15NH]=C1NCCC1", "[15NH2]C1=NCCC1", true},
+    TautomerCase{CS_CYCLIC_AMIDINE, "N=C1[15NH]CCC1", "NC1=[15N]CCC1", true},
+    TautomerCase{CS_CYCLIC_AMIDINE, "N=[13C]1NCCC1", "N[13C]1=NCCC1", true},
+    TautomerCase{CS_CYCLIC_AMIDINE, "N=C1N[C@H](C)CC1", "NC1=N[C@H](C)CC1", true},
+    TautomerCase{CS_CYCLIC_AMIDINE, "NC1=NCCC1", "NC1=NCCC1", false},
+    TautomerCase{CS_CYCLIC_AMIDINE, "NC1=NCCCC1", "NC1=NCCCC1", false},
+    TautomerCase{CS_CYCLIC_AMIDINE, "N=C1NCC1", "N=C1NCC1", false},
+    TautomerCase{CS_CYCLIC_AMIDINE, "N=C1NCCCCC1", "N=C1NCCCCC1", false},
+    TautomerCase{CS_CYCLIC_AMIDINE, "N=C1NCCN1", "N=C1NCCN1", false},
+    TautomerCase{CS_CYCLIC_AMIDINE, "N=C1NCCO1", "N=C1NCCO1", false},
+    TautomerCase{CS_CYCLIC_AMIDINE, "N=C1NCC=C1", "N=C1NCC=C1", false},
+    TautomerCase{CS_CYCLIC_AMIDINE, "N=C1NC(=O)CC1", "N=C1NC(=O)CC1", false},
+    TautomerCase{CS_CYCLIC_AMIDINE, "N1C(=N)CCCC1=N", "N1C(=N)CCCC1=N", false},
+    TautomerCase{CS_CYCLIC_AMIDINE, "N=C1NC2CCCCC2C1", "N=C1NC2CCCCC2C1", false},
+    TautomerCase{CS_CYCLIC_AMIDINE, "N=C1NCCC12CCCC2", "N=C1NCCC12CCCC2", false},
+    TautomerCase{CS_CYCLIC_AMIDINE, "N=C1N(C)CCC1", "N=C1N(C)CCC1", false},
+    TautomerCase{CS_CYCLIC_AMIDINE, "CN=C1NCCC1", "CN=C1NCCC1", false},
+    TautomerCase{CS_CYCLIC_AMIDINE, "[NH2+]=C1NCCC1", "[NH2+]=C1NCCC1", false},
+    TautomerCase{CS_CYCLIC_AMIDINE, "[NH2+]1C(=N)CCC1", "[NH2+]1C(=N)CCC1", false},
+    TautomerCase{CS_CYCLIC_AMIDINE, "[2H]N1C(=N)CCC1", "[2H]N1C(=N)CCC1", false},
+    TautomerCase{CS_CYCLIC_AMIDINE, "N1C(=N[2H])CCC1", "N1C(=N[2H])CCC1", false},
+    TautomerCase{CS_CYCLIC_AMIDINE, "[H]N1C(=N)CCC1", "[H]N1C(=N)CCC1", false},
+    TautomerCase{CS_CYCLIC_AMIDINE, "CC(N)=NC", "CC(N)=NC", false},
+    TautomerCase{CS_CYCLIC_AMIDINE, "N=C1NCCC1", "NC1=NCCC1", true,
+                 standardisation::KetoEnol::kToEnol},
+    TautomerCase{CS_ALL, "N=C1NCCC1", "NC1=NCCC1", true},
+    TautomerCase{CS_ALL, "N1C(=N[H])CCC1", "NC1=NCCC1", true},
+    TautomerCase{CS_ALL, "[H]N1C(=N)CCC1", "NC1=NCCC1", true},
+    TautomerCase{CS_ALL, "NC1=NCCC1", "NC1=NCCC1", false},
     TautomerCase{CS_NITROSO_OXIME, "CN=O", "C=NO", true},
     TautomerCase{CS_NITROSO_OXIME, "CCN=O", "CC=NO", true},
     TautomerCase{CS_NITROSO_OXIME, "CC(C)N=O", "CC(C)=NO", true},
@@ -1431,6 +1464,66 @@ TEST_F(TestStandardisation, BetaKetoesterCanBeDisabledAndReportsIndependently) {
   EXPECT_EQ(_m1.number_formally_charged_atoms(), 0);
   EXPECT_EQ(_m1.chiral_centres(), 0);
   EXPECT_EQ(_chemical_standardisation.process(_m1), 0);
+}
+
+TEST_F(TestStandardisation, CyclicAmidineCanBeDisabledAndReportsNeutralChanges) {
+  _chemical_standardisation.activate_all();
+  ASSERT_TRUE(_chemical_standardisation.Activate("-cyclic-amidine", 0));
+  ASSERT_TRUE(_m1.build_from_smiles("N=C1NCCC1"));
+  const IWString before = _m1.unique_smiles();
+  EXPECT_EQ(_chemical_standardisation.process(_m1), 0);
+  EXPECT_EQ(_m1.unique_smiles(), before);
+  ASSERT_TRUE(_chemical_standardisation.Activate(CS_CYCLIC_AMIDINE, 0));
+  ASSERT_TRUE(_chemical_standardisation.Activate("-amidine", 0));
+  _chemical_standardisation.set_append_string_depending_on_what_changed(1);
+  EXPECT_EQ(_chemical_standardisation.process(_m1), 1);
+  EXPECT_EQ(_m1.number_formally_charged_atoms(), 0);
+  EXPECT_EQ(_m1.hcount(0), 2);
+  EXPECT_EQ(_m1.hcount(2), 0);
+  EXPECT_EQ(_m1.chiral_centres(), 0);
+  EXPECT_TRUE(_m1.bond_between_atoms(0, 1)->is_single_bond());
+  EXPECT_TRUE(_m1.bond_between_atoms(1, 2)->is_double_bond());
+  EXPECT_TRUE(_m1.name().contains("STD:cyclic-amidine"));
+  std::ostringstream report;
+  ASSERT_TRUE(_chemical_standardisation.report(report));
+  EXPECT_NE(report.str().find("Cyclic amidine changed 1 groups"), std::string::npos);
+  EXPECT_EQ(_chemical_standardisation.process(_m1), 0);
+}
+
+TEST_F(TestStandardisation, CyclicAmidineAfterChargeNeutralisationIsStable) {
+  _chemical_standardisation.activate_all();
+  Molecule expected;
+  ASSERT_TRUE(expected.build_from_smiles("NC1=NCCC1"));
+  for (const char* smiles : {"[NH2+]=C1NCCC1", "[NH2+]1C(=N)CCC1", "[NH+]1=C(N)CCC1"}) {
+    Molecule original;
+    ASSERT_TRUE(original.build_from_smiles(smiles));
+    for (int i = 0; i < 100; ++i) {
+      Molecule molecule;
+      ASSERT_TRUE(molecule.build_from_smiles(original.random_smiles()));
+      EXPECT_GT(_chemical_standardisation.process(molecule), 0);
+      EXPECT_EQ(molecule.unique_smiles(), expected.unique_smiles());
+      EXPECT_EQ(molecule.molecular_formula(), expected.molecular_formula());
+      EXPECT_EQ(molecule.number_formally_charged_atoms(), 0);
+      EXPECT_TRUE(molecule.valence_ok());
+      EXPECT_EQ(_chemical_standardisation.process(molecule), 0);
+    }
+  }
+}
+
+TEST_F(TestStandardisation, CyclicAmidinePreservesExplicitCentralAnnotation) {
+  ASSERT_TRUE(_chemical_standardisation.Activate(CS_CYCLIC_AMIDINE, 0));
+  ASSERT_TRUE(_m1.build_from_smiles("N=C1NCCC1"));
+  auto marked = std::make_unique<Chiral_Centre>(1);
+  marked->set_top_front(_m1[1].other(1, 0));
+  marked->set_top_back(_m1[1].other(1, 1));
+  marked->set_left_down(_m1[1].other(1, 2));
+  marked->set_right_down(kChiralConnectionIsImplicitHydrogen);
+  ASSERT_TRUE(_m1.add_chiral_centre(marked.get()));
+  const Chiral_Centre* saved = marked.release();
+  EXPECT_EQ(_chemical_standardisation.process(_m1), 0);
+  EXPECT_EQ(_m1.chiral_centre_at_atom(1), saved);
+  EXPECT_TRUE(_m1.bond_between_atoms(0, 1)->is_double_bond());
+  EXPECT_TRUE(_m1.bond_between_atoms(1, 2)->is_single_bond());
 }
 
 }  // namespace

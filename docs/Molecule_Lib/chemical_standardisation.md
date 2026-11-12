@@ -82,6 +82,7 @@ Entering `-g help` to most LillyMol tools yields the usage message
  -g pyrazolone    convert pyrazolone to keto form
  -g aminothazole  convert -N=c1scc[nH]1 to -[NH]c1sccn1
  -g keto_enol     convert O/S enol to keto forms (no adjacent heteroatoms)
+ -g cyclic-amidine canonicalise isolated neutral cyclic amidines
  -g nitroso      convert neutral aliphatic C-N=O groups to C=N-OH
  -g phosphorus   convert neutral P-OH tautomers to P(=O)H
  -g beta-ketoester canonicalise acyclic beta-ketoester enols
@@ -234,6 +235,39 @@ SMILES/aromaticity/stereochemistry handling rather than a standardisation rule.
 Use `-f` to stop with a nonzero exit status on a failure. Invalid starting
 valence is distinguished from invalid valence introduced by standardisation;
 the latter is counted as a failure and written to the failure file.
+
+### Isolated cyclic amidines
+
+`-g cyclic-amidine` chooses an endocyclic C=N bond and an exocyclic amino
+nitrogen in isolated five- and six-membered cyclic amidines:
+
+```text
+N=C1NCCC1   ->  NC1=NCCC1
+N=C1NCCCC1  ->  NC1=NCCCC1
+```
+
+This rule is included in `-g all` and broadens default tautomer equivalence.
+Disable it with `-g all -g -cyclic-amidine`. Its fixed representative is also
+used with the `ENOL` preference. It is separate from the non-ring `amidine`
+rule, which prefers a terminal imine.
+
+The ring must contain one nitrogen and otherwise saturated carbon atoms,
+except for the amidine carbon. The starting ring nitrogen must be NH and the
+exocyclic imine nitrogen terminal. Single-bonded substituents on the remaining
+ring carbons are allowed. Fused/spiro rings, N-substituted groups, shared
+amidines, conjugated or N-acyl systems, specified imine geometry, and marked
+chiral centres at participating atoms are excluded. Remote stereocentres and
+isotope labels on participating heavy atoms are retained; no new stereocentre
+annotations or charges are created.
+
+Explicit hydrogen atoms bonded to either participating nitrogen prevent this
+conversion, protecting isotopic hydrogen. With `-g all`, ordinary explicit
+hydrogens are removed and amine neutralisation runs before this rule, so
+eligible protonated precursors can also reach the neutral representative in
+one pass. `-g cyclic-amidine` alone does not neutralise charged groups.
+
+Reports count cyclic-amidine conversions separately. `-g APP=EACH` appends
+`STD:cyclic-amidine` when the rule changes a molecule.
 
 ### Aliphatic nitroso groups
 

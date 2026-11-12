@@ -807,6 +807,25 @@ TEST_P(TestOxygenAndSulphurTautomers, CanonicalFormAndAtomOrder) {
 }
 
 INSTANTIATE_TEST_SUITE_P(OxygenAndSulphur, TestOxygenAndSulphurTautomers, testing::Values(
+    TautomerCase{CS_GUANDR, "N1C(=Nc2ccccc2)NCC1", "N1=C(Nc2ccccc2)NCC1", true},
+    TautomerCase{CS_GUANDR, "N1C(=NC)NCC1", "N1=C(NC)NCC1", true},
+    TautomerCase{CS_GUANDR, "N1C(=Nc2ccccc2)NCCC1", "N1=C(Nc2ccccc2)NCCC1", true},
+    TautomerCase{CS_GUANDR, "N1C(=Nc2ccccc2)NC(C)C1", "N1=C(Nc2ccccc2)NC(C)C1", true},
+    TautomerCase{CS_GUANDR, "N1C(Nc2ccccc2)=NC(C)C1", "N1=C(Nc2ccccc2)NC(C)C1", true},
+    TautomerCase{CS_GUANDR, "N1=C(Nc2ccccc2)NC(C)C1", "N1=C(Nc2ccccc2)NC(C)C1", false},
+    TautomerCase{CS_GUANDR, "N1C(=Nc2ccccc2)NC(C)CC1", "N1=C(Nc2ccccc2)NC(C)CC1", true},
+    TautomerCase{CS_GUANDR, "N1C(=Nc2ccccc2)[15NH]CC1", "N1=C(Nc2ccccc2)[15NH]CC1", true},
+    TautomerCase{CS_GUANDR, "N1C(=Nc2ccccc2)NC[13CH2]1", "N1C(Nc2ccccc2)=NC[13CH2]1", true},
+    TautomerCase{CS_GUANDR, "[NH]1C(=Nc2ccccc2)NCC1", "N1=C(Nc2ccccc2)NCC1", true},
+    TautomerCase{CS_GUANDR, "N1C(=N[C@H](F)C)NCC1", "N1=C(N[C@H](F)C)NCC1", true},
+    TautomerCase{CS_GUANDR, "N1C(=Nc2ccccc2)NC(C)C1C", "N1C(=Nc2ccccc2)NC(C)C1C", false},
+    TautomerCase{CS_GUANDR, "N1C(=Nc2ccccc2)NC(C)CC1CC", "N1C(=Nc2ccccc2)NC(C)CC1CC", false},
+    TautomerCase{CS_GUANDR, "N1C(=Nc2ccccc2)N[C@H](C)C1", "N1C(=Nc2ccccc2)N[C@H](C)C1", false},
+    TautomerCase{CS_GUANDR, "N1C(=NC(=O)C)NCC1", "N1C(=NC(=O)C)NCC1", false},
+    TautomerCase{CS_GUANDR, "N1C(=N)NCC1", "N1C(=N)NCC1", false},
+    TautomerCase{CS_GUANDR, "N1C(=Nc2ccccc2)NCCCC1", "N1C(=Nc2ccccc2)NCCCC1", false},
+    TautomerCase{CS_GUANDR, "O=C1NC(=Nc2ccccc2)NC1", "O=C1NC(=Nc2ccccc2)NC1", false},
+    TautomerCase{CS_GUANDR, "N1C(=Nc2ccccc2)NNC1", "N1C(=Nc2ccccc2)NNC1", false},
     TautomerCase{CS_ALPHA_KETOAMIDE, "NC(=O)C(O)=C", "NC(=O)C(=O)C", true},
     TautomerCase{CS_ALPHA_KETOAMIDE, "CNC(=O)C(O)=CC", "CNC(=O)C(=O)CC", true},
     TautomerCase{CS_ALPHA_KETOAMIDE, "CN(C)C(=O)C(O)=Cc1ccccc1", "CN(C)C(=O)C(=O)Cc1ccccc1", true},
@@ -2205,6 +2224,45 @@ TEST_F(TestStandardisation, BiguanidePreservesParticipatingChiralAnnotations) {
     EXPECT_TRUE(_m1.bond_between_atoms(3, 4)->is_double_bond());
     EXPECT_TRUE(_m1.bond_between_atoms(3, 5)->is_single_bond());
   }
+}
+
+TEST_F(TestStandardisation, LocalRingGuanidineConvergesWithAllRules) {
+  for (const char* directive : {CS_GUANDR, CS_ALL}) {
+    Chemical_Standardisation standardisation;
+    ASSERT_TRUE(standardisation.Activate(directive, 0));
+    for (const char* input : {"N1C(=Nc2ccccc2)NC(C)C1",
+                              "N1C(Nc2ccccc2)=NC(C)C1",
+                              "N1=C(Nc2ccccc2)NC(C)C1"}) {
+      Molecule original;
+      ASSERT_TRUE(original.build_from_smiles(input));
+      ASSERT_TRUE(_m2.build_from_smiles("N1=C(Nc2ccccc2)NC(C)C1"));
+      const IWString expected = _m2.unique_smiles();
+      const IWString formula = original.molecular_formula();
+      for (int i = 0; i < 100; ++i) {
+        Molecule molecule;
+        ASSERT_TRUE(molecule.build_from_smiles(original.random_smiles()));
+        standardisation.process(molecule);
+        EXPECT_EQ(molecule.unique_smiles(), expected);
+        EXPECT_EQ(molecule.molecular_formula(), formula);
+        EXPECT_TRUE(molecule.valence_ok());
+        EXPECT_EQ(standardisation.process(molecule), 0);
+      }
+    }
+  }
+}
+
+TEST_F(TestStandardisation, LocalRingGuanidineRespectsDisabledRuleAndReports) {
+  _chemical_standardisation.activate_all();
+  ASSERT_TRUE(_chemical_standardisation.Activate("-Rguan", 0));
+  ASSERT_TRUE(_m1.build_from_smiles("N1C(=Nc2ccccc2)NCC1"));
+  const IWString before = _m1.unique_smiles();
+  EXPECT_EQ(_chemical_standardisation.process(_m1), 0);
+  EXPECT_EQ(_m1.unique_smiles(), before);
+  ASSERT_TRUE(_chemical_standardisation.Activate(CS_GUANDR, 0));
+  _chemical_standardisation.set_append_string_depending_on_what_changed(1);
+  EXPECT_EQ(_chemical_standardisation.process(_m1), 1);
+  EXPECT_TRUE(_m1.name().contains("STD:Rguanidine"));
+  EXPECT_EQ(_chemical_standardisation.process(_m1), 0);
 }
 
 TEST_F(TestStandardisation, AlphaKetoamideConvergesAndCanBeDisabled) {

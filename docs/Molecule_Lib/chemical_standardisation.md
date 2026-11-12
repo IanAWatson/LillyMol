@@ -388,6 +388,39 @@ this rule.
 Reports count amidoxime conversions separately. `-g APP=EACH` appends
 `STD:amidoxime` when this rule changes a molecule.
 
+### Locally resolved cyclic guanidines
+
+`-g Rguan`, included in `-g all`, also handles neutral guanidines in isolated,
+otherwise saturated five- and six-membered rings containing two nitrogens:
+
+```text
+N1C(=Nc2ccccc2)NCC1 -> N1=C(Nc2ccccc2)NCC1
+```
+
+The exocyclic nitrogen must have one alkyl or aryl carbon substituent.
+N-acyl and other unsaturated aliphatic external branches are excluded.
+Specified geometry, marked stereocentres on the ring or reacting nitrogen,
+and explicit hydrogen neighbours on reacting nitrogens prevent this additional
+conversion. Existing handling of other ring guanidines is retained.
+
+The representative has an endocyclic C=N bond. The ring nitrogen is chosen
+by a local lexicographic comparison: lower nitrogen isotope first, then lower
+connectivity of the adjacent ring carbon, then lower isotope on that carbon.
+The comparison does not depend on the incoming double-bond position or the
+nitrogen hydrogen counts. Both incoming endocyclic forms are examined, so
+an existing C=N may move to the other ring nitrogen.
+
+If these properties tie and both neighbouring ring carbons are matching CH2
+groups, the two choices are equivalent; an existing endocyclic bond is retained.
+More substituted ties remain unchanged. There is no shell expansion or full
+canonical ranking. This is a canonicalisation convention rather than a
+prediction of solution tautomer populations. Isotopes and remote stereochemistry
+are retained, no charges are introduced, and changed nitrogen hydrogen
+specifications are reset.
+
+Disable the ring rule with `-g all -g -Rguan`. Conversions use the existing
+ring-guanidine counter and `STD:Rguanidine` annotation with `-g APP=EACH`.
+
 ### Simple alpha-ketoamides
 
 `-g alpha-ketoamide` selects the keto form of eligible neutral, acyclic

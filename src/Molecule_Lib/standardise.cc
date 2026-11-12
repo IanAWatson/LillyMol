@@ -7,6 +7,7 @@
 #include <filesystem>
 #include <iostream>
 #include <memory>
+#include <tuple>
 #include <utility>
 #include <vector>
 
@@ -3554,6 +3555,126 @@ compute_guanidine_bond_acceptance_desirability(Molecule& m, atom_number_t n,
 }
 #endif
 
+// Select a ring N without using the current C=N bond or N hydrogen counts:
+// those describe the incoming tautomer rather than a canonical preference.
+static atom_number_t
+LocalRingGuanidineChoice(Molecule& m, atom_number_t carbon,
+                         atom_number_t n1, atom_number_t n2) {
+  const atom_number_t c1 = m[n1].other(n1, m[n1].other(n1, 0) == carbon ? 1 : 0);
+  const atom_number_t c2 = m[n2].other(n2, m[n2].other(n2, 0) == carbon ? 1 : 0);
+  const auto score1 = std::make_tuple(m.isotope(n1), m.ncon(c1), m.isotope(c1));
+  const auto score2 = std::make_tuple(m.isotope(n2), m.ncon(c2), m.isotope(c2));
+  if (score1 < score2) {
+    return n1;
+  }
+  if (score2 < score1) {
+    return n2;
+  }
+  // In an isolated saturated five/six membered ring, matching CH2 groups
+  // adjacent to both N atoms make the two directions equivalent. Stereo on
+  // the ring has already been excluded. Either choice gives the same graph.
+  if (m.ncon(c1) == 2 && m.hcount(c1) == 2 &&
+      m.ncon(c2) == 2 && m.hcount(c2) == 2) {
+    // Retain an existing endocyclic bond in this symmetry case so a second
+    // pass reports no change, even if the ring traversal order has changed.
+    return m.bond_between_atoms(carbon, n2)->is_double_bond() ? n2 : n1;
+  }
+  return kInvalidAtomNumber;  // More substituted ties need a wider comparison.
+}
+
+// Returns -1 outside the locally resolvable scope, 0 if already canonical,
+// and 1 if changed. Inspect both incoming tautomers: an endocyclic C=N may
+// still be on the wrong ring N. The caller reserves handled centres from
+// the legacy rule, including centres needing no bond changes.
+static int
+CanonicaliseLocalRingGuanidine(Molecule& m, atom_number_t carbon,
+                               const IWStandard_Current_Molecule& data) {
+  const int* membership = data.ring_membership();
+  if (membership[carbon] != 1 || m.formal_charge(carbon) ||
+      m.ncon(carbon) != 3 || m.nbonds(carbon) != 4 || m.hcount(carbon)) {
+    return -1;
+  }
+  const Set_of_Atoms* ring = data.ring_containing_atom(carbon);
+  if (ring == nullptr || (ring->number_elements() != 5 && ring->number_elements() != 6)) {
+    return -1;
+  }
+  atom_number_t n1 = kInvalidAtomNumber;
+  atom_number_t n2 = kInvalidAtomNumber;
+  for (atom_number_t a : *ring) {
+    if (membership[a] != 1 || data.atom_is_aromatic()[a] ||
+        m.formal_charge(a) || m.chiral_centre_at_atom(a)) {
+      return -1;
+    }
+    if (a == carbon) {
+      continue;
+    }
+    if (m.atomic_number(a) == 7) {
+      if (m.ncon(a) != 2 || (m.nbonds(a) != 2 && m.nbonds(a) != 3) ||
+          m.hcount(a) != 3 - m.nbonds(a)) {
+        return -1;
+      }
+      if (n1 == kInvalidAtomNumber) {
+        n1 = a;
+      } else if (n2 == kInvalidAtomNumber) {
+        n2 = a;
+      } else {
+        return -1;
+      }
+    } else if (m.atomic_number(a) != 6 || m.nbonds(a) != m.ncon(a) ||
+               m.nbonds(a) + m.hcount(a) != 4) {
+      return -1;
+    }
+  }
+  if (n2 == kInvalidAtomNumber || !m.are_bonded(carbon, n1) ||
+      !m.are_bonded(carbon, n2)) {
+    return -1;
+  }
+  atom_number_t exocyclic = kInvalidAtomNumber;
+  for (const Bond* b : m[carbon]) {
+    if ((!b->is_single_bond() && !b->is_double_bond()) ||
+        b->is_directional() || b->part_of_cis_trans_grouping()) {
+      return -1;
+    }
+    const atom_number_t other = b->other(carbon);
+    if (other != n1 && other != n2) {
+      exocyclic = other;
+    }
+  }
+  if (exocyclic == kInvalidAtomNumber || m.atomic_number(exocyclic) != 7 ||
+      membership[exocyclic] || m.ncon(exocyclic) != 2 ||
+      m.formal_charge(exocyclic) || m.chiral_centre_at_atom(exocyclic) ||
+      (m.nbonds(exocyclic) != 2 && m.nbonds(exocyclic) != 3) ||
+      m.hcount(exocyclic) != 3 - m.nbonds(exocyclic)) {
+    return -1;
+  }
+  for (const Bond* b : m[exocyclic]) {
+    if (b->is_directional() || b->part_of_cis_trans_grouping()) {
+      return -1;
+    }
+    const atom_number_t other = b->other(exocyclic);
+    if (other == carbon) {
+      continue;
+    }
+    if (!b->is_single_bond() || m.atomic_number(other) != 6 ||
+        m.formal_charge(other) ||
+        (!m.is_aromatic(other) && m.nbonds(other) != m.ncon(other))) {
+      return -1;  // Excludes N-acyl and other conjugated external branches.
+    }
+  }
+  const atom_number_t chosen = LocalRingGuanidineChoice(m, carbon, n1, n2);
+  if (chosen == kInvalidAtomNumber) {
+    return -1;
+  }
+  if (m.bond_between_atoms(carbon, chosen)->is_double_bond()) {
+    return 0;
+  }
+  for (atom_number_t n : {n1, n2, exocyclic}) {
+    m.set_bond_type_between_atoms(carbon, n, n == chosen ? DOUBLE_BOND : SINGLE_BOND);
+    m.unset_all_implicit_hydrogen_information(n);
+  }
+  return 1;
+}
+
 // #define DEBUG_RING_GUANIDINE_STANDARDISE
 
 /*
@@ -3602,6 +3723,13 @@ Chemical_Standardisation::_do_transform_ring_guanidine(
     }
 
     if (0 == ring_membership[c]) {
+      continue;
+    }
+
+    if (int local = CanonicaliseLocalRingGuanidine(m, c, current_molecule_data);
+        local >= 0) {
+      rc += local;
+      current_molecule_data.remove_possible_guanidine(c);
       continue;
     }
 

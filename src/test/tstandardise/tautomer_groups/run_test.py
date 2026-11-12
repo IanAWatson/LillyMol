@@ -29,6 +29,35 @@ cases = [
     'N1=C(O)C=C(O)N=C1O.O=c1cc[nH]c(C)n1',
     'N1=NC(=NN=C(C2=CC=NC=C2)Br)NN1',
 ]
+local_ring_guanidines = [
+    'N1C(=Nc2ccccc2)NCC1',
+    'N1C(=NC)NCC1',
+    'N1C(=Nc2ccccc2)NCCC1',
+    'N1C(=Nc2ccccc2)NC(C)C1',
+    'N1C(Nc2ccccc2)=NC(C)C1',
+    'N1=C(Nc2ccccc2)NC(C)C1',
+    'N1C(=Nc2ccccc2)NC(C)CC1',
+    'N1C(=Nc2ccccc2)[15NH]CC1',
+    'N1C(=Nc2ccccc2)NC[13CH2]1',
+    '[NH]1C(=Nc2ccccc2)NCC1',
+    'N1C(=N[C@H](F)C)NCC1',
+    'N1C(=Nc2ccccc2)NC(C)C1C',
+    'N1C(=Nc2ccccc2)NC(C)CC1CC',
+    'N1C(=Nc2ccccc2)N[C@H](C)C1',
+    'N1C(=NC(=O)C)NCC1',
+    'N1C(=N)NCC1',
+    'N1C(=Nc2ccccc2)NCCCC1',
+    'O=C1NC(=Nc2ccccc2)NC1',
+    'N1C(=Nc2ccccc2)NNC1',
+]
+check('local_ring_guanidine', ['-g', 'Rguan'], local_ring_guanidines)
+check('local_ring_guanidine_all', ['-g', 'all'], local_ring_guanidines)
+# With the rule disabled, a bracket-specified H on just one of two
+# symmetry-equivalent N atoms exposes an existing unique-SMILES inconsistency.
+# The enabled-rule checks above include that input and reset its H specification.
+check('local_ring_guanidine_disabled', ['-g', 'all', '-g', '-Rguan'],
+      [smi for smi in local_ring_guanidines if not smi.startswith('[NH]')])
+
 alpha_ketoamides = [
     'NC(=O)C(O)=C',
     'CNC(=O)C(O)=CC',

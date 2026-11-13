@@ -35,7 +35,10 @@ from one, including the identifier token. Tag-based `-M` specifications are
 rejected; only `col=<col>` is supported. Limits include the leader. A global
 `-m` limit must be at least two; a per-molecule limit of one is allowed and
 produces a singleton. A per-molecule limit overrides the global `-m` limit.
-Use `-h` to avoid repeating the centre if it occurs in its own neighbour list.
+Use `-h` to exclude self-neighbours from both leader and Taylor–Butina
+clustering, including the neighbour counts used to select Butina centres.
+This does not exclude zero-distance neighbours with different identifiers.
+The option does not change Jarvis–Patrick neighbour-list semantics.
 
 Input order defines molecule priority: put the highest-scoring or most desirable
 molecules first before generating the neighbour file. With multiple input files,
@@ -60,6 +63,9 @@ it is not equivalent to clustering the complete collection and filtering its
 output afterwards. This also reduces Jarvis–Patrick shared-neighbour counts,
 and `-J` list-size limits apply to the remaining neighbour lists. Unknown
 neighbours remain errors when the pool limit has not been reached.
+
+Neighbour distances must be finite and in `[0, 1]`; NaN and infinities are rejected
+when the data is loaded.
 
 Malformed input is an error, not an end-of-file marker. Truncated TFRecord
 frames, checksum failures, invalid protobufs, missing identifiers, and incomplete

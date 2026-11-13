@@ -6,6 +6,7 @@
 
 #include <algorithm>
 #include <cctype>
+#include <cmath>
 #include <limits>
 #include <memory>
 #include <optional>
@@ -156,7 +157,7 @@ class Leader_Item {
 
   //  private functions
 
-  void RemoveMissingNeighbours();
+  void RemoveExcludedNeighbours();
 
   int Build(const nnbr::NearNeighbours& proto,
                    const IW_STL_Hash_Map_int& id_to_ndx,
@@ -228,11 +229,13 @@ Leader_Item::~Leader_Item() {
   return;
 }
 
+// Normalise a loaded list once, keeping indices and distances aligned. The
+// clustering kernels need no checks for omitted neighbours or suppressed self IDs.
 void
-Leader_Item::RemoveMissingNeighbours() {
+Leader_Item::RemoveExcludedNeighbours() {
   int retained = 0;
   for (int i = 0; i < _nbrs; ++i) {
-    if (_nbr[i] < 0) {
+    if (_nbr[i] < 0 || (suppress_self_neighbours && _nbr[i] == _ndx)) {
       continue;
     }
     _nbr[retained] = _nbr[i];
@@ -521,7 +524,7 @@ convert_to_float(const const_IWSubstring& buffer, T& d, const T minv, const T ma
   const_IWSubstring s;
   buffer.from_to(openangle + 1, buffer.length() - 2, s);
 
-  if (!s.numeric_value(d) || d < minv || d > maxv) {
+  if (!s.numeric_value(d) || !std::isfinite(d) || d < minv || d > maxv) {
     cerr << "convert_to_float:invalid distance '" << buffer << "'\n";
     return 0;
   }
@@ -592,8 +595,8 @@ Leader_Item::build(iwstring_data_source& input, const IW_STL_Hash_Map_int& id_to
     return 0;
   }
 
-  if (ignore_missing_neighbours) {
-    RemoveMissingNeighbours();
+  if (ignore_missing_neighbours || suppress_self_neighbours) {
+    RemoveExcludedNeighbours();
   }
 
 #ifdef DEBUG_BUILD
@@ -662,7 +665,7 @@ Leader_Item::Build(const nnbr::NearNeighbours& proto,
     }
 
     float d = nbr.dist();
-    if (d < 0.0f || d > maximum_distance) {
+    if (!std::isfinite(d) || d < 0.0f || d > maximum_distance) {
       cerr << "Leader_Item::Build:invalid distance " << proto.ShortDebugString() << '\n';
       return 0;
     }
@@ -671,8 +674,8 @@ Leader_Item::Build(const nnbr::NearNeighbours& proto,
     ++ndx;
   }
 
-  if (ignore_missing_neighbours) {
-    RemoveMissingNeighbours();
+  if (ignore_missing_neighbours || suppress_self_neighbours) {
+    RemoveExcludedNeighbours();
   }
 
 #ifdef DEBUG_BUILD
@@ -781,10 +784,6 @@ Leader_Item::form_cluster_threshold(int* selected, const float threshold,
       continue;
     }
 
-    if (suppress_self_neighbours && j == _ndx) {
-      continue;
-    }
-
     csize++;
   }
 
@@ -793,10 +792,6 @@ Leader_Item::form_cluster_threshold(int* selected, const float threshold,
   if (1 == csize) {
     selected[_ndx] = 1;
     return finish_cluster(1, output);
-  }
-
-  if (suppress_self_neighbours) {
-    selected[_ndx] = 1;
   }
 
   for (int i = 0; i < istop; ++i) {
@@ -823,12 +818,8 @@ Leader_Item::form_cluster_max_cluster_size(int* selected, const float threshold,
                                            const resizable_array_p<IWString>& smiles,
                                            const resizable_array_p<IWString>& id,
                                            IWString_and_File_Descriptor& output) {
-  // The limit includes the leader. With -h, exclude a self neighbour from
-  // both the size calculation and output, just as in the uncapped path.
-  if (suppress_self_neighbours) {
-    selected[_ndx] = 1;
-  }
-
+  // The limit includes the leader. Any self neighbours suppressed by -h
+  // have already been removed during ingestion.
   int csize = 1;
   int istop = 0;
   for (; istop < _nbrs && csize < max_cluster_size; ++istop) {
@@ -1575,7 +1566,7 @@ leader(int argc, char** argv) {
     }
   }
 
-  if (cl.option_present('h')) {
+  if (cl.option_present('h') && njp == 0) {
     suppress_self_neighbours = 1;
 
     if (verbose) {

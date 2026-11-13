@@ -61,6 +61,16 @@ The existing regression cases passed despite the bugs below.
   numbers. Tests check zero-distance matches, distance-one neighbours,
   isolated molecules and identical results across all three option forms.
 
+- [x] Remove self neighbours once during ingestion when `-h` applies (leader
+  and Taylor–Butina). Combine this with omitted-neighbour compaction, keeping
+  indices/distances aligned without another allocation. Remove self checks
+  from cluster formation. Mixed self/no-self lists no longer bias Butina's
+  input-order tie breaking; JP's existing interpretation is preserved.
+- [x] Reject non-finite distances during TDT/proto loading, before pruning or
+  clustering. NaN previously passed proto range comparisons and could join
+  molecules even at threshold zero. No finite-value checks are added to the
+  clustering kernels.
+
 ## Correctness status
 
 All correctness issues recorded in this review have been addressed.
@@ -75,6 +85,10 @@ All correctness issues recorded in this review have been addressed.
   during optimisation unless a deliberate behaviour change is agreed.
 - Neighbour lists are assumed sorted by distance. Do not add repeated sorting
   or validation in the clustering kernels.
+- Neighbour IDs are assumed distinct within a list. Malformed duplicate IDs
+  can inflate counts and size headers; normal GFP-generated lists should not
+  contain them. Any future validation should happen during ingestion, not in
+  the clustering kernels.
 
 ## Optimisation work, after correctness
 

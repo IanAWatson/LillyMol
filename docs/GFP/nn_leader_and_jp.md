@@ -99,3 +99,41 @@ produce a warning. This is only a sanity check: the observed maximum is not the
 generation cutoff, and count-limited lists cannot establish complete distance
 coverage. The check uses records read under `-s`, before self or excluded-subset
 neighbours are removed. Jarvis–Patrick does not use this distance check.
+
+## Reassigning small clusters
+
+```shell
+nn_leader_and_jp -h -t 0.2 -R 1 neighbours.nn > reassigned.tdt
+nn_leader_and_jp -r -T -h -t 0.2,0.3 -R 2 -B reassigned neighbours.rio
+```
+
+`-R <size>` enables a final pass for leader or Taylor–Butina clustering. Size
+includes the leader: `-R 1` reassigns singletons, while `-R 2` also dissolves
+pairs. Each member independently joins the cluster containing its nearest
+**stored** neighbour among original members of clusters larger than this limit.
+Only the initial larger clusters are destinations; newly reassigned members do
+not attract further items. A pair may split between two destinations. Equal
+distances favour the earliest neighbour in molecule input order, regardless of
+its position among equal-distance entries in a neighbour list.
+
+The final pass examines stored distances beyond the initial `-t`. Resulting
+clusters can exceed both the original threshold and `-m`/`-M` size constraints.
+Use neighbour lists with enough distance coverage for this search; this tool
+cannot calculate missing distances from fingerprints. Members with no stored
+neighbour in a destination cluster retain their original membership, with a
+warning. If no larger clusters exist, the original clustering is retained.
+Molecules left unclustered by `-C` are neither reassigned nor destinations.
+
+Destination leaders remain unchanged. A partially dissolved source cluster
+whose leader moved uses its first remaining input member as its new leader.
+`DIST` continues to mean distance to the final leader. Either stored direction
+can supply that distance; if neither exists, the member is written without a
+`DIST` field (or without a distance column in `-a` output). A warning reports
+the number of missing leader distances. The attracting member's distance is
+never substituted for an unavailable leader distance.
+
+With `-R`, output is deferred until the final pass, and empty clusters are
+removed with consecutive output cluster numbers. Without `-R`, write-as-you-go
+output is unchanged. Membership and reassignment state are private to each
+threshold worker. `-R` is incompatible with Jarvis–Patrick (`-J`). Verbose
+cluster-size statistics describe the final clustering.

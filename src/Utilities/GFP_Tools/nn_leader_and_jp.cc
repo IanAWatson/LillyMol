@@ -51,6 +51,7 @@ static int write_tdt_output = 1;
 
 static int max_clusters_to_find = std::numeric_limits<int>::max();
 static int max_cluster_size = 0;
+static int reassign_max_size = 0;
 
 /*
   We can process any number of thresholds
@@ -1251,6 +1252,185 @@ report_clustering(const int* selected, const resizable_array<int>& cluster_size,
   return cerr.good();
 }
 
+struct ClusterMember {
+  int item;
+  float distance;
+};
+
+struct StoredCluster {
+  int root;
+  std::vector<ClusterMember> members;
+};
+
+// The ordinary clustering path still writes immediately. This collector is used
+// only with -R, and applies the same threshold, cap and selection updates.
+template <typename MarkSelected>
+static int
+CollectCluster(const Leader_Item& root, int root_index, float cutoff, int max_size,
+               const int* selected, StoredCluster& cluster, MarkSelected mark_selected) {
+  cluster.root = root_index;
+  cluster.members.push_back({root_index, 0.0f});
+  for (int i = 0; i < root.neighbour_count(); ++i) {
+    const float d = root.neighbour_distance(i);
+    if (d > cutoff || (max_size > 0 && cluster.members.size() >= static_cast<size_t>(max_size))) {
+      break;
+    }
+    const int item = root.neighbour(i);
+    if (selected[item]) {
+      continue;
+    }
+    cluster.members.push_back({item, d});
+    mark_selected(item);
+  }
+  mark_selected(root_index);
+  return cluster.members.size();
+}
+
+// Fall back to the member's stored direction when the leader has no such edge.
+// A missing edge is unknown, not zero, and is omitted from the final output.
+static float
+DistanceToRoot(const Leader_Item& item, int root) {
+  for (int i = 0; i < item.neighbour_count(); ++i) {
+    if (item.neighbour(i) == root) {
+      return item.neighbour_distance(i);
+    }
+  }
+  return -1.0f;
+}
+
+static int
+ReassignClusters(const Leader_Item* pool, int pool_size,
+                 std::vector<StoredCluster>& clusters, float cutoff,
+                 std::mutex& diagnostics_mutex) {
+  std::vector<int> original(pool_size, -1);
+  std::vector<float> original_distances(pool_size, 0.0f);
+  for (int c = 0; c < static_cast<int>(clusters.size()); ++c) {
+    for (const ClusterMember& member : clusters[c].members) {
+      original[member.item] = c;
+      original_distances[member.item] = member.distance;
+    }
+  }
+  std::vector<int> assignment(original);
+  int moved = 0;
+  int retained = 0;
+  for (int item = 0; item < pool_size; ++item) {
+    if (original[item] < 0 ||
+        clusters[original[item]].members.size() > static_cast<size_t>(reassign_max_size)) {
+      continue;
+    }
+    float closest = std::numeric_limits<float>::max();
+    int nearest = pool_size;
+    int destination = -1;
+    // Inspect the entire stored list, including distances beyond this run's -t.
+    for (int i = 0; i < pool[item].neighbour_count(); ++i) {
+      const int target = pool[item].neighbour(i);
+      const int c = original[target];
+      if (c < 0 || clusters[c].members.size() <= static_cast<size_t>(reassign_max_size)) {
+        continue;
+      }
+      const float d = pool[item].neighbour_distance(i);
+      if (d < closest || (d == closest && target < nearest)) {
+        closest = d;
+        nearest = target;
+        destination = c;
+      }
+    }
+    if (destination < 0) {
+      ++retained;
+    } else {
+      assignment[item] = destination;
+      ++moved;
+    }
+  }
+  int missing_distances = 0;
+  if (moved) {
+    std::vector<std::vector<int>> members(clusters.size());
+    for (int item = 0; item < pool_size; ++item) {
+      if (assignment[item] >= 0) {
+        members[assignment[item]].push_back(item);
+      }
+    }
+    // Cache each surviving leader's edges once. Stamps avoid clearing an N-sized
+    // array for every cluster, and lookup avoids rescanning a long leader list
+    // separately for every incoming member.
+    std::vector<int> distance_owner(pool_size, -1);
+    std::vector<float> leader_distances(pool_size);
+    for (int c = 0; c < static_cast<int>(clusters.size()); ++c) {
+      StoredCluster& cluster = clusters[c];
+      cluster.members.clear();
+      if (members[c].empty()) {
+        continue;
+      }
+      const int old_root = cluster.root;
+      if (assignment[old_root] != c) {
+        cluster.root = members[c].front();
+      }
+      for (int i = 0; i < pool[cluster.root].neighbour_count(); ++i) {
+        const int item = pool[cluster.root].neighbour(i);
+        distance_owner[item] = c;
+        leader_distances[item] = pool[cluster.root].neighbour_distance(i);
+      }
+      cluster.members.push_back({cluster.root, 0.0f});
+      for (int item : members[c]) {
+        if (item == cluster.root) {
+          continue;
+        }
+        float d;
+        if (original[item] == c && cluster.root == old_root) {
+          d = original_distances[item];
+        } else if (distance_owner[item] == c) {
+          d = leader_distances[item];
+        } else {
+          d = DistanceToRoot(pool[item], cluster.root);
+        }
+        missing_distances += d < 0.0f;
+        cluster.members.push_back({item, d});
+      }
+    }
+  }
+  if (verbose || retained || missing_distances) {
+    const std::lock_guard<std::mutex> lock(diagnostics_mutex);
+    cerr << "Threshold " << cutoff << ": reassigned " << moved << " small-cluster members\n";
+    if (retained) {
+      cerr << "Warning: retained " << retained
+           << " members without a stored neighbour in a larger cluster\n";
+    }
+    if (missing_distances) {
+      cerr << "Warning: omitted unavailable leader distances for " << missing_distances
+           << " members; reassignment used closest stored cluster members\n";
+    }
+  }
+  return moved;
+}
+
+static int
+WriteStoredClusters(const std::vector<StoredCluster>& clusters,
+                    const resizable_array_p<IWString>& smiles,
+                    const resizable_array_p<IWString>& id,
+                    extending_resizable_array<int>& sizes,
+                    IWString_and_File_Descriptor& output) {
+  for (int i = 0; i < sizes.number_elements(); ++i) {
+    sizes[i] = 0;
+  }
+  int number = 0;
+  for (const StoredCluster& cluster : clusters) {
+    if (cluster.members.empty()) {
+      continue;
+    }
+    const int size = cluster.members.size();
+    write_cluster_header(cluster.root, smiles, id, number++, size, output);
+    for (int i = 1; i < size; ++i) {
+      const ClusterMember& member = cluster.members[i];
+      write_smiles_id_dist(smiles[member.item], id[member.item], member.distance, output);
+    }
+    finish_cluster(size, output);
+    if (verbose) {
+      sizes[size]++;
+    }
+  }
+  return number;
+}
+
 static int
 choose_next_centre(const int* selected, int pool_size, int& istart, int& icentre) {
   icentre = -1;
@@ -1282,6 +1462,7 @@ leader(const Leader_Item* pool, const int pool_size, int* selected,
   std::fill_n(selected, pool_size, 0);
 
   extending_resizable_array<int> cluster_size;
+  std::vector<StoredCluster> stored_clusters;
 
   // Each threshold starts a fresh scan, while selections within a run advance it.
   int istart = 0;
@@ -1323,6 +1504,11 @@ leader(const Leader_Item* pool, const int pool_size, int* selected,
     // The ordinary leader callback compiles to the original selected[] store.
     // Only Butina tracks assignments for its subsequent count update.
     const auto form_cluster = [&](auto mark_selected) {
+      if (reassign_max_size > 0) {
+        stored_clusters.emplace_back();
+        return CollectCluster(ldr, icentre, global_threshold, max_cluster_size_this_molecule,
+                              selected, stored_clusters.back(), mark_selected);
+      }
       if (max_cluster_size_this_molecule) {
         return ldr.form_cluster_max_cluster_size(
             selected, global_threshold, max_cluster_size_this_molecule, clusters_found,
@@ -1351,6 +1537,11 @@ leader(const Leader_Item* pool, const int pool_size, int* selected,
     if (!choose_next()) {
       break;
     }
+  }
+
+  if (reassign_max_size > 0) {
+    ReassignClusters(pool, pool_size, stored_clusters, global_threshold, diagnostics_mutex);
+    clusters_found = WriteStoredClusters(stored_clusters, smiles, id, cluster_size, output);
   }
 
   if (verbose) {
@@ -1500,6 +1691,8 @@ the most unselected neighbours, breaking ties by earliest input position.
 Usage:
 L -t <dis>         distance threshold(s) in [0, 1], inclusive; CSV '-t 0.15,0.20,0.25'
 L -C <number>      maximum number of clusters to find
+L -R <size>        reassign clusters of at most <size> members to larger clusters
+                  uses closest stored member; ignores threshold and size cap
 L -m <number>      maximum cluster size
 L -M col=<col>     max cluster size for each molecule in column <col> of name
 
@@ -1648,7 +1841,7 @@ ReportClusterSizes(const Leader_Item* pool, int pool_size, std::ostream& output)
 
 static int
 leader(int argc, char** argv) {
-  Command_Line cl(argc, argv, "vs:I:t:C:m:M:B:J:aThr");
+  Command_Line cl(argc, argv, "vs:I:t:C:m:M:B:J:aThrR:");
 
   if (cl.unrecognised_options_encountered()) {
     cerr << "Unrecognised options encountered\n";
@@ -1800,6 +1993,17 @@ leader(int argc, char** argv) {
 
     if (verbose) {
       cerr << "Recognised " << njp << " Jarvis Patrick clustering specifications\n";
+    }
+  }
+
+  if (cl.option_present('R')) {
+    if (!cl.value('R', reassign_max_size) || reassign_max_size < 1) {
+      cerr << "The reassignment size (-R) must be a positive integer\n";
+      return 1;
+    }
+    if (njp) {
+      cerr << "The -R reassignment option applies only to leader and Taylor Butina\n";
+      return 1;
     }
   }
 

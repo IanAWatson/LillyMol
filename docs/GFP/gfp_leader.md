@@ -227,7 +227,9 @@ may have been slow.
 `gfp_leader_standard -t 0.2 -R 1 fingerprints.gfp` first forms the usual
 leader clusters, then dissolves singletons into larger clusters. `-R 2` dissolves
 clusters containing one or two members, counting the leader. The same `-R <size>`
-option is available in `gfp_leader`.
+option is available in `gfp_leader`. For precomputed neighbour lists,
+[nn_leader_and_jp](nn_leader_and_jp.md#reassigning-small-clusters) also supports
+`-R`, subject to the distances available in those lists.
 
 Each dissolved member independently joins the cluster containing its closest
 member. Destinations and their eligible members are fixed from the initial

@@ -5,10 +5,11 @@
 #include <stdlib.h>
 
 #include <algorithm>
+#include <cctype>
 #include <limits>
 #include <memory>
 #include <optional>
-#include <random>
+#include <string_view>
 
 #define RESIZABLE_ARRAY_IMPLEMENTATION
 #include "Foundational/accumulator/accumulator.h"
@@ -19,7 +20,6 @@
 #include "Foundational/iwmisc/iwdigits.h"
 #include "Foundational/iwmisc/misc.h"
 #include "Foundational/iwmisc/set_or_unset.h"
-#include "Foundational/iwmisc/timsort.hpp"
 #include "Foundational/iwstring/iw_stl_hash_map.h"
 
 #ifdef BUILD_BAZEL
@@ -31,20 +31,6 @@
 using std::cerr;
 
 typedef float similarity_type_t;
-
-/*
-  We can have the threshold for each item read from the file
-*/
-
-static IWString score_tag;
-
-static int scores_present = 0;
-
-/*
-  Or the score may be embedded in the id
-*/
-
-static int score_column = -1;
 
 static int verbose = 0;
 
@@ -68,15 +54,6 @@ static int max_cluster_size = 0;
 static int number_thresholds = 0;
 static similarity_type_t* threshold = nullptr;
 
-static int select_next_leader_randomly = 0;
-
-/*
-  Note order dependency of initialisation...
-*/
-
-static std::random_device rd;
-static std::mt19937_64 rng(rd());
-
 /*
   The identifier tag used in each TDT
 */
@@ -88,16 +65,10 @@ static IWString neighbour_tag("NBR<");
 
 static IWString distance_tag("DIST<");
 
-static int number_threshold_tags = 0;
-static IWString* threshold_from_file_tag = nullptr;
-
-static IWString max_cluster_size_tag;
 static int max_cluster_size_column = -1;
 
 static IWString cluster_number_tag("CLUSTER<");
 static IWString cluster_size_tag("CSIZE<");
-
-typedef float score_t;
 
 static int taylor_butina = 0;
 
@@ -181,24 +152,18 @@ class Leader_Item {
 
   Set_or_Unset<int> _max_cluster_size;
 
-  //  Each item may have any number of thresholds associated with it
-
-  similarity_type_t* _threshold;
-
-  score_t _score;
-
   int _ndx;
 
   //  private functions
 
+  void RemoveMissingNeighbours();
+
   int Build(const nnbr::NearNeighbours& proto,
                    const IW_STL_Hash_Map_int& id_to_ndx,
-                   int n);
+                   int n, bool ignore_missing_neighbours);
  public:
   Leader_Item();
   ~Leader_Item();
-
-  int threshold(similarity_type_t& zresult, int which_one) const;
 
   int
   neighbour_count() const {
@@ -210,16 +175,6 @@ class Leader_Item {
     _ndx = s;
   }
 
-  score_t
-  score() const {
-    return _score;
-  }
-
-  void
-  set_score(const score_t s) {
-    _score = s;
-  }
-
   void update_max_distance(float& d) const;
 
   int
@@ -227,10 +182,11 @@ class Leader_Item {
     return _max_cluster_size.value(m);
   }
 
-  int build(iwstring_data_source& input, const IW_STL_Hash_Map_int& id_to_ndx, int n);
+  int build(iwstring_data_source& input, const IW_STL_Hash_Map_int& id_to_ndx,
+            int n, bool ignore_missing_neighbours);
   int Build(iw_tf_data_record::TFDataReader& input,
                    const IW_STL_Hash_Map_int& id_to_ndx,
-                   int n);
+                   int n, bool ignore_missing_neighbours);
 
   int form_cluster_threshold(int* selected, const float threshold,
                              const int cluster_number,
@@ -255,8 +211,6 @@ Leader_Item::Leader_Item() {
   _nbrs = 0;
   _nbr = nullptr;
   _dist = nullptr;
-  _threshold = nullptr;
-  _score = static_cast<score_t>(0.0);
   _ndx = -1;
 
   return;
@@ -271,11 +225,21 @@ Leader_Item::~Leader_Item() {
     delete[] _dist;
   }
 
-  if (nullptr != _threshold) {
-    delete[] _threshold;
-  }
-
   return;
+}
+
+void
+Leader_Item::RemoveMissingNeighbours() {
+  int retained = 0;
+  for (int i = 0; i < _nbrs; ++i) {
+    if (_nbr[i] < 0) {
+      continue;
+    }
+    _nbr[retained] = _nbr[i];
+    _dist[retained] = _dist[i];
+    ++retained;
+  }
+  _nbrs = retained;
 }
 
 void
@@ -291,138 +255,174 @@ Leader_Item::update_max_distance(float& d) const {
   return;
 }
 
+// Per-record readers must distinguish an error from clean EOF. The first
+// pass must never turn a damaged suffix into a successfully loaded prefix.
+enum class RecordReadResult { kRecord, kEof, kError };
+
 static int
 data_from_tdt(const const_IWSubstring buffer, resizable_array_p<IWString>& s) {
-  int openangle = buffer.index('<');
-  if (openangle < 0) {  // huh?
+  const int openangle = buffer.index('<');
+  if (openangle < 0 || !buffer.ends_with('>')) {
     return 0;
   }
 
   IWString* tmp = new IWString;
-
-  buffer.from_to(openangle + 1, buffer.length() - 2, *tmp);
-
+  // An empty SMILES is allowed, but from_to requires a nonempty range.
+  if (buffer.length() > openangle + 2) {
+    buffer.from_to(openangle + 1, buffer.length() - 2, *tmp);
+  }
   s.add(tmp);
-
   return 1;
 }
 
-static int
+static RecordReadResult
 ReadSmilesAndIdsAndNbrCount(const nnbr::NearNeighbours& proto,
-                                  resizable_array_p<IWString>& smiles,
-                                  resizable_array_p<IWString>& id,
-                                  resizable_array<int>& ncount) {
-
+                           resizable_array_p<IWString>& smiles,
+                           resizable_array_p<IWString>& id,
+                           resizable_array<int>& ncount) {
+  if (proto.name().empty() ||
+      std::isspace(static_cast<unsigned char>(proto.name().front()))) {
+    cerr << "ReadSmilesAndIdsAndNbrCount:missing or empty identifier\n";
+    return RecordReadResult::kError;
+  }
   id << new IWString(proto.name());
   smiles << new IWString(proto.smiles());
   ncount << proto.nbr_size();
-
-  return 1;
+  return RecordReadResult::kRecord;
 }
 
-static int
+static RecordReadResult
 ReadSmilesAndIdsAndNbrCount(iw_tf_data_record::TFDataReader& input,
-                                  resizable_array_p<IWString>& smiles,
-                                  resizable_array_p<IWString>& id,
-                                  resizable_array<int>& ncount) {
-  std::optional<nnbr::NearNeighbours> maybe_proto = 
-        input.ReadProto<nnbr::NearNeighbours>();
-  if (! maybe_proto) {
-    return 0;
+                           resizable_array_p<IWString>& smiles,
+                           resizable_array_p<IWString>& id,
+                           resizable_array<int>& ncount) {
+  // Read the frame separately so a protobuf parse failure cannot be confused
+  // with EOF, even if the reader has already buffered the final frame.
+  const auto data = input.Next();
+  if (!data) {
+    if (input.good() && input.eof()) {
+      return RecordReadResult::kEof;
+    }
+    cerr << "ReadSmilesAndIdsAndNbrCount:record read error after "
+         << input.items_read() << " records\n";
+    return RecordReadResult::kError;
   }
-
-  return ReadSmilesAndIdsAndNbrCount(*maybe_proto, smiles, id, ncount);
+  nnbr::NearNeighbours proto;
+  if (!proto.ParseFromString(std::string_view(data->data(), data->length()))) {
+    cerr << "ReadSmilesAndIdsAndNbrCount:cannot parse protobuf record "
+         << input.items_read() << '\n';
+    return RecordReadResult::kError;
+  }
+  return ReadSmilesAndIdsAndNbrCount(proto, smiles, id, ncount);
 }
 
-static int
+static RecordReadResult
 read_smiles_and_ids_and_nbr_count(iwstring_data_source& input,
-                                  resizable_array_p<IWString>& smiles,
-                                  resizable_array_p<IWString>& id,
-                                  resizable_array<int>& ncount)
-
-{
+                                resizable_array_p<IWString>& smiles,
+                                resizable_array_p<IWString>& id,
+                                resizable_array<int>& ncount) {
   const_IWSubstring buffer;
-
-  int got_smiles_this_molecule = 0;
-  int got_id_this_molecule = 0;
-  int nbrs_this_molecule = 0;
+  bool got_smiles = false;
+  bool got_id = false;
+  bool got_record_data = false;
+  bool terminated = false;
+  int nbrs = 0;
 
   while (input.next_record(buffer)) {
+    if (buffer.empty()) {
+      continue;
+    }
+    got_record_data = true;
+    if (buffer == '|') {
+      terminated = true;
+      break;
+    }
     if (buffer.starts_with(smiles_tag)) {
-      if (0 == got_smiles_this_molecule) {
-        data_from_tdt(buffer, smiles);
-        got_smiles_this_molecule = 1;
+      if (!got_smiles) {
+        if (!data_from_tdt(buffer, smiles)) {
+          cerr << "Invalid SMILES dataitem at line " << input.lines_read() << '\n';
+          return RecordReadResult::kError;
+        }
+        got_smiles = true;
       }
     } else if (buffer.starts_with(identifier_tag)) {
-      if (0 == got_id_this_molecule) {
-        data_from_tdt(buffer, id);
-        got_id_this_molecule = 1;
-      } else {
-        nbrs_this_molecule++;
+      // Validate parent and neighbour IDs before substring extraction. In
+      // particular, an empty parent must not be mistaken for a missing one.
+      if (buffer.length() <= identifier_tag.length() + 1 || !buffer.ends_with('>') ||
+          std::isspace(static_cast<unsigned char>(buffer[identifier_tag.length()]))) {
+        cerr << "Invalid or empty identifier at line " << input.lines_read() << '\n';
+        return RecordReadResult::kError;
       }
-    } else if ('|' == buffer) {
-      break;
+      if (!got_id) {
+        if (!data_from_tdt(buffer, id)) {
+          return RecordReadResult::kError;
+        }
+        got_id = true;
+      } else {
+        ++nbrs;
+      }
     }
   }
 
-  if (!got_smiles_this_molecule && !got_id_this_molecule) {
-    return 0;
+  if (!input.good()) {
+    cerr << "TDT read error near line " << input.lines_read() << '\n';
+    return RecordReadResult::kError;
   }
-
-  ncount.add(nbrs_this_molecule);
-
-  return 1;
+  if (!terminated) {
+    if (!got_record_data && input.eof()) {
+      return RecordReadResult::kEof;
+    }
+    cerr << "Unterminated neighbour record near line " << input.lines_read() << '\n';
+    return RecordReadResult::kError;
+  }
+  if (!got_smiles || !got_id) {
+    cerr << "Neighbour record missing SMILES or identifier near line "
+         << input.lines_read() << '\n';
+    return RecordReadResult::kError;
+  }
+  ncount.add(nbrs);
+  return RecordReadResult::kRecord;
 }
 
 static int
 read_smiles_and_ids_and_nbr_count(iwstring_data_source& input, const int max_pool_size,
-                                  resizable_array_p<IWString>& smiles,
-                                  resizable_array_p<IWString>& id,
-                                  resizable_array<int>& ncount) {
-  while (read_smiles_and_ids_and_nbr_count(input, smiles, id, ncount)) {
-    if (smiles.size() != id.size() || id.size() != ncount.size()) {
-      cerr << "Mismatch on smiles " << smiles.size() << " ids " << id.size()
-           << " and/or ncount " << ncount.size() << " at line " << input.lines_read()
-           << '\n';
+                                resizable_array_p<IWString>& smiles,
+                                resizable_array_p<IWString>& id,
+                                resizable_array<int>& ncount) {
+  while (smiles.number_elements() < max_pool_size) {
+    const auto status = read_smiles_and_ids_and_nbr_count(input, smiles, id, ncount);
+    if (status == RecordReadResult::kError) {
       return 0;
     }
-
-    if (smiles.number_elements() >= max_pool_size) {
+    if (status == RecordReadResult::kEof) {
       break;
     }
   }
-
   if (smiles.empty()) {
     cerr << "read_smiles_and_ids_and_nbr_count:no data\n";
     return 0;
   }
-
   return smiles.number_elements();
 }
 
 static int
 ReadSerializedProtos(iw_tf_data_record::TFDataReader& input, const int max_pool_size,
-                                  resizable_array_p<IWString>& smiles,
-                                  resizable_array_p<IWString>& id,
-                                  resizable_array<int>& ncount) {
-  while (ReadSmilesAndIdsAndNbrCount(input, smiles, id, ncount)) {
-    if (smiles.size() != id.size() || id.size() != ncount.size()) {
-      cerr << "Mismatch on smiles " << smiles.size() << " ids " << id.size()
-           << " and/or ncount " << ncount.size() << " at line " << input.items_read()
-           << '\n';
+                     resizable_array_p<IWString>& smiles,
+                     resizable_array_p<IWString>& id,
+                     resizable_array<int>& ncount) {
+  while (smiles.number_elements() < max_pool_size) {
+    const auto status = ReadSmilesAndIdsAndNbrCount(input, smiles, id, ncount);
+    if (status == RecordReadResult::kError) {
       return 0;
     }
-
-    if (smiles.number_elements() >= max_pool_size) {
+    if (status == RecordReadResult::kEof) {
       break;
     }
   }
-
   if (smiles.empty()) {
-    cerr << "read_smiles_and_ids_and_nbr_count:no data\n";
+    cerr << "ReadSerializedProtos:no data\n";
     return 0;
   }
-
   return smiles.number_elements();
 }
 
@@ -457,7 +457,7 @@ ReadSerializedProtos(const char* fname, const int max_pool_size,
 
 static int
 get_nbr_id(const const_IWSubstring& buffer, const IW_STL_Hash_Map_int& id_to_ndx,
-           int& nbr) {
+           int& nbr, bool ignore_missing_neighbours) {
   int openangle = buffer.index('<');
   if (openangle < 0) {
     return 0;
@@ -471,6 +471,10 @@ get_nbr_id(const const_IWSubstring& buffer, const IW_STL_Hash_Map_int& id_to_ndx
   const auto f = id_to_ndx.find(id);
 
   if (f == id_to_ndx.end()) {
+    if (ignore_missing_neighbours) {
+      nbr = -1;
+      return 1;
+    }
     cerr << "get_nbr_id:no number for '" << id << "'\n";
     return 0;
   }
@@ -484,7 +488,7 @@ get_nbr_id(const const_IWSubstring& buffer, const IW_STL_Hash_Map_int& id_to_ndx
 
 static int
 GetNbrId(const std::string& id, const IW_STL_Hash_Map_int& id_to_ndx,
-         int& nbr) {
+         int& nbr, bool ignore_missing_neighbours) {
   IWString s(id);
 
   s.truncate_at_first(' ');
@@ -492,6 +496,10 @@ GetNbrId(const std::string& id, const IW_STL_Hash_Map_int& id_to_ndx,
   const auto f = id_to_ndx.find(s);
 
   if (f == id_to_ndx.end()) {
+    if (ignore_missing_neighbours) {
+      nbr = -1;
+      return 1;
+    }
     cerr << "GetNbrId:no number for '" << id << "'\n";
     return 0;
   }
@@ -504,7 +512,11 @@ GetNbrId(const std::string& id, const IW_STL_Hash_Map_int& id_to_ndx,
 template <typename T>
 int
 convert_to_float(const const_IWSubstring& buffer, T& d, const T minv, const T maxv) {
-  int openangle = buffer.index('<');
+  const int openangle = buffer.index('<');
+  if (openangle < 0 || buffer.length() <= openangle + 2 || !buffer.ends_with('>')) {
+    cerr << "convert_to_float:invalid numeric dataitem '" << buffer << "'\n";
+    return 0;
+  }
 
   const_IWSubstring s;
   buffer.from_to(openangle + 1, buffer.length() - 2, s);
@@ -519,7 +531,7 @@ convert_to_float(const const_IWSubstring& buffer, T& d, const T minv, const T ma
 
 int
 Leader_Item::build(iwstring_data_source& input, const IW_STL_Hash_Map_int& id_to_ndx,
-                   int n) {
+                   int n, bool ignore_missing_neighbours) {
   _nbrs = n;
   _nbr = new int[_nbrs];
   _dist = new float[_nbrs];
@@ -529,37 +541,59 @@ Leader_Item::build(iwstring_data_source& input, const IW_STL_Hash_Map_int& id_to
   int ndx_nbrs = 0;  // index into _nbrs
   int ndx_dist = 0;  // index into _dist array
 
+  bool terminated = false;
   const_IWSubstring buffer;
   while (input.next_record(buffer)) {
     //  cerr << "Leader_Item::build:reading '" << buffer << "'\n";
 
     if ('|' == buffer) {
+      terminated = true;
       break;
     }
 
     if (buffer.starts_with(identifier_tag)) {
       if (0 == id.length()) {
-        buffer.from_to(identifier_tag.length() + 1, buffer.length() - 2, id);
-      } else if (!get_nbr_id(buffer, id_to_ndx, _nbr[ndx_nbrs])) {
+        // identifier_tag already includes '<'; the value starts immediately after it.
+        buffer.from_to(identifier_tag.length(), buffer.length() - 2, id);
+      } else if (ndx_nbrs >= _nbrs) {
+        cerr << "Leader_Item::build:too many neighbour identifiers for '" << id
+             << "', expected " << _nbrs << ", line " << input.lines_read() << '\n';
+        return 0;
+      } else if (!get_nbr_id(buffer, id_to_ndx, _nbr[ndx_nbrs], ignore_missing_neighbours)) {
         cerr << "Leader_Item::build:invalid neighbour specification '" << buffer << "'\n";
         return 0;
       } else {
         ndx_nbrs++;
       }
     } else if (buffer.starts_with(distance_tag)) {
+      if (ndx_dist >= _nbrs) {
+        cerr << "Leader_Item::build:too many distances for '" << id
+             << "', expected " << _nbrs << ", line " << input.lines_read() << '\n';
+        return 0;
+      }
       if (!convert_to_float(buffer, _dist[ndx_dist], 0.0f, maximum_distance)) {
         cerr << "Leader_Item::build:invalid distance '" << buffer << "'\n";
         return 0;
       }
 
       ndx_dist++;
-    } else if (score_tag.length() && buffer.starts_with(score_tag)) {
-      if (!convert_to_float(buffer, _score, -std::numeric_limits<float>::max(),
-                            std::numeric_limits<float>::max())) {
-        cerr << "Leader_Item::build:invalid score '" << buffer << "'\n";
-        return 0;
-      }
     }
+  }
+
+  if (!terminated || id.empty() || !input.good()) {
+    cerr << "Leader_Item::build:incomplete or unreadable neighbour record at line "
+         << input.lines_read() << '\n';
+    return 0;
+  }
+
+  if (ndx_nbrs != _nbrs || ndx_dist != _nbrs) {
+    cerr << "Leader_Item::build:expected " << _nbrs << " neighbours for '" << id
+         << "', read " << ndx_nbrs << " identifiers and " << ndx_dist << " distances\n";
+    return 0;
+  }
+
+  if (ignore_missing_neighbours) {
+    RemoveMissingNeighbours();
   }
 
 #ifdef DEBUG_BUILD
@@ -569,31 +603,10 @@ Leader_Item::build(iwstring_data_source& input, const IW_STL_Hash_Map_int& id_to
   }
 #endif
 
-  if (ndx_nbrs != ndx_dist) {
-    cerr << "Leader_Item::build:mismatch btw ids " << ndx_nbrs << " and dists "
-         << ndx_dist << '\n';
-    return 0;
-  }
-
-  if (score_column >= 0) {
-    IWString s;
-    if (!id.word(score_column, s)) {
-      cerr << "Leader_Item::build:cannot extract column " << (score_column + 1)
-           << " from '" << id << "'\n";
-      return 0;
-    }
-
-    if (!s.numeric_value(_score)) {
-      cerr << "Leader_Item::build:invalid score '" << id << "', column "
-           << (score_column + 1) << "\n";
-      return 0;
-    }
-  }
-
   if (max_cluster_size_column >= 0) {
     IWString s;
     if (!id.word(max_cluster_size_column, s)) {
-      cerr << "Leader_Item::build:cannot extract column " << (score_column + 1)
+      cerr << "Leader_Item::build:cannot extract column " << (max_cluster_size_column + 1)
            << " from '" << id << "'\n";
       return 0;
     }
@@ -615,20 +628,20 @@ Leader_Item::build(iwstring_data_source& input, const IW_STL_Hash_Map_int& id_to
 int
 Leader_Item::Build(iw_tf_data_record::TFDataReader& input,
                    const IW_STL_Hash_Map_int& id_to_ndx,
-                   int n) {
+                   int n, bool ignore_missing_neighbours) {
   std::optional<nnbr::NearNeighbours> maybe_proto = 
         input.ReadProto<nnbr::NearNeighbours>();
   if (! maybe_proto) {
     return 0;
   }
 
-  return Build(*maybe_proto, id_to_ndx, n);
+  return Build(*maybe_proto, id_to_ndx, n, ignore_missing_neighbours);
 }
 
 int
 Leader_Item::Build(const nnbr::NearNeighbours& proto,
                    const IW_STL_Hash_Map_int& id_to_ndx,
-                   int n) {
+                   int n, bool ignore_missing_neighbours) {
 
   if (proto.nbr_size() != n) {
     cerr << "Leader_Item::Build:size mismatch, expected " << n << " got " <<
@@ -643,7 +656,7 @@ Leader_Item::Build(const nnbr::NearNeighbours& proto,
   int ndx = 0;  // Index into the arrays.
 
   for (const nnbr::Nbr& nbr : proto.nbr()) {
-    if (!GetNbrId(nbr.id(), id_to_ndx, _nbr[ndx])) {
+    if (!GetNbrId(nbr.id(), id_to_ndx, _nbr[ndx], ignore_missing_neighbours)) {
       cerr << "Leader_Item::build:invalid neighbour specification '" << nbr.id() << "'\n";
       return 0;
     }
@@ -658,6 +671,10 @@ Leader_Item::Build(const nnbr::NearNeighbours& proto,
     ++ndx;
   }
 
+  if (ignore_missing_neighbours) {
+    RemoveMissingNeighbours();
+  }
+
 #ifdef DEBUG_BUILD
   cerr << "Item " << _ndx << " has " << _nbrs << " neighbours\n";
   for (int i = 0; i < _nbrs; ++i) {
@@ -665,27 +682,11 @@ Leader_Item::Build(const nnbr::NearNeighbours& proto,
   }
 #endif
 
-  if (score_column >= 0) {
-    const IWString id = proto.name();
-    IWString s;
-    if (!id.word(score_column, s)) {
-      cerr << "Leader_Item::build:cannot extract column " << (score_column + 1)
-           << " from '" << id << "'\n";
-      return 0;
-    }
-
-    if (!s.numeric_value(_score)) {
-      cerr << "Leader_Item::build:invalid score '" << id << "', column "
-           << (score_column + 1) << "\n";
-      return 0;
-    }
-  }
-
   if (max_cluster_size_column >= 0) {
     const IWString id = proto.name();
     IWString s;
     if (!id.word(max_cluster_size_column, s)) {
-      cerr << "Leader_Item::build:cannot extract column " << (score_column + 1)
+      cerr << "Leader_Item::build:cannot extract column " << (max_cluster_size_column + 1)
            << " from '" << id << "'\n";
       return 0;
     }
@@ -822,75 +823,39 @@ Leader_Item::form_cluster_max_cluster_size(int* selected, const float threshold,
                                            const resizable_array_p<IWString>& smiles,
                                            const resizable_array_p<IWString>& id,
                                            IWString_and_File_Descriptor& output) {
-  int csize = 1;
-
-  for (int i = 0; i < _nbrs; ++i)  // first work out the cluster size
-  {
-    if (_dist[i] > threshold) {
-      break;
-    }
-
-    const auto j = _nbr[i];
-
-    if (selected[j]) {
-      continue;
-    }
-
-    csize++;
-
-    if (csize >= max_cluster_size) {
-      break;
-    }
+  // The limit includes the leader. With -h, exclude a self neighbour from
+  // both the size calculation and output, just as in the uncapped path.
+  if (suppress_self_neighbours) {
+    selected[_ndx] = 1;
   }
 
-  selected[_ndx] = 1;
+  int csize = 1;
+  int istop = 0;
+  for (; istop < _nbrs && csize < max_cluster_size; ++istop) {
+    if (_dist[istop] > threshold) {
+      break;
+    }
+    if (!selected[_nbr[istop]]) {
+      ++csize;
+    }
+  }
 
   write_cluster_header(_ndx, smiles, id, cluster_number, csize, output);
 
-  if (1 == csize) {
-    return finish_cluster(1, output);
-  }
-
-  csize = 0;
-
-  for (int i = 0; i < _nbrs; ++i) {
-    if (_dist[i] > threshold) {
-      break;
-    }
-
-    int j = _nbr[i];
-
+  // Reuse the same neighbour prefix so counting and writing apply the same
+  // threshold, limit and selection rules. A limit of one leaves it empty.
+  for (int i = 0; i < istop; ++i) {
+    const int j = _nbr[i];
     if (selected[j]) {
       continue;
     }
 
     write_smiles_id_dist(smiles[j], id[j], _dist[i], output);
-
     selected[j] = 1;
-
-    csize++;
-
-    if (csize >= max_cluster_size) {
-      break;
-    }
   }
 
+  selected[_ndx] = 1;
   return finish_cluster(csize, output);
-}
-
-int
-Leader_Item::threshold(similarity_type_t& zresult, int which_one) const {
-  assert(which_one >= 0);
-
-  similarity_type_t t = _threshold[which_one];
-
-  if (t >= 0.0)  // valid value, therefore we have a threshold
-  {
-    zresult = t;
-    return 1;
-  }
-
-  return 0;
 }
 
 int
@@ -1116,243 +1081,59 @@ report_clustering(const int* selected, const resizable_array<int>& cluster_size,
   return cerr.good();
 }
 
-/*
-  Prepare for Taylor Butina clustering. All we need to do is sort the pool
-  by size of neighbour list
-  Actually it complicated by the fact that the smiles and id arrays are separate
-  We keep a separate structure describing each cluster centre and its number of
-  unselected neighbours
-
-  We don't need to sort this list, we only want the single best choice
-*/
-
-#ifdef NEED_TO_SORT_EVERYTHING
-class Unselected_Item {
- private:
-  int _ndx;
-  int _unselected_neighbours;
-  score_t _score;
-
- public:
-  int
-  ndx() const {
-    return _ndx;
-  }
-
-  int
-  unselected_neighbours() const {
-    return _unselected_neighbours;
-  }
-
-  score_t
-  score() const {
-    return _score;
-  }
-
-  void
-  set_ndx(const int s) {
-    _ndx = s;
-  }
-
-  void
-  set_unselected_neighbours(const int s) {
-    _unselected_neighbours = s;
-  }
-
-  void
-  set_score(score_t s) {
-    _score = s;
-  }
-};
-
-class Unselected_Item_Comparator {
- private:
- public:
-  int
-  operator()(const Unselected_Item& ui1, const Unselected_Item& ui2) const {
-    if (ui1.unselected_neighbours() > ui2.unselected_neighbours()) {
-      return 1;
-    }
-
-    if (ui1.score() > ui2.score()) {
-      return 1;
-    }
-
-    return 0;
-  }
-};
-
 static int
 identify_next_tb_leader(const Leader_Item* pool, const int pool_size, const int* selected,
-                        int& leader) {
-  Unselected_Item* ui = new Unselected_Item[pool_size];
-  std::unique_ptr<Unselected_Item[]> free_ui(
-      ui);  // very inefficient to put this here, but cleaner
-
-  int ndx;
-
-  for (int i = 0; i < pool_size; ++i) {
-    if (selected[i]) {
-      continue;
-    }
-
-    ui[ndx].set_ndx(i);
-    ui[ndx].set_unselected_neighbours(pool[i].unselected_neighbours(selected));
-    ui[ndx].set_score(pool[i].score());
-    ndx++;
-  }
-
-  if (0 == ndx) {
-    return 0;
-  }
-
-  if (1 == ndx) {
-    return 1;
-  }
-
-  Unselected_Item_Comparator uic;
-
-  gfx::timsort(ui, ui + ndx, uic);
-
-  leader = ui[0].ndx();
-
-  return 1;
-}
-#endif
-
-static int
-do_select_next_leader_randomly(const int* selected, const int pool_size, int& icentre) {
-  std::uniform_int_distribution<int> u(0, pool_size - 1);
-
-  const int j = u(rng);
-
-  for (int i = j; i < pool_size; ++i) {
-    if (selected[i]) {
-      continue;
-    }
-
-    icentre = i;
-    return 1;
-  }
-
-  for (int i = 0; i < j; ++i) {
-    if (selected[i]) {
-      continue;
-    }
-
-    icentre = i;
-    return 1;
-  }
-
-  return 0;
-}
-
-static int
-identify_next_tb_leader(const Leader_Item* pool, const int pool_size, const int* selected,
-                        const int threshold_number,
                         const similarity_type_t global_threshold, int& leader) {
   leader = -1;
   int nmax = -1;
-  score_t max_score = static_cast<score_t>(0.0);
-
-  similarity_type_t mythreshold;
-  if (threshold_number >= 0) {
-    mythreshold = threshold[threshold_number];
-  } else {
-    mythreshold = global_threshold;
-  }
 
   for (int i = 0; i < pool_size; ++i) {
     if (selected[i]) {
       continue;
     }
 
-    const int n = pool[i].unselected_neighbours(selected, mythreshold);
+    const int n = pool[i].unselected_neighbours(selected, global_threshold);
 
-    if (n < nmax)  // not interested
-      ;
-    else if (n > nmax) {
+    // Scan in input order and replace only for a strictly larger count.
+    // Earlier molecules have higher priority when neighbour counts tie.
+    if (n > nmax) {
       nmax = n;
-      max_score = pool[i].score();
-      leader = i;
-    } else if (!scores_present)
-      ;
-    else if (pool[i].score() > max_score)  // same size, break tie via score
-    {
-      max_score = pool[i].score();
       leader = i;
     }
   }
-
-// #define DEBUG_IDENTIFY_NEXT_TB_LEADER
-#ifdef DEBUG_IDENTIFY_NEXT_TB_LEADER
-  cerr << unselected << " items avaialbel\n";
-  cerr << "Max cluster size " << nmax << " item " << leader;
-  if (scores_present) {
-    cerr << " score " << max_score;
-  }
-  cerr << '\n';
-#endif
 
   return leader >= 0;
 }
 
 static int
 choose_next_centre(const int* selected, const Leader_Item* pool, const int pool_size,
-                   const int threshold_number, const similarity_type_t global_threshold,
+                   const similarity_type_t global_threshold,
                    int& istart, int& icentre) {
   if (taylor_butina) {
-    return identify_next_tb_leader(pool, pool_size, selected, threshold_number,
-                                   global_threshold, icentre);
-  }
-
-  if (select_next_leader_randomly) {
-    return do_select_next_leader_randomly(selected, pool_size, icentre);
+    return identify_next_tb_leader(pool, pool_size, selected, global_threshold, icentre);
   }
 
   icentre = -1;
 
-  // If scores not present, return the first unselected.
-  // Save the position of the previously selected item for efficiency
-  if (!scores_present) {
-    for (int i = istart; i < pool_size; i++) {
-      if (!selected[i]) {
-        icentre = i;
-        istart = i + 1;
-        return 1;
-      }
-    }
-
-    return 0;
-  }
-
-  // Must look at scores
-
-  score_t max_score = 0.0;
-  for (int i = 0; i < pool_size; i++) {
-    if (selected[i]) {
-      continue;
-    }
-
-    score_t s = pool[i].score();
-
-    if (icentre < 0 || s > max_score) {
-      max_score = s;
+  // Input order defines priority. Resume after the previous leader since
+  // earlier items have already been assigned to clusters.
+  for (int i = istart; i < pool_size; ++i) {
+    if (!selected[i]) {
       icentre = i;
+      istart = i + 1;
+      return 1;
     }
   }
 
-  return icentre >= 0;
+  return 0;
 }
 
 int
 leader(Leader_Item* pool, const int pool_size, int* selected,
        const resizable_array_p<IWString>& smiles, const resizable_array_p<IWString>& id,
-       similarity_type_t global_threshold, const int threshold_number,
-       IWString_and_File_Descriptor& output) {
+       similarity_type_t global_threshold, IWString_and_File_Descriptor& output) {
   if (verbose > 1) {
-    cerr << "Beginning clustering at " << global_threshold << " threshold "
-         << threshold_number << '\n';
+    cerr << "Beginning clustering at " << global_threshold << '\n';
   }
 
   int clusters_found = 0;
@@ -1363,7 +1144,7 @@ leader(Leader_Item* pool, const int pool_size, int* selected,
   // Each threshold starts a fresh scan, while selections within a run advance it.
   int istart = 0;
   int icentre;
-  if (!choose_next_centre(selected, pool, pool_size, threshold_number, global_threshold,
+  if (!choose_next_centre(selected, pool, pool_size, global_threshold,
                           istart, icentre)) {
     cerr << "Yipes, cannot find initial leader\n";
     return 0;
@@ -1374,15 +1155,6 @@ leader(Leader_Item* pool, const int pool_size, int* selected,
   while (1) {
     Leader_Item& ldr = pool[icentre];
 
-    similarity_type_t my_threshold;
-    if (threshold_number < 0) {
-      my_threshold = global_threshold;
-    } else if (ldr.threshold(my_threshold, threshold_number)) {  // perhaps a per item threshold can be used
-      ;
-    } else {
-      my_threshold = global_threshold;
-    }
-
     int max_cluster_size_this_molecule;
 
     if (ldr.max_cluster_size(max_cluster_size_this_molecule)) {
@@ -1392,7 +1164,7 @@ leader(Leader_Item* pool, const int pool_size, int* selected,
     }
 
     if (verbose > 1) {
-      cerr << "Start cluster " << clusters_found << ". Threshold = " << my_threshold
+      cerr << "Start cluster " << clusters_found << ". Threshold = " << global_threshold
            << ", max size " << max_cluster_size_this_molecule << '\n';
     }
 
@@ -1400,10 +1172,10 @@ leader(Leader_Item* pool, const int pool_size, int* selected,
 
     if (max_cluster_size_this_molecule) {
       csize = pool[icentre].form_cluster_max_cluster_size(
-          selected, my_threshold, max_cluster_size_this_molecule - 1, clusters_found,
+          selected, global_threshold, max_cluster_size_this_molecule, clusters_found,
           smiles, id, output);
     } else {
-      csize = pool[icentre].form_cluster_threshold(selected, my_threshold, clusters_found,
+      csize = pool[icentre].form_cluster_threshold(selected, global_threshold, clusters_found,
                                                    smiles, id, output);
     }
 
@@ -1417,7 +1189,7 @@ leader(Leader_Item* pool, const int pool_size, int* selected,
       break;
     }
 
-    if (!choose_next_centre(selected, pool, pool_size, threshold_number, global_threshold,
+    if (!choose_next_centre(selected, pool, pool_size, global_threshold,
                             istart, icentre)) {
       break;
     }
@@ -1433,8 +1205,7 @@ leader(Leader_Item* pool, const int pool_size, int* selected,
 static int
 leader(Leader_Item* pool, const int pool_size, int* selected,
        const resizable_array_p<IWString>& smiles, const resizable_array_p<IWString>& id,
-       similarity_type_t global_threshold, int threshold_number,
-       const const_IWSubstring& stem, int ndx) {
+       similarity_type_t global_threshold, const const_IWSubstring& stem, int ndx) {
   IWString fname(stem);
   fname << ndx;
   fname << ".ldr";
@@ -1449,15 +1220,15 @@ leader(Leader_Item* pool, const int pool_size, int* selected,
     cerr << "Begin clustering at " << global_threshold << '\n';
   }
 
-  return leader(pool, pool_size, selected, smiles, id, global_threshold, threshold_number,
-                output);
+  return leader(pool, pool_size, selected, smiles, id, global_threshold, output);
 }
 
 static int
 build_pool(iwstring_data_source& input, Leader_Item* pool, const int istop, int& ndx,
-           const IW_STL_Hash_Map_int& id_to_ndx, resizable_array<int>& ncount) {
-  for (; ndx < istop && !input.eof(); ++ndx) {
-    if (!pool[ndx].build(input, id_to_ndx, ncount[ndx])) {
+           const IW_STL_Hash_Map_int& id_to_ndx, resizable_array<int>& ncount,
+           bool ignore_missing_neighbours) {
+  for (; ndx < istop; ++ndx) {
+    if (!pool[ndx].build(input, id_to_ndx, ncount[ndx], ignore_missing_neighbours)) {
       cerr << "Cannot read pool item " << ndx << ", near line " << input.lines_read()
            << '\n';
       return 0;
@@ -1470,9 +1241,10 @@ build_pool(iwstring_data_source& input, Leader_Item* pool, const int istop, int&
 static int
 BuildPool(iw_tf_data_record::TFDataReader& input, Leader_Item* pool,
            const int istop, int& ndx,
-           const IW_STL_Hash_Map_int& id_to_ndx, resizable_array<int>& ncount) {
-  for (; ndx < istop && !input.eof(); ++ndx) {
-    if (!pool[ndx].Build(input, id_to_ndx, ncount[ndx])) {
+           const IW_STL_Hash_Map_int& id_to_ndx, resizable_array<int>& ncount,
+           bool ignore_missing_neighbours) {
+  for (; ndx < istop; ++ndx) {
+    if (!pool[ndx].Build(input, id_to_ndx, ncount[ndx], ignore_missing_neighbours)) {
       cerr << "Cannot read pool item " << ndx << ", near line " << input.items_read()
            << '\n';
       return 0;
@@ -1484,7 +1256,8 @@ BuildPool(iw_tf_data_record::TFDataReader& input, Leader_Item* pool,
 
 static int
 build_pool(const char* fname, Leader_Item* pool, const int istop, int& ndx,
-           const IW_STL_Hash_Map_int& id_to_ndx, resizable_array<int>& ncount) {
+           const IW_STL_Hash_Map_int& id_to_ndx, resizable_array<int>& ncount,
+           bool ignore_missing_neighbours) {
   iwstring_data_source input(fname);
 
   if (!input.good()) {
@@ -1492,12 +1265,13 @@ build_pool(const char* fname, Leader_Item* pool, const int istop, int& ndx,
     return 0;
   }
 
-  return build_pool(input, pool, istop, ndx, id_to_ndx, ncount);
+  return build_pool(input, pool, istop, ndx, id_to_ndx, ncount, ignore_missing_neighbours);
 }
 
 static int
 BuildPool(const char* fname, Leader_Item* pool, const int istop, int& ndx,
-           const IW_STL_Hash_Map_int& id_to_ndx, resizable_array<int>& ncount) {
+           const IW_STL_Hash_Map_int& id_to_ndx, resizable_array<int>& ncount,
+           bool ignore_missing_neighbours) {
   iw_tf_data_record::TFDataReader input(fname);
 
   if (!input.good()) {
@@ -1505,7 +1279,7 @@ BuildPool(const char* fname, Leader_Item* pool, const int istop, int& ndx,
     return 0;
   }
 
-  return BuildPool(input, pool, istop, ndx, id_to_ndx, ncount);
+  return BuildPool(input, pool, istop, ndx, id_to_ndx, ncount, ignore_missing_neighbours);
 }
 
 static void
@@ -1523,17 +1297,15 @@ from gfp_nearneighbours_single_file for example.
 
 Options applicable to Leader have an L prepended, J for Jarvis Patrick functionality,
 and T for Taylor Butina.
+Input order defines molecule priority (highest priority first). Leader clustering
+uses this order. Taylor Butina selects the molecule with
+the most unselected neighbours, breaking ties by earliest input position.
 
 Usage:
-L -t <dis>         specify distance threshold(s). CSV values are accepted '-t 0.15,0.20,0.25'
+L -t <dis>         distance threshold(s) in [0, 1], inclusive; CSV '-t 0.15,0.20,0.25'
 L -C <number>      maximum number of clusters to find
-L -H <TAG>         threshold for each molecule in dataitem <TAG>
 L -m <number>      maximum cluster size
-L -M <tag>         max cluster size for each molecule in <TAG>
 L -M col=<col>     max cluster size for each molecule in column <col> of name
-L -S <TAG>         score tag (molecules selected highest score to lowest)
-L -S col=<col>     scores are in column <col> of the name
-L -e               leader selections are random
 
 T -T                 do Taylor Butina clustering
 
@@ -1541,7 +1313,7 @@ J -J <n,c>         Jarvis Patrick: size of nbr list (. for no limit), neighbours
 
  -r               input file is TFDataRecord serialized protos (nn2proto -S ...)
  -B <stem>        file name stem for multiple outputs
- -s <number>      specify max pool size
+ -s <number>      max items across all files; required for multiple input files
  -a               write smiles as output rather than tdt form
  -h               suppress self neighbours during Taylor Butina and Leader
  -v               verbose output
@@ -1602,102 +1374,18 @@ do_leader_clustering(Leader_Item* pool, const int pool_size,
 
   IWString_and_File_Descriptor output(1);
 
-  int computation_number = 0;
-
-  if (1 == number_thresholds && 0 == number_threshold_tags) {
-    if (!leader(pool, pool_size, selected, smiles, id, threshold[0], -1, output)) {
-      return 0;
-    }
-  } else {
-    for (int i = 0; i < number_thresholds; i++) {
-      if (!leader(pool, pool_size, selected, smiles, id, threshold[i], -1, stem,
-                  computation_number)) {
-        cerr << "Clustering at " << threshold[i] << " failed\n";
-        return 0;
-      }
-
-      computation_number++;
-    }
+  if (number_thresholds == 1) {
+    return leader(pool, pool_size, selected, smiles, id, threshold[0], output);
   }
 
-  if (1 == number_threshold_tags && 0 == number_thresholds) {
-    if (!leader(pool, pool_size, selected, smiles, id, 0.0, 0, output)) {
+  for (int i = 0; i < number_thresholds; ++i) {
+    if (!leader(pool, pool_size, selected, smiles, id, threshold[i], stem, i)) {
+      cerr << "Clustering at " << threshold[i] << " failed\n";
       return 0;
-    }
-  } else {
-    for (int i = 0; i < number_threshold_tags; i++) {
-      if (!leader(pool, pool_size, selected, smiles, id, 0.0, i, stem,
-                  computation_number)) {
-        cerr << "Clustering on threshold tag " << i << " failed\n";
-        return 0;
-      }
-
-      computation_number++;
     }
   }
 
   return 1;
-}
-
-static int
-read_scores_from_file(Leader_Item* pool, const int pool_size,
-                      const IW_STL_Hash_Map_int& id_to_ndx, iwstring_data_source& input) {
-  const_IWSubstring buffer;
-
-  int scores_processed = 0;
-
-  while (input.next_record(buffer)) {
-    IWString id;
-    int i = 0;
-    buffer.nextword(id, i);
-
-    const auto f = id_to_ndx.find(id);
-
-    //  cerr << "Processing '" << id << "' absent? " << (f == id_to_ndx.end()) << '\n';
-
-    if (f == id_to_ndx.end()) {  // extra data, ignore
-      continue;
-    }
-
-    const_IWSubstring token;
-    if (!buffer.nextword(token, i)) {
-      cerr << "read_scores_from_file:cannot read second column from '" << buffer << "'\n";
-      return 0;
-    }
-
-    score_t s;
-
-    if (token.numeric_value(s)) {
-      pool[f->second].set_score(s);
-      scores_processed++;
-    } else if (0 == scores_processed)
-      ;
-    else {
-      cerr << "read_scores_from_file:invalid numeric '" << buffer << "'\n";
-      return 0;
-    }
-  }
-
-  if (pool_size == scores_processed) {
-    return 1;
-  }
-
-  cerr << "read_scores_from_file:pool contains " << pool_size
-       << " fingerprints, but read " << scores_processed << " scores\n";
-  return 0;
-}
-
-static int
-read_scores_from_file(Leader_Item* pool, const int pool_size,
-                      const IW_STL_Hash_Map_int& id_to_ndx, IWString& fname) {
-  iwstring_data_source input(fname.null_terminated_chars());
-
-  if (!input.good()) {
-    cerr << "read_scores_from_file:cannot open '" << fname << "'\n";
-    return 0;
-  }
-
-  return read_scores_from_file(pool, pool_size, id_to_ndx, input);
 }
 
 static int
@@ -1719,7 +1407,7 @@ ReportClusterSizes(const Leader_Item* pool, int pool_size, std::ostream& output)
 
 static int
 leader(int argc, char** argv) {
-  Command_Line cl(argc, argv, "vs:I:t:H:S:C:m:M:B:J:aTher");
+  Command_Line cl(argc, argv, "vs:I:t:C:m:M:B:J:aThr");
 
   if (cl.unrecognised_options_encountered()) {
     cerr << "Unrecognised options encountered\n";
@@ -1775,54 +1463,10 @@ leader(int argc, char** argv) {
     }
   }
 
-  if (cl.option_present('H')) {
-    number_threshold_tags = cl.option_count('H');
-    threshold_from_file_tag = new IWString[number_threshold_tags];
-
-    for (int i = 0; i < number_threshold_tags; i++) {
-      threshold_from_file_tag[i] = cl.string_value('H', i);
-
-      if (verbose) {
-        cerr << "Threshold in tag '" << threshold_from_file_tag[i] << "' tag\n";
-      }
-    }
-  }
-
-  IWString score_file;
-
-  if (cl.option_present('S')) {
-    const_IWSubstring s = cl.string_value('S');
-
-    if (s.starts_with("col=")) {
-      s.remove_leading_chars(4);
-      if (!s.numeric_value(score_column) || score_column < 1) {
-        cerr << "INvalid score column specifier 'col=" << s << "'\n";
-        return 8;
-      }
-
-      if (verbose) {
-        cerr << "Scores taken from column " << score_column << " of the identifier\n";
-      }
-
-      score_column--;
-    } else if (s.starts_with("FILE=")) {
-      s.remove_leading_chars(5);
-      score_file = s;
-    } else {
-      score_tag = cl.string_value('S');
-      if (verbose) {
-        cerr << "Score tag is " << score_tag << "'\n";
-      }
-    }
-
-    scores_present = 1;
-  }
-
   if (cl.option_present('J'))
     ;
-  else if (!cl.option_present('t') && !cl.option_present('H') &&
-           !cl.option_present('Y')) {
-    cerr << "Threshold distance must be specified via -t, -H or -V options\n";
+  else if (!cl.option_present('t')) {
+    cerr << "Threshold distance must be specified via -t\n";
     usage(28);
   }
 
@@ -1833,14 +1477,19 @@ leader(int argc, char** argv) {
     const_IWSubstring t = cl.string_value('t');
 
     number_thresholds = t.nwords(',');
+    if (number_thresholds == 0) {
+      cerr << "The -t option requires a distance in [0, 1]\n";
+      return 1;
+    }
     threshold = new similarity_type_t[number_thresholds];
 
     int i = 0;
     const_IWSubstring token;
     for (int ndx = 0; t.nextword(token, i, ','); ndx++) {
-      if (!token.numeric_value(threshold[ndx]) || threshold[ndx] <= 0.0f ||
-          threshold[ndx] >= 1.0f) {
-        cerr << "INvalud threshold '" << token << "' in '" << t << "'\n";
+      if (!token.numeric_value(threshold[ndx]) || threshold[ndx] < 0.0f ||
+          threshold[ndx] > 1.0f) {
+        cerr << "Invalid threshold '" << token << "' in '" << t
+             << "': expected a distance in [0, 1]\n";
         return 1;
       }
 
@@ -1852,7 +1501,7 @@ leader(int argc, char** argv) {
     threshold = new similarity_type_t[number_thresholds];
     for (int i = 0; i < number_thresholds; i++) {
       if (!cl.value('t', threshold[i], i) || threshold[i] < 0.0 || threshold[i] > 1.0) {
-        cerr << "Invalid threshold\n";
+        cerr << "Invalid threshold: expected a distance in [0, 1]\n";
         return 6;
       }
 
@@ -1873,38 +1522,24 @@ leader(int argc, char** argv) {
     }
   }
 
-  if (cl.option_present('e')) {
-    select_next_leader_randomly = 1;
-
-    if (verbose) {
-      cerr << "Next leader selected randomly\n";
-    }
-  }
-
   if (cl.option_present('M')) {
     const_IWSubstring m = cl.string_value('M');
-
-    if (m.starts_with("col=")) {
-      m.remove_leading_chars(4);
-      if (!m.numeric_value(max_cluster_size_column) || max_cluster_size_column < 1) {
-        cerr << "The column for the per molecule maximum cluster size must be a whole "
-                "positive number\n";
-        usage(11);
-      }
-
-      if (verbose) {
-        cerr << "The maximum cluster size per molecule will be in column "
-             << max_cluster_size_column << '\n';
-      }
-
-      max_cluster_size_column--;
-    } else {
-      max_cluster_size_tag = m;
-
-      if (verbose) {
-        cerr << "Max cluster size in '" << max_cluster_size_tag << "' tag\n";
-      }
+    if (!m.starts_with("col=")) {
+      cerr << "The -M option only supports col=<col> (a column in the molecule name)\n";
+      return 1;
     }
+    m.remove_leading_chars(4);
+    if (!m.numeric_value(max_cluster_size_column) || max_cluster_size_column < 1) {
+      cerr << "The column for the per molecule maximum cluster size must be a whole "
+              "positive number\n";
+      usage(11);
+    }
+
+    if (verbose) {
+      cerr << "The maximum cluster size per molecule will be in column "
+           << max_cluster_size_column << '\n';
+    }
+    --max_cluster_size_column;
   }
 
   JarvisPatrickParameters* jp = nullptr;
@@ -1953,6 +1588,11 @@ leader(int argc, char** argv) {
     usage(1);
   }
 
+  if (cl.number_elements() > 1 && !cl.option_present('s')) {
+    cerr << "Multiple input files require an explicit pool size via -s\n";
+    return 1;
+  }
+
   int input_is_serialized_protos = 0;
   if (cl.option_present('r')) {
     input_is_serialized_protos = 1;
@@ -1969,7 +1609,7 @@ leader(int argc, char** argv) {
   resizable_array<int> ncount;
   resizable_array<int> istop;
 
-  for (int i = 0; i < cl.number_elements(); ++i) {
+  for (int i = 0; i < cl.number_elements() && smiles.number_elements() < max_pool_size; ++i) {
     int rc;
     if (input_is_serialized_protos) {
       rc = ReadSerializedProtos(cl[i], max_pool_size, smiles, id, ncount);
@@ -1990,6 +1630,10 @@ leader(int argc, char** argv) {
   }
 
   pool_size = smiles.number_elements();
+  // Once the explicit limit is reached, unseen IDs can belong to the unread
+  // portion of the input. Cluster the retained subset and omit those neighbours.
+  const bool ignore_missing_neighbours =
+      cl.option_present('s') && pool_size == max_pool_size;
 
   IW_STL_Hash_Map_int id_to_ndx;
 
@@ -2014,12 +1658,12 @@ leader(int argc, char** argv) {
 
   int ndx = 0;
 
-  for (int i = 0; i < cl.number_elements(); ++i) {
+  for (int i = 0; i < istop.number_elements(); ++i) {
     int rc;
     if (input_is_serialized_protos) {
-      rc = BuildPool(cl[i], pool, istop[i], ndx, id_to_ndx, ncount);
+      rc = BuildPool(cl[i], pool, istop[i], ndx, id_to_ndx, ncount, ignore_missing_neighbours);
     } else {
-      rc = build_pool(cl[i], pool, istop[i], ndx, id_to_ndx, ncount);
+      rc = build_pool(cl[i], pool, istop[i], ndx, id_to_ndx, ncount, ignore_missing_neighbours);
     }
     if (! rc) {
       cerr << "Cannot read fingerprints from '" << cl[i] << "'\n";
@@ -2029,13 +1673,6 @@ leader(int argc, char** argv) {
 
   if (verbose) {
     ReportClusterSizes(pool, pool_size, cerr);
-  }
-
-  if (score_file.length()) {
-    if (!read_scores_from_file(pool, pool_size, id_to_ndx, score_file)) {
-      cerr << "Cannot read scores from '" << score_file << "'\n";
-      return 2;
-    }
   }
 
   float max_distance = 0.0f;
@@ -2060,8 +1697,7 @@ leader(int argc, char** argv) {
     cerr << '\n';
   }
 
-  int number_clusterings = number_thresholds + number_threshold_tags;
-  if (number_clusterings > 1 && !cl.option_present('B')) {
+  if (number_thresholds > 1 && !cl.option_present('B')) {
     cerr << "If doing multiple thresholds, must specify file name stem via the -B "
             "option\n";
     usage(12);

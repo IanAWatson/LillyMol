@@ -12,8 +12,10 @@ nn_leader_and_jp -J 10,3 neighbours.nn > jp.tdt
 Use `-r` for TFDataRecord serialized nearest-neighbour protos instead of TDT
 input. `-a` writes SMILES with identifiers instead of TDT records.
 
-The `-t` cutoff is inclusive: neighbours at the threshold are eligible; neighbours
-beyond it remain available for later clusters. Each threshold in a multi-threshold
+The `-t` cutoff accepts the inclusive range `[0, 1]`, whether specified as a
+single value, a CSV list, or repeated `-t` options. Zero admits only zero-distance
+neighbours; one admits every neighbour present in the input list. Neighbours at
+the threshold are eligible; neighbours beyond it remain available for later clusters. Each threshold in a multi-threshold
 run starts with all molecules available.
 
 Leader and Taylor–Butina member distances use platform-independent formatting
@@ -23,3 +25,45 @@ have no distance to a designated leader, so their output omits distances.
 
 Multiple thresholds, for example `-t 0.2,0.3 -B clusters`, write
 `clusters0.ldr`, `clusters1.ldr`, and so on, with the same distance formatting.
+
+Leader and Taylor–Butina require a global distance threshold via `-t`.
+Per-molecule threshold tags (`-H`) are no longer supported.
+
+Use `-m <number>` for a global maximum cluster size, or `-M col=<col>` to
+read the maximum from a column of each molecule's name. Columns are numbered
+from one, including the identifier token. Tag-based `-M` specifications are
+rejected; only `col=<col>` is supported. Limits include the leader. A global
+`-m` limit must be at least two; a per-molecule limit of one is allowed and
+produces a singleton. A per-molecule limit overrides the global `-m` limit.
+Use `-h` to avoid repeating the centre if it occurs in its own neighbour list.
+
+Input order defines molecule priority: put the highest-scoring or most desirable
+molecules first before generating the neighbour file. With multiple input files,
+priority follows the command-line file order and then record order within each
+file. Explicit scoring options (`-S`) are no longer supported.
+
+Leader clustering chooses the first remaining molecule. Random leader selection
+(`-e`) is no longer supported. Taylor–Butina chooses the molecule with the largest number
+of unselected neighbours within the threshold; ties go to the earliest molecule
+in the input. Input priority therefore resolves ties without overriding the
+neighbour-count criterion.
+
+A single input file can be read without `-s`. Multiple input files require
+`-s <number>`, which sets one overall limit, rather than a limit per file.
+Reading stops at that number even in the middle of a file; later files are not
+opened. A limit larger than the available data simply processes everything,
+without a warning.
+
+When the limit is reached, neighbours whose identifiers are absent from the
+retained pool are omitted. Clustering therefore uses only the retained subset;
+it is not equivalent to clustering the complete collection and filtering its
+output afterwards. This also reduces Jarvis–Patrick shared-neighbour counts,
+and `-J` list-size limits apply to the remaining neighbour lists. Unknown
+neighbours remain errors when the pool limit has not been reached.
+
+Malformed input is an error, not an end-of-file marker. Truncated TFRecord
+frames, checksum failures, invalid protobufs, missing identifiers, and incomplete
+TDT records cause a nonzero exit status instead of clustering a partial dataset.
+TDT records must contain SMILES and identifier fields and end with `|`; identifiers
+must be nonempty. As with normal records, data beyond an explicit `-s` limit is
+not examined.

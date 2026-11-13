@@ -12,6 +12,36 @@
       "shell_script": {
         "script_name": "run_test.py"
       }
+    },
+    {
+      "name": "options",
+      "shell_script": {
+        "script_name": "run_test.py"
+      }
+    },
+    {
+      "name": "capped",
+      "shell_script": {
+        "script_name": "run_test.py"
+      }
+    },
+    {
+      "name": "malformed",
+      "shell_script": {
+        "script_name": "run_test.py"
+      }
+    },
+    {
+      "name": "pool_limit",
+      "shell_script": {
+        "script_name": "run_test.py"
+      }
+    },
+    {
+      "name": "input_errors",
+      "shell_script": {
+        "script_name": "run_test.py"
+      }
     }
   ]
 }

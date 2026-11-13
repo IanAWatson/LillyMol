@@ -1,0 +1,94 @@
+# nn_leader_and_jp review follow-up
+
+Address correctness issues before introducing the proposed optimisations. This
+checklist records the review and small-input reproductions from November 2026.
+The existing regression cases passed despite the bugs below.
+
+## Addressed
+
+- [x] Remove `-H`, which dereferenced an uninitialised per-item threshold array.
+  Remove that array and the threshold-index arguments throughout the clustering
+  code. Only global thresholds specified with `-t` remain supported.
+- [x] Restrict `-M` to `col=<col>`. Tag-based limits were accepted but never read.
+  Reject those specifications rather than silently ignoring them.
+
+- [x] Remove `-S` and all explicit score storage and parsing. Input order now
+  defines priority, with earlier molecules preferred. This eliminates duplicate
+  score-file completeness bugs and unsupported score tags with proto input.
+- [x] Remove the disabled `NEED_TO_SORT_EVERYTHING` implementation, which
+  referenced the retired scores and contained an uninitialised index and an
+  invalid comparator.
+
+- [x] Correct capped cluster sizes, headers and returned counts. The limit
+  includes the leader; counting and writing use the same neighbour prefix.
+  Name-column limits of one yield singletons, and `-h` applies consistently.
+  Preserve the uncapped self-neighbour output convention when `-h` is absent.
+
+- [x] Fix TDT parent identifier extraction to start immediately after the tag,
+  preserving the first character. Test `-M col=1` with multi-digit and
+  single-digit names, and single-character identifiers in leader, Butina and
+  JP modes, using default and custom identifier tags.
+
+- [x] Remove `-e`, the random-leader selection path and RNG initialisation.
+  This also eliminates the bias in the previous random-start/next-available
+  selection scheme. All leader selections now follow input priority.
+
+- [x] Check TDT array bounds before writing neighbour IDs or distances, and
+  require both final counts to equal the allocated neighbour count. Move
+  debug array reads after validation. Regression tests cover excess distances
+  (including zero-neighbour records), missing distances, and valid empty
+  neighbour lists in all three modes.
+
+- [x] Require `-s` for multiple input files and enforce one overall pool limit
+  in both passes. Do not open later files once the limit is reached. Oversized
+  limits process all available data silently. When the explicit limit is
+  reached, omit unresolved neighbours and compact indices/distances together
+  in place; otherwise unresolved IDs remain errors. Subset clustering, including
+  JP shared-neighbour counts, uses only retained neighbours. Tests cover both
+  input formats and all clustering modes.
+
+- [x] Separate record, EOF and error outcomes in first-pass readers. TFRecord
+  frame/read failures and protobuf parse failures now reject the whole run,
+  including after a valid prefix or in a later file. Second-pass readers must
+  fill every expected item rather than accepting a positive partial count.
+- [x] Reject empty/malformed TDT identifiers and missing metadata or record
+  terminators without assertions. Reject empty numeric distance fields before
+  substring extraction. Empty SMILES remain allowed. Preserve `-s` behaviour:
+  corrupt data beyond the explicit cutoff is not read or validated.
+
+- [x] Accept the inclusive threshold range `[0, 1]` in single, CSV and
+  repeated `-t` arguments. Reject empty values and invalid or out-of-range
+  numbers. Tests check zero-distance matches, distance-one neighbours,
+  isolated molecules and identical results across all three option forms.
+
+## Correctness status
+
+All correctness issues recorded in this review have been addressed.
+
+## Behaviour decisions
+
+- Input order defines priority. Ordinary leader clustering takes the first
+  remaining molecule. Taylor–Butina maximises available neighbours and breaks ties by
+  earliest input position. Preserve these rules in future parallel reductions.
+- JP currently requires sufficient shared neighbours, without requiring the
+  two items to occur in each other's neighbour lists. Preserve this variant
+  during optimisation unless a deliberate behaviour change is agreed.
+- Neighbour lists are assumed sorted by distance. Do not add repeated sorting
+  or validation in the clustering kernels.
+
+## Optimisation work, after correctness
+
+1. Replace JP full-pool relabelling with union–find and group output members in
+   one pass. Preserve component/member order by original input position.
+2. Investigate an inverted neighbour index to avoid all-pairs JP testing.
+3. Maintain Taylor–Butina available-neighbour counts with reverse adjacency
+   and an indexed priority queue, instead of recounting the pool each round.
+   Account for directed/truncated neighbour lists.
+4. Consider contiguous neighbour indices/distances with row offsets, using
+   counts from the first pass to allocate and filling them during the second.
+5. Separate immutable graph data, options and per-run state. Parallelise
+   independent parameter runs, or pair testing and deterministic reductions,
+   without racing on selection arrays, union state or output streams.
+
+Benchmark realistic neighbour densities and cluster sizes. Parallelising the
+current repeated scans alone will retain their unfavourable scaling.

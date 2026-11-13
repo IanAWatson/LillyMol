@@ -8,6 +8,7 @@
 #include <stdlib.h>
 
 #include <algorithm>
+#include <cstdlib>
 #include <iostream>
 #include <limits>
 #include <memory>
@@ -235,29 +236,27 @@ usage(int rc)
   cerr << "  -v             verbose output\n";
   // clang-format on
 
-  exit(rc);
+  std::exit(rc);
 }
 
 static void
-display_histogram_options(std::ostream& os)
-{
-  os << "                 Fingerprints are either bits according to queries hit\n";
-  os << "                 or binned values of the atom contributions\n";
-  os << "  -G fptag=<tag> fingerprint derived from one bit per query\n";
-  os << "  -G altag=<tag> fingerprint with one bit per ISO= value\n";
-  os << "  -G buckets=b   number of buckets to use in the fingerprint\n";
-  os << "  -G hist=m,m,d  histogram for fingerprint, syntax 'min,max,dx'\n";
+display_histogram_options(int rc) {
+  std::cerr << "                 Fingerprints are either bits according to queries hit\n";
+  std::cerr << "                 or binned values of the atom contributions\n";
+  std::cerr << "  -G fptag=<tag> fingerprint derived from one bit per query\n";
+  std::cerr << "  -G altag=<tag> fingerprint with one bit per ISO= value\n";
+  std::cerr << "  -G buckets=b   number of buckets to use in the fingerprint\n";
+  std::cerr << "  -G hist=m,m,d  histogram for fingerprint, syntax 'min,max,dx'\n";
 
-  return;
+  std::exit(rc);
 }
 
 static void
-display_dash_j_qualifiers(std::ostream& os)
-{
-  os << " -J blki         aromatic bonds lose their Kekule identity\n";
-  os << " -J qndn         use query names as descriptor names\n";
+display_dash_j_qualifiers(int rc) {
+  std::cerr << " -J blki         aromatic bonds lose their Kekule identity\n";
+  std::cerr << " -J qndn         use query names as descriptor names\n";
 
-  return;
+  std::exit(rc);
 }
 
 static int
@@ -1062,7 +1061,7 @@ parse_dash_G_option(Command_Line& cl,
 
       nbuckets = tmp.nbuckets();
     } else if ("help" == g) {
-      display_histogram_options(cerr);
+      display_histogram_options(0);
       exit(0);
     } else {
       cerr << "Unrecognised histogram specifier '" << g << "'\n";
@@ -1142,6 +1141,9 @@ ghose_crippin(int argc, char** argv)
     usage(1);
   }
 
+  DisplayDashHelpIfRequested(cl, 'G', display_histogram_options);
+  DisplayDashHelpIfRequested(cl, 'J', display_dash_j_qualifiers);
+
   verbose = cl.option_count('v');
 
   if (cl.option_present('A')) {
@@ -1192,7 +1194,7 @@ ghose_crippin(int argc, char** argv)
           cerr << "Will use query names as descriptor names\n";
         }
       } else if ("help" == j) {
-        display_dash_j_qualifiers(cerr);
+        display_dash_j_qualifiers(0);
         return 0;
       } else {
         cerr << "Unrecognised -J qualifier '" << j << "'\n";

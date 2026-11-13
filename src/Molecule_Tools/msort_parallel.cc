@@ -13,6 +13,7 @@
 
 #include <algorithm>
 #include <fstream>
+#include <cstdlib>
 #include <iostream>
 #include <memory>
 
@@ -211,7 +212,7 @@ usage(int rc)
 
   // clang-format on
 
-  exit(rc);
+  std::exit(rc);
 }
 
 class File_Record
@@ -2435,17 +2436,16 @@ TBB_Compute_Properties::operator()(const tbb::blocked_range<File_Record**>& r) c
 }
 
 static int
-display_dash_m_options(std::ostream& os)
-{
+display_dash_m_options(int rc) {
   // clang-format off
-  os << R"( -M ea=<n>         write <n> chunks of output each containing roughly equal total atoms.
+  std::cerr << R"( -M ea=<n>         write <n> chunks of output each containing roughly equal total atoms.
  -M svsf        ensure that all values wthin the same chunk (-D required) have the same properties.           
  -M firstprop   the file name generated will be based on the first sort criterion.
  -M nc=<chunks> Write the data in <nc> chunks (-D required).
 )";
   // clang-format on
 
-  exit(1);
+  std::exit(rc);
 }
 
 static unsigned int
@@ -2474,6 +2474,8 @@ msort(int argc, char** argv)
     cerr << "Unrecognised options encountered\n";
     usage(1);
   }
+
+  DisplayDashHelpIfRequested(cl, 'M', display_dash_m_options);
 
   verbose = cl.option_count('v');
 
@@ -2587,10 +2589,10 @@ msort(int argc, char** argv)
           cerr << "Will write as " << number_chunks << " chunks\n";
         }
       } else if ("help" == m) {
-        display_dash_m_options(cerr);
+        display_dash_m_options(0);
       } else {
         cerr << "Unrecognised -M qualifier '" << m << "'\n";
-        display_dash_m_options(cerr);
+        display_dash_m_options(1);
       }
     }
   }

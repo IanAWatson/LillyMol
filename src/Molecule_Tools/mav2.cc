@@ -2,10 +2,12 @@
   Molecular abstractions
 */
 
+#include <cstdlib>
 #include <iostream>
 #include <limits>
 #include <memory>
 
+#include "Foundational/iwmisc/misc.h"
 #include "Foundational/cmdline/cmdline.h"
 
 #include "Molecule_Lib/aromatic.h"
@@ -94,7 +96,7 @@ usage(int rc)
   cerr << "  -K ...        standard smiles options\n";
   cerr << "  -v            verbose output\n";
 
-  exit(rc);
+  std::exit(rc);
 }
 
 static void
@@ -372,19 +374,18 @@ read_abstraction_directives_from_file (const char * fname,
 }
 
 static void
-display_dash_z_options (std::ostream & os)
-{
-  os << " -z writeif     only follow WRITE directive if changes at that stage\n";
-  os << " -z writec      append number of changes to the tag\n";
-  os << " -z 0empty      write an empty molecule if the selection criterion does not match\n";
+display_dash_z_options(int rc) {
+  std::cerr << " -z writeif     only follow WRITE directive if changes at that stage\n";
+  std::cerr << " -z writec      append number of changes to the tag\n";
+  std::cerr << " -z 0empty      write an empty molecule if the selection criterion does not match\n";
 
-  exit(1);
+  std::exit(rc);
 }
 
 static void
-DisplayDashXOptions(std::ostream& output) {
-  output << " -X flush        flush output after each molecule\n";
-  ::exit(0);
+DisplayDashXOptions(int rc) {
+  std::cerr << " -X flush        flush output after each molecule\n";
+  std::exit(rc);
 }
 
 static int
@@ -397,6 +398,11 @@ mav2 (int argc, char ** argv)
     cerr << "Unrecognised options encountered\n";
     usage(1);
   }
+
+  DisplayDashHelpIfRequested(cl, 'a', DisplayUsageExamples);
+
+  DisplayDashHelpIfRequested(cl, 'z', display_dash_z_options);
+  DisplayDashHelpIfRequested(cl, 'X', DisplayDashXOptions);
 
   verbose = cl.option_count('v');
 
@@ -539,11 +545,11 @@ mav2 (int argc, char ** argv)
           cerr << "Will write an empty molecule on zero query match\n";
       }
       else if ("help" == z)
-        display_dash_z_options(cerr);
+        display_dash_z_options(0);
       else
       {
         cerr << "Unrecognised -z qualifier '" << z << "'\n";
-        display_dash_z_options(cerr);
+        display_dash_z_options(1);
       }
     }
   }
@@ -567,7 +573,7 @@ mav2 (int argc, char ** argv)
     const_IWSubstring a = cl.string_value('a', i);
 
     if (a == "help") {
-      DisplayUsageExamples(cerr);
+      DisplayUsageExamples(0);
       return 0;
     }
 
@@ -619,10 +625,10 @@ mav2 (int argc, char ** argv)
           mabs[i].set_write_unique_smiles(0);
         }
       } else if (x == "help") {
-        DisplayDashXOptions(cerr);
+        DisplayDashXOptions(0);
       } else {
         cerr << "Unrecognised -X qualifier '" << x << "'\n";
-        DisplayDashXOptions(cerr);
+        DisplayDashXOptions(0);
       }
     }
   }

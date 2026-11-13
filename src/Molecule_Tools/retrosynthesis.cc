@@ -8,6 +8,7 @@
 #include <algorithm>
 #include <atomic>
 #include <exception>
+#include <cstdlib>
 #include <iostream>
 #include <limits>
 #include <memory>
@@ -378,7 +379,7 @@ usage(int rc)
   cerr << "  -v            verbose output\n";
   // clang-format on
 
-  exit(rc);
+  std::exit(rc);
 }
 
 /*
@@ -2222,8 +2223,7 @@ gather_radii(const const_IWSubstring& buffer, resizable_array<int>& radius)
 }
 
 static void
-display_misc_dash_X_options()
-{
+display_misc_dash_X_options(int rc) {
   cerr << " -X ersfrm       add an extra output with small fragments (-a) removed\n";
   cerr << " -X nsmfp        do NOT split multi fragment products into individual "
           "components\n";
@@ -2240,7 +2240,7 @@ display_misc_dash_X_options()
   cerr << " -X proto        write results in retros::Output proto form\n";
   cerr << " -X rmwidow      remove widow atoms\n";
 
-  exit(1);
+  std::exit(rc);
 }
 
 static void
@@ -2287,6 +2287,8 @@ retrosynthesis(int argc, char** argv)
     cerr << "Unrecognised options encountered\n";
     usage(1);
   }
+
+  DisplayDashHelpIfRequested(cl, 'X', display_misc_dash_X_options);
 
   verbose = cl.option_count('v');
 
@@ -2487,10 +2489,10 @@ retrosynthesis(int argc, char** argv)
           cerr << "Widow type atoms removed from LHS\n";
         }
       } else if ("help" == x) {
-        display_misc_dash_X_options();
+        display_misc_dash_X_options(0);
       } else {
         cerr << "Unrecognised -X directive '" << x << "'\n";
-        display_misc_dash_X_options();
+        display_misc_dash_X_options(1);
       }
     }
   }

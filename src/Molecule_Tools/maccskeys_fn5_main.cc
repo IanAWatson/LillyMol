@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <cstdint>
+#include <cstdlib>
 #include <iostream>
 #include <memory>
 
@@ -72,12 +73,12 @@ IntAccumulator::average_number_of_hits() const {
 }
 
 void
-DisplayDashXOptions(std::ostream& output) {
-  output << R"(
+DisplayDashXOptions(int rc) {
+  std::cerr << R"(
  -X flush         flush output after each molecule
 )";
 
-  ::exit(0);
+  std::exit(rc);
 }
 
 class Options {
@@ -741,6 +742,8 @@ Options::Main(int argc, char** argv) {
     Usage(3);
   }
 
+  DisplayDashHelpIfRequested(cl, 'X', DisplayDashXOptions);
+
   _verbose = cl.option_count('v');
 
   if (cl.option_present('g')) {
@@ -984,10 +987,10 @@ Options::Main(int argc, char** argv) {
           cerr << "Will flush output after each molecule\n";
         }
       } else if (x == "help") {
-        DisplayDashXOptions(cerr);
+        DisplayDashXOptions(0);
       } else {
         cerr << "Unrecognised -X qualifier '" << x << "'\n";
-        DisplayDashXOptions(cerr);
+        DisplayDashXOptions(0);
       }
     }
   }

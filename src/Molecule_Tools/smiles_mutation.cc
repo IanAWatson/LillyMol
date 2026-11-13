@@ -5,6 +5,7 @@
 #include <time.h>
 
 #include <algorithm>
+#include <cstdlib>
 #include <iostream>
 #include <limits>
 #include <memory>
@@ -173,7 +174,7 @@ usage(int rc) {
   cerr << "  -v            verbose output\n";
   // clang-format on
 
-  exit(rc);
+  std::exit(rc);
 }
 
 static double
@@ -1137,16 +1138,16 @@ smiles_mutation(resizable_array_p<IWString>& smiles,
 }
 
 static void
-display_dash_o_options(std::ostream& os) {
-  os << " -O pia=<prob>         probability of an intra molecular mutation\n";
-  os << " -O pie=<prob>         probability of an inter molecular mutation\n";
-  os << " -O trans              translate non organics to something organic\n";
-  os << " -O run=<secs>         stop after <secs> seconds\n";
-  os << " -O prd=<n>            stop after producing <n> valid molecules\n";
-  os << " -O oknp               ok to produce non periodic table elements\n";
-  os << " -O organic            reject any non-organic molecule produced\n";
+display_dash_o_options(int rc) {
+  std::cerr << " -O pia=<prob>         probability of an intra molecular mutation\n";
+  std::cerr << " -O pie=<prob>         probability of an inter molecular mutation\n";
+  std::cerr << " -O trans              translate non organics to something organic\n";
+  std::cerr << " -O run=<secs>         stop after <secs> seconds\n";
+  std::cerr << " -O prd=<n>            stop after producing <n> valid molecules\n";
+  std::cerr << " -O oknp               ok to produce non periodic table elements\n";
+  std::cerr << " -O organic            reject any non-organic molecule produced\n";
 
-  exit(1);
+  std::exit(rc);
 }
 
 static int
@@ -1157,6 +1158,8 @@ smiles_mutation(int argc, char** argv) {
     cerr << "Unrecognised options encountered\n";
     usage(1);
   }
+
+  DisplayDashHelpIfRequested(cl, 'O', display_dash_o_options);
 
   verbose = cl.option_count('v');
 
@@ -1439,7 +1442,7 @@ smiles_mutation(int argc, char** argv) {
             probability_inter_molecule_change < 0.0 ||
             probability_inter_molecule_change > 1.0) {
           cerr << "Invalid probability of inter molecular change 'pie=" << o << "'\n";
-          display_dash_o_options(cerr);
+          display_dash_o_options(1);
         }
 
         if (verbose) {
@@ -1453,7 +1456,7 @@ smiles_mutation(int argc, char** argv) {
             probability_intra_molecule_change < 0.0 ||
             probability_intra_molecule_change > 1.0) {
           cerr << "Invalid probability of intra molecular change 'pia=" << o << "'\n";
-          display_dash_o_options(cerr);
+          display_dash_o_options(1);
         }
 
         if (verbose) {
@@ -1514,10 +1517,10 @@ smiles_mutation(int argc, char** argv) {
           return 1;
         }
       } else if ("help" == o) {
-        display_dash_o_options(cerr);
+        display_dash_o_options(0);
       } else {
         cerr << "Unrecognised -O qualifier '" << o << "'\n";
-        display_dash_o_options(cerr);
+        display_dash_o_options(1);
       }
     }
   }

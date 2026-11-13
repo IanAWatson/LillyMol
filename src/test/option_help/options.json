@@ -1,0 +1,268 @@
+{
+  "abraham": [
+    "G",
+    "Y"
+  ],
+  "activity_consistency": [
+    "V",
+    "Y"
+  ],
+  "alogp": [
+    "J",
+    "Y",
+    "o"
+  ],
+  "atom_pair_fingerprint": [
+    "J"
+  ],
+  "atom_triples": [
+    "J"
+  ],
+  "chirality_fingerprint": [
+    "M"
+  ],
+  "common_names": [
+    "X"
+  ],
+  "dbf": [
+    "W"
+  ],
+  "dicer": [
+    "B",
+    "C",
+    "I",
+    "K",
+    "M"
+  ],
+  "dicer_fragment_replace": [
+    "Y",
+    "z"
+  ],
+  "ec_fingerprint": [
+    "J"
+  ],
+  "enumeration": [
+    "Y"
+  ],
+  "extended_atom_pairs": [
+    "G",
+    "e"
+  ],
+  "fileconv": [
+    "B",
+    "F",
+    "I",
+    "J",
+    "O",
+    "Q",
+    "Y",
+    "f",
+    "h",
+    "p",
+    "s"
+  ],
+  "fingerprint_substructure": [
+    "O",
+    "z"
+  ],
+  "get_substituents": [
+    "X",
+    "t"
+  ],
+  "gfp_erg": [
+    "B"
+  ],
+  "ghose_crippen": [
+    "G",
+    "J"
+  ],
+  "grid_fingerprint": [
+    "M"
+  ],
+  "hydrophobic_sections": [
+    "Y"
+  ],
+  "iwdemerit": [
+    "W",
+    "c"
+  ],
+  "iwdescr": [
+    "B",
+    "F",
+    "G",
+    "O",
+    "T"
+  ],
+  "iwecfp": [
+    "G",
+    "Q",
+    "Y"
+  ],
+  "iwecfp_v2": [
+    "B",
+    "M",
+    "Q",
+    "X",
+    "Y"
+  ],
+  "iwfp": [
+    "M",
+    "U",
+    "Y"
+  ],
+  "iwpathd": [
+    "X",
+    "t"
+  ],
+  "jwcats": [
+    "X"
+  ],
+  "jwdist": [
+    "q"
+  ],
+  "jwmolconn": [
+    "Y"
+  ],
+  "labute": [
+    "Q"
+  ],
+  "linear_fingerprint": [
+    "J"
+  ],
+  "linker_replacement": [
+    "X"
+  ],
+  "maccskeys": [
+    "X"
+  ],
+  "mol2qry": [
+    "D",
+    "Y"
+  ],
+  "molecular_abstraction": [
+    "X",
+    "a",
+    "z"
+  ],
+  "molecular_transformations": [
+    "O",
+    "R",
+    "W"
+  ],
+  "molecule_subset": [
+    "M"
+  ],
+  "msort": [
+    "M"
+  ],
+  "msort_parallel": [
+    "M"
+  ],
+  "multiple_reactions": [
+    "J"
+  ],
+  "numbered_smiles": [
+    "Y"
+  ],
+  "pharmacophore_2d": [
+    "Y"
+  ],
+  "psafp": [
+    "T",
+    "W",
+    "X"
+  ],
+  "pubchem_fingerprints": [
+    "X"
+  ],
+  "qed": [
+    "M",
+    "Q"
+  ],
+  "random_molecular_permutations": [
+    "M",
+    "T"
+  ],
+  "random_smiles": [
+    "C"
+  ],
+  "representations": [
+    "O"
+  ],
+  "retrosynthesis": [
+    "X"
+  ],
+  "rgroup": [
+    "X"
+  ],
+  "ring_extraction": [
+    "X"
+  ],
+  "ring_replacement": [
+    "X"
+  ],
+  "ring_replacement_inexact": [
+    "X"
+  ],
+  "rotatable_bonds": [
+    "F"
+  ],
+  "rxn_fingerprint": [
+    "K",
+    "M"
+  ],
+  "rxn_reverse": [
+    "D"
+  ],
+  "rxn_standardize": [
+    "D",
+    "X"
+  ],
+  "smi2linker": [
+    "I"
+  ],
+  "smiles_mutation": [
+    "O"
+  ],
+  "spatial_replacement": [
+    "W"
+  ],
+  "superimpose_by_matched_atoms": [
+    "Z"
+  ],
+  "temperature": [
+    "B",
+    "Y"
+  ],
+  "tnass": [
+    "X"
+  ],
+  "topotorsion_fingerprints": [
+    "X"
+  ],
+  "trxn": [
+    "J",
+    "M",
+    "z"
+  ],
+  "tshadow": [
+    "B"
+  ],
+  "tsubstructure": [
+    "M",
+    "R",
+    "j",
+    "m",
+    "n"
+  ],
+  "tsymmetry": [
+    "W"
+  ],
+  "xlogp": [
+    "J",
+    "Y"
+  ],
+  "xray_structure_compare": [
+    "G"
+  ]
+}

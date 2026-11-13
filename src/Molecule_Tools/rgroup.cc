@@ -5,6 +5,7 @@
 #include <ctype.h>
 
 #include <algorithm>
+#include <cstdlib>
 #include <iostream>
 #include <limits>
 #include <memory>
@@ -1160,10 +1161,10 @@ rgroups(const char* fname, FileType input_type, IWString_and_File_Descriptor& ou
 }
 
 static void
-DisplayDashXOptions(std::ostream& output) {
-  output << " -x rname          write the parent name with the R group\n";
+DisplayDashXOptions(int rc) {
+  std::cerr << " -X rname          write the parent name with the R group\n";
 
-  ::exit(0);
+  std::exit(rc);
 }
 
 static int
@@ -1174,6 +1175,8 @@ rgroups(int argc, char** argv) {
     cerr << "unrecognised_options_encountered\n";
     usage(1);
   }
+
+  DisplayDashHelpIfRequested(cl, 'X', DisplayDashXOptions);
 
   verbose = cl.option_count('v');
 
@@ -1424,10 +1427,10 @@ rgroups(int argc, char** argv) {
       if (x == "rname") {
         write_parent_name_with_fragment = 1;
       } else if (x == "help") {
-        DisplayDashXOptions(cerr);
+        DisplayDashXOptions(0);
       } else {
         cerr << "Unrecognised -X qualifier '" << x << "'\n";
-        DisplayDashXOptions(cerr);
+        DisplayDashXOptions(0);
       }
     }
   }

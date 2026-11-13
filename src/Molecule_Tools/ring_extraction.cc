@@ -12,6 +12,7 @@
 #include <cstring>
 #include <ctime>
 #include <filesystem>
+#include <cstdlib>
 #include <iostream>
 #include <memory>
 #include <optional>
@@ -319,9 +320,9 @@ ExtractRings::ExtractRings() {
 }
 
 void
-DisplayDashXOption(std::ostream& output) {
+DisplayDashXOption(int rc) {
   // clang-format off
-  output << R"( -X sss     substructure search the starting molecule as a check
+  std::cerr << R"( -X sss     substructure search the starting molecule as a check
  -X a:A     strings assigned to aromatic and aliphatic rings
             -X Ar:Al is used for generating the files in the LillyMol distribution
  -X noarom  generate smarts that do not specify aromaticity,
@@ -331,7 +332,7 @@ DisplayDashXOption(std::ostream& output) {
 )";
   // clang-format on
 
-  ::exit(0);
+  std::exit(rc);
 }
 
 int
@@ -452,10 +453,10 @@ ExtractRings::Initialise(Command_Line& cl) {
           cerr << "Will write atomic degree specifications as bracketed ranges rather than > operators\n";
         }
       } else if (x == "help") {
-        DisplayDashXOption(cerr);
+        DisplayDashXOption(0);
       } else {
         cerr << "Unrecognised -X qualifier '" << x << "'\n";
-        DisplayDashXOption(cerr);
+        DisplayDashXOption(0);
       }
     }
   }
@@ -1608,6 +1609,8 @@ Main(int argc, char** argv) {
     cerr << "unrecognised_options_encountered\n";
     Usage(1);
   }
+
+  DisplayDashHelpIfRequested(cl, 'X', DisplayDashXOption);
 
   const int verbose = cl.option_count('v');
 

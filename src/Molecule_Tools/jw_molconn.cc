@@ -5,6 +5,7 @@
 #include <assert.h>
 #include <stdlib.h>
 
+#include <cstdlib>
 #include <iostream>
 #include <memory>
 
@@ -88,7 +89,7 @@ usage(int rc) {
   cerr << "  -v             verbose output\n";
   // clang-format on
 
-  exit(rc);
+  std::exit(rc);
 }
 
 static int
@@ -2340,10 +2341,10 @@ jw_molconn_descriptor_pipeline(const char* fname,
 }
 
 static void
-DisplayDashYOptions() {
+DisplayDashYOptions(int rc) {
   cerr << " -Y rpipe    input is a descriptor file pipeline  smiles id d1 d2 d3 ...\n";
   cerr << " -Y wpipe    write a descriptor file pipeline - smiles id d1 d2 d3 ...\n";
-  ::exit(0);
+  std::exit(rc);
 }
 
 static int
@@ -2354,6 +2355,8 @@ jw_molconn(int argc, char** argv) {
     cerr << "Unrecognised options encountered\n";
     usage(1);
   }
+
+  DisplayDashHelpIfRequested(cl, 'Y', DisplayDashYOptions);
 
   verbose = cl.option_count('v');
 
@@ -2392,10 +2395,10 @@ jw_molconn(int argc, char** argv) {
           cerr << "Will write a descriptor file pipeline\n";
         }
       } else if (y == "help") {
-        DisplayDashYOptions();
+        DisplayDashYOptions(0);
       } else {
         cerr << "Unrecognised -Y directive '" << y << "'\n";
-        DisplayDashYOptions();
+        DisplayDashYOptions(0);
       }
     }
   }

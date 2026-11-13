@@ -4,6 +4,7 @@
 
 #include <algorithm>
 #include <filesystem>
+#include <cstdlib>
 #include <iostream>
 #include <memory>
 #include <optional>
@@ -197,7 +198,7 @@ usage(int rc) {
   cerr << "  -v             verbose output\n";
   // clang-format on
 
-  exit(rc);
+  std::exit(rc);
 }
 
 /*
@@ -3377,15 +3378,15 @@ Set_of_Reactions::_add_reaction(const_IWSubstring& fname,
 }
 
 static void
-DisplayReactionSpecificationOptions(std::ostream& output) {
-  output << R"(Reactions can be specified via the -R option in these forms:
+DisplayReactionSpecificationOptions(int rc) {
+  std::cerr << R"(Reactions can be specified via the -R option in these forms:
   -R F:<fname>          <fname> contains a list of old style reaction files.
   -R SMIRKS:<smirks>    smirks - remember to use quotes.
   -R K:<fname>          a file containing smirks - one per line.
   -R proto:<fname>      a single proto reaction.
   -R PROTO:<fname>      a single containing a list of textproto file names.
 )";
-  ::exit(0);
+  std::exit(rc);
 }
 
 int
@@ -3438,7 +3439,7 @@ Set_of_Reactions::build(Command_Line& cl, const char opt, Sidechain_Match_Condit
         return 0;
       }
     } else if (r == "help") {
-      DisplayReactionSpecificationOptions(cerr);
+      DisplayReactionSpecificationOptions(0);
     } else if (!_add_reaction(r, smc)) {
       cerr << "Cannot create reaction from '" << r << "'\n";
       return 0;
@@ -3468,23 +3469,23 @@ Set_of_Reactions::build(Command_Line& cl, const char opt, Sidechain_Match_Condit
 }
 
 static int
-display_miscellaneous_options(std::ostream& output, const char flag) {
-  output << "  -" << flag << " append      append sidechain names if present\n";
-  output << "  -" << flag << " apprxn      append reaction names if present\n";
-  output << "  -" << flag << " apprgnt     append reagent  names if present\n";
-  output << "  -" << flag
+display_miscellaneous_options(int rc) {
+  std::cerr << "  -O append      append sidechain names if present\n";
+  std::cerr << "  -O apprxn      append reaction names if present\n";
+  std::cerr << "  -O apprgnt     append reagent  names if present\n";
+  std::cerr << "  -" << 'O'
          << " aeuao       Atom Environments match Unmatched Atoms Only\n";
-  output << "  -" << flag << " orspm       one reaction scheme per input molecule\n";
+  std::cerr << "  -O orspm       one reaction scheme per input molecule\n";
 
-  exit(1);
+  std::exit(rc);
 }
 
 static void
-display_dash_W_options(std::ostream& output) {
-  output << " -W rgsep=<...>     separator between reaction name and reagent \n";
-  output << " -W rxsep=<...>     separator between reaction\n";
+display_dash_W_options(int rc) {
+  std::cerr << " -W rgsep=<...>     separator between reaction name and reagent \n";
+  std::cerr << " -W rxsep=<...>     separator between reaction\n";
 
-  exit(0);
+  std::exit(rc);
 }
 
 static int
@@ -3496,6 +3497,10 @@ molecular_transformations(int argc, char** argv) {
     cerr << "unrecognised_options_encountered\n";
     usage(1);
   }
+
+  DisplayDashHelpIfRequested(cl, 'R', DisplayReactionSpecificationOptions);
+  DisplayDashHelpIfRequested(cl, 'W', display_dash_W_options);
+  DisplayDashHelpIfRequested(cl, 'O', display_miscellaneous_options);
 
   verbose = cl.option_count('v');
 
@@ -3597,7 +3602,7 @@ molecular_transformations(int argc, char** argv) {
         name_separator.unhtml();
         append_reaction_names = 1;
       } else if ("help" == w) {
-        display_dash_W_options(cerr);
+        display_dash_W_options(0);
       } else {
         name_separator = w;
         name_separator.unhtml();
@@ -3639,10 +3644,10 @@ molecular_transformations(int argc, char** argv) {
           cerr << "One reaction scheme per input molecule\n";
         }
       } else if ("help" == m) {
-        display_miscellaneous_options(cerr, 'O');
+        display_miscellaneous_options(0);
       } else {
         cerr << "Unrecognised -O qualifier '" << m << "'\n";
-        display_miscellaneous_options(cerr, 'O');
+        display_miscellaneous_options(1);
       }
     }
   }

@@ -2,6 +2,7 @@
 #include <math.h>
 #include <errno.h>
 
+#include <cstdlib>
 #include <iostream>
 #include <memory>
 #include <unordered_map>
@@ -15,6 +16,7 @@
 #include <google/protobuf/message.h>
 #include <google/protobuf/text_format.h>
 
+#include "Foundational/iwmisc/misc.h"
 #include "Foundational/cmdline/cmdline.h"
 #include "Foundational/data_source/iwstring_data_source.h"
 
@@ -709,7 +711,7 @@ usage(int rc)
  -v             verbose output.
 )";
 
-  exit(rc);
+  std::exit(rc);
 }
 
 static void
@@ -736,26 +738,25 @@ separate_depending_on_fragment_match(resizable_array_p<Substructure_Hit_Statisti
 }
 
 static void
-display_dash_W_options(std::ostream & os)
-{
-  os << " -W dnv=<ndx>         which numeric value in the query file to use as the demerit score\n";
-  os << " -W maxe=<n>          maximum number of substructure queries to identify\n";
-  os << " -W imp2exp           make implicit Hydrogens explicit\n";
-  os << " -W nokekule          aromatic bonds no longer remember their Kekule forms\n";
-  os << " -W slist             write a sorted list of demerit values and reasons\n";
-  os << " -W demerits=<fname>  read query name/demerit value overrides from <fname>\n";
-  os << " -W tabular           create a tabular output of 'smiles id demerit'\n";
+display_dash_W_options(int rc) {
+  std::cerr << " -W dnv=<ndx>         which numeric value in the query file to use as the demerit score\n";
+  std::cerr << " -W maxe=<n>          maximum number of substructure queries to identify\n";
+  std::cerr << " -W imp2exp           make implicit Hydrogens explicit\n";
+  std::cerr << " -W nokekule          aromatic bonds no longer remember their Kekule forms\n";
+  std::cerr << " -W slist             write a sorted list of demerit values and reasons\n";
+  std::cerr << " -W demerits=<fname>  read query name/demerit value overrides from <fname>\n";
+  std::cerr << " -W tabular           create a tabular output of 'smiles id demerit'\n";
 
-  exit(1);
+  std::exit(rc);
 }
 
 static void
-display_atom_cutoff_options(std::ostream & output)
-{
-  output << " -c hmin=<n>           hard min cutoff - molecules with fewer atoms rejected\n";
-  output << " -c smin=<h>           soft min cutoff - molecules with fewer atoms demerited\n";
-  output << " -c smax=<h>           soft max cutoff - molecules with more  atoms demerited\n";
-  output << " -c hmax=<h>           hard max cutoff - molecules with more  atoms rejected\n";
+display_atom_cutoff_options(int rc) {
+  std::cerr << " -c hmin=<n>           hard min cutoff - molecules with fewer atoms rejected\n";
+  std::cerr << " -c smin=<h>           soft min cutoff - molecules with fewer atoms demerited\n";
+  std::cerr << " -c smax=<h>           soft max cutoff - molecules with more  atoms demerited\n";
+  std::cerr << " -c hmax=<h>           hard max cutoff - molecules with more  atoms rejected\n";
+  std::exit(rc);
 }
 
 int
@@ -797,6 +798,9 @@ int
 iwdemerit(int argc, char ** argv)
 {
   Command_Line cl(argc, argv, "M:VX:tA:S:R:G:O:kd:Dq:E:vi:o:c:C:N:uyf:xrlI:Z:z:W:P:");
+
+  DisplayDashHelpIfRequested(cl, 'c', display_atom_cutoff_options);
+  DisplayDashHelpIfRequested(cl, 'W', display_dash_W_options);
 
   if (cl.unrecognised_options_encountered())
     usage(1);
@@ -1006,7 +1010,7 @@ iwdemerit(int argc, char ** argv)
     {
       if ("help" == c)
       {
-        display_atom_cutoff_options(cerr);
+        display_atom_cutoff_options(0);
         return 0;
       }
 
@@ -1190,12 +1194,12 @@ iwdemerit(int argc, char ** argv)
           return 1;
         }
       } else if ("help" == w) {
-        display_dash_W_options(cerr);
+        display_dash_W_options(0);
       }
       else
       {
         cerr << "Unrecognised -W qualifier '" << w << "'\n";
-        display_dash_W_options(cerr);
+        display_dash_W_options(1);
       }
     }
   }

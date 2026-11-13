@@ -8,6 +8,7 @@
 #include <time.h>
 
 #include <fstream>
+#include <cstdlib>
 #include <iostream>
 #include <memory>
 #include <vector>
@@ -65,14 +66,14 @@ Usage(int rc) {
   cerr << "  -v             verbose output\n";
   // clang-format on
 
-  exit(rc);
+  std::exit(rc);
 }
 
 void
-DisplayDashXOptions(std::ostream& output) {
-  output << " -X flush      flush output after each molecule\n";
+DisplayDashXOptions(int rc) {
+  std::cerr << " -X flush      flush output after each molecule\n";
 
-  ::exit(0);
+  std::exit(rc);
 }
 
 void
@@ -453,6 +454,8 @@ Options::Main(int argc, char** argv) {
     Usage(1);
   }
 
+  DisplayDashHelpIfRequested(cl, 'X', DisplayDashXOptions);
+
   _verbose = cl.option_count('v');
 
   if (!process_elements(cl)) {
@@ -613,10 +616,10 @@ Options::Main(int argc, char** argv) {
           cerr << "Will flush after every molecule\n";
         }
       } else if (x == "help") {
-        DisplayDashXOptions(cerr);
+        DisplayDashXOptions(0);
       } else {
         cerr << "Unrecognised -X qualifier '" << x << "'\n";
-        DisplayDashXOptions(cerr);
+        DisplayDashXOptions(0);
       }
     }
   }

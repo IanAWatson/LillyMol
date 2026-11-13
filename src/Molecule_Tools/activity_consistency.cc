@@ -3,6 +3,7 @@
 */
 
 #include <cstdint>
+#include <cstdlib>
 #include <iostream>
 #include <memory>
 #include <random>
@@ -280,7 +281,7 @@ and can be used for model building.
 )";
   // clang-format on
 
-  exit(rc);
+  std::exit(rc);
 }
 
 class Smiles_ID_Activity {
@@ -1904,8 +1905,8 @@ do_write_tabular_output(const Group_of_Molecules* const* gm, const int n,
 }
 
 static void
-display_dash_V_options(std::ostream& os) {
-  os << R"( -V first         take first of multi-valued activity data.
+display_dash_V_options(int rc) {
+  std::cerr << R"( -V first         take first of multi-valued activity data.
  -V ave           take average of multi-valued activity data.
  -V max           take max value of multi-valued activity data.
  -V keep          keep all multi-valued activity data.
@@ -1915,7 +1916,7 @@ display_dash_V_options(std::ostream& os) {
                   not a real measurement, more likely to be a data artifact.
 )";
 
-  exit(0);
+  std::exit(rc);
 }
 
 // Free some data structures
@@ -1952,6 +1953,9 @@ activity_consistency(int argc, char** argv) {
     cerr << "Unrecognised options encountered\n";
     usage(1);
   }
+
+  DisplayDashHelpIfRequested(cl, 'Y', DisplayDashYOption);
+  DisplayDashHelpIfRequested(cl, 'V', display_dash_V_options);
 
   verbose = cl.option_count('v');
 
@@ -2138,10 +2142,10 @@ activity_consistency(int argc, char** argv) {
           cerr << "Will drop cases with identical Y values\n";
         }
       } else if ("help" == lcv) {
-        display_dash_V_options(cerr);
+        display_dash_V_options(0);
       } else {
         cerr << "Unrecognised -V qualifier '" << v << "'\n";
-        display_dash_V_options(cerr);
+        display_dash_V_options(0);
       }
     }
 
@@ -2274,7 +2278,7 @@ activity_consistency(int argc, char** argv) {
       } else if (retain_multi_valued_data) {
       } else {
         cerr << "Must specify some handling of multi-valued data via the -V option\n";
-        display_dash_V_options(cerr);
+        display_dash_V_options(0);
       }
 
       handle_multi_valued_activities(id_to_activity);

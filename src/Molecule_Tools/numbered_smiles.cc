@@ -3,6 +3,7 @@
   Produce isotopic smiles
 */
 
+#include <cstdlib>
 #include <iostream>
 #include <memory>
 
@@ -568,10 +569,10 @@ numbered_smiles(const char* fname, FileType input_type, Molecule_Output_Object& 
 }
 
 static void
-DisplayDashYOptions(std::ostream& output) {
-  output << " -Y spiro          ring systems span spiro fusions\n";
+DisplayDashYOptions(int rc) {
+  std::cerr << " -Y spiro          ring systems span spiro fusions\n";
 
-  ::exit(0);
+  std::exit(rc);
 }
 
 static int
@@ -583,6 +584,8 @@ numbered_smiles(int argc, char** argv)
     cerr << "Unrecognised options encountered\n";
     usage(6);
   }
+
+  DisplayDashHelpIfRequested(cl, 'Y', DisplayDashYOptions);
 
   verbose = cl.option_count('v');
 
@@ -642,10 +645,10 @@ numbered_smiles(int argc, char** argv)
       if (y == "spiro") {
         ring_systems_span_spiro_fusions = 1;
       } else if (y == "help") {
-        DisplayDashYOptions(cerr);
+        DisplayDashYOptions(0);
       } else {
         cerr << "Unrecognised -Y qualifier '" << y << "'\n";
-        DisplayDashYOptions(cerr);
+        DisplayDashYOptions(0);
       }
     }
   }

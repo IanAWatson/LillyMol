@@ -5,6 +5,7 @@
 
 #include <algorithm>
 #include <iomanip>
+#include <cstdlib>
 #include <iostream>
 #include <memory>
 #include <numbers>
@@ -171,7 +172,7 @@ usage(int rc) {
   cerr << "  -v             verbose output\n";
   // clang-format on
 
-  exit(rc);
+  std::exit(rc);
 }
 
 static int
@@ -1764,10 +1765,10 @@ tshadow_descriptor_pipeline(const char* fname,
 }
 
 static void
-DisplayDashBOptions() {
-  cerr << " -Y rpipe    input is a descriptor file pipeline  smiles id d1 d2 d3 ...\n";
-  cerr << " -Y wpipe    write a descriptor file pipeline - smiles id d1 d2 d3 ...\n";
-  ::exit(0);
+DisplayDashBOptions(int rc) {
+  cerr << " -B rpipe    input is a descriptor file pipeline  smiles id d1 d2 d3 ...\n";
+  cerr << " -B wpipe    write a descriptor file pipeline - smiles id d1 d2 d3 ...\n";
+  std::exit(rc);
 }
 
 static int
@@ -1778,6 +1779,8 @@ tshadow(int argc, char** argv) {
     cerr << "Unrecognised options encountered\n";
     usage(1);
   }
+
+  DisplayDashHelpIfRequested(cl, 'B', DisplayDashBOptions);
 
   verbose = cl.option_count('v');
 
@@ -1806,10 +1809,10 @@ tshadow(int argc, char** argv) {
           cerr << "Will write a descriptor file pipeline\n";
         }
       } else if (b == "help") {
-        DisplayDashBOptions();
+        DisplayDashBOptions(0);
       } else {
         cerr << "Unrecognised -B directive '" << b << "'\n";
-        DisplayDashBOptions();
+        DisplayDashBOptions(0);
       }
     }
   }

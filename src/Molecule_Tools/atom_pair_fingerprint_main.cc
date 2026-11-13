@@ -76,7 +76,7 @@ usage(int rc) {
   cerr << "  -A ...        standard aromaticity specifications\n";
   cerr << "  -v            verbose output\n";
 
-  exit(rc);
+  std::exit(rc);
 }
 
 using atom_pair_fingerprint::AtomPairFingerprint;
@@ -262,6 +262,8 @@ DoAtomPairFingerprint(int argc, char** argv) {
   if (cl.unrecognised_options_encountered()) {
     usage(1);
   }
+
+  DisplayDashHelpIfRequested(cl, 'J', fingerprint_writer::DisplayFingerprintWriterOptions);
 
   verbose = cl.option_count('v');
 

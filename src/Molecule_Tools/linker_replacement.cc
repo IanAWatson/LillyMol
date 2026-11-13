@@ -1,5 +1,6 @@
 // Given a set of substituents and linkers, enumerate the possibilities
 
+#include <cstdlib>
 #include <iostream>
 #include <memory>
 
@@ -10,6 +11,7 @@
 
 #define RESIZABLE_ARRAY_IMPLEMENTATION
 
+#include "Foundational/iwmisc/misc.h"
 #include "Foundational/cmdline/cmdline.h"
 #include "Foundational/data_source/iwstring_data_source.h"
 #include "Foundational/iwstring/absl_hash.h"
@@ -303,11 +305,11 @@ Options::Options() {
 }
 
 void
-DisplayDashXOptions(std::ostream& output) {
-  output << "The following -X options are recognised\n";
-  output << " -X nwv            do NOT warn about invalid valences\n";
+DisplayDashXOptions(int rc) {
+  std::cerr << "The following -X options are recognised\n";
+  std::cerr << " -X nwv            do NOT warn about invalid valences\n";
 
-  ::exit(0);
+  std::exit(rc);
 }
 
 int
@@ -344,10 +346,10 @@ Options::Initialise(Command_Line& cl) {
           cerr << "Will NOT report bad valence errors\n";
         }
       } else if (x == "help") {
-        DisplayDashXOptions(cerr);
+        DisplayDashXOptions(0);
       } else {
         cerr << "Unrecognised -X qualifier '" << x << "'\n";
-        DisplayDashXOptions(cerr);
+        DisplayDashXOptions(0);
       }
     }
   }
@@ -939,6 +941,8 @@ Main(int argc, char** argv) {
     cerr << "Unrecognised options encountered\n";
     Usage(1);
   }
+
+  DisplayDashHelpIfRequested(cl, 'X', DisplayDashXOptions);
 
   int verbose = cl.option_count('v');
 

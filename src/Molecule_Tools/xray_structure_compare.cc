@@ -2,6 +2,7 @@
   Compare geometric features in 2 3D structures
 */
 
+#include <cstdlib>
 #include <iostream>
 #include <limits>
 #include <memory>
@@ -113,7 +114,7 @@ usage(int rc)
   cerr << "  -v            verbose output\n";
   // clang-format on
 
-  exit(rc);
+  std::exit(rc);
 }
 
 class Atom_Names : public resizable_array_p<IWString>
@@ -1852,18 +1853,17 @@ read_probe_molecule(const const_IWSubstring& fname, resizable_array_p<Molecule>&
 }
 
 static void
-display_dash_G_options(std::ostream& os)
-{
-  os << " -G sbrms=<f>  single   bond distance rms, default " << single_bond_distance_rms
+display_dash_G_options(int rc) {
+  std::cerr << " -G sbrms=<f>  single   bond distance rms, default " << single_bond_distance_rms
      << endl;
-  os << " -G mbrms=<f>  multiple bond distance rms, default "
+  std::cerr << " -G mbrms=<f>  multiple bond distance rms, default "
      << non_single_bond_distance_rms << endl;
-  os << " -G bnsg=<i>   bond distance nsigma, default " << bond_distance_nsigma << endl;
-  os << " -G arms=<f>   bond angle rms, default " << bond_angle_rms << endl;
-  os << " -G ansg=<i>   bond angle nsigma, default " << bond_angle_nsigma << endl;
-  os << " -G NONE       turn off all aspects of this feature\n";
+  std::cerr << " -G bnsg=<i>   bond distance nsigma, default " << bond_distance_nsigma << endl;
+  std::cerr << " -G arms=<f>   bond angle rms, default " << bond_angle_rms << endl;
+  std::cerr << " -G ansg=<i>   bond angle nsigma, default " << bond_angle_nsigma << endl;
+  std::cerr << " -G NONE       turn off all aspects of this feature\n";
 
-  exit(0);
+  std::exit(rc);
 }
 
 static int
@@ -1875,6 +1875,8 @@ xray_structure_compare(int argc, char** argv)
     cerr << "Unrecognised options encountered\n";
     usage(1);
   }
+
+  DisplayDashHelpIfRequested(cl, 'G', display_dash_G_options);
 
   verbose = cl.option_count('v');
 
@@ -2043,10 +2045,10 @@ xray_structure_compare(int argc, char** argv)
           cerr << "Comparison with sigma variations turned off\n";
         }
       } else if ("help" == g) {
-        display_dash_G_options(cerr);
+        display_dash_G_options(0);
       } else {
         cerr << "Unrecognised -G directive '" << g << "'\n";
-        display_dash_G_options(cerr);
+        display_dash_G_options(0);
       }
     }
   }

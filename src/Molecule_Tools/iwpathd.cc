@@ -6,6 +6,7 @@
 #include <stdlib.h>
 
 #include <algorithm>
+#include <cstdlib>
 #include <iostream>
 #include <limits>
 #include <memory>
@@ -136,6 +137,28 @@ static int create_sparse_fingerprint = 0;
 
 static int create_constant_width_fingerprint = 0;
 
+void
+DisplayDashXOptions(int rc) {
+  cerr << "  -X nodis       do NOT build disubstituted ring paths\n";
+  cerr << "  -X tshape=nn   produce tshaped subsets for paths at least NN\n";
+  cerr << "  -X oktsr       tshaped paths that form rings will be allowed\n";
+  cerr << "                 but there will be no ring info in the path!\n";
+  cerr << "  -X help        this message\n";
+
+  std::exit(rc);
+}
+
+void
+DisplayDashtOptions(int rc) {
+  cerr << " -t seed=<n>        use <n> as random number seed\n";
+  cerr << " -t free            free global arrays after each molecule\n";
+  cerr << " -t kg              keep going after a test failure\n";
+  cerr << " -t <n>             perform <n> random smiles tests on each molecule\n";
+  cerr << " -t dwf=smiles      die if smiles <smiles> is formed\n";
+
+  std::exit(rc);
+}
+
 static void
 usage(int rc)
 {
@@ -175,7 +198,7 @@ usage(int rc)
   cerr << "  -v            verbose output\n";
   // clang-format on
 
-  exit(rc);
+  std::exit(rc);
 }
 
 static unsigned int
@@ -6450,6 +6473,10 @@ path_descriptors(int argc, char** argv)
     usage(1);
   }
 
+  DisplayDashHelpIfRequested(cl, 'X', DisplayDashXOptions);
+
+  DisplayDashHelpIfRequested(cl, 't', DisplayDashtOptions);
+
   verbose = cl.option_count('v');
 
   if (cl.option_present('A')) {
@@ -6651,14 +6678,8 @@ path_descriptors(int argc, char** argv)
           cerr << "Will die when smiles '" << die_when_formed << "' is formed\n";
         }
       } else if ("help" == t) {
-        cerr << " -t seed=<n>        use <n> as random number seed\n";
-        cerr << " -t free            free global arrays after each molecule\n";
-        cerr << " -t kg              keep going after a test failure\n";
-        cerr << " -t <n>             perform <n> random smiles tests on each molecule\n";
-        cerr << " -t dwf=smiles      die if smiles <smiles> is formed\n";
-
-        exit(0);
-      } else if (t.numeric_value(ntest) && ntest >= 0) {
+      DisplayDashtOptions(0);
+    } else if (t.numeric_value(ntest) && ntest >= 0) {
         if (verbose) {
           cerr << "Will perform " << ntest << " tests on each molecule\n";
         }
@@ -6710,13 +6731,8 @@ path_descriptors(int argc, char** argv)
                << fingerprint_cross_reference_file_name << "' will be created\n";
         }
       } else if ("help" == x) {
-        cerr << "  -X nodis       do NOT build disubstituted ring paths\n";
-        cerr << "  -X tshape=nn   produce tshaped subsets for paths at least NN\n";
-        cerr << "  -X oktsr       tshaped paths that form rings will be allowed\n";
-        cerr << "                 but there will be no ring info in the path!\n";
-        cerr << "  -X help        this message\n";
-        return 0;
-      } else {
+      DisplayDashXOptions(0);
+    } else {
         cerr << "Unrecognised -X qualifier '" << x << "'\n";
         return 3;
       }

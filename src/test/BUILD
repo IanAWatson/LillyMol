@@ -49,3 +49,8 @@ py_test(
         "compare_descriptor_files_test.py",
     ],
 )
+
+exports_files([
+    "option_help/run_test.py",
+    "option_help/options.json",
+])

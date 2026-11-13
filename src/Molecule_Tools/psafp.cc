@@ -1,5 +1,6 @@
 // Computes PSA fingerprints
 
+#include <cstdlib>
 #include <iostream>
 #include <limits>
 #include <memory>
@@ -77,7 +78,7 @@ usage(int rc) {
 )";
   // clang-format on
 
-  exit(rc);
+  std::exit(rc);
 }
 
 static void
@@ -257,22 +258,22 @@ psafp(const char* input_fname, IWString_and_File_Descriptor& output) {
 }
 
 static void
-DisplayDashXOptions(std::ostream& output) {
-  output << " -X flush       flush output after every molecule\n";
+DisplayDashXOptions(int rc) {
+  std::cerr << " -X flush       flush output after every molecule\n";
 
-  ::exit(0);
+  std::exit(rc);
 }
 
 static void
-DisplayDashTOptions(std::ostream& output) {
-  output << R"(Options for generating a descriptor file.
+DisplayDashTOptions(int rc) {
+  std::cerr << R"(Options for generating a descriptor file.
 -T min=<n>      minimum value for TPSA
 -T max=<n>      maximum value for TPSA
 -T sep=<char>   output separator, default ' '.
 -T .            default, no filtering, all molecules written.
 )";
 
-  ::exit(0);
+  std::exit(rc);
 }
 
 static int
@@ -283,6 +284,11 @@ psafp(int argc, char** argv) {
     cerr << "Unrecognised options encountered\n";
     usage(1);
   }
+
+  DisplayDashHelpIfRequested(cl, 'W', nvrtspsa::DisplayOptions);
+
+  DisplayDashHelpIfRequested(cl, 'X', DisplayDashXOptions);
+  DisplayDashHelpIfRequested(cl, 'T', DisplayDashTOptions);
 
   verbose = cl.option_count('v');
 
@@ -389,10 +395,10 @@ psafp(int argc, char** argv) {
           cerr << "Will flush output after each molecule\n";
         }
       } else if (x == "help") {
-        DisplayDashXOptions(cerr);
+        DisplayDashXOptions(0);
       } else {
         cerr << "Unrecognised -X qualifier '" << x << "'\n";
-        DisplayDashXOptions(cerr);
+        DisplayDashXOptions(0);
       }
     }
   }
@@ -432,10 +438,10 @@ psafp(int argc, char** argv) {
           cerr << "Descriptor file output separator " << output_separator << '\n';
         }
       } else if (t == "help") {
-        DisplayDashTOptions(cerr);
+        DisplayDashTOptions(0);
       } else {
         cerr << "Unrecognised -T qualifier '" << t << "'\n";
-        DisplayDashTOptions(cerr);
+        DisplayDashTOptions(0);
       }
     }
 

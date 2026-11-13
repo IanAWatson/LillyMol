@@ -89,7 +89,7 @@ usage(int rc)
 )";
   // clang-format on
 
-  exit(rc);
+  std::exit(rc);
 }
 
 void
@@ -270,6 +270,8 @@ int
 LinearFingerprint(int argc, char ** argv)
 {
   Command_Line cl(argc, argv, "E:A:K:lg:i:J:P:vfr:R:ysB:cxw");
+
+  DisplayDashHelpIfRequested(cl, 'J', fingerprint_writer::DisplayFingerprintWriterOptions);
 
   if (cl.unrecognised_options_encountered())
     usage(1);

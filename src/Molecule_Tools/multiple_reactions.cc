@@ -1,6 +1,7 @@
 //  Apply a set of reactions to input molecules.
 
 #include <filesystem>
+#include <cstdlib>
 #include <iostream>
 #include <memory>
 #include <optional>
@@ -8,6 +9,7 @@
 #include "google/protobuf/io/zero_copy_stream.h"
 #include "google/protobuf/io/zero_copy_stream_impl.h"
 
+#include "Foundational/iwmisc/misc.h"
 #include "Foundational/cmdline/cmdline.h"
 #include "Foundational/data_source/tfdatarecord.h"
 #include "Foundational/iwmisc/proto_support.h"
@@ -213,12 +215,12 @@ MultipleReactions::MultipleReactions()
 }
 
 void
-DisplayDashJQualifiers(std::ostream& output) {
-  output << R"(The following options are recognisde
+DisplayDashJQualifiers(int rc) {
+  std::cerr << R"(The following options are recognisde
  -J noschmsg    do NOT write warning messages about no sidechain substructure matches
   )";
 
-  ::exit(0);
+  std::exit(rc);
 }
 
 int
@@ -387,10 +389,10 @@ MultipleReactions::Initialise(Command_Line& cl)
           cerr << "Will NOT warn about no sidechain query matches\n";
         }
       } else if (j == "help") {
-        DisplayDashJQualifiers(cerr);
+        DisplayDashJQualifiers(0);
       } else {
         cerr << "Unrecognised -J qualifier '" << j << "'\n";
-        DisplayDashJQualifiers(cerr);
+        DisplayDashJQualifiers(0);
         return 1;
       }
     }
@@ -1224,6 +1226,8 @@ Main(int argc, char** argv)
     cerr << "unrecognised_options_encountered\n";
     Usage(1);
   }
+
+  DisplayDashHelpIfRequested(cl, 'J', DisplayDashJQualifiers);
 
   const int verbose = cl.option_count('v');
 

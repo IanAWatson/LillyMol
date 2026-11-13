@@ -7,6 +7,7 @@
 #include <stdlib.h>
 #include <time.h>
 
+#include <cstdlib>
 #include <iostream>
 #include <memory>
 #include <sstream>
@@ -311,11 +312,10 @@ topotorsion_fingerprints(const char* fname, FileType input_type,
 }
 
 static void
-DisplayDashXOptions(std::ostream& output)
-{
-  output << " -X flush      flush output after each molecule\n";
+DisplayDashXOptions(int rc) {
+  std::cerr << " -X flush      flush output after each molecule\n";
 
-  ::exit(0);
+  std::exit(rc);
 }
 
 static void
@@ -352,6 +352,8 @@ topotorsion(int argc, char** argv)
   if (cl.unrecognised_options_encountered()) {
     usage();
   }
+
+  DisplayDashHelpIfRequested(cl, 'X', DisplayDashXOptions);
 
   verbose = cl.option_count('v');
 
@@ -417,10 +419,10 @@ topotorsion(int argc, char** argv)
           cerr << "Will flush after every molecule\n";
         }
       } else if (x == "help") {
-        DisplayDashXOptions(cerr);
+        DisplayDashXOptions(0);
       } else {
         cerr << "Unrecognised -X qualifier '" << x << "'\n";
-        DisplayDashXOptions(cerr);
+        DisplayDashXOptions(0);
       }
     }
   }

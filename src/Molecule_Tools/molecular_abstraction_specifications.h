@@ -115,7 +115,7 @@ class Molecule_With_Info_About_Parent : public Molecule
 #define MAD_TYPE_CSCAFFOLD 25
 
 extern void DisplayAbstractionNames(std::ostream& output);
-extern void DisplayUsageExamples(std::ostream& output);
+extern void DisplayUsageExamples(int rc);
 
 class Molecular_Abstraction_Directives_Node
 {

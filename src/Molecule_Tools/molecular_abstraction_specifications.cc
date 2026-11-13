@@ -1,4 +1,5 @@
 #include <stdlib.h>
+#include <cstdlib>
 #include <iostream>
 
 #include "molecular_abstraction_specifications.h"
@@ -38,39 +39,40 @@ DisplayAbstractionNames(std::ostream& output) {
 }
 
 void
-DisplayUsageExamples(std::ostream& output) {
-  output << "Specify a set of operations that are performed in a pipeline\n";
-  output << "allbonds(<1,2,3>)    change all bonds to type <1,2,3>\n";
-  output << "arf(<lrs,lhc,ELE=,AROM=,ALIPH=>)\n";
-  output << "bigring(spiro)\n";
-  output << "cbt(<smarts>=<1,2,3>)  change the bond between first two matched atoms to <1,2,3>\n";
-  output << "charge(<smarts, CHARGE=, SMARTS=, n=q, *>)\n";
-  output << "compress(<>)\n";
-  output << "fragment(KEEP=<smt> REMOVE=<smt>) fragment filtering\n";
-  output << "isotope(<ISO=<i> SMARTS=<i=n> <i>)\n";
-  output << "invscaf(SCH=<ele>)  keep the atoms that are NOT the scaffold\n";
-  output << "rings()\n";
-  output << "ringsys(<>)\n";
-  output << "rmbond()\n";
-  output << "rmrd2(<e>)  remove [eRD2] atoms in ring\n";
-  output << "rplink(ELE=<e>)\n";
-  output << "scafold(keepfirst)  keepfirst means keep first ring attachment\n";
-  output << "spinach(RMDBSC, AROM=<e>, ALIPH=<e>, CHAIN=<e>\n";
-  output << "sss(SMARTS=<smt>, NONM, ...)   substructure search, ... is a query file, NONM pass non matches\n";
-  output << "translate()\n";
-  output << "\n";
-  output << "Recognised by all operators...\n";
-  output << " WRITE     write the current molecule\n";
-  output << " FP        generate fingerprint for the current molecule\n";
-  output << " WRITEC    append number of changes to output\n";
-  output << " WRITEIF   write if the molecule is changed\n";
-  output << " WRITE_MIN_ATOMS=<nn>   write if the molecule contains at least nn atoms\n";
-  output << " WRITE_MAX_ATOMS=<nn>   write if the molecule contains at most  nn atoms\n";
-  output << " WRITE_MIN_PARENT_ATOM_RATIO=<frac>   write if ratio of atoms now to parent > frac\n";
-  output << " WRITE_MAX_PARENT_ATOM_RATIO=<frac>   write if ratio of atoms now to parent < frac\n";
-  output << " ISO=<n>       apply atom typing\n";
-  output << " AT=<atype>       apply atom typing\n";
-  return;
+DisplayUsageExamples(int rc) {
+  std::cerr << " -a <operations>  molecular abstraction pipeline examples\n";
+  std::cerr << "Specify a set of operations that are performed in a pipeline\n";
+  std::cerr << "allbonds(<1,2,3>)    change all bonds to type <1,2,3>\n";
+  std::cerr << "arf(<lrs,lhc,ELE=,AROM=,ALIPH=>)\n";
+  std::cerr << "bigring(spiro)\n";
+  std::cerr << "cbt(<smarts>=<1,2,3>)  change the bond between first two matched atoms to <1,2,3>\n";
+  std::cerr << "charge(<smarts, CHARGE=, SMARTS=, n=q, *>)\n";
+  std::cerr << "compress(<>)\n";
+  std::cerr << "fragment(KEEP=<smt> REMOVE=<smt>) fragment filtering\n";
+  std::cerr << "isotope(<ISO=<i> SMARTS=<i=n> <i>)\n";
+  std::cerr << "invscaf(SCH=<ele>)  keep the atoms that are NOT the scaffold\n";
+  std::cerr << "rings()\n";
+  std::cerr << "ringsys(<>)\n";
+  std::cerr << "rmbond()\n";
+  std::cerr << "rmrd2(<e>)  remove [eRD2] atoms in ring\n";
+  std::cerr << "rplink(ELE=<e>)\n";
+  std::cerr << "scafold(keepfirst)  keepfirst means keep first ring attachment\n";
+  std::cerr << "spinach(RMDBSC, AROM=<e>, ALIPH=<e>, CHAIN=<e>\n";
+  std::cerr << "sss(SMARTS=<smt>, NONM, ...)   substructure search, ... is a query file, NONM pass non matches\n";
+  std::cerr << "translate()\n";
+  std::cerr << "\n";
+  std::cerr << "Recognised by all operators...\n";
+  std::cerr << " WRITE     write the current molecule\n";
+  std::cerr << " FP        generate fingerprint for the current molecule\n";
+  std::cerr << " WRITEC    append number of changes to output\n";
+  std::cerr << " WRITEIF   write if the molecule is changed\n";
+  std::cerr << " WRITE_MIN_ATOMS=<nn>   write if the molecule contains at least nn atoms\n";
+  std::cerr << " WRITE_MAX_ATOMS=<nn>   write if the molecule contains at most  nn atoms\n";
+  std::cerr << " WRITE_MIN_PARENT_ATOM_RATIO=<frac>   write if ratio of atoms now to parent > frac\n";
+  std::cerr << " WRITE_MAX_PARENT_ATOM_RATIO=<frac>   write if ratio of atoms now to parent < frac\n";
+  std::cerr << " ISO=<n>       apply atom typing\n";
+  std::cerr << " AT=<atype>       apply atom typing\n";
+  std::exit(rc);
 }
 
 Molecular_Abstraction_Directives_Node::Molecular_Abstraction_Directives_Node()

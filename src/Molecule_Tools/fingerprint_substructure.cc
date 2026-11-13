@@ -1213,6 +1213,9 @@ Options::Main(int argc, char** argv) {
     usage(1);
   }
 
+  DisplayDashHelpIfRequested(cl, 'z', DisplayDashzOptions);
+  DisplayDashHelpIfRequested(cl, 'O', DisplayDashOOptions);
+
   verbose = cl.option_count('v');
 
   if (cl.option_present('A')) {

@@ -2,11 +2,13 @@
 // Primary task is to take forward reactions and reverse them.
 // Performs various transformation and filtering operations.
 
+#include <cstdlib>
 #include <iostream>
 #include <memory>
 
 #include <stdlib.h>
 
+#include "Foundational/iwmisc/misc.h"
 #include "Foundational/cmdline/cmdline.h"
 #include "Foundational/data_source/iwstring_data_source.h"
 #include "Molecule_Lib/aromatic.h"
@@ -297,13 +299,13 @@ int rxn_reverse(const char * fname,
 void
 usage(int rc)
 {
-  exit(rc);
+  std::exit(rc);
 }
 
 void
-display_discard_options(std::ostream & output)
-{
-  exit(1);
+display_discard_options(int rc) {
+  std::cerr << " -D help   reaction-discard directives are not implemented in this tool\n";
+  std::exit(rc);
 }
 
 int
@@ -316,6 +318,8 @@ rxn_reverse(int argc, char ** argv)
     cerr << "Unrecognised options encountered\n";
     usage(1);
   }
+
+  DisplayDashHelpIfRequested(cl, 'D', display_discard_options);
 
   verbose = cl.option_count('v');
 
@@ -364,12 +368,12 @@ rxn_reverse(int argc, char ** argv)
       }
       else if ("help" == d)
       {
-        display_discard_options(cerr);
+        display_discard_options(0);
       }
       else
       {
         cerr << "Unrecognised -D qualifier '" << d << "'\n";
-        display_discard_options(cerr);
+        display_discard_options(1);
       }
     }
   }

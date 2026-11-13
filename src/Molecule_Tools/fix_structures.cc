@@ -1,4 +1,5 @@
 #include <array>
+#include <cstdlib>
 #include <iostream>
 #include <memory>
 
@@ -611,4 +612,11 @@ Structure_Fixing::process(Molecule & m)
   m.atoms(atoms);
 
   return _process(m, atoms);
+}
+
+void
+Structure_Fixing::DisplayDashJOptions(int rc) {
+  Structure_Fixing options;
+  options.usage('J', std::cerr);
+  std::exit(rc);
 }

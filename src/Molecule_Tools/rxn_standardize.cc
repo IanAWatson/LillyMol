@@ -2,6 +2,7 @@
   standardizes a reaction
 */
 
+#include <cstdlib>
 #include <iostream>
 #include <memory>
 
@@ -866,39 +867,39 @@ rxn_standardize_rdfile(iwstring_data_source& input,
 }
 
 static void
-display_misc_X_options(std::ostream& output) {
+display_misc_X_options(int rc) {
   // clang-format off
-  output << " -X rmmr         discard reactions that have multiple reactants\n";
-  output << " -X rmmp         discard reactions that have multiple products\n";
-  output << " -X rmiso        discard reactions containing isotopic atoms\n";
-  output << " -X igbad        discard bad reactions (default is to exit)\n";
-  output << " -X nclf         discard reactions where there is no change in the largest fragment\n";
-  output << " -X rmncma       discard reactions that have no common mapped atoms in the reactants and product\n";
-  output << " -X rmab         discard reactions that contain aromatic bonds\n";
-  output << " -X rmdmap       discard reactions containing duplicate atom map numbers\n";
+  std::cerr << " -X rmmr         discard reactions that have multiple reactants\n";
+  std::cerr << " -X rmmp         discard reactions that have multiple products\n";
+  std::cerr << " -X rmiso        discard reactions containing isotopic atoms\n";
+  std::cerr << " -X igbad        discard bad reactions (default is to exit)\n";
+  std::cerr << " -X nclf         discard reactions where there is no change in the largest fragment\n";
+  std::cerr << " -X rmncma       discard reactions that have no common mapped atoms in the reactants and product\n";
+  std::cerr << " -X rmab         discard reactions that contain aromatic bonds\n";
+  std::cerr << " -X rmdmap       discard reactions containing duplicate atom map numbers\n";
   // clang-format on
 
-  exit(0);
+  std::exit(rc);
 }
 
 static void
-display_misc_D_options(std::ostream& output) {
+display_misc_D_options(int rc) {
   // clang-format off
-  output << " -D rmdr         remove duplicate reactants\n";
-  output << " -D rmdp         remove duplicate products\n";
-  output << " -D rmda         remove duplicate agents\n";
-  output << " -D rmaa         remove all agents\n";
-  output << " -D rmnmap       remove any component with no atom mapping at all\n";
-  output << " -D rmdup        remove components that are shown as both reactants and products\n";
-  output << " -D rdlp         reduce product to largest product\n";
-  output << " -D rdlr         reduce reactant to largest reactant\n";
-  output << " -D rmrnp        remove reactants not participating\n";
-  output << " -D rmfnp        remove any reactant fragments not participating\n";
-  output << " -D unmap        unmap all atoms with duplicate atom map numbers\n";
-  output << " -D fmap         add unique mapping numbers for any atoms that are not mapped\n";
+  std::cerr << " -D rmdr         remove duplicate reactants\n";
+  std::cerr << " -D rmdp         remove duplicate products\n";
+  std::cerr << " -D rmda         remove duplicate agents\n";
+  std::cerr << " -D rmaa         remove all agents\n";
+  std::cerr << " -D rmnmap       remove any component with no atom mapping at all\n";
+  std::cerr << " -D rmdup        remove components that are shown as both reactants and products\n";
+  std::cerr << " -D rdlp         reduce product to largest product\n";
+  std::cerr << " -D rdlr         reduce reactant to largest reactant\n";
+  std::cerr << " -D rmrnp        remove reactants not participating\n";
+  std::cerr << " -D rmfnp        remove any reactant fragments not participating\n";
+  std::cerr << " -D unmap        unmap all atoms with duplicate atom map numbers\n";
+  std::cerr << " -D fmap         add unique mapping numbers for any atoms that are not mapped\n";
   // clang-format on
 
-  exit(0);
+  std::exit(rc);
 }
 
 static int rxn_standardize(const char* fname, IWString_and_File_Descriptor& output);
@@ -967,6 +968,9 @@ rxn_standardize(int argc, char** argv) {
     cerr << "Unrecognised options encountered\n";
     usage();
   }
+
+  DisplayDashHelpIfRequested(cl, 'X', display_misc_X_options);
+  DisplayDashHelpIfRequested(cl, 'D', display_misc_D_options);
 
   verbose = cl.option_count('v');
 
@@ -1186,9 +1190,9 @@ rxn_standardize(int argc, char** argv) {
       }
 
       else if ("help" == x) {
-        display_misc_X_options(cerr);
+        display_misc_X_options(0);
       } else {
-        display_misc_X_options(cerr);
+        display_misc_X_options(0);
       }
     }
   }
@@ -1251,7 +1255,7 @@ rxn_standardize(int argc, char** argv) {
           cerr << "Will remove any reactant fragments that are not participating\n";
         }
       } else if ("help" == d) {
-        display_misc_D_options(cerr);
+        display_misc_D_options(0);
       } else if ("unmap" == d) {
         unmap_duplicate_atom_map_numbers = 1;
         if (verbose) {
@@ -1263,7 +1267,7 @@ rxn_standardize(int argc, char** argv) {
           cerr << "Will assign mapping numbers to any atoms that are not mapped\n";
         }
       } else {
-        display_misc_D_options(cerr);
+        display_misc_D_options(0);
       }
     }
   }

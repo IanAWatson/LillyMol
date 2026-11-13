@@ -9,6 +9,9 @@ class Command_Line;
 
 namespace nvrtspsa {
 
+// Display option help on stderr and exit with rc.
+void DisplayOptions(int rc);
+
 // Class for performing Novartis Polar Surface Area calculations.
 class NovartisPolarSurfaceArea {
   private:

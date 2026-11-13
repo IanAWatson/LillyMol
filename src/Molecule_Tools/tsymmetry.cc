@@ -4,6 +4,7 @@
 
 #include <algorithm>
 #include <iomanip>
+#include <cstdlib>
 #include <iostream>
 #include <memory>
 
@@ -118,6 +119,21 @@ static int write_symmetry_descriptors_to_stdout = 0;
 static int include_centre_atoms_with_symmetry_groupings = 0;
 
 static int ignore_molecules_with_fewer_atoms = 0;
+
+void
+DisplayDashWOptions(int rc) {
+  // clang-format off
+  cerr << " -W symmat<op><number>      number   of atoms in symmetry relationships\n";
+  cerr << " -W fsymmat<op><ratio>      fraction of atoms in symmetry relationships\n";
+  cerr << " -W nsymmat<op><number>     number   of atoms NOT in symmetry relationships\n";
+  cerr << " -W nfsymmat<op><ratio>     fraction of atoms NOT in symmetry relationships\n";
+  cerr << " where <op> is one of '=', '>=' or '<='\n";
+  cerr << " -W minatm=<natoms>         just PASS molecules with fewer than <natoms> atoms - avoid problems with benzene\n";
+  cerr << "                            note that these molecules are written to the -m stream\n";
+  // clang-format on
+
+  std::exit(rc);
+}
 
 static void
 usage (int rc)
@@ -950,6 +966,8 @@ static int
 tsymmetry (int argc, char ** argv)
 {
   Command_Line cl (argc, argv, "S:x:T:vi:E:A:t:L:o:u:W:m:n:ad:czw:");
+
+  DisplayDashHelpIfRequested(cl, 'W', DisplayDashWOptions);
   if(cl.unrecognised_options_encountered())
     usage(2);
 
@@ -1214,18 +1232,8 @@ tsymmetry (int argc, char ** argv)
       }
       else if ("help" == w)
       {
-        // clang-format off
-        cerr << " -W symmat<op><number>      number   of atoms in symmetry relationships\n";
-        cerr << " -W fsymmat<op><ratio>      fraction of atoms in symmetry relationships\n";
-        cerr << " -W nsymmat<op><number>     number   of atoms NOT in symmetry relationships\n";
-        cerr << " -W nfsymmat<op><ratio>     fraction of atoms NOT in symmetry relationships\n";
-        cerr << " where <op> is one of '=', '>=' or '<='\n";
-        cerr << " -W minatm=<natoms>         just PASS molecules with fewer than <natoms> atoms - avoid problems with benzene\n";
-        cerr << "                            note that these molecules are written to the -m stream\n";
-        // clang-format on
-
-        return 0;
-      }
+      DisplayDashWOptions(0);
+    }
       else
       {
         cerr << "Unrecognised -W qualifier '" << w << "'\n";

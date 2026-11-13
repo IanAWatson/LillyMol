@@ -2,6 +2,7 @@
 // part of a molecule by another group.
 // Input must be 3d structures.
 
+#include <cstdlib>
 #include <iostream>
 #include <limits>
 #include <memory>
@@ -202,7 +203,6 @@ class Options {
               Molecule_Output_Object& output);
   int ReadReplacementMoleculesFileOfFiles(IWString& fname,
                                           resizable_array_p<Molecule>& destination);
-  void DisplayDashWQualifiers(std::ostream& output) const;
 
   std::optional<std::tuple<int, int>> IdentifyKeyBond(Molecule& m,
                                                       const float* distance_matrix,
@@ -305,12 +305,12 @@ Options::Options() {
   _rng.seed(rd());
 }
 
-void
-Options::DisplayDashWQualifiers(std::ostream& output) const {
-  output << " -W rep       write the replacement before each product\n";
-  output << " -W once      write the starting molecule once\n";
-  output << " -W each      write the starting molecule before each product\n";
-  ::exit(0);
+static void
+DisplayDashWQualifiers(int rc) {
+  std::cerr << " -W rep       write the replacement before each product\n";
+  std::cerr << " -W once      write the starting molecule once\n";
+  std::cerr << " -W each      write the starting molecule before each product\n";
+  std::exit(rc);
 }
 
 int
@@ -382,7 +382,7 @@ Options::Initialise(Command_Line& cl) {
       } else if (w == "each") {
         _write_scaffold_to_output = 2;
       } else if (w == "help") {
-        DisplayDashWQualifiers(cerr);
+        DisplayDashWQualifiers(0);
       } else {
         cerr << "Unrecognised -w qualifier '" << w << "'\n";
         return 0;
@@ -1414,6 +1414,8 @@ SpatialReplacement(int argc, char** argv) {
     cerr << "Unrecognised options encountered\n";
     Usage(1);
   }
+
+  DisplayDashHelpIfRequested(cl, 'W', DisplayDashWQualifiers);
 
   int verbose = cl.option_count('v');
 

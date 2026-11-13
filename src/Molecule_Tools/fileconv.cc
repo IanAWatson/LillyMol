@@ -2,6 +2,7 @@
   File conversion utility.
 */
 
+#include <cstdlib>
 #include <iostream>
 #include <iostream>
 #include <memory>
@@ -170,11 +171,11 @@ LocalOptions::Build(Command_Line& cl) {
 }
 
 void
-DisplayDashBOptions(std::ostream& os) {
-  os << " -B <nn>        ignore as many as <nn> otherwise fatal input errors\n";
-  os << " -B log=<fname> echo (unchanged) rejected input records to <fname>\n";
+DisplayDashBOptions(int rc) {
+  std::cerr << " -B <nn>        ignore as many as <nn> otherwise fatal input errors\n";
+  std::cerr << " -B log=<fname> echo (unchanged) rejected input records to <fname>\n";
 
-  exit(1);
+  std::exit(rc);
 }
 
 int
@@ -192,7 +193,7 @@ LocalOptions::ParseBadHandlingoptions(Command_Line& cl, char flag) {
       if (verbose)
         cerr << "Will log connection table errors to '" << connection_table_error_file << "'\n";
     } else if ("help" == b) {
-      DisplayDashBOptions(cerr);
+      DisplayDashBOptions(0);
     } else if (b.numeric_value(connection_table_errors_allowed) &&
                connection_table_errors_allowed >= 0) {
       if (verbose)
@@ -598,6 +599,20 @@ Fileconv(int argc, char ** argv) {
     cerr << "Unrecognised options encountered\n";
     fileconv::Usage(1);
   }
+
+  DisplayDashHelpIfRequested(cl, 'J', Structure_Fixing::DisplayDashJOptions);
+
+  DisplayDashHelpIfRequested(cl, 'h', fileconv::DisplayDashhOptions);
+  DisplayDashHelpIfRequested(cl, 'p', fileconv::DisplayPDirectives);
+  DisplayDashHelpIfRequested(cl, 'Y', fileconv::DisplayDashYOptions);
+  DisplayDashHelpIfRequested(cl, 'I', fileconv::DisplayDashIOptions);
+  DisplayDashHelpIfRequested(cl, 's', fileconv::DisplayChiralityOptions);
+  DisplayDashHelpIfRequested(cl, 'f', fileconv::DisplayfOptions);
+  DisplayDashHelpIfRequested(cl, 'F', fileconv::DisplayFOptions);
+  DisplayDashHelpIfRequested(cl, 'O', fileconv::DisplayOrganicOptions);
+  DisplayDashHelpIfRequested(cl, 'Q', fileconv::DisplayChargeOptions);
+
+  DisplayDashHelpIfRequested(cl, 'B', DisplayDashBOptions);
 
   fileconv::FileconvConfig config;
   if (! config.Build(cl)) {

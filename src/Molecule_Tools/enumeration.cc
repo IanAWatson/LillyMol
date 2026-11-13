@@ -4,6 +4,7 @@
 // available sites in the molecules.
 
 #include <algorithm>
+#include <cstdlib>
 #include <iostream>
 #include <limits>
 #include <memory>
@@ -81,17 +82,17 @@ in each fragment is used.
 }
 
 void
-DisplayDashYOptions(std::ostream& output) {
+DisplayDashYOptions(int rc) {
   // clang-format off
-  output << " -Y xiso           remove isotopic labels from product molecules\n";
-  output << " -Y dmv=<n>        do not process any molecule that has more than <n> reactive sites\n";
-  output << " -Y dns=<n>        if a molecule has more than <n> sites, randomly downsample to limit to approximately <n>\n";
-  output << " -Y valence        check for OK valences in product molecules, and discard bad\n";
-  output << " -Y stop=<n>       stop processing a molecule once it has generated <n> products\n";
-  output << "                   note that this will be a function of the size of the fragment library as well as sites in the molecule\n";
+  std::cerr << " -Y xiso           remove isotopic labels from product molecules\n";
+  std::cerr << " -Y dmv=<n>        do not process any molecule that has more than <n> reactive sites\n";
+  std::cerr << " -Y dns=<n>        if a molecule has more than <n> sites, randomly downsample to limit to approximately <n>\n";
+  std::cerr << " -Y valence        check for OK valences in product molecules, and discard bad\n";
+  std::cerr << " -Y stop=<n>       stop processing a molecule once it has generated <n> products\n";
+  std::cerr << "                   note that this will be a function of the size of the fragment library as well as sites in the molecule\n";
   // clang-format on
 
-  ::exit(0);
+  std::exit(rc);
 }
 
 // Keep track of the sidechains being added.
@@ -952,10 +953,10 @@ Options::Initialise(Command_Line& cl) {
           cerr << "Will abandon an input molecule if it generates more than " << s << " products\n";
         }
       } else if (y == "help") {
-        DisplayDashYOptions(cerr);
+        DisplayDashYOptions(0);
       } else {
         cerr << "Unrecognised -Y qualifier '" << y << "'\n";
-        DisplayDashYOptions(cerr);
+        DisplayDashYOptions(0);
       }
     }
   }
@@ -1817,6 +1818,8 @@ SubstituentEnumeration(int argc, char** argv) {
     cerr << "Unrecognised options encountered\n";
     Usage(1);
   }
+
+  DisplayDashHelpIfRequested(cl, 'Y', DisplayDashYOptions);
 
   int verbose = cl.option_count('v');
 

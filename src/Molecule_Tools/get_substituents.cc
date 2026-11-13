@@ -1,5 +1,6 @@
 // Identify substituents that are defined by matched query atoms.
 
+#include <cstdlib>
 #include <iostream>
 #include <limits>
 #include <memory>
@@ -1482,13 +1483,13 @@ GetSubstituents(Options& options,
 }
 
 void
-DisplayDashXOptions(std::ostream& output) {
-  output << "\n";
-  output << " -X 3d              include coordinates with smiles (needs 3D input)\n";
-  output << " -X okdouble        allow doubly bonded substituents\n";
-  output << " -X anchor          include the anchor atom with the fragment\n";
+DisplayDashXOptions(int rc) {
+  std::cerr << "\n";
+  std::cerr << " -X 3d              include coordinates with smiles (needs 3D input)\n";
+  std::cerr << " -X okdouble        allow doubly bonded substituents\n";
+  std::cerr << " -X anchor          include the anchor atom with the fragment\n";
 
-  ::exit(0);
+  std::exit(rc);
 }
 
 int
@@ -1499,6 +1500,8 @@ Main(int argc, char** argv) {
     cerr << "Unrecognised options encountered\n";
     Usage(1);
   }
+
+  DisplayDashHelpIfRequested(cl, 'X', DisplayDashXOptions);
 
   DisplayDashHelpIfRequested(cl, 't', DisplayDashtOptions);
 
@@ -1550,10 +1553,10 @@ Main(int argc, char** argv) {
         }
       } else if (x == "help") {
         cerr << "Unrecognised -X qualifier '" << x << "'\n";
-        DisplayDashXOptions(cerr);
+        DisplayDashXOptions(0);
       } else {
         cerr << "Unrecognised -X qualifier '" << x << "'\n";
-        DisplayDashXOptions(cerr);
+        DisplayDashXOptions(0);
       }
     }
   }

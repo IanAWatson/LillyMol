@@ -363,7 +363,6 @@ struct DescriptorsToCompute {
   int saturated_chains = 1;
 
   void SetAll(int s);
-  int DisplayUsage(std::ostream& output) const;
   int ReadDescriptorsToCompute(const const_IWSubstring& fname);
   int ReadDescriptorsToCompute(iwstring_data_source& input);
   int Initialise(Command_Line& cl);

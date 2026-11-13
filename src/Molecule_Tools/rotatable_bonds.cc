@@ -1,3 +1,4 @@
+#include <cstdlib>
 #include <iostream>
 #include <memory>
 
@@ -164,12 +165,13 @@ ReadQueries(char flag, const const_IWSubstring& directive,
 }
 
 static void
-DisplayRobBondBetweenOptions(std::ostream& output) {
-  output << " q1:<qry>          substructure query for first  matched atom\n";
-  output << " q2:<qry>          substructure query for second matched atom\n";
-  output << " write=<fname>     write smiles name rotbond to <fname>\n";
-  output << " iso=<isotope>     place isotope on matched atoms\n";
-  ::exit(0);
+DisplayRobBondBetweenOptions(int rc) {
+  std::cerr << "Options for reporting rotatable bonds between query matches (-F):\n";
+  std::cerr << " q1:<qry>          substructure query for first  matched atom\n";
+  std::cerr << " q2:<qry>          substructure query for second matched atom\n";
+  std::cerr << " write=<fname>     write smiles name rotbond to <fname>\n";
+  std::cerr << " iso=<isotope>     place isotope on matched atoms\n";
+  std::exit(rc);
 }
 
 int
@@ -214,10 +216,10 @@ RotBondBetween::Initialise(const Command_Line& cl, char flag) {
         cerr << "Isotope " << _isotope << " placed on matched atoms\n";
       }
     } else if (f == "help") {
-      DisplayRobBondBetweenOptions(cerr);
+      DisplayRobBondBetweenOptions(0);
     } else {
       cerr << "Unrecognised -" << flag << " specification '" << f << "'\n";
-      DisplayRobBondBetweenOptions(cerr);
+      DisplayRobBondBetweenOptions(0);
     }
   }
 
@@ -432,7 +434,7 @@ usage(int rc) {
   cerr << "  -v             verbose output\n";
   // clang-format on
 
-  exit(rc);
+  std::exit(rc);
 }
 
 static void
@@ -1123,6 +1125,8 @@ rotatable_bonds(int argc, char** argv) {
     cerr << "unrecognised_options_encountered\n";
     usage(3);
   }
+
+  DisplayDashHelpIfRequested(cl, 'F', DisplayRobBondBetweenOptions);
 
   verbose = cl.option_count('v');
 

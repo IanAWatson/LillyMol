@@ -7,6 +7,7 @@
 #include <algorithm>
 #include <cassert>
 #include <cstring>
+#include <cstdlib>
 #include <iostream>
 #include <limits>
 #include <memory>
@@ -30,6 +31,13 @@ Iwecfp::Iwecfp() = default;
 
 Iwecfp::~Iwecfp() {
   Finalise();
+}
+
+void
+DisplayDashQOptions(int rc) {
+  std::cerr << " -Q <n>     number of atom coverage equalisation steps (positive integer)\n";
+  std::cerr << " -Q label   label atoms by their visit counts\n";
+  std::exit(rc);
 }
 
 void
@@ -1092,7 +1100,7 @@ Iwecfp::Initialise(Command_Line& cl) {
       if (q == "label") {
         _label_by_visited = 1;
       } else if (q == "help") {
-        // Original source had no detailed help here.
+        DisplayDashQOptions(0);
       } else if (!q.numeric_value(_equalise_atom_coverage) ||
                  _equalise_atom_coverage < 1) {
         cerr << "The number of visited equalisation steps (-Q) must be a whole +ve number\n";

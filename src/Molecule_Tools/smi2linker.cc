@@ -2,6 +2,7 @@
 // Or should we just use dicer fragments.
 // This has more control.
 
+#include <cstdlib>
 #include <iostream>
 #include <limits>
 #include <memory>
@@ -250,18 +251,18 @@ Options::~Options() {
 }
 
 void
-DisplayDashIQualifiers(std::ostream& output) {
+DisplayDashIQualifiers(int rc) {
   // clang-format off
-  output << "The -I option controls isotopic labels applied to fragments\n";
-  output << " -I join          isotope 1 applied to fragment atoms that join the rest of the molecule\n";
-  output << " -I alar          Al (aliphatic) and Ar (arom) atms attached to the fragment\n";
-  output << " -I alarsize      Al (aliphatic) and Ar (arom) atms attached to the fragment\n";
-  output << "                  they are assigned an isotope based on the size of the ring\n";
-  output << " -I atype         Dummy Ti atoms added with isotope being the atom type\n";
-  output << "                  of the attached atom (non fragment) atom type\n";
+  std::cerr << "The -I option controls isotopic labels applied to fragments\n";
+  std::cerr << " -I join          isotope 1 applied to fragment atoms that join the rest of the molecule\n";
+  std::cerr << " -I alar          Al (aliphatic) and Ar (arom) atms attached to the fragment\n";
+  std::cerr << " -I alarsize      Al (aliphatic) and Ar (arom) atms attached to the fragment\n";
+  std::cerr << "                  they are assigned an isotope based on the size of the ring\n";
+  std::cerr << " -I atype         Dummy Ti atoms added with isotope being the atom type\n";
+  std::cerr << "                  of the attached atom (non fragment) atom type\n";
   // clang-format on
 
-  exit(0);
+  std::exit(rc);
 }
 
 int
@@ -375,7 +376,7 @@ Options::Initialise(Command_Line& cl) {
           ++isotope_specifications;
         }
       } else if (s == "help") {
-        DisplayDashIQualifiers(cerr);
+        DisplayDashIQualifiers(0);
         return 0;
       } else {
         cerr << "Unrecognised -I qualifier '" << s << "'\n";
@@ -944,6 +945,8 @@ Smi2Linker(int argc, char** argv) {
     cerr << "Unrecognised options encountered\n";
     Usage(1);
   }
+
+  DisplayDashHelpIfRequested(cl, 'I', DisplayDashIQualifiers);
 
   int verbose = cl.option_count('v');
 

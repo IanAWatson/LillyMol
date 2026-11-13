@@ -83,7 +83,7 @@ usage(int rc) {
   cerr << "  -v             verbose output\n";
   // clang-format on
 
-  exit(rc);
+  std::exit(rc);
 }
 
 static void
@@ -92,7 +92,7 @@ display_q_directives(int rc) {
   cerr << "  -q QUERY:F:file       queries are in <file>\n";
   cerr << "  -q SMARTS:smt     query is written in smarts\n";
 
-  exit(rc);
+  std::exit(rc);
 }
 
 static int
@@ -596,6 +596,8 @@ jwdist(int argc, char** argv) {
     cerr << "Unrecognised options encountered\n";
     usage(1);
   }
+
+  DisplayDashHelpIfRequested(cl, 'q', display_q_directives);
 
   verbose = cl.option_count('v');
 

@@ -15,6 +15,9 @@
 
 namespace qed {
 
+// Display option help on stderr and exit with rc.
+void DisplayQueryOptions(int rc);
+
 struct QEDProperties {
   public:
     float amw;

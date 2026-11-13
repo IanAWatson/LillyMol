@@ -4,6 +4,7 @@
 
 #include <assert.h>
 
+#include <cstdlib>
 #include <iostream>
 #include <limits>
 #include <memory>
@@ -46,6 +47,31 @@ namespace fileconv {
 using std::cerr;
 
 FileconvConfig::FileconvConfig() { DefaultValues(); }
+
+
+void
+DisplayChargeOptions(int rc) {
+  cerr << "The following -Q qualifiers are recognised\n";
+  cerr << " -Q gast    Gasteiger partial charges\n";
+  cerr << " -Q gh      Gasteiger Huckel partial charges\n";
+  cerr << " -Q abraham Abraham partial charges\n";
+
+  std::exit(rc);
+}
+
+void
+DisplayOrganicOptions(int rc) {
+  cerr << "The -O option is troublesome due to it's long history and evolution\n";
+  cerr << "Options can also be order dependent\n";
+  cerr << " -O def         reject if any of the non-OK non-organics are present\n";
+  cerr << " -O allow:El    temporarily allow El as an OK non-organic\n";
+  cerr << " -O none        reject if any non-organic atoms present\n";
+  cerr << " -O El          element El becomes fully organic for the course of the run\n";
+  cerr << " -O nometal     exclude any molecule containing metal atoms\n";
+  cerr << " -O okOBO       exclude Boron, except if it is as O-B-O form\n";
+
+  std::exit(rc);
+}
 
 void
 FileconvConfig::DefaultValues() {
@@ -369,15 +395,15 @@ Usage(int rc = 1) {
 }
 
 void
-DisplayDashhOptions(std::ostream& output) {
+DisplayDashhOptions(int rc) {
   // clang-format off
-  output << " -h <all>       make implicit hydrogens explicit\n";
-  output << " -h last=<z>    move atoms with atomic number <z> to end of the connection table\n";
-  output << " -h <query>     make implicit hydrogens on atoms matching <query> explicit\n";
-  output << "                -h SMARTS:smt, -h PROTO:query.textproto also recognised\n";
+  std::cerr << " -h <all>       make implicit hydrogens explicit\n";
+  std::cerr << " -h last=<z>    move atoms with atomic number <z> to end of the connection table\n";
+  std::cerr << " -h <query>     make implicit hydrogens on atoms matching <query> explicit\n";
+  std::cerr << "                -h SMARTS:smt, -h PROTO:query.textproto also recognised\n";
   // clang-format on
 
-  ::exit(0);
+  std::exit(rc);
 }
 
 void
@@ -423,8 +449,7 @@ DisplayfOptions(int rc) {
 )";
   // clang-format on
 
-
-  exit(rc);
+  std::exit(rc);
 }
 
 void
@@ -434,7 +459,7 @@ DisplayFOptions(int rc) {
   cerr << "  -F mnsz=<n>      when counting fragments only count those with > <n> atoms\n";
   // clang-format on
 
-  exit(rc);
+  std::exit(rc);
 }
 
 void
@@ -459,51 +484,51 @@ DisplayPDirectives(int rc) {
 )";
   // clang-format on
 
-  exit(rc);
+  std::exit(rc);
 }
 
 void
-DisplayDashYOptions(std::ostream& os, int rc) {
+DisplayDashYOptions(int rc) {
   // clang-format off
-  os << "-Y nbvm          No Bad Valence Messages, or strange electron counts\n";
-  os << "-Y okbvi         during valence check, ok to have bad valence on isotopes\n";
-  os << "-Y appchg=xxxx   append 'xxxx' to the name of molecules that are changed\n";
-  os << "-Y pblen         print all bond lengths in the molecules\n";
-  os << "-Y pbang         print all bond angles in the molecules\n";
-  os << "-Y ptor          print all torsion angles in the molecules\n";
-  os << "-Y pmaxd         print the max interatomic distance in each molecule\n";
-  os << "-Y dbg           debug print each molecule\n";
-  os << "-Y namerx=<rx>   discard molecules unless the molecule name matches <rx>\n";
-  os << "-Y grepvname=<rx> discard molecules if the molecule name matches <rx>\n";
-  os << "-Y ftn           keep only the first token in molecule names\n";
-  os << "-Y nsubw=c       translate all whitespace in molecule names to 'c'\n";
-  os << "-Y chname=rx     change name to what is matched by <rx> (optional match)\n";
-  os << "-Y CHNAME=rx     change name to what is matched by <rx> (MUST match)\n";
-  os << "-Y tfirst=char   truncate name at first <char>\n";
-  os << "-Y tlast=char    truncate name at last <char>\n";
-  os << "-Y NPREPEND=s    prepend <s> to each name\n";
-  os << "-Y ntoken=n      the output name is word 'n' in the input name\n";
-  os << "-Y maxplen=<n>   discard molecules with max path length > <n>\n";
+  std::cerr << "-Y nbvm          No Bad Valence Messages, or strange electron counts\n";
+  std::cerr << "-Y okbvi         during valence check, ok to have bad valence on isotopes\n";
+  std::cerr << "-Y appchg=xxxx   append 'xxxx' to the name of molecules that are changed\n";
+  std::cerr << "-Y pblen         print all bond lengths in the molecules\n";
+  std::cerr << "-Y pbang         print all bond angles in the molecules\n";
+  std::cerr << "-Y ptor          print all torsion angles in the molecules\n";
+  std::cerr << "-Y pmaxd         print the max interatomic distance in each molecule\n";
+  std::cerr << "-Y dbg           debug print each molecule\n";
+  std::cerr << "-Y namerx=<rx>   discard molecules unless the molecule name matches <rx>\n";
+  std::cerr << "-Y grepvname=<rx> discard molecules if the molecule name matches <rx>\n";
+  std::cerr << "-Y ftn           keep only the first token in molecule names\n";
+  std::cerr << "-Y nsubw=c       translate all whitespace in molecule names to 'c'\n";
+  std::cerr << "-Y chname=rx     change name to what is matched by <rx> (optional match)\n";
+  std::cerr << "-Y CHNAME=rx     change name to what is matched by <rx> (MUST match)\n";
+  std::cerr << "-Y tfirst=char   truncate name at first <char>\n";
+  std::cerr << "-Y tlast=char    truncate name at last <char>\n";
+  std::cerr << "-Y NPREPEND=s    prepend <s> to each name\n";
+  std::cerr << "-Y ntoken=n      the output name is word 'n' in the input name\n";
+  std::cerr << "-Y maxplen=<n>   discard molecules with max path length > <n>\n";
   // os << "-Y B4F=<fname>   write frag stripped smiles before filtering to <fname>\n";
-  os << "-Y aclf          atom counts are for the largest fragment only\n";
-  os << "-Y nhsqb         explicit hydrogen atoms in smiles written without square brackets\n";
-  os << "-Y rmsqb         remove unnecessary square bracketed atoms  - Hcount is OK as specified\n";
-  os << "-Y FHrmsqb       in atoms like [C] free the H count to what is computed. Square brackets removed\n";
-  os << "-Y Xihaltvalence discard molecules like =S- where an implicit hydrogen satisfies an alternate valence\n";
-  os << "-Y rmamap        remove atom map numbers\n";
-  os << "-Y fixarom=smarts call find_kekule_form on the ring (system) matched by the first atom in <smarts>\n";
-  os << "-Y rmatom=smarts remove all atoms that match <smarts>\n";
-  os << "-Y zpad=width    left pad the name with 0's to <width>. Negative numbers remove leading chars from name\n";
-  os << "-Y rot=x,y,z,angle rotate molecules `angle` degrees around x,y,z\n";
-  os << "-Y atype=<atype> atom typing specification - use with '-I atype'\n";
-  os << "-Y  help          this message\n";
+  std::cerr << "-Y aclf          atom counts are for the largest fragment only\n";
+  std::cerr << "-Y nhsqb         explicit hydrogen atoms in smiles written without square brackets\n";
+  std::cerr << "-Y rmsqb         remove unnecessary square bracketed atoms  - Hcount is OK as specified\n";
+  std::cerr << "-Y FHrmsqb       in atoms like [C] free the H count to what is computed. Square brackets removed\n";
+  std::cerr << "-Y Xihaltvalence discard molecules like =S- where an implicit hydrogen satisfies an alternate valence\n";
+  std::cerr << "-Y rmamap        remove atom map numbers\n";
+  std::cerr << "-Y fixarom=smarts call find_kekule_form on the ring (system) matched by the first atom in <smarts>\n";
+  std::cerr << "-Y rmatom=smarts remove all atoms that match <smarts>\n";
+  std::cerr << "-Y zpad=width    left pad the name with 0's to <width>. Negative numbers remove leading chars from name\n";
+  std::cerr << "-Y rot=x,y,z,angle rotate molecules `angle` degrees around x,y,z\n";
+  std::cerr << "-Y atype=<atype> atom typing specification - use with '-I atype'\n";
+  std::cerr << "-Y  help          this message\n";
   // clang-format on
 
-  exit(rc);
+  std::exit(rc);
 }
 
 void
-DisplayDashIOptions(char flag, std::ostream& os) {
+DisplayDashIOptions(int rc) {
   // clang-format off
   cerr << R"(
   -I 0             discard molecules containing any isotopic atoms.
@@ -518,7 +543,7 @@ DisplayDashIOptions(char flag, std::ostream& os) {
 )";
   // clang-format on
 
-  exit(1);
+  std::exit(rc);
 }
 
 void
@@ -3681,15 +3706,7 @@ FileconvConfig::ParseOrganicSpecification(Command_Line& cl, char flag) {
       filter_for_disallowed_elements = 1;
       continue;
     } else if ("help" == o) {
-      cerr << "The -O option is troublesome due to it's long history and evolution\n";
-      cerr << "Options can also be order dependent\n";
-      cerr << " -O def         reject if any of the non-OK non-organics are present\n";
-      cerr << " -O allow:El    temporarily allow El as an OK non-organic\n";
-      cerr << " -O none        reject if any non-organic atoms present\n";
-      cerr << " -O El          element El becomes fully organic for the course of the run\n";
-      cerr << " -O nometal     exclude any molecule containing metal atoms\n";
-      cerr << " -O okOBO       exclude Boron, except if it is as O-B-O form\n";
-      exit(1);
+      DisplayOrganicOptions(0);
     } else {
       Element_Matcher* e = new Element_Matcher;
       if (!e->construct_from_string(o)) {
@@ -3912,14 +3929,14 @@ FileconvConfig::GetIsotopeDirectives(Command_Line& cl, char flag) {
         if (!s1.numeric_value(a) || a < 0 || !s2.numeric_value(b) || b < 0) {
           cerr << "The isotopic conversion directive must contain a valid set of isotopes '" << tmp
                << "' invalid\n";
-          DisplayDashIOptions('I', cerr);
+          DisplayDashIOptions(1);
           return 0;
         }
       } else {
         if (!tmp.numeric_value(a) || a < 0) {
           cerr << "The isotopic conversion directive must contain a valid set of isotopes '" << tmp
                << "' invalid\n";
-          DisplayDashIOptions('I', cerr);
+          DisplayDashIOptions(1);
           return 0;
         }
       }
@@ -3937,7 +3954,7 @@ FileconvConfig::GetIsotopeDirectives(Command_Line& cl, char flag) {
       if (! ParseAsSmartsAndIsotope(tmp, convert_specific_isotopes_query, 
                                     convert_specific_isotopes_query_new_isotope)) {
         cerr << "Invalid 'smarts=' directive '" << tmp << "'\n";
-        DisplayDashIOptions('I', cerr);
+        DisplayDashIOptions(1);
         return 0;
       }
     } else if (tmp.starts_with("firstatom:") || tmp.starts_with("firstatom=")) {
@@ -3953,7 +3970,7 @@ FileconvConfig::GetIsotopeDirectives(Command_Line& cl, char flag) {
       if (!tmp.numeric_value(convert_all_isotopes_to) || convert_all_isotopes_to < 0) {
         cerr << "The convert all isotopes 'alliso=' directive must have a valid isotopic value, '"
              << tmp << "' invalid\n";
-        DisplayDashIOptions('I', cerr);
+        DisplayDashIOptions(1);
         return 0;
       }
 
@@ -3969,7 +3986,7 @@ FileconvConfig::GetIsotopeDirectives(Command_Line& cl, char flag) {
         cerr << "Atoms will be labelled with their atom type\n";
       }
     } else if ("help" == tmp) {
-      DisplayDashIOptions('I', cerr);
+      DisplayDashIOptions(0);
     } else {
       cerr << "Unrecognised -I qualifier '" << tmp << "'\n";
       Usage(1);
@@ -3990,12 +4007,7 @@ FileconvConfig::GetChargeCalculation(Command_Line& cl, char flag) {
   const_IWSubstring q;
   for (int i = 0; cl.value(flag, q, i); ++i) {
     if ("help" == q) {
-      cerr << "The following -Q qualifiers are recognised\n";
-      cerr << " -Q gast    Gasteiger partial charges\n";
-      cerr << " -Q gh      Gasteiger Huckel partial charges\n";
-      cerr << " -Q abraham Abraham partial charges\n";
-
-      return 0;
+      DisplayChargeOptions(0);
     } else if (q.starts_with("gast")) {
       fileconv_partial_charge_type = kGasteiger;
       if (verbose)
@@ -4239,7 +4251,7 @@ FileconvConfig::ParseMiscOptions(Command_Line& cl, char flag) {
     } else if (y == "dbg") {
       // handled elsewhere
     } else if ("help" == y) {
-      DisplayDashYOptions(cerr, 2);
+      DisplayDashYOptions(0);
     } else {
       cerr << "Unrecognised -Y qualifier '" << y << "'\n";
       return 0;
@@ -4284,7 +4296,7 @@ FileconvConfig::InitialiseRotation(const_IWSubstring buffer) {
 }
 
 void
-DisplayChiralityOptions() {
+DisplayChiralityOptions(int rc) {
 //cerr << "  -s discard     discard all chiral information in the input\n";
   cerr << "  -s good        ignore erroneous chiral input\n";
   cerr << "  -s find        identify all stereo centres in the molecules (random chirality)\n";        
@@ -4304,7 +4316,7 @@ DisplayChiralityOptions() {
   cerr << "  -s rmnoc       remove chirality from non organic atoms\n";
   cerr << "  -s maxc=<n>    discard molecules with more than <n> chiral centres\n";
 
-  return;
+  std::exit(rc);
 }
 
 int
@@ -4318,7 +4330,7 @@ FileconvConfig::GetChiralityInstructions(Command_Line& cl, char flag) {
   IWString tmp;
   for (int i = 0; cl.value(flag, tmp, i); ++i) {
     if ("help" == tmp) {
-      DisplayChiralityOptions();
+      DisplayChiralityOptions(0);
       exit(1);
     }
 
@@ -5204,7 +5216,7 @@ FileconvConfig::ParseImplicitHydrogenDirectives(Command_Line& cl, char flag) {
                 " to the end of the connection table\n";
       }
     } else if (h == "help") {
-      DisplayDashhOptions(cerr);
+      DisplayDashhOptions(0);
     } else {
       if (! process_cmdline_token('*', h, atoms_for_implicit_hydrogens, verbose)) {
         cerr << "Cannot process implicit hydrogen query qualifier '" << h << "'\n";

@@ -199,4 +199,7 @@ void FillDescriptorExtremeties(std::span<Descriptor>&  d, const int resolution);
 int DescriptorNumber(const IWString& prefix, const IWString& dname,
         const std::span<const Descriptor>& descriptors);
 
+// Display the descriptor-selection (-O) options and exit with rc.
+void DisplayDescriptorOptions(int rc);
+
 #endif  // MOLECULE_TOOLS_IWDESCR_LIB_H_

@@ -8,6 +8,7 @@
 
 #include <stdlib.h>
 
+#include <cstdlib>
 #include <iostream>
 #include <memory>
 
@@ -596,7 +597,7 @@ usage(int rc) {
   cerr << "  -v             verbose output\n";
   // clang-format on
 
-  exit(rc);
+  std::exit(rc);
 }
 
 /*
@@ -1687,12 +1688,12 @@ build_header(IWString& header, const int nfeatures) {
 }
 
 static void
-display_hard_coded_features(char flag, std::ostream& os) {
-  os << "  -" << flag << " arom5     perceive 5 membered aromatic rings\n";
-  os << "  -" << flag << " arom6     perceive 6 membered aromatic rings\n";
-  os << "  -" << flag << " arom      perceive 5 and 6 membered aromatic rings\n";
+display_hard_coded_features(int rc) {
+  std::cerr << "  -W arom5     perceive 5 membered aromatic rings\n";
+  std::cerr << "  -W arom6     perceive 6 membered aromatic rings\n";
+  std::cerr << "  -W arom      perceive 5 and 6 membered aromatic rings\n";
 
-  return;
+  std::exit(rc);
 }
 
 // If tag is of the form 'NCDBF:n', identify 'n' as int_bit_count_scaling_factor
@@ -1728,6 +1729,8 @@ distance_between_features(int argc, char** argv) {
     cerr << "Unrecognised options encountered\n";
     usage(1);
   }
+
+  DisplayDashHelpIfRequested(cl, 'W', display_hard_coded_features);
 
   verbose = cl.option_count('v');
 
@@ -1971,11 +1974,11 @@ distance_between_features(int argc, char** argv) {
                << hard_coded_query_centre_of_aromatic_6_membered_ring << '\n';
         }
       } else if ("help" == w) {
-        display_hard_coded_features('W', cerr);
+        display_hard_coded_features(0);
         return 0;
       } else {
         cerr << "Unrecognised -W qualifier '" << w << "'\n";
-        display_hard_coded_features('W', cerr);
+        display_hard_coded_features(1);
         return 5;
       }
     }

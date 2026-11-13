@@ -2,6 +2,7 @@
 // an exact replacement for the ring being lost.
 
 #include <algorithm>
+#include <cstdlib>
 #include <iostream>
 #include <limits>
 #include <memory>
@@ -786,10 +787,10 @@ Options::Options() {
 }
 
 void
-DisplayDashXOptions(std::ostream& output) {
-  output << "-X any             any available ring atom can receive substituents - not just isotopically labelled\n";
+DisplayDashXOptions(int rc) {
+  std::cerr << "-X any             any available ring atom can receive substituents - not just isotopically labelled\n";
 
-  ::exit(0);
+  std::exit(rc);
 }
 
 int
@@ -828,10 +829,10 @@ Options::Initialise(Command_Line& cl) {
       if (x == "any") {
         _use_existing_attachment_points = 0;
       } else if (x == "help") {
-        DisplayDashXOptions(cerr);
+        DisplayDashXOptions(0);
       } else {
         cerr << "Unrecognised -X qualifier '" << x << "'\n";
-        DisplayDashXOptions(cerr);
+        DisplayDashXOptions(0);
       }
     }
   }
@@ -2119,6 +2120,8 @@ RingReplacementInexact(int argc, char** argv) {
     cerr << "Unrecognised options encountered\n";
     Usage(1);
   }
+
+  DisplayDashHelpIfRequested(cl, 'X', DisplayDashXOptions);
 
   int verbose = cl.option_count('v');
 

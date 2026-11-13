@@ -1038,6 +1038,7 @@ V1.0 - 2005Dec02 - Initial release.
 
 // clang-format on
 
+#include <cstdlib>
 #include <iostream>
 #include <memory>
 
@@ -1124,7 +1125,7 @@ usage(int rc) {
   cerr << "  -v            verbose output\n";
 // clang-format on
 
-  exit(rc);
+  std::exit(rc);
 }
 
 static void
@@ -2204,10 +2205,10 @@ initialise_write_bit_files(const Command_Line &cl, char flag) {
 }
 
 static void
-DisplayDashXOptions(std::ostream& output) {
-  output << " -X flush            flush output after each molecule\n";
+DisplayDashXOptions(int rc) {
+  std::cerr << " -X flush            flush output after each molecule\n";
 
-  ::exit(0);
+  std::exit(rc);
 }
 
 static int
@@ -2218,6 +2219,8 @@ pubchem_fingerprints(int argc, char **argv) {
     cerr << "Unrecognised options encountered\n";
     usage(1);
   }
+
+  DisplayDashHelpIfRequested(cl, 'X', DisplayDashXOptions);
 
   verbose = cl.option_count('v');
 
@@ -2349,10 +2352,10 @@ pubchem_fingerprints(int argc, char **argv) {
           cerr << "Will flush output after every molecule\n";
         }
       } else if (x == "help") {
-        DisplayDashXOptions(cerr);
+        DisplayDashXOptions(0);
       } else {
         cerr << "Unrecognised -X qualifier '" << x << "'\n";
-        DisplayDashXOptions(cerr);
+        DisplayDashXOptions(0);
       }
     }
   }

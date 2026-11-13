@@ -3,6 +3,7 @@
 // and the command-line testing harness. IWDescr owns only descriptor calculation.
 
 #include <cstring>
+#include <cstdlib>
 #include <iostream>
 #include <memory>
 #include <ranges>
@@ -267,8 +268,8 @@ DisplayDashBOptions(int rc) {
 }
 
 static void
-DisplayFilterOptions(std::ostream& output, int rc) {
-  output << R"(
+DisplayFilterOptions(int rc) {
+  std::cerr << R"(
 Use the -F option to filter molecules. The syntax uses fortran like comparison operators.
 -F w_natoms.lt.50
 only writes molecules that have fewer than 50 heavy atoms. Note that when using property filters
@@ -279,12 +280,12 @@ iwdescr ... -F w_natoms.gt.12 -F w_natoms.lt.50 -F w_nrings.gt.1 -F w_nrings.lt.
 would only write molecules that satisfy all conditions.
 )";
 
-  ::exit(rc);
+  std::exit(rc);
 }
 
 static void
-DisplayDashTOptions(std::ostream& output) {
-  output << R"(The -T option performs tests.
+DisplayDashTOptions(int rc) {
+  std::cerr << R"(The -T option performs tests.
 For each molecule read, generate a number of random smiles and check that the computed values
 are the same across all random variants.
  -T kg              if a molecule fails, do NOT terminate the compuation, keep going.
@@ -293,7 +294,7 @@ are the same across all random variants.
  -T WRITE=<fname>   write molecules that fail to <fname>.
 )";
 
-  exit(0);
+  std::exit(rc);
 }
 
 
@@ -431,7 +432,7 @@ IWDescrMainOptions::Initialise(Command_Line& cl) {
           cerr << "Molecules failing tests written to '" << fname << "'\n";
         }
       } else if (t == "help") {
-        DisplayDashTOptions(cerr);
+        DisplayDashTOptions(0);
       } else if (!t.numeric_value(_ntest) || _ntest < 1) {
         cerr << "The test option (-T) must be followed by a whole positive number '" <<
                 t << "' invalid\n";
@@ -497,9 +498,9 @@ IWDescrMainOptions::InitialiseRangesAndFilters(Command_Line& cl, IWDescr& iwdesc
 }
 
 static void
-DisplayFingerprintOptions(std::ostream& output) {
+DisplayFingerprintOptions(int rc) {
   // clang-format off
-  output << R"(The following fingerprint directives are recognised.
+  std::cerr << R"(The following fingerprint directives are recognised.
  -G FILTER         work as a TDT filter, used internally by gfp_make.
  -G R=<n>          the number of buckets used in discretising the values.
  -G ALL            use all descriptors to generate the fingerprint.
@@ -520,6 +521,7 @@ DisplayFingerprintOptions(std::ostream& output) {
  natoms gets 10, rotbond 20 and nrings gets 3 replicates.
  -G 10 -G natoms -G 20 -G rotbond -G nrings:3
 )";
+  std::exit(rc);
 }
 
 static int
@@ -615,7 +617,7 @@ IWDescrMainOptions::InitialiseFingerprints(Command_Line& cl, IWDescr& iwdescr) {
 
   for (int i = 0; cl.value('G', s, i); ++i) {
     if (s == "help") {
-      DisplayFingerprintOptions(cerr);
+      DisplayFingerprintOptions(0);
       return 0;
     }
 
@@ -702,7 +704,7 @@ IWDescrMainOptions::ReadFilterSpecifications(Command_Line& cl, IWDescr& iwdescr)
   for (int i = 0; i < n; ++i) {
     const_IWSubstring f = cl.string_value('F', i);
     if (f == "help") {
-      DisplayFilterOptions(cerr, 0);
+      DisplayFilterOptions(0);
       continue;
     }
 
@@ -1456,6 +1458,13 @@ iwdescr_main(int argc, char** argv) {
     std::cerr << "Unrecognised options encountered\n";
     Usage(1);
   }
+
+  DisplayDashHelpIfRequested(cl, 'O', DisplayDescriptorOptions);
+
+  DisplayDashHelpIfRequested(cl, 'B', DisplayDashBOptions);
+  DisplayDashHelpIfRequested(cl, 'T', DisplayDashTOptions);
+  DisplayDashHelpIfRequested(cl, 'G', DisplayFingerprintOptions);
+  DisplayDashHelpIfRequested(cl, 'F', DisplayFilterOptions);
 
   const int verbose = cl.option_present('v');
 

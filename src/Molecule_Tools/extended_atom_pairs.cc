@@ -3,6 +3,7 @@
 */
 
 #include <algorithm>
+#include <cstdlib>
 #include <iostream>
 #include <limits>
 #include <memory>
@@ -273,6 +274,14 @@ Fuzziness_Profile::~Fuzziness_Profile() {
   TODO: swtich to proto.
 */
 
+void
+DisplayDasheOptions(int rc) {
+  cerr << " -e type           include atom type in bit formation\n";
+  cerr << " -e ring           include ring status in bit formation\n";
+
+  std::exit(rc);
+}
+
 int
 Fuzziness_Profile::build(const const_IWSubstring& s) {
   const_IWSubstring bsep, fvalues;
@@ -386,7 +395,7 @@ Usage(int rc) {
 )";
   // clang-format on
 
-  exit(rc);
+  std::exit(rc);
 }
 
 // Apply either isotopic label `s`, or atom map number
@@ -1514,13 +1523,14 @@ WriteDescriptorFileHeader(uint32_t ncols, IWString_and_File_Descriptor& output) 
 }
 
 void
-DisplayDashGOptins(std::ostream& output) {
-  output << R"( -G samedist       distances within range are identical\n";
+DisplayDashGOptins(int rc) {
+  std::cerr << R"( -G samedist       distances within range are identical\n";
  -G desc=<ncols>   generate a descriptor file output with <ncols> columns
  -G flush          flush output after each molecule
  -G fpatype        set extra bits for presence of atoms by type
  -G help           this message
 )";
+  std::exit(rc);
 }
 
 int
@@ -1531,6 +1541,10 @@ ExtendedAtomPairs(int argc, char** argv) {
     cerr << "unrecognised_options_encountered\n";
     Usage(1);
   }
+
+  DisplayDashHelpIfRequested(cl, 'e', DisplayDasheOptions);
+
+  DisplayDashHelpIfRequested(cl, 'G', DisplayDashGOptins);
 
   verbose = cl.option_count('v');
 
@@ -1712,7 +1726,7 @@ ExtendedAtomPairs(int argc, char** argv) {
           cerr << "Will flush output after each molecule\n";
         }
       } else if (g == "help") {
-        DisplayDashGOptins(cerr);
+        DisplayDashGOptins(0);
         return 1;
       } else {
         cerr << "Unrecognised -G qualifier '" << g << "'\n";
@@ -1730,10 +1744,8 @@ ExtendedAtomPairs(int argc, char** argv) {
       } else if (e.starts_with("ring")) {
         bonded_atom_type |= AP_BOND_PROPERTY_RING_MEMBERSHIP;
       } else if ("help" == e) {
-        cerr << " -e type           include atom type in bit formation\n";
-        cerr << " -e ring           include ring status in bit formation\n";
-        return 1;
-      } else {
+      DisplayDasheOptions(0);
+    } else {
         cerr << "Unrecognised -e qualifier '" << e << "'\n";
         Usage(2);
       }

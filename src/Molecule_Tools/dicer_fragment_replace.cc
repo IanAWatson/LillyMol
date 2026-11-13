@@ -2,6 +2,7 @@
 // We may still generate no products, but let's write the parent here
 // if requested.
 
+#include <cstdlib>
 #include <iostream>
 #include <limits>
 #include <memory>
@@ -122,7 +123,7 @@ DisplayDashYOptions(int rc) {
 }
 
 void
-DisplayDashZOptions() {
+DisplayDashZOptions(int rc) {
   // clang-format off
   cerr << R"(Controlling how various non match and failures are handled
  -z smiles              sometimes aromatic smiles in protos cannot be decoded. Ignore that.
@@ -130,7 +131,7 @@ DisplayDashZOptions() {
 )";
   // clang-format on
 
-  ::exit(1);
+  std::exit(rc);
 }
 
 
@@ -269,7 +270,7 @@ ReplacementSpecifications::Initialise(Command_Line& cl) {
           cerr << "Will ignore smiles interpretation errors\n";
         }
       } else if (z == "help") {
-        DisplayDashZOptions();
+        DisplayDashZOptions(0);
       }
     }
   }
@@ -1261,7 +1262,7 @@ Options::Initialise(Command_Line& cl) {
           cerr << "Will ignore molecules not maching any of the bond breaking queries\n";
         }
       } else if (z == "help") {
-        DisplayDashZOptions();
+        DisplayDashZOptions(0);
       }
     }
   }
@@ -2126,6 +2127,8 @@ Main(int argc, char** argv) {
     cerr << "Unrecognised options encountered\n";
     Usage(1);
   }
+
+  DisplayDashHelpIfRequested(cl, 'z', DisplayDashZOptions);
 
   DisplayDashHelpIfRequested(cl, 'Y', DisplayDashYOptions);
 

@@ -8,6 +8,7 @@
 #include <stdlib.h>
 
 #include <algorithm>
+#include <cstdlib>
 #include <iostream>
 #include <memory>
 
@@ -1864,15 +1865,14 @@ gfp_erg(const char* fname, FileType input_type, IWString_and_File_Descriptor& ou
 }
 
 static void
-display_abstraction_specifications(std::ostream& output)
-{
-  output << " -B cf3          convert CF3 to Chloro\n";
-  output << " -B tb           convert t-butyl to Chloro\n";
-  output << " -B so2          convert O=S=O groups to a single atom\n";
-  output << " -B ch2          compress consecutive chain CH2 groups\n";
-  output << " -B all          activate all other conversions\n";
+display_abstraction_specifications(int rc) {
+  std::cerr << " -B cf3          convert CF3 to Chloro\n";
+  std::cerr << " -B tb           convert t-butyl to Chloro\n";
+  std::cerr << " -B so2          convert O=S=O groups to a single atom\n";
+  std::cerr << " -B ch2          compress consecutive chain CH2 groups\n";
+  std::cerr << " -B all          activate all other conversions\n";
 
-  exit(1);
+  std::exit(rc);
 }
 
 static int
@@ -1884,6 +1884,8 @@ gfp_erg(int argc, char** argv)
     cerr << "Unrecognised options encountered\n";
     usage(1);
   }
+
+  DisplayDashHelpIfRequested(cl, 'B', display_abstraction_specifications);
 
   if (argc == 1) {
     usage(4);
@@ -2068,10 +2070,10 @@ gfp_erg(int argc, char** argv)
         convert_cf3_to_chloro = 1;
         convert_tbutyl_to_chloro = 1;
       } else if ("help" == b) {
-        display_abstraction_specifications(cerr);
+        display_abstraction_specifications(0);
       } else {
         cerr << "Unrecognised abstraction qualifier '" << b << "'\n";
-        display_abstraction_specifications(cerr);
+        display_abstraction_specifications(1);
       }
     }
   }

@@ -5,9 +5,11 @@
 // various structure abstractions.
 
 #include <algorithm>
+#include <cstdlib>
 #include <iostream>
 #include <memory>
 
+#include "Foundational/iwmisc/misc.h"
 #include "Foundational/cmdline/cmdline.h"
 #include "Foundational/iwstring/iwstring.h"
 
@@ -90,11 +92,11 @@ Options::Options() {
 }
 
 void
-DisplayDashOOptions(std::ostream& output) {
-  output << " -O scaffold       generate a column containing the molecular scaffold\n";
-  output << " -O Iscaffold      generate a column containing the molecular scaffold with isotopes\n";
+DisplayDashOOptions(int rc) {
+  std::cerr << " -O scaffold       generate a column containing the molecular scaffold\n";
+  std::cerr << " -O Iscaffold      generate a column containing the molecular scaffold with isotopes\n";
 
-  exit(0);
+  std::exit(rc);
 }
 
 int
@@ -145,10 +147,10 @@ Options::Initialise(Command_Line& cl) {
           cerr << "Will generate a column for the isotopicaly labelled scaffold\n";
         }
       } else if (o == "help") {
-        DisplayDashOOptions(cerr);
+        DisplayDashOOptions(0);
       } else {
         cerr << "Unrecognised -O qualifier '" << o << "'\n";
-        DisplayDashOOptions(cerr);
+        DisplayDashOOptions(0);
       }
     }
   }
@@ -389,6 +391,8 @@ Main(int argc, char** argv) {
     cerr << "unrecognised_options_encountered\n";
     Usage(1);
   }
+
+  DisplayDashHelpIfRequested(cl, 'O', DisplayDashOOptions);
 
   const int verbose = cl.option_count('v');
 

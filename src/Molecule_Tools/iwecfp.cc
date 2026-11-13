@@ -2,6 +2,7 @@
  Implementation of extended connectivity
 */
 
+#include <cstdlib>
 #include <iostream>
 #include <limits>
 #include <memory>
@@ -122,6 +123,13 @@ static int bit_replicates = 0;
 // The bit offset between versions.
 static int bit_replicte_offset = 741;  // An arbitrary number.
 
+void
+DisplayDashQOptions(int rc) {
+  std::cerr << " -Q <n>     number of atom coverage equalisation steps (positive integer)\n";
+  std::cerr << " -Q label   label atoms by their visit counts\n";
+  std::exit(rc);
+}
+
 static void
 usage(int rc) {
   // clang-format off
@@ -159,7 +167,7 @@ usage(int rc) {
   cerr << "  -v             verbose output\n";
   // clang-format on
 
-  exit(rc);
+  std::exit(rc);
 }
 
 static int
@@ -1265,23 +1273,23 @@ iwecfp(const char* fname, FileType input_type, IWString_and_File_Descriptor& out
 }
 
 static void
-display_dash_G_options(std::ostream& os) {
-  os << "  -G presence   record presence of bits only, not count\n";
-  os << "  -G WRITE=fname write the global fingerprint to <fname>\n";
+display_dash_G_options(int rc) {
+  std::cerr << "  -G presence   record presence of bits only, not count\n";
+  std::cerr << "  -G WRITE=fname write the global fingerprint to <fname>\n";
 
-  exit(0);
+  std::exit(rc);
 }
 
 static void
-DisplayDashYOptions(std::ostream& output) {
+DisplayDashYOptions(int rc) {
   // clang-format off
-  output << " -Y flush            flush output after each molecule\n";
-  output << " -Y fixed=<nbits>    generate fixed width fingerprints with <nbits> bits\n";
-  output << " -Y desc=<ncols>     generate descriptor file output with <ncols> columns\n";
-  output << " -Y scale=<n>        multiple all bit counts by <n>. Beware truncation at 255.\n";
+  std::cerr << " -Y flush            flush output after each molecule\n";
+  std::cerr << " -Y fixed=<nbits>    generate fixed width fingerprints with <nbits> bits\n";
+  std::cerr << " -Y desc=<ncols>     generate descriptor file output with <ncols> columns\n";
+  std::cerr << " -Y scale=<n>        multiple all bit counts by <n>. Beware truncation at 255.\n";
   // clang-format on
 
-  ::exit(0);
+  std::exit(rc);
 }
 
 static int
@@ -1341,6 +1349,11 @@ iwecfp(int argc, char** argv) {
     cerr << "Unrecognised options encountered\n";
     usage(1);
   }
+
+  DisplayDashHelpIfRequested(cl, 'Q', DisplayDashQOptions);
+
+  DisplayDashHelpIfRequested(cl, 'Y', DisplayDashYOptions);
+  DisplayDashHelpIfRequested(cl, 'G', display_dash_G_options);
 
   verbose = cl.option_count('v');
 
@@ -1491,10 +1504,10 @@ iwecfp(int argc, char** argv) {
           cerr << "Central atoms will only be CD4 or CD3H types\n";
         }
       } else if (y == "help") {
-        DisplayDashYOptions(cerr);
+        DisplayDashYOptions(0);
       } else {
         cerr << "Unrecongised -Y qualifier '" << y << "'\n";
-        DisplayDashYOptions(cerr);
+        DisplayDashYOptions(0);
       }
     }
   }
@@ -1615,7 +1628,7 @@ iwecfp(int argc, char** argv) {
         g.remove_leading_chars(6);
         fname = g.c_str();
       } else if ("help" == g) {
-        display_dash_G_options(cerr);
+        display_dash_G_options(0);
       } else {
         cerr << "Unrecognised -G qualifier '" << g << "'\n";
         usage(3);
@@ -1736,6 +1749,7 @@ iwecfp(int argc, char** argv) {
       if ("label" == q) {
         label_by_visited = 1;
       } else if ("help" == q) {
+        DisplayDashQOptions(0);
       } else if (!q.numeric_value(equalise_atom_coverage) || equalise_atom_coverage < 1) {
         cerr << "The number of visited equalisation steps (-Q) must be a whole +ve "
                 "number\n";

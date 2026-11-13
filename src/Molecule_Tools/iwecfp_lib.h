@@ -16,6 +16,12 @@
 
 namespace iwecfp {
 
+// Display option help on stderr and exit with rc.
+void DisplayDashMOptions(int rc);
+void DisplayDashBOptions(int rc);
+void DisplayDashXOptions(int rc);
+void DisplayDashQOptions(int rc);
+
 // Return codes from Iwecfp::Fingerprint()
 enum class FingerprintResult {
   kOk,
@@ -147,7 +153,7 @@ class Iwecfp {
 
 void Usage(int rc);
 void DisplayDashGOptions(std::ostream& output);
-void DisplayDashYOptions(std::ostream& output);
+void DisplayDashYOptions(int rc);
 
 }  // namespace iwecfp
 

@@ -82,6 +82,8 @@ class Structure_Fixing
     int _process (Molecule & m, const Atom ** atom);
 
   public:
+    static void DisplayDashJOptions(int rc);
+
     Structure_Fixing ();
 
     int initialise (Command_Line & cl, char c, int vb);

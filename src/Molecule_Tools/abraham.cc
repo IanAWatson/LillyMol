@@ -7,6 +7,7 @@
 */
 
 #include <algorithm>
+#include <cstdlib>
 #include <iostream>
 #include <memory>
 using std::cerr;
@@ -566,20 +567,20 @@ usage(int rc)
   cerr << "  -v             verbose output\n";
   // clang-format on
 
-  exit(rc);
+  std::exit(rc);
 }
 
 static void
-display_dash_G_qualifiers(std::ostream &os) {
+display_dash_G_qualifiers(int rc) {
   // clang-format off
-  os << " -G blki         aromatic bonds lose their Kekule identity\n";
-  os << " -G qndn         use query names as descriptor names\n";
-  os << " -G tovl         run in a mode to test query overlaps\n";
-  os << " -G ncpm         do NOT check previously matched atoms\n";
-  os << " -G ql2f         process queries last to first\n";
+  std::cerr << " -G blki         aromatic bonds lose their Kekule identity\n";
+  std::cerr << " -G qndn         use query names as descriptor names\n";
+  std::cerr << " -G tovl         run in a mode to test query overlaps\n";
+  std::cerr << " -G ncpm         do NOT check previously matched atoms\n";
+  std::cerr << " -G ql2f         process queries last to first\n";
   // clang-format on
 
-  return;
+  std::exit(rc);
 }
 
 /*
@@ -1705,11 +1706,11 @@ abraham_descriptor_pipeline(const char *fname, Queries_and_Additive_Models *mode
 }
 
 static void
-DisplayDashYOptions() {
+DisplayDashYOptions(int rc) {
   cerr << " -Y rpipe    input is a descriptor file pipeline  smiles id d1 d2 d3 ...\n";
   cerr << " -Y wpipe    write a descriptor file pipeline - smiles id d1 d2 d3 ...\n";
   cerr << " -Y flush    flush output after every molecule processed\n";
-  ::exit(0);
+  std::exit(rc);
 }
 
 /*
@@ -1725,6 +1726,9 @@ abraham(int argc, char **argv) {
     cerr << "Unrecognised options encountered\n";
     usage(1);
   }
+
+  DisplayDashHelpIfRequested(cl, 'Y', DisplayDashYOptions);
+  DisplayDashHelpIfRequested(cl, 'G', display_dash_G_qualifiers);
 
   verbose = cl.option_count('v');
 
@@ -1781,10 +1785,10 @@ abraham(int argc, char **argv) {
           cerr << "Will flush after every molecule processed\n";
         }
       } else if (y == "help") {
-        DisplayDashYOptions();
+        DisplayDashYOptions(0);
       } else {
         cerr << "Unrecognised -Y directive '" << y << "'\n";
-        DisplayDashYOptions();
+        DisplayDashYOptions(0);
       }
     }
   }
@@ -1819,7 +1823,7 @@ abraham(int argc, char **argv) {
           cerr << "Will process queries last to first\n";
         }
       } else if ("help" == g) {
-        display_dash_G_qualifiers(cerr);
+        display_dash_G_qualifiers(0);
         return 0;
       } else {
         cerr << "Unrecognised -G qualifier '" << g << "'\n";

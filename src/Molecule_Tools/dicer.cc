@@ -7,6 +7,7 @@
 #include <time.h>
 
 #include <algorithm>
+#include <cstdlib>
 #include <iostream>
 #include <limits>
 #include <memory>
@@ -3425,7 +3426,7 @@ dicer -k 3 -I 1 -M 16 -M maxnr=9 -c -B nbamide -B brcb -B fragstatproto -B frags
 )";
   // clang-format on
 
-  exit(rc);
+  std::exit(rc);
 }
 
 /*
@@ -7675,71 +7676,71 @@ InitialiseEnvironmentElements() {
 }
 
 static int
-display_misc_B_options(std::ostream& os) {
+display_misc_B_options(int rc) {
   // clang-format off
-  os << " -B atype=<tag>    Calculate atom type and dump it in frag/comp pairs\n";
-  os << " -B term           perceive terminal groups\n";
-  os << " -B bscb           allow Carbon-Carbon single bonds to break\n";
-  os << " -B bCCD3          allow C-[CD>2] bonds to break\n";
-  os << " -B eH             change O,N and S with Hydrogens to other elements\n";
-  os << " -B xsub           do not report fragments that are exact subsets of others\n";
-  os << " -B nosmi          suppress output of fragment smiles\n";
-  os << " -B noparent       suppress output of parent smiles\n";
-  os << " -B proto          main output is a dicer_data.DicedMolecule proto\n";
-  os << " -B serialized_proto main output is tfdatarecord of serialized dicer_data::DicedMolecule\n";
-  os << " -B time           run timing\n";
-  os << " -B addq           run the -q queries in addition to the default rules\n";
-  os << " -B WB=fname       write smiles of just broken molecules to <fname>\n";
-  os << " -B BRB            break some kinds of cross ring bond pairs\n";
-  os << " -B BRF            break fused rings\n";
-  os << " -B BRS            break spiro rings\n";
-  os << " -B BBRK_FILE=<fname> write bonds to break to <fname> - no computation\n";
-  os << " -B BBRK_TAG=<tag> read bonds to be broken from sdf tag <tag> (def DICER_BBRK)\n";
-  os << " -B nousmi         do NOT uuse unique smiles to keep track of fragments - dangerous\n";
-  os << " -B nbamide        do NOT break amide and amide-like bonds\n";
-  os << " -B brcb           break all bonds from a chain to a ring\n";
-  os << " -B nbunsat        do not break bonds to unsaturated atoms\n";
+  std::cerr << " -B atype=<tag>    Calculate atom type and dump it in frag/comp pairs\n";
+  std::cerr << " -B term           perceive terminal groups\n";
+  std::cerr << " -B bscb           allow Carbon-Carbon single bonds to break\n";
+  std::cerr << " -B bCCD3          allow C-[CD>2] bonds to break\n";
+  std::cerr << " -B eH             change O,N and S with Hydrogens to other elements\n";
+  std::cerr << " -B xsub           do not report fragments that are exact subsets of others\n";
+  std::cerr << " -B nosmi          suppress output of fragment smiles\n";
+  std::cerr << " -B noparent       suppress output of parent smiles\n";
+  std::cerr << " -B proto          main output is a dicer_data.DicedMolecule proto\n";
+  std::cerr << " -B serialized_proto main output is tfdatarecord of serialized dicer_data::DicedMolecule\n";
+  std::cerr << " -B time           run timing\n";
+  std::cerr << " -B addq           run the -q queries in addition to the default rules\n";
+  std::cerr << " -B WB=fname       write smiles of just broken molecules to <fname>\n";
+  std::cerr << " -B BRB            break some kinds of cross ring bond pairs\n";
+  std::cerr << " -B BRF            break fused rings\n";
+  std::cerr << " -B BRS            break spiro rings\n";
+  std::cerr << " -B BBRK_FILE=<fname> write bonds to break to <fname> - no computation\n";
+  std::cerr << " -B BBRK_TAG=<tag> read bonds to be broken from sdf tag <tag> (def DICER_BBRK)\n";
+  std::cerr << " -B nousmi         do NOT uuse unique smiles to keep track of fragments - dangerous\n";
+  std::cerr << " -B nbamide        do NOT break amide and amide-like bonds\n";
+  std::cerr << " -B brcb           break all bonds from a chain to a ring\n";
+  std::cerr << " -B nbunsat        do not break bonds to unsaturated atoms\n";
    
   // the nbfts option is not working, TODO ianwatson fix.
   //os << " -B nbfts          do NOT break bonds that would yield fragments too small\n";
-  os << " -B appnatoms      append the atom count to each fragment produced\n";
-  os << " -B MAXAL=<n>      max atoms lost when creating any fragment\n";
-  os << " -B MINFF=<f>      discard fragments that comprise less than <f> fraction of atoms in parent\n";
-  os << " -B MAXFF=<f>      discard fragments that comprise more than <f> fraction of atoms in parent\n";
-  os << " -B fragstat=<fname> write fragment statistics to <fname>\n";
-  os << " -B fstsp=<float>  fractional support level for inclusion in fragstat= file\n";
-  os << " -B fragstatproto  write the fragstat file as a DicerFragments text proto\n";
-  os << " -B fragstatbinproto write the fragstat file as TFDatarecord DicerFragments serialized proto's\n";
-  os << " -B smiles_proto   write the fragstat file as 'smiles DicerFragments text proto'\n";
-  os << " -B WRITEALL=<fname> write all fragments found to <fname>. Can be HUGE!\n";
-  os << " -B FMC:<qry>      queries that fragments reported must contain, for smarts: -B FMC:SMARTS:smt \n";
-  os << " -B                use zero occurrences to enforce a negative selection:  -B FMC:SMARTS:0[B,P,Br,I]\n";
-  os << " -B FMC:heteroatom fragments reported must contain a heteroatom, :n for count\n";
-  os << " -B VF=<n>         output will be viewed in vf with <n> structures per page\n";
-  os << " -B flush          flush output after each molecule\n";
-  os << " -B chiraldummy    replace each removed chiral neighbour with a terminal * (chain cuts)\n";
-  os << " -B lostchiral     check each fragment for lost chirality\n";
-  os << " -B recap          work like Recap - break all breakable bonds at once\n";
-  os << " -B nooutput       suppress writing diced fragments, useful with the '-B fragstat' option\n";
-  os << " -B rpt=<n>        report progress every <n> molecules processed\n";
-  os << " -B help           this message\n";
+  std::cerr << " -B appnatoms      append the atom count to each fragment produced\n";
+  std::cerr << " -B MAXAL=<n>      max atoms lost when creating any fragment\n";
+  std::cerr << " -B MINFF=<f>      discard fragments that comprise less than <f> fraction of atoms in parent\n";
+  std::cerr << " -B MAXFF=<f>      discard fragments that comprise more than <f> fraction of atoms in parent\n";
+  std::cerr << " -B fragstat=<fname> write fragment statistics to <fname>\n";
+  std::cerr << " -B fstsp=<float>  fractional support level for inclusion in fragstat= file\n";
+  std::cerr << " -B fragstatproto  write the fragstat file as a DicerFragments text proto\n";
+  std::cerr << " -B fragstatbinproto write the fragstat file as TFDatarecord DicerFragments serialized proto's\n";
+  std::cerr << " -B smiles_proto   write the fragstat file as 'smiles DicerFragments text proto'\n";
+  std::cerr << " -B WRITEALL=<fname> write all fragments found to <fname>. Can be HUGE!\n";
+  std::cerr << " -B FMC:<qry>      queries that fragments reported must contain, for smarts: -B FMC:SMARTS:smt \n";
+  std::cerr << " -B                use zero occurrences to enforce a negative selection:  -B FMC:SMARTS:0[B,P,Br,I]\n";
+  std::cerr << " -B FMC:heteroatom fragments reported must contain a heteroatom, :n for count\n";
+  std::cerr << " -B VF=<n>         output will be viewed in vf with <n> structures per page\n";
+  std::cerr << " -B flush          flush output after each molecule\n";
+  std::cerr << " -B chiraldummy    replace each removed chiral neighbour with a terminal * (chain cuts)\n";
+  std::cerr << " -B lostchiral     check each fragment for lost chirality\n";
+  std::cerr << " -B recap          work like Recap - break all breakable bonds at once\n";
+  std::cerr << " -B nooutput       suppress writing diced fragments, useful with the '-B fragstat' option\n";
+  std::cerr << " -B rpt=<n>        report progress every <n> molecules processed\n";
+  std::cerr << " -B help           this message\n";
   // clang-format on
 
-  exit(3);
+  std::exit(rc);
 }
 
 static int
-display_dash_K_options(char flag, std::ostream& os) {
+display_dash_K_options(int rc) {
   // clang-format off
-  os << " -" << flag << " READ=<fname>    read existing data from <fname>\n";
-  os << " -" << flag << " WRITE=<fname>   when complete, write data to <fname>\n";
-  os << " -" << flag << " ADD             add new strings to the hash (default)\n";
-  os << " -" << flag << " NOADD           do NOT add new strings to the hash\n";
-  os << "                       useful for creating fixed dictionary fingerprints\n";
-  os << " -" << flag << " help            this message\n";
+  std::cerr << " -K READ=<fname>    read existing data from <fname>\n";
+  std::cerr << " -K WRITE=<fname>   when complete, write data to <fname>\n";
+  std::cerr << " -K ADD             add new strings to the hash (default)\n";
+  std::cerr << " -K NOADD           do NOT add new strings to the hash\n";
+  std::cerr << "                       useful for creating fixed dictionary fingerprints\n";
+  std::cerr << " -K help            this message\n";
   // clang-format on
 
-  exit(3);
+  std::exit(rc);
 }
 
 static int
@@ -7799,7 +7800,7 @@ display_dash_i_options(int rc) {
 )";
   // clang-format on
 
-  exit(rc);
+  std::exit(rc);
 }
 
 static void
@@ -7931,6 +7932,12 @@ dicer(int argc, char** argv) {
     cerr << "Unrecognised options encountered\n";
     usage(1);
   }
+
+  DisplayDashHelpIfRequested(cl, 'B', display_misc_B_options);
+  DisplayDashHelpIfRequested(cl, 'C', DisplayComplementaryFragmentOptions);
+  DisplayDashHelpIfRequested(cl, 'I', display_dash_i_options);
+  DisplayDashHelpIfRequested(cl, 'M', DisplayDashMOptions);
+  DisplayDashHelpIfRequested(cl, 'K', display_dash_K_options);
 
   verbose = cl.option_count('v');
 
@@ -8564,7 +8571,7 @@ dicer(int argc, char** argv) {
           cerr << "Will report progress every " << rpt << " molecules\n";
         }
       } else if ("help" == b) {
-        display_misc_B_options(cerr);
+        display_misc_B_options(0);
       } else {
         cerr << "Unrecognised -B qualifier '" << b << "'\n";
         return 4;
@@ -8815,7 +8822,7 @@ dicer(int argc, char** argv) {
           cerr << "New features not added to hash\n";
         }
       } else if ("help" == k) {
-        display_dash_K_options('K', cerr);
+        display_dash_K_options(0);
       } else {
         cerr << "Unrecognised -K qualifier '" << k << "'\n";
         usage(4);

@@ -1,5 +1,6 @@
 // Creates a temperature fingerprint based on the atom count
 
+#include <cstdlib>
 #include <iostream>
 #include <limits>
 #include <memory>
@@ -61,10 +62,9 @@ static unsigned char abbreviated_fingerprints = 0;
 
 
 static void
-DisplayDashYOptions(std::ostream& output)
-{
-  output << " -Y flush     flush output after every molecule\n";
-  ::exit(1);
+DisplayDashYOptions(int rc) {
+  std::cerr << " -Y flush     flush output after every molecule\n";
+  std::exit(rc);
 }
 
 static void
@@ -98,7 +98,7 @@ usage(int rc)
   cerr << "  -v             verbose output\n";
   // clang-format on
 
-  exit(rc);
+  std::exit(rc);
 }
 
 struct Options {
@@ -168,10 +168,10 @@ Options::Initialise(Command_Line& cl)
           cerr << "Will flush output after each molecule\n";
         }
       } else if (y == "help") {
-        DisplayDashYOptions(cerr);
+        DisplayDashYOptions(0);
       } else {
         cerr << "Unrecognised -Y qualifier '" << y << "'\n";
-        DisplayDashYOptions(cerr);
+        DisplayDashYOptions(1);
       }
     }
   }
@@ -492,18 +492,17 @@ temperature(const char* fname, FileType input_type, Options& options,
 }
 
 static void
-display_dash_B_qualifiers(std::ostream& os)
-{
-  os << " -B n     natoms\n";
-  os << " -B l     largest ring size\n";
-  os << " -B r     nrings\n";
-  os << " -B g     ring atoms\n";
-  os << " -B a     aromatic atoms\n";
-  os << " -B f     fused ring atoms\n";
-  os << " -B h     heteroatom count\n";
-  os << " -B u     unsaturated atoms\n";
+display_dash_B_qualifiers(int rc) {
+  std::cerr << " -B n     natoms\n";
+  std::cerr << " -B l     largest ring size\n";
+  std::cerr << " -B r     nrings\n";
+  std::cerr << " -B g     ring atoms\n";
+  std::cerr << " -B a     aromatic atoms\n";
+  std::cerr << " -B f     fused ring atoms\n";
+  std::cerr << " -B h     heteroatom count\n";
+  std::cerr << " -B u     unsaturated atoms\n";
 
-  exit(1);
+  std::exit(rc);
 }
 
 static int
@@ -518,6 +517,9 @@ temperature(int argc, char** argv)
     cerr << "Unrecognised options encountered\n";
     usage(1);
   }
+
+  DisplayDashHelpIfRequested(cl, 'Y', DisplayDashYOptions);
+  DisplayDashHelpIfRequested(cl, 'B', display_dash_B_qualifiers);
 
   verbose = cl.option_count('v');
 
@@ -550,7 +552,7 @@ temperature(int argc, char** argv)
     b.to_lowercase();
 
     if ("help" == b) {
-      display_dash_B_qualifiers(cerr);
+      display_dash_B_qualifiers(0);
     }
 
     for (int i = 0; i < b.length(); i++) {
@@ -579,7 +581,7 @@ temperature(int argc, char** argv)
           cerr << ' ';
         }
         cerr << "^\n";
-        display_dash_B_qualifiers(cerr);
+        display_dash_B_qualifiers(1);
       }
     }
 

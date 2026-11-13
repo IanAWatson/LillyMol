@@ -1,4 +1,5 @@
 #include <algorithm>
+#include <cstdlib>
 #include <iostream>
 #include <memory>
 
@@ -257,7 +258,7 @@ One file for the scaffold, mandatory, and zero or more file(s) for each sidechai
 )";
   // clang-format on
 
-  exit(rc);
+  std::exit(rc);
 }
 
 static void
@@ -1515,9 +1516,9 @@ DisplayDashMOptions(int rc) {
 }
 
 static void
-display_dash_j_qualifiers(std::ostream& os) {
+display_dash_j_qualifiers(int rc) {
   // clang-format off
-  os << R"(
+  std::cerr << R"(
  -J wrscaf      write scaffolds  to the output stream.
  -J wrsdch      write sidechains to the output stream.
  -J blki        bonds lose Kekule identity.
@@ -1552,7 +1553,7 @@ display_dash_j_qualifiers(std::ostream& os) {
 )";
   // clang-format on
 
-  return;
+  std::exit(rc);
 }
 
 static int
@@ -1616,6 +1617,9 @@ trxn(int argc, char** argv) {
     cerr << "Unrecognised options encountered\n";
     usage(1);
   }
+
+  DisplayDashHelpIfRequested(cl, 'J', display_dash_j_qualifiers);
+  DisplayDashHelpIfRequested(cl, 'M', DisplayDashMOptions);
 
   verbose = cl.option_count('v');
 
@@ -1784,7 +1788,7 @@ trxn(int argc, char** argv) {
     const_IWSubstring j;
     while (cl.value('J', j, i++)) {
       if ("help" == j) {
-        display_dash_j_qualifiers(cerr);
+        display_dash_j_qualifiers(0);
         return 0;
       } else if ("appinfo" == j) {
         set_reaction_transfer_text_info_to_products(1);
@@ -1992,7 +1996,7 @@ trxn(int argc, char** argv) {
         }
       } else {
         cerr << "Unrecognised -J qualifier '" << j << "'\n";
-        display_dash_j_qualifiers(cerr);
+        display_dash_j_qualifiers(1);
         return 1;
       }
     }

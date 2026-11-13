@@ -10,6 +10,9 @@
 
 namespace fingerprint_writer {
 
+// Display option help on stderr and exit with rc.
+void DisplayFingerprintWriterOptions(int rc);
+
 // Several programmes generate fingerprints. This is a common means
 // of producing different kinds of ourput.
 //  Sparse fingerprints
@@ -56,7 +59,6 @@ class FingerprintWriter {
     fixed_bit_vector::FixedBitVector _fixed;
 
   // private functions
-    void DisplayUsage(char flag, std::ostream& output) const;
 
     // The functions that do the actual writing, depending on what is in _output_type.
     int WriteFixedFingerprint(const Sparse_Fingerprint_Creator& sfc, IWString_and_File_Descriptor& output);

@@ -2,6 +2,7 @@
   Sort molecules based on a given criterion
 */
 
+#include <cstdlib>
 #include <iostream>
 #include <memory>
 
@@ -172,7 +173,7 @@ msort -k natoms -k nring file.smi > file_sorted.smi
 )";
   // clang-format on
 
-  exit(rc);
+  std::exit(rc);
 }
 
 class File_Record {
@@ -1247,17 +1248,17 @@ fetch_smarts(const const_IWSubstring &s) {
 }
 
 static int
-display_dash_m_options(std::ostream &os) {
+display_dash_m_options(int rc) {
   // clang-format off
-  os << " -M ea=<n>         write <n> chunks of output each containing roughly equal total atoms\n";
-  os << " -M s2f            convert non numeric tags and column contents to arbitrary\n";
-  os << "                   numeric form - grouped rather than sorted\n";
-  os << " -M svsf           same values to in the same file (use with the -D option)\n";
-  os << " -M firstprop      the file name index of each -D file is the first property\n";
-  os << " -M rpt=<n>        report progress every <n> molecules processed\n";
+  std::cerr << " -M ea=<n>         write <n> chunks of output each containing roughly equal total atoms\n";
+  std::cerr << " -M s2f            convert non numeric tags and column contents to arbitrary\n";
+  std::cerr << "                   numeric form - grouped rather than sorted\n";
+  std::cerr << " -M svsf           same values to in the same file (use with the -D option)\n";
+  std::cerr << " -M firstprop      the file name index of each -D file is the first property\n";
+  std::cerr << " -M rpt=<n>        report progress every <n> molecules processed\n";
   // clang-format on
 
-  exit(1);
+  std::exit(rc);
 }
 
 static int
@@ -1268,6 +1269,8 @@ msort(int argc, char **argv) {
     cerr << "Unrecognised options encountered\n";
     usage(1);
   }
+
+  DisplayDashHelpIfRequested(cl, 'M', display_dash_m_options);
 
   verbose = cl.option_count('v');
 
@@ -1365,10 +1368,10 @@ msort(int argc, char **argv) {
           cerr << "The -D files will be created with name containing the first property\n";
         }
       } else if ("help" == m) {
-        display_dash_m_options(cerr);
+        display_dash_m_options(0);
       } else {
         cerr << "Unrecognised -M qualifier '" << m << "'\n";
-        display_dash_m_options(cerr);
+        display_dash_m_options(1);
       }
     }
   }

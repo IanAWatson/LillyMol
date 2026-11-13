@@ -1,8 +1,10 @@
 // Command line interface to QED calculations.
 
+#include <cstdlib>
 #include <iostream>
 
 #include "Foundational/accumulator/accumulator.h"
+#include "Foundational/iwmisc/misc.h"
 #include "Foundational/cmdline/cmdline.h"
 
 #include "Molecule_Lib/aromatic.h"
@@ -17,6 +19,12 @@
 namespace qed {
 
 using std::cerr;
+
+void
+DisplayDashMOptions(int rc) {
+  std::cerr << " -M PREFIX=<text>  prefix for descriptor names\n";
+  std::exit(rc);
+}
 
 void
 Usage(int rc) {
@@ -152,6 +160,7 @@ Options::Initialise(Command_Line& cl) {
         m.remove_leading_chars(7);
         _descriptor_prefix = m;
       } else if (m == "help") {
+        DisplayDashMOptions(0);
       } else {
       }
     }
@@ -368,6 +377,9 @@ QEDMain(int argc, char** argv) {
     cerr << "Unrecognised options encountered\n";
     Usage(1);
   }
+
+  DisplayDashHelpIfRequested(cl, 'M', DisplayDashMOptions);
+  DisplayDashHelpIfRequested(cl, 'Q', qed::DisplayQueryOptions);
 
   int verbose = cl.option_count('v');
 

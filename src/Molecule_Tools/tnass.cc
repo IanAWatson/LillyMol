@@ -2,6 +2,7 @@
   Tester for the NEED/AVAILABLE substructure queries
 */
 
+#include <cstdlib>
 #include <iostream>
 #include <limits>
 #include <memory>
@@ -71,7 +72,7 @@ usage(int rc) {
   cerr << "  -v             verbose output\n";
   // clang-format on
 
-  exit(rc);
+  std::exit(rc);
 }
 
 static int verbose = 0;
@@ -506,9 +507,9 @@ create_header(IWString& header, const IWString& descriptor_stem = "") {
 }
 
 static void
-DisplayDashXOptions(std::ostream& output) {
-  output << " -X flush        flush output after each molecule\n";
-  ::exit(0);
+DisplayDashXOptions(int rc) {
+  std::cerr << " -X flush        flush output after each molecule\n";
+  std::exit(rc);
 }
 
 static int
@@ -519,6 +520,8 @@ tnass(int argc, char** argv) {
     cerr << "Unrecognised options encountered\n";
     usage(1);
   }
+
+  DisplayDashHelpIfRequested(cl, 'X', DisplayDashXOptions);
 
   verbose = cl.option_count('v');
 
@@ -785,10 +788,10 @@ tnass(int argc, char** argv) {
           cerr << "Will flush output after each molecule\n";
         }
       } else if (x == "help") {
-        DisplayDashXOptions(cerr);
+        DisplayDashXOptions(0);
       } else {
         cerr << "Unrecognised -X qualifier '" << x << "'\n";
-        DisplayDashXOptions(cerr);
+        DisplayDashXOptions(0);
       }
     }
   }

@@ -1,6 +1,7 @@
 #include <stdlib.h>
 
 #include <algorithm>
+#include <cstdlib>
 #include <iostream>
 #include <memory>
 #include <random>
@@ -9,6 +10,7 @@
 #define RESIZABLE_ARRAY_IMPLEMENTATION
 #define ISTREAM_AND_TYPE_IMPLEMENTATION
 
+#include "Foundational/iwmisc/misc.h"
 #include "Foundational/cmdline/cmdline.h"
 #include "Foundational/iwstring/iw_stl_hash_set.h"
 
@@ -23,6 +25,8 @@
 
 using std::cerr;
 using std::endl;
+
+static void DisplayConvolutionOptions(int rc);
 
 static int verbose = 0;
 
@@ -69,7 +73,7 @@ usage(int rc)
   cerr << "  -K ...         standard smiles control options, enter '-K help' for info\n";
   cerr << "  -v             verbose output\n";
 
-  exit(rc);
+  std::exit(rc);
 }
 
 class Molecule_and_Atom_Type : public Molecule
@@ -305,8 +309,6 @@ class For_Convolution
   int _replicate_each_type;  // how many instances of a given type do we ask for
 
   //  private functions
-
-  void _display_for_convolution_options(const char flag, std::ostream& output) const;
   int _build(Set_of_Random_Smiles& sors, Molecule& m,
              std::unordered_map<int, int>& atype_count);
   int _generate_row(const int r, IWString& buffer);
@@ -399,8 +401,7 @@ For_Convolution::build(Command_Line& cl, char flag)
         return 0;
       }
     } else if ("help" == s) {
-      _display_for_convolution_options(flag, cerr);
-      exit(0);
+      DisplayConvolutionOptions(0);
     } else {
       cerr << "For_Convolution::build:unrecognised directive\n";
       return 0;
@@ -512,15 +513,13 @@ For_Convolution::build(Command_Line& cl, char flag)
   return 1;
 }
 
-void
-For_Convolution::_display_for_convolution_options(const char flag,
-                                                  std::ostream& output) const
-{
-  output << " -" << flag << " width=w    frame width for each smiles fragment\n";
-  output << " -" << flag
+static void
+DisplayConvolutionOptions(int rc) {
+  std::cerr << " -C width=w    frame width for each smiles fragment\n";
+  std::cerr << " -" << 'C'
          << " N=n        number of random smiles replicates (default 10)\n";
-  output << " -" << flag << " nbits=n    number of atom types to process\n";
-  return;
+  std::cerr << " -C nbits=n    number of atom types to process\n";
+  std::exit(rc);
 }
 
 #ifdef NO_LONGER_USED_MMMMMMMMM2
@@ -727,6 +726,8 @@ make_random_smiles(int argc, char** argv)
     cerr << "unrecognised_options_encountered\n";
     usage(3);
   }
+
+  DisplayDashHelpIfRequested(cl, 'C', DisplayConvolutionOptions);
 
   verbose = cl.option_count('v');
 

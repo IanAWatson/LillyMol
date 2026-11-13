@@ -1,6 +1,7 @@
 // Generate pharmacophore-like queries for 2D molecules
 
 #include <filesystem>
+#include <cstdlib>
 #include <iostream>
 #include <limits>
 #include <memory>
@@ -305,7 +306,6 @@ class Options {
   int _reduce_to_largest_fragment;
 
   // Private functions.
-  void DisplayDashYOptions(std::ostream& output);
 
   int Pharmacophore2d(Molecule& m, PerMoleculeData& pmd, int number_functional_groups,
                       IWString& fname);
@@ -377,13 +377,13 @@ Options::Options() {
   _reduce_to_largest_fragment = 0;
 }
 
-void
-Options::DisplayDashYOptions(std::ostream& output) {
-  output << " -Y iso            label functional groups in the -L file as isotopes "
+static void
+DisplayDashYOptions(int rc) {
+  std::cerr << " -Y iso            label functional groups in the -L file as isotopes "
             "(default is atom map)\n";
-  output << " -Y fname=<fname>  file name to which labelled smiles are written\n";
+  std::cerr << " -Y fname=<fname>  file name to which labelled smiles are written\n";
 
-  ::exit(0);
+  std::exit(rc);
 }
 
 int
@@ -602,10 +602,10 @@ Options::Initialise(Command_Line& cl) {
         y.remove_leading_chars(6);
         fname = y;
       } else if (y == "help") {
-        DisplayDashYOptions(cerr);
+        DisplayDashYOptions(0);
       } else {
         cerr << "Unrecognised -Y qualifier '" << y << "'\n";
-        DisplayDashYOptions(cerr);
+        DisplayDashYOptions(0);
       }
     }
 
@@ -1358,6 +1358,8 @@ Pharmacophore2d(int argc, char** argv) {
     cerr << "unrecognised_options_encountered\n";
     Usage(1);
   }
+
+  DisplayDashHelpIfRequested(cl, 'Y', DisplayDashYOptions);
 
   int verbose = cl.option_count('v');
 

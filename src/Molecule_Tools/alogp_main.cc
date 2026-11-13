@@ -2,6 +2,7 @@
 
 #include <cctype>
 #include <cstdio>
+#include <cstdlib>
 #include <iostream>
 #include <limits>
 #include <memory>
@@ -373,36 +374,36 @@ Options::Options() {
 }
 
 void
-DisplayDashJOptions(std::ostream& output) {
-  output << R"( -J <tag>          tag for fingerprints
+DisplayDashJOptions(int rc) {
+  std::cerr << R"( -J <tag>          tag for fingerprints
  -J fixed=<nn>     generate 'thermometer-like' fixed width fingerprints of width <nn> bits.
                    The number of bits set is a function of the alogp value.
                    Low values set hardly any of the <nn> bits high values set all of them.
 )";
 
-  ::exit(0);
+  std::exit(rc);
 }
 
 void
-DisplayDashYOptions(std::ostream& output) {
-  output << " -Y flush          flush output after each molecule\n";
-  output << " -Y label          label atoms with atom type assigned\n";
-  output << " -Y quiet          suppress warning messages about unassigned atoms\n";
-  output << " -Y alcacid        use the alcohol atom type for certain acids - rdkit compat\n";
-  output << " -Y RDKIT.N+       treat N+ atoms same as RDKit\n";
-  output << " -Y RDKIT.HP       treat phosphoric acids same as RDKit\n";
-  output << " -Y ZWIT           explicit treatment of Zwitterions\n";
-  output << " -Y okx            do NOT fail on encountering an unclassified atom. Values set to 0.0\n";
+DisplayDashYOptions(int rc) {
+  std::cerr << " -Y flush          flush output after each molecule\n";
+  std::cerr << " -Y label          label atoms with atom type assigned\n";
+  std::cerr << " -Y quiet          suppress warning messages about unassigned atoms\n";
+  std::cerr << " -Y alcacid        use the alcohol atom type for certain acids - rdkit compat\n";
+  std::cerr << " -Y RDKIT.N+       treat N+ atoms same as RDKit\n";
+  std::cerr << " -Y RDKIT.HP       treat phosphoric acids same as RDKit\n";
+  std::cerr << " -Y ZWIT           explicit treatment of Zwitterions\n";
+  std::cerr << " -Y okx            do NOT fail on encountering an unclassified atom. Values set to 0.0\n";
 
-  ::exit(0);
+  std::exit(rc);
 }
 
 void
-DisplayDashoOptions(std::ostream& output) {
-  output << " -o osep=<char>    output separator, default space: -o sep=tab, -o sep= ...\n";
-  output << " -o missing=<char> token written for missing values, default '.'\n";
+DisplayDashoOptions(int rc) {
+  std::cerr << " -o osep=<char>    output separator, default space: -o sep=tab, -o sep= ...\n";
+  std::cerr << " -o missing=<char> token written for missing values, default '.'\n";
 
-  ::exit(0);
+  std::exit(rc);
 }
 
 int
@@ -463,7 +464,7 @@ Options::Initialise(Command_Line& cl) {
         }
         _write_as_fixed_width_fingerprint_as_descriptors = 1;
       } else if (j == "help") {
-        DisplayDashJOptions(cerr);
+        DisplayDashJOptions(0);
       } else {
         got_tag = 1;
         _alogp_tag = j;
@@ -547,7 +548,7 @@ Options::Initialise(Command_Line& cl) {
           cerr << "Missing value set to '" << _missing_value << '\n';
         }
       } else if (o == "help") {
-        DisplayDashoOptions(cerr);
+        DisplayDashoOptions(0);
       } else {
         cerr << "Unrecognised -o directive '" << o << "'\n";
         return 0;
@@ -559,7 +560,7 @@ Options::Initialise(Command_Line& cl) {
     const_IWSubstring y;
     for (int i = 0; cl.value('Y', y, i); ++i) {
       if (y == "help") {
-        DisplayDashYOptions(cerr);
+        DisplayDashYOptions(0);
       } else if (y == "flush") {
         _flush_after_every_molecule = 1;
         if (_verbose) {
@@ -599,7 +600,7 @@ Options::Initialise(Command_Line& cl) {
         }
       } else {
         cerr << "Unrecognised -Y qualifier '" << y << "'\n";
-        DisplayDashYOptions(cerr);
+        DisplayDashYOptions(0);
       }
     }
   }
@@ -1383,6 +1384,10 @@ Main(int argc, char** argv) {
     cerr << "Unrecognised options encountered\n";
     Usage(1);
   }
+
+  DisplayDashHelpIfRequested(cl, 'J', DisplayDashJOptions);
+  DisplayDashHelpIfRequested(cl, 'Y', DisplayDashYOptions);
+  DisplayDashHelpIfRequested(cl, 'o', DisplayDashoOptions);
 
   const int verbose = cl.option_count('v');
 

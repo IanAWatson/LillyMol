@@ -1,4 +1,5 @@
 #include <algorithm>
+#include <cstdlib>
 #include <iostream>
 #include <utility>
 
@@ -32,15 +33,15 @@ FingerprintWriter::~FingerprintWriter() {
 }
 
 void
-FingerprintWriter::DisplayUsage(char flag,
-                          std::ostream& output) const {
-  output << " -" << flag << " <tag>          tag for fingerprint output, same as TAG=<tag>\n";
-  output << " -" << flag << " sep=<sep>      output column separator when writing a descriptor file\n";
-  output << " -" << flag << " name=<name>    prefix for feature names when writing a descriptor file (default 'fp')\n";
-  output << " -" << flag << " nbits=<nbits>  number of bits in fixed width fingerprint, or columns in descriptor file\n";
-  output << " -" << flag << " array          output is descriptor file form\n";
-  output << " -" << flag << " fixed          output is fixed width fingerprint form\n";
-  output << " -" << flag << " sparse         output is sparse fingerprint form\n";
+DisplayFingerprintWriterOptions(int rc) {
+  std::cerr << " -J <tag>          tag for fingerprint output, same as TAG=<tag>\n";
+  std::cerr << " -J sep=<sep>      output column separator when writing a descriptor file\n";
+  std::cerr << " -J name=<name>    prefix for feature names when writing a descriptor file (default 'fp')\n";
+  std::cerr << " -J nbits=<nbits>  number of bits in fixed width fingerprint, or columns in descriptor file\n";
+  std::cerr << " -J array          output is descriptor file form\n";
+  std::cerr << " -J fixed          output is fixed width fingerprint form\n";
+  std::cerr << " -J sparse         output is sparse fingerprint form\n";
+  std::exit(rc);
 }
 
 int
@@ -58,7 +59,7 @@ FingerprintWriter::Initialise(Command_Line& cl,
       _feature_prefix = opt;
       _output_type = OutputType::kDescriptor;
     } else if (opt == "help") {
-      DisplayUsage(flag, cerr);
+      DisplayFingerprintWriterOptions(0);
       return 0;
     } else if (opt.starts_with("nbits=")) {
       opt.remove_leading_chars(6);

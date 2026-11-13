@@ -24,6 +24,17 @@
 
 namespace fileconv {
 
+// Display option help on stderr and exit with rc.
+void DisplayDashhOptions(int rc);
+void DisplayPDirectives(int rc);
+void DisplayDashYOptions(int rc);
+void DisplayDashIOptions(int rc);
+void DisplayChiralityOptions(int rc);
+void DisplayfOptions(int rc);
+void DisplayFOptions(int rc);
+void DisplayOrganicOptions(int rc);
+void DisplayChargeOptions(int rc);
+
 // FileconvConfig::Process() uses a FileconvResult struct to
 // pass data back to the caller.
 struct FileconvResult {

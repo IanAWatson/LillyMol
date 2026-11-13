@@ -94,7 +94,7 @@ usage(int rc)
   cerr << "  -v            verbose output\n";
   // clang-format on
 
-  exit(rc);
+  std::exit(rc);
 }
 
 static void
@@ -699,6 +699,8 @@ atom_triples(int argc, char** argv)
     cerr << "Unrecognised options encountered\n";
     usage(1);
   }
+
+  DisplayDashHelpIfRequested(cl, 'J', fingerprint_writer::DisplayFingerprintWriterOptions);
 
   verbose = cl.option_count('v');
 

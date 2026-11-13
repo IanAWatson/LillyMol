@@ -3,6 +3,7 @@
 */
 
 #include <algorithm>
+#include <cstdlib>
 #include <iostream>
 #include <memory>
 #include <limits>
@@ -748,12 +749,11 @@ read_template_molecule(const const_IWSubstring & fname,
 }
 
 static void
-display_misc_options (char flag, std::ostream & output)
-{
-  output << " -" << flag << " vH           the smarts v directive includes implicit Hydrogens\n";
-  output << " -" << flag << " help         this message\n";
+display_misc_options(int rc) {
+  std::cerr << " -Z vH           the smarts v directive includes implicit Hydrogens\n";
+  std::cerr << " -Z help         this message\n";
 
-  exit(0);
+  std::exit(rc);
 }
 
 static int
@@ -766,6 +766,8 @@ superimpose_molecules (int argc, char ** argv)
     cerr << "Unrecognised options encountered\n";
     usage(1);
   }
+
+  DisplayDashHelpIfRequested(cl, 'Z', display_misc_options);
 
   verbose = cl.option_count('v');
 
@@ -937,12 +939,12 @@ superimpose_molecules (int argc, char ** argv)
       }
       else if ("help" == z)
       {
-        display_misc_options('Z', cerr);
+        display_misc_options(0);
       }
       else
       {
         cerr << "Unrecognised -Z qualifier '" << z << "'\n";
-        display_misc_options('Z', cerr);
+        display_misc_options(0);
       }
     }
   }

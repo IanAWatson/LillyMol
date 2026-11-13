@@ -1,4 +1,5 @@
 
+#include <cstdlib>
 #include <iostream>
 
 #include "Foundational/accumulator/accumulator.h"
@@ -42,10 +43,10 @@ DescriptorsToCompute::SetAll(int s) {
   ramey_descriptors = s;
 }
 
-int
-DescriptorsToCompute::DisplayUsage(std::ostream& output) const {
+void
+DisplayDescriptorOptions(int rc) {
   // clang-format off
-  output << R"(Specify descriptor(s) to be disabled or enabled.
+  std::cerr << R"(Specify descriptor(s) to be disabled or enabled.
 If the feature name starts with '-', the feature is disabled.
  -O none          turn off all optional descriptors
  -O all           turn on  all optional descriptors
@@ -77,7 +78,7 @@ If the feature name starts with '-', the feature is disabled.
 )";
   // clang-format on
 
-  return 0;
+  std::exit(rc);
 }
 
 int
@@ -238,10 +239,10 @@ DescriptorsToCompute::Initialise(Command_Line& cl) {
         return 0;
       }
     } else if (o == "help") {
-      return DisplayUsage(cerr);
+      DisplayDescriptorOptions(0);
     } else {
       cerr << "DescriptorsToCompute::Initialise:unrecognised '" << o << "'\n";
-      return DisplayUsage(cerr);
+      DisplayDescriptorOptions(1);
     }
   }
 

@@ -6,6 +6,7 @@
 #include <stdlib.h>
 #include <time.h>
 
+#include <cstdlib>
 #include <iostream>
 #include <memory>
 #include <string>
@@ -14,6 +15,7 @@
 
 #define RESIZABLE_ARRAY_IMPLEMENTATION
 
+#include "Foundational/iwmisc/misc.h"
 #include "Foundational/cmdline/cmdline.h"
 #include "Foundational/iwaray/iwaray.h"
 #include "Foundational/iwmisc/report_progress.h"
@@ -226,7 +228,7 @@ common_names -c -l -g all -S output -v input.smi
  -v             verbose output.
 )";
 
-  exit(rc);
+  std::exit(rc);
 }
 
 class Preprocessing {
@@ -821,13 +823,13 @@ OpenStreamForProtos(IWString& fname, IWString_and_File_Descriptor& output) {
 }
 
 void
-DisplayDashXOptions(std::ostream& output) {
-  output << " -X num         append an extra column to the output with the number of "
+DisplayDashXOptions(int rc) {
+  std::cerr << " -X num         append an extra column to the output with the number of "
             "exemplars\n";
-  output << " -X proto=<fname>  write results as common_names::CommonNames textprotos to "
+  std::cerr << " -X proto=<fname>  write results as common_names::CommonNames textprotos to "
             "<fname>\n";
 
-  ::exit(0);
+  std::exit(rc);
 }
 
 std::optional<uint64_t>
@@ -852,6 +854,8 @@ CommonNames(int argc, char** argv) {
     cerr << "unrecognised_options_encountered\n";
     usage(1);
   }
+
+  DisplayDashHelpIfRequested(cl, 'X', DisplayDashXOptions);
 
   verbose = cl.option_count('v');
 
@@ -928,10 +932,10 @@ CommonNames(int argc, char** argv) {
           return 1;
         }
       } else if (x == "help") {
-        DisplayDashXOptions(cerr);
+        DisplayDashXOptions(0);
       } else {
         cerr << "Unrecognised -X qualifier '" << x << "'\n";
-        DisplayDashXOptions(cerr);
+        DisplayDashXOptions(0);
       }
     }
   }

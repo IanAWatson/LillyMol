@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <cassert>
+#include <cstdlib>
 #include <iostream>
 #include <limits>
 #include <memory>
@@ -167,11 +168,11 @@ usage(int rc) {
   cerr << "  -v             verbose output\n";
   // clang-format on
 
-  exit(rc);
+  std::exit(rc);
 }
 
 static void
-display_dash_M_options() {
+display_dash_M_options(int rc) {
   // clang-format off
   cerr << "  -M impring     matches must include an implicit ring\n";
   cerr << "  -M noimpring   no implicit rings allowed between matched atoms\n";
@@ -225,11 +226,11 @@ display_dash_M_options() {
   cerr << "  -M minat=<nn>  only search molecules with at least <nn> atoms\n";
   // clang-format on
 
-  return;
+  std::exit(rc);
 }
 
 static void
-display_dash_j_options() {
+display_dash_j_options(int rc) {
   // clang-format off
   cerr << "  -j <number>    label matched atoms as isotopes. Offset hits by <number>\n";
   cerr << "  -j <symbol>    changed matched atoms to type <symbol>\n";
@@ -248,7 +249,7 @@ display_dash_j_options() {
   cerr << "  -j noclear     preserve existing isotopic labels on unmatched atoms in the existing molecule\n";
   // clang-format on
 
-  return;
+  std::exit(rc);
 }
 
 static void
@@ -671,7 +672,7 @@ LabelMatchedAtoms::Initialise(Command_Line& cl) {
         cerr << "Will label matched atoms with consecutive isotopic labels\n";
       }
     } else if ("help" == j) {
-      display_dash_j_options();
+      display_dash_j_options(0);
       return 0;
     } else if (j.numeric_value(_label_matched_atoms)) {
       if (_label_matched_atoms < 0) {
@@ -2215,6 +2216,10 @@ tsubstructure(int argc, char** argv) {
     usage(1);
   }
 
+  DisplayDashHelpIfRequested(cl, 'j', display_dash_j_options);
+  DisplayDashHelpIfRequested(cl, 'M', display_dash_M_options);
+  DisplayDashHelpIfRequested(cl, 'n', DisplayDashmOptions);
+
   DisplayDashHelpIfRequested(cl, 'm', DisplayDashmOptions);
   DisplayDashHelpIfRequested(cl, 'R', DisplayDashROptions);
 
@@ -2747,11 +2752,11 @@ tsubstructure(int argc, char** argv) {
                << rx_match_only->pattern() << "'\n";
         }
       } else if ("help" == m) {
-        display_dash_M_options();
+        display_dash_M_options(0);
         return 0;
       } else {
         cerr << "Unrecognised -M qualifier '" << m << "'\n";
-        display_dash_M_options();
+        display_dash_M_options(1);
         return 0;
       }
     }

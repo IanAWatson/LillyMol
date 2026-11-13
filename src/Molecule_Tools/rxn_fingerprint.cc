@@ -6,6 +6,7 @@
 #include <algorithm>
 #include <cstdint>
 #include <cctype>
+#include <cstdlib>
 #include <iostream>
 #include <memory>
 #include <string>
@@ -33,6 +34,8 @@
 
 using std::cerr;
 using std::endl;
+
+static int display_help_message(int rc);
 
 const char * prog_name = nullptr;
 
@@ -180,8 +183,6 @@ class Columnar_Output_Specifications
 
     int build(const Command_Line & cl, const char flag, const int verbose);
 
-    int display_help_message(const char flag, std::ostream & output) const;
-
     const IWString & output_separator() const { return _output_separator;}
     const IWString & bit_separator() const { return _bit_separator;}
     int active() const { return _active;}
@@ -269,7 +270,7 @@ Columnar_Output_Specifications::build(const Command_Line & cl,
       ;
     else if ("help" == k)
     {
-      display_help_message(flag, cerr);
+      display_help_message(0);
     }
     else
     {
@@ -287,16 +288,15 @@ Columnar_Output_Specifications::build(const Command_Line & cl,
 }
 
 int
-Columnar_Output_Specifications::display_help_message(const char flag, std::ostream & output) const
-{
-  output << "Columnar Output via -" << flag << endl;
-  output << " -" << flag << " MD5          produce MD5 of fingerprints\n";
-  output << " -" << flag << " NC           produce non colliding fingerprints\n";
-  output << " -" << flag << " sep='x'      output separator, default space\n";
-  output << " -" << flag << " bsep='x'     separator between bits separator, default comma\n";
-  output << " -" << flag << " def          default behaviour for all\n";
+display_help_message(int rc) {
+  std::cerr << "Columnar Output via -" << 'K' << endl;
+  std::cerr << " -K MD5          produce MD5 of fingerprints\n";
+  std::cerr << " -K NC           produce non colliding fingerprints\n";
+  std::cerr << " -K sep='x'      output separator, default space\n";
+  std::cerr << " -K bsep='x'     separator between bits separator, default comma\n";
+  std::cerr << " -K def          default behaviour for all\n";
 
-  return 1;
+  std::exit(rc);
 }
 
 static class Columnar_Output_Specifications columnar_output_specifications;
@@ -349,7 +349,7 @@ usage(int rc)
   cerr << "  -A ...        standard aromaticity specifications\n";
   cerr << "  -v            verbose output\n";
 
-  exit(rc);
+  std::exit(rc);
 }
 
 static void
@@ -1703,22 +1703,21 @@ get_radii(const Command_Line & cl,
 }
 
 static void
-display_misc_options(std::ostream & output)
-{
-  output << " -M naqm         suppress 'no atoms in query' message\n";
-  output << " -M CTAG=<tag>   add a fingerprint that contains the changing atom count\n";
-  output << " -M noiso        discard reactions containing isotopic atoms\n";
-  output << " -M cacff        discern changing atom count on the first fragment only\n";
-  output << " -M cbc          changes in bonding will be included with the changing atom count\n";
-  output << " -M skip0c       skip reactions with no changing atoms\n";
-  output << " -M rmnp         remove non participating fragments from reactions\n";
-  output << " -M rmagent      when writing reaction smiles, do NOT write the agent(s)\n";
-  output << " -M ebch         generate extra bits for the changing atoms\n";
-  output << " -M xctb         remove cis trans bonding from input\n";
-  output << " -M anyf         changing atoms can be in any reagent\n";
-  output << " -M aromb        when looking at changing bonds, do not consider aromatic Kekule forms\n";
+display_misc_options(int rc) {
+  std::cerr << " -M naqm         suppress 'no atoms in query' message\n";
+  std::cerr << " -M CTAG=<tag>   add a fingerprint that contains the changing atom count\n";
+  std::cerr << " -M noiso        discard reactions containing isotopic atoms\n";
+  std::cerr << " -M cacff        discern changing atom count on the first fragment only\n";
+  std::cerr << " -M cbc          changes in bonding will be included with the changing atom count\n";
+  std::cerr << " -M skip0c       skip reactions with no changing atoms\n";
+  std::cerr << " -M rmnp         remove non participating fragments from reactions\n";
+  std::cerr << " -M rmagent      when writing reaction smiles, do NOT write the agent(s)\n";
+  std::cerr << " -M ebch         generate extra bits for the changing atoms\n";
+  std::cerr << " -M xctb         remove cis trans bonding from input\n";
+  std::cerr << " -M anyf         changing atoms can be in any reagent\n";
+  std::cerr << " -M aromb        when looking at changing bonds, do not consider aromatic Kekule forms\n";
 
-  exit(1);
+  std::exit(rc);
 }
 
 static int
@@ -1731,6 +1730,9 @@ rxn_fingerprint(int argc, char ** argv)
     cerr << "Unrecognised options encountered\n";
     usage(1);
   }
+
+  DisplayDashHelpIfRequested(cl, 'M', display_misc_options);
+  DisplayDashHelpIfRequested(cl, 'K', display_help_message);
 
   verbose = cl.option_count('v');
 
@@ -1868,12 +1870,12 @@ rxn_fingerprint(int argc, char ** argv)
       }
       else if ("help" == m)
       {
-        display_misc_options(cerr);
+        display_misc_options(0);
       }
       else
       {
         cerr << "Unrecognised -M qualifier '" << m << "'\n";
-        display_misc_options(cerr);
+        display_misc_options(1);
       }
     }
   }

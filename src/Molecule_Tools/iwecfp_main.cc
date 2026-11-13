@@ -1,4 +1,5 @@
 #include <algorithm>
+#include <cstdlib>
 #include <iostream>
 #include <memory>
 
@@ -137,14 +138,14 @@ Options::~Options() {
 }
 
 void
-DisplayDashYOptions(std::ostream& output) {
-  output << " -Y flush flush output after each molecule\n";
-  output << " -Y fixed=<nbits> generate fixed width fingerprints with <nbits> bits\n";
-  output << " -Y desc=<ncols> generate descriptor file output with <ncols> columns\n";
-  output << " -Y scale=<n> multiple all bit counts by <n>. Beware truncation at 255.\n";
-  output << " -Y replicates=<n>[,<offset>] replicate bits with optional offset\n";
-  output << " -Y pchiral include central atom isotope offset in generated bits\n";
-  ::exit(0);
+DisplayDashYOptions(int rc) {
+  std::cerr << " -Y flush flush output after each molecule\n";
+  std::cerr << " -Y fixed=<nbits> generate fixed width fingerprints with <nbits> bits\n";
+  std::cerr << " -Y desc=<ncols> generate descriptor file output with <ncols> columns\n";
+  std::cerr << " -Y scale=<n> multiple all bit counts by <n>. Beware truncation at 255.\n";
+  std::cerr << " -Y replicates=<n>[,<offset>] replicate bits with optional offset\n";
+  std::cerr << " -Y pchiral include central atom isotope offset in generated bits\n";
+  std::exit(rc);
 }
 
 int
@@ -253,10 +254,10 @@ Options::Initialise(Command_Line& cl) {
 //        cerr << "Central atoms will only be CD4 or CD3H types\n";
 //      }
       } else if (y == "help") {
-        DisplayDashYOptions(cerr);
+        DisplayDashYOptions(0);
       } else {
         cerr << "Unrecongised -Y qualifier '" << y << "'\n";
-        DisplayDashYOptions(cerr);
+        DisplayDashYOptions(0);
       }
     }
   }
@@ -667,6 +668,13 @@ Main(int argc, char** argv) {
     cerr << "Unrecognised options encountered\n";
     Usage(1);
   }
+
+  DisplayDashHelpIfRequested(cl, 'M', DisplayDashMOptions);
+  DisplayDashHelpIfRequested(cl, 'B', DisplayDashBOptions);
+  DisplayDashHelpIfRequested(cl, 'X', DisplayDashXOptions);
+  DisplayDashHelpIfRequested(cl, 'Q', DisplayDashQOptions);
+
+  DisplayDashHelpIfRequested(cl, 'Y', DisplayDashYOptions);
 
   const int verbose = cl.option_count('v');
 

@@ -3,6 +3,7 @@
 */
 
 #include <algorithm>
+#include <cstdlib>
 #include <iostream>
 #include <limits>
 #include <memory>
@@ -4911,7 +4912,7 @@ usage(int rc) {
   // cerr << "  -E autocreate  automatically create new elements when encountered\n";
   cerr << "  -v             verbose output\n";
 
-  exit(rc);
+  std::exit(rc);
 }
 
 static int
@@ -4931,25 +4932,25 @@ permutation_breed_with_close_to_target(Molecule& m, const Can_Change& can_change
 }
 
 static void
-display_miscellaneous_options(const char c, std::ostream& output) {
-  output << "  -" << c
+display_miscellaneous_options(int rc) {
+  std::cerr << "  -" << 'M'
          << " afras      allow fused ring atoms to swap atoms - can generate strange "
             "ring systems\n";
-  output << "  -" << c
+  std::cerr << "  -" << 'M'
          << " cblast     the changed by string contains only the last permuation\n";
-  output << "  -" << c
+  std::cerr << "  -" << 'M'
          << " okcage     will allow formation of strongly fused ring systems\n";
-  output << "  -" << c << " prd=<n>    produce <n> molecules then stop\n";
-  output << "  -" << c << " run=<secs> run for <secs> seconds and terminate\n";
-  output << "  -" << c << " stopfile=<fname> terminate processing if <fname> present\n";
-  output << "  -" << c
+  std::cerr << "  -M prd=<n>    produce <n> molecules then stop\n";
+  std::cerr << "  -M run=<secs> run for <secs> seconds and terminate\n";
+  std::cerr << "  -M stopfile=<fname> terminate processing if <fname> present\n";
+  std::cerr << "  -" << 'M'
          << " scrand     all sidechains  will be attached via random atoms\n";
-  output << "  -" << c
+  std::cerr << "  -" << 'M'
          << " ssintra    perform non random sequential scan of all intra molecular "
             "transformations\n";
-  output << "  -" << c << " all        assign unit probability to every transformation\n";
+  std::cerr << "  -M all        assign unit probability to every transformation\n";
 
-  exit(1);
+  std::exit(rc);
 }
 
 /*
@@ -6250,19 +6251,19 @@ read_aromatic_ring_fusions(const_IWSubstring& fname, resizable_array_p<Molecule>
 }
 
 static void
-display_dash_T_options(std::ostream& output) {
-  output << "Options for controlling building towards a target population of molecules\n";
-  output << " -T <fname>          file containing the desired molecules\n";
-  output << " -T nmax=<n>         the number of proximal molecules to retain\n";
-  output
+display_dash_T_options(int rc) {
+  std::cerr << "Options for controlling building towards a target population of molecules\n";
+  std::cerr << " -T <fname>          file containing the desired molecules\n";
+  std::cerr << " -T nmax=<n>         the number of proximal molecules to retain\n";
+  std::cerr
       << " -T dmax=<d>         only retain proximal molecules that are closer than <d>\n";
-  output
+  std::cerr
       << " -T fdbk=<n>         feed back newly identified proximal molecules <n> times\n";
-  output << " -T tom=<d>          turn off any target molecule matched to within <d>\n";
-  output << " -T write=<fname>    write all molecules added to the proximal collection "
+  std::cerr << " -T tom=<d>          turn off any target molecule matched to within <d>\n";
+  std::cerr << " -T write=<fname>    write all molecules added to the proximal collection "
             "to <fname>\n";
 
-  exit(1);
+  std::exit(rc);
 }
 
 static int
@@ -6273,6 +6274,9 @@ random_molecular_permutations(int argc, char** argv) {
     cerr << "Unrecognised_options_encountered\n";
     usage(1);
   }
+
+  DisplayDashHelpIfRequested(cl, 'M', display_miscellaneous_options);
+  DisplayDashHelpIfRequested(cl, 'T', display_dash_T_options);
 
   verbose = cl.option_count('v');
 
@@ -6343,7 +6347,7 @@ random_molecular_permutations(int argc, char** argv) {
     const_IWSubstring m;
     while (cl.value('M', m, i++)) {
       if ("help" == m) {
-        display_miscellaneous_options('M', cerr);
+        display_miscellaneous_options(0);
       } else if ("afras" == m) {
         allow_fused_rings_to_swap_atoms = 1;
         if (verbose) {
@@ -6414,7 +6418,7 @@ random_molecular_permutations(int argc, char** argv) {
         warn_invalid_valence = 0;
       } else {
         cerr << "Unrecognised -M qualifier '" << m << "'\n";
-        display_miscellaneous_options('M', cerr);
+        display_miscellaneous_options(1);
       }
     }
   }
@@ -6526,7 +6530,7 @@ random_molecular_permutations(int argc, char** argv) {
             iterations_through_new_molecules < 1) {
           cerr
               << "The number of feedback iterations (fdbk=) must be a whole +ve number\n";
-          display_dash_T_options(cerr);
+          display_dash_T_options(1);
         }
         if (verbose) {
           cerr << "Will iterate through accumulated proximal molecules "
@@ -6539,7 +6543,7 @@ random_molecular_permutations(int argc, char** argv) {
             set_turn_off_molecules_matched_to_within > 1.0f) {
           cerr << "The turn off if matched within option (zwd=) must be a valid "
                   "distance\n";
-          display_dash_T_options(cerr);
+          display_dash_T_options(1);
         }
         if (verbose) {
           cerr << "Ay target molecule matched to within "
@@ -6547,12 +6551,12 @@ random_molecular_permutations(int argc, char** argv) {
                << " will no longer be examined\n";
         }
       } else if ("help" == t) {
-        display_dash_T_options(cerr);
+        display_dash_T_options(0);
       } else if (0 == fname.length()) {
         fname = t;
       } else {
         cerr << "Unrecognised -T qualifier '" << t << "'\n";
-        display_dash_T_options(cerr);
+        display_dash_T_options(1);
       }
     }
 
@@ -6574,7 +6578,7 @@ random_molecular_permutations(int argc, char** argv) {
 
     if (0 == max_size_extra_molecules) {
       cerr << "New proximal molecules being saved, must specify max size of container\n";
-      display_dash_T_options(cerr);
+      display_dash_T_options(1);
     }
 
     closer_molecules.initialise(max_size_extra_molecules);

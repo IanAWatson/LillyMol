@@ -5,6 +5,7 @@
 #include <stdlib.h>
 
 #include <algorithm>
+#include <cstdlib>
 #include <iostream>
 #include <memory>
 
@@ -182,7 +183,7 @@ Useful for examining the spatial arrangements of matched atoms across a series o
 )";
   // clang-format on
 
-  exit(rc);
+  std::exit(rc);
 }
 
 static int
@@ -762,18 +763,17 @@ molecule_subset(const char* fname, FileType input_type, Molecule_Output_Object& 
 }
 
 static int
-display_standard_dash_M_options(std::ostream& os) {
-  os << " -M aeuao       Atom Environments match Unmatched Atoms Only\n";
-  os << " -M imp2exp     make implicit Hydrogens explicit\n";
+display_standard_dash_M_options(int rc) {
+  std::cerr << " -M aeuao       Atom Environments match Unmatched Atoms Only\n";
+  std::cerr << " -M imp2exp     make implicit Hydrogens explicit\n";
 #ifdef NO_LONGER_WORKS
-  os << " -M onlysubiso  isotopic atoms in query molecules indicate subsitution points\n";
+  std::cerr << " -M onlysubiso  isotopic atoms in query molecules indicate subsitution points\n";
 #endif
-  os << " -M iso=nn      apply isotope <nn> to the points of breakage\n";
-  os << " -M isomatch    place an isotope for the query atom number on each atom "
+  std::cerr << " -M iso=nn      apply isotope <nn> to the points of breakage\n";
+  std::cerr << " -M isomatch    place an isotope for the query atom number on each atom "
         "written\n";
 
-
-  return os.good();
+  std::exit(rc);
 }
 
 static int
@@ -784,6 +784,8 @@ molecule_subset(int argc, char** argv) {
     cerr << "Unrecognised options encountered\n";
     usage(1);
   }
+
+  DisplayDashHelpIfRequested(cl, 'M', display_standard_dash_M_options);
 
   verbose = cl.option_count('v');
 
@@ -833,7 +835,7 @@ molecule_subset(int argc, char** argv) {
           cerr << "Will place the matched atom number as isotope\n";
         }
       } else if ("help" == m) {
-        display_standard_dash_M_options(cerr);
+        display_standard_dash_M_options(0);
         return 0;
       } else {
         cerr << "Unrecognised -m qualifier '" << m << "'\n";

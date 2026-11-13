@@ -3,6 +3,7 @@
 */
 
 #include <fstream>
+#include <cstdlib>
 #include <iostream>
 #include <memory>
 #include <tuple>
@@ -423,11 +424,11 @@ struct GeometryConfig {
 };
 
 void
-DisplayGeometricConfigOptions(std::ostream& output) {
-  output << " -D tol=x    specify tolerance for distance matches\n";
-  output << " -D inch     by default hydrogens are excluded. Use this to include them\n";
+DisplayGeometricConfigOptions(int rc) {
+  std::cerr << " -D tol=x    specify tolerance for distance matches\n";
+  std::cerr << " -D inch     by default hydrogens are excluded. Use this to include them\n";
 
-  ::exit(0);
+  std::exit(rc);
 }
 
 int
@@ -445,7 +446,7 @@ BuildGeometricConfig(Command_Line& cl, char flag, GeometryConfig& geometry_confi
     } else if (d == "inch") {
       geometry_config.include_hydrogen = true;
     } else if (d == "help") {
-      DisplayGeometricConfigOptions(cerr);
+      DisplayGeometricConfigOptions(0);
     } else {
       cerr << "Unrecognised -" << flag << " specification '" << d << "'\n";
       return 0;
@@ -1009,8 +1010,8 @@ Mol2Smarts(Molecule_to_Query_Specifications& mqs, Command_Line& cl, FileType inp
 }
 
 void
-display_dash_y_options(std::ostream& os) {
-  os << R"(
+display_dash_y_options(int rc) {
+  std::cerr << R"(
  -Y minextra=n  for a match, target must have at least N extra atoms
  -Y maxextra=n  for a match, target must have at most  N extra atoms
  -Y minfm=<f>   set the min fraction atoms matched to <f>
@@ -1030,7 +1031,7 @@ display_dash_y_options(std::ostream& os) {
  -Y test        for each query formed, do a match against the starting molecule
 )";
 
-  exit(1);
+  std::exit(rc);
 }
 
 int
@@ -1042,6 +1043,9 @@ mol2qry(int argc, char** argv) {
   if (cl.unrecognised_options_encountered()) {
     usage(2);
   }
+
+  DisplayDashHelpIfRequested(cl, 'D', DisplayGeometricConfigOptions);
+  DisplayDashHelpIfRequested(cl, 'Y', display_dash_y_options);
 
   if (!process_elements(cl)) {
     usage(3);
@@ -1331,7 +1335,7 @@ mol2qry(int argc, char** argv) {
         if (!y.numeric_value(e) || e < 0) {
           cerr << "The min number extra atoms to be matched '-Y minextra=' must be a "
                   "whole +ve number\n";
-          display_dash_y_options(cerr);
+          display_dash_y_options(1);
         }
 
         mqs.set_min_extra_atoms_in_target(e);
@@ -1345,7 +1349,7 @@ mol2qry(int argc, char** argv) {
         if (!y.numeric_value(e) || e < 0) {
           cerr << "The max number extra atoms to be matched '-Y minextra=' must be a "
                   "whole +ve number\n";
-          display_dash_y_options(cerr);
+          display_dash_y_options(1);
         }
 
         mqs.set_max_extra_atoms_in_target(e);
@@ -1359,7 +1363,7 @@ mol2qry(int argc, char** argv) {
         if (!y.numeric_value(n) || n < 0) {
           cerr << "The number of connections to matched atoms '-Y ncon=' must be a whole "
                   "+ve number\n";
-          display_dash_y_options(cerr);
+          display_dash_y_options(1);
         }
 
         mqs.set_ncon(n);
@@ -1373,7 +1377,7 @@ mol2qry(int argc, char** argv) {
         if (!y.numeric_value(n) || n < 0) {
           cerr << "The minimum number of connections to matched atoms '-Y min_ncon=' "
                   "must be a whole +ve number\n";
-          display_dash_y_options(cerr);
+          display_dash_y_options(1);
         }
 
         mqs.set_min_ncon(n);
@@ -1388,7 +1392,7 @@ mol2qry(int argc, char** argv) {
         if (!y.numeric_value(n) || n < 0) {
           cerr << "The maximum number of connections to matched atoms '-Y max_ncon=' "
                   "must be a whole +ve number\n";
-          display_dash_y_options(cerr);
+          display_dash_y_options(1);
         }
 
         mqs.set_max_ncon(n);
@@ -1472,10 +1476,10 @@ mol2qry(int argc, char** argv) {
           cerr << "Smarts relational specifications written as rdkit ranges\n";
         }
       } else if ("help" == y) {
-        display_dash_y_options(cerr);
+        display_dash_y_options(0);
       } else {
         cerr << "Unrecognised -Y qualifier '" << y << "'\n";
-        display_dash_y_options(cerr);
+        display_dash_y_options(1);
       }
     }
   }

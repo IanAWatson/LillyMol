@@ -3,6 +3,7 @@
 */
 
 #include <algorithm>
+#include <cstdlib>
 #include <iostream>
 #include <limits>
 #include <memory>
@@ -127,7 +128,7 @@ usage(int rc) {
 )";
   // clang-format on
 
-  exit(rc);
+  std::exit(rc);
 }
 
 static void
@@ -970,13 +971,12 @@ chirality_fingerprint(const char* fname, FileType input_type,
 }
 
 static void
-DisplayDashMOptions(std::ostream& output) {
-  output << " -M fpnochiral     write empty fingerprints for molecules with no chirality\n";
-  output << " -M discard        discard all existing chirality information\n";
-  output << " -M rminvalid      will discard any chiral centres that are not valid\n";
+DisplayDashMOptions(int rc) {
+  std::cerr << " -M fpnochiral     write empty fingerprints for molecules with no chirality\n";
+  std::cerr << " -M discard        discard all existing chirality information\n";
+  std::cerr << " -M rminvalid      will discard any chiral centres that are not valid\n";
 
-
-  ::exit(1);
+  std::exit(rc);
 }
 
 static int
@@ -987,6 +987,8 @@ chirality_fingerprint(int argc, char** argv) {
     cerr << "Unrecognised options encountered\n";
     usage(1);
   }
+
+  DisplayDashHelpIfRequested(cl, 'M', DisplayDashMOptions);
 
   verbose = cl.option_count('v');
 
@@ -1052,10 +1054,10 @@ chirality_fingerprint(int argc, char** argv) {
           cerr << "Will remove invalid chiral centres\n";
         }
       } else if (m == "help") {
-        DisplayDashMOptions(cerr);
+        DisplayDashMOptions(0);
       } else {
         cerr << "Unrecognised -M qualifier '" << m << "'\n";
-        DisplayDashMOptions(cerr);
+        DisplayDashMOptions(1);
       }
     }
   }

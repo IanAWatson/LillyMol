@@ -7,6 +7,7 @@
 #include <algorithm>
 #include <cmath>
 #include <limits>
+#include <cstdlib>
 #include <iostream>
 #include <memory>
 
@@ -128,7 +129,7 @@ usage(int rc) {
   cerr << "  -v             verbose output\n";
   // clang-format on
 
-  exit(rc);
+  std::exit(rc);
 }
 
 // Use integer output for counts and stable fixed-decimal output for fractions.
@@ -1428,11 +1429,11 @@ HydrophobicSectionsPipeline(const char* fname,
 
 
 static void
-DisplayDashYOptions() {
+DisplayDashYOptions(int rc) {
   cerr << " -Y rpipe    input is a descriptor file pipeline  smiles id d1 d2 d3 ...\n";
   cerr << " -Y wpipe    write a descriptor file pipeline - smiles id d1 d2 d3 ...\n";
   cerr << " -Y flush    flush output after every molecule\n";
-  ::exit(0);
+  std::exit(rc);
 }
 
 static int
@@ -1443,6 +1444,8 @@ hydrophobic_sections(int argc, char** argv) {
     cerr << "unrecognised_options_encountered\n";
     usage(1);
   }
+
+  DisplayDashHelpIfRequested(cl, 'Y', DisplayDashYOptions);
 
   verbose = cl.option_count('v');
 
@@ -1504,10 +1507,10 @@ hydrophobic_sections(int argc, char** argv) {
           cerr << "Will flush the output after every molecule read\n";
         }
       } else if (y == "help") {
-        DisplayDashYOptions();
+        DisplayDashYOptions(0);
       } else {
         cerr << "Unrecognised -Y directive '" << y << "'\n";
-        DisplayDashYOptions();
+        DisplayDashYOptions(0);
       }
     }
   }

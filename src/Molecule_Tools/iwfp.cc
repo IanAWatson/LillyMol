@@ -1,5 +1,6 @@
 //  Linear Fingerprint generation
 
+#include <cstdlib>
 #include <iostream>
 #include <memory>
 
@@ -156,7 +157,7 @@ usage(int rc) {
   cerr << "  -v             verbose output\n";
   // clang-format on
 
-  exit(rc);
+  std::exit(rc);
 }
 
 static void
@@ -525,6 +526,12 @@ do_accumulate_statistics(const IWMFingerprint& fp) {
   return;
 }
 
+static void
+DisplayFingerprintOptions(int rc) {
+  display_misc_fingerprint_options(std::cerr, 'Y');
+  std::exit(rc);
+}
+
 static int
 iwfp(Molecule& m, IWMFingerprint& fp) {
   if (min_heteroatoms_at_ends) {
@@ -705,19 +712,19 @@ iwfp(const char* fname, FileType input_type, IWString_and_File_Descriptor& outpu
 }
 
 static void
-display_standard_munging_options(std::ostream& os, char mflag) {
-  os << "  -" << mflag << " single       munge to all single bonds\n";
-  os << "  -" << mflag << " graph        munge to graph form\n";
-  os << "  -" << mflag << " carbon       munge to all carbon\n";
+display_standard_munging_options(int rc) {
+  std::cerr << "  -M single       munge to all single bonds\n";
+  std::cerr << "  -M graph        munge to graph form\n";
+  std::cerr << "  -M carbon       munge to all carbon\n";
 
-  exit(1);
+  std::exit(rc);
 }
 
 static void
-DisplayDashUOptions(std::ostream& output) {
-  output << " -U flush             flush output after each molecule\n";
+DisplayDashUOptions(int rc) {
+  std::cerr << " -U flush             flush output after each molecule\n";
 
-  ::exit(0);
+  std::exit(rc);
 }
 
 static int
@@ -729,6 +736,11 @@ iwfp(int argc, char** argv) {
     cerr << "Unrecognised options encountered\n";
     usage(1);
   }
+
+  DisplayDashHelpIfRequested(cl, 'Y', DisplayFingerprintOptions);
+
+  DisplayDashHelpIfRequested(cl, 'M', display_standard_munging_options);
+  DisplayDashHelpIfRequested(cl, 'U', DisplayDashUOptions);
 
   verbose = cl.option_count('v');
 
@@ -917,10 +929,10 @@ iwfp(int argc, char** argv) {
           cerr << "Will munge to carbon form\n";
         }
       } else if ("help" == m) {
-        display_standard_munging_options(cerr, 'M');
+        display_standard_munging_options(0);
       } else {
         cerr << "Unrecognised munge specifier '" << m << "'\n";
-        display_standard_munging_options(cerr, 'M');
+        display_standard_munging_options(1);
       }
     }
   }
@@ -943,10 +955,10 @@ iwfp(int argc, char** argv) {
           cerr << "Will flush output after each molecule processed\n";
         }
       } else if (u == "help") {
-        DisplayDashUOptions(cerr);
+        DisplayDashUOptions(0);
       } else {
         cerr << "Unrecognised -U qualifier '" << u << "'\n";
-        DisplayDashUOptions(cerr);
+        DisplayDashUOptions(0);
       }
     }
   }

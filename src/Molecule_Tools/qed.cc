@@ -1,3 +1,4 @@
+#include <cstdlib>
 #include <array>
 #include <cstdlib>
 #include <iostream>
@@ -65,7 +66,12 @@ ads(float x, const ADSparameter& p) {
 }
 
 void
-Usage(std::ostream& output) {
+DisplayQueryOptions(int rc) {
+  std::cerr << " -Q QUERY=<query>  structural alert queries\n";
+  std::cerr << " -Q ACC=<query>    hydrogen bond acceptor queries\n";
+  std::cerr << " -Q DON=<query>    hydrogen bond donor queries\n";
+  std::cerr << " -Q ROTB=<query>   rotatable bond queries\n";
+  std::exit(rc);
 }
 
 Qed::Qed() {
@@ -206,11 +212,11 @@ Qed::Initialise(Command_Line& cl, char flag) {
         return 0;
       }
     } else if (s == "help") {
-      Usage(cerr);
+      DisplayQueryOptions(0);
       return 0;
     } else {
       cerr << "Qed::Initialise:unrecogised directive '" << s << "'\n";
-      Usage(cerr);
+      DisplayQueryOptions(1);
       return 0;
     }
   }

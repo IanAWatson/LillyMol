@@ -6,6 +6,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <cstdlib>
 #include <iostream>
 #include <memory>
 #include <unordered_map>
@@ -97,7 +98,7 @@ usage(int rc) {
   cerr << " -v            verbose output\n";
   // clang-format on
 
-  exit(rc);
+  std::exit(rc);
 }
 
 /*
@@ -389,10 +390,10 @@ grid_fingerprint(const char* fname, FileType input_type, const Molecule& grid,
 }
 
 static void
-DisplayDashMOptions(std::ostream& output) {
-  output << " -M grid        fingerprint grid occupancy - regardless of atom type\n";
+DisplayDashMOptions(int rc) {
+  std::cerr << " -M grid        fingerprint grid occupancy - regardless of atom type\n";
 
-  ::exit(0);
+  std::exit(rc);
 }
 
 static int
@@ -403,6 +404,8 @@ grid_fingerprint(int argc, char** argv) {
     cerr << "Unrecognised options encountered\n";
     usage(1);
   }
+
+  DisplayDashHelpIfRequested(cl, 'M', DisplayDashMOptions);
 
   verbose = cl.option_count('v');
 
@@ -446,10 +449,10 @@ grid_fingerprint(int argc, char** argv) {
           cerr << "Will fingerprint grid occupancy\n";
         }
       } else if (m == "help") {
-        DisplayDashMOptions(cerr);
+        DisplayDashMOptions(0);
       } else {
         cerr << "Unrecognised -M qualifier '" << m << "'\n";
-        DisplayDashMOptions(cerr);
+        DisplayDashMOptions(0);
       }
     }
   }

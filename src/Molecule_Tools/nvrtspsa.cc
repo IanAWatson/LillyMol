@@ -1,5 +1,6 @@
 #include "nvrtspsa.h"
 
+#include <cstdlib>
 #include <iostream>
 #include <memory>
 
@@ -14,12 +15,13 @@ using std::cerr;
 namespace nvrtspsa {
 
 void
-DisplayOptions(char flag) {
-  cerr << " -" << flag << " rvstd        convert to charge separated forms - best compat with RDKit\n";
-  cerr << " -" << flag << " zeroP        Phosphorus atoms make zero contribution\n";
-  cerr << " -" << flag << " zeroS        Sulphur atoms make zero contribution\n";
-  cerr << " -" << flag << " zeroU        all unclassified atoms make zero contribution\n";
-  cerr << " -" << flag << " RDKit        as close as possible to the RDKit implementation\n";
+DisplayOptions(int rc) {
+  cerr << " -W rvstd        convert to charge separated forms - best compat with RDKit\n";
+  cerr << " -W zeroP        Phosphorus atoms make zero contribution\n";
+  cerr << " -W zeroS        Sulphur atoms make zero contribution\n";
+  cerr << " -W zeroU        all unclassified atoms make zero contribution\n";
+  cerr << " -W RDKit        as close as possible to the RDKit implementation\n";
+  std::exit(rc);
 }
 
 }  // namespace nvrtspsa
@@ -596,7 +598,7 @@ NovartisPolarSurfaceArea::InitialiseOptions(const Command_Line& cl, char flag) {
   for (int i = 0; i < nw; ++i) {
     const_IWSubstring w = cl.string_value(flag, i);
     if (w == "help") {
-      DisplayOptions(flag);
+      DisplayOptions(0);
       return 1;
     }
 
@@ -616,7 +618,7 @@ NovartisPolarSurfaceArea::InitialiseOptions(const Command_Line& cl, char flag) {
       SetRDKitCompatibility();
     } else {
       cerr << "NovartisPolarSurfaceArea::InitialiseOptions:unrecognised option '" << w << "'\n";
-      DisplayOptions(flag);
+      DisplayOptions(1);
       return 0;
     }
   }

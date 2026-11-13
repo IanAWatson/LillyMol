@@ -1138,6 +1138,8 @@ cc_binary(
     srcs = [
         "nn_leader_and_jp.cc",
     ],
+    copts = ["-pthread"],
+    linkopts = ["-pthread"],
     deps = [
         ":gfp",
         "//Foundational/iwmisc",

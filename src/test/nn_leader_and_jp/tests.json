@@ -48,6 +48,12 @@
       "shell_script": {
         "script_name": "run_test.py"
       }
+    },
+    {
+      "name": "parallel_thresholds",
+      "shell_script": {
+        "script_name": "run_test.py"
+      }
     }
   ]
 }

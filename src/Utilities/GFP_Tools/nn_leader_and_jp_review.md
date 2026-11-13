@@ -106,3 +106,19 @@ All correctness issues recorded in this review have been addressed.
 
 Benchmark realistic neighbour densities and cluster sizes. Parallelising the
 current repeated scans alone will retain their unfavourable scaling.
+
+
+## Parallel threshold implementation
+
+Leader and Taylor–Butina threshold runs now use one `std::thread` per threshold.
+Single-threshold runs remain serial. Each worker owns its selected array, cluster
+statistics and output stream; the shared pool is const during clustering.
+The dispatcher joins all started workers, propagates errors/exceptions and keeps
+filenames tied to the original threshold indices. A dispatcher-owned mutex
+protects verbose messages and complete reports, without locking neighbour loops.
+No worker-count option or inner-loop parallelism is introduced.
+
+Regression tests compare output files byte-for-byte with independent serial
+runs for both formats/algorithms, caps, subsets, repeated thresholds, verbose
+output and a failed output alongside successful workers. Remaining optimisation
+ideas above are still proposals; JP runs are not parallelised by this change.

@@ -7,10 +7,14 @@
 #include <algorithm>
 #include <cctype>
 #include <cmath>
+#include <exception>
 #include <limits>
 #include <memory>
+#include <mutex>
 #include <optional>
 #include <string_view>
+#include <thread>
+#include <vector>
 
 #define RESIZABLE_ARRAY_IMPLEMENTATION
 #include "Foundational/accumulator/accumulator.h"
@@ -193,12 +197,12 @@ class Leader_Item {
                              const int cluster_number,
                              const resizable_array_p<IWString>& smiles,
                              const resizable_array_p<IWString>& id,
-                             IWString_and_File_Descriptor& output);
+                             IWString_and_File_Descriptor& output) const;
   int form_cluster_max_cluster_size(int* selected, const float threshold,
                                     const int max_cluster_size, const int cluster_number,
                                     const resizable_array_p<IWString>& smiles,
                                     const resizable_array_p<IWString>& id,
-                                    IWString_and_File_Descriptor& output);
+                                    IWString_and_File_Descriptor& output) const;
 
   int mark_neighbours(int* n, const int maxn, const int x) const;
   bool neighbours_in_common(const int* n, const JarvisPatrickParameters&,
@@ -766,7 +770,7 @@ Leader_Item::form_cluster_threshold(int* selected, const float threshold,
                                     const int cluster_number,
                                     const resizable_array_p<IWString>& smiles,
                                     const resizable_array_p<IWString>& id,
-                                    IWString_and_File_Descriptor& output) {
+                                    IWString_and_File_Descriptor& output) const {
   // First need to find the cluster size so we can write the CSIZE tag.
   int csize = 1;
 
@@ -817,7 +821,7 @@ Leader_Item::form_cluster_max_cluster_size(int* selected, const float threshold,
                                            const int cluster_number,
                                            const resizable_array_p<IWString>& smiles,
                                            const resizable_array_p<IWString>& id,
-                                           IWString_and_File_Descriptor& output) {
+                                           IWString_and_File_Descriptor& output) const {
   // The limit includes the leader. Any self neighbours suppressed by -h
   // have already been removed during ingestion.
   int csize = 1;
@@ -1120,10 +1124,12 @@ choose_next_centre(const int* selected, const Leader_Item* pool, const int pool_
 }
 
 int
-leader(Leader_Item* pool, const int pool_size, int* selected,
+leader(const Leader_Item* pool, const int pool_size, int* selected,
        const resizable_array_p<IWString>& smiles, const resizable_array_p<IWString>& id,
-       similarity_type_t global_threshold, IWString_and_File_Descriptor& output) {
+       similarity_type_t global_threshold, IWString_and_File_Descriptor& output,
+       std::mutex& diagnostics_mutex) {
   if (verbose > 1) {
+    const std::lock_guard<std::mutex> lock(diagnostics_mutex);
     cerr << "Beginning clustering at " << global_threshold << '\n';
   }
 
@@ -1137,6 +1143,7 @@ leader(Leader_Item* pool, const int pool_size, int* selected,
   int icentre;
   if (!choose_next_centre(selected, pool, pool_size, global_threshold,
                           istart, icentre)) {
+    const std::lock_guard<std::mutex> lock(diagnostics_mutex);
     cerr << "Yipes, cannot find initial leader\n";
     return 0;
   }
@@ -1144,7 +1151,7 @@ leader(Leader_Item* pool, const int pool_size, int* selected,
   resizable_array<int> cluster;
 
   while (1) {
-    Leader_Item& ldr = pool[icentre];
+    const Leader_Item& ldr = pool[icentre];
 
     int max_cluster_size_this_molecule;
 
@@ -1155,6 +1162,7 @@ leader(Leader_Item* pool, const int pool_size, int* selected,
     }
 
     if (verbose > 1) {
+      const std::lock_guard<std::mutex> lock(diagnostics_mutex);
       cerr << "Start cluster " << clusters_found << ". Threshold = " << global_threshold
            << ", max size " << max_cluster_size_this_molecule << '\n';
     }
@@ -1187,6 +1195,10 @@ leader(Leader_Item* pool, const int pool_size, int* selected,
   }
 
   if (verbose) {
+    const std::lock_guard<std::mutex> lock(diagnostics_mutex);
+    if (number_thresholds > 1) {
+      cerr << "Threshold " << global_threshold << ":\n";
+    }
     report_clustering(selected, cluster_size, pool_size, clusters_found);
   }
 
@@ -1194,24 +1206,27 @@ leader(Leader_Item* pool, const int pool_size, int* selected,
 }
 
 static int
-leader(Leader_Item* pool, const int pool_size, int* selected,
+leader(const Leader_Item* pool, const int pool_size, int* selected,
        const resizable_array_p<IWString>& smiles, const resizable_array_p<IWString>& id,
-       similarity_type_t global_threshold, const const_IWSubstring& stem, int ndx) {
+       similarity_type_t global_threshold, const const_IWSubstring& stem, int ndx,
+       std::mutex& diagnostics_mutex) {
   IWString fname(stem);
   fname << ndx;
   fname << ".ldr";
 
   IWString_and_File_Descriptor output;
   if (!output.open(fname)) {
+    const std::lock_guard<std::mutex> lock(diagnostics_mutex);
     cerr << "Cannot open '" << fname << "'\n";
     return 0;
   }
 
   if (verbose) {
+    const std::lock_guard<std::mutex> lock(diagnostics_mutex);
     cerr << "Begin clustering at " << global_threshold << '\n';
   }
 
-  return leader(pool, pool_size, selected, smiles, id, global_threshold, output);
+  return leader(pool, pool_size, selected, smiles, id, global_threshold, output, diagnostics_mutex);
 }
 
 static int
@@ -1356,27 +1371,67 @@ do_jarvis_patrick(const JarvisPatrickParameters* jp, const int njp, Leader_Item*
 }
 
 static int
-do_leader_clustering(Leader_Item* pool, const int pool_size,
+do_leader_clustering(const Leader_Item* pool, const int pool_size,
                      const resizable_array_p<IWString>& smiles,
                      const resizable_array_p<IWString>& id, const IWString& stem,
                      const float* threshold, const int number_thresholds) {
-  int* selected = new int[pool_size];
-  std::unique_ptr<int[]> free_selected(selected);
-
-  IWString_and_File_Descriptor output(1);
-
+  std::mutex diagnostics_mutex;
   if (number_thresholds == 1) {
-    return leader(pool, pool_size, selected, smiles, id, threshold[0], output);
+    std::unique_ptr<int[]> selected(new int[pool_size]);
+    IWString_and_File_Descriptor output(1);
+    return leader(pool, pool_size, selected.get(), smiles, id, threshold[0], output,
+                  diagnostics_mutex);
   }
 
-  for (int i = 0; i < number_thresholds; ++i) {
-    if (!leader(pool, pool_size, selected, smiles, id, threshold[i], stem, i)) {
+  // Each threshold has private selection state and an output stream. The pool,
+  // names, formatting tables and options are immutable until every worker joins.
+  // Avoid vector<bool>: workers must write independent result locations.
+  std::vector<int> success(number_thresholds, 0);
+  std::vector<std::exception_ptr> errors(number_thresholds);
+  std::vector<std::thread> threads;
+  threads.reserve(number_thresholds);
+
+  bool started_all = true;
+  try {
+    for (int i = 0; i < number_thresholds; ++i) {
+      threads.emplace_back([&, i]() {
+        try {
+          std::unique_ptr<int[]> selected(new int[pool_size]);
+          success[i] = leader(pool, pool_size, selected.get(), smiles, id, threshold[i],
+                              stem, i, diagnostics_mutex);
+        } catch (...) {
+          errors[i] = std::current_exception();
+        }
+      });
+    }
+  } catch (const std::exception& e) {
+    // A thread creation failure must still join workers already started.
+    const std::lock_guard<std::mutex> lock(diagnostics_mutex);
+    cerr << "Cannot start threshold worker: " << e.what() << '\n';
+    started_all = false;
+  }
+
+  for (std::thread& thread : threads) {
+    thread.join();
+  }
+
+  bool ok = started_all;
+  for (int i = 0; i < static_cast<int>(threads.size()); ++i) {
+    if (errors[i]) {
+      try {
+        std::rethrow_exception(errors[i]);
+      } catch (const std::exception& e) {
+        cerr << "Clustering at " << threshold[i] << " threw: " << e.what() << '\n';
+      } catch (...) {
+        cerr << "Clustering at " << threshold[i] << " threw an unknown exception\n";
+      }
+    }
+    if (!success[i]) {
       cerr << "Clustering at " << threshold[i] << " failed\n";
-      return 0;
+      ok = false;
     }
   }
-
-  return 1;
+  return ok;
 }
 
 static int

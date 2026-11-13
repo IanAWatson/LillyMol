@@ -23,8 +23,19 @@ with four decimal places and trailing zeros omitted, in both output modes.
 Clustering comparisons retain the original precision. Jarvis–Patrick members
 have no distance to a designated leader, so their output omits distances.
 
-Multiple thresholds, for example `-t 0.2,0.3 -B clusters`, write
-`clusters0.ldr`, `clusters1.ldr`, and so on, with the same distance formatting.
+Multiple thresholds, for example `-t 0.2,0.3 -B clusters`, run concurrently,
+one thread per threshold, and write `clusters0.ldr`, `clusters1.ldr`, and so on.
+File numbers follow the threshold order on the command line, regardless of
+completion order. Each file is identical to a separate single-threshold run,
+with the same distance formatting. This applies to both leader and Taylor–Butina
+clustering; Jarvis–Patrick parameter runs remain sequential.
+
+The loaded neighbour data is shared read-only. Each threshold has its own
+selection array and output stream, so memory for selection state grows with the
+number of thresholds. A single threshold uses the original serial path to
+standard output. Verbose reports are protected from interleaving, but their
+completion order may vary. A worker failure gives a nonzero exit status after
+all started workers have finished.
 
 Leader and Taylor–Butina require a global distance threshold via `-t`.
 Per-molecule threshold tags (`-H`) are no longer supported.

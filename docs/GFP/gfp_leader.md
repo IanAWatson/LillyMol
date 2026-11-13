@@ -68,7 +68,23 @@ gfp_leader -t 0.15 -v file.gfp > file.ldr
 
 If you have a large file, you may want to run `gfp_leader_tbb` in order to 
 run multi-threaded. If you are using the standard fingerprints `gfp_make -STD` then
-you can use `gfp_leader_std` which is also multi-threaded.
+you can use `gfp_leader_standard` which is also multi-threaded.
+
+To explore different distance thresholds for either `gfp_leader` or
+`gfp_leader_standard`, consider [nn_leader_and_jp](nn_leader_and_jp.md).
+Compute nearest neighbours once, then reuse that file to cluster at several
+thresholds without repeating the fingerprint comparisons:
+
+```shell
+nn_leader_and_jp -t 0.15,0.2,0.25 -B clusters neighbours.nn
+```
+
+This runs one thread per threshold and writes `clusters0.ldr`, `clusters1.ldr`
+and `clusters2.ldr`, in threshold order. Add `-r` if the neighbour file contains
+TFDataRecord serialized protos. Generate distance-limited neighbour lists that
+cover at least the largest threshold you want to explore; limiting the number
+of neighbours can omit eligible members and change the clustering. Preserve
+the desired input order, since it determines leader priority.
 
 The following options are supported by the base, serial, version.
 ```

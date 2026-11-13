@@ -937,28 +937,51 @@ Leader_Item::unselected_neighbours(const int* sel, const similarity_type_t withi
   return rc;
 }
 
-/*
-  Items c1 and c2 belong in the same cluster. But they had already been assigned cluster
-  id's. Merge those two clusters
-*/
+// JP's pair tests define an undirected graph. Union-find maintains its
+// connected components without relabelling every member after each match.
+class ClusterUnionFind {
+ private:
+  std::vector<int> _parent;
+  std::vector<int> _size;
 
-static void
-merge_clusters(int* cluster, const int n, const int c1, const int c2) {
-  int cfrom = cluster[c2];
-  int cto = cluster[c1];
-
-  for (int i = 0; i < n; ++i) {
-    if (cfrom == cluster[i]) {
-      cluster[i] = cto;
+ public:
+  explicit ClusterUnionFind(int n) : _parent(n), _size(n, 1) {
+    for (int i = 0; i < n; ++i) {
+      _parent[i] = i;
     }
   }
 
-  return;
-}
+  int Find(int item) {
+    // Path halving shortens the chain on every visit.
+    while (_parent[item] != item) {
+      _parent[item] = _parent[_parent[item]];
+      item = _parent[item];
+    }
+    return item;
+  }
+
+  void Union(int a, int b) {
+    a = Find(a);
+    b = Find(b);
+    if (a == b) {
+      return;
+    }
+    // Attach the smaller tree to the larger one.
+    if (_size[a] < _size[b]) {
+      std::swap(a, b);
+    }
+    _parent[b] = a;
+    _size[a] += _size[b];
+  }
+
+  int Size(int root) const {
+    return _size[root];
+  }
+};
 
 static int
-Jarvis_Patrick(Leader_Item* pool, const int pool_size, const JarvisPatrickParameters& jp,
-               int* cluster) {
+Jarvis_Patrick(const Leader_Item* pool, const int pool_size, const JarvisPatrickParameters& jp,
+               ClusterUnionFind& cluster) {
   if (verbose) {
     cerr << "Doing JP clustering, nbrs ";
     if (0 == jp.nbr_list_size()) {
@@ -977,9 +1000,7 @@ Jarvis_Patrick(Leader_Item* pool, const int pool_size, const JarvisPatrickParame
 
     for (int j = i + 1; j < pool_size; ++j) {
       if (pool[j].neighbours_in_common(tmp, jp, i)) {
-        //      cerr << " i = " << i << " j = " << j << " common " <<
-        //      pool[j].neighbours_in_common(tmp, jp, i) << " merge \n";
-        merge_clusters(cluster, pool_size, i, j);
+        cluster.Union(i, j);
       }
     }
   }
@@ -988,19 +1009,24 @@ Jarvis_Patrick(Leader_Item* pool, const int pool_size, const JarvisPatrickParame
 }
 
 static int
-Jarvis_Patrick(Leader_Item* pool, const int pool_size, const JarvisPatrickParameters& jp,
+Jarvis_Patrick(const Leader_Item* pool, const int pool_size, const JarvisPatrickParameters& jp,
                const resizable_array_p<IWString>& smiles,
                const resizable_array_p<IWString>& id,
                IWString_and_File_Descriptor& output) {
-  int* cluster = new int[pool_size];
-  std::unique_ptr<int[]> free_cluster(cluster);
-
-  for (int i = 0; i < pool_size; ++i) {
-    cluster[i] = i + 1;
-  }
-
+  ClusterUnionFind cluster(pool_size);
   if (!Jarvis_Patrick(pool, pool_size, jp, cluster)) {
     return 0;
+  }
+
+  // Build one linked member list per root. Prepending in reverse input order
+  // leaves each list in ascending order. Union-by-size may choose any root;
+  // the first member, not the root index, determines output order.
+  std::vector<int> first(pool_size, -1);
+  std::vector<int> next(pool_size, -1);
+  for (int i = pool_size - 1; i >= 0; --i) {
+    const int root = cluster.Find(i);
+    next[i] = first[root];
+    first[root] = i;
   }
 
   extending_resizable_array<int> cluster_size;
@@ -1008,23 +1034,16 @@ Jarvis_Patrick(Leader_Item* pool, const int pool_size, const JarvisPatrickParame
   int cluster_number = 0;
 
   for (int i = 0; i < pool_size; ++i) {
-    if (0 == cluster[i]) {
+    const int root = cluster.Find(i);
+    if (first[root] != i) {
       continue;
     }
 
-    int csize = std::count(cluster + i, cluster + pool_size, cluster[i]);
-
+    const int csize = cluster.Size(root);
     write_cluster_header(i, smiles, id, cluster_number, csize, output);
+    ++cluster_number;
 
-    cluster_number++;
-
-    for (int j = i + 1; j < pool_size; ++j) {
-      if (cluster[i] != cluster[j]) {
-        continue;
-      }
-
-      cluster[j] = 0;
-
+    for (int j = next[i]; j >= 0; j = next[j]) {
       write_smiles_id_dist(smiles[j], id[j], -1.0, output);
     }
 
@@ -1330,7 +1349,7 @@ J -J <n,c>         Jarvis Patrick: size of nbr list (. for no limit), neighbours
 }
 
 static int
-do_jarvis_patrick(const JarvisPatrickParameters* jp, const int njp, Leader_Item* pool,
+do_jarvis_patrick(const JarvisPatrickParameters* jp, const int njp, const Leader_Item* pool,
                   const int pool_size, const resizable_array_p<IWString>& smiles,
                   const resizable_array_p<IWString>& id, const IWString& stem) {
   if (1 == njp) {

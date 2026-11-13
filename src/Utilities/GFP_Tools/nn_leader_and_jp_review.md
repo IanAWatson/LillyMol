@@ -92,8 +92,8 @@ All correctness issues recorded in this review have been addressed.
 
 ## Optimisation work, after correctness
 
-1. Replace JP full-pool relabelling with union–find and group output members in
-   one pass. Preserve component/member order by original input position.
+1. **Implemented:** JP union–find merging and one-pass member grouping,
+   preserving component/member order by original input position (details below).
 2. Investigate an inverted neighbour index to avoid all-pairs JP testing.
 3. Maintain Taylor–Butina available-neighbour counts with reverse adjacency
    and an indexed priority queue, instead of recounting the pool each round.
@@ -122,3 +122,39 @@ Regression tests compare output files byte-for-byte with independent serial
 runs for both formats/algorithms, caps, subsets, repeated thresholds, verbose
 output and a failed output alongside successful workers. Remaining optimisation
 ideas above are still proposals; JP runs are not parallelised by this change.
+
+
+## JP union–find implementation
+
+The pair-test criterion and all-pairs traversal are unchanged. Qualifying pairs
+now join components using union by size and path halving, instead of scanning
+and relabelling the entire pool. Already-connected pairs require no relabelling.
+Once comparisons finish, a reverse input-order pass builds linked member lists
+using array indices. Output visits each component at its earliest input member,
+then follows its members in input order. The internal root need not be that
+first member. This removes repeated output scans without sorting or copying
+neighbour data; working storage remains linear in pool size.
+
+A breadth-first graph reference tests components independently of union–find,
+including late bridges, nonminimal roots, interleaved components, self/directed
+lists, neighbour-list limits, multiple parameter runs, subsets, both input and
+output formats. These tests pass against both the old and new executables.
+The complete existing regression suite also passes.
+
+Local synthetic timings (seconds, median of three runs, including reading and
+output) compared the previous executable with this change. Output bytes matched
+in every comparison. Merge-heavy inputs give every molecule the same single
+neighbour, causing every pair to qualify; singleton inputs have empty lists.
+These illustrate the removed costs rather than predict real-data speedups.
+
+| Input | Molecules | Previous | Union–find | Speedup |
+|---|---:|---:|---:|---:|
+| Merge-heavy | 500 | 0.0708 | 0.0150 | 4.7x |
+| Merge-heavy | 1,000 | 0.4777 | 0.0390 | 12.3x |
+| Merge-heavy | 2,000 | 2.6732 | 0.1122 | 23.8x |
+| Singletons | 2,000 | 0.1037 | 0.0998 | 1.0x |
+| Singletons | 4,000 | 0.1282 | 0.1121 | 1.1x |
+| Singletons | 8,000 | 0.2179 | 0.1550 | 1.4x |
+
+JP remains serial. All-pairs neighbour-list testing is still quadratic and is
+the next candidate for algorithmic or parallel work.

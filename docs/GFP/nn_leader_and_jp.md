@@ -62,6 +62,13 @@ of unselected neighbours within the threshold; ties go to the earliest molecule
 in the input. Input priority therefore resolves ties without overriding the
 neighbour-count criterion.
 
+Taylor–Butina maintains these counts after each cluster using reverse neighbour
+links and an indexed priority queue. It therefore retains dynamic reordering,
+including for asymmetric neighbour lists, without recounting the entire pool.
+The reverse index is shared between threshold workers; counts and priorities
+are private to each worker. This adds memory linear in the eligible edges and
+pool size, in exchange for reducing the work when many clusters are formed.
+
 A single input file can be read without `-s`. Multiple input files require
 `-s <number>`, which sets one overall limit, rather than a limit per file.
 Reading stops at that number even in the middle of a file; later files are not

@@ -95,9 +95,8 @@ All correctness issues recorded in this review have been addressed.
 1. **Implemented:** JP union–find merging and one-pass member grouping,
    preserving component/member order by original input position (details below).
 2. Investigate an inverted neighbour index to avoid all-pairs JP testing.
-3. Maintain Taylor–Butina available-neighbour counts with reverse adjacency
-   and an indexed priority queue, instead of recounting the pool each round.
-   Account for directed/truncated neighbour lists.
+3. **Implemented:** Taylor–Butina incremental counts, shared reverse adjacency
+   and private indexed heaps, including directed/truncated lists (details below).
 4. Consider contiguous neighbour indices/distances with row offsets, using
    counts from the first pass to allocate and filling them during the second.
 5. Separate immutable graph data, options and per-run state. Parallelise
@@ -158,3 +157,56 @@ These illustrate the removed costs rather than predict real-data speedups.
 
 JP remains serial. All-pairs neighbour-list testing is still quadratic and is
 the next candidate for algorithmic or parallel work.
+
+
+## Incremental Taylor–Butina implementation
+
+The dynamic centre criterion is unchanged: maximise the number of unselected
+neighbours within the threshold, with ties resolved by earliest input position.
+An indexed binary heap stores exactly one entry per available molecule. It
+supports removal and count decreases without accumulating stale entries.
+
+A single reverse CSR index is built up to the largest requested threshold and
+shared read-only between workers. Each entry stores its source and distance,
+so workers apply their own cutoffs even when their threshold is smaller than
+that of the shared index. Offsets use size_t rather than int for total edge
+counts. Each worker owns its selected flags, counts, heap/positions, pending
+assignments and batched decrements; heap and scratch storage are bounded by
+pool size and are allocated before cluster formation.
+
+Cluster formation records each newly assigned molecule once (including a
+listed self neighbour when -h is absent). Before the next centre is chosen,
+incoming edges identify affected surviving centres. Decrements are accumulated
+per source, then applied with one decrease-key operation per affected centre.
+Assigned centres are skipped, and the final cluster needs no incoming-edge
+updates. Per-molecule/global caps and early termination update only molecules
+actually assigned. Ordinary leader runs build no reverse index or heap; their
+templated assignment callback remains a direct selected-array store.
+
+Working memory is linear: the shared reverse index uses one source/distance
+entry per eligible edge plus offsets; each threshold's mutable state is O(N).
+The extra index/setup trades some memory and startup work for avoiding repeated
+pool-wide recounts. The graph is neither assumed symmetric nor physically
+edited during clustering.
+
+An independent Python recount reference verifies directed graphs, changing
+counts, input-order ties, empty/self-only/dense lists, caps including one,
+subsets, early stopping, both formats/output modes and concurrent thresholds.
+The same tests pass against the previous executable.
+
+Local timings below are medians of three optimised runs, including input and
+output. All output bytes matched the previous executable. Sparse examples
+benefit strongly; dense single-cluster inputs pay extra setup without avoiding
+many recounts. These synthetic timings are not predictions for other datasets.
+
+| Input | Molecules | Previous seconds | Incremental seconds | Speedup |
+|---|---:|---:|---:|---:|
+| Singletons | 10,000 | 0.3677 | 0.1155 | 3.2x |
+| Singletons | 30,000 | 2.4343 | 0.1564 | 15.6x |
+| Disjoint pairs | 10,000 | 0.2842 | 0.1181 | 2.4x |
+| Disjoint pairs | 30,000 | 1.7406 | 0.1734 | 10.0x |
+| Groups of eight | 16,000 | 0.3928 | 0.1772 | 2.2x |
+| Groups of eight | 32,000 | 1.2397 | 0.2693 | 4.6x |
+| Groups of eight, -m 2 | 16,000 | 1.0137 | 0.1184 | 8.6x |
+| One dense cluster | 500 | 0.1372 | 0.1415 | 0.97x |
+| One dense cluster | 1,000 | 0.5370 | 0.5474 | 0.98x |

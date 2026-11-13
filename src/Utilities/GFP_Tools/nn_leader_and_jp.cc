@@ -193,23 +193,33 @@ class Leader_Item {
                    const IW_STL_Hash_Map_int& id_to_ndx,
                    int n, bool ignore_missing_neighbours);
 
+  template <typename MarkSelected>
   int form_cluster_threshold(int* selected, const float threshold,
                              const int cluster_number,
                              const resizable_array_p<IWString>& smiles,
                              const resizable_array_p<IWString>& id,
-                             IWString_and_File_Descriptor& output) const;
+                             IWString_and_File_Descriptor& output, MarkSelected mark_selected) const;
+  template <typename MarkSelected>
   int form_cluster_max_cluster_size(int* selected, const float threshold,
                                     const int max_cluster_size, const int cluster_number,
                                     const resizable_array_p<IWString>& smiles,
                                     const resizable_array_p<IWString>& id,
-                                    IWString_and_File_Descriptor& output) const;
+                                    IWString_and_File_Descriptor& output, MarkSelected mark_selected) const;
 
   int mark_neighbours(int* n, const int maxn, const int x) const;
   bool neighbours_in_common(const int* n, const JarvisPatrickParameters&,
                             const int x) const;
 
-  int unselected_neighbours(const int* selected) const;
-  int unselected_neighbours(const int* selected, const similarity_type_t within) const;
+  int neighbours_within(float within) const {
+    if (_nbrs == 0) {
+      return 0;
+    }
+    return static_cast<int>(std::upper_bound(_dist, _dist + _nbrs, within) - _dist);
+  }
+
+  int neighbour(int i) const { return _nbr[i]; }
+  float neighbour_distance(int i) const { return _dist[i]; }
+
 };
 
 Leader_Item::Leader_Item() {
@@ -765,12 +775,14 @@ finish_cluster(const int csize, IWString_and_File_Descriptor& output) {
   return csize;
 }
 
+template <typename MarkSelected>
 int
 Leader_Item::form_cluster_threshold(int* selected, const float threshold,
                                     const int cluster_number,
                                     const resizable_array_p<IWString>& smiles,
                                     const resizable_array_p<IWString>& id,
-                                    IWString_and_File_Descriptor& output) const {
+                                    IWString_and_File_Descriptor& output,
+                                    MarkSelected mark_selected) const {
   // First need to find the cluster size so we can write the CSIZE tag.
   int csize = 1;
 
@@ -794,7 +806,7 @@ Leader_Item::form_cluster_threshold(int* selected, const float threshold,
   write_cluster_header(_ndx, smiles, id, cluster_number, csize, output);
 
   if (1 == csize) {
-    selected[_ndx] = 1;
+    mark_selected(_ndx);
     return finish_cluster(1, output);
   }
 
@@ -807,21 +819,23 @@ Leader_Item::form_cluster_threshold(int* selected, const float threshold,
 
     write_smiles_id_dist(smiles[j], id[j], _dist[i], output);
 
-    selected[j] = 1;
+    mark_selected(j);
   }
 
-  selected[_ndx] = 1;
+  mark_selected(_ndx);
 
   return finish_cluster(csize, output);
 }
 
+template <typename MarkSelected>
 int
 Leader_Item::form_cluster_max_cluster_size(int* selected, const float threshold,
                                            const int max_cluster_size,
                                            const int cluster_number,
                                            const resizable_array_p<IWString>& smiles,
                                            const resizable_array_p<IWString>& id,
-                                           IWString_and_File_Descriptor& output) const {
+                                           IWString_and_File_Descriptor& output,
+                                    MarkSelected mark_selected) const {
   // The limit includes the leader. Any self neighbours suppressed by -h
   // have already been removed during ingestion.
   int csize = 1;
@@ -846,10 +860,10 @@ Leader_Item::form_cluster_max_cluster_size(int* selected, const float threshold,
     }
 
     write_smiles_id_dist(smiles[j], id[j], _dist[i], output);
-    selected[j] = 1;
+    mark_selected(j);
   }
 
-  selected[_ndx] = 1;
+  mark_selected(_ndx);
   return finish_cluster(csize, output);
 }
 
@@ -896,46 +910,178 @@ Leader_Item::neighbours_in_common(const int* n, const JarvisPatrickParameters& j
   return false;
 }
 
-int
-Leader_Item::unselected_neighbours(const int* sel) const {
-  int rc = 0;
+// This read-only reverse index is shared by all threshold workers. Edges above
+// the largest requested threshold are not needed. Keeping each edge's distance
+// lets every worker apply its own cutoff without copying the reverse graph.
+class ReverseNeighbours {
+ public:
+  struct Edge {
+    int _source;
+    float _distance;
+  };
 
-  for (int i = 0; i < _nbrs; ++i) {
-    if (!sel[_nbr[i]]) {
-      rc++;
+ private:
+  std::vector<size_t> _offset;
+  std::unique_ptr<Edge[]> _edge;
+
+ public:
+  ReverseNeighbours(const Leader_Item* pool, int n, float max_threshold)
+      : _offset(static_cast<size_t>(n) + 1, 0) {
+    std::vector<int> within(n);
+    for (int i = 0; i < n; ++i) {
+      within[i] = pool[i].neighbours_within(max_threshold);
+      for (int j = 0; j < within[i]; ++j) {
+        ++_offset[pool[i].neighbour(j) + 1];
+      }
+    }
+    for (size_t i = 1; i < _offset.size(); ++i) {
+      _offset[i] += _offset[i - 1];
+    }
+    _edge.reset(new Edge[_offset.back()]);
+    std::vector<size_t> cursor(_offset.begin(), _offset.end() - 1);
+    for (int i = 0; i < n; ++i) {
+      for (int j = 0; j < within[i]; ++j) {
+        const int target = pool[i].neighbour(j);
+        _edge[cursor[target]++] = {i, pool[i].neighbour_distance(j)};
+      }
     }
   }
 
-  return rc;
-}
+  size_t begin(int item) const { return _offset[item]; }
+  size_t end(int item) const { return _offset[item + 1]; }
+  const Edge& edge(size_t i) const { return _edge[i]; }
+};
 
-int
-Leader_Item::unselected_neighbours(const int* sel, const similarity_type_t within) const {
-  if (0 == _nbrs) {
-    return 0;
+// Per-threshold dynamic Butina state. The indexed heap has exactly one entry
+// per unselected molecule, ordered by neighbour count and then input position.
+// It does not accumulate stale priority-queue entries as counts change.
+class ButinaState {
+ private:
+  int* _selected;
+  const ReverseNeighbours& _reverse;
+  float _threshold;
+  std::vector<int> _count;
+  std::vector<int> _heap;
+  std::vector<int> _position;
+  std::vector<int> _decrement;
+  std::vector<int> _assigned;
+  std::vector<int> _affected;
+
+  bool HigherPriority(int a, int b) const {
+    return _count[a] > _count[b] || (_count[a] == _count[b] && a < b);
   }
 
-  if (_dist[_nbrs - 1] <=
-      within) {  // all nbrs within distance, no need to check individually
-    return unselected_neighbours(sel);
+  void Swap(size_t a, size_t b) {
+    std::swap(_heap[a], _heap[b]);
+    _position[_heap[a]] = static_cast<int>(a);
+    _position[_heap[b]] = static_cast<int>(b);
   }
 
-  int rc = 0;
-
-  for (int i = 0; i < _nbrs; ++i) {
-    if (sel[_nbr[i]]) {
-      continue;
+  void SiftUp(size_t pos) {
+    while (pos > 0) {
+      const size_t parent = (pos - 1) / 2;
+      if (!HigherPriority(_heap[pos], _heap[parent])) {
+        break;
+      }
+      Swap(pos, parent);
+      pos = parent;
     }
-
-    if (_dist[i] > within) {
-      break;
-    }
-
-    rc++;
   }
 
-  return rc;
-}
+  void SiftDown(size_t pos) {
+    while (2 * pos + 1 < _heap.size()) {
+      size_t child = 2 * pos + 1;
+      if (child + 1 < _heap.size() && HigherPriority(_heap[child + 1], _heap[child])) {
+        ++child;
+      }
+      if (!HigherPriority(_heap[child], _heap[pos])) {
+        break;
+      }
+      Swap(pos, child);
+      pos = child;
+    }
+  }
+
+  void Remove(int item) {
+    const size_t pos = _position[item];
+    const int replacement = _heap.back();
+    _heap.pop_back();
+    _position[item] = -1;
+    if (pos == _heap.size()) {
+      return;
+    }
+    _heap[pos] = replacement;
+    _position[replacement] = static_cast<int>(pos);
+    if (pos > 0 && HigherPriority(replacement, _heap[(pos - 1) / 2])) {
+      SiftUp(pos);
+    } else {
+      SiftDown(pos);
+    }
+  }
+
+ public:
+  ButinaState(const Leader_Item* pool, int n, float threshold, int* selected,
+              const ReverseNeighbours& reverse)
+      : _selected(selected), _reverse(reverse), _threshold(threshold),
+        _count(n), _heap(n), _position(n), _decrement(n, 0) {
+    // These buffers are reused; no allocation is needed while forming clusters.
+    _assigned.reserve(n);
+    _affected.reserve(n);
+    for (int i = 0; i < n; ++i) {
+      _count[i] = pool[i].neighbours_within(threshold);
+      _heap[i] = i;
+      _position[i] = i;
+    }
+    for (size_t i = _heap.size() / 2; i > 0; --i) {
+      SiftDown(i - 1);
+    }
+  }
+
+  int NextCentre() const {
+    return _heap.empty() ? -1 : _heap.front();
+  }
+
+  void Select(int item) {
+    // Without -h, a listed self neighbour and the leader's final assignment
+    // refer to the same molecule. Remove and account for it only once.
+    if (_position[item] < 0) {
+      return;
+    }
+    _selected[item] = 1;
+    Remove(item);
+    _assigned.push_back(item);
+  }
+
+  void FinishCluster() {
+    if (_heap.empty()) {
+      _assigned.clear();
+      return;
+    }
+    // All members have already been removed. Update only centres that remain
+    // available, using incoming edges rather than assuming symmetric lists.
+    for (int item : _assigned) {
+      for (size_t i = _reverse.begin(item); i < _reverse.end(item); ++i) {
+        const auto& edge = _reverse.edge(i);
+        const int source = edge._source;
+        if (_position[source] < 0 || edge._distance > _threshold) {
+          continue;
+        }
+        if (_decrement[source]++ == 0) {
+          _affected.push_back(source);
+        }
+      }
+    }
+    // Apply one decrease-key operation per affected centre. Changing counts
+    // one at a time preserves heap validity throughout the update.
+    for (int item : _affected) {
+      _count[item] -= _decrement[item];
+      _decrement[item] = 0;
+      SiftDown(_position[item]);
+    }
+    _affected.clear();
+    _assigned.clear();
+  }
+};
 
 // JP's pair tests define an undirected graph. Union-find maintains its
 // connected components without relabelling every member after each match.
@@ -1096,37 +1242,7 @@ report_clustering(const int* selected, const resizable_array<int>& cluster_size,
 }
 
 static int
-identify_next_tb_leader(const Leader_Item* pool, const int pool_size, const int* selected,
-                        const similarity_type_t global_threshold, int& leader) {
-  leader = -1;
-  int nmax = -1;
-
-  for (int i = 0; i < pool_size; ++i) {
-    if (selected[i]) {
-      continue;
-    }
-
-    const int n = pool[i].unselected_neighbours(selected, global_threshold);
-
-    // Scan in input order and replace only for a strictly larger count.
-    // Earlier molecules have higher priority when neighbour counts tie.
-    if (n > nmax) {
-      nmax = n;
-      leader = i;
-    }
-  }
-
-  return leader >= 0;
-}
-
-static int
-choose_next_centre(const int* selected, const Leader_Item* pool, const int pool_size,
-                   const similarity_type_t global_threshold,
-                   int& istart, int& icentre) {
-  if (taylor_butina) {
-    return identify_next_tb_leader(pool, pool_size, selected, global_threshold, icentre);
-  }
-
+choose_next_centre(const int* selected, int pool_size, int& istart, int& icentre) {
   icentre = -1;
 
   // Input order defines priority. Resume after the previous leader since
@@ -1146,7 +1262,7 @@ int
 leader(const Leader_Item* pool, const int pool_size, int* selected,
        const resizable_array_p<IWString>& smiles, const resizable_array_p<IWString>& id,
        similarity_type_t global_threshold, IWString_and_File_Descriptor& output,
-       std::mutex& diagnostics_mutex) {
+       std::mutex& diagnostics_mutex, const ReverseNeighbours* reverse) {
   if (verbose > 1) {
     const std::lock_guard<std::mutex> lock(diagnostics_mutex);
     cerr << "Beginning clustering at " << global_threshold << '\n';
@@ -1159,15 +1275,23 @@ leader(const Leader_Item* pool, const int pool_size, int* selected,
 
   // Each threshold starts a fresh scan, while selections within a run advance it.
   int istart = 0;
+  std::optional<ButinaState> butina;
+  if (reverse != nullptr) {
+    butina.emplace(pool, pool_size, global_threshold, selected, *reverse);
+  }
   int icentre;
-  if (!choose_next_centre(selected, pool, pool_size, global_threshold,
-                          istart, icentre)) {
+  const auto choose_next = [&]() {
+    if (butina) {
+      icentre = butina->NextCentre();
+      return icentre >= 0;
+    }
+    return choose_next_centre(selected, pool_size, istart, icentre) != 0;
+  };
+  if (!choose_next()) {
     const std::lock_guard<std::mutex> lock(diagnostics_mutex);
     cerr << "Yipes, cannot find initial leader\n";
     return 0;
   }
-
-  resizable_array<int> cluster;
 
   while (1) {
     const Leader_Item& ldr = pool[icentre];
@@ -1186,16 +1310,20 @@ leader(const Leader_Item* pool, const int pool_size, int* selected,
            << ", max size " << max_cluster_size_this_molecule << '\n';
     }
 
-    int csize;
-
-    if (max_cluster_size_this_molecule) {
-      csize = pool[icentre].form_cluster_max_cluster_size(
-          selected, global_threshold, max_cluster_size_this_molecule, clusters_found,
-          smiles, id, output);
-    } else {
-      csize = pool[icentre].form_cluster_threshold(selected, global_threshold, clusters_found,
-                                                   smiles, id, output);
-    }
+    // The ordinary leader callback compiles to the original selected[] store.
+    // Only Butina tracks assignments for its subsequent count update.
+    const auto form_cluster = [&](auto mark_selected) {
+      if (max_cluster_size_this_molecule) {
+        return ldr.form_cluster_max_cluster_size(
+            selected, global_threshold, max_cluster_size_this_molecule, clusters_found,
+            smiles, id, output, mark_selected);
+      }
+      return ldr.form_cluster_threshold(selected, global_threshold, clusters_found,
+                                        smiles, id, output, mark_selected);
+    };
+    const int csize = butina
+        ? form_cluster([&](int item) { butina->Select(item); })
+        : form_cluster([selected](int item) { selected[item] = 1; });
 
     clusters_found++;
 
@@ -1207,8 +1335,10 @@ leader(const Leader_Item* pool, const int pool_size, int* selected,
       break;
     }
 
-    if (!choose_next_centre(selected, pool, pool_size, global_threshold,
-                            istart, icentre)) {
+    if (butina) {
+      butina->FinishCluster();
+    }
+    if (!choose_next()) {
       break;
     }
   }
@@ -1228,7 +1358,7 @@ static int
 leader(const Leader_Item* pool, const int pool_size, int* selected,
        const resizable_array_p<IWString>& smiles, const resizable_array_p<IWString>& id,
        similarity_type_t global_threshold, const const_IWSubstring& stem, int ndx,
-       std::mutex& diagnostics_mutex) {
+       std::mutex& diagnostics_mutex, const ReverseNeighbours* reverse) {
   IWString fname(stem);
   fname << ndx;
   fname << ".ldr";
@@ -1245,7 +1375,7 @@ leader(const Leader_Item* pool, const int pool_size, int* selected,
     cerr << "Begin clustering at " << global_threshold << '\n';
   }
 
-  return leader(pool, pool_size, selected, smiles, id, global_threshold, output, diagnostics_mutex);
+  return leader(pool, pool_size, selected, smiles, id, global_threshold, output, diagnostics_mutex, reverse);
 }
 
 static int
@@ -1394,12 +1524,17 @@ do_leader_clustering(const Leader_Item* pool, const int pool_size,
                      const resizable_array_p<IWString>& smiles,
                      const resizable_array_p<IWString>& id, const IWString& stem,
                      const float* threshold, const int number_thresholds) {
+  std::unique_ptr<ReverseNeighbours> reverse;
+  if (taylor_butina) {
+    reverse = std::make_unique<ReverseNeighbours>(
+        pool, pool_size, *std::max_element(threshold, threshold + number_thresholds));
+  }
   std::mutex diagnostics_mutex;
   if (number_thresholds == 1) {
     std::unique_ptr<int[]> selected(new int[pool_size]);
     IWString_and_File_Descriptor output(1);
     return leader(pool, pool_size, selected.get(), smiles, id, threshold[0], output,
-                  diagnostics_mutex);
+                  diagnostics_mutex, reverse.get());
   }
 
   // Each threshold has private selection state and an output stream. The pool,
@@ -1417,7 +1552,7 @@ do_leader_clustering(const Leader_Item* pool, const int pool_size,
         try {
           std::unique_ptr<int[]> selected(new int[pool_size]);
           success[i] = leader(pool, pool_size, selected.get(), smiles, id, threshold[i],
-                              stem, i, diagnostics_mutex);
+                              stem, i, diagnostics_mutex, reverse.get());
         } catch (...) {
           errors[i] = std::current_exception();
         }

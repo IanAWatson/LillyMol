@@ -154,19 +154,10 @@ PCN<methane 50>
 and then specifying `-M col=2`.
 
 ### -S tag -S col=nn
-This is only supported in gfp_leader_tbb. Obscure, perhaps should
-be deprecated.
-
-This can be used to increase diversity. By default, the next cluster center is
-the first unselected item. With this setting in effect, the next cluster center
-is the fingerprint is determined by the max of this formula
-```
-fp.score() + scale * fp.shortest_distance_to_cluster_centre()
-```
-If this factor is zero, then the highest scoring molecule is selected.
-But if greater than zero, a fingerprint becomes more desirable as it
-is more distant from a previous cluster center. This met an important
-project need once upon a time...
+Select the next leader by highest score, from a TDT tag or a one-based column
+in the identifier. Without `-S`, input order determines leader priority.
+The former `gfp_leader -R` score-distance adjustment has been replaced by
+small-cluster reassignment, described below.
 
 ### -A fname
 Specify a file of fingerprints containing molecules that are to be treated as
@@ -214,3 +205,45 @@ from the leader.
 The number of fingerprints in the input. Seldom needed. By default the tool counts
 the fingerprints, and then allocates internal arrays. Once upon a time this
 may have been slow.
+
+## Reassigning small clusters
+
+`gfp_leader_standard -t 0.2 -R 1 fingerprints.gfp` first forms the usual
+leader clusters, then dissolves singletons into larger clusters. `-R 2` dissolves
+clusters containing one or two members, counting the leader. The same `-R <size>`
+option is available in `gfp_leader`.
+
+Each dissolved member independently joins the cluster containing its closest
+member. Destinations and their eligible members are fixed from the initial
+clustering; newly assigned members do not attract subsequent assignments.
+Equal distances favour the earliest destination member in input order. Members
+of a dissolved cluster may join different clusters. If no larger cluster exists,
+the tool warns and retains the original clustering.
+
+Reassignment can exceed the initial distance threshold and any initial cluster
+size constraint. It preserves destination leaders, and output `DIST` values
+remain distances to those leaders, rather than to the closest member. Empty
+clusters disappear and output cluster numbers are consecutive. Both ordinary
+and `-k .` textproto output support reassignment. Molecules excluded by `-A`,
+or not clustered when `-n` (`gfp_leader_standard`) or `-C` (`gfp_leader`) stops
+processing, remain excluded.
+
+The final search compares every dissolved member with all original members of
+larger clusters. `gfp_leader_standard` uses the OpenMP thread count selected
+with `-h`; the `gfp_leader` final search is serial. All fingerprints remain
+available; neither implementation squeezes its pool.
+When no members move, the existing output path is used. After reassignment,
+member lists are built in a single pass to avoid repeated scans of the pool.
+
+Without `-R`, `gfp_leader` retains its write-as-you-go output. With `-R`, it
+retains membership and defers output until reassignment is complete. Existing
+`-E` echo selection, `-r` distance sorting and `-k` output options still apply.
+The final search uses the configured distance metric, including Tversky, with
+the destination member as the first argument. The initial `-X` early-abandon
+cutoff does not apply. An item without any comparable destination member stays
+in its original cluster, with a warning. If a partially dissolved source cluster
+loses its leader, the first remaining input member becomes its leader.
+
+`gfp_leader -R` cannot be combined with `-D sbc` or `-D sbcr`: those options
+discard members during within-cluster sub-clustering. The initial maximum
+cluster sizes (`-m`/`-M`) do not constrain the reassignment pass.

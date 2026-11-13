@@ -1,14 +1,17 @@
 {
   "executable": "gfp_leader_standard",
   "test": [
-
     {
       "name": "case_1",
       "args": [
         "-t 0.35 ${LILLYMOL_HOME}/data/pubchem_example.gfp"
       ]
+    },
+    {
+      "name": "reassignment",
+      "shell_script": {
+        "script_name": "run_test.py"
+      }
     }
-
   ]
-
 }

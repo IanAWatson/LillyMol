@@ -6,6 +6,7 @@
 
 #include <iostream>
 #include <limits>
+#include <vector>
 
 using std::cout;
 
@@ -33,6 +34,8 @@ using std::endl;
 const char* prog_name = nullptr;
 
 static int verbose = 0;
+
+static int reassign_max_size = 0;
 
 static int clusters_to_form = std::numeric_limits<int>::max();
 
@@ -87,6 +90,8 @@ usage(int rc) {
   // clang-format off
   cerr << "Leader implementation requiring MPR IW MK MK2\n";
   cerr << " -t <dist>      distance threshold\n";
+  cerr << " -R <size>      reassign clusters of at most <size> members to larger clusters\n";
+  cerr << "                closest member chooses destination; ignores initial threshold\n";
   cerr << " -n <number>    number of clusters to form\n";
   cerr << " -A <fname>     file of previously selected fingerprints\n";
   cerr << " -s <size>      size of fingerprint file\n";
@@ -412,6 +417,123 @@ WriteNeighboursAsProtos(int clusters_formed, IWString_and_File_Descriptor& outpu
   return 1;
 }
 
+// Membership and leaders describe the initial clustering. Only initial members
+// of larger clusters are targets, so assignments cannot depend on one another.
+static int
+ReassignSmallClusters(const std::vector<int>& sizes, const std::vector<int>& leaders) {
+  std::vector<int> candidates;
+  std::vector<int> targets;
+  for (int i = 0; i < pool_size; ++i) {
+    if (selected[i] <= 0) {  // Excluded by -A or not clustered due to -n.
+      continue;
+    }
+    if (sizes[selected[i]] <= reassign_max_size) {
+      candidates.push_back(i);
+    } else {
+      targets.push_back(i);
+    }
+  }
+  if (candidates.empty()) {
+    return 0;
+  }
+  if (targets.empty()) {
+    cerr << "Warning: no clusters larger than " << reassign_max_size
+         << "; retaining original clustering\n";
+    return 0;
+  }
+  std::vector<int> assignments(candidates.size());
+#pragma omp parallel for schedule(static) if (candidates.size() > 32)
+  for (int i = 0; i < static_cast<int>(candidates.size()); ++i) {
+    const int item = candidates[i];
+    float closest = std::numeric_limits<float>::max();
+    int destination = -1;
+    // Targets are in input order; strict comparison retains the first equal hit.
+    for (int j : targets) {
+      const float d = fingerprints[item].tanimoto_distance(fingerprints[j]);
+      if (d < closest) {
+        closest = d;
+        destination = selected[j];
+      }
+    }
+    assignments[i] = destination;
+    // DIST always means distance to the leader, not to the closest member.
+    distances[item] = fingerprints[item].tanimoto_distance(
+        fingerprints[leaders[destination]]);
+  }
+  for (int i = 0; i < static_cast<int>(candidates.size()); ++i) {
+    selected[candidates[i]] = assignments[i];
+  }
+  if (verbose) {
+    cerr << "Reassigned " << candidates.size() << " members of clusters of size <= "
+         << reassign_max_size << '\n';
+  }
+  return candidates.size();
+}
+
+// After reassignment input order no longer identifies the leader. Build linked
+// member lists in one pass, then write each item once, keeping original leaders.
+static int
+WriteReassignedClusters(int clusters_formed, const std::vector<int>& leaders,
+                        IWString_and_File_Descriptor& output) {
+  std::vector<int> head(clusters_formed + 1, -1);
+  std::vector<int> next(pool_size, -1);
+  std::vector<int> sizes(clusters_formed + 1, 0);
+  for (int i = pool_size - 1; i >= 0; --i) {
+    if (selected[i] <= 0) {
+      continue;
+    }
+    const int c = selected[i];
+    next[i] = head[c];
+    head[c] = i;
+    ++sizes[c];
+  }
+  int number = 0;
+  for (int c = 1; c <= clusters_formed; ++c) {
+    if (head[c] < 0) {
+      continue;
+    }
+    const int centre = leaders[c];
+    nnbr::NearNeighbours proto;
+    if (write_neighbours_as_protos) {
+      const IWString& smi = leader_item[centre].smiles();
+      const IWString& id = leader_item[centre].id();
+      proto.set_smiles(smi.data(), smi.length());
+      proto.set_name(id.data(), id.length());
+      proto.set_cluster(number++);
+    } else {
+      output << smiles_tag << leader_item[centre].smiles() << ">\n";
+      output << identifier_tag << leader_item[centre].id() << ">\n";
+      output << "CLUSTER<" << number++ << ">\nCSIZE<" << sizes[c] << ">\n";
+    }
+    for (int j = head[c]; j >= 0; j = next[j]) {
+      if (j == centre) {
+        continue;
+      }
+      if (write_neighbours_as_protos) {
+        nnbr::Nbr* nbr = proto.add_nbr();
+        const IWString& smi = leader_item[j].smiles();
+        const IWString& id = leader_item[j].id();
+        nbr->set_smi(smi.data(), smi.length());
+        nbr->set_id(id.data(), id.length());
+        nbr->set_dist(distances[j]);
+      } else {
+        output << smiles_tag << leader_item[j].smiles() << ">\n";
+        output << identifier_tag << leader_item[j].id() << ">\n";
+        output << distance_tag << distances[j] << ">\n";
+        output.write_if_buffer_holds_more_than(8192);
+      }
+    }
+    if (write_neighbours_as_protos) {
+      if (!gfp::WriteNNData(proto, output)) {
+        return 0;
+      }
+    } else {
+      output << "|\n";
+    }
+  }
+  return 1;
+}
+
 static int
 allocate_pool(int s) {
   leader_item = new Leader_Item[s];
@@ -432,7 +554,7 @@ allocate_pool(int s) {
 
 static int
 gfp_leader_standard(int argc, char** argv) {
-  Command_Line cl(argc, argv, "vt:A:s:p:r:h:n:k:");
+  Command_Line cl(argc, argv, "vt:A:s:p:r:h:n:k:R:");
 
   if (cl.unrecognised_options_encountered()) {
     cerr << "Unrecognised options encountered\n";
@@ -478,6 +600,13 @@ gfp_leader_standard(int argc, char** argv) {
 
     if (verbose) {
       cerr << "Will stop processing after forming " << clusters_to_form << " clusters\n";
+    }
+  }
+
+  if (cl.option_present('R')) {
+    if (!cl.value('R', reassign_max_size) || reassign_max_size < 1) {
+      cerr << "The reassignment size (-R) must be a positive integer\n";
+      usage(2);
     }
   }
 
@@ -589,6 +718,23 @@ gfp_leader_standard(int argc, char** argv) {
   if (verbose) {
     cerr << "Clustered " << pool_size << " fingerprints into " << clusters_formed
          << " clusters\n";
+  }
+
+  if (reassign_max_size > 0) {
+    std::vector<int> sizes(clusters_formed + 1, 0);
+    std::vector<int> leaders(clusters_formed + 1, -1);
+    for (int i = 0; i < pool_size; ++i) {
+      if (selected[i] <= 0) {
+        continue;
+      }
+      const int c = selected[i];
+      if (sizes[c]++ == 0) {
+        leaders[c] = i;
+      }
+    }
+    if (ReassignSmallClusters(sizes, leaders) > 0) {
+      return WriteReassignedClusters(clusters_formed, leaders, output) ? 0 : 1;
+    }
   }
 
   if (write_neighbours_as_protos) {

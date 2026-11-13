@@ -6,8 +6,10 @@
 #include <stdint.h>
 #include <stdlib.h>
 
+#include <algorithm>
 #include <iostream>
 #include <limits>
+#include <vector>
 
 #include "google/protobuf/text_format.h"
 
@@ -39,15 +41,6 @@ static Tversky tversky;
 static IWString score_tag;
 static int score_column = -1;
 
-/*
-  May 99. When looking for the next molecule to select, we can
-  add a multiple of the distance to the nearest cluster centre
-  to the score. That way, we can include some varying function
-  of diversity into the next cluster selection
-*/
-
-static similarity_type_t cluster_distance_scale_factor = 0.0;
-
 static resizable_array_p<IWString> dataitems_to_echo;
 
 static int verbose = 0;
@@ -63,6 +56,7 @@ static similarity_type_t abandon_distance_cutoff = -1.0;
 static int max_clusters_to_find = std::numeric_limits<int>::max();
 static int clusters_found = 0;
 static int max_cluster_size = 0;
+static int reassign_max_size = 0;
 
 static similarity_type_t threshold = 0.0;
 
@@ -443,10 +437,22 @@ template void move_in_from_right<GFP_L *, Distance_Comparitor>(GFP_L **, int &, 
 
 static int
 process_cluster(Cluster &cluster, similarity_type_t my_threshold,
-                iwstring_data_source &input, IWString_and_File_Descriptor &output) {
+                iwstring_data_source &input, IWString_and_File_Descriptor &output,
+                bool preserve_leader = false) {
   if (sort_by_distance_from_centre) {
-    Distance_Comparitor dc;
-    cluster.iwqsort(dc);
+    if (preserve_leader) {
+      // A reassigned item can tie the leader at zero distance. Sort only members.
+      std::sort(cluster.begin() + 1, cluster.begin() + cluster.size(),
+                [](const GFP_L* a, const GFP_L* b) {
+                  if (a->distance() != b->distance()) {
+                    return a->distance() < b->distance();
+                  }
+                  return a < b;  // Equal distances retain input-order priority.
+                });
+    } else {
+      Distance_Comparitor dc;
+      cluster.iwqsort(dc);
+    }
   }
 
   if (leader_on_clusters) {
@@ -505,6 +511,121 @@ process_cluster(Cluster &cluster, similarity_type_t my_threshold,
   return output.good();
 }
 
+// Full distances are needed for reassignment; the initial clustering's early
+// abandon cutoff must not discard possible destinations. Keep the same argument
+// order as clustering (destination first), which matters for asymmetric Tversky.
+static similarity_type_t
+ReassignmentDistance(GFP_L& destination, GFP_L& item) {
+  if (tversky.active()) {
+    return 1.0f - destination.IW_General_Fingerprint::tversky(item, tversky);
+  }
+  return destination.IW_General_Fingerprint::distance(item);
+}
+
+// Only original members of larger clusters can attract reassigned items. Store
+// membership separately from selected(), which is also used for -A exclusions.
+static int
+ReassignAndWrite(const std::vector<std::vector<int>>& original,
+                 iwstring_data_source& input, IWString_and_File_Descriptor& output) {
+  std::vector<int> assignment(pool_size, -1);
+  std::vector<int> targets;
+  for (int c = 0; c < static_cast<int>(original.size()); ++c) {
+    for (int item : original[c]) {
+      assignment[item] = c;
+    }
+  }
+  // Scan in input order for deterministic tie breaking, even with scored leaders.
+  for (int i = 0; i < pool_size; ++i) {
+    if (assignment[i] >= 0 &&
+        original[assignment[i]].size() > static_cast<size_t>(reassign_max_size)) {
+      targets.push_back(i);
+    }
+  }
+  int moved = 0;
+  int unmatched = 0;
+  for (const auto& members : original) {
+    if (members.size() > static_cast<size_t>(reassign_max_size)) {
+      continue;
+    }
+    for (int item : members) {
+      similarity_type_t closest = std::numeric_limits<similarity_type_t>::max();
+      int destination = -1;
+      for (int target : targets) {
+        if (!can_be_compared(pool[target], pool[item])) {
+          continue;
+        }
+        const similarity_type_t d = ReassignmentDistance(pool[target], pool[item]);
+        if (d < closest) {
+          closest = d;
+          destination = assignment[target];
+        }
+      }
+      if (destination < 0) {
+        ++unmatched;
+        continue;
+      }
+      // Targets never move, so these assignments cannot affect later searches.
+      assignment[item] = destination;
+      ++moved;
+    }
+  }
+  if (unmatched) {
+    cerr << "Warning: retained " << unmatched
+         << " small-cluster members without a comparable member in a larger cluster; "
+            "retaining original membership for those items\n";
+  }
+  if (verbose) {
+    cerr << "Reassigned " << moved << " small-cluster members\n";
+  }
+
+  // This path is needed only if ordering has changed. Group members in one scan
+  // rather than searching the whole pool once for every output cluster.
+  std::vector<std::vector<int>> final_members;
+  if (moved) {
+    final_members.resize(original.size());
+    for (int i = 0; i < pool_size; ++i) {
+      if (assignment[i] >= 0) {
+        final_members[assignment[i]].push_back(i);
+      }
+    }
+  }
+  clusters_found = 0;
+  items_selected = 0;
+  Cluster cluster;
+  for (int c = 0; c < static_cast<int>(original.size()); ++c) {
+    const auto& members = moved ? final_members[c] : original[c];
+    if (members.empty()) {
+      continue;
+    }
+    int centre = original[c].front();
+    if (assignment[centre] != c) {
+      // Incomparable items can leave a partially dissolved source cluster.
+      centre = members.front();
+    }
+    cluster.resize_keep_storage(0);
+    cluster.add(&pool[centre]);
+    pool[centre].set_distance(0.0f);
+    for (int item : members) {
+      if (item == centre) {
+        continue;
+      }
+      if (moved) {
+        // DIST retains its normal meaning, distance to the final leader.
+        pool[item].set_distance(ReassignmentDistance(pool[centre], pool[item]));
+      }
+      cluster.add(&pool[item]);
+    }
+    similarity_type_t my_threshold = threshold;
+    pool[centre].threshold(my_threshold);
+    if (!process_cluster(cluster, my_threshold, input, output, moved > 0)) {
+      return 0;
+    }
+    items_selected += cluster.number_elements();
+    ++clusters_found;
+  }
+  return 1;
+}
+
 static int
 choose_next_centre(int &icentre) {
   icentre = -1;
@@ -515,21 +636,6 @@ choose_next_centre(int &icentre) {
       if (!pool[i].selected()) {
         icentre = i;
         return 1;
-      }
-    }
-  } else if (cluster_distance_scale_factor > static_cast<similarity_type_t>(0.0)) {
-    score_t max_score = static_cast<score_t>(0.0);
-    for (int i = 0; i < pool_size; i++) {
-      if (pool[i].selected()) {
-        continue;
-      }
-
-      score_t s = pool[i].score() + cluster_distance_scale_factor *
-                                        pool[i].shortest_distance_to_cluster_centre();
-
-      if (icentre < 0 || s > max_score) {
-        max_score = s;
-        icentre = i;
       }
     }
   } else  // raw scores
@@ -725,6 +831,7 @@ leader(iwstring_data_source &input, IWString_and_File_Descriptor &output) {
     return 0;
   }
 
+  std::vector<std::vector<int>> deferred;
   Cluster cluster;
   if (!cluster.resize(pool_size)) {
     cerr << "Yipes, cannot allocate " << pool_size << " elements in pool\n";
@@ -764,7 +871,16 @@ leader(iwstring_data_source &input, IWString_and_File_Descriptor &output) {
 
     (void)form_cluster(icentre, cluster, my_threshold, max_cluster_size_this_molecule);
 
-    (void)process_cluster(cluster, my_threshold, input, output);
+    if (reassign_max_size) {
+      std::vector<int> members;
+      members.reserve(cluster.number_elements());
+      for (const GFP_L* member : cluster) {
+        members.push_back(member - pool);
+      }
+      deferred.push_back(std::move(members));
+    } else if (!process_cluster(cluster, my_threshold, input, output)) {
+      return 0;
+    }
 
     clusters_found++;
     if (clusters_found >= max_clusters_to_find) {
@@ -776,6 +892,10 @@ leader(iwstring_data_source &input, IWString_and_File_Descriptor &output) {
     if (!choose_next_centre(icentre)) {
       break;
     }
+  }
+
+  if (reassign_max_size) {
+    return ReassignAndWrite(deferred, input, output);
   }
 
   return 1;
@@ -1037,6 +1157,8 @@ usage(int rc) {
   cerr << " -t col=<nn>      threshold is column <nn> of the name field\n";
   cerr << " -t tag=<TAG>     threshold for each molecule in dataitem <TAG>\n";
   cerr << " -H <TAG>         threshold for each molecule in dataitem <TAG>\n";
+  cerr << " -R <size>        reassign clusters of at most <size> members to larger clusters\n";
+  cerr << "                  closest member selects destination; ignores threshold and size cap\n";
   cerr << " -m <number>      maximum cluster size\n";
   cerr << " -M <tag>         max cluster size for each molecule in <TAG>\n";
   cerr << " -M col=nn        max cluster size is column <nn> of the name field\n";
@@ -1048,7 +1170,6 @@ usage(int rc) {
   cerr << " -E ALL           echo all dataitems from the pool file\n";
   // cerr << " -X <distance>    abandon distance computation if any component >
   // distance\n"; cerr << " -Y <factor>      thresold = (max_score - score) / factor\n";
-  // cerr << " -R <factor>      score = score + <factor> * distance to cluster\n";
   cerr << " -A <file>        file(s) of previously selected molecules - discard all within threshold\n";
   cerr << " -a <dist>        use <dist> as the threshold when comparing against the -A file\n";
   cerr << " -L <file>        write fingerprints discarded by -A file(s)\n";
@@ -1254,16 +1375,13 @@ leader(int argc, char **argv) {
   }
 
   if (cl.option_present('R')) {
-    if (!cl.value('R', cluster_distance_scale_factor) ||
-        cluster_distance_scale_factor <= 0.0) {
-      cerr << "The cluster distance scale factor option (-R) must be followed by a "
-              "positive number\n";
-      usage(19);
+    if (!cl.value('R', reassign_max_size) || reassign_max_size < 1) {
+      cerr << "The reassignment size (-R) must be a positive integer\n";
+      usage(2);
     }
-
-    if (verbose) {
-      cerr << "Scores adjusted by " << cluster_distance_scale_factor
-           << " times distance to nearest cluster centre\n";
+    if (leader_on_clusters) {
+      cerr << "Cannot combine -R reassignment with -D sbc/sbcr sub-clustering\n";
+      return 1;
     }
   }
 
@@ -1482,7 +1600,9 @@ leader(int argc, char **argv) {
   IWString_and_File_Descriptor output(1);
 
   try {
-    leader(pool_file, output);
+    if (!leader(pool_file, output)) {
+      return 1;
+    }
   } catch (const char *err) {
     cerr << "Caught '" << err << "' terminated\n";
     return 81;

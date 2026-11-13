@@ -165,7 +165,8 @@ class Leader_Item {
 
   int Build(const nnbr::NearNeighbours& proto,
                    const IW_STL_Hash_Map_int& id_to_ndx,
-                   int n, bool ignore_missing_neighbours);
+                   int n, bool ignore_missing_neighbours,
+                   float& max_stored_distance);
  public:
   Leader_Item();
   ~Leader_Item();
@@ -188,10 +189,12 @@ class Leader_Item {
   }
 
   int build(iwstring_data_source& input, const IW_STL_Hash_Map_int& id_to_ndx,
-            int n, bool ignore_missing_neighbours);
+            int n, bool ignore_missing_neighbours,
+                   float& max_stored_distance);
   int Build(iw_tf_data_record::TFDataReader& input,
                    const IW_STL_Hash_Map_int& id_to_ndx,
-                   int n, bool ignore_missing_neighbours);
+                   int n, bool ignore_missing_neighbours,
+                   float& max_stored_distance);
 
   template <typename MarkSelected>
   int form_cluster_threshold(int* selected, const float threshold,
@@ -548,7 +551,8 @@ convert_to_float(const const_IWSubstring& buffer, T& d, const T minv, const T ma
 
 int
 Leader_Item::build(iwstring_data_source& input, const IW_STL_Hash_Map_int& id_to_ndx,
-                   int n, bool ignore_missing_neighbours) {
+                   int n, bool ignore_missing_neighbours,
+                   float& max_stored_distance) {
   _nbrs = n;
   _nbr = new int[_nbrs];
   _dist = new float[_nbrs];
@@ -609,6 +613,8 @@ Leader_Item::build(iwstring_data_source& input, const IW_STL_Hash_Map_int& id_to
     return 0;
   }
 
+  // Neighbour lists are sorted. Capture coverage before pruning self/subset edges.
+  update_max_distance(max_stored_distance);
   if (ignore_missing_neighbours || suppress_self_neighbours) {
     RemoveExcludedNeighbours();
   }
@@ -645,20 +651,22 @@ Leader_Item::build(iwstring_data_source& input, const IW_STL_Hash_Map_int& id_to
 int
 Leader_Item::Build(iw_tf_data_record::TFDataReader& input,
                    const IW_STL_Hash_Map_int& id_to_ndx,
-                   int n, bool ignore_missing_neighbours) {
+                   int n, bool ignore_missing_neighbours,
+                   float& max_stored_distance) {
   std::optional<nnbr::NearNeighbours> maybe_proto = 
         input.ReadProto<nnbr::NearNeighbours>();
   if (! maybe_proto) {
     return 0;
   }
 
-  return Build(*maybe_proto, id_to_ndx, n, ignore_missing_neighbours);
+  return Build(*maybe_proto, id_to_ndx, n, ignore_missing_neighbours, max_stored_distance);
 }
 
 int
 Leader_Item::Build(const nnbr::NearNeighbours& proto,
                    const IW_STL_Hash_Map_int& id_to_ndx,
-                   int n, bool ignore_missing_neighbours) {
+                   int n, bool ignore_missing_neighbours,
+                   float& max_stored_distance) {
 
   if (proto.nbr_size() != n) {
     cerr << "Leader_Item::Build:size mismatch, expected " << n << " got " <<
@@ -688,6 +696,8 @@ Leader_Item::Build(const nnbr::NearNeighbours& proto,
     ++ndx;
   }
 
+  // Neighbour lists are sorted. Capture coverage before pruning self/subset edges.
+  update_max_distance(max_stored_distance);
   if (ignore_missing_neighbours || suppress_self_neighbours) {
     RemoveExcludedNeighbours();
   }
@@ -1381,9 +1391,10 @@ leader(const Leader_Item* pool, const int pool_size, int* selected,
 static int
 build_pool(iwstring_data_source& input, Leader_Item* pool, const int istop, int& ndx,
            const IW_STL_Hash_Map_int& id_to_ndx, resizable_array<int>& ncount,
-           bool ignore_missing_neighbours) {
+           bool ignore_missing_neighbours, float& max_stored_distance) {
   for (; ndx < istop; ++ndx) {
-    if (!pool[ndx].build(input, id_to_ndx, ncount[ndx], ignore_missing_neighbours)) {
+    if (!pool[ndx].build(input, id_to_ndx, ncount[ndx],
+                         ignore_missing_neighbours, max_stored_distance)) {
       cerr << "Cannot read pool item " << ndx << ", near line " << input.lines_read()
            << '\n';
       return 0;
@@ -1397,9 +1408,10 @@ static int
 BuildPool(iw_tf_data_record::TFDataReader& input, Leader_Item* pool,
            const int istop, int& ndx,
            const IW_STL_Hash_Map_int& id_to_ndx, resizable_array<int>& ncount,
-           bool ignore_missing_neighbours) {
+           bool ignore_missing_neighbours, float& max_stored_distance) {
   for (; ndx < istop; ++ndx) {
-    if (!pool[ndx].Build(input, id_to_ndx, ncount[ndx], ignore_missing_neighbours)) {
+    if (!pool[ndx].Build(input, id_to_ndx, ncount[ndx],
+                         ignore_missing_neighbours, max_stored_distance)) {
       cerr << "Cannot read pool item " << ndx << ", near line " << input.items_read()
            << '\n';
       return 0;
@@ -1412,7 +1424,7 @@ BuildPool(iw_tf_data_record::TFDataReader& input, Leader_Item* pool,
 static int
 build_pool(const char* fname, Leader_Item* pool, const int istop, int& ndx,
            const IW_STL_Hash_Map_int& id_to_ndx, resizable_array<int>& ncount,
-           bool ignore_missing_neighbours) {
+           bool ignore_missing_neighbours, float& max_stored_distance) {
   iwstring_data_source input(fname);
 
   if (!input.good()) {
@@ -1420,13 +1432,14 @@ build_pool(const char* fname, Leader_Item* pool, const int istop, int& ndx,
     return 0;
   }
 
-  return build_pool(input, pool, istop, ndx, id_to_ndx, ncount, ignore_missing_neighbours);
+  return build_pool(input, pool, istop, ndx, id_to_ndx, ncount,
+                    ignore_missing_neighbours, max_stored_distance);
 }
 
 static int
 BuildPool(const char* fname, Leader_Item* pool, const int istop, int& ndx,
            const IW_STL_Hash_Map_int& id_to_ndx, resizable_array<int>& ncount,
-           bool ignore_missing_neighbours) {
+           bool ignore_missing_neighbours, float& max_stored_distance) {
   iw_tf_data_record::TFDataReader input(fname);
 
   if (!input.good()) {
@@ -1434,7 +1447,35 @@ BuildPool(const char* fname, Leader_Item* pool, const int istop, int& ndx,
     return 0;
   }
 
-  return BuildPool(input, pool, istop, ndx, id_to_ndx, ncount, ignore_missing_neighbours);
+  return BuildPool(input, pool, istop, ndx, id_to_ndx, ncount,
+                    ignore_missing_neighbours, max_stored_distance);
+}
+
+// An observed maximum is only a sanity check, not the generating distance cutoff.
+// Count-limited lists in particular cannot establish complete distance coverage.
+static void
+WarnDistanceCoverage(const char* fname, float maximum) {
+  bool warn = maximum < 0.0f;
+  for (int i = 0; i < number_thresholds; ++i) {
+    warn = warn || threshold[i] > maximum;
+  }
+  if (!warn || number_thresholds == 0) {
+    return;
+  }
+  cerr << "Warning: distance coverage in '" << fname << "': ";
+  if (maximum < 0.0f) {
+    cerr << "no stored neighbour distances; cannot assess requested thresholds";
+  } else {
+    cerr << "requested thresholds";
+    for (int i = 0; i < number_thresholds; ++i) {
+      if (threshold[i] > maximum) {
+        cerr << ' ' << threshold[i];
+      }
+    }
+    cerr << " exceed maximum stored distance " << maximum;
+  }
+  cerr << "; clustering uses only stored neighbours. Observed maxima do not establish "
+          "the generation cutoff or completeness of count-limited lists.\n";
 }
 
 static void
@@ -1857,13 +1898,16 @@ leader(int argc, char** argv) {
   }
 
   int ndx = 0;
+  std::vector<float> file_max_distances(istop.number_elements(), -1.0f);
 
   for (int i = 0; i < istop.number_elements(); ++i) {
     int rc;
     if (input_is_serialized_protos) {
-      rc = BuildPool(cl[i], pool, istop[i], ndx, id_to_ndx, ncount, ignore_missing_neighbours);
+      rc = BuildPool(cl[i], pool, istop[i], ndx, id_to_ndx, ncount,
+                     ignore_missing_neighbours, file_max_distances[i]);
     } else {
-      rc = build_pool(cl[i], pool, istop[i], ndx, id_to_ndx, ncount, ignore_missing_neighbours);
+      rc = build_pool(cl[i], pool, istop[i], ndx, id_to_ndx, ncount,
+                     ignore_missing_neighbours, file_max_distances[i]);
     }
     if (! rc) {
       cerr << "Cannot read fingerprints from '" << cl[i] << "'\n";
@@ -1876,11 +1920,16 @@ leader(int argc, char** argv) {
   }
 
   float max_distance = 0.0f;
+  for (int i = 0; i < istop.number_elements(); ++i) {
+    max_distance = std::max(max_distance, file_max_distances[i]);
+    if (njp == 0) {
+      WarnDistanceCoverage(cl[i], file_max_distances[i]);
+    }
+  }
   Accumulator_Int<int> nbr_count;
 
   for (int i = 0; i < pool_size; ++i) {
     if (verbose) {
-      pool[i].update_max_distance(max_distance);
       nbr_count.extra(pool[i].neighbour_count());
     }
   }

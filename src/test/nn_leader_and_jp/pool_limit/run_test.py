@@ -41,7 +41,8 @@ class PoolLimit(unittest.TestCase):
         if success:
             self.assertEqual(result.returncode, 0, result.stderr)
             # An oversized -s is not an error or a warning.
-            self.assertEqual(result.stderr, '')
+            self.assertEqual(''.join(line for line in result.stderr.splitlines(True)
+                                        if not line.startswith("Warning: distance coverage in '")), '')
         else:
             self.assertGreater(result.returncode, 0, result.stderr)
             self.assertEqual(result.stdout, '')

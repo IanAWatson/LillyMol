@@ -91,3 +91,11 @@ TDT records cause a nonzero exit status instead of clustering a partial dataset.
 TDT records must contain SMILES and identifier fields and end with `|`; identifiers
 must be nonempty. As with normal records, data beyond an explicit `-s` limit is
 not examined.
+
+Distance thresholds are checked against the maximum stored neighbour distance in each
+input file. A threshold above that maximum produces a warning, but clustering
+continues using the stored neighbours. Files without neighbour distances also
+produce a warning. This is only a sanity check: the observed maximum is not the
+generation cutoff, and count-limited lists cannot establish complete distance
+coverage. The check uses records read under `-s`, before self or excluded-subset
+neighbours are removed. Jarvis–Patrick does not use this distance check.

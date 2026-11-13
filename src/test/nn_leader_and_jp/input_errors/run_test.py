@@ -138,7 +138,8 @@ class InputErrors(unittest.TestCase):
                 result = self.run_tool([first, second], mode, serialized, limit=99, success=True)
                 self.assertEqual(re.findall(r'^PCN<([^>]+)>', result.stdout, re.MULTILINE),
                                  ['m0', 'm1'])
-                self.assertEqual(result.stderr, '')
+                self.assertEqual(''.join(line for line in result.stderr.splitlines(True)
+                                        if not line.startswith("Warning: distance coverage in '")), '')
 
 
 if __name__ == '__main__':

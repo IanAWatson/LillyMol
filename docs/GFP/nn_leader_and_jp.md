@@ -129,13 +129,17 @@ not counts truncated by cluster-size caps. `-O` requires `-T` and accepts only
 
 ```shell
 nn_leader_and_jp -h -t 0.2 -R 1 neighbours.nn > reassigned.tdt
-nn_leader_and_jp -r -T -h -t 0.2,0.3 -R 2 -B reassigned neighbours.rio
+nn_leader_and_jp -r -T -h -t 0.2,0.3 -R 2:any -B reassigned neighbours.rio
 ```
 
 `-R <size>` enables a final pass for leader or Taylor–Butina clustering. Size
 includes the leader: `-R 1` reassigns singletons, while `-R 2` also dissolves
-pairs. Each member independently joins the cluster containing its nearest
-**stored** neighbour among original members of clusters larger than this limit.
+pairs. Bare `-R <n>` searches only surviving leaders. `-R <n>:any` searches all
+original members of clusters larger than the limit and joins the cluster
+containing the nearest stored member. Bare `-R` is the cheaper default; `:any`
+selects the previous nearest-member behaviour. Both searches are limited to
+neighbours present in the item's stored list. A member-only hit cannot attract
+an item in nearest-leader mode when the corresponding leader is absent.
 Only the initial larger clusters are destinations; newly reassigned members do
 not attract further items. A pair may split between two destinations. Equal
 distances favour the earliest neighbour in molecule input order, regardless of
@@ -144,9 +148,9 @@ its position among equal-distance entries in a neighbour list.
 The final pass examines stored distances beyond the initial `-t`. Resulting
 clusters can exceed both the original threshold and `-m`/`-M` size constraints.
 Use neighbour lists with enough distance coverage for this search; this tool
-cannot calculate missing distances from fingerprints. Members with no stored
-neighbour in a destination cluster retain their original membership, with a
-warning. If no larger clusters exist, the original clustering is retained.
+cannot calculate missing distances from fingerprints. Members with no eligible
+stored target (leader, or member with `:any`) retain their original membership,
+with a warning. If no larger clusters exist, the original clustering is retained.
 Molecules left unclustered by `-C` are neither reassigned nor destinations.
 
 Destination leaders remain unchanged. A partially dissolved source cluster

@@ -86,6 +86,23 @@ cover at least the largest threshold you want to explore; limiting the number
 of neighbours can omit eligible members and change the clustering. Preserve
 the desired input order, since it determines leader priority.
 
+## DISE-style input ordering
+
+If you are looking for Directed Sphere Exclusion (DISE), its reference-derived
+priority can be supplied by ordering the input before ordinary leader selection.
+The exclusion rule itself is unchanged. To calculate distances to a set of
+reference molecules, see the [gfp_lnearneighbours sorting recipe](gfp_lnearneighbours.md#sorting-by-proximity-to-reference-molecules-dise-style-ordering),
+which uses the nearest `DIST` value and `tdt_sort` to rank candidate records.
+Use the resulting ranking to order molecules before fingerprint generation.
+
+Closest-to-any-reference ordering is a useful alternative to sorting by a
+medicinal desirability score. It differs from the original DISE lexicographic
+ordering, where subsequent reference similarities only break ties in the first.
+This applies to input prioritisation for both `gfp_leader` and
+`gfp_leader_standard`.
+
+## Options
+
 The following options are supported by the base, serial, version.
 ```
 Performs leader clustering on a set of fingerprints
@@ -231,10 +248,20 @@ option is available in `gfp_leader`. For precomputed neighbour lists,
 [nn_leader_and_jp](nn_leader_and_jp.md#reassigning-small-clusters) also supports
 `-R`, subject to the distances available in those lists.
 
-Each dissolved member independently joins the cluster containing its closest
-member. Destinations and their eligible members are fixed from the initial
-clustering; newly assigned members do not attract subsequent assignments.
-Equal distances favour the earliest destination member in input order. Members
+Bare `-R <n>` assigns each dissolved member to its nearest surviving leader.
+Use `-R <n>:any` to search all original members of the larger clusters and
+join the cluster containing the closest member instead. For example:
+
+```shell
+gfp_leader_standard -t 0.2 -R 1 fingerprints.gfp > nearest_leader.tdt
+gfp_leader_standard -t 0.2 -R 1:any fingerprints.gfp > nearest_member.tdt
+```
+
+The same syntax applies to `gfp_leader`. The cheaper nearest-leader search is
+the default; `:any` explicitly selects the previous nearest-member behaviour.
+Destinations and eligible targets are fixed from the initial clustering;
+newly assigned members do not attract subsequent assignments. Equal distances
+favour the earliest eligible target in input order. Members
 of a dissolved cluster may join different clusters. If no larger cluster exists,
 the tool warns and retains the original clustering.
 
@@ -246,8 +273,8 @@ and `-k .` textproto output support reassignment. Molecules excluded by `-A`,
 or not clustered when `-n` (`gfp_leader_standard`) or `-C` (`gfp_leader`) stops
 processing, remain excluded.
 
-The final search compares every dissolved member with all original members of
-larger clusters. `gfp_leader_standard` uses the OpenMP thread count selected
+The final search compares every dissolved member with surviving leaders, or
+with all original members of larger clusters when `:any` is specified. `gfp_leader_standard` uses the OpenMP thread count selected
 with `-h`; the `gfp_leader` final search is serial. All fingerprints remain
 available; neither implementation squeezes its pool.
 When no members move, the existing output path is used. After reassignment,
@@ -257,8 +284,8 @@ Without `-R`, `gfp_leader` retains its write-as-you-go output. With `-R`, it
 retains membership and defers output until reassignment is complete. Existing
 `-E` echo selection, `-r` distance sorting and `-k` output options still apply.
 The final search uses the configured distance metric, including Tversky, with
-the destination member as the first argument. The initial `-X` early-abandon
-cutoff does not apply. An item without any comparable destination member stays
+the eligible destination target as the first argument. The initial `-X` early-abandon
+cutoff does not apply. An item without any comparable eligible target stays
 in its original cluster, with a warning. If a partially dissolved source cluster
 loses its leader, the first remaining input member becomes its leader.
 

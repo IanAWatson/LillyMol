@@ -57,6 +57,7 @@ static int max_clusters_to_find = std::numeric_limits<int>::max();
 static int clusters_found = 0;
 static int max_cluster_size = 0;
 static int reassign_max_size = 0;
+static bool reassign_to_any = false;
 
 static similarity_type_t threshold = 0.0;
 
@@ -537,7 +538,8 @@ ReassignAndWrite(const std::vector<std::vector<int>>& original,
   // Scan in input order for deterministic tie breaking, even with scored leaders.
   for (int i = 0; i < pool_size; ++i) {
     if (assignment[i] >= 0 &&
-        original[assignment[i]].size() > static_cast<size_t>(reassign_max_size)) {
+        original[assignment[i]].size() > static_cast<size_t>(reassign_max_size) &&
+        (reassign_to_any || original[assignment[i]].front() == i)) {
       targets.push_back(i);
     }
   }
@@ -571,7 +573,7 @@ ReassignAndWrite(const std::vector<std::vector<int>>& original,
   }
   if (unmatched) {
     cerr << "Warning: retained " << unmatched
-         << " small-cluster members without a comparable member in a larger cluster; "
+         << " small-cluster members without a comparable eligible target in a larger cluster; "
             "retaining original membership for those items\n";
   }
   if (verbose) {
@@ -1157,8 +1159,8 @@ usage(int rc) {
   cerr << " -t col=<nn>      threshold is column <nn> of the name field\n";
   cerr << " -t tag=<TAG>     threshold for each molecule in dataitem <TAG>\n";
   cerr << " -H <TAG>         threshold for each molecule in dataitem <TAG>\n";
-  cerr << " -R <size>        reassign clusters of at most <size> members to larger clusters\n";
-  cerr << "                  closest member selects destination; ignores threshold and size cap\n";
+  cerr << " -R <n>           reassign clusters of at most <n> members to nearest surviving leader\n";
+  cerr << " -R <n>:any       search all members of larger clusters; ignores threshold and size cap\n";
   cerr << " -m <number>      maximum cluster size\n";
   cerr << " -M <tag>         max cluster size for each molecule in <TAG>\n";
   cerr << " -M col=nn        max cluster size is column <nn> of the name field\n";
@@ -1375,8 +1377,13 @@ leader(int argc, char **argv) {
   }
 
   if (cl.option_present('R')) {
-    if (!cl.value('R', reassign_max_size) || reassign_max_size < 1) {
-      cerr << "The reassignment size (-R) must be a positive integer\n";
+    const_IWSubstring specification = cl.option_value('R');
+    reassign_to_any = specification.ends_with(":any");
+    if (reassign_to_any) {
+      specification.chop(4);
+    }
+    if (!specification.numeric_value(reassign_max_size) || reassign_max_size < 1) {
+      cerr << "The -R option requires a positive size, optionally followed by ':any'\n";
       usage(2);
     }
     if (leader_on_clusters) {

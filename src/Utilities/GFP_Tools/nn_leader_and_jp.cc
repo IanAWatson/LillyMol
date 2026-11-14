@@ -52,6 +52,7 @@ static int write_tdt_output = 1;
 static int max_clusters_to_find = std::numeric_limits<int>::max();
 static int max_cluster_size = 0;
 static int reassign_max_size = 0;
+static bool reassign_to_any = false;
 
 /*
   We can process any number of thresholds
@@ -1344,6 +1345,15 @@ ReassignClusters(const Leader_Item* pool, int pool_size,
     }
   }
   std::vector<int> assignment(original);
+  // Choose eligible targets once, keeping the search loop independent of mode.
+  std::vector<int> eligible_cluster(pool_size, -1);
+  for (int item = 0; item < pool_size; ++item) {
+    const int c = original[item];
+    if (c >= 0 && clusters[c].members.size() > static_cast<size_t>(reassign_max_size) &&
+        (reassign_to_any || clusters[c].root == item)) {
+      eligible_cluster[item] = c;
+    }
+  }
   int moved = 0;
   int retained = 0;
   for (int item = 0; item < pool_size; ++item) {
@@ -1357,8 +1367,8 @@ ReassignClusters(const Leader_Item* pool, int pool_size,
     // Inspect the entire stored list, including distances beyond this run's -t.
     for (int i = 0; i < pool[item].neighbour_count(); ++i) {
       const int target = pool[item].neighbour(i);
-      const int c = original[target];
-      if (c < 0 || clusters[c].members.size() <= static_cast<size_t>(reassign_max_size)) {
+      const int c = eligible_cluster[target];
+      if (c < 0) {
         continue;
       }
       const float d = pool[item].neighbour_distance(i);
@@ -1426,11 +1436,11 @@ ReassignClusters(const Leader_Item* pool, int pool_size,
     cerr << "Threshold " << cutoff << ": reassigned " << moved << " small-cluster members\n";
     if (retained) {
       cerr << "Warning: retained " << retained
-           << " members without a stored neighbour in a larger cluster\n";
+           << " members without an eligible stored neighbour in a larger cluster\n";
     }
     if (missing_distances) {
       cerr << "Warning: omitted unavailable leader distances for " << missing_distances
-           << " members; reassignment used closest stored cluster members\n";
+           << " members; reassignment used closest eligible stored neighbours\n";
     }
   }
   return moved;
@@ -1732,8 +1742,8 @@ the most unselected neighbours, breaking ties by earliest input position.
 Usage:
 L -t <dis>         distance threshold(s) in [0, 1], inclusive; CSV '-t 0.15,0.20,0.25'
 L -C <number>      maximum number of clusters to find
-L -R <size>        reassign clusters of at most <size> members to larger clusters
-                  uses closest stored member; ignores threshold and size cap
+L -R <n>           reassign clusters of at most <n> members to nearest surviving leader
+L -R <n>:any       search all stored members of larger clusters; ignores threshold and size cap
 L -m <number>      maximum cluster size
 L -M col=<col>     max cluster size for each molecule in column <col> of name
 
@@ -2039,8 +2049,13 @@ leader(int argc, char** argv) {
   }
 
   if (cl.option_present('R')) {
-    if (!cl.value('R', reassign_max_size) || reassign_max_size < 1) {
-      cerr << "The reassignment size (-R) must be a positive integer\n";
+    const_IWSubstring specification = cl.option_value('R');
+    reassign_to_any = specification.ends_with(":any");
+    if (reassign_to_any) {
+      specification.chop(4);
+    }
+    if (!specification.numeric_value(reassign_max_size) || reassign_max_size < 1) {
+      cerr << "The -R option requires a positive size, optionally followed by ':any'\n";
       return 1;
     }
     if (njp) {

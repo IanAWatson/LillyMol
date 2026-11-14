@@ -25,7 +25,7 @@ with tempfile.TemporaryDirectory() as tmp:
         return result.stdout
     for threshold in ('0.00001', '0.35', '0.7'):
         for extra in ([], ['-n', '1'], ['-n', '2'], ['-n', '3'], ['-n', '7'],
-                      ['-A', str(previous)], ['-R', '2'], ['-k', '.']):
+                      ['-A', str(previous)], ['-R', '2'], ['-R', '2:any'], ['-k', '.']):
             reference = run('-t', threshold, '-h', '1', *extra)
             for threads in ('1', '4'):
                 for batch in ('1', '2'):

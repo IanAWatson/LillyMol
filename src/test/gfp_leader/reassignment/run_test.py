@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Check final reassignment against all original destination members."""
+"""Check nearest-leader and nearest-member final reassignment."""
 from pathlib import Path
 import re
 import subprocess
@@ -55,27 +55,30 @@ with tempfile.TemporaryDirectory() as tmp:
             else:
                 path.write_text(''.join(expanded))
             original = parse(run(path, *args, *metric).stdout)
-            targets = [g for g, _ in original if len(g) > cutoff]
-            assert targets
-            expected = {g[0]: set(g) for g in targets}
-            order = re.findall(r'^PCN<([^>]+)>', path.read_text(), re.M)
-            eligible = [item for item in order if any(item in g for g in targets)]
-            for group, _ in original:
-                if len(group) > cutoff:
-                    continue
-                for item in group:
-                    nearest = min(eligible, key=lambda target: distance(target, item))
-                    dest = next(g[0] for g in targets if nearest in g)
-                    expected[dest].add(item)
-            actual = parse(run(path, *args, *metric, '-R', str(cutoff)).stdout)
-            assert {g[0]: set(g) for g, _ in actual} == expected
-            for group, distances in actual:
-                for item, d in zip(group[1:], distances):
-                    assert abs(d - distance(group[0], item)) < 0.0002
-            assert sum(len(g) for g, _ in actual) == len(expanded)
-            sorted_actual = parse(run(path, *args, *metric, '-R', str(cutoff), '-r').stdout)
-            assert {g[0]: set(g) for g, _ in sorted_actual} == expected
-            assert all(ds == sorted(ds) for _, ds in sorted_actual)
+            for suffix in ('', ':any'):
+                targets = [g for g, _ in original if len(g) > cutoff]
+                assert targets
+                expected = {g[0]: set(g) for g in targets}
+                order = re.findall(r'^PCN<([^>]+)>', path.read_text(), re.M)
+                eligible = [item for item in order if any(item in g for g in targets)]
+                if not suffix:
+                    eligible = [item for item in eligible if item in expected]
+                for group, _ in original:
+                    if len(group) > cutoff:
+                        continue
+                    for item in group:
+                        nearest = min(eligible, key=lambda target: distance(target, item))
+                        dest = next(g[0] for g in targets if nearest in g)
+                        expected[dest].add(item)
+                actual = parse(run(path, *args, *metric, '-R', str(cutoff) + suffix).stdout)
+                assert {g[0]: set(g) for g, _ in actual} == expected
+                for group, distances in actual:
+                    for item, d in zip(group[1:], distances):
+                        assert abs(d - distance(group[0], item)) < 0.0002
+                assert sum(len(g) for g, _ in actual) == len(expanded)
+                sorted_actual = parse(run(path, *args, *metric, '-R', str(cutoff) + suffix, '-r').stdout)
+                assert {g[0]: set(g) for g, _ in sorted_actual} == expected
+                assert all(ds == sorted(ds) for _, ds in sorted_actual)
 
     path.write_text(''.join(expanded))
     baseline = run(path, '-t', '0.00001').stdout
@@ -96,7 +99,8 @@ with tempfile.TemporaryDirectory() as tmp:
     assert 'PCN<' not in proto and 'name:' in proto
     sorted_output = parse(run(path, '-t', '0.00001', '-R', '1', '-r').stdout)
     assert all(ds == sorted(ds) for _, ds in sorted_output)
-    for args in (['-R', '0'], ['-R', '1', '-D', 'sbc=0.1']):
+    for args in (['-R', '1', '-D', 'sbc=0.1'],
+                 *[['-R', value] for value in ('0', '0:any', '1:bad', '1:any:any', ':any')]):
         r = subprocess.run([exe, '-t', '0.2', *args, str(path)], capture_output=True)
         assert r.returncode != 0
 print('gfp_leader reassignment checks passed')

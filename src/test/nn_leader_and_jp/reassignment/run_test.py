@@ -55,7 +55,7 @@ with tempfile.TemporaryDirectory() as tmp:
         assert result.returncode == 0, result.stderr
         return result
 
-    def check(data, serialized, mode, cutoff, *args):
+    def check(data, serialized, mode, cutoff, *args, any_member=True):
         path = write(data, serialized)
         baseline = run(path, serialized, mode, *args)
         initial = parse(baseline.stdout)
@@ -66,7 +66,7 @@ with tempfile.TemporaryDirectory() as tmp:
             if sizes[original[item]] > cutoff:
                 continue
             eligible = [other for other in data[item] if other in original and
-                        sizes[original[other]] > cutoff]
+                        sizes[original[other]] > cutoff and (any_member or other == original[other])]
             if eligible:
                 closest = min(eligible, key=lambda other: (data[item][other], list(data).index(other)))
                 assignment[item] = original[closest]
@@ -77,7 +77,7 @@ with tempfile.TemporaryDirectory() as tmp:
             if members:
                 new_root = old_root if old_root in members else members[0]
                 expected[new_root] = set(members)
-        result = run(path, serialized, mode, *args, '-R', str(cutoff))
+        result = run(path, serialized, mode, *args, '-R', str(cutoff) + (':any' if any_member else ''))
         actual = parse(result.stdout)
         assert {g[0]: set(g) for g, _ in actual} == expected, (actual, expected)
         for group, distances in actual:
@@ -104,8 +104,11 @@ with tempfile.TemporaryDirectory() as tmp:
         for mode in ([], ['-T'], ['-T', '-O', 'static']):
             for cap in ([], ['-m', '2']):
                 result, _ = check(data, serialized, mode, 1, '-t', '.2', *cap)
+                check(data, serialized, mode, 1, '-t', '.2', *cap, any_member=False)
             check(split_pair, serialized, mode, 2, '-t', '.2')
+            check(split_pair, serialized, mode, 2, '-t', '.2', any_member=False)
             check(partial, serialized, mode, 2, '-t', '.2')
+            check(partial, serialized, mode, 2, '-t', '.2', any_member=False)
             asymmetric = {a: dict(b) for a, b in data.items()}
             del asymmetric['a']['s']  # New leader distance exists only in s's list.
             check(asymmetric, serialized, mode, 1, '-t', '.2')
@@ -130,6 +133,9 @@ with tempfile.TemporaryDirectory() as tmp:
         result, _ = check(data, serialized, [], 1, '-t', '.2')
         groups = {g[0]: (set(g), ds) for g, ds in parse(result.stdout)}
         assert {'s', 't'} <= groups['a'][0] and groups['a'][1]['s'] == .8
+        leaders_only, _ = check(data, serialized, [], 1, '-t', '.2', any_member=False)
+        leader_groups = {g[0]: set(g) for g, _ in parse(leaders_only.stdout)}
+        assert 's' in leader_groups['c'] and leader_groups['t'] == {'t'}
         assert 't' not in groups['a'][1] and 'omitted unavailable leader distances' in result.stderr
         result, _ = check(split_pair, serialized, [], 2, '-t', '.2')
         groups = {g[0]: set(g) for g, _ in parse(result.stdout)}
@@ -138,7 +144,9 @@ with tempfile.TemporaryDirectory() as tmp:
         groups = {g[0]: set(g) for g, _ in parse(result.stdout)}
         assert groups['d'] == {'d'} and 'c' in groups['a']
         path = write(data, serialized)
-        for options in (['-t', '.2', '-R', '0'], ['-J', '.,1', '-R', '1']):
+        for options in (['-t', '.2', '-R', '0'], ['-J', '.,1', '-R', '1'],
+                        *[['-t', '.2', '-R', value] for value in
+                          ('0:any', '1:bad', '1:any:any', ':any')]):
             result = subprocess.run([exe, *(['-r'] if serialized else []),
                                      *options, str(path)], capture_output=True)
             assert result.returncode != 0

@@ -37,6 +37,7 @@ const char* prog_name = nullptr;
 static int verbose = 0;
 
 static int reassign_max_size = 0;
+static bool reassign_to_any = false;
 
 static int clusters_to_form = std::numeric_limits<int>::max();
 
@@ -91,8 +92,8 @@ usage(int rc) {
   // clang-format off
   cerr << "Leader implementation requiring MPR IW MK MK2\n";
   cerr << " -t <dist>      distance threshold\n";
-  cerr << " -R <size>      reassign clusters of at most <size> members to larger clusters\n";
-  cerr << "                closest member chooses destination; ignores initial threshold\n";
+  cerr << " -R <n>         reassign clusters of at most <n> members to nearest surviving leader\n";
+  cerr << " -R <n>:any     search all members of larger clusters; ignores threshold and size cap\n";
   cerr << " -n <number>    number of clusters to form\n";
   cerr << " -A <fname>     file of previously selected fingerprints\n";
   cerr << " -s <size>      size of fingerprint file\n";
@@ -419,7 +420,7 @@ WriteNeighboursAsProtos(int clusters_formed, IWString_and_File_Descriptor& outpu
 }
 
 // Membership and leaders describe the initial clustering. Only initial members
-// of larger clusters are targets, so assignments cannot depend on one another.
+// of larger clusters (or just their leaders) are targets; assignments are independent.
 static int
 ReassignSmallClusters(const std::vector<int>& sizes, const std::vector<int>& leaders) {
   std::vector<int> candidates;
@@ -430,7 +431,7 @@ ReassignSmallClusters(const std::vector<int>& sizes, const std::vector<int>& lea
     }
     if (sizes[selected[i]] <= reassign_max_size) {
       candidates.push_back(i);
-    } else {
+    } else if (reassign_to_any || leaders[selected[i]] == i) {
       targets.push_back(i);
     }
   }
@@ -458,8 +459,8 @@ ReassignSmallClusters(const std::vector<int>& sizes, const std::vector<int>& lea
     }
     assignments[i] = destination;
     // DIST always means distance to the leader, not to the closest member.
-    distances[item] = fingerprints[item].tanimoto_distance(
-        fingerprints[leaders[destination]]);
+    distances[item] = reassign_to_any ? fingerprints[item].tanimoto_distance(
+        fingerprints[leaders[destination]]) : closest;
   }
   for (int i = 0; i < static_cast<int>(candidates.size()); ++i) {
     selected[candidates[i]] = assignments[i];
@@ -605,8 +606,13 @@ gfp_leader_standard(int argc, char** argv) {
   }
 
   if (cl.option_present('R')) {
-    if (!cl.value('R', reassign_max_size) || reassign_max_size < 1) {
-      cerr << "The reassignment size (-R) must be a positive integer\n";
+    const_IWSubstring specification = cl.option_value('R');
+    reassign_to_any = specification.ends_with(":any");
+    if (reassign_to_any) {
+      specification.chop(4);
+    }
+    if (!specification.numeric_value(reassign_max_size) || reassign_max_size < 1) {
+      cerr << "The -R option requires a positive size, optionally followed by ':any'\n";
       usage(2);
     }
   }

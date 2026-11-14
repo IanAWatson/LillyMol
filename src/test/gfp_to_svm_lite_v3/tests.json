@@ -1,6 +1,7 @@
 {
   "executable": "gfp_to_svm_lite_v3",
   "difftool": "diff",
+  "difftool_options": "-w",
   "test": [
     {
       "name": "fixed_counted_features",

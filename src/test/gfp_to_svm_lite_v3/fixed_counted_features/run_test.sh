@@ -68,7 +68,7 @@ cat "${indir}/in.fc.gfp" > stdin_copy.gfp
 expect_failure "cross reference from stdin" bash -c "cat stdin_copy.gfp | '${exe}' -r -O svml -C s -S s -"
 
 # A record with no identifier must not be silently dropped.
-sed '0,/^PCN</s//XXX</' "${indir}/in.fc.gfp" > noid.gfp
+sed '1,/^PCN</s//XXX</' "${indir}/in.fc.gfp" > noid.gfp
 expect_failure "record with no identifier" "${exe}" -r -O svml -C n -S n noid.gfp
 
 # Applying a cross reference made from two fingerprints to an input that has

@@ -308,7 +308,8 @@ synchronisation, but also calculate some second distances that separate scans
 would avoid. The benefit depends on threshold, dataset, and thread count;
 benchmark representative inputs before adopting it as a default.
 
-A local benchmark on `rand50k.gfp`, using an optimised native build, gave the
+Before active-index compaction, a local benchmark on `rand50k.gfp`, using an
+optimised native build, gave the
 following median wall times over three runs (including reading and writing):
 
 | Threshold | Threads | `-p 1` | `-p 2` |
@@ -321,3 +322,34 @@ following median wall times over three runs (including reading and writing):
 All output hashes agreed between modes and thread counts. These measurements
 are specific to that dataset and machine; on a 10k subset at threshold 0.5,
 paired scans did not consistently improve elapsed time.
+
+## Active candidate indices in gfp_leader_standard
+
+Both ordinary and paired leader scans use an input-ordered array of candidate
+indices. Molecules excluded by `-A` are left out when the array is built.
+Selected slots are marked inactive during the parallel scan. When approximately
+one quarter of the remaining range is inactive, the indices are compacted
+between scans, preserving input order. This reduces scans of already assigned
+items and helps distribute useful work among OpenMP workers.
+
+Fingerprint objects, original molecule indices, cluster assignments and output
+metadata stay in their original storage. Compaction therefore also works with
+both `-R <n>` and `-R <n>:any`; the final pass can still access every original
+fingerprint. Leader selection, `-n` limits, distances and output ordering are
+unchanged. No extra command-line option is required.
+
+A local before/after comparison on `rand50k.gfp` used median wall times over
+three alternating runs of each executable, including input and output. At eight
+threads the results were:
+
+| Threshold | Leaders per scan | Previous scans | Active indices |
+| --- | --- | --- | --- |
+| 0.20 | 1 | 10.06 s | 9.38 s |
+| 0.20 | 2 | 8.60 s | 8.55 s |
+| 0.35 | 1 | 4.35 s | 3.99 s |
+| 0.35 | 2 | 3.73 s | 3.57 s |
+
+Output hashes matched in every comparison. Gains were generally clearer on the
+larger file than on the 10k file, where results were mixed; the paired path had
+less remaining scanning overhead to remove. These are measurements for one
+machine and dataset, rather than expected speedups for all workloads.

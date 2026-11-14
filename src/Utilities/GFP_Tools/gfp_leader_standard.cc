@@ -107,162 +107,166 @@ usage(int rc) {
   exit(rc);
 }
 
-static int
-choose_next_leader(const int* selected, int n) {
-  for (int i = 0; i < n; i++) {
-    //      cerr << " CNL i = " << i << " sel " << selected[i] << endl;
-    if (!selected[i]) {
-      return i;
+// Fingerprints stay in their original storage for output and reassignment.
+// Only this input-ordered list of candidate indices is squeezed. Selected slots
+// are marked -1 during parallel scans, then removed when they occupy a quarter
+// of the remaining range. Compaction preserves priority and bounds wasted work.
+class ActiveCandidates {
+ private:
+  std::vector<int> _indices;
+  int _first = 0;
+  int _holes = 0;
+
+ public:
+  ActiveCandidates() {
+    _indices.reserve(pool_size);
+    for (int i = 0; i < pool_size; ++i) {
+      if (!selected[i]) {  // Exclude -A matches before the first scan.
+        _indices.push_back(i);
+      }
     }
   }
 
-  return -1;
-}
+  int first() const { return _first; }
+  int size() const { return _indices.size(); }
+  int* data() { return _indices.data(); }
 
-static int
-choose_next_leaders(const int* selected, int n, int* leaders, int leaders_requested) {
-  int leader_count = 0;
+  int NextLeaders(int* leaders, int requested) const {
+    int found = 0;
+    for (int i = _first; i < size() && found < requested; ++i) {
+      if (_indices[i] >= 0) {
+        leaders[found++] = _indices[i];
+      }
+    }
+    return found;
+  }
 
-  for (int i = 0; i < n; i++) {
-    if (selected[i]) {
+  void RemoveLeaders(int count) {
+    while (count > 0) {
+      if (_indices[_first++] < 0) {
+        --_holes;
+      } else {
+        --count;
+      }
+    }
+  }
+
+  // Called after the parallel scan has completed; no worker retains a pointer
+  // when storage is resized or indices are moved.
+  void RemoveSelected(int count) {
+    _holes += count;
+    if (_holes == 0 || _holes < (size() - _first + 3) / 4) {
+      return;
+    }
+    int destination = 0;
+    for (int i = _first; i < size(); ++i) {
+      if (_indices[i] >= 0) {
+        _indices[destination++] = _indices[i];
+      }
+    }
+    _indices.resize(destination);
+    _first = 0;
+    _holes = 0;
+  }
+};
+
+static void
+AssignToLeader(ActiveCandidates& candidates, int centre, int cluster) {
+  int* indices = candidates.data();
+  const int first = candidates.first();
+  const int stop = candidates.size();
+  int removed = 0;
+#pragma omp parallel for schedule(static) reduction(+:removed) if (stop - first > 500)
+  for (int pos = first; pos < stop; ++pos) {
+    const int item = indices[pos];
+    if (item < 0) {
       continue;
     }
-
-    leaders[leader_count] = i;
-    leader_count++;
-
-    if (leader_count == leaders_requested) {
-      return leaders_requested;
+    const float d = fingerprints[centre].tanimoto_distance(fingerprints[item]);
+    if (d <= threshold) {
+      selected[item] = cluster;
+      distances[item] = d;
+      indices[pos] = -1;
+      ++removed;
     }
   }
+  candidates.RemoveSelected(removed);
+}
 
-  return leader_count;
+static void
+AssignToTwoLeaders(ActiveCandidates& candidates, const int* leaders, int first_cluster) {
+  int* indices = candidates.data();
+  const int first = candidates.first();
+  const int stop = candidates.size();
+  int removed = 0;
+#pragma omp parallel for schedule(static) reduction(+:removed) if (stop - first > 500)
+  for (int pos = first; pos < stop; ++pos) {
+    const int item = indices[pos];
+    if (item < 0) {
+      continue;
+    }
+    float d[2];
+    fingerprints[item].tanimoto_distance_2(fingerprints[leaders[0]],
+                                         fingerprints[leaders[1]], d);
+    if (d[0] <= threshold) {
+      selected[item] = first_cluster;
+      distances[item] = d[0];
+    } else if (d[1] <= threshold) {
+      selected[item] = first_cluster + 1;
+      distances[item] = d[1];
+    } else {
+      continue;
+    }
+    indices[pos] = -1;
+    ++removed;
+  }
+  candidates.RemoveSelected(removed);
 }
 
 static int
 leader(IWString_and_File_Descriptor& output) {
+  ActiveCandidates candidates;
   int cluster_id = 0;
-
-  int icentre;
-
-  int start = 0;
-
-#ifdef DEBUG_LEADER1
-  for (int i = 0; i < pool_size; i++) {
-    cerr << " i = " << i << " selected " << selected[i] << endl;
-  }
-#endif
-
-  while ((icentre = choose_next_leader(selected + start, pool_size - start)) >= 0) {
-    cluster_id++;
-
+  int centre;
+  while (cluster_id < clusters_to_form && candidates.NextLeaders(&centre, 1)) {
+    ++cluster_id;
     if (report_progress()) {
       cerr << "Formed " << cluster_id << " clusters, "
            << count_non_zero_occurrences_in_array(selected, pool_size)
            << " items in clusters\n";
     }
-
-#ifdef DEBUG_LEADER1
-    cerr << "Selected " << icentre << " index " << (icentre + start) << endl;
-#endif
-
-    icentre += start;
-
-    selected[icentre] = cluster_id;
-    distances[icentre] = 0.0f;
-
-    start = icentre + 1;
-
-#pragma omp parallel for schedule(static) if (pool_size - start > 500)
-#ifdef DEBUG_LEADER1
-    cerr << "leader was " << icentre << " scanning from " << start << " to " << pool_size
-         << endl;
-#endif
-    for (int i = start; i < pool_size; ++i) {
-      if (!selected[i]) {
-        distances[i] = fingerprints[icentre].tanimoto_distance(fingerprints[i]);
-        if (distances[i] <= threshold) {
-          selected[i] = cluster_id;
-        }
-      }
-    }
-
-    if (cluster_id >= clusters_to_form) {
-      break;
-    }
+    candidates.RemoveLeaders(1);
+    selected[centre] = cluster_id;
+    distances[centre] = 0.0f;
+    AssignToLeader(candidates, centre, cluster_id);
   }
-
-#ifdef DEBUG_LEADER1
-  for (int i = 0; i < pool_size; i++) {
-    cerr << " i = " << i << " selected " << selected[i] << endl;
-  }
-#endif
-
   return cluster_id;
 }
 
 static int
 leader_two_at_once() {
-  int leaders[2];
+  ActiveCandidates candidates;
   int cluster_id = 0;
-
-  int leaders_found;
-  int start = 0;
-
+  int leaders[2];
+  int found;
   while (cluster_id < clusters_to_form &&
-         (leaders_found = choose_next_leaders(
-              selected + start, pool_size - start, leaders,
-              std::min(2, clusters_to_form - cluster_id)))) {
-    for (int i = 0; i < leaders_found; i++) {
-      leaders[i] += start;
+         (found = candidates.NextLeaders(leaders, std::min(2, clusters_to_form - cluster_id)))) {
+    if (found == 2 && fingerprints[leaders[0]].tanimoto_distance(
+                         fingerprints[leaders[1]]) <= threshold) {
+      found = 1;  // Leave the second candidate available for this leader's scan.
     }
-
-    if (1 == leaders_found || fingerprints[leaders[0]].tanimoto_distance(
-                                  fingerprints[leaders[1]]) <= threshold) {
-      cluster_id++;
-
-      int icentre = leaders[0];
-      start = icentre + 1;
-      selected[icentre] = cluster_id;
-      distances[icentre] = 0.0f;
-#pragma omp parallel for schedule(static) if (pool_size - start > 500)
-      for (int i = start; i < pool_size; ++i) {
-        if (!selected[i]) {
-          distances[i] = fingerprints[icentre].tanimoto_distance(fingerprints[i]);
-          if (distances[i] <= threshold) {
-            selected[i] = cluster_id;
-          }
-        }
-      }
+    candidates.RemoveLeaders(found);
+    for (int i = 0; i < found; ++i) {
+      selected[leaders[i]] = cluster_id + i + 1;
+      distances[leaders[i]] = 0.0f;
+    }
+    if (found == 1) {
+      AssignToLeader(candidates, leaders[0], cluster_id + 1);
     } else {
-      // Both of these will end up being actual centers so amortize FPDB load costs by
-      // comparing everything else to both
-      const int c0id = cluster_id + 1;
-      const int c1id = cluster_id + 2;
-      cluster_id += 2;
-      start = leaders[1] + 1;
-      selected[leaders[0]] = c0id;
-      selected[leaders[1]] = c1id;
-      distances[leaders[0]] = 0.0f;
-      distances[leaders[1]] = 0.0f;
-#pragma omp parallel for schedule(static) if (pool_size - start > 500)
-      for (int i = start; i < pool_size; i++) {
-        if (!selected[i]) {
-          float cand_distances[2];  // Per-iteration storage, private to this thread.
-          fingerprints[i].tanimoto_distance_2(fingerprints[leaders[0]],
-                                              fingerprints[leaders[1]], cand_distances);
-          if (cand_distances[0] <= threshold) {
-            selected[i] = c0id;
-            distances[i] = cand_distances[0];
-          } else if (cand_distances[1] <= threshold) {
-            selected[i] = c1id;
-            distances[i] = cand_distances[1];
-          }
-        }
-      }
+      AssignToTwoLeaders(candidates, leaders, cluster_id + 1);
     }
+    cluster_id += found;
   }
-
   return cluster_id;
 }
 

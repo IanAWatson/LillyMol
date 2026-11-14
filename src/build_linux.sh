@@ -68,12 +68,19 @@ fi
 # Download and built pre-requisites for LillyMol.
 # Deliberately no robust error checking.
 
-# Some third party dependencies an be built in parallel.
-# Make sure the number of threads is the same as what you
-# have available via quota on the machine being used.
-# Things will likely go badly if you request 12 cores, but
-# are restructed to 1.
-THREADS=8
+# Some third party dependencies can be built in parallel, and THREADS is
+# also passed to bazel as --jobs. Things will likely go badly if you
+# request 12 cores, but are restricted to 1, so size THREADS to the
+# machine actually running the build rather than hardcoding it - this
+# matters especially for small/constrained CI and container builds.
+#
+# Allow an external override (eg a container build that wants to be
+# conservative) to take precedence.
+if [[ ! -v THREADS ]] ; then
+    THREADS=$(./compute_build_threads.sh)
+fi
+
+echo "Using THREADS=${THREADS}"
 
 # We expect to be invoked from either the top level directory of
 # the repo, or src. We want third party to be at the same level

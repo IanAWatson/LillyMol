@@ -132,7 +132,7 @@ AllFlexibleBonds(const Molecule& m, atom_number_t zatom, atom_number_t destinati
 
   for (const Bond* b : m[zatom]) {
     if (! b->is_single_bond()) {
-      return 0;
+      continue;
     }
     if (b->nrings()) {
       continue;
@@ -143,7 +143,8 @@ AllFlexibleBonds(const Molecule& m, atom_number_t zatom, atom_number_t destinati
       return 1;
     }
 
-    if (dm[zatom * matoms + o] != (dist - 1)) {
+    // Follow only shortest paths towards the destination.
+    if (dm[o * matoms + destination] != (dist - 1)) {
       continue;
     }
 

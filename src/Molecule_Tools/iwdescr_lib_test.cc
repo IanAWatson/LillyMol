@@ -90,6 +90,39 @@ TEST(IWDescr, SpinachRotatableBondDescriptors) {
   EXPECT_EQ(DescriptorValue(iwdescr, hexane_values, "maxrotbgrp"), 3.0f);
 }
 
+TEST(IWDescr, InternalHydrogenBondPossibilities) {
+  const char* argv[] = {"iwdescr_test", "-O", "none", "-O", "dm"};
+  Command_Line cl(5, const_cast<char**>(argv), "O:");
+  IWDescr iwdescr;
+  ASSERT_TRUE(iwdescr.Initialise(cl));
+  std::vector<float> values(iwdescr.number_descriptors());
+
+  struct TestCase {
+    const char* smiles;
+    int expected;
+  };
+  for (const TestCase& test : {
+           TestCase{"NCOC", 0},        // Too close.
+           TestCase{"NCCOC", 1},       // Minimum separation: three bonds.
+           TestCase{"NCCCOC", 1},
+           TestCase{"NCCCCOC", 1},
+           TestCase{"NCCCCCOC", 1},     // Maximum separation: six bonds.
+           TestCase{"NCCCCCCOC", 0},    // Too far apart.
+           TestCase{"NCC=COC", 0},     // Double bond on the connecting path.
+           TestCase{"NC1CCOC1", 0},    // Ring bonds on the connecting path.
+           TestCase{"NCCO", 0},        // Both endpoints have hydrogens.
+           TestCase{"CN(C)CCOC", 0},   // Neither endpoint has hydrogens.
+           TestCase{"NCC(=C)COC", 1},  // Off-path double bond must not reject it.
+           TestCase{"COCC(=C)CN", 1},  // Same molecule, reversed atom ordering.
+           TestCase{"COCC(N)CCOC", 2}}) {
+    SCOPED_TRACE(test.smiles);
+    Molecule molecule;
+    ASSERT_TRUE(molecule.build_from_smiles(test.smiles));
+    ASSERT_TRUE(iwdescr.Process(molecule, values.data()));
+    EXPECT_EQ(DescriptorValue(iwdescr, values, "internalhbd"), test.expected);
+  }
+}
+
 TEST(IWDescr, NovartisPsaPerAtom) {
   const char* argv[] = {"iwdescr_test", "-O", "none", "-O", "psa"};
   Command_Line cl(5, const_cast<char**>(argv), "O:");

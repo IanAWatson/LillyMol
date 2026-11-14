@@ -5,6 +5,33 @@
 tool_home = ".."
 
 require_relative "lib/iwcmdline"
+require 'tempfile'
+require 'shellwords'
+
+# Tempfile.create returns a File without automatic unlinking: dry runs and
+# asynchronous submissions need their command files to survive process exit.
+def create_command_file(prefix)
+  begin
+    return Tempfile.create([prefix, ''], Dir.pwd)
+  rescue SystemCallError => error
+    warn "Warning: cannot create temporary command file in '#{Dir.pwd}': #{error.message}; trying /tmp"
+  end
+
+  begin
+    Tempfile.create([prefix, ''], '/tmp')
+  rescue SystemCallError => error
+    warn "Cannot create temporary command file in /tmp: #{error.message}"
+    exit 3
+  end
+end
+
+# Preserve an executor's status, including signal termination and failure to start.
+def command_exit_status
+  status = $?
+  return 127 unless status
+
+  status.exitstatus || (128 + status.termsig)
+end
 
 cl = IWCmdline.new("-v-a=i-o=i-e=i-w=ipos-k-ks-dry-start=i-stop=i-do=s-stem=s-rx=s-suffix=s-dsc=sfile-qsub-cluster-cluster.seq-sync-qsubopt=close-file=sfile-col=s-echo-echon-f=s-rxdir=dir-subdir-s-array=s-sleep=ipos-sortrx-expert-parallel=ipos-xargs=ipos-l=s-V-j-q-submit=xfile-noeval")
 
@@ -16,16 +43,16 @@ dry_run = cl.option_present('dry')
 
 qsub = cl.option_present('qsub') || cl.option_present('cluster') || cl.option_present('qsubopt') || cl.option_present('sync') || cl.option_present('l') || cl.option_present('V')
 
-doitfilename = "DOPATTERNTMP#{Process.pid}"
+doitfilename = nil
 doitfile = false
+if cl.option_present('parallel') && cl.option_present('xargs')
+  warn '-parallel and -xargs are mutually exclusive; specify only one'
+  exit 3
+end
+xargs_mode = cl.option_present('xargs')
 
 if qsub || cl.option_present('parallel') || cl.option_present('xargs')
   dry_run = true
-  doitfile = File.open(doitfilename, mode='w')
-  unless doitfile
-    $stderr.print "Cannot create temporary file for qsub submission\n"
-    exit 3
-  end
 end
 
 fsub = '%'
@@ -132,8 +159,6 @@ end
 
 items_to_do = Array.new
 
-numeric_sequence = false
-
 suppress_stderr = cl.option_present('q')
 
 array = Array.new
@@ -197,7 +222,7 @@ elsif cl.option_present('rx')
   d.each do |fname|
     m = (rx.match(fname))
     next unless (m)
-    next if (only_match_non_zero_file_size && ! File.size?(fname))
+    next if (only_match_non_zero_file_size && ! File.size?(File.join(dir, fname)))
     items_to_do.push(fname)
     if m.size > 1
       matchdata.push(m[1])
@@ -222,7 +247,7 @@ elsif cl.option_present('suffix')
   d.each do |fname|
     m = (rx.match(fname))
     next unless (m)
-    next if (only_match_non_zero_file_size && ! File.size?(fname))
+    next if (only_match_non_zero_file_size && ! File.size?(File.join(dir, fname)))
     items_to_do.push(fname)
     if m.size > 1
       matchdata.push(m[1])
@@ -251,7 +276,7 @@ elsif cl.option_present('subdir')
   raise "Cannot open directory '#{dname}'" unless (d)
 
   d.each do |fname|
-    next unless (File.directory?(fname))
+    next unless (File.directory?(File.join(dname, fname)))
     next if (/^\./ =~ fname)
     items_to_do.push(fname)
   end
@@ -297,7 +322,6 @@ else
     items_to_do.push(i)
   end
 
-  numeric_sequence = true if (1 == istart && 1 == istep)
 end
 
 keep_going_after_failure = cl.option_present('k')
@@ -315,34 +339,15 @@ end
 
 cmd = ARGV.join(' ')
 
-if (! numeric_sequence) && (0.class != items_to_do[0].class)
-  as_numeric = Array.new
-  digit_rx = Regexp.new('^\\d+$')
-  numeric_sequence = true
-  items_to_do.each do |i|
-    unless digit_rx.match(i)
-      numeric_sequence = false
-      break
-    end
-
-    j = i.to_i
-
-    if j <= 0
-      numeric_sequence = false
-      break
-    end
-
-    as_numeric[j] = true
-  end
-
-  if numeric_sequence   # make sure no gaps
-    as_numeric.each_with_index do |i, v|
-      unless v
-        numeric_sequence = false
-        break
-      end
-    end
-  end
+# The array shortcut replaces each item with SGE_TASK_ID. Its item order and
+# spelling must therefore be exactly 1,2,...,N; gaps, duplicates and leading
+# zeros cannot use that shortcut without changing the commands.
+numeric_sequence = !items_to_do.empty? && items_to_do.each_with_index.all? do |item, index|
+  item.to_s == (index + 1).to_s
+end
+if cl.option_present('cluster.seq') && !numeric_sequence
+  warn '-cluster.seq requires the ordered sequence 1,2,...,N without gaps or duplicates'
+  exit 3
 end
 
 qsub_options = ''
@@ -362,10 +367,10 @@ if cl.option_present('l')
 end
 
 if numeric_sequence && cl.option_present('cluster.seq')
-  cmd.gsub!('%', '${SGE_TASK_ID}')
-  qsub_file = "dptrntmp#{Process.pid}"
-  outp = File.open(qsub_file, mode='w')
-  raise "Cannot open '#{qsub_file}'" unless outp
+  task_value = width > 0 ? "$(printf '%0#{width}d' \"${SGE_TASK_ID}\")" : '${SGE_TASK_ID}'
+  cmd.gsub!(fsub, task_value)
+  outp = create_command_file("dptrntmp#{Process.pid}.")
+  qsub_file = outp.path
   outp.print "#! /bin/bash\n"
   outp.print "#\$ -cwd\n"
   outp.print "#\$ -S /bin/bash\n"
@@ -377,10 +382,16 @@ if numeric_sequence && cl.option_present('cluster.seq')
   end
   cmd = "/etc/cluster-setup.sh && qsub -t 1-#{items_to_do.size}"
   cmd << " #{qsub_options}" if qsub_options.length > 0
-  cmd << " #{qsub_file}"
+  cmd << " #{Shellwords.escape(qsub_file)}"
   $stderr << "Executing '#{cmd}'\n" if verbose
   system(cmd)
-  exit
+  exit(command_exit_status)
+end
+
+# Create the command file only after options and inputs have been checked.
+if qsub || cl.option_present('parallel') || cl.option_present('xargs')
+  doitfile = create_command_file("DOPATTERNTMP#{Process.pid}.")
+  doitfilename = doitfile.path
 end
 
 number_rx = Regexp.new('^\\d+$')
@@ -440,7 +451,10 @@ failures = 0
 # $stderr << "After quote replacement '#{mycmd}'\n"
 
   if doitfile
-    doitfile.print "#{mycmd}\n"
+    # -0 makes xargs pass each complete shell command without interpreting its
+    # quotes, backslashes or embedded newlines. Other backends use text records.
+    doitfile.write(mycmd)
+    doitfile.write(xargs_mode ? "\0" : "\n")
     next
   end
 
@@ -481,14 +495,15 @@ if doitfile
     exit
   end
 
+  command_file_argument = Shellwords.escape(doitfilename)
   if cl.option_present('parallel')
     j = cl.value('parallel')
-    cmd = "parallel -j #{j} < #{doitfilename}" # TODO: we may want to relocate parallel to a lib/p path instead
+    cmd = "parallel -j #{j} < #{command_file_argument}" # TODO: we may want to relocate parallel to a lib/p path instead
   elsif cl.option_present('xargs')
     j = cl.value('xargs')
-    cmd = "xargs -I{} -P #{j} bash -c '{}' < #{doitfilename}"
+    cmd = "xargs -0 -I{} -P #{j} bash -c '{}' < #{command_file_argument}"
   else
-    cmd = "#{iwqb} "
+    cmd = "#{Shellwords.escape(iwqb)} "
     cmd << "-qsub #{qsub_options} -qsub " if qsub_options.length > 0
     if cl.option_present('sync')
       cmd << '-sync '
@@ -496,7 +511,7 @@ if doitfile
     if cl.option_present('j')
       cmd << ' -j'
     end
-    cmd << "#{doitfilename}"
+    cmd << command_file_argument
   end
 
   if cl.option_present('dry')
@@ -506,12 +521,12 @@ if doitfile
 
   $stderr.print "Executing '#{cmd}'\n" if (verbose)
   system(cmd)
+  status = command_exit_status
 
   if cl.option_present('sync') || cl.option_present('parallel') || cl.option_present('xargs')
-    File.unlink(doitfilename)
+    File.unlink(doitfilename) if File.exist?(doitfilename)
   end
-  if cl.option_present('sync')
-    File.unlink(doitfilename)
-  end
-  
+  exit(status)
 end
+
+exit(failures > 0 ? 1 : 0)

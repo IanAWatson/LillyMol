@@ -105,6 +105,37 @@ dopattern can use gnu parallel to execute the tasks in parallel on
 an SMP machine. In addition, if you have a Grid Engine cluster,
 dopattern can be used to launch tasks to a Grid Engine cluster.
 
+`-xargs <jobs>` also runs commands concurrently. Specifying both `-parallel` and
+`-xargs` is a fatal error. These modes collect commands
+in a uniquely named temporary file in the current directory. If that file
+cannot be created, `dopattern.rb` warns and retries in `/tmp`. This changes only
+the command-file location; commands still run from the original working
+directory. Failure to create the file in either location produces a nonzero
+exit status.
+
+Completed `-xargs` and GNU Parallel runs remove their command files. Dry runs
+retain the generated file, and asynchronous cluster submissions retain it so
+the submitter can read it after `dopattern.rb` exits. The same directory
+fallback applies to `-cluster.seq` scripts.
+
+For `-xargs`, command files contain NUL-separated records and are executed with
+`xargs -0`. This preserves shell quotes, backslashes and embedded newlines in
+each command. Dry-run files use the same format; to inspect one as text, use
+`tr '\0' '\n' < command_file`. GNU Parallel and cluster command files remain
+newline-separated.
+
+The exit status of GNU Parallel, xargs or the cluster submitter is propagated.
+Temporary files for completed local or synchronous execution are removed even
+when execution fails. For sequential execution, `-k` and `-ks` continue after
+failures but still produce a nonzero final exit status.
+
+The `-cluster.seq` shortcut requires exactly the ordered sequence `1,2,...,N`.
+Gaps, duplicate indices, a different starting index, or differently spelled
+indices such as `01` are rejected rather than being replaced with the wrong
+task IDs. Use ordinary execution for those sequences. The shortcut honours
+`-f` and numeric padding via `-w`.
+
+
 # parallel_process_file
 This is a Go tool that can in some cases perform the same
 functionality as dopattern, but without the need to split an input

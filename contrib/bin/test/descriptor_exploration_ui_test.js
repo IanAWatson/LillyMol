@@ -60,6 +60,21 @@ assert(magnitudes.every((value, i) => i === 0 || magnitudes[i-1] >= value));
 const detail = elements.rows.children[1].children[0].children[0];
 detail.open = true;
 detail.events.toggle(); // Exercise curve and interval drawing.
+const tableToggle=detail.children.find(child=>child.tag==='button'&&child.textContent==='Show bucket tables');
+assert(tableToggle);
+const tables=detail.children[detail.children.indexOf(tableToggle)+1];
+assert.equal(tables.hidden,true);
+assert(tables.children.some(child=>child.tag==='table'));
+tableToggle.onclick();
+assert.equal(tables.hidden,false);
+assert.equal(tableToggle.textContent,'Hide bucket tables');
+tableToggle.onclick();
+assert.equal(tables.hidden,true);
+const described=data.features.find(row=>row.description);
+if(described){
+  const expanded=vm.runInContext('details(data.features.find(row=>row.description))',context);
+  assert(expanded.children.some(child=>child.textContent===described.description));
+}
 vm.runInContext("inspect(data.features[0].buckets[0].groups[0].members, 'Selected bucket')", context);
 const members = data.features[0].buckets[0].groups[0].members;
 assert.equal(elements.inspect.children[0].textContent, 'Selected bucket');

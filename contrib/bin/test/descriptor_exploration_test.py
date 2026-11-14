@@ -15,7 +15,7 @@ import numpy as np
 BIN = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(BIN))
 import descriptor_exploration as exploration
-from descriptor_exploration_report import build_html, SCRIPT
+from descriptor_exploration_report import build_html, descriptor_descriptions, SCRIPT
 
 
 def options(work, **overrides):
@@ -214,6 +214,19 @@ class AnalysisTest(unittest.TestCase):
 
 
 class InputAndReportTest(unittest.TestCase):
+    def test_descriptor_documentation(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            docs = root/'docs/Molecule_Tools'
+            docs.mkdir(parents=True)
+            (docs/'iwdescr.md').write_text(
+                '| Name | Definition | Group |\n'
+                '| ---- | ---------- | ----- |\n'
+                '| natoms | Full description with `code` and <special> text. | Always |\n')
+            with mock.patch.dict('os.environ', LILLYMOL_HOME=str(root)):
+                self.assertEqual(descriptor_descriptions(),
+                                 {'natoms': 'Full description with `code` and <special> text.'})
+
     def test_input_validation(self):
         with tempfile.TemporaryDirectory() as tmp:
             work=Path(tmp)
@@ -250,7 +263,8 @@ class InputAndReportTest(unittest.TestCase):
         with tempfile.TemporaryDirectory(prefix='descriptor exploration ') as tmp:
             work=Path(tmp)
             x=np.linspace(-3,3,40)
-            write_data(work,x[:,None],x*x,names=['</script><script>bad()</script>'])
+            write_data(work,np.column_stack([x, x+1, x+2]),x*x,
+                       names=['</script><script>bad()</script>', 'w_natoms', 'natoms'])
             output,report=work/'report.json',work/'report.html'
             command=['analyse',str(work/'descriptors.w'),'-A',str(work/'activity.txt'),
                      '-o',str(output),'--html',str(report),'--no_forest','--permutations','0','--repeats','1','--nomedian']
@@ -258,6 +272,11 @@ class InputAndReportTest(unittest.TestCase):
                 self.assertEqual(exploration.main(command),0)
             data=json.loads(output.read_text());html=report.read_text()
             self.assertEqual(data['summary']['n'],40)
+            payload=json.loads(html.split('<script id="report-data" type="application/json">')[1].split('</script>')[0])
+            by_name={row['name']:row for row in payload['features']}
+            self.assertEqual(by_name['w_natoms']['description'], 'The number of atoms in the molecule.')
+            self.assertEqual(by_name['w_natoms']['description'], by_name['natoms']['description'])
+            self.assertEqual(by_name['</script><script>bad()</script>']['description'], '')
             self.assertIn('Inspect / export',html)
             self.assertNotIn('</script><script>bad()',html)
             self.assertIn('\\u003c/script>',html)

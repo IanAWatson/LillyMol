@@ -4,6 +4,7 @@ script_dir="$(cd -- "$(dirname -- "$0")" && pwd)"
 export LILLYMOL_HOME="${LILLYMOL_HOME:-$(cd -- "${script_dir}/../.." && pwd)}"
 # Use the checked LillyMol environment when staged bindings are available.
 # Plain JSON-to-HTML rendering still works without a LillyMol installation.
+export PYTHONPATH="${script_dir}:${PYTHONPATH:+:${PYTHONPATH}}"
 if [[ -f "${LILLYMOL_HOME}/lib/lillymol.so" ]]; then
   exec "${LILLYMOL_HOME}/run_python.sh" "${script_dir}/dicer_fragment_activity_html.py" "$@"
 fi

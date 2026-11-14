@@ -2,6 +2,8 @@
 import base64
 import html
 import json
+import os
+from pathlib import Path
 
 
 SCRIPT = r'''
@@ -47,14 +49,18 @@ canvas.onmousemove=e=>{const rect=canvas.getBoundingClientRect(),x=(e.clientX-re
 let best=null,d=100;for(const p of points){const v=(sx(p[0])-x)**2+(sy(p[1])-y)**2;if(v<d){d=v;best=p;}}
 canvas.title=best?data.observations.identifiers[best[2]]+': '+row.name+'='+fmt(best[0])+', activity='+fmt(best[1]):'';};}
 function details(row){const detail=el('details'),summary=el('summary','Curve, buckets, correlated properties and molecule exports');detail.append(summary);
+if(row.description)detail.append(el('p',row.description,'descriptor-description'));
 if(row.notes.length)detail.append(el('p',row.notes.join('; '),'warning'));
 const canvas=el('canvas');canvas.width=650;canvas.height=285;canvas.setAttribute('aria-label',row.name+' versus measured activity');detail.append(canvas);
 const describe=el('p','Gray: observations (possibly reduced for display). Red: descriptive full-data fit. Green: finest retained bucket means with approximate 95% mean intervals. The red curve is not a held-out prediction.');detail.append(describe);
 const cv=el('p','Spline gain by repeat: '+row.spline_cv_repeats.map(fmt).join(', ')+'. Linear CV gain: '+fmt(row.linear_cv_gain)+'. IQR fitted activity difference: '+fmt(row.effect_iqr)+'.');detail.append(cv);
-for(const profile of row.buckets){detail.append(el('h3',profile.requested+' requested buckets → '+profile.actual+' retained; η² '+fmt(profile.eta_squared)+'; CV gain '+fmt(profile.cv_gain)));
+const tables=el('div');tables.hidden=true;
+const toggle=el('button','Show bucket tables');toggle.setAttribute('aria-expanded','false');
+toggle.onclick=()=>{tables.hidden=!tables.hidden;toggle.textContent=tables.hidden?'Show bucket tables':'Hide bucket tables';toggle.setAttribute('aria-expanded',String(!tables.hidden));};detail.append(toggle,tables);
+for(const profile of row.buckets){tables.append(el('h3',profile.requested+' requested buckets → '+profile.actual+' retained; η² '+fmt(profile.eta_squared)+'; CV gain '+fmt(profile.cv_gain)));
 const table=el('table'),head=el('tr');for(const title of ['Descriptor range','n','Mean',...(data.show_median?['Median']:[]),'SD','95% mean interval','Molecules'])head.append(el('th',title));table.append(head);
 for(const group of profile.groups){const tr=el('tr');for(const value of [fmt(group.low)+' … '+fmt(group.high),group.n,fmt(group.mean),...(data.show_median?[fmt(group.median)]:[]),fmt(group.sd),group.mean_ci?.map(fmt).join(' … ')??'—'])tr.append(el('td',value));
-const cell=el('td'),button=el('button','Inspect / export');button.onclick=()=>inspect(group.members,row.name+': '+fmt(group.low)+' … '+fmt(group.high));cell.append(button);tr.append(cell);table.append(tr);}detail.append(table);}
+const cell=el('td'),button=el('button','Inspect / export');button.onclick=()=>inspect(group.members,row.name+': '+fmt(group.low)+' … '+fmt(group.high));cell.append(button);tr.append(cell);table.append(tr);}tables.append(table);}
 const near=el('p','Correlated descriptors (pairwise complete Spearman): '+(row.neighbors.map(n=>n.name+' ('+fmt(n.spearman)+', n='+n.n+')').join('; ')||'None above the configured threshold.'));detail.append(near);
 detail.addEventListener('toggle',()=>{if(detail.open)plot(canvas,row);});return detail;}
 function render(){const rows=selected(),size=data.page_size;page=Math.max(0,Math.min(page,Math.ceil(rows.length/size)-1));
@@ -97,8 +103,33 @@ def representative_indices(groups, observations):
     return result
 
 
+def descriptor_descriptions():
+    """Read the complete Definition column from the iwdescr documentation."""
+    roots = [Path(__file__).resolve().parents[2]]
+    if os.environ.get('LILLYMOL_HOME'):
+        roots.insert(0, Path(os.environ['LILLYMOL_HOME']))
+    for root in roots:
+        path = root / 'docs/Molecule_Tools/iwdescr.md'
+        if not path.is_file():
+            continue
+        descriptions = {}
+        for line in path.read_text().splitlines():
+            if not line.startswith('|'):
+                continue
+            fields = [field.strip() for field in line.split('|')]
+            if len(fields) != 5 or fields[1] in ('Name', '----', ''):
+                continue
+            descriptions[fields[1]] = fields[2]
+        return descriptions
+    return {}
+
+
 def build_html(data, args):
     rows = data['features'][:args.top_n] if args.top_n else data['features']
+    descriptions = descriptor_descriptions()
+    rows = [dict(row, description=descriptions.get(row['name'],
+                 descriptions.get(row['name'].removeprefix('w_'),
+                                  row.get('description', '')))) for row in rows]
     payload = dict(data, features=rows, page_size=args.page_size, show_median=not args.nomedian)
     # Embed only bounded example images. Statistical results and molecule exports
     # remain complete; SMILES are shown when an image was not embedded.

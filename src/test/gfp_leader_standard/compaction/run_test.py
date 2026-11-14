@@ -45,7 +45,7 @@ with tempfile.TemporaryDirectory() as tmp:
     blocks = sorted(interleaved)
     shuffled = list(interleaved)
     random.Random(7391).shuffle(shuffled)
-    for ordering in (interleaved, blocks, shuffled):
+    for ordering in (interleaved, blocks, shuffled, interleaved[:501], interleaved[:502]):
         path = tmp / 'pool.gfp'
         path.write_text(''.join(re.sub(r'PCN<[^>]+>', f'PCN<m{i}>', records[k])
                                 for i, k in enumerate(ordering)))

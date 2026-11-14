@@ -303,7 +303,7 @@ If they belong to the same sphere, the tool falls back to the ordinary scan.
 
 `-p 1` uses the default one-leader path. Both modes preserve leader order,
 cluster membership, distances, `-n` limits (including odd limits), and `-R`
-reassignment. Paired scans can reduce memory traffic and parallel-region
+reassignment. Paired scans can reduce memory traffic and scan
 synchronisation, but also calculate some second distances that separate scans
 would avoid. The benefit depends on threshold, dataset, and thread count;
 benchmark representative inputs before adopting it as a default.
@@ -353,3 +353,34 @@ Output hashes matched in every comparison. Gains were generally clearer on the
 larger file than on the 10k file, where results were mixed; the paired path had
 less remaining scanning overhead to remove. These are measurements for one
 machine and dataset, rather than expected speedups for all workloads.
+
+## Persistent OpenMP team in gfp_leader_standard
+
+With `-p 2`, large candidate scans share one OpenMP parallel region for the
+clustering run.
+Thread zero selects the next leader or pair and compacts candidate indices when
+needed. A barrier publishes that state, then all threads, including thread zero,
+perform assignments. The assignment barrier completes reductions before indices
+can move or the next leaders are chosen. No explicit mutex is required.
+
+When the remaining range is small, the team finishes and the tail is processed
+serially. Single-threaded and small-input runs bypass the parallel region.
+The default and explicit `-p 1` retain the simpler per-scan OpenMP execution
+path. `-p 2` uses the persistent team. Both paths preserve selection and output
+semantics and remain independently usable. Final `-R` reassignment happens
+after the initial clustering team ends.
+
+Local comparisons against the compact-index implementation with per-scan
+parallel regions gave these median wall times, including input and output:
+
+| Molecules | Threshold | Threads | Leaders per scan | Per-scan regions | Persistent team |
+| --- | --- | --- | --- | --- | --- |
+| 50k | 0.20 | 8 | 2 | 8.72 s | 8.16 s |
+| 50k | 0.35 | 8 | 2 | 3.67 s | 3.40 s |
+| 100k | 0.35 | 8 | 2 | 7.58 s | 7.07 s |
+
+The 50k timings used three alternating runs of each executable; the 100k timings
+used two. Output hashes matched. Improvements were clearest for paired scans,
+about 6–7% in these larger cases. An experimental persistent-team single-leader
+path showed no consistent benefit, so the simpler single-leader path was retained. OpenMP already reuses worker threads, so savings from a persistent
+region are smaller than avoiding operating-system thread creation would suggest.

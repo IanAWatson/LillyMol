@@ -170,6 +170,7 @@ class ActiveCandidates {
   }
 };
 
+// Simple fallback: preserve the per-scan OpenMP implementation for -p 1.
 static void
 AssignToLeader(ActiveCandidates& candidates, int centre, int cluster) {
   int* indices = candidates.data();
@@ -189,36 +190,6 @@ AssignToLeader(ActiveCandidates& candidates, int centre, int cluster) {
       indices[pos] = -1;
       ++removed;
     }
-  }
-  candidates.RemoveSelected(removed);
-}
-
-static void
-AssignToTwoLeaders(ActiveCandidates& candidates, const int* leaders, int first_cluster) {
-  int* indices = candidates.data();
-  const int first = candidates.first();
-  const int stop = candidates.size();
-  int removed = 0;
-#pragma omp parallel for schedule(static) reduction(+:removed) if (stop - first > 500)
-  for (int pos = first; pos < stop; ++pos) {
-    const int item = indices[pos];
-    if (item < 0) {
-      continue;
-    }
-    float d[2];
-    fingerprints[item].tanimoto_distance_2(fingerprints[leaders[0]],
-                                         fingerprints[leaders[1]], d);
-    if (d[0] <= threshold) {
-      selected[item] = first_cluster;
-      distances[item] = d[0];
-    } else if (d[1] <= threshold) {
-      selected[item] = first_cluster + 1;
-      distances[item] = d[1];
-    } else {
-      continue;
-    }
-    indices[pos] = -1;
-    ++removed;
   }
   candidates.RemoveSelected(removed);
 }
@@ -243,29 +214,129 @@ leader(IWString_and_File_Descriptor& output) {
   return cluster_id;
 }
 
+// The mode is selected outside the candidate loop; there is no per-item branch
+// for single versus paired leaders. Each slot is owned by one worker per scan.
+template <bool Paired>
+static inline int
+AssignCandidate(int& slot, const int* leaders, int first_cluster) {
+  if (slot < 0) {
+    return 0;
+  }
+  const int item = slot;
+  int cluster = first_cluster;
+  float distance;
+  if constexpr (Paired) {
+    float d[2];
+    fingerprints[item].tanimoto_distance_2(fingerprints[leaders[0]],
+                                         fingerprints[leaders[1]], d);
+    if (d[0] <= threshold) {
+      distance = d[0];
+    } else if (d[1] <= threshold) {
+      distance = d[1];
+      ++cluster;
+    } else {
+      return 0;
+    }
+  } else {
+    distance = fingerprints[leaders[0]].tanimoto_distance(fingerprints[item]);
+    if (!(distance <= threshold)) {
+      return 0;
+    }
+  }
+  selected[item] = cluster;
+  distances[item] = distance;
+  slot = -1;
+  return 1;
+}
+
 static int
 leader_two_at_once() {
   ActiveCandidates candidates;
   int cluster_id = 0;
   int leaders[2];
-  int found;
-  while (cluster_id < clusters_to_form &&
-         (found = candidates.NextLeaders(leaders, std::min(2, clusters_to_form - cluster_id)))) {
+  int found = 0;
+  int first_cluster = 0;
+  int first = 0;
+  int stop = 0;
+  int* indices = nullptr;
+  int removed = 0;
+
+  // Only the coordinating thread changes leaders or resizes candidate storage.
+  // Each parallel scan finishes at a barrier before the next preparation step.
+  const auto prepare = [&](bool parallel_phase) {
+    candidates.RemoveSelected(removed);
+    removed = 0;
+    found = 0;
+    if (cluster_id >= clusters_to_form ||
+        (parallel_phase && candidates.size() - candidates.first() <= 501)) {
+      return false;
+    }
+    found = candidates.NextLeaders(leaders,
+        std::min(2, clusters_to_form - cluster_id));
+    if (!found) {
+      return false;
+    }
     if (found == 2 && fingerprints[leaders[0]].tanimoto_distance(
                          fingerprints[leaders[1]]) <= threshold) {
-      found = 1;  // Leave the second candidate available for this leader's scan.
+      found = 1;
     }
     candidates.RemoveLeaders(found);
+    first_cluster = cluster_id + 1;
     for (int i = 0; i < found; ++i) {
-      selected[leaders[i]] = cluster_id + i + 1;
+      selected[leaders[i]] = first_cluster + i;
       distances[leaders[i]] = 0.0f;
     }
-    if (found == 1) {
-      AssignToLeader(candidates, leaders[0], cluster_id + 1);
-    } else {
-      AssignToTwoLeaders(candidates, leaders, cluster_id + 1);
-    }
     cluster_id += found;
+    indices = candidates.data();
+    first = candidates.first();
+    stop = candidates.size();
+    return true;
+  };
+
+  if (omp_get_max_threads() > 1 && candidates.size() > 501) {
+    // One persistent team handles the large scans. Master plus an explicit
+    // publication barrier avoids contending to choose a single-section owner.
+    // The coordinator also participates in the parallel assignment loop.
+#pragma omp parallel
+    {
+      while (true) {
+#pragma omp master
+        {
+          prepare(true);
+        }
+#pragma omp barrier
+        if (!found) {
+          break;
+        }
+        // Private snapshots keep the hot loop independent of coordinator state.
+        const int roots[2] = {leaders[0], found == 2 ? leaders[1] : leaders[0]};
+        const int cluster = first_cluster;
+        if (found == 1) {
+#pragma omp for schedule(static) reduction(+:removed)
+          for (int pos = first; pos < stop; ++pos) {
+            removed += AssignCandidate<false>(indices[pos], roots, cluster);
+          }
+        } else {
+#pragma omp for schedule(static) reduction(+:removed)
+          for (int pos = first; pos < stop; ++pos) {
+            removed += AssignCandidate<true>(indices[pos], roots, cluster);
+          }
+        }
+      }
+    }
+  }
+  // Once the range is small, leave the team rather than synchronising idle
+  // workers for every remaining leader. Single-threaded runs use this throughout.
+  while (prepare(false)) {
+    if (found == 1) {
+      for (int pos = first; pos < stop; ++pos) {
+        removed += AssignCandidate<false>(indices[pos], leaders, first_cluster);
+      }
+    } else {
+      for (int pos = first; pos < stop; ++pos) {
+        removed += AssignCandidate<true>(indices[pos], leaders, first_cluster);
+      }
+    }
   }
   return cluster_id;
 }

@@ -1,5 +1,7 @@
 #include <array>
 #include <cstdint>
+#include <cmath>
+#include <random>
 #include <memory>
 #include <vector>
 
@@ -87,6 +89,44 @@ TEST(GfpStandard, PairedDistancesMatchIndividualDistances) {
         candidate.tanimoto_distance_2(a, b, distances);
         EXPECT_EQ(distances[0], candidate.tanimoto_distance(a));
         EXPECT_EQ(distances[1], candidate.tanimoto_distance(b));
+      }
+    }
+  }
+}
+
+TEST(GfpStandard, BoundedDistanceMatchesScalarAtBoundaries) {
+  std::mt19937 rng(73621);
+  std::array<GFP_Standard, 32> pool;
+  for (int i = 0; i < 32; ++i) {
+    int properties[8];
+    for (int& p : properties) {
+      p = 1 + rng() % 100;
+    }
+    pool[i].build_molecular_properties(properties, 8);
+    std::array<int, 2048> iw{};
+    std::array<int, 192> mk{}, mk2{};
+    int nset = 0;
+    for (int j = 0; j < 2048; ++j) {
+      nset += iw[j] = (i & 1) ? (rng() % 4 == 0) : 0;
+    }
+    for (int j = 0; j < 192; ++j) {
+      mk[j] = (i & 2) ? (rng() % 3 == 0) : 0;
+      mk2[j] = (i & 4) ? (rng() % 5 == 0) : 0;
+    }
+    pool[i].build_iwfp(iw.data(), nset);
+    pool[i].build_mk(mk.data(), mk.size());
+    pool[i].build_mk2(mk2.data(), mk2.size());
+  }
+  for (const auto& lhs : pool) {
+    for (const auto& rhs : pool) {
+      const float expected = lhs.tanimoto_distance(rhs);
+      for (float cutoff : {0.0f, 0.1f, 0.25f, 0.5f, 0.75f, 1.0f, expected,
+                           std::nextafter(expected, 0.0f), std::nextafter(expected, 1.0f)}) {
+        const auto result = lhs.tanimoto_distance_if_less(rhs, cutoff);
+        ASSERT_EQ(result.has_value(), expected <= cutoff) << expected << " cutoff " << cutoff;
+        if (result) {
+          EXPECT_EQ(*result, expected);
+        }
       }
     }
   }

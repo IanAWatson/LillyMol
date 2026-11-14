@@ -366,46 +366,48 @@ GFP_Standard::tanimoto_distance_2(GFP_Standard const &fp1, GFP_Standard const &f
 }
 
 std::optional<float>
-GFP_Standard::tanimoto_distance_if_less(const GFP_Standard &rhs,
-                                        float must_be_closer_than) const {
-  // The calculations are done in similarity space, so convert one time.
-  const float similarity_needed = 1.0 - must_be_closer_than;
+GFP_Standard::tanimoto_distance_if_less(const GFP_Standard& rhs,
+                                       float must_be_closer_than) const {
+  // The ordinary calculation excludes jointly empty components. Keep that less
+  // common case out of the four-component fast path below.
+  if (!(_nset_iw || rhs._nset_iw) || !(_nset_mk || rhs._nset_mk) ||
+      !(_nset_mk2 || rhs._nset_mk2)) {
+    const float d = tanimoto_distance(rhs);
+    return d <= must_be_closer_than ? std::optional<float>(d) : std::nullopt;
+  }
 
-  float rc = static_cast<float>(0.0);
-
-  rc += gfp_internal::molecular_property_ratio_table().similarity(_molecular_properties,
-                                                         rhs._molecular_properties, 8);
-
-  if ((rc + 3.0f) / 4.0f < similarity_needed) {
+  const float similarity_needed = 1.0f - must_be_closer_than;
+  // Bounds must be conservative at floating-point boundaries. The partial sum
+  // uses a different order from the final scalar calculation; allow for rounding
+  // in that sum, the remaining contributions and the cutoff conversion.
+  constexpr float kRoundingSlack = 8.0f * std::numeric_limits<float>::epsilon();
+  const float properties = gfp_internal::molecular_property_ratio_table().similarity(
+      _molecular_properties, rhs._molecular_properties, 8);
+  if ((properties + 3.0f) * 0.25f + kRoundingSlack < similarity_needed) {
     return std::nullopt;
   }
 
-  if (_nset_mk2 || rhs._nset_mk2) {
-    int bic = popcount_2fp(_mk2, rhs._mk2, 8);
-    rc += iwmisc::Fraction<float>(bic, _nset_mk2 + rhs._nset_mk2 - bic);
-    if ((rc + 2.0) / 4.0 < similarity_needed) {
-      return std::nullopt;
-    }
-  }
-
-  if (_nset_mk || rhs._nset_mk) {
-    int bic = popcount_2fp(_mk, rhs._mk, 8);
-    rc += iwmisc::Fraction<float>(bic, _nset_mk + rhs._nset_mk - bic);
-    if ((rc + 1.0) / 3.0 < similarity_needed) {
-      return std::nullopt;
-    }
-  }
-
-  int bic = popcount_2fp(_iw, rhs._iw, 64);
-  rc += iwmisc::Fraction<float>(bic, _nset_iw + rhs._nset_iw - bic);
-
-  rc = rc * 0.25;
-
-  if (rc < similarity_needed) {
+  // Cheap components first, so distant candidates can avoid the large IW scan.
+  int bic = popcount_2fp(_mk2, rhs._mk2, 8);
+  const float mk2 = iwmisc::Fraction<float>(bic, _nset_mk2 + rhs._nset_mk2 - bic);
+  if ((properties + mk2 + 2.0f) * 0.25f + kRoundingSlack < similarity_needed) {
     return std::nullopt;
   }
+  bic = popcount_2fp(_mk, rhs._mk, 8);
+  const float mk = iwmisc::Fraction<float>(bic, _nset_mk + rhs._nset_mk - bic);
+  if ((properties + mk2 + mk + 1.0f) * 0.25f + kRoundingSlack < similarity_needed) {
+    return std::nullopt;
+  }
+  bic = popcount_2fp(_iw, rhs._iw, 64);
+  const float iw = iwmisc::Fraction<float>(bic, _nset_iw + rhs._nset_iw - bic);
 
-  return 1.0f - rc;
+  // Match tanimoto()'s addition order exactly, not just its mathematical value.
+  float similarity = properties;
+  similarity += iw;
+  similarity += mk;
+  similarity += mk2;
+  const float d = 1.0f - similarity * 0.25f;
+  return d <= must_be_closer_than ? std::optional<float>(d) : std::nullopt;
 }
 
 int

@@ -3,6 +3,8 @@
 */
 
 #include <algorithm>
+#include <cmath>
+#include <vector>
 #include <iostream>
 #include <memory>
 #include <optional>
@@ -217,6 +219,7 @@ struct Selected_Item {
   int _sel;
   int _nsn;
   float _dist;
+  float _scale;
 };
 
 static int pool_size = 0;
@@ -247,7 +250,8 @@ usage(int rc)
  -n <nsel>       number of items to select
  -A <fname>      file of previously selected fingerprints
  -p FILE=<fname> read weight values from <fname>
- -p COL=<col>    weight values are column <col> in the name
+ -p COL=<col>    weight values are column <col> in the name (1-based, >=2)
+ -p FCOL=<col>   weight column in FILE= input (1-based including id; default 2)
  -N <tag>        gfp_nearneighbours has been run and initial distances are in <tag> "
                   (also FILE=, COL=)
  -S rand         choose first item randomly
@@ -255,7 +259,7 @@ usage(int rc)
  -t <dist>       stop selection once distance drops below <dist>
  -h <n>          maximum number of OMP threads to use
  -r <n>          report progress every <n> items selected
- -q <n>          squeeze out already selected items evern <n> selections (def 1000)
+ -q <n>          squeeze out already selected items every <n> selections (def 1000)
  -b              brief output (smiles id dist)
  -v              verbose output
 )";
@@ -270,7 +274,9 @@ static int
 get_previously_computed_nearest_neighbour(
     const IWString& id, const IW_STL_Hash_Map_float& previously_computed_distances,
     float& d) {
-  IW_STL_Hash_Map_float::const_iterator f = previously_computed_distances.find(id);
+  IWString key(id);
+  key.truncate_at_first(' ');
+  IW_STL_Hash_Map_float::const_iterator f = previously_computed_distances.find(key);
 
   if (f ==
       previously_computed_distances.end()) {  // OK if no previously computed distance
@@ -408,9 +414,40 @@ RandomPoolMember(int pool_size) {
   return u(generator);
 }
 
+// Neighbour identities are original indices, so they remain valid when active
+// fingerprints and their per-item state move. Selected output also stores its
+// scale explicitly rather than looking it up in the squeezed weight array.
+template <typename F>
+static int
+SqueezeWeighted(F* pool, int& size, int next, float* weights) {
+  if (size < 1000) {
+    return next;
+  }
+  int destination = 0;
+  int result = -1;
+  for (int i = 0; i < size; ++i) {
+    if (selected[i]) {
+      continue;
+    }
+    if (i == next) {
+      result = destination;
+    }
+    if (destination != i) {
+      pool[destination] = pool[i];
+      selected[destination] = 0;
+      distances[destination] = distances[i];
+      nearest_previously_selected[destination] = nearest_previously_selected[i];
+      weights[destination] = weights[i];
+    }
+    ++destination;
+  }
+  size = destination;
+  return result;
+}
+
 template <typename F>
 int
-spread_with_weights(F* fingerprints, const int pool_size, const float* weight,
+spread_with_weights(F* fingerprints, int& pool_size, float* weight,
                     Selected_Item* selected_item) {
   int s;
 
@@ -444,8 +481,8 @@ spread_with_weights(F* fingerprints, const int pool_size, const float* weight,
     // #pragma omp parallel for schedule(dynamic,256)
     for (int i = 0; i < pool_size; i++) {
       distances[i] = weight[i] * fingerprints[s].tanimoto_distance(fingerprints[i]);
-      assert(distances[i] >= 0.0 && distances[i] <= 1.0);
-      nearest_previously_selected[i] = s;
+      assert(std::isfinite(distances[i]) && distances[i] >= 0.0f);
+      nearest_previously_selected[i] = fingerprints[s].initial_ndx();
     }
 
     distances[s] = 1.0f;
@@ -460,19 +497,20 @@ spread_with_weights(F* fingerprints, const int pool_size, const float* weight,
     //  cerr << " s = " << s << '\n';
     //  iw_write_array(spread_order, pool_size, "selected", cerr);
 
-    // nearest_previously_selected[] is initialised to -1, and with -A in effect
-    // the first selection has no in-pool neighbour, so it stays -1. Indexing
-    // fingerprints[-1] would be out of bounds; pass -1 through instead and let
-    // the writer emit '*' for the neighbour, as it already does for that case.
+    // Neighbour ids are original indices, including after squeezing. With -A
+    // or -N, the first selection can have no known in-pool neighbour (-1).
     const int nps = nearest_previously_selected[s];
 
     set_selected_item(selected_item[items_selected], fingerprints[s].initial_ndx(),
-                      nps >= 0 ? fingerprints[nps].initial_ndx() : -1,
-                      distances[s]);
+                      nps, distances[s]);
 
+    selected_item[items_selected]._scale = weight[s];
     items_written = items_selected + 1;
 
     selected[s] = 1;
+    if (items_written == nsel) {
+      break;
+    }
 
     int nexts_shared = -1;
     float dmax_shared = -1.0f;
@@ -491,10 +529,11 @@ spread_with_weights(F* fingerprints, const int pool_size, const float* weight,
         float d = weight[i] * fingerprints[s].tanimoto_distance(fingerprints[i]);
         if (d < distances[i]) {
           distances[i] = d;
-          nearest_previously_selected[i] = s;
+          nearest_previously_selected[i] = fingerprints[s].initial_ndx();
         }
 
-        if (distances[i] > mydmax) {
+        if (distances[i] > mydmax ||
+            (distances[i] == mydmax && (mynexts < 0 || i < mynexts))) {
           mydmax = distances[i];
           mynexts = i;
         }
@@ -502,7 +541,9 @@ spread_with_weights(F* fingerprints, const int pool_size, const float* weight,
 
 #pragma omp critical
       {
-        if (mydmax > dmax_shared) {
+        if (mydmax > dmax_shared ||
+            (mydmax == dmax_shared && mynexts >= 0 &&
+             (nexts_shared < 0 || mynexts < nexts_shared))) {
           dmax_shared = mydmax;
           nexts_shared = mynexts;
         }
@@ -512,10 +553,31 @@ spread_with_weights(F* fingerprints, const int pool_size, const float* weight,
     //  cerr << "Selected " << s << " dist " << distances[s] << '\n';
 
     if (nexts_shared < 0) {
+      // Zero-distance (including zero-weight) items still fill the requested
+      // count when no positive stopping threshold has been specified.
+      if (stop_once_distance_drops_below == 0.0f) {
+        for (int i = 0; i < pool_size && items_written < nsel; ++i) {
+          if (selected[i]) {
+            continue;
+          }
+          set_selected_item(selected_item[items_written], fingerprints[i].initial_ndx(),
+                            nearest_previously_selected[i], distances[i]);
+          selected_item[items_written]._scale = weight[i];
+          selected[i] = 1;
+          ++items_written;
+        }
+      }
+      break;
+    }
+    if (dmax_shared < stop_once_distance_drops_below) {
       break;
     }
 
     s = nexts_shared;
+    if (next_squeeze == items_written) {
+      s = SqueezeWeighted(fingerprints, pool_size, s, weight);
+      next_squeeze += squeeze;
+    }
 
     if (report_progress()) {
       cerr << "Selected " << items_selected << " fingerprints\n";
@@ -680,6 +742,9 @@ spread4(F* pool, int& pool_size, IWString_and_File_Descriptor& output) {
   for (int items_selected = 0; items_selected < nsel; items_selected++) {
     WriteSelected(pool, s, output);
     pool[s].set_selected(1);
+    if (items_selected + 1 == nsel) {
+      return nsel;
+    }
 
     // Variables shared between threads.
     int nexts_shared = -1;
@@ -703,7 +768,8 @@ spread4(F* pool, int& pool_size, IWString_and_File_Descriptor& output) {
 #else
         pool[i].NofitySelected(pool[s]);
 #endif
-        if (pool[i].distance() > mydmax) {
+        if (pool[i].distance() > mydmax ||
+            (pool[i].distance() == mydmax && (mynexts < 0 || i < mynexts))) {
           mydmax = pool[i].distance();
           mynexts = i;
         }
@@ -711,7 +777,9 @@ spread4(F* pool, int& pool_size, IWString_and_File_Descriptor& output) {
 
 #pragma omp critical
       {
-        if (mydmax > dmax_shared) {
+        if (mydmax > dmax_shared ||
+            (mydmax == dmax_shared && mynexts >= 0 &&
+             (nexts_shared < 0 || mynexts < nexts_shared))) {
           dmax_shared = mydmax;
           nexts_shared = mynexts;
         }
@@ -724,18 +792,23 @@ spread4(F* pool, int& pool_size, IWString_and_File_Descriptor& output) {
 #endif
 
     if (nexts_shared < 0) {  // we are ignoring nsel, unlikely to be a problem...
-      for (int i = 0; i < pool_size; ++i) {
-        if (!pool[i].selected()) {
-          WriteSelected(pool, i, output);
+      int written = items_selected + 1;
+      if (stop_once_distance_drops_below == 0.0f) {
+        for (int i = 0; i < pool_size && written < nsel; ++i) {
+          if (!pool[i].selected()) {
+            WriteSelected(pool, i, output);
+            pool[i].set_selected(1);
+            ++written;
+          }
         }
       }
-      return items_selected;
+      return written;
     }
 
     s = nexts_shared;
 
     if (dmax_shared < stop_once_distance_drops_below) {
-      return items_selected;
+      return items_selected + 1;
     }
 
     if (report_progress()) {
@@ -743,7 +816,7 @@ spread4(F* pool, int& pool_size, IWString_and_File_Descriptor& output) {
            << '\n';
     }
 
-    if (next_squeeze == items_selected) {
+    if (next_squeeze == items_selected + 1) {
       // cerr << "Before squeeze s " << s << " pool_size " << pool_size << '\n';
       s = do_squeeze(pool, pool_size, s);
       // cerr << "After  squeeze s " << s << " pool_size " << pool_size << '\n';
@@ -1065,9 +1138,6 @@ spread() {
 static int
 assign_scaling_factors_from_token(const IWString* pcn, const int pool_size,
                                   int scaling_factor_column, float* weight) {
-  scaling_factor_column--;
-  cerr << "From column " << scaling_factor_column << '\n';
-
   for (int i = 0; i < pool_size; i++) {
     const_IWSubstring s;
 
@@ -1079,7 +1149,7 @@ assign_scaling_factors_from_token(const IWString* pcn, const int pool_size,
 
     float v;
 
-    if (!s.numeric_value(v) || v < 0.0f) {
+    if (!s.numeric_value(v) || !std::isfinite(v) || v < 0.0f) {
       cerr << "Invalid scaling factor '" << pcn[i] << "'\n";
       return 0;
     }
@@ -1093,65 +1163,56 @@ assign_scaling_factors_from_token(const IWString* pcn, const int pool_size,
 static int
 assign_scaling_factors_from_file(iwstring_data_source& input, int col,
                                  const IWString* pcn, int verbose) {
+  input.set_dos(1);
+  input.set_translate_tabs(1);
   IW_STL_Hash_Map_int id_to_ndx;
-
-  for (int i = 0; i < pool_size; i++) {
+  for (int i = 0; i < pool_size; ++i) {
     IWString id = pcn[i];
-
     id.truncate_at_first(' ');
-
     id_to_ndx[id] = i;
   }
-
+  std::vector<unsigned char> seen(pool_size, 0);
   const_IWSubstring buffer;
-
-  int rc = 0;
-
+  int count = 0;
   while (input.next_record(buffer)) {
-    IWString id, s;
-
-    if (!buffer.split(id, ' ', s)) {
-      cerr << "Cannot tokenise fingerprint weight record '" << buffer << "'\n";
+    IWString id;
+    const_IWSubstring token;
+    if (!buffer.word(0, id) || !buffer.word(col, token)) {
+      cerr << "Cannot extract weight column " << col + 1 << " from '" << buffer << "'\n";
       return 0;
     }
-
-    if (1 == col) {
-      s.truncate_at_first(' ');
-    } else {
-      const_IWSubstring tmp(s);
-      tmp.word(col - 1, s);
-    }
-
-    float w;
-
-    if (!s.numeric_value(w) || w < 0.0f) {
-      if (1 == input.lines_read()) {  // header record
-        continue;
+    const auto found = id_to_ndx.find(id);
+    float value;
+    if (!token.numeric_value(value)) {
+      if (input.lines_read() == 1 && found == id_to_ndx.end()) {
+        continue;  // Optional header, not a malformed weight for a known id.
       }
-
       cerr << "Invalid fingerprint weight '" << buffer << "'\n";
       return 0;
     }
-
-    IW_STL_Hash_Map_int::const_iterator f = id_to_ndx.find(id);
-
-    if (f == id_to_ndx.end()) {
+    if (!std::isfinite(value) || value < 0.0f) {
+      cerr << "Invalid fingerprint weight '" << buffer << "'\n";
+      return 0;
+    }
+    if (found == id_to_ndx.end()) {
       if (verbose > 2) {
         cerr << "Weight specified for '" << id << "' but no fingerprint\n";
       }
       continue;
     }
-
-    weight[(*f).second] = w;
-
-    rc++;
+    const int ndx = found->second;
+    if (seen[ndx]) {
+      cerr << "Duplicate fingerprint weight for '" << id << "'\n";
+      return 0;
+    }
+    seen[ndx] = 1;
+    weight[ndx] = value;
+    ++count;
   }
-
-  if (rc != pool_size) {
-    cerr << "Only got " << rc << " weight values for " << pool_size << " fingerprints\n";
+  if (count != pool_size) {
+    cerr << "Only got " << count << " weight values for " << pool_size << " fingerprints\n";
     return 0;
   }
-
   return 1;
 }
 
@@ -1293,7 +1354,7 @@ read_pool(iwstring_data_source& input, F* pool, int& pool_size) {
               pcn[ndx], previously_computed_distances, distances[ndx])) {
         return 0;
       }
-    } else if (previous_computed_distance_column > 0) {
+    } else if (previous_computed_distance_column >= 0) {
       if (!get_previously_computed_from_name_column(
               pcn[ndx], previous_computed_distance_column, distances[ndx])) {
         return 0;
@@ -1408,7 +1469,7 @@ gfp_spread_standard(int argc, char** argv) {
       } else if (p.starts_with("FCOL=")) {
         p.remove_leading_chars(5);
         if (!p.numeric_value(scaling_factor_column_in_file) ||
-            scaling_factor_column_in_file < 1) {
+            scaling_factor_column_in_file < 2) {
           cerr << "Invalid scaling factor column number 'FCOL=" << p << "'\n";
           return 2;
         }
@@ -1438,6 +1499,10 @@ gfp_spread_standard(int argc, char** argv) {
       scaling_factor_column--;
     }
 
+    if (!scaling_factor_file_name.length() && !col.length()) {
+      cerr << "The -p option requires FILE= or COL=\n";
+      return 2;
+    }
     scaling_factor_specified = 1;
   }
 
@@ -1521,7 +1586,7 @@ gfp_spread_standard(int argc, char** argv) {
 
     if (0 == pool_size) {
       cerr << "No occurrences of " << identifier_tag << "' in input\n";
-      return 0;
+      return 3;
     }
 
     if (!allocate_pool(pool_size, scaling_factor_specified)) {
@@ -1539,10 +1604,10 @@ gfp_spread_standard(int argc, char** argv) {
 
   if (!read_pool(input, fingerprints, pool_size)) {
     cerr << "Cannot read fingerprints\n";
-    return 0;
+    return 3;
   }
 
-  if (scaling_factor_column > 1) {
+  if (scaling_factor_column >= 1) {
     if (!assign_scaling_factors_from_token(pcn, pool_size, scaling_factor_column,
                                            weight)) {
       cerr << "Cannot extract scaling factors from column " << scaling_factor_column
@@ -1560,7 +1625,7 @@ gfp_spread_standard(int argc, char** argv) {
 #ifdef USE_OMP
   if (cl.option_present('h')) {
     int h;
-    if (!cl.value('h', h) || h < 0) {
+    if (!cl.value('h', h) || h < 1) {
       cerr << "The maximum number of threads to use (-h) must be a valid whole +ve "
               "number\n";
       usage(2);
@@ -1570,10 +1635,17 @@ gfp_spread_standard(int argc, char** argv) {
   }
 #endif
 
+  if (cl.option_present('N')) {
+    for (int i = 0; i < pool_size; ++i) {
+      if (!std::isfinite(distances[i]) || distances[i] < 0.0f || distances[i] > 1.0f) {
+        cerr << "Invalid initial distance for '" << pcn[i] << "'\n";
+        return 3;
+      }
+    }
+  }
+
   if (cl.option_present('A')) {
     const char* fname = cl.option_value('A');
-
-    std::fill_n(distances, pool_size, 1.0f);
 
     if (!do_previously_selected(fname)) {
       cerr << "Cannot process previously selected file '" << fname << "'\n";
@@ -1585,8 +1657,14 @@ gfp_spread_standard(int argc, char** argv) {
     }
 
     previously_selected_file_specified = 1;
+  }
 
+  if (previously_selected_file_specified) {
     for (int i = 0; i < pool_size; ++i) {
+      if (!std::isfinite(distances[i]) || distances[i] < 0.0f || distances[i] > 1.0f) {
+        cerr << "Invalid initial distance for '" << pcn[i] << "': " << distances[i] << '\n';
+        return 3;
+      }
       fingerprints[i].set_distance(distances[i]);
     }
   }
@@ -1723,7 +1801,7 @@ gfp_spread_standard(int argc, char** argv) {
         output << smiles_tag << smiles[nsn] << ">\n";
         output << identifier_tag << pcn[nsn] << ">\n";
         output << scale_tag;
-        fraction_as_string.append_number(output, weight[id]);
+        fraction_as_string.append_number(output, s._scale);
         output << ">\n";
         output << distance_tag;
         fraction_as_string.append_number(output, s._dist);
@@ -1732,13 +1810,9 @@ gfp_spread_standard(int argc, char** argv) {
         output << smiles_tag << "*>\n";
         output << identifier_tag << "*>\n";
         output << scale_tag << "*>\n";
-        if (s._dist > 0.0f) {
-          output << distance_tag;
-          fraction_as_string.append_number(output, s._dist);
-          output << ">\n";
-        } else {
-          output << distance_tag << "1>\n";
-        }
+        output << distance_tag;
+        fraction_as_string.append_number(output, s._dist);
+        output << ">\n";
       }
       output << "|\n";
 

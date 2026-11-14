@@ -107,6 +107,12 @@
       "comment": [
         "Weights and weighted distances above one use stable fallback formatting."
       ]
+    },
+    {
+      "name": "correctness",
+      "shell_script": {
+        "script_name": "run_test.py"
+      }
     }
   ]
 }

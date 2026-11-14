@@ -358,6 +358,36 @@ version as possible. Several of the experimental features
 added to `gfp_spread` have not been implemented in the parallel
 versions.
 
+For `gfp_spread_standard`, the following conventions apply to both ordinary and
+weighted selection:
+
+- `-n` is a strict upper bound. With no positive `-t`, zero-distance candidates
+  can fill the remaining requested positions, in input order.
+- After each selection, `-t` stops before the next point if its distance is below
+  the cutoff. In weighted mode this is the scaled distance.
+- Equal maximum distances favour the earliest input molecule, independently of
+  thread scheduling. Nearest-neighbour ties can have multiple valid answers.
+- `-q` applies to weighted selection as well as ordinary selection. Neighbour
+  identities and scales retain their original meaning after pool squeezing.
+
+`-p COL=2` reads weights from the second word of each molecule name. For a
+separate weight file, `-p FILE=weights.txt` expects `id weight`; an optional
+`-p FCOL=3` reads the third column of that file instead. Columns are one-based,
+including the id column, and weight columns must be at least 2. Space- and
+tab-separated files are accepted, with an optional header. Each pool identifier
+must have exactly one matching weight record. Weights must be finite and
+nonnegative; values greater than one are allowed.
+
+Initial raw distances can be supplied with `-N COL=2`, `-N DIST`, or
+`-N FILE=distances.txt`. They must be finite values in `[0, 1]`, and are used
+for the initial selection in both modes. File lookups use the first token of
+the molecule name; unmatched ids retain the initial distance of 1. If `-A` is
+also supplied, its distances are combined with `-N` by taking the minimum.
+The nearest molecule's identity may be unavailable for these seed distances,
+so output can contain a `*` neighbour with a valid distance, including zero.
+Malformed fingerprint input and invalid numeric data produce a nonzero exit
+status.
+
 # gfp_spread_buckets
 This is a variant of spread where each item in the input is assigned
 to a bucket. This can be any kind of classification. For example it

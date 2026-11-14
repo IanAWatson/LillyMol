@@ -60,7 +60,7 @@ class QueryAccumulator:
     matched: list[float] = field(default_factory=list)
     unmatched: list[float] = field(default_factory=list)
     count_values: dict[str, list[float]] = field(default_factory=dict)
-    examples: list[Example] = field(default_factory=list)
+    example_records: list[MoleculeRecord] = field(default_factory=list)
     molecules_with_multiple_matches: int = 0
     max_matches: int = 0
 
@@ -371,6 +371,40 @@ def parse_count_buckets(text: str) -> list[str]:
     return buckets
 
 
+def representative_records(records: list[MoleculeRecord], limit: int) -> list[MoleculeRecord]:
+    """Choose distinct examples spanning the activity range, preferring small molecules."""
+    if limit <= 0 or not records:
+        return []
+
+    def tie_break(record):
+        return record.mol.natoms(), record.identifier, record.smiles
+
+    remaining = list(records)
+    low = min(record.activity for record in records)
+    high = max(record.activity for record in records)
+    count = min(limit, len(records))
+    # Select the endpoints first so a near-midpoint example cannot consume
+    # an endpoint. Larger requested sets sample evenly across the range.
+    fractions = [0.0] if count == 1 else [0.0, 1.0]
+    fractions.extend(i / (count - 1) for i in range(1, count - 1))
+    selected = []
+    for fraction in fractions:
+        target = low * (1.0 - fraction) + high * fraction
+        index = min(range(len(remaining)), key=lambda i: (
+            abs(remaining[i].activity - target), *tie_break(remaining[i])))
+        selected.append(remaining.pop(index))
+    return sorted(selected, key=lambda record: (record.activity, *tie_break(record)))
+
+
+def representative_examples(acc: QueryAccumulator, limit: int) -> list[Example]:
+    # Only selected examples need a second search and a labelled molecule copy.
+    result = []
+    for record in representative_records(acc.example_records, limit):
+        matches = acc.spec.query.substructure_search_matches(record.mol)
+        result.append(labelled_example(record, matches, len(matches)))
+    return result
+
+
 def labelled_example(record: MoleculeRecord, matches, nhits: int) -> Example:
     mol = Molecule(record.mol)
     for match in matches or []:
@@ -421,8 +455,8 @@ def analyse(args: argparse.Namespace) -> dict[str, object]:
 
             if nhits > 0:
                 acc.matched.append(record.activity)
-                if len(acc.examples) < args.max_examples:
-                    acc.examples.append(labelled_example(record, matches, nhits))
+                if args.max_examples > 0:
+                    acc.example_records.append(record)
             else:
                 acc.unmatched.append(record.activity)
 
@@ -467,7 +501,7 @@ def analyse(args: argparse.Namespace) -> dict[str, object]:
                     for bucket, values in acc.count_values.items()
                 },
             },
-            'examples': [example.__dict__ for example in acc.examples],
+            'examples': [example.__dict__ for example in representative_examples(acc, args.max_examples)],
         })
 
     return {
@@ -551,7 +585,8 @@ def add_analyse_args(parser: argparse.ArgumentParser) -> None:
     parser.add_argument('--bins', type=int, default=20, help='Number of common histogram bins')
     parser.add_argument('--min_matches', type=nonnegative_integer, default=1,
                         help='Minimum number of matched molecules for a query to appear in JSON/HTML (default 1; 0 keeps all queries)')
-    parser.add_argument('--max_examples', type=int, default=3, help='Matched example molecules retained per query')
+    parser.add_argument('--max_examples', type=nonnegative_integer, default=3,
+                        help='Examples spanning the matched activity range (default 3: lowest, midpoint, highest; ties prefer fewer atoms; 0 disables)')
     parser.add_argument('--okmissing_activity', action='store_true', help='Allow molecules with no activity value; they are skipped')
     parser.add_argument('--multiplicity', choices=['presence', 'count'], default='presence', help='Primary multiplicity interpretation')
     parser.add_argument('--count-buckets', default='0,1,2,3+', help='Hit count buckets stored in JSON')

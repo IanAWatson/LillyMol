@@ -17,6 +17,64 @@ import substructure_exploration as exploration
 from lillymol import MolFromSmiles, Standardise
 
 
+class RepresentativeExamplesTest(unittest.TestCase):
+    def record(self, identifier, activity, smiles):
+        return exploration.MoleculeRecord(smiles, identifier, activity, MolFromSmiles(smiles))
+
+    def test_midpoint_is_activity_range_not_median(self):
+        records = [self.record(str(activity), activity, 'C') for activity in [1, 2, 6, 0, 10]]
+        chosen = exploration.representative_records(records, 3)
+        self.assertEqual([r.activity for r in chosen], [0, 6, 10])
+
+    def test_ties_prefer_smallest_molecule(self):
+        records = [self.record('low-large', 0, 'CCC'), self.record('low-small', 0, 'C'),
+                   self.record('high-large', 10, 'CCC'), self.record('high-small', 10, 'C'),
+                   self.record('middle-large', 4, 'CCC'), self.record('middle-small', 6, 'CC')]
+        chosen = exploration.representative_records(records, 3)
+        self.assertEqual([r.identifier for r in chosen], ['low-small', 'middle-small', 'high-small'])
+        self.assertEqual([r.identifier for r in exploration.representative_records(records[::-1], 3)],
+                         [r.identifier for r in chosen])
+
+    def test_constant_activity_and_small_sets(self):
+        records = [self.record('large', 5, 'CCC'), self.record('small', 5, 'C'),
+                   self.record('medium', 5, 'CC'), self.record('largest', 5, 'CCCC')]
+        self.assertEqual([r.identifier for r in exploration.representative_records(records, 3)],
+                         ['small', 'medium', 'large'])
+        self.assertEqual(exploration.representative_records(records, 0), [])
+        self.assertEqual(exploration.representative_records([], 3), [])
+        self.assertEqual(len(exploration.representative_records(records[:2], 3)), 2)
+
+    def test_configurable_example_limit(self):
+        records = [self.record(str(i), i, 'C') for i in range(5)]
+        for limit, expected in [(1, [0]), (2, [0, 4]), (3, [0, 2, 4]),
+                                (5, [0, 1, 2, 3, 4]), (10, [0, 1, 2, 3, 4])]:
+            with self.subTest(limit=limit):
+                self.assertEqual([r.activity for r in exploration.representative_records(records, limit)],
+                                 expected)
+
+    def test_analysis_selects_then_labels_examples(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            work = Path(tmp)
+            (work / 'input.smi').write_text(
+                'NCCC middle-large\nNCCCC low-large\nNCCC high-large\n'
+                'NC middle-small\nN low-small\nN high-small\n')
+            (work / 'activity.txt').write_text(
+                'ID activity\nmiddle-large 5\nlow-large 0\nhigh-large 10\n'
+                'middle-small 5\nlow-small 0\nhigh-small 10\n')
+            (work / 'queries.textproto').write_text('query { name: "nitrogen" smarts: "N" }\n')
+            output = work / 'result.json'
+            self.assertEqual(exploration.main([
+                'analyse', '--config', str(work / 'queries.textproto'),
+                '-A', str(work / 'activity.txt'), '-o', str(output), str(work / 'input.smi')]), 0)
+            row = json.loads(output.read_text())['queries'][0]
+            self.assertEqual(row['matched']['summary']['n'], 6)
+            self.assertEqual([e['identifier'] for e in row['examples']],
+                             ['low-small', 'middle-small', 'high-small'])
+            for example in row['examples']:
+                self.assertEqual(example['nhits'], 1)
+                self.assertEqual(MolFromSmiles(example['labelled_smiles']).number_isotopic_atoms(), 1)
+
+
 class CatalogueTest(unittest.TestCase):
     @classmethod
     def setUpClass(cls):

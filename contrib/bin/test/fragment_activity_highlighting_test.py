@@ -104,7 +104,7 @@ class FragmentHighlightingTest(unittest.TestCase):
             svg = base64.b64decode(encoded).decode()
             self.assertIn('<ellipse', svg)
             self.assertIn('#33CC66', svg)
-            self.assertIn('hits 1', document)
+            self.assertNotIn('hits 1', document)
             self.assertEqual(path.read_bytes(), original)
 
 

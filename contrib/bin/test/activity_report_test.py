@@ -172,7 +172,8 @@ class CompactQueryTest(unittest.TestCase):
                                           labelled_smiles='[1CH3]N', nhits=1)])
         self.assertIn('Depiction unavailable', rendered)
         self.assertIn('<code>[1CH3]N</code>', rendered)
-        self.assertIn('&lt;example&gt; activity 2 hits 1', rendered)
+        self.assertIn('&lt;example&gt; activity 2', rendered)
+        self.assertNotIn('hits 1', rendered)
         self.assertNotIn('<img', rendered)
 
     def test_import_and_ranking_do_not_load_rdkit(self):
@@ -235,7 +236,8 @@ class StructureDepictionTest(unittest.TestCase):
         ET.fromstring(base64.b64decode(image['src'][len(prefix):]))
         self.assertIn('<summary>SMILES</summary>', rendered)
         self.assertIn('[1CH3][1CH2]O', rendered)
-        self.assertIn('activity 1.25 hits 2', rendered)
+        self.assertIn('activity 1.25', rendered)
+        self.assertNotIn('hits 2', rendered)
 
     def test_invalid_smiles_falls_back_without_breaking_report(self):
         rendered = examples_html([dict(identifier='bad', activity=1,

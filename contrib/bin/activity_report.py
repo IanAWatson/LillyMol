@@ -271,8 +271,7 @@ def examples_html(examples: list[dict[str, object]], fragment_smiles: str | None
                          f'<code>{html.escape(smiles)}</code></details>')
         parts.append(
             '<span>' + html.escape(str(example['identifier'])) +
-            f' activity {fmt(example["activity"])}' +
-            (f' hits {example["nhits"]}' if 'nhits' in example else '') + '</span>'
+            f' activity {fmt(example["activity"])}' + '</span>'
         )
         if example.get('highlight_note'):
             parts.append('<span class="highlight-note">' + html.escape(example['highlight_note']) + '</span>')

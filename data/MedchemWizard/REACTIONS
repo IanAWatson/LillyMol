@@ -323,3 +323,4 @@ PROTO:vicinal_diol_to_acetonide.rxn
 PROTO:phenol_to_benzoxazolone.rxn
 PROTO:ketone_to_oxetane.rxn
 PROTO:michael_acceptor_to_cyclopropane.rxn
+PROTO:remove_peg.rxn

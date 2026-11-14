@@ -68,7 +68,7 @@ deactivate_lillymol() {
   if [[ -v _LILLYMOL_TOOLS_ENV_OLD_LILLYMOL_HOME ]] ; then
     LILLYMOL_HOME=${_LILLYMOL_TOOLS_ENV_OLD_LILLYMOL_HOME}
   else
-    uset LILLYMOL_HOME
+    unset LILLYMOL_HOME
   fi
 
   unset -f deactivate_lillymol

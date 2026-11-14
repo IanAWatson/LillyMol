@@ -21,20 +21,22 @@ def f32(value):
 
 
 def recount(rows, threshold, caps, suppress_self=True, global_cap=0,
-            column=False, retained=None, max_clusters=None):
+            column=False, retained=None, max_clusters=None, static_order=False):
     n = len(rows) if retained is None else retained
     threshold = f32(threshold)
     neighbours = [sorted([(j, f32(d)) for j, d in row if j < n and
                            (not suppress_self or j != i)], key=lambda e: e[1])
                   for i, row in enumerate(rows[:n])]
+    initial_counts = [sum(d <= threshold for _, d in row) for row in neighbours]
     selected = set()
     clusters = []
     while len(selected) < n:
         # Deliberately recompute every count after each cluster. No heap or
         # reverse adjacency is used by this reference implementation.
         centre = min((i for i in range(n) if i not in selected),
-                     key=lambda i: (-sum(j not in selected and d <= threshold
-                                         for j, d in neighbours[i]), i))
+                     key=lambda i: (-(initial_counts[i] if static_order else
+                                      sum(j not in selected and d <= threshold
+                                          for j, d in neighbours[i])), i))
         members = [centre]
         cap = caps[centre] if column else global_cap
         for j, d in neighbours[centre]:
@@ -109,11 +111,12 @@ class Butina(unittest.TestCase):
         self.assertEqual(actual, expected)
 
     def check(self, rows, threshold, serialized, caps=None, suppress_self=True,
-              global_cap=0, column=False, retained=None, max_clusters=None, smiles=False):
+              global_cap=0, column=False, retained=None, max_clusters=None, smiles=False,
+              static_order=False):
         caps = caps if caps is not None else [4] * len(rows)
         path, ids = self.write(rows, caps, serialized)
         groups = recount(rows, threshold, caps, suppress_self, global_cap, column,
-                         retained, max_clusters)
+                         retained, max_clusters, static_order)
         expected = [[ids[i] for i in group] for group in groups]
         args = ['-t', str(threshold)]
         if suppress_self:

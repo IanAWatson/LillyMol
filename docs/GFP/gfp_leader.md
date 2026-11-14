@@ -265,3 +265,32 @@ loses its leader, the first remaining input member becomes its leader.
 `gfp_leader -R` cannot be combined with `-D sbc` or `-D sbcr`: those options
 discard members during within-cluster sub-clustering. The initial maximum
 cluster sizes (`-m`/`-M`) do not constrain the reassignment pass.
+
+## Paired scans in gfp_leader_standard
+
+`gfp_leader_standard -p 2 -h 8 -t 0.2 fingerprints.gfp` can process two
+successive leaders in a single candidate scan. If the next two unassigned
+molecules are farther apart than the threshold, both will become leaders; each
+remaining candidate is compared with both, giving the first leader priority.
+If they belong to the same sphere, the tool falls back to the ordinary scan.
+
+`-p 1` uses the default one-leader path. Both modes preserve leader order,
+cluster membership, distances, `-n` limits (including odd limits), and `-R`
+reassignment. Paired scans can reduce memory traffic and parallel-region
+synchronisation, but also calculate some second distances that separate scans
+would avoid. The benefit depends on threshold, dataset, and thread count;
+benchmark representative inputs before adopting it as a default.
+
+A local benchmark on `rand50k.gfp`, using an optimised native build, gave the
+following median wall times over three runs (including reading and writing):
+
+| Threshold | Threads | `-p 1` | `-p 2` |
+| --- | --- | --- | --- |
+| 0.20 | 4 | 12.48 s | 10.30 s |
+| 0.20 | 8 | 10.47 s | 9.07 s |
+| 0.35 | 4 | 5.46 s | 4.49 s |
+| 0.35 | 8 | 4.50 s | 3.74 s |
+
+All output hashes agreed between modes and thread counts. These measurements
+are specific to that dataset and machine; on a 10k subset at threshold 0.5,
+paired scans did not consistently improve elapsed time.

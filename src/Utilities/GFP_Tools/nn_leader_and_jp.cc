@@ -77,6 +77,7 @@ static IWString cluster_number_tag("CLUSTER<");
 static IWString cluster_size_tag("CSIZE<");
 
 static int taylor_butina = 0;
+static bool static_butina_ordering = false;
 
 static int suppress_self_neighbours = 0;
 
@@ -1094,6 +1095,38 @@ class ButinaState {
   }
 };
 
+// Static Butina ranks once by initial neighbour count. Assigned molecules are
+// skipped without updating any remaining counts. Each threshold owns its order.
+class StaticButinaOrder {
+ private:
+  const int* _selected;
+  std::vector<int> _order;
+  size_t _next = 0;
+
+ public:
+  StaticButinaOrder(const Leader_Item* pool, int n, float cutoff, const int* selected)
+      : _selected(selected), _order(n) {
+    std::vector<int> count(n);
+    for (int i = 0; i < n; ++i) {
+      _order[i] = i;
+      count[i] = pool[i].neighbours_within(cutoff);
+    }
+    std::sort(_order.begin(), _order.end(), [&count](int a, int b) {
+      return count[a] > count[b] || (count[a] == count[b] && a < b);
+    });
+  }
+
+  int NextCentre() {
+    while (_next < _order.size()) {
+      const int item = _order[_next++];
+      if (!_selected[item]) {
+        return item;
+      }
+    }
+    return -1;
+  }
+};
+
 // JP's pair tests define an undirected graph. Union-find maintains its
 // connected components without relabelling every member after each match.
 class ClusterUnionFind {
@@ -1467,11 +1500,19 @@ leader(const Leader_Item* pool, const int pool_size, int* selected,
   // Each threshold starts a fresh scan, while selections within a run advance it.
   int istart = 0;
   std::optional<ButinaState> butina;
+  std::optional<StaticButinaOrder> static_order;
+  if (taylor_butina && static_butina_ordering) {
+    static_order.emplace(pool, pool_size, global_threshold, selected);
+  }
   if (reverse != nullptr) {
     butina.emplace(pool, pool_size, global_threshold, selected, *reverse);
   }
   int icentre;
   const auto choose_next = [&]() {
+    if (static_order) {
+      icentre = static_order->NextCentre();
+      return icentre >= 0;
+    }
     if (butina) {
       icentre = butina->NextCentre();
       return icentre >= 0;
@@ -1697,6 +1738,7 @@ L -m <number>      maximum cluster size
 L -M col=<col>     max cluster size for each molecule in column <col> of name
 
 T -T                 do Taylor Butina clustering
+T -O <order>         dynamic (default) or static initial neighbour-count ordering
 
 J -J <n,c>         Jarvis Patrick: size of nbr list (. for no limit), neighbours in common
 
@@ -1759,7 +1801,7 @@ do_leader_clustering(const Leader_Item* pool, const int pool_size,
                      const resizable_array_p<IWString>& id, const IWString& stem,
                      const float* threshold, const int number_thresholds) {
   std::unique_ptr<ReverseNeighbours> reverse;
-  if (taylor_butina) {
+  if (taylor_butina && !static_butina_ordering) {
     reverse = std::make_unique<ReverseNeighbours>(
         pool, pool_size, *std::max_element(threshold, threshold + number_thresholds));
   }
@@ -1841,7 +1883,7 @@ ReportClusterSizes(const Leader_Item* pool, int pool_size, std::ostream& output)
 
 static int
 leader(int argc, char** argv) {
-  Command_Line cl(argc, argv, "vs:I:t:C:m:M:B:J:aThrR:");
+  Command_Line cl(argc, argv, "vs:I:t:C:m:M:B:J:aThrR:O:");
 
   if (cl.unrecognised_options_encountered()) {
     cerr << "Unrecognised options encountered\n";
@@ -2017,6 +2059,18 @@ leader(int argc, char** argv) {
 
     if (verbose) {
       cerr << "Will do Taylor Butina leader clustering\n";
+    }
+  }
+
+  if (cl.option_present('O')) {
+    const_IWSubstring order = cl.option_value('O');
+    if (!taylor_butina || (order != "static" && order != "dynamic")) {
+      cerr << "The -O option requires -T and either 'static' or 'dynamic'\n";
+      return 1;
+    }
+    static_butina_ordering = order == "static";
+    if (verbose) {
+      cerr << "Butina ordering: " << order << '\n';
     }
   }
 

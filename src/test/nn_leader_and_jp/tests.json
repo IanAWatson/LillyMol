@@ -78,6 +78,12 @@
       "shell_script": {
         "script_name": "run_test.py"
       }
+    },
+    {
+      "name": "static_butina",
+      "shell_script": {
+        "script_name": "run_test.py"
+      }
     }
   ]
 }

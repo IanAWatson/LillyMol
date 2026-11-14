@@ -65,6 +65,33 @@ void CheckPair(const GFP_Standard& lhs, const GFP_Standard& rhs) {
 
 }
 
+TEST(GfpStandard, PairedDistancesMatchIndividualDistances) {
+  // Include empty components: each pair can have a different denominator.
+  std::array<GFP_Standard, 8> pool;
+  for (int mask = 0; mask < 8; ++mask) {
+    const int properties[8] = {10 + mask, 2, 3, 4, 5, 6, 7, 8};
+    pool[mask].build_molecular_properties(properties, 8);
+    std::array<int, 2048> iw{};
+    std::array<int, 192> mk{}, mk2{};
+    iw[mask] = (mask & 1) != 0;
+    mk[mask] = (mask & 2) != 0;
+    mk2[mask] = (mask & 4) != 0;
+    pool[mask].build_iwfp(iw.data(), iw[mask]);
+    pool[mask].build_mk(mk.data(), mk.size());
+    pool[mask].build_mk2(mk2.data(), mk2.size());
+  }
+  for (const auto& candidate : pool) {
+    for (const auto& a : pool) {
+      for (const auto& b : pool) {
+        float distances[2];
+        candidate.tanimoto_distance_2(a, b, distances);
+        EXPECT_EQ(distances[0], candidate.tanimoto_distance(a));
+        EXPECT_EQ(distances[1], candidate.tanimoto_distance(b));
+      }
+    }
+  }
+}
+
 TEST(GfpStandard, StackArray) {
   std::array<GFP_Standard, 4> pool;
   for (int i = 0; i < 4; ++i) {

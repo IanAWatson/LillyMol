@@ -100,6 +100,31 @@ generation cutoff, and count-limited lists cannot establish complete distance
 coverage. The check uses records read under `-s`, before self or excluded-subset
 neighbours are removed. Jarvis–Patrick does not use this distance check.
 
+## Static and dynamic Butina ordering
+
+`-T` uses **dynamic** ordering by default: after forming a cluster, neighbour
+counts for remaining candidates are updated, and the next leader has the most
+currently unassigned neighbours. `-T -O dynamic` explicitly selects this mode.
+
+```shell
+nn_leader_and_jp -T -O static -h -t 0.2 neighbours.nn > static.tdt
+```
+
+`-T -O static` instead counts neighbours once at the requested threshold and
+sorts candidates by those initial counts. Assigned molecules are skipped, but
+the ranking of remaining candidates never changes. Both modes break equal
+counts by molecule input position. They can produce different later leaders,
+cluster memberships and singleton counts, even with identical input and cutoff.
+
+Static ordering follows the initial-count ranking used in the
+[original Butina procedure](https://doi.org/10.1021/ci9803381).
+It requires no reverse-neighbour index or count-update heap. Each
+threshold worker builds its own initial ordering. Both modes support `-m`/`-M`
+limits, `-C`, `-s`, both input formats, parallel thresholds, and `-R`
+reassignment. Counts used for ranking are neighbour counts at the threshold,
+not counts truncated by cluster-size caps. `-O` requires `-T` and accepts only
+`static` or `dynamic`; it does not apply to ordinary leader or Jarvis–Patrick.
+
 ## Reassigning small clusters
 
 ```shell

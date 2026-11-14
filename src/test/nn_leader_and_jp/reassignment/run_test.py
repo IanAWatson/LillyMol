@@ -101,7 +101,7 @@ with tempfile.TemporaryDirectory() as tmp:
     partial = graph(['c', 'd', 'a', 'b', 'h'], [
         ('c', 'd', .1), ('a', 'b', .1), ('a', 'h', .1), ('c', 'b', .35)])
     for serialized in (False, True):
-        for mode in ([], ['-T']):
+        for mode in ([], ['-T'], ['-T', '-O', 'static']):
             for cap in ([], ['-m', '2']):
                 result, _ = check(data, serialized, mode, 1, '-t', '.2', *cap)
             check(split_pair, serialized, mode, 2, '-t', '.2')

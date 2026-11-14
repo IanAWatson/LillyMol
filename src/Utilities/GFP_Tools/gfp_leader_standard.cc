@@ -4,6 +4,7 @@
 
 #include <stdlib.h>
 
+#include <algorithm>
 #include <iostream>
 #include <limits>
 #include <vector>
@@ -95,7 +96,7 @@ usage(int rc) {
   cerr << " -n <number>    number of clusters to form\n";
   cerr << " -A <fname>     file of previously selected fingerprints\n";
   cerr << " -s <size>      size of fingerprint file\n";
-  cerr << " -p <n>         process <n> leaders at once (max 2 for now)\n";
+  cerr << " -p <n>         1 (default) or 2 leaders per scan; same clustering results\n";
   cerr << " -h <n>         maximum number of OMP threads to use\n";
   cerr << " -r <n>         report progress every <n> clusters formed\n";
   cerr << " -k .           write neighbours as textproto form\n";
@@ -200,15 +201,17 @@ leader(IWString_and_File_Descriptor& output) {
 }
 
 static int
-leader(int* leaders, int leaders_requested, float* cand_distances,
-       IWString_and_File_Descriptor& output) {
+leader_two_at_once() {
+  int leaders[2];
   int cluster_id = 0;
 
   int leaders_found;
   int start = 0;
 
-  while ((leaders_found = choose_next_leaders(selected + start, pool_size - start,
-                                              leaders, leaders_requested))) {
+  while (cluster_id < clusters_to_form &&
+         (leaders_found = choose_next_leaders(
+              selected + start, pool_size - start, leaders,
+              std::min(2, clusters_to_form - cluster_id)))) {
     for (int i = 0; i < leaders_found; i++) {
       leaders[i] += start;
     }
@@ -221,7 +224,7 @@ leader(int* leaders, int leaders_requested, float* cand_distances,
       start = icentre + 1;
       selected[icentre] = cluster_id;
       distances[icentre] = 0.0f;
-#pragma omp parallel for schedule(static)
+#pragma omp parallel for schedule(static) if (pool_size - start > 500)
       for (int i = start; i < pool_size; ++i) {
         if (!selected[i]) {
           distances[i] = fingerprints[icentre].tanimoto_distance(fingerprints[i]);
@@ -237,16 +240,14 @@ leader(int* leaders, int leaders_requested, float* cand_distances,
       const int c1id = cluster_id + 2;
       cluster_id += 2;
       start = leaders[1] + 1;
-      // cout << "S"<<c0id << " " << pool.id(potl_centers[0]) << " " << 0.0f<<endl;
-      // cout << "S"<<c1id << " " << pool.id(potl_centers[1]) << " " << 0.0f<<endl;
       selected[leaders[0]] = c0id;
       selected[leaders[1]] = c1id;
       distances[leaders[0]] = 0.0f;
       distances[leaders[1]] = 0.0f;
-// Ignore compiler warnings about cand_distances being unitialised.
-#pragma omp parallel for schedule(static) private(cand_distances)
+#pragma omp parallel for schedule(static) if (pool_size - start > 500)
       for (int i = start; i < pool_size; i++) {
         if (!selected[i]) {
+          float cand_distances[2];  // Per-iteration storage, private to this thread.
           fingerprints[i].tanimoto_distance_2(fingerprints[leaders[0]],
                                               fingerprints[leaders[1]], cand_distances);
           if (cand_distances[0] <= threshold) {
@@ -705,12 +706,7 @@ gfp_leader_standard(int argc, char** argv) {
       cerr << "Will process " << p << " leaders at each step\n";
     }
 
-    int* leaders = new int[p];
-    std::unique_ptr<int[]> free_leaders(leaders);
-    float* cand_distances = new float[p];
-    std::unique_ptr<float[]> free_cand_distances(cand_distances);
-
-    clusters_formed = leader(leaders, p, cand_distances, output);
+    clusters_formed = p == 1 ? leader(output) : leader_two_at_once();
   } else {
     clusters_formed = leader(output);
   }

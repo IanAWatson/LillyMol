@@ -310,7 +310,6 @@ GFP_Standard::tanimoto(const GFP_Standard &rhs) const {
 void
 GFP_Standard::tanimoto_distance_2(GFP_Standard const &fp1, GFP_Standard const &fp2,
                                   float *d) const {
-  abort();
   float rc1 = static_cast<float>(0.0);
   float rc2 = static_cast<float>(0.0);
 
@@ -360,8 +359,8 @@ GFP_Standard::tanimoto_distance_2(GFP_Standard const &fp1, GFP_Standard const &f
     ++ndiv2;
   }
 
-  d[0] = rc1 / static_cast<float>(ndiv1);
-  d[1] = rc2 / static_cast<float>(ndiv2);
+  d[0] = 1.0f - rc1 / static_cast<float>(ndiv1);
+  d[1] = 1.0f - rc2 / static_cast<float>(ndiv2);
 
   return;
 }

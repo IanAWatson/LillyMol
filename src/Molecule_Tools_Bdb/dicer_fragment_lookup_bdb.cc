@@ -3,6 +3,7 @@
 // Dicer.DicerFragment protos.
 
 #include <stdlib.h>
+#include <cstdint>
 #include <iostream>
 #include <memory>
 #include <optional>
@@ -177,14 +178,16 @@ class DicerFragmentLookupImpl {
     int _input_is_textproto;
 
     // the number of molecules passed to DoOutput.
-    int _molecules_processed;
+    uint64_t _molecules_processed = 0;
 
     // Some molecules will not have any fragments that pass
     // the rules for geneation.
-    int _molecules_with_no_fragments;
+    uint64_t _molecules_with_no_fragments = 0;
 
     // The number of molecules above our threshold.
-    int _above_min_count;
+    uint64_t _above_min_count = 0;
+
+    uint64_t _molecules_below_support_requirment = 0;
 
     // Optionally, molecules with fragments below the threshold
     // can be written.
@@ -192,7 +195,7 @@ class DicerFragmentLookupImpl {
 
     // To make things easy to view with vf, we can write the rarest
     // fragment on a separate line.
-    int _rarest_fragment_on_separate_line;
+    int _rarest_fragment_on_separate_line = 0;
 
     // It can be interesting to record the atom count of
     // the rarest fragment.
@@ -304,6 +307,7 @@ DicerFragmentLookupImpl::DicerFragmentLookupImpl() {
   _write_header_record = 0;
   _molecules_processed = 0;
   _molecules_with_no_fragments = 0;
+  _molecules_below_support_requirment = 0;
   _min_count_needed = 0;
   _above_min_count = 0;
   _min_fragment_size = 0;
@@ -316,22 +320,22 @@ DicerFragmentLookupImpl::DicerFragmentLookupImpl() {
 }
 
 void
-DisplayDashJOptions(std::ostream& output) {
-  output << " -J def      default conditions\n";
-  output << " -J          other qualifiers will be added\n";
+DisplayDashJOptions(int rc) {
+  cerr << " -J def      default conditions\n";
+  cerr << " -J          other qualifiers will be added\n";
 
-  exit(0);
+  std::exit(rc);
 }
 
 void
-DisplayDashYOptions(std::ostream& output) {
+DisplayDashYOptions(int rc) {
   cerr << R"(
  -Y header              write a header record
  -Y vf2                 write the rarest fragment on a separate line, useful with vf
  -Y peratom             for each molecule, write number of failures as a function of size.
 )";
 
-  ::exit(0);
+  std::exit(rc);
 }
 
 int
@@ -422,10 +426,10 @@ DicerFragmentLookupImpl::Initialise(Command_Line& cl) {
       if (opt == "def") {
       } else if (opt.starts_with("")) {
       } else if (opt == "help") {
-        DisplayDashJOptions(cerr);
+        DisplayDashJOptions(0);
       } else {
         cerr << "Unrecognised -J qualifier '" << opt << "'\n";
-        DisplayDashJOptions(cerr);
+        DisplayDashJOptions(1);
       }
     }
 
@@ -486,10 +490,10 @@ DicerFragmentLookupImpl::Initialise(Command_Line& cl) {
           cerr << "Will write per natoms data for failed molecules\n";
         }
       } else if (y == "help") {
-        DisplayDashYOptions(cerr);
+        DisplayDashYOptions(0);
       } else {
         cerr << "Unrecognised -Y qualifier '" << y << "'\n";
-        DisplayDashYOptions(cerr);
+        DisplayDashYOptions(1);
       }
     }
   }
@@ -598,7 +602,7 @@ DicerFragmentLookupImpl::DoOutput(const const_IWSubstring& smiles,
                                   IWString_and_File_Descriptor& output) {
   ++_molecules_processed;
 
-  if (count > _min_count_needed) {
+  if (count >= _min_count_needed) {
     output << smiles << _sep << id << _sep << count;
     if (_rarest_fragment_on_separate_line) {
       output << '\n';
@@ -698,7 +702,6 @@ DicerFragmentLookupImpl::ProcessMolecule(const IWString& smiles,
   int index_with_lowest_count = -1;
 
   for (int i = 0; i < nfrag; ++i) {
-
     int count = Lookup(fragments[i]->smiles);
     if (count == 0) {
       continue;
@@ -721,11 +724,17 @@ DicerFragmentLookupImpl::ProcessMolecule(const IWString& smiles,
     WriteAtomCoverage(*atom_coverage, _stream_for_atom_coverage);
   }
 
-  if (lowest_count > _min_count_needed) {
+  if (index_with_lowest_count < 0) {
+    return 0;
+  }
+
+  if (lowest_count >= _min_count_needed) {
     ++_above_min_count;
     return Write(smiles, name, *fragments[index_with_lowest_count],
                  lowest_count, output);
   }
+
+  ++_molecules_below_support_requirment;
 
   if (_write_per_natoms_data) {
     WritePerNatomsData(smiles, name, per_natom_min, cerr);
@@ -850,7 +859,8 @@ DicerFragmentLookupImpl::Write(const IWString& smiles,
   } else {
     output << _sep;
   }
-  output << rarest_frag.smiles << _sep << rarest_frag.natoms << '\n';
+  output << rarest_frag.smiles << _sep << count << '\n';
+
   output.write_if_buffer_holds_more_than(4096);
 
   return 1;
@@ -877,11 +887,16 @@ DicerFragmentLookupImpl::Report(std::ostream& output) const {
   output << "Read " << _molecules_processed << " molecules\n";
   output << _molecules_with_no_fragments << " molecules generated no fragments\n";
   if (_above_min_count > 0) {
-    output << _above_min_count << " above " << _min_count_needed << '\n';
+    output << _above_min_count << " with at least " << _min_count_needed << '\n';
   }
+  if (_molecules_below_support_requirment) {
+    output << _molecules_below_support_requirment << " molecules below support requirement\n";
+  }
+
   if (_smiles_db.size() > 0) {
     output << _found_in_smiles_db << " fragments found in smiles databases\n";
   }
+
   return 1;
 }
 
@@ -1066,6 +1081,9 @@ Main(int argc, char** argv) {
     cerr << "unrecognised_options_encountered\n";
     Usage(1);
   }
+
+  DisplayDashHelpIfRequested(cl, 'J', DisplayDashJOptions);
+  DisplayDashHelpIfRequested(cl, 'Y', DisplayDashYOptions);
 
   const int verbose = cl.option_count('v');
 

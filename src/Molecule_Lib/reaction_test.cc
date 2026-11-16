@@ -679,7 +679,7 @@ TEST_F(TestReaction, TestSubstructureQuery)
   EXPECT_EQ(_m.unique_smiles(), "C.CNCCC");
 }
 
-TEST_F(TestReaction, TestReplaceAtom)
+TEST_F(TestReaction, TestReplaceAtomInScaffold)
 {
   _string_proto = R"(
     scaffold: {
@@ -700,7 +700,36 @@ TEST_F(TestReaction, TestReplaceAtom)
 
   ASSERT_EQ(_rxn.in_place_transformations(_m), 1);
 
-  EXPECT_EQ(_m.unique_smiles(), "F.Cl[C@H](N)C");
+  EXPECT_EQ(_m.unique_smiles(), "Cl[C@H](N)C") << _m.unique_smiles();
+}
+
+TEST_F(TestReaction, TestReplaceAtomSidechain1)
+{
+  _string_proto = R"(
+name: "replace_atom_example"
+scaffold {
+  smarts: "[#0]-*"
+}
+sidechain {
+  id: 1
+  reagent: "OC methoxy"
+  smarts: "OC"
+  replace_atom {
+    a1: 0
+    a2: 0
+  }
+}
+)";
+
+  ASSERT_TRUE(google::protobuf::TextFormat::ParseFromString(_string_proto, &_proto));
+
+  ASSERT_TRUE(_rxn.ConstructFromProto(_proto, _unused_fname, _smc));
+
+  ASSERT_TRUE(_MoleculeFromSmiles("BrC[9C@@H](C)* CHEMBL446288"));
+
+  ASSERT_EQ(_rxn.in_place_transformations(_m), 1);
+
+  EXPECT_EQ(_m.unique_smiles(), "BrC[9C@H](OC)C") << _m.unique_smiles();
 }
 
 TEST_F(TestReaction, TestInvertChirality)

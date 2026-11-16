@@ -1509,6 +1509,10 @@ class IWReaction : public Scaffold_Reaction_Site
 
     int _has_sidechain_isotope_requirement;
 
+    // We mark replaced atoms with a magic isotope. If this is set then
+    // we remove atoms with that isotope from products.
+    int _has_atom_replacements = 0;
+
 //  private functions
 
     int _construct_from_msi_object (const msi_object &,
@@ -1665,6 +1669,9 @@ class IWReaction : public Scaffold_Reaction_Site
     int _sidechain_with_mapped_atom(const int x) const;
 
     int _determine_has_sidechain_isotope_requirement();
+    int _determine_has_replacement_atoms();
+
+    int RemoveReplacedAtoms(Molecule& m) const;
 
   public:
     IWReaction ();

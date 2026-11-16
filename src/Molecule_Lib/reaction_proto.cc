@@ -1718,6 +1718,8 @@ IWReaction::ConstructFromProto(const ReactionProto::Reaction& proto,
 
   _determine_has_sidechain_isotope_requirement();
 
+  _determine_has_replacement_atoms();
+
   if (! check_internal_consistency()) {
     return WriteError("IWReaction::ConstructFromProto:not internally consistent", proto);
   }
@@ -1736,6 +1738,17 @@ IWReaction::_determine_has_sidechain_isotope_requirement() {
   }
 
   return _has_sidechain_isotope_requirement;
+}
+
+int
+IWReaction::_determine_has_replacement_atoms() {
+  _has_atom_replacements = _replace_atom.number_elements();
+
+  for (const Sidechain_Reaction_Site* s : _sidechains) {
+    _has_atom_replacements += s->number_atom_replacements();
+  }
+
+  return 1;
 }
 
 

@@ -21,6 +21,11 @@ using std::cerr;
 
 template class data_source_and_type<Molecule_and_Embedding>;
 
+// Atoms that have been replaced as a result of a Replace_Atom directive
+// get this "magic" iostope number. The alternative would be passing arrays
+// of Matched_Atom_in_Component around.
+static constexpr isotope_t kReplaced = 888;
+
 static int strip_reagents_to_largest_fragment = 0;
 
 static int transfer_text_info = 0;
@@ -1180,9 +1185,11 @@ Sidechain_Reaction_Site::ok() const {
   for (int i = 0; i < nr; i++) {
     const Replace_Atom* b = _replace_atom[i];
 
-    const Matched_Atom_in_Component& a1 = b->a1();
+    const Matched_Atom_in_Component& a2 = b->a2();
 
-    if (_atom_slated_for_removal(a1)) {
+    if (_atom_slated_for_removal(a2)) {
+      cerr << "Sidechain_Reaction_Site::ok: Replace_Atom matched atom " << b->a1()
+           << " slated for removal\n";
       return 0;
     }
   }
@@ -4039,8 +4046,29 @@ IWReaction::in_place_transformations(Molecule& m, const Substructure_Results& sr
     return 0;
   }
 
+  if (_has_atom_replacements) {
+    RemoveReplacedAtoms(m);
+  }
+
   if (_append_to_name.length() && rc) {
     m.append_to_name(_append_to_name);
+  }
+
+  return rc;
+}
+
+int
+IWReaction::RemoveReplacedAtoms(Molecule& m) const {
+  int rc = 0;
+  for (int i = m.natoms() - 1; i >= 0; --i) {
+    if (m.isotope(i) != kReplaced) {
+      continue;
+    }
+    m.remove_atom(i);
+    ++rc;
+    if (rc == _has_atom_replacements) {
+      return rc;
+    }
   }
 
   return rc;
@@ -4278,6 +4306,10 @@ IWReaction::_perform_reaction(Molecule& result, const Set_of_Atoms* scaffold_emb
 
   if (!_perform_scaffold_transformations(result, scaffold_embedding, etmp)) {
     return 0;
+  }
+
+  if (_has_atom_replacements) {
+    RemoveReplacedAtoms(result);
   }
 
 #ifdef DEBUG_PERFORM_REACTION
@@ -5633,6 +5665,8 @@ Scaffold_Reaction_Site::_do_intra_particle_replacements(
       return 0;
     }
 
+    result.set_isotope(ma1, kReplaced);
+
     if (r->invert_chirality()) {
       InvertChiralCentreInvolving(result, ma2);
     }
@@ -5679,6 +5713,9 @@ Replace_Atom::DoReplacement(Molecule& result, const Set_of_Atoms* scaffold_embed
     cerr << *this << '\n';
     return 0;
   }
+
+  cerr << "Setting atom " << a2 << " result has " << result.natoms() << " atoms\n";
+  result.set_isotope(a1, kReplaced);
 
   if (_invert_chirality) {
     InvertChiralCentreInvolving(result, a2);

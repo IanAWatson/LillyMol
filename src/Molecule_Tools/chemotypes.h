@@ -9,6 +9,7 @@
 #include "Molecule_Lib/set_of_atoms.h"
 
 class Atom_Typing_Specification;
+class Element;
 class Substructure_Query;
 
 namespace chemotypes {
@@ -44,6 +45,10 @@ struct ChemotypeOptions {
   bool whole_molecule = false;
   isotope_t chemotype_isotope = 0;
   isotope_t outside_isotope = 0;
+  // If set, the complement gets one atom of this element bonded to every
+  // excluded atom that was bonded to a retained atom. The original bond type is
+  // kept, except that an aromatic bond becomes single. Not owned.
+  const Element* complement_dummy = nullptr;
 };
 
 

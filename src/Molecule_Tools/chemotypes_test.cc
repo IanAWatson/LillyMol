@@ -681,6 +681,63 @@ TEST(Chemotypes, ComplementLabelsBothEndpointsBeyondRetainedAttachment) {
   EXPECT_EQ(labelled, 1);
 }
 
+namespace {
+
+// Reduce `smiles` to the ring system matched by `smarts` (plus n adjacent ring
+// systems) and return the complement built with a '*' dummy atom.
+Molecule ComplementWithDummy(const char* smiles, const char* smarts, int adjacent) {
+  Molecule m;
+  EXPECT_TRUE(m.build_from_smiles(smiles));
+  resizable_array_p<Substructure_Query> queries;
+  AddSmarts(queries, smarts);
+  chemotypes::ChemotypeOptions options;
+  options.adjacent_ring_systems_to_include = adjacent;
+  options.complement_dummy = get_element_from_atomic_number(0);
+  chemotypes::ChemotypeScratch scratch;
+  chemotypes::ChemotypeQueryMatch match;
+  Molecule complement;
+  EXPECT_EQ(chemotypes::ReduceToChemotype(m, queries, options, scratch, match,
+                                          nullptr, &complement),
+            chemotypes::ChemotypeQueryMatchStatus::kMatched);
+  return complement;
+}
+
+}  // namespace
+
+TEST(Chemotypes, ComplementDummySingleAttachment) {
+  Molecule c = ComplementWithDummy("CCN1CCCCC1", "[N]", 0);
+  EXPECT_EQ(c.number_fragments(), 1);
+  EXPECT_EQ(c.unique_smiles(), "CC*");
+}
+
+TEST(Chemotypes, ComplementDummyJoinsSeveralAttachments) {
+  // Substituents on both the seed ring and the adjacent ring.
+  Molecule c = ComplementWithDummy("CCN1CCC(C(C)C)CC1", "[N]", 0);
+  EXPECT_EQ(c.number_fragments(), 1);
+  int dummies = 0;
+  for (int i = 0; i < c.natoms(); ++i) {
+    if (c.atomic_number(i) == 0) {
+      ++dummies;
+      EXPECT_EQ(c.ncon(i), 2);
+    }
+  }
+  EXPECT_EQ(dummies, 1);
+  EXPECT_EQ(c.natoms(), 1 + 2 + 3);
+}
+
+TEST(Chemotypes, ComplementDummyNotAddedWithoutCutBond) {
+  // A counterion is not attached to the chemotype: no dummy, and no join.
+  Molecule c = ComplementWithDummy("C1CCNCC1.[Na+]", "[N]", 0);
+  EXPECT_EQ(c.natoms(), 1);
+  EXPECT_EQ(c.atomic_number(0), 11);
+}
+
+TEST(Chemotypes, ComplementDummyKeepsDoubleBond) {
+  Molecule c = ComplementWithDummy("N1CCCCC1(=C)", "[N]", 0);
+  // Exocyclic double bonded atoms are retained with the ring, so nothing is cut.
+  EXPECT_TRUE(c.empty());
+}
+
 TEST(Chemotypes, ComplementDisconnectedPiecesAndEmptyComplement) {
   for (const char* smiles : {"CN1CCC(C)CC1", "N1CCCCC1"}) {
     Molecule m;

@@ -34,6 +34,22 @@ class ChemotypeIsotopes(unittest.TestCase):
             self.assertEqual(self.labels(
                 (self._directory / "complement.smi").read_text()), [2, 2])
 
+    def test_complement_dummy(self):
+        self._input.write_text("CC1(C)CCNCC1 example\n")
+        result = self.run_tool("-C", "comp", "-C", "dummy=*")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        record = (self._directory / "comp.smi").read_text().split()[0]
+        self.assertEqual(record.count("*"), 1)
+        self.assertNotIn(".", record)
+        result = self.run_tool("-C", "dummy=*", "-C", "comp2")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertTrue((self._directory / "comp2.smi").exists())
+        for bad in [("-C", "dummy=Qq"), ("-C", "dummy=")]:
+            result = self.run_tool("-C", "comp3", *bad)
+            self.assertNotEqual(result.returncode, 0)
+        result = self.run_tool("-C", "dummy=*")
+        self.assertNotEqual(result.returncode, 0)
+
     def test_repeat_last_base_and_zero_base(self):
         self._input.write_text("N1CCC(c2ccccc2)C(C2CC2)C1 example\n")
         result = self.run_tool("-n", "2", "-I", "ring=10,20")

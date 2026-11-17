@@ -140,6 +140,22 @@ No record is written for an empty complement. `-C` requires a separate file
 stem and cannot be used with fingerprint output. A fixed isotope marks sites;
 it does not uniquely pair multiple connections.
 
+When the excluded region has several attachment points the complement is a
+multi-fragment record. Use `-C dummy=<element>` to join them:
+
+```shell
+chemotypes -s 'O=C1NC(=O)CCC1' -n 1 -I 1 -C Cfile -C dummy='*' -i smi input.smi
+```
+
+One atom of the given element is added to each complement record and bonded to
+every excluded atom that was bonded to the chemotype. A single attachment gives
+`*-fragment`; several attachments are all bonded to the same dummy, so the
+record is one connected molecule. The dummy has no isotope label, and the bond
+keeps its original order (an aromatic bond becomes single). Excluded pieces
+that were never bonded to the chemotype, such as counterions, get no dummy and
+are written as before. The element must be known to LillyMol; `*` is atomic
+number 0. The stem and `dummy=` may appear in either order.
+
 ### Label the whole molecule
 
 Use `-I whole=inside,outside` to retain the full molecule and label every atom
@@ -421,6 +437,7 @@ per-reason counters.
 | `-u` | Include one-hop atoms attached to retained ring atoms. |
 | `-x` | With `-u`, ignore singly connected attached atoms. |
 | `-C <stem>` | Write excluded atoms to a separate output stem using the `-o` types. |
+| `-C dummy=<el>` | With `-C <stem>`, bond one atom of element `<el>` (e.g. `*`) to every excluded atom that was attached to the chemotype. |
 | `-B <fname>` | Write rejected whole molecules as SMILES with their identifier and rejection reason, and continue. Appends `.smi` if needed. |
 | `-I <iso>` | Label retained boundary atoms, and complement endpoints, with isotope `iso`; additive with ring bases. Incompatible with `-P`. |
 | `-I whole=i,j` | Retain the whole molecule; replace chemotype isotopes with `i` and outside isotopes with `j`. Zero is allowed. |

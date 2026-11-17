@@ -14,6 +14,7 @@
 
 #include "Molecule_Lib/aromatic.h"
 #include "Molecule_Lib/atom_typing.h"
+#include "Molecule_Lib/element.h"
 #include "Molecule_Lib/etrans.h"
 #include "Foundational/data_source/iwstring_data_source.h"
 #include "Foundational/iwmisc/md5.h"
@@ -279,6 +280,9 @@ Options:
                 May combine with numeric -I; boundary labels add to ring bases. Incompatible with -P.
  -I whole=i,j   retain the whole molecule; label chemotype atoms i and all other atoms j (zero allowed).
  -C <stem>      write excluded atoms to a separate output stem; uses -o types.
+ -C dummy=<el>  with -C <stem>, add one atom of element <el> (for example *) to each
+                complement record, bonded to every excluded atom that was bonded to
+                the chemotype, so a complement is a single connected molecule.
  -B <fname>     write rejected whole molecules as SMILES, identifier and reason; append .smi.
                 Continue after per-molecule rejections; fingerprint output gets an empty fingerprint.
  -J FP<tag>     generate fixed-width linear fingerprint of chemotype atoms.
@@ -443,15 +447,18 @@ CheckRejectionFilename(const Command_Line& cl, IWString& filename) {
     types.push_back(FILE_TYPE_SMI);
   }
   for (char flag : {'S', 'C'}) {
-    if (!cl.option_present(flag) || cl.string_value(flag) == "-") {
-      continue;
-    }
-    for (FileType ft : types) {
-      IWString output;
-      if (create_file_with_appropriate_name(cl.string_value(flag), output, ft) &&
-          SameOutputFile(filename, output)) {
-        cerr << "Rejection output conflicts with -" << flag << '\n';
-        return false;
+    IWString value;
+    for (int i = 0; cl.value(flag, value, i); ++i) {
+      if (value == "-" || value.starts_with("dummy=")) {
+        continue;
+      }
+      for (FileType ft : types) {
+        IWString output;
+        if (create_file_with_appropriate_name(value, output, ft) &&
+            SameOutputFile(filename, output)) {
+          cerr << "Rejection output conflicts with -" << flag << '\n';
+          return false;
+        }
       }
     }
   }
@@ -584,7 +591,29 @@ Options::Initialise(Command_Line& cl) {
   }
 
   if (cl.option_present('C')) {
-    IWString stem = cl.string_value('C');
+    IWString stem;
+    IWString c_value;
+    for (int i = 0; cl.value('C', c_value, i); ++i) {
+      if (c_value.starts_with("dummy=")) {
+        IWString symbol(c_value);
+        symbol.remove_leading_chars(6);
+        _chemotype_options.complement_dummy =
+            symbol.empty() ? nullptr : get_element_from_symbol_no_case_conversion(symbol);
+        if (_chemotype_options.complement_dummy == nullptr) {
+          cerr << "Invalid complement dummy element (-C dummy=) '" << symbol << "'\n";
+          return 0;
+        }
+      } else if (! stem.empty()) {
+        cerr << "Specify one complement stem (-C stem)\n";
+        return 0;
+      } else {
+        stem = c_value;
+      }
+    }
+    if (stem.empty()) {
+      cerr << "-C requires an output stem\n";
+      return 0;
+    }
     if (stem == "-" || (cl.option_present('S') && stem == cl.string_value('S'))) {
       cerr << "Complement output must use a separate file stem\n";
       return 0;

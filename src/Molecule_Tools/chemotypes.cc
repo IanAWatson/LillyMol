@@ -10,6 +10,7 @@
 #include "Molecule_Lib/atom.h"
 #include "Molecule_Lib/atom_typing.h"
 #include "Molecule_Lib/bond.h"
+#include "Molecule_Lib/element.h"
 #include "Molecule_Lib/substructure.h"
 
 namespace chemotypes {
@@ -728,7 +729,38 @@ ReduceToChemotype(Molecule& m, resizable_array_p<Substructure_Query>& queries,
     std::vector<int> outside(keep.size());
     std::transform(keep.begin(), keep.end(), outside.begin(),
                    [](int value) { return value == kChemotypeNotKept; });
+    // Index of each excluded atom in the complement after atom removal.
+    std::vector<atom_number_t> new_index(keep.size(), kInvalidAtomNumber);
+    atom_number_t next = 0;
+    for (size_t i = 0; i < outside.size(); ++i) {
+      if (outside[i]) {
+        new_index[i] = next++;
+      }
+    }
+    // Cut bonds: excluded atom and bond type. Must be found before removal.
+    std::vector<std::pair<atom_number_t, bond_type_t>> cuts;
+    if (options.complement_dummy != nullptr) {
+      for (const Bond* bond : m.bond_list()) {
+        const atom_number_t a1 = bond->a1();
+        const atom_number_t a2 = bond->a2();
+        if (outside[a1] == outside[a2]) {
+          continue;
+        }
+        bond_type_t btype = bond->btype();
+        if (bond->is_aromatic()) {
+          btype = SINGLE_BOND;
+        }
+        cuts.emplace_back(new_index[outside[a1] ? a1 : a2], btype);
+      }
+    }
     complement->remove_atoms(outside.data(), 0);
+    if (!cuts.empty()) {
+      const atom_number_t dummy = complement->natoms();
+      complement->add(options.complement_dummy);
+      for (const auto& [atom, btype] : cuts) {
+        complement->add_bond(dummy, atom, btype);
+      }
+    }
   }
   if (!options.whole_molecule) {
     m.remove_atoms(keep.data(), 0);

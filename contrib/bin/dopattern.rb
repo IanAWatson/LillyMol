@@ -33,7 +33,7 @@ def command_exit_status
   status.exitstatus || (128 + status.termsig)
 end
 
-cl = IWCmdline.new("-v-a=i-o=i-e=i-w=ipos-k-ks-dry-start=i-stop=i-do=s-stem=s-rx=s-suffix=s-dsc=sfile-qsub-cluster-cluster.seq-sync-qsubopt=close-file=sfile-col=s-echo-echon-f=s-rxdir=dir-subdir-s-array=s-sleep=ipos-sortrx-expert-parallel=ipos-xargs=ipos-l=s-V-j-q-submit=xfile-noeval-slurm-sbatch=close-sdir=close-throttle=ipos")
+cl = IWCmdline.new("-v-a=i-o=i-e=i-w=ipos-k-ks-dry-start=i-stop=i-do=s-stem=s-rx=s-suffix=s-dsc=sfile-qsub-cluster-cluster.seq-sync-qsubopt=close-file=sfile-col=s-echo-echon-f=s-rxdir=dir-subdir-s-array=s-sleep=ipos-sortrx-expert-parallel=ipos-xargs=ipos-l=s-V-j-q-submit=xfile-noeval-slurm-sbatch=close-sdir=close-throttle=ipos-queue=s")
 
 verbose = cl.option_present('v')
 
@@ -59,6 +59,11 @@ else
   end
 end
 
+if cl.option_present('queue') && !qsub && !cl.option_present('cluster.seq')
+  warn '-queue requires -cluster or -slurm'
+  exit 3
+end
+
 doitfilename = nil
 doitfile = false
 if cl.option_present('parallel') && cl.option_present('xargs')
@@ -75,7 +80,7 @@ fsub = '%'
 
 sleeptime = 0    # sleep between issuing commands
 
-iwqb = File.join(__dir__, slurm ? 'iwqb_slurm.rb' : 'iwqb.rb')
+iwqb = File.join(__dir__, 'iwqb.rb')
 
 if cl.option_present('submit')
   iwqb = cl.value('submit')
@@ -109,7 +114,8 @@ def usage (rc)
   $stderr.print " -cluster.seq    collect all commands in a file and submit to qsub - if numeric sequence (Cluster setup is required)\n" if (FileTest.directory?(clusterdir) && $expert)
   $stderr.print " -sync           submit to qsub, wait for results (Cluster setup is required)\n" if (FileTest.directory?(clusterdir))
   $stderr.print " -qsubopt ... -qsubopt options passed to qsub (Cluster setup is required)\n" if $expert
-  $stderr.print " -slurm          like -cluster, but submit a Slurm array job with sbatch (via iwqb_slurm.rb)\n"
+  $stderr.print " -queue <name>   queue (Grid Engine) or partition (Slurm) to submit to; with -cluster or -slurm\n"
+  $stderr.print " -slurm          like -cluster, but submit a Slurm array job with sbatch (via iwqb.rb)\n"
   $stderr.print " -sbatch ... -sbatch options passed to sbatch, e.g. -sbatch --time=1:00:00 --mem=4G -sbatch\n" if $expert
   $stderr.print " -sdir ... -sdir  directive to insert as a #SBATCH line, e.g. -sdir --partition=short -sdir\n" if $expert
   $stderr.print " -throttle <n>   with -slurm: run at most <n> array tasks at once\n" if $expert
@@ -386,6 +392,12 @@ if cl.option_present('l')
   end
 end
 
+# Grid Engine: the queue is just another qsub option, which reaches both the
+# -cluster.seq script and iwqb. Slurm passes -queue to iwqb (--partition).
+if cl.option_present('queue') && !slurm
+  qsub_options << " -q #{Shellwords.escape(cl.value('queue'))}"
+end
+
 if numeric_sequence && cl.option_present('cluster.seq')
   task_value = width > 0 ? "$(printf '%0#{width}d' \"${SGE_TASK_ID}\")" : '${SGE_TASK_ID}'
   cmd.gsub!(fsub, task_value)
@@ -526,6 +538,7 @@ if doitfile
     cmd = "#{Shellwords.escape(iwqb)} "
     if slurm
       cmd << '-slurm '
+      cmd << "-queue #{Shellwords.escape(cl.value('queue'))} " if cl.option_present('queue')
       cmd << "-sbatch #{cl.value('sbatch')} -sbatch " if cl.option_present('sbatch')
       cl.values('sdir').each { |d| cmd << "-sdir #{d} -sdir " } if cl.option_present('sdir')
       cmd << "-throttle #{cl.value('throttle')} " if cl.option_present('throttle')

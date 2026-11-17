@@ -131,7 +131,7 @@ failures but still produce a nonzero final exit status.
 
 ## Slurm
 `-slurm` is `-cluster` for a Slurm cluster. The commands are collected in a file
-and submitted as a single `sbatch` array job, using `iwqb_slurm.rb`. Without
+and submitted as a single `sbatch` array job, using `iwqb.rb`. Without
 `-slurm`, `-cluster` uses Grid Engine (`iwqb.rb` and `qsub`).
 
 ```
@@ -141,6 +141,7 @@ dopattern.sh -slurm -o 100 'process.sh chunk%.smi > chunk%.out'
 | Option | Meaning |
 |---|---|
 | `-slurm` | Submit with `sbatch` rather than `qsub`. |
+| `-queue name` | The Slurm partition (`--partition=name`). Also works with `-cluster` for Grid Engine, where it is `qsub -q name`. |
 | `-sbatch ... -sbatch` | Options passed to `sbatch`, e.g. `-sbatch --time=1:00:00 --mem=4G -sbatch`. |
 | `-sdir ... -sdir` | A directive written into the job script as a `#SBATCH` line, e.g. `-sdir --partition=short -sdir`. May be repeated. |
 | `-throttle n` | Run at most `n` array tasks at once (`--array=1-N%n`). |

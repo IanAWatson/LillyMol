@@ -4,7 +4,9 @@
 with activities. It compares molecules that generated a fragment with those
 that did not, then optionally writes a JSON report for an interactive static
 HTML display. The analyzer treats structures as strings. The HTML renderer can
-optionally use LillyMol for fragment matching and RDKit for depiction.
+optionally use LillyMol for fragment matching and RDKit for depiction. It is one of
+three tools for exploring an SAR series; see
+[SAR series exploration](../Workflows/sar_series_exploration.md).
 
 ## Generate, analyze and display
 

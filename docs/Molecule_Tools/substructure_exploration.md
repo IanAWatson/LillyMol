@@ -3,7 +3,8 @@
 `substructure_exploration.sh` compares activity values for molecules that contain
 or lack medicinal chemistry features. It writes JSON with summary statistics,
 activity distributions, match counts and labelled examples. It can also produce
-a static HTML report.
+a static HTML report. It is one of three tools for exploring an SAR series; see
+[SAR series exploration](../Workflows/sar_series_exploration.md).
 
 ```shell
 substructure_exploration.sh analyse -A activity.txt molecules.smi \

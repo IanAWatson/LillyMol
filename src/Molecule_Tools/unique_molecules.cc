@@ -727,6 +727,12 @@ unique_molecule(int argc, char** argv) {
       cerr << "Structure comparisons done via InChI\n";
     }
   }
+#else
+  if (cl.option_present('C')) {
+    cerr << "The -C option (InChI) is not available, this build does not include InChI\n";
+    cerr << "Rebuild with bazel --config=inchi\n";
+    return 1;
+  }
 #endif
 
   if (cl.option_present('j')) {

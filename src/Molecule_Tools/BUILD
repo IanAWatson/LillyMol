@@ -5,14 +5,6 @@ load("@rules_cc//cc:defs.bzl", "cc_binary", "cc_proto_library", "cc_library", "c
 load("@rules_proto//proto:defs.bzl", "proto_library")
 load("@com_google_protobuf//bazel:cc_proto_library.bzl", "cc_proto_library")
 
-config_setting(
-    name = "build_inchi_enabled",
-    flag_values = {
-        "//build_defs:build_inchi": "true",
-    },
-    visibility = ["//visibility:public"],
-)
-
 proto_library(
    name = "alogp_proto",
    srcs = [
@@ -948,18 +940,7 @@ cc_binary(
         "//Foundational/iwmisc",
         "//Molecule_Lib:iwmolecule",
         "//Molecule_Lib:moleculeio",
-    ] + select({
-        "//build_defs:build_inchi_enabled": [
-            "@inchi//:inchi",
-        ],
-        "//conditions:default": [],
-        }),
-    defines = select({
-        "//build_defs:build_inchi_enabled": [
-        "BUILD_INCHI",
-        ],
-    "//conditions:default": [],
-    }),
+    ],
 )
 
 cc_binary(
@@ -2843,7 +2824,16 @@ cc_binary(
         "//Molecule_Lib:iwreaction",
         "//Molecule_Lib:moleculeio",
         "@com_google_absl//absl/container:flat_hash_map",
-    ],
+    ] + select({
+        # InChI is optional. It is enabled with --config=inchi (--define BUILD_INCHI=1),
+        # the same switch that enables it in Molecule_Lib. Default builds do not use it.
+        "//Molecule_Lib:inchi_yes": ["@third_party//:inchi"],
+        "//conditions:default": [],
+    }),
+    defines = select({
+        "//Molecule_Lib:inchi_yes": ["BUILD_INCHI"],
+        "//conditions:default": [],
+    }),
 )
 
 cc_binary(

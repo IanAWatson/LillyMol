@@ -159,4 +159,11 @@ end
 cmd << " ./#{master}"
 
 $stderr.print "Executing '#{cmd}'\n" if (verbose)
-system (cmd)
+# Pass the submitter's failure back to the caller, otherwise a failed submission
+# looks like success. system returns nil if the command could not be started.
+started = system(cmd)
+if started.nil?
+  $stderr.print "Could not run '#{cmd.strip}'\n"
+  exit(127)
+end
+exit($?.exitstatus || (128 + $?.termsig))

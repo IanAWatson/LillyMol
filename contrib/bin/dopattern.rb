@@ -59,7 +59,7 @@ fsub = '%'
 
 sleeptime = 0    # sleep between issuing commands
 
-iwqb = "#{tool_home}/ruby/iwqb.rb"
+iwqb = File.join(__dir__, 'iwqb.rb')
 
 if cl.option_present('submit')
   iwqb = cl.value('submit')
@@ -520,8 +520,10 @@ if doitfile
   end
 
   $stderr.print "Executing '#{cmd}'\n" if (verbose)
-  system(cmd)
+  started = system(cmd)
   status = command_exit_status
+  # system returns nil, with no message, if the command cannot be started.
+  $stderr << "Could not execute '#{cmd}'\n" if started.nil?
 
   if cl.option_present('sync') || cl.option_present('parallel') || cl.option_present('xargs')
     File.unlink(doitfilename) if File.exist?(doitfilename)

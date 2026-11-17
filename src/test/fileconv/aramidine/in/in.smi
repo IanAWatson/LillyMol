@@ -1,0 +1,11 @@
+O=C1NC(C)=NC2=CC=CC=C12 quinazolinone_3H
+O=C1N=C(C)NC2=CC=CC=C12 quinazolinone_1H
+O=C1NC(C)=NC=C1 pyrimidinone_3H
+O=C1N=C(C)NC=C1 pyrimidinone_1H
+OC1=CN=C(NC1=O)C1=CC=C(C=C1)C(F)(F)F CHEMBL3920565_original
+C1=C(C=CC(=C1)C(F)(F)F)C1=NC(=O)C(=CN1)O CHEMBL3920565_from_inchi
+CC1=NOC(=O)N1 oxadiazolone_4H
+CC1=NC(=O)ON1 oxadiazolone_2H
+CC1=NC=CC=N1 negative_no_carbonyl
+O=C1N(C)C(C)=NC2=CC=CC=C12 negative_N3_methyl
+O=C1N=C(C)N(C)C2=CC=CC=C12 negative_N1_methyl

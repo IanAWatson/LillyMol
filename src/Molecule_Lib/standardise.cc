@@ -401,6 +401,7 @@ Chemical_Standardisation::activate_all() {
   _transform_nitroso_to_oxime.activate();
   _transform_isoxazole.activate();
   _transform_aromatic_guanidine_ring.activate();
+  _transform_aromatic_amidine_ring.activate();
   _transform_pyrazolone.activate();
   _transform_amino_thiazole.activate();
   _transform_enol_to_keto.activate();
@@ -497,6 +498,7 @@ display_all_chemical_standardisation_options(std::ostream& os, char zoption) {
   os << zopt << CS_LACTIM_LACTAM_RING << "       convert lactim to lactam form (ring)\n";
   os << zopt << CS_ISOXAZOLE << "   convert Hydroxy isoxazoles to O= forms\n";
   os << zopt << CS_ARGUAN << "      aromatic \"gauanidines\" - adjacent to =O, better name needed\n";
+  os << zopt << CS_ARAMIDINE << "   aromatic ring amidines with a non-N substituent: H on the ring N adjacent to =O\n";
   os << zopt << CS_PYRAZOLONE << "    convert pyrazolone to keto form\n";
   os << zopt << CS_AMINO_THIAZOLE << "  convert -N=c1scc[nH]1 to -[NH]c1sccn1\n";
   os << zopt << CS_KETO_ENOL << "     convert O/S enol to keto forms (no adjacent heteroatoms)\n";
@@ -964,6 +966,12 @@ Chemical_Standardisation::Activate(const IWString& directive, const int verbose)
       _transform_aromatic_guanidine_ring.deactivate();
     } else {
       _transform_aromatic_guanidine_ring.activate();
+    }
+  } else if (CS_ARAMIDINE == tmp) {
+    if (negation) {
+      _transform_aromatic_amidine_ring.deactivate();
+    } else {
+      _transform_aromatic_amidine_ring.activate();
     }
   } else if (CS_PYRAZOLONE == tmp) {
     if (negation) {
@@ -4161,6 +4169,113 @@ Chemical_Standardisation::_do_transform_aromatic_ring_guanidine(
 }
 
 /*
+  Aromatic ring amidines, such as 2-substituted pyrimidin-4(3H)-ones and quinazolin-4(3H)-ones
+
+    O=c1[nH]c(R)nc2ccccc12   and   O=c1nc(R)[nH]c2ccccc12
+
+  are tautomers. InChI keeps only a mobile hydrogen, so a structure read back from InChI can
+  have the hydrogen on either nitrogen. Put it on the ring nitrogen adjacent to the aromatic
+  carbonyl, the lactam form. This is what arguan does when the carbon also has an exocyclic
+  nitrogen; here the carbon has a non-nitrogen substituent.
+
+  The carbon must have exactly two aromatic ring nitrogens (no charge, two connections) and one
+  other neighbour that is not a nitrogen. Exactly one of the two nitrogens must be next to an
+  aromatic carbonyl, so a ring with =O on both sides is left alone, as is a ring where
+  the hydrogen is not on the nitrogen remote from the carbonyl.
+*/
+
+int
+Chemical_Standardisation::_do_transform_aromatic_ring_amidine(
+    Molecule& m, IWStandard_Current_Molecule& current_molecule_data) {
+  const int* ncon = current_molecule_data.ncon();
+  const int* atom_is_aromatic = current_molecule_data.atom_is_aromatic();
+  const atomic_number_t* z = current_molecule_data.atomic_number();
+
+  const int matoms = m.natoms();
+
+  int rc = 0;
+
+  for (int i = 0; i < matoms; ++i) {
+    if (6 != z[i] || 3 != ncon[i] || !atom_is_aromatic[i]) {
+      continue;
+    }
+
+    const Atom* c = m.atomi(i);
+
+    atom_number_t ring_n[2];
+    int nn = 0;
+    int others = 0;
+    atom_number_t substituent = kInvalidAtomNumber;
+    for (int j = 0; j < 3; ++j) {
+      const atom_number_t o = c->other(i, j);
+      if (7 != z[o]) {
+        substituent = o;
+        others++;
+        continue;
+      }
+      // Nitrogen: must be an uncharged aromatic ring nitrogen, otherwise this is not for us.
+      if (!atom_is_aromatic[o] || 2 != ncon[o] || 0 != m.formal_charge(o) || 2 == nn) {
+        nn = -1;
+        break;
+      }
+      ring_n[nn++] = o;
+    }
+
+    if (2 != nn || 1 != others) {
+      continue;
+    }
+
+    if (!m.bond_between_atoms(i, substituent)->is_single_bond()) {
+      continue;
+    }
+
+    atom_number_t n1 = ring_n[0];
+    atom_number_t n2 = ring_n[1];
+
+    const int x1 = attached_to_aromatic_carbonyl(m, n1, i, current_molecule_data);
+    const int x2 = attached_to_aromatic_carbonyl(m, n2, i, current_molecule_data);
+
+    if (x1 == x2) {  // neither, or both
+      continue;
+    }
+
+    if (x2) {
+      std::swap(n1, n2);
+    }
+
+    // n1 is next to the carbonyl. It must be the one without the hydrogen.
+    if (0 != m.hcount(n1) || 1 != m.hcount(n2)) {
+      continue;
+    }
+
+    // Moving the hydrogen is swapping the two Kekule bonds at the carbon.
+    if (!m.bond_between_atoms(i, n1)->is_double_bond() ||
+        !m.bond_between_atoms(i, n2)->is_single_bond()) {
+      continue;
+    }
+
+    m.set_bond_type_between_atoms(i, n1, SINGLE_BOND);
+    m.set_bond_type_between_atoms(i, n2, DOUBLE_BOND);
+
+    rc++;
+  }
+
+  if (rc) {
+    _transform_aromatic_amidine_ring.extra(rc);
+
+    if (_verbose) {
+      cerr << "Transformed " << rc << " aromatic ring amidines\n";
+    }
+
+    if (_append_string_depending_on_what_changed) {
+      _append_to_changed_molecules << " STD:aramidine";
+    }
+  }
+
+  return rc;
+}
+
+/*
   For Research Records, we often want counterions to be properly charged
 
   We put + charges on
@@ -4563,6 +4678,11 @@ Chemical_Standardisation::_process(Molecule& m,
   if (_transform_aromatic_guanidine_ring.active() &&
       current_molecule_data.possible_guanidine().number_elements()) {
     rc += _do_transform_aromatic_ring_guanidine(m, current_molecule_data);
+  }
+
+  if (_transform_aromatic_amidine_ring.active() &&
+      current_molecule_data.aromatic_rings_with_multiple_nitrogens() > 0) {
+    rc += _do_transform_aromatic_ring_amidine(m, current_molecule_data);
   }
 
   if (_transform_amino_thiazole.active()) {
@@ -5094,6 +5214,11 @@ Chemical_Standardisation::report(std::ostream& os) const {
   if (_transform_sulfonyl_urea.active()) {
     os << "  sulfonyl_urea ";
     _transform_sulfonyl_urea.report(os);
+  }
+
+  if (_transform_aromatic_amidine_ring.active()) {
+    os << "  aromatic ring amidine ";
+    _transform_aromatic_amidine_ring.report(os);
   }
 
   if (_transform_124_triazine.active()) {

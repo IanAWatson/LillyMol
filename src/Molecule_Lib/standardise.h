@@ -434,6 +434,7 @@ class IWStandard_Current_Molecule
 #define CS_NV5DO "rvnv5o"
 #define CS_ISOXAZOLE  "isoxazole"
 #define CS_ARGUAN "arguan"
+#define CS_ARAMIDINE "aramidine"
 #define CS_PYRAZOLONE "pyrazolone"
 #define CS_AMINO_THIAZOLE "aminothazole"
 #define CS_KETO_ENOL "keto_enol"
@@ -537,6 +538,7 @@ class Chemical_Standardisation
     Chemical_Transformation _transform_lactim_lactam;
     Chemical_Transformation _transform_lactim_lactam_ring;
     Chemical_Transformation _transform_aromatic_guanidine_ring;
+    Chemical_Transformation _transform_aromatic_amidine_ring;
     Chemical_Transformation _transform_pyrazolone;
     Chemical_Transformation _transform_amino_thiazole;
     Chemical_Transformation _transform_enol_to_keto;
@@ -613,6 +615,7 @@ class Chemical_Standardisation
     int  _do_transform_ring_guanidine (Molecule & m, IWStandard_Current_Molecule & current_molecule_data);
     int  _do_transform_aromatic_ring_guanidine (Molecule & m, const Set_of_Atoms & r, IWStandard_Current_Molecule & current_molecule_data);
     int  _do_transform_aromatic_ring_guanidine (Molecule & m, IWStandard_Current_Molecule & current_molecule_data);
+    int  _do_transform_aromatic_ring_amidine (Molecule & m, IWStandard_Current_Molecule & current_molecule_data);
     int  _do_transform_single_atom_ions (Molecule &, IWStandard_Current_Molecule & current_molecule_data);
     int  _do_protonate_sulfur_acids (Molecule &, IWStandard_Current_Molecule & current_molecule_data);
     int  _do_protonate_phosphorous_acids (Molecule &, IWStandard_Current_Molecule & current_molecule_data);

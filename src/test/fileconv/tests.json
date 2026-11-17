@@ -33,6 +33,18 @@
     },
 
     {
+      "name": "aramidine",
+      "comment": [
+        "Ring amidine tautomers (2-substituted quinazolin-4(3H)-one, pyrimidin-4(3H)-one,",
+        "1,2,4-oxadiazol-5-one) converge on the H next to the carbonyl. The N-methyl and",
+        "no-carbonyl entries must be unchanged."
+      ],
+      "args": [
+        "-g aramidine -o usmi -S - #{indir}/in.smi"
+      ]
+    },
+
+    {
       "name": "inchi_stereo",
       "comment": [
         "Stereo layers of InChI written by fileconv, checked against RDKit, plus a",

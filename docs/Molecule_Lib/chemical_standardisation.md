@@ -80,6 +80,7 @@ Entering `-g help` to most LillyMol tools yields the usage message
  -g ltltr       convert lactim to lactam form (ring)
  -g isoxazole   convert Hydroxy isoxazoles to O= forms
  -g arguan      aromatic "gauanidines" - adjacent to =O, better name needed
+ -g aramidine   aromatic ring amidines with a non-N substituent: H on the ring N adjacent to =O
  -g pyrazolone    convert pyrazolone to keto form
  -g aminothazole  convert -N=c1scc[nH]1 to -[NH]c1sccn1
  -g keto_enol     convert O/S enol to keto forms (no adjacent heteroatoms)
@@ -711,6 +712,39 @@ one pass. `-g cyclic-amidine` alone does not neutralise charged groups.
 
 Reports count cyclic-amidine conversions separately. `-g APP=EACH` appends
 `STD:cyclic-amidine` when the rule changes a molecule.
+
+### Aromatic ring amidines next to a carbonyl
+
+`-g aramidine` puts the hydrogen on the ring nitrogen next to the carbonyl in
+aromatic ring amidines such as 2-substituted pyrimidin-4(3H)-ones and
+quinazolin-4(3H)-ones, the lactam form:
+
+```text
+O=c1[n]c(C)[nH]c2ccccc12   ->  O=c1[nH]c(C)[n]c2ccccc12
+```
+
+The two forms are tautomers. InChI records only a mobile hydrogen, so a
+structure read back from InChI can have the hydrogen on either nitrogen. For
+example, `O=c1[nH]c(Ar)[n]cc1O` and `O=c1[n]c(Ar)[nH]cc1O` both become the first
+form. This is the companion of `arguan`, which does the same when the amidine
+carbon also carries an exocyclic nitrogen; `aramidine` is for a carbon with any
+other substituent. `arguan` itself is unchanged.
+
+The amidine carbon must be aromatic with exactly two aromatic ring nitrogens,
+neither charged nor substituted, and one single-bonded substituent that is not
+nitrogen. Exactly one of those nitrogens must be next to an aromatic carbonyl.
+The hydrogen must currently be on the other nitrogen. N-substituted rings (a
+3-methylquinazolin-4-one), rings with no carbonyl, and rings with a carbonyl on
+both sides are left alone.
+
+This rule is included in `-g all` and broadens default tautomer equivalence.
+Disable it with `-g all -g -aramidine`. It is not limited to six-membered
+rings. In a set of 10,000 ChEMBL molecules the only change to `-g all` output
+was in four 3-aryl-1,2,4-oxadiazol-5-ones, which move from the 2H to the more
+usual 4H form (`O=c1[n]c(Ar)[nH]o1` to `O=c1[nH]c(Ar)[n]o1`).
+
+Reports count these conversions separately. `-g APP=EACH` appends
+`STD:aramidine` when the rule changes a molecule.
 
 ### Aliphatic nitroso groups
 

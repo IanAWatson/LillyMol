@@ -13,6 +13,29 @@
       "args": [
            "-S unique -D duplicate -c -v -l #{indir}/in.smi"
       ]
+    },
+
+    {
+      "name": "tautomers_smiles",
+      "comment": [
+        "Without -C, structures are compared as SMILES, so the 2-pyridone and",
+        "2-hydroxypyridine tautomers stay distinct. Valid for every build."
+      ],
+      "args": [
+           "-S unique -D duplicate -l #{indir}/tautomers.smi"
+      ]
+    },
+
+    {
+      "name": "tautomers_inchi",
+      "comment": [
+        "-C compares by InChI, which is only present in builds made with",
+        "--config=inchi. The script checks the right behaviour for either kind of",
+        "build and prints PASS in both cases. See run_test.sh."
+      ],
+      "shell_script": {
+        "script_name": "run_test.sh"
+      }
     }
 
   ]

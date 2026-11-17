@@ -1831,6 +1831,10 @@ extern void set_warn_duplicate_atom_deletion(int s);
 extern void set_warn_non_bonded_breaks(int s);
 extern void set_warn_no_query_in_reaction_object(int s);
 
+// The character used for a bond type in msi reaction files. Defined in iwreaction.cc and used by the
+// msi writer (reaction_msi.cc) and by operator<< for an Inter_Particle_Bond.
+extern char character_representation_of_bond(bond_type_t bt);
+
 extern int
 determine_atom_number (const Set_of_Atoms & scaffold_embedding,
                        const Matched_Atom_in_Component & ma,

@@ -526,6 +526,7 @@ cc_library(
         "reaction_from_smirks.cc",
         "reaction_iterator.cc",
         "reaction_match_conditions.cc",
+        "reaction_msi.cc",
         "reaction_proto.cc",
         "rxn_3d_replace.cc",
         "rxn_bond_angle.cc",

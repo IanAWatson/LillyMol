@@ -178,6 +178,7 @@ set(iwreaction_srcs
   reaction_iterator.cc
   reaction_from_smirks.cc
   reaction_match_conditions.cc
+  reaction_msi.cc
   reaction_proto.cc
   rxnfile.cc
   rxnfile2.cc

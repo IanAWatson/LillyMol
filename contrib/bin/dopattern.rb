@@ -33,7 +33,7 @@ def command_exit_status
   status.exitstatus || (128 + status.termsig)
 end
 
-cl = IWCmdline.new("-v-a=i-o=i-e=i-w=ipos-k-ks-dry-start=i-stop=i-do=s-stem=s-rx=s-suffix=s-dsc=sfile-qsub-cluster-cluster.seq-sync-qsubopt=close-file=sfile-col=s-echo-echon-f=s-rxdir=dir-subdir-s-array=s-sleep=ipos-sortrx-expert-parallel=ipos-xargs=ipos-l=s-V-j-q-submit=xfile-noeval")
+cl = IWCmdline.new("-v-a=i-o=i-e=i-w=ipos-k-ks-dry-start=i-stop=i-do=s-stem=s-rx=s-suffix=s-dsc=sfile-qsub-cluster-cluster.seq-sync-qsubopt=close-file=sfile-col=s-echo-echon-f=s-rxdir=dir-subdir-s-array=s-sleep=ipos-sortrx-expert-parallel=ipos-xargs=ipos-l=s-V-j-q-submit=xfile-noeval-slurm-sbatch=close-sdir=close-throttle=ipos")
 
 verbose = cl.option_present('v')
 
@@ -42,6 +42,22 @@ $expert = cl.option_present('expert')
 dry_run = cl.option_present('dry')
 
 qsub = cl.option_present('qsub') || cl.option_present('cluster') || cl.option_present('qsubopt') || cl.option_present('sync') || cl.option_present('l') || cl.option_present('V')
+
+slurm = cl.option_present('slurm')
+if slurm
+  qsub = true
+  %w[V l qsubopt cluster.seq].each do |sge_only|
+    next unless cl.option_present(sge_only)
+    warn "-#{sge_only} is a Grid Engine option and cannot be used with -slurm"
+    exit 3
+  end
+else
+  %w[sbatch sdir throttle].each do |slurm_only|
+    next unless cl.option_present(slurm_only)
+    warn "-#{slurm_only} requires -slurm"
+    exit 3
+  end
+end
 
 doitfilename = nil
 doitfile = false
@@ -59,7 +75,7 @@ fsub = '%'
 
 sleeptime = 0    # sleep between issuing commands
 
-iwqb = File.join(__dir__, 'iwqb.rb')
+iwqb = File.join(__dir__, slurm ? 'iwqb_slurm.rb' : 'iwqb.rb')
 
 if cl.option_present('submit')
   iwqb = cl.value('submit')
@@ -93,6 +109,10 @@ def usage (rc)
   $stderr.print " -cluster.seq    collect all commands in a file and submit to qsub - if numeric sequence (Cluster setup is required)\n" if (FileTest.directory?(clusterdir) && $expert)
   $stderr.print " -sync           submit to qsub, wait for results (Cluster setup is required)\n" if (FileTest.directory?(clusterdir))
   $stderr.print " -qsubopt ... -qsubopt options passed to qsub (Cluster setup is required)\n" if $expert
+  $stderr.print " -slurm          like -cluster, but submit a Slurm array job with sbatch (via iwqb_slurm.rb)\n"
+  $stderr.print " -sbatch ... -sbatch options passed to sbatch, e.g. -sbatch --time=1:00:00 --mem=4G -sbatch\n" if $expert
+  $stderr.print " -sdir ... -sdir  directive to insert as a #SBATCH line, e.g. -sdir --partition=short -sdir\n" if $expert
+  $stderr.print " -throttle <n>   with -slurm: run at most <n> array tasks at once\n" if $expert
   $stderr.print " -l ...          cluster resource specification(s) (Cluster setup is required)\n" if $expert
   $stderr.print " -parallel <j>   use gnu parallel to process <j> tasks at a time\n" if $expert
   $stderr.print " -xargs <j>      use xargs to process <j> tasks at a time\n" if $expert
@@ -504,12 +524,19 @@ if doitfile
     cmd = "xargs -0 -I{} -P #{j} bash -c '{}' < #{command_file_argument}"
   else
     cmd = "#{Shellwords.escape(iwqb)} "
-    cmd << "-qsub #{qsub_options} -qsub " if qsub_options.length > 0
+    if slurm
+      cmd << '-slurm '
+      cmd << "-sbatch #{cl.value('sbatch')} -sbatch " if cl.option_present('sbatch')
+      cl.values('sdir').each { |d| cmd << "-sdir #{d} -sdir " } if cl.option_present('sdir')
+      cmd << "-throttle #{cl.value('throttle')} " if cl.option_present('throttle')
+    else
+      cmd << "-qsub #{qsub_options} -qsub " if qsub_options.length > 0
+    end
     if cl.option_present('sync')
       cmd << '-sync '
     end
     if cl.option_present('j')
-      cmd << ' -j'
+      cmd << '-j '
     end
     cmd << command_file_argument
   end

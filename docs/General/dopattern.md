@@ -129,6 +129,30 @@ Temporary files for completed local or synchronous execution are removed even
 when execution fails. For sequential execution, `-k` and `-ks` continue after
 failures but still produce a nonzero final exit status.
 
+## Slurm
+`-slurm` is `-cluster` for a Slurm cluster. The commands are collected in a file
+and submitted as a single `sbatch` array job, using `iwqb_slurm.rb`. Without
+`-slurm`, `-cluster` uses Grid Engine (`iwqb.rb` and `qsub`).
+
+```
+dopattern.sh -slurm -o 100 'process.sh chunk%.smi > chunk%.out'
+```
+
+| Option | Meaning |
+|---|---|
+| `-slurm` | Submit with `sbatch` rather than `qsub`. |
+| `-sbatch ... -sbatch` | Options passed to `sbatch`, e.g. `-sbatch --time=1:00:00 --mem=4G -sbatch`. |
+| `-sdir ... -sdir` | A directive written into the job script as a `#SBATCH` line, e.g. `-sdir --partition=short -sdir`. May be repeated. |
+| `-throttle n` | Run at most `n` array tasks at once (`--array=1-N%n`). |
+| `-sync` | Wait for the jobs to finish (`sbatch --wait`). |
+| `-j` | Send standard error to the same file as standard output. |
+
+`-V`, `-l`, `-qsubopt` and `-cluster.seq` are Grid Engine options and are
+rejected with `-slurm`; `-sbatch`, `-sdir` and `-throttle` are rejected
+without it. `-dry` leaves the command file and prints the submission command
+without running it. As with Grid Engine, the exit status is that of the
+submitter, so a failed `sbatch` gives a nonzero status.
+
 The `-cluster.seq` shortcut requires exactly the ordered sequence `1,2,...,N`.
 Gaps, duplicate indices, a different starting index, or differently spelled
 indices such as `01` are rejected rather than being replaced with the wrong

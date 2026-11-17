@@ -356,7 +356,15 @@ Molecule::InChI(IWString & inchi_string)      // maybe this could be a const met
 #endif
       s.neighbor[4-nas+j] = a;
     }
-   
+
+    // next_atom yields top_front, top_back, left_down, right_down. With parity EVEN InChI
+    // needs the last two the other way round when all four neighbours are real atoms.
+    // (When neighbor[0] is the central atom, standing in for an implicit H or lone pair,
+    // the order above is already right.) Without this, the stereo layer of every
+    // quaternary stereocentre was inverted, and the InChI read back differently.
+    if(4 == nas)
+      std::swap(s.neighbor[2], s.neighbor[3]);
+
   }
 
   inchi_inp.szOptions = NULL;

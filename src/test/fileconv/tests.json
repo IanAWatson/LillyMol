@@ -30,7 +30,18 @@
       "args": [
         "-o usmi -p AMWI -E autocreate -S - #{indir}/in.smi"
       ]
-    }
+    },
 
+    {
+      "name": "inchi_stereo",
+      "comment": [
+        "Stereo layers of InChI written by fileconv, checked against RDKit, plus a",
+        "round trip. Needs a build made with --config=inchi, otherwise just prints PASS."
+      ],
+      "difftool": "diff",
+      "shell_script": {
+        "script_name": "run_test.sh"
+      }
+    }
   ]
 }

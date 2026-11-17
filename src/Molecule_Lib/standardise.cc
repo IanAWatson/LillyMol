@@ -10646,7 +10646,10 @@ IWStandard_Current_Molecule::initialise(Molecule& m) {
         continue;
       }
 
-      if (single_bond_to_oxygen(m, n)) {
+      // A nitrogen bonded to oxygen in a ring is an isoxazole or similar, which have their
+      // own rules. Acyclic, it is a hydroxamic acid or hydroximate written as the imidic acid,
+      // C(O)=NO, and the amide form C(=O)NO is the one to prefer.
+      if (_ring_membership[c] > 0 && single_bond_to_oxygen(m, n)) {
         continue;
       }
 

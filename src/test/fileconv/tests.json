@@ -33,6 +33,17 @@
     },
 
     {
+      "name": "hydroxamic",
+      "comment": [
+        "Acyclic N-hydroxy and N-alkoxy imidic acids go to the amide (hydroxamic acid) form.",
+        "The ring hydroxyisoxazole is converted by its own rule, as before."
+      ],
+      "args": [
+        "-g all -o usmi -S - #{indir}/in.smi"
+      ]
+    },
+
+    {
       "name": "aramidine",
       "comment": [
         "Ring amidine tautomers (2-substituted quinazolin-4(3H)-one, pyrimidin-4(3H)-one,",

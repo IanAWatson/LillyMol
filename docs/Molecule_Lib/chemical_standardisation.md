@@ -135,6 +135,14 @@ be two-connected, or a neutral terminal `=NH`. Explicit `[OH]`, `[SH]`, and
 | `CC(O)=N` | `CC(=O)N` |
 | `CC(S)=N` | `CC(=S)N` |
 | `NC(S)=N` | `NC(=S)N` |
+| `CC(O)=NO` | `CC(=O)NO` |
+| `CC(O)=NOC` | `CC(=O)NOC` |
+
+A nitrogen bonded to oxygen is accepted when the carbon is not in a ring, so a
+hydroxamic acid or hydroximate written as the imidic acid, `C(O)=NO`, becomes
+the amide form. Earlier releases left these unchanged. In rings, nitrogen bonded
+to oxygen (isoxazoles and similar) is still excluded from `ltltr`; those have
+their own rules, such as `-g isoxazole`.
 
 Terminal `=NH` support broadens equivalence relative to older releases, which
 left these forms unchanged. Charged terminal imines and specified C=N

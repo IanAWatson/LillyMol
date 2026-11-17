@@ -316,10 +316,6 @@ molecular_abstraction -a 'rmat(smarts WRITE)'
 ```
 but `remove_matched_atoms` has more options and flexiblity.
 
-## representations
-Write a tabular file of standardised forms. Useful for uniqueness
-and database loads.
-
 ## retrosynthesis
 Part of the retrosynthesis tool set. Needs documentation.
 

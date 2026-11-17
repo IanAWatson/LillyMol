@@ -602,6 +602,20 @@ cc_binary(
 )
 
 cc_binary(
+    name = "representations",
+    srcs = [
+        "representations.cc",
+    ],
+    deps = [
+        "//Foundational/cmdline:iwcmdline",
+        "//Foundational/iwaray",
+        "//Foundational/iwmisc",
+        "//Molecule_Lib:iwmolecule",
+        "//Molecule_Lib:moleculeio",
+    ],
+)
+
+cc_binary(
     name = "ring_combinations",
     srcs = [
         "ring_combinations.cc",

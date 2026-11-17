@@ -1843,20 +1843,6 @@ cc_binary(
 )
 
 cc_binary(
-    name = "representations",
-    srcs = [
-        "representations.cc",
-    ],
-    deps = [
-        "//Foundational/cmdline:iwcmdline",
-        "//Foundational/iwaray",
-        "//Foundational/iwmisc",
-        "//Molecule_Lib:iwmolecule",
-        "//Molecule_Lib:moleculeio",
-    ],
-)
-
-cc_binary(
     name = "retrosynthesis",
     srcs = [
         "retrosynthesis.cc",
@@ -4334,7 +4320,6 @@ py_test(
         "//Molecule_Tools:qed",
         "//Molecule_Tools:random_molecular_permutations",
         "//Molecule_Tools:random_smiles",
-        "//Molecule_Tools:representations",
         "//Molecule_Tools:retrosynthesis",
         "//Molecule_Tools:rgroup",
         "//Molecule_Tools:ring_extraction",

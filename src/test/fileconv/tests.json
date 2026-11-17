@@ -33,6 +33,20 @@
     },
 
     {
+      "name": "to2ap",
+      "comment": [
+        "Exocyclic imines on aromatic rings become amines when a ring N-H can take the double",
+        "bond: next to the carbon, para to it, or round a benzo ring (acridine), and several",
+        "imines in a ring when each has an N-H. The neg_ entries must be unchanged: more N-H",
+        "than imines (a choice of tautomer), no N-H, a substituted ring N next to the imine",
+        "carbon (3-methylcytosine), oximes, and non-aromatic rings."
+      ],
+      "args": [
+        "-g to2ap -o usmi -S - #{indir}/in.smi"
+      ]
+    },
+
+    {
       "name": "hydroxamic",
       "comment": [
         "Acyclic N-hydroxy and N-alkoxy imidic acids go to the amide (hydroxamic acid) form.",

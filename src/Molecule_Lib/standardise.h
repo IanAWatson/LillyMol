@@ -763,6 +763,11 @@ class Chemical_Standardisation
     int _do_transform_to_2_amino_pyridine(Molecule& m, 
                         standardisation::KetoEnol keto_enol,
                         IWStandard_Current_Molecule& current_molecule_data);
+    // The two parts of to2ap. The first needs an N-H next to the imine carbon, the
+    // second finds an N-H elsewhere in the same six membered ring.
+    int _do_to_2ap_adjacent_nh(Molecule& m, standardisation::KetoEnol keto_enol,
+                        IWStandard_Current_Molecule& current_molecule_data);
+    int _do_to_2ap_in_ring(Molecule& m, IWStandard_Current_Molecule& current_molecule_data);
     int _do_transform_oxo_pyrimidine(Molecule& m,
                 IWStandard_Current_Molecule& current_molecule_data);
     int _do_transform_indole_hydrogen(Molecule& m,

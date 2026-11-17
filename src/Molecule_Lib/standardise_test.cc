@@ -625,6 +625,19 @@ INSTANTIATE_TEST_SUITE_P(TestStandardisationP, TestStandardisationP, testing::Va
 
   ForStd{{"to2ap"}, "O=C(NN)c1cc[nH]c(=N)c1 CHEMBL3091876", "O=C(NN)c1cc([n]cc1)N"},
   ForStd{{"to2ap"}, "N=C(N)N=c1sc([n][nH]1)c1c(C)cccc1 CHEMBL1188079", "NC(=N)Nc1sc(c2c(C)cccc2)[n][n]1"},
+  // The N-H is not next to the imine carbon, so the hydrogen travels along a path of bonds.
+  ForStd{{"to2ap"}, "N=C1C=CNC=C1 4-aminopyridine", "Nc1cc[n]cc1"},
+  ForStd{{"to2ap"}, "N=C1C=CNC2=CC=CC=C12 4-aminoquinoline", "Nc1c2c([n]cc1)cccc2"},
+  ForStd{{"to2ap"}, "N(C1=CC=CC=C1)=C1C=CNC2=CC=CC=C12 4-anilinoquinoline",
+         "[n]1c2c(c(Nc3ccccc3)cc1)cccc2"},
+  // Every ring atom of the central ring is shared with a benzo ring, so the path runs round one.
+  ForStd{{"to2ap"}, "N=C1C2=CC=CC=C2NC2=CC=CC=C12 9-aminoacridine", "Nc1c2c([n]c3c1cccc3)cccc2"},
+  ForStd{{"to2ap"}, "CS(=O)(=O)N=C1C=CNC=C1 sulfonyl", "CS(=O)(=O)Nc1cc[n]cc1"},
+  ForStd{{"to2ap"}, "Clc1cc(C=NN=c2c3ccc(cc3[nH]c(C)c2)C)ccc1 CHEMBL548908-like azine",
+         "Clc1cc(C=NNc2c3c([n]c(c2)C)cc(cc3)C)ccc1"},
+  // Two imines and two N-H in one ring: every N-H is used, so the result is unambiguous.
+  ForStd{{"to2ap"}, "CC=CC1=C(C(=CC(=C1)CC1=CNC(=N)NC1=N)CCC)OC CHEMBL528943",
+         "COc1c(CCC)cc(Cc2c([n]c([n]c2)N)N)cc1C=CC"},
 
   ForStd{{"isoxazole"}, "C12=C(SN=C1-O)CCCC2NC CHEMBL150489", "O=c1[nH]sc2c1C(NC)CCC2"},
 
@@ -754,7 +767,16 @@ TEST_P(TestStandardisationNoChange, Tests) {
 }
 INSTANTIATE_TEST_SUITE_P(TestStandardisationNoChange, TestStandardisationNoChange, testing::Values(
   NoChange{{"to2ap"}, "C12=NC(=N)C=CN1[C@H]1O[C@H]([C@H](O)[C@H]1O2)CO CHEMBL4303543"},
-  NoChange{{"to2ap"}, "CC=CC1=C(C(=CC(=C1)CC1=CNC(=N)NC1=N)CCC)OC CHEMBL528943"},
+  // More N-H than imines in the ring: which nitrogen keeps its hydrogen is a choice.
+  NoChange{{"to2ap"}, "N=C1NC2=C(N=CN2)C(=O)N1 guanine imine"},
+  NoChange{{"to2ap"}, "N=C1NC(=O)C=CN1 cytosine imine"},
+  // No N-H to move, or an adjacent substituted nitrogen (as in 3-methylcytosine) that
+  // cannot take part in a tautomer, so the imine is the stable form.
+  NoChange{{"to2ap"}, "N=C1C=CN(C)C=C1 N-methyl"},
+  NoChange{{"to2ap"}, "N=C1C=CNC(=O)N1C 3-methylcytosine"},
+  // Oximes and oxime ethers are not treated as imines.
+  NoChange{{"to2ap"}, "ON=C1C=CNC=C1 oxime"},
+  NoChange{{"to2ap"}, "CON=C1C=CNC=C1 oxime ether"},
   NoChange{{"indoleh"}, "CC1=CC(=O)N2N=CC=C2N1 CHEMBL4525057"},
   NoChange{{"guan"}, "C(=N)(NC1=C2C(=CC=C1)C=CC=C2)N1CCCCC1 CHEMBL91145"}
 ));

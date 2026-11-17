@@ -1,0 +1,15 @@
+Nc1[n]cccc1 ortho_2_aminopyridine_unchanged_behaviour
+Nc1cc[n]cc1 para_4_aminopyridine
+Nc1cc[n]c2c1cccc2 para_4_aminoquinoline
+N(c1ccccc1)c1c2c([n]cc1)cccc2 para_4_anilinoquinoline
+Nc1c2ccccc2[n]c2ccccc12 acridine_9_amino_path_round_a_benzo_ring
+CS(=O)(=O)Nc1cc[n]cc1 para_sulfonyl_imine
+Nc1cc[n]c([n]1)N diimine_all_NH_used_2_4_diaminopyrimidine
+Clc1cc(C=NNc2c3ccc(cc3[n]c(C)c2)C)ccc1 azine_4_quinolyl_hydrazone
+O=c1[nH]c(=N)[nH]c2[nH]c[n]c12 neg_guanine_imine_more_NH_than_imines
+O=c1cc[nH]c(=N)[nH]1 neg_cytosine_imine_more_NH_than_imines
+N=c1cc[n](C)cc1 neg_N_methyl_no_NH
+O=c1[nH]ccc(=N)[n]1C neg_3_methylcytosine_adjacent_substituted_N
+ON=c1cc[nH]cc1 neg_oxime
+CON=c1cc[nH]cc1 neg_oxime_ether
+N=c1scc[n]1C neg_thiazoline_imine

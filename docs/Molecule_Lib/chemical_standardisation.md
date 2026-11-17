@@ -103,7 +103,7 @@ Entering `-g help` to most LillyMol tools yields the usage message
  -g 124-triazine  convert S-C(=N)-N to S=C(-N)-N
  -g enol-fused    convert [O,S;D1]-c(:n):[aD3x3] to O=C form
  -g isotope       convert all isotopic atoms to non isotopic forms
- -g to2ap         convert exocyclic N=C:[nH] to N-c:n (InChI generates these)
+ -g to2ap         convert exocyclic N=C to N-c where a ring N-H takes the double bond (InChI generates these)
  -g all         ALL the above standardistions
  -g rvnitro     convert O=N=O nitro groups to charge separated
  -g rvnv5       convert all 5 valent N atoms to charge separated
@@ -753,6 +753,47 @@ usual 4H form (`O=c1[n]c(Ar)[nH]o1` to `O=c1[nH]c(Ar)[n]o1`).
 
 Reports count these conversions separately. `-g APP=EACH` appends
 `STD:aramidine` when the rule changes a molecule.
+
+### Exocyclic imines on aromatic rings
+
+`-g to2ap` converts an exocyclic imine on an aromatic ring to the amine when a ring
+N-H can take the double bond. The imine is `N=c` where the nitrogen is terminal (`=NH`) or
+has one substituent and no hydrogen. InChI records only a mobile hydrogen, so structures
+read back from InChI are often in the imine form.
+
+```text
+N=c1cc[nH]cc1           ->  Nc1cc[n]cc1             4-aminopyridine
+N=c1cc[nH]c2ccccc12     ->  Nc1cc[n]c2ccccc12       4-aminoquinoline
+N=c1c2ccccc2[nH]c2ccccc12  ->  Nc1c2ccccc2[n]c2ccccc12   9-aminoacridine
+N=c1[nH]c(=N)[nH]cc1    ->  Nc1nc(N)ncc1            2,4-diaminopyrimidine
+```
+
+The rule works in two steps. First, as in earlier releases, an N-H next to the imine carbon
+takes the double bond: `N=c1[nH]cccc1` becomes `Nc1ncccc1`. Then, for imines that remain, the
+hydrogen is moved along an alternating single-double-single path of bonds through the aromatic
+ring system, which reaches an N-H para to the imine carbon, or round a benzo ring as in an
+acridine. This second step is new, and is only done when the aromatic ring system has
+exactly as many N-H as imines, so that every N-H is used and the result does not depend on
+how they are paired. Earlier releases left several imines in one ring unchanged
+(`N=c1[nH]c(=N)[nH]cc1` is now converted).
+
+Some imines are left alone, because the imine is the form to expect or because there is a
+choice to make:
+
+- More N-H than imines in the ring system, as in cytosine or guanine drawn as the imine
+  (`N=c1[nH]c(=O)cc[nH]1`). Which nitrogen keeps its hydrogen is a choice, and these are not
+  changed.
+- A substituted ring nitrogen next to the imine carbon, as in 3-methylcytosine
+  (`N=c1cc[nH]c(=O)n1C`). That nitrogen cannot take part in a tautomer, and the imine is the
+  stable form. The whole ring system is left alone.
+- No ring N-H, for example `N=c1ccn(C)cc1`.
+- Oximes and oxime ethers (`ON=c1cc[nH]cc1`), and imines in rings that are not aromatic.
+
+This rule is included in `-g all` and broadens default tautomer equivalence. Disable it
+with `-g all -g -to2ap`. Across 100,000 ChEMBL molecules as drawn, `-g all` output changed for
+5 molecules: three 4-quinolyl azines and two 9-anilinoacridines, all drawn as the imine
+(`N=c`) tautomer. Specified geometry of the C=N bond is lost when the imine becomes an
+amine. Reports count conversions with `-g APP=EACH` appending `STD:to2ap`.
 
 ### Aliphatic nitroso groups
 

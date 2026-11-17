@@ -507,7 +507,7 @@ display_all_chemical_standardisation_options(std::ostream& os, char zoption) {
   os << zopt << CS_124TRIAZINE << "  convert S-C(=N)-N to S=C(-N)-N\n";
   os << zopt << CS_ENOL_FUSED << "    convert [O,S;D1]-c(:n):[aD3x3] to O=C form\n";
   os << zopt << CS_ISOTOPE << "       convert all isotopic atoms to non isotopic forms\n";
-  os << zopt << CS_2AMINO_PYRIDINE << "         convert exocyclic N=C:[nH] to N-c:n (InChI generates these)\n";
+  os << zopt << CS_2AMINO_PYRIDINE << "         convert exocyclic N=C to N-c where a ring N-H takes the double bond (InChI generates these)\n";
 
   os << zopt << "KETO        prefer keto forms where a tautomer preference is supported (default)\n";
   os << zopt << "ENOL        prefer enol forms where a tautomer preference is supported\n";
@@ -13442,7 +13442,7 @@ struct Possible2AP {
 };
 
 int
-Chemical_Standardisation::_do_transform_to_2_amino_pyridine(
+Chemical_Standardisation::_do_to_2ap_adjacent_nh(
     Molecule& m, standardisation::KetoEnol keto_enol,
     IWStandard_Current_Molecule& current_molecule_data) {
   const atomic_number_t* atomic_number = current_molecule_data.atomic_number();
@@ -13569,6 +13569,279 @@ Chemical_Standardisation::_do_transform_to_2_amino_pyridine(
     m.unset_all_implicit_hydrogen_information(n1);
     ++rc;
   }
+
+  return rc;
+}
+
+// Matches exocyclic imines with mobile ring hydrogens inside one fused aromatic ring system.
+// Atoms are numbered locally. bt[i][j] is 0 if i and j are not bonded within the aromatic
+// part of the system, 1 for a single bond and 2 for a double bond. Moving a hydrogen from a ring
+// nitrogen to an imine is flipping every bond on an alternating path
+// single-double-single ... that joins the imine carbon to the nitrogen: the carbon gains a
+// ring double bond and the nitrogen loses its hydrogen. Interior atoms keep their valence.
+namespace {
+class RingImineMatcher {
+ public:
+  int n = 0;
+  std::vector<std::vector<signed char>> bt;
+  std::vector<int> imine_carbon;
+  std::vector<char> is_nh;
+
+  bool Match() {
+    used_.assign(n, 0);
+    visited_.assign(n, 0);
+    budget_ = 20000;
+    return MatchFrom(0);
+  }
+
+ private:
+  std::vector<char> used_;
+  std::vector<char> visited_;
+  int budget_ = 0;
+
+  void Flip(const std::vector<int>& path) {
+    for (size_t i = 1; i < path.size(); ++i) {
+      const signed char flipped = (bt[path[i - 1]][path[i]] == 1) ? 2 : 1;
+      bt[path[i - 1]][path[i]] = flipped;
+      bt[path[i]][path[i - 1]] = flipped;
+    }
+  }
+
+  bool MatchFrom(size_t j) {
+    if (j == imine_carbon.size()) {
+      return true;
+    }
+
+    const std::vector<char> saved = visited_;
+    visited_.assign(n, 0);
+    visited_[imine_carbon[j]] = 1;
+    std::vector<int> path{imine_carbon[j]};
+    const bool result = Extend(j, path, 1);
+    visited_ = saved;
+    return result;
+  }
+
+  // `need` is the type of the next bond on the path.
+  bool Extend(size_t j, std::vector<int>& path, int need) {
+    if (--budget_ < 0) {
+      return false;
+    }
+
+    const int a = path.back();
+    for (int o = 0; o < n; ++o) {
+      if (bt[a][o] != need || visited_[o]) {
+        continue;
+      }
+
+      path.push_back(o);
+
+      if (need == 1 && is_nh[o] && !used_[o]) {
+        Flip(path);
+        used_[o] = 1;
+        if (MatchFrom(j + 1)) {
+          return true;
+        }
+        used_[o] = 0;
+        Flip(path);
+      } else if (!is_nh[o] || need == 2) {
+        visited_[o] = 1;
+        const bool found = Extend(j, path, need == 1 ? 2 : 1);
+        visited_[o] = 0;
+        if (found) {
+          return true;
+        }
+      }
+
+      path.pop_back();
+    }
+
+    return false;
+  }
+};
+}  // namespace
+
+// Exocyclic imines on aromatic rings whose N-H is not next to the imine carbon, or where there are
+// several imines in the ring system.
+//   N=c1cc[nH]cc1                ->  Nc1ccncc1                    4-aminopyridine
+//   N=c1c2ccccc2[nH]c2ccccc12    ->  Nc1c2ccccc2nc2ccccc12        9-aminoacridine
+//   N=c1[nH]c(=N)[nH]cc1         ->  Nc1nc(N)ncc1                 2,4-diaminopyrimidine
+// This is only done when the aromatic ring system has exactly as many N-H as imines, so every N-H
+// is used and the result does not depend on how they are paired. A system with more N-H than
+// imines (guanine, cytosine) needs a choice of which nitrogen keeps its hydrogen, and is left
+// alone, as is a system with an N-H but nothing to move it to.
+int
+Chemical_Standardisation::_do_to_2ap_in_ring(
+    Molecule& m, IWStandard_Current_Molecule& current_molecule_data) {
+  const atomic_number_t* z = current_molecule_data.atomic_number();
+  const int* ncon = current_molecule_data.ncon();
+  const int* atom_is_aromatic = current_molecule_data.atom_is_aromatic();
+  const int* ring_membership = current_molecule_data.ring_membership();
+
+  struct RingImine {
+    atom_number_t nitrogen;
+    atom_number_t carbon;
+    // A substituted ring nitrogen next to the carbon, as in 3-methylcytosine. That nitrogen
+    // cannot take part in a tautomer, and the imine is the form chemists expect.
+    bool fixed;
+  };
+
+  std::vector<RingImine> imines;
+
+  const int matoms = m.natoms();
+  for (int i = 0; i < matoms; ++i) {
+    if (7 != z[i] || 0 != m.formal_charge(i)) {
+      continue;
+    }
+
+    if (ncon[i] == 1) {
+    } else if (ncon[i] == 2 && ring_membership[i] == 0 && m.hcount(i) == 0) {
+    } else {
+      continue;
+    }
+
+    // Oxime ethers and similar are not treated as imines here.
+    if (single_bond_to_oxygen(m, i)) {
+      continue;
+    }
+
+    for (const Bond* b : m[i]) {
+      if (!b->is_double_bond()) {
+        continue;
+      }
+
+      const atom_number_t c = b->other(i);
+      if (6 == z[c] && 3 == ncon[c] && atom_is_aromatic[c] && 1 <= ring_membership[c]) {
+        bool fixed = false;
+        for (const Bond* bc : m[c]) {
+          const atom_number_t o = bc->other(c);
+          if (7 == z[o] && atom_is_aromatic[o] && 3 == ncon[o]) {
+            fixed = true;
+          }
+        }
+        imines.push_back({i, c, fixed});
+      }
+      break;
+    }
+  }
+
+  if (imines.empty()) {
+    return 0;
+  }
+
+  int rc = 0;
+
+  std::vector<int> done(imines.size(), 0);
+
+  for (size_t i = 0; i < imines.size(); ++i) {
+    if (done[i]) {
+      continue;
+    }
+
+    const int system = current_molecule_data.fused_system_identifier(imines[i].carbon);
+    if (system < 0) {
+      continue;
+    }
+
+    std::vector<size_t> group;
+    for (size_t j = i; j < imines.size(); ++j) {
+      if (current_molecule_data.fused_system_identifier(imines[j].carbon) == system) {
+        group.push_back(j);
+        done[j] = 1;
+      }
+    }
+
+    // Leave the whole ring system alone if any imine in it cannot tautomerise.
+    bool any_fixed = false;
+    for (const size_t j : group) {
+      any_fixed = any_fixed || imines[j].fixed;
+    }
+    if (any_fixed) {
+      continue;
+    }
+
+    // The aromatic atoms of the ring system, numbered locally.
+    std::vector<atom_number_t> atoms;
+    std::vector<int> local(matoms, -1);
+    for (int a = 0; a < matoms; ++a) {
+      if (current_molecule_data.fused_system_identifier(a) == system && atom_is_aromatic[a]) {
+        local[a] = static_cast<int>(atoms.size());
+        atoms.push_back(a);
+      }
+    }
+
+    if (atoms.size() > 64) {
+      continue;
+    }
+
+    RingImineMatcher matcher;
+    matcher.n = static_cast<int>(atoms.size());
+    matcher.bt.assign(matcher.n, std::vector<signed char>(matcher.n, 0));
+    matcher.is_nh.assign(matcher.n, 0);
+
+    bool ok = true;
+    int nh_count = 0;
+    for (int k = 0; k < matcher.n && ok; ++k) {
+      const atom_number_t a = atoms[k];
+      matcher.is_nh[k] = 7 == z[a] && 2 == ncon[a] && 0 == m.formal_charge(a) && 1 == m.hcount(a);
+      nh_count += matcher.is_nh[k];
+
+      for (const Bond* b : m[a]) {
+        const int o = local[b->other(a)];
+        if (o < 0) {
+          continue;
+        }
+        if (b->is_single_bond()) {
+          matcher.bt[k][o] = 1;
+        } else if (b->is_double_bond()) {
+          matcher.bt[k][o] = 2;
+        } else {
+          ok = false;
+        }
+      }
+    }
+
+    if (!ok || 0 == nh_count || static_cast<int>(group.size()) != nh_count) {
+      continue;
+    }
+
+    for (const size_t j : group) {
+      matcher.imine_carbon.push_back(local[imines[j].carbon]);
+    }
+
+    const std::vector<std::vector<signed char>> original = matcher.bt;
+
+    if (!matcher.Match()) {
+      continue;
+    }
+
+    for (int k = 0; k < matcher.n; ++k) {
+      for (int o = k + 1; o < matcher.n; ++o) {
+        if (matcher.bt[k][o] != original[k][o]) {
+          m.set_bond_type_between_atoms(atoms[k], atoms[o],
+                                        matcher.bt[k][o] == 2 ? DOUBLE_BOND : SINGLE_BOND);
+        }
+      }
+      if (matcher.is_nh[k]) {
+        m.unset_all_implicit_hydrogen_information(atoms[k]);
+      }
+    }
+
+    for (const size_t j : group) {
+      m.set_bond_type_between_atoms(imines[j].nitrogen, imines[j].carbon, SINGLE_BOND);
+      m.unset_all_implicit_hydrogen_information(imines[j].nitrogen);
+      ++rc;
+    }
+  }
+
+  return rc;
+}
+
+int
+Chemical_Standardisation::_do_transform_to_2_amino_pyridine(
+    Molecule& m, standardisation::KetoEnol keto_enol,
+    IWStandard_Current_Molecule& current_molecule_data) {
+  int rc = _do_to_2ap_adjacent_nh(m, keto_enol, current_molecule_data);
+  rc += _do_to_2ap_in_ring(m, current_molecule_data);
 
   if (rc == 0) {
     return 0;

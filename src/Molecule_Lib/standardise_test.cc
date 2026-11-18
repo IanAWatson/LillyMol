@@ -1750,6 +1750,71 @@ TEST_F(TestStandardisation, BetaDiketoneRingChainAndGeometryConverge) {
   }
 }
 
+TEST_F(TestStandardisation, ThreePyrazoloneFormsConverge) {
+  for (const char* directive : {CS_PYRAZOLONE, CS_ALL}) {
+    Chemical_Standardisation standardisation;
+    ASSERT_TRUE(standardisation.Activate(directive, 0));
+    for (const auto& [input, target] : std::vector<std::pair<const char*, const char*>>{
+        {"OC1=CC=NN1", "O=C1C=CNN1"},
+        {"O=C1C=CNN1", "O=C1C=CNN1"},
+        {"O=C1CC=NN1", "O=C1C=CNN1"},
+        {"O=C1CC=NN1.O=C1CC=NN1", "O=C1C=CNN1.O=C1C=CNN1"},
+        {"CC1=NN(c2ccccc2)C(O)=C1", "CC1=CC(=O)N(c2ccccc2)N1"},
+        {"CC1=CC(=O)N(c2ccccc2)N1", "CC1=CC(=O)N(c2ccccc2)N1"},
+        {"CC1=NN(c2ccccc2)C(=O)C1", "CC1=CC(=O)N(c2ccccc2)N1"},
+        {"O=C1C(C)C=NN1", "O=C1C(C)=CNN1"},
+        {"O=C1[13CH2]C=[15N]N1", "O=C1[13CH]=C[15NH]N1"},
+        {"O=C1[CH2]C=[N]N1", "O=C1C=CNN1"},
+        {"O=C1CC=NN1[C@H](F)C", "O=C1C=CNN1[C@H](F)C"},
+        {"O=C1CC=NN1CC/C=C/C", "O=C1C=CNN1CC/C=C/C"}}) {
+      SCOPED_TRACE(input);
+      Molecule original, expected;
+      ASSERT_TRUE(original.build_from_smiles(input));
+      ASSERT_TRUE(expected.build_from_smiles(target));
+      const IWString key = expected.unique_smiles();
+      const IWString formula = original.molecular_formula();
+      for (int i = 0; i < 50; ++i) {
+        Molecule molecule;
+        ASSERT_TRUE(molecule.build_from_smiles(i == 0 ? IWString(input) : original.random_smiles()));
+        standardisation.process(molecule);
+        EXPECT_EQ(molecule.unique_smiles(), key);
+        EXPECT_EQ(molecule.molecular_formula(), formula);
+        EXPECT_EQ(molecule.chiral_centres(), original.chiral_centres());
+        EXPECT_TRUE(molecule.valence_ok());
+        EXPECT_EQ(standardisation.process(molecule), 0);
+      }
+    }
+  }
+}
+
+TEST_F(TestStandardisation, ChPyrazoloneRestrictions) {
+  for (const char* input : {"O=C1[C@H](C)C=NN1", "O=C1C(C)(C)C=NN1",
+                            "O=C1C2CCCCC2=NN1", "S=C1CC=NN1"}) {
+    SCOPED_TRACE(input);
+    Chemical_Standardisation standardisation;
+    ASSERT_TRUE(standardisation.Activate(CS_PYRAZOLONE, 0));
+    Molecule molecule;
+    ASSERT_TRUE(molecule.build_from_smiles(input));
+    const IWString before = molecule.unique_smiles();
+    EXPECT_EQ(standardisation.process(molecule), 0);
+    EXPECT_EQ(molecule.unique_smiles(), before);
+  }
+  for (const char* directive : {"ENOL", "-pyrazolone"}) {
+    Chemical_Standardisation standardisation;
+    standardisation.activate_all();
+    if (IWString(directive) == "ENOL") {
+      standardisation.set_keto_enol_preference(standardisation::KetoEnol::kToEnol);
+    } else {
+      ASSERT_TRUE(standardisation.Activate(directive, 0));
+    }
+    Molecule molecule;
+    ASSERT_TRUE(molecule.build_from_smiles("O=C1CC=NN1"));
+    const IWString before = molecule.unique_smiles();
+    EXPECT_EQ(standardisation.process(molecule), 0);
+    EXPECT_EQ(molecule.unique_smiles(), before);
+  }
+}
+
 TEST_F(TestStandardisation, BetaDiketoneCanBeDisabled) {
   _chemical_standardisation.activate_all();
   ASSERT_TRUE(_chemical_standardisation.Activate("-beta-diketone", 0));

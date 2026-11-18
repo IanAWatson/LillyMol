@@ -9537,6 +9537,75 @@ Chemical_Standardisation::_do_transform_non_ring_lactim(
   return rc;
 }
 
+// The non-aromatic CH tautomer O=C1CC=NN1 is not perceived by the
+// aromatic pyrazolone rule. Move one H from the carbon next to C=O to
+// the imine N, giving O=C1C=CNN1, the same NH form produced from pyrazolol.
+// Restrict this to isolated rings: shared bonds in fused systems need a
+// separate treatment of the adjoining ring's Kekule structure.
+static int
+ConvertChPyrazolone(Molecule& m, const Set_of_Atoms& ring,
+                    const IWStandard_Current_Molecule& data,
+                    int* atom_already_changed) {
+  const auto* z = data.atomic_number();
+  for (atom_number_t a : ring) {
+    if (data.ring_membership()[a] != 1 || m.formal_charge(a) ||
+        m.chiral_centre_at_atom(a) || atom_already_changed[a]) {
+      return 0;
+    }
+  }
+  for (int i = 0; i < 5; ++i) {
+    const atom_number_t carbonyl = ring[i];
+    if (z[carbonyl] != 6 || m.ncon(carbonyl) != 3) {
+      continue;
+    }
+    for (int direction : {-1, 1}) {
+      const atom_number_t donor = ring[(i + direction + 5) % 5];
+      const atom_number_t imine_c = ring[(i + 2 * direction + 5) % 5];
+      const atom_number_t imine_n = ring[(i + 3 * direction + 5) % 5];
+      const atom_number_t amide_n = ring[(i + 4 * direction + 5) % 5];
+      if (z[donor] != 6 || z[imine_c] != 6 || z[imine_n] != 7 ||
+          z[amide_n] != 7 || m.ncon(imine_n) != 2 ||
+          m.hcount(imine_n) != 0 || m.hcount(donor) < 1 ||
+          m.ncon(donor) > 3 || m.nbonds(donor) != m.ncon(donor) ||
+          m.ncon(imine_c) > 3 ||
+          m.nbonds(imine_c) != m.ncon(imine_c) + 1 ||
+          m.nbonds(amide_n) != m.ncon(amide_n)) {
+        continue;
+      }
+      if (!m.bond_between_atoms(carbonyl, donor)->is_single_bond() ||
+          !m.bond_between_atoms(donor, imine_c)->is_single_bond() ||
+          !m.bond_between_atoms(imine_c, imine_n)->is_double_bond() ||
+          !m.bond_between_atoms(imine_n, amide_n)->is_single_bond() ||
+          !m.bond_between_atoms(amide_n, carbonyl)->is_single_bond()) {
+        continue;
+      }
+      atom_number_t oxygen = kInvalidAtomNumber;
+      for (const Bond* b : m[carbonyl]) {
+        const atom_number_t other = b->other(carbonyl);
+        if (z[other] == 8 && b->is_double_bond() && m.ncon(other) == 1 &&
+            !m.formal_charge(other)) {
+          oxygen = other;
+          break;
+        }
+      }
+      if (oxygen == kInvalidAtomNumber) {
+        continue;
+      }
+      // Remove the old double bond first so obsolete geometry is discarded.
+      m.set_bond_type_between_atoms(imine_c, imine_n, SINGLE_BOND);
+      m.set_bond_type_between_atoms(donor, imine_c, DOUBLE_BOND);
+      m.unset_all_implicit_hydrogen_information(donor);
+      m.unset_all_implicit_hydrogen_information(imine_n);
+      for (atom_number_t a : ring) {
+        atom_already_changed[a] = 1;
+      }
+      atom_already_changed[oxygen] = 1;
+      return 1;
+    }
+  }
+  return 0;
+}
+
 int
 Chemical_Standardisation::_do_transform_pyrazolone(
     Molecule& m, int* atom_already_changed,
@@ -9559,10 +9628,6 @@ Chemical_Standardisation::_do_transform_pyrazolone(
 #endif
 
   for (int i = 0; i < nr; ++i) {
-    if (!ring_is_aromatic[i]) {
-      continue;
-    }
-
     if (5 != ring_size[i]) {
       continue;
     }
@@ -9572,6 +9637,12 @@ Chemical_Standardisation::_do_transform_pyrazolone(
     }
 
     const Set_of_Atoms* ri = current_molecule_data.ringi(i);
+    if (!ring_is_aromatic[i]) {
+      if (!ring_is_fused[i] && _keto_enol == standardisation::KetoEnol::kToKeto) {
+        rc += ConvertChPyrazolone(m, *ri, current_molecule_data, atom_already_changed);
+      }
+      continue;
+    }
 
     rc += _do_transform_pyrazolone_new(m, _keto_enol, *ri, ring_is_fused[i],
                                    atom_already_changed, current_molecule_data);
@@ -10804,6 +10875,11 @@ Chemical_Standardisation::_processing_needed(
   }
 
   if (current_molecule_data.aromatic_rings_with_multiple_nitrogens() > 0) {
+    return 1;
+  }
+
+  if (_transform_pyrazolone.active() && current_molecule_data.nrings() > 0 &&
+      current_molecule_data.nitrogens() >= 2 && current_molecule_data.oxygens() > 0) {
     return 1;
   }
 

@@ -916,6 +916,30 @@ can enable another local enol conversion in the same standardisation pass.
 Reports include beta-ketoester counts, and `-g APP=EACH` appends
 `STD:beta-ketoester` when this rule changes a molecule.
 
+### Pyrazolone tautomers
+
+`-g pyrazolone`, included in `-g all`, brings the OH (pyrazolol), NH keto,
+and CH keto forms of eligible isolated pyrazolones to the NH keto form:
+
+```text
+OC1=CC=NN1   -> O=C1C=CNN1
+O=C1CC=NN1  -> O=C1C=CNN1
+```
+
+The CH-to-NH conversion moves a hydrogen from the ring carbon next to C=O
+onto the imine nitrogen and shifts the ring double bond. This also handles
+N-substituted compounds such as edaravone and broadens default structural
+equivalence. Isotope labels and stereochemistry outside the ring are retained;
+a marked ring chiral centre prevents the CH conversion. A transferable
+implicit hydrogen is required; explicit hydrogen atoms are not moved.
+
+This new CH conversion excludes fused and spiro rings, charged ring atoms,
+and sulfur analogues. Existing aromatic pyrazolone processing, including its
+handling of fused systems, is unchanged. Fused CH forms would need separate
+validation of shared bonds and Kekule structures. The CH-to-NH conversion is
+inactive with the `ENOL` preference. Disable the whole pyrazolone rule with
+`-g all -g -pyrazolone`.
+
 ### Beta-diketone enols
 
 `-g beta-diketone` converts eligible `O=C–CH=C(OH)–` motifs to the

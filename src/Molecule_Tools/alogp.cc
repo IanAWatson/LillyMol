@@ -1029,12 +1029,10 @@ ALogP::SaturatedOxygen(PerMoleculeData& pmd, atom_number_t zatom) {
   if (acon == 1) {
     atom_number_t o = pmd.mol.other(zatom, 0);
 
-    // RDKit defines O2 as [OH,OH2] with no restriction on the attached atom,
-    // so a neutral hydroxyl on a nitrogen (oxime, N-hydroxy aromatic), oxygen
-    // (peroxide), halogen, boron, silicon... is O2. Hydroxyls on carbon, phosphorus
-    // and sulphur are handled by other rules.
-    if (pmd.formal_charge[zatom] == 0 && pmd.z[o] != 6 && pmd.z[o] != 15 &&
-        pmd.z[o] != 16) {
+    // RDKit defines O2 as [OH,OH2] with no restriction on the attached atom, so
+    // any neutral hydroxyl that was not recognised as an acid above is O2:
+    // oxime, N-hydroxy aromatic, peroxide, boronic acid, silanol, P(=S)OH...
+    if (pmd.formal_charge[zatom] == 0) {
       pmd.assigned[zatom] = kO2;
       return 1;
     }
@@ -1110,21 +1108,19 @@ ALogP::Phosphorus(PerMoleculeData& pmd, atom_number_t zatom) {
   return 1;
 }
 
-// Or nitrogen to deal with RDKit's handling of
+// RDKit assigns S2 to a neutral sulphur doubly bonded to [N,O,P,S], see
+// [S-0]=[N,O,P,S]. The nitrogen case is needed for
 // S(=O)(=O)(N=S(C)CCCC)C1=CC=C(C)C=C1 CHEMBL1533581
 int
-DoublyBondedToOxygen(const PerMoleculeData& pmd, atom_number_t zatom) {
+DoublyBondedToNOPS(const PerMoleculeData& pmd, atom_number_t zatom) {
   for (const Bond* b : pmd.mol[zatom]) {
     if (! b->is_double_bond()) {
       continue;
     }
 
-    atom_number_t o = b->other(zatom);
-    if (pmd.z[o] == 8) {
-      return 1;
-    }
-    if (pmd.z[o] == 7) {
-      return 1;
+    switch (pmd.z[b->other(zatom)]) {
+      case 7: case 8: case 15: case 16:
+        return 1;
     }
   }
 
@@ -1139,9 +1135,9 @@ ALogP::Sulphur(PerMoleculeData& pmd, atom_number_t zatom) {
     return 1;
   }
 
-  // RDKit seems to apply S2 to S=O groups, which seems wrong
+  // RDKit seems to apply S2 to S=O (and S=N, S=P, S=S) groups, which seems wrong
   // Maybe this should be made a settable behaviour.
-  if (pmd.double_bond_count[zatom] && DoublyBondedToOxygen(pmd.mol, zatom)) {
+  if (pmd.double_bond_count[zatom] && DoublyBondedToNOPS(pmd, zatom)) {
     pmd.assigned[zatom] = kS2;
     return 1;
   }

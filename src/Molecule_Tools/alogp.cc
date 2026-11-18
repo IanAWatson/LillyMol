@@ -337,6 +337,19 @@ ALogP::AromaticCarbon(PerMoleculeData& pmd, atom_number_t zatom) {
   return 1;
 }
 
+// RDKit's C3 and C4 types need an attached [N,O,P,S,F,Cl,Br,I]. A saturated carbon
+// attached to any other non-carbon atom (B, Si, Se...) is C27.
+int
+HasClassicHeteroatomNeighbour(const PerMoleculeData& pmd, atom_number_t zatom) {
+  for (const Bond* b : pmd.mol[zatom]) {
+    switch (pmd.z[b->other(zatom)]) {
+      case 7: case 8: case 9: case 15: case 16: case 17: case 35: case 53:
+        return 1;
+    }
+  }
+  return 0;
+}
+
 int
 ALogP::SaturatedPrimaryCarbon(PerMoleculeData& pmd, atom_number_t zatom) {
   assert(pmd.z[zatom] == 6);
@@ -359,8 +372,12 @@ ALogP::SaturatedPrimaryCarbon(PerMoleculeData& pmd, atom_number_t zatom) {
       return 1;   // kC1 is zero, so cannot return it. All these functions shuold be boolean.
     } else {  // heteroatom
       // C3 primary heteroatom
-      pmd.assigned[zatom] = kC3;
-      return kC3;
+      if (HasClassicHeteroatomNeighbour(pmd, zatom)) {
+        pmd.assigned[zatom] = kC3;
+        return kC3;
+      }
+      pmd.assigned[zatom] = kC27;
+      return kC27;
     }
   }
 }
@@ -384,7 +401,11 @@ ALogP::SaturatedSecondaryCarbom(PerMoleculeData& pmd, atom_number_t zatom) {
 
 
   // C3
-  pmd.assigned[zatom] = kC3;
+  if (HasClassicHeteroatomNeighbour(pmd, zatom)) {
+    pmd.assigned[zatom] = kC3;
+  } else {
+    pmd.assigned[zatom] = kC27;
+  }
   return 1;
 }
 
@@ -430,7 +451,11 @@ ALogP::SaturatedCarbon(PerMoleculeData& pmd, atom_number_t zatom) {
     return 1;
   }
   // C4
-  pmd.assigned[zatom] = kC4;
+  if (HasClassicHeteroatomNeighbour(pmd, zatom)) {
+    pmd.assigned[zatom] = kC4;
+  } else {
+    pmd.assigned[zatom] = kC27;
+  }
   return 1;
 }
 
@@ -979,6 +1004,17 @@ ALogP::SaturatedOxygen(PerMoleculeData& pmd, atom_number_t zatom) {
 
   if (acon == 1) {
     atom_number_t o = pmd.mol.other(zatom, 0);
+
+    // RDKit defines O2 as [OH,OH2] with no restriction on the attached atom,
+    // so a neutral hydroxyl on a nitrogen (oxime, N-hydroxy aromatic), oxygen
+    // (peroxide), halogen, boron, silicon... is O2. Hydroxyls on carbon, phosphorus
+    // and sulphur are handled by other rules.
+    if (pmd.formal_charge[zatom] == 0 && pmd.z[o] != 6 && pmd.z[o] != 15 &&
+        pmd.z[o] != 16) {
+      pmd.assigned[zatom] = kO2;
+      return 1;
+    }
+
     // O6 oxide
     if (pmd.z[o] == 16) {
       pmd.assigned[zatom] = kO6;
@@ -1116,6 +1152,11 @@ ALogP::IsHydrogenAcid(PerMoleculeData& pmd, atom_number_t zatom) {
     return 0;
   }
 
+  // [#1]OC=... requires a carbon. An oxime or nitrous acid OH is H3 ([#1]O[#7]).
+  if (pmd.z[carbon] == 7 || pmd.z[carbon] == 8) {
+    return 0;
+  }
+
   // RDKit does not consider phosphoric acid H's to be acidic.
   // An argument could be made to only consider 1 of the two
   // to be acidic, but that would slow things down by breaking
@@ -1146,10 +1187,10 @@ IsPeroxide(PerMoleculeData& pmd, atom_number_t zatom) {
   }
 
   const atom_number_t os = pmd.mol.other(zatom, 0);
-  if (pmd.mol.ncon(os) != 2) {
-    return 0;
+  if (pmd.z[os] == 8) {
+    return 1;
   }
-  if (pmd.z[os] == 8 || pmd.z[os] == 16) {
+  if (pmd.z[os] == 16 && pmd.mol.ncon(os) == 2) {
     return 1;
   }
 
@@ -1234,11 +1275,12 @@ IsHydrogenAlcohol(PerMoleculeData& pmd, atom_number_t zatom) {
     return 0;
   }
 
-  if (pmd.z[zatom] == 7 || pmd.z[zatom] == 8) {
-    return 1;
+  if (pmd.z[zatom] == 7) {
+    return 0;
   }
 
-  return 0;
+  // [#1][!C;!N;!O] is H2 in RDKit, which includes H on B, Si, halogens...
+  return 1;
 }
 
 int

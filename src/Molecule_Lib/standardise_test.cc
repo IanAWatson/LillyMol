@@ -783,8 +783,6 @@ INSTANTIATE_TEST_SUITE_P(TestStandardisationNoChange, TestStandardisationNoChang
 
 TEST_F(TestStandardisation, OxygenAndSulphurTautomersWithCombinedTransformations) {
   _chemical_standardisation.activate_all();
-  // 4-pyridone is opt-in and is deliberately not enabled by activate_all().
-  ASSERT_TRUE(_chemical_standardisation.Activate(CS_4_PYRIDONE, 0));
   for (const auto& [input, output] : std::vector<std::pair<const char*, const char*>>{
            {"CC([SH])=NC", "CC(=S)NC"},
            {"CC([OH])=[NH]", "CC(=O)N"},
@@ -811,14 +809,86 @@ TEST_F(TestStandardisation, OxygenAndSulphurTautomersWithCombinedTransformations
   }
 }
 
-TEST_F(TestStandardisation, FourPyridoneRemainsOptIn) {
-  _chemical_standardisation.activate_all();
-  for (const char* input : {"Oc1ccncc1", "Sc1ccncc1"}) {
+TEST_F(TestStandardisation, FourPyridoneEnabledByDefaultAndCanBeDisabled) {
+  for (const char* input : {"Oc1ccncc1", "Sc1ccncc1", "Oc1ccnc2ccccc12",
+                             "Sc1ccnc2ccccc12"}) {
+    SCOPED_TRACE(input);
+    Chemical_Standardisation enabled;
+    enabled.activate_all();
     Molecule molecule;
     ASSERT_TRUE(molecule.build_from_smiles(input));
     const IWString before = molecule.unique_smiles();
-    EXPECT_EQ(_chemical_standardisation.process(molecule), 0);
+    EXPECT_NE(enabled.process(molecule), 0);
+    EXPECT_NE(molecule.unique_smiles(), before);
+    EXPECT_TRUE(molecule.valence_ok());
+    EXPECT_EQ(enabled.process(molecule), 0);
+
+    Chemical_Standardisation disabled;
+    disabled.activate_all();
+    ASSERT_TRUE(disabled.Activate("-4-pyridone", 0));
+    ASSERT_TRUE(molecule.build_from_smiles(input));
+    EXPECT_EQ(disabled.process(molecule), 0);
     EXPECT_EQ(molecule.unique_smiles(), before);
+  }
+}
+
+TEST_F(TestStandardisation, FourQuinoloneDefaultConvergence) {
+  Molecule expected;
+  ASSERT_TRUE(expected.build_from_smiles("O=C1C=CNC2=CC=CC=C12"));
+  const IWString expected_smiles = expected.unique_smiles();
+  _chemical_standardisation.activate_all();
+  for (const char* input : {"Oc1ccnc2ccccc12", "OC1=CC=NC2=CC=CC=C12",
+                             "OC1=CC=NC2=C1C=CC=C2", "O=c1cc[nH]c2ccccc12",
+                             "O=C1C=CNC2=CC=CC=C12"}) {
+    SCOPED_TRACE(input);
+    Molecule original;
+    ASSERT_TRUE(original.build_from_smiles(input));
+    const IWString formula = original.molecular_formula();
+    for (int i = 0; i < 20; ++i) {
+      Molecule molecule;
+      ASSERT_TRUE(molecule.build_from_smiles(i == 0 ? IWString(input) : original.random_smiles()));
+      // Re-read aromatic notation too, so the starting Kekule assignment is not
+      // merely carried through from the explicit single/double-bond input.
+      if (i > 0) {
+        const IWString aromatic = molecule.aromatic_smiles();
+        ASSERT_TRUE(molecule.build_from_smiles(aromatic));
+      }
+      _chemical_standardisation.process(molecule);
+      EXPECT_EQ(molecule.unique_smiles(), expected_smiles);
+      EXPECT_EQ(molecule.molecular_formula(), formula);
+      EXPECT_TRUE(molecule.valence_ok());
+      EXPECT_EQ(molecule.aromatic_atom_count(), 10);
+      EXPECT_EQ(_chemical_standardisation.process(molecule), 0);
+    }
+  }
+}
+
+TEST_F(TestStandardisation, FourQuinoloneConvertsBothSitesInOnePass) {
+  const char* input = "Oc1ccnc2ccccc12.Oc1ccnc2ccccc12";
+  const char* connected = "Oc1ccnc2ccc(CCc3ccc4nccc(O)c4c3)cc12";
+  for (const auto& [source, target] : std::vector<std::pair<const char*, const char*>>{
+           {input, "O=c1cc[nH]c2ccccc12.O=c1cc[nH]c2ccccc12"},
+           {connected, "O=c1cc[nH]c2ccc(CCc3ccc4[nH]ccc(=O)c4c3)cc12"},
+           {"O=C(NCCCNCCCCNCCCNC(=O)C1=C(O)C2=CC=C(C(F)(F)F)C=C2N=C1)C1=C(O)C2=CC=C(C(F)(F)F)C=C2N=C1",
+            "O=C(NCCCNCCCCNCCCNC(=O)c1c[nH]c2c(c1=O)ccc(c2)C(F)(F)F)c1c[nH]c2c(c1=O)ccc(c2)C(F)(F)F"}}) {
+    SCOPED_TRACE(source);
+    Molecule original;
+    ASSERT_TRUE(original.build_from_smiles(source));
+    Molecule expected;
+    ASSERT_TRUE(expected.build_from_smiles(target));
+    const IWString key = expected.unique_smiles();
+    const IWString formula = original.molecular_formula();
+    for (int i = 0; i < 10; ++i) {
+      Chemical_Standardisation standardisation;
+      standardisation.activate_all();
+      Molecule molecule;
+      ASSERT_TRUE(molecule.build_from_smiles(i == 0 ? IWString(source) : original.random_smiles()));
+      EXPECT_NE(standardisation.process(molecule), 0);
+      EXPECT_EQ(molecule.unique_smiles(), key);
+      EXPECT_EQ(molecule.molecular_formula(), formula);
+      EXPECT_TRUE(molecule.valence_ok());
+      EXPECT_EQ(standardisation.process(molecule), 0);
+    }
   }
 }
 
@@ -1405,6 +1475,24 @@ INSTANTIATE_TEST_SUITE_P(OxygenAndSulphur, TestOxygenAndSulphurTautomers, testin
     TautomerCase{CS_4_PYRIDONE, "S=C1C=CNC=C1", "S=C1C=CNC=C1", false},
     TautomerCase{CS_4_PYRIDONE, "CSc1ccncc1", "CSc1ccncc1", false},
     TautomerCase{CS_4_PYRIDONE, "Sc1cccnc1", "Sc1cccnc1", false},
+    TautomerCase{CS_4_PYRIDONE, "Oc1ccnc2ccccc12", "O=C1C=CNC2=CC=CC=C12", true},
+    TautomerCase{CS_4_PYRIDONE, "OC1=CC=NC2=CC=CC=C12", "O=C1C=CNC2=CC=CC=C12", true},
+    TautomerCase{CS_4_PYRIDONE, "OC1=CC=NC2=C1C=CC=C2", "O=C1C=CNC2=CC=CC=C12", true},
+    TautomerCase{CS_4_PYRIDONE, "[OH]c1cc[nH0]c2ccccc12", "O=C1C=CNC2=CC=CC=C12", true},
+    TautomerCase{CS_4_PYRIDONE, "[18OH]c1cc[15nH0]c2ccccc12", "[18O]=C1C=C[15NH]C2=CC=CC=C12", true},
+    TautomerCase{CS_4_PYRIDONE, "Sc1ccnc2ccccc12", "S=C1C=CNC2=CC=CC=C12", true},
+    TautomerCase{CS_4_PYRIDONE, "Oc1ccnc2ccc(O)cc12", "O=c1cc[nH]c2ccc(O)cc12", true},
+    TautomerCase{CS_4_PYRIDONE, "O=c1cc[nH]c2ccccc12", "O=c1cc[nH]c2ccccc12", false},
+    TautomerCase{CS_4_PYRIDONE, "S=c1cc[nH]c2ccccc12", "S=c1cc[nH]c2ccccc12", false},
+    TautomerCase{CS_4_PYRIDONE, "COc1ccnc2ccccc12", "COc1ccnc2ccccc12", false},
+    TautomerCase{CS_4_PYRIDONE, "Oc1cncc2ccccc12", "Oc1cncc2ccccc12", false},
+    TautomerCase{CS_4_PYRIDONE, "Oc1cc[nH+]cc1", "Oc1cc[nH+]cc1", false},
+    TautomerCase{CS_4_PYRIDONE, "Oc1cc[n+](C)cc1", "Oc1cc[n+](C)cc1", false},
+    TautomerCase{CS_4_PYRIDONE, "Oc1ccnc(O)c1", "Oc1ccnc(O)c1", false},
+    TautomerCase{CS_4_PYRIDONE, "Oc1c(C(=O)O)cnc2ccccc12", "O=c1c(C(=O)O)c[nH]c2ccccc12", true},
+    TautomerCase{CS_4_PYRIDONE, "Oc1ccnc2ccc([C@H](C)F)cc12", "O=c1cc[nH]c2ccc([C@H](C)F)cc12", true},
+    // No aromatic enol Kekule form can retain both required fusion double bonds.
+    TautomerCase{CS_4_PYRIDONE, "Oc1c2ccccc2nc2ccccc12", "Oc1c2ccccc2nc2ccccc12", false},
     TautomerCase{CS_OXO_PYRIMIDINE, "O=c1cc[nH]c(C)n1", "O=c1ccnc(C)[nH]1", true},
     TautomerCase{CS_OXO_PYRIMIDINE, "S=c1cc[nH]c(C)n1", "S=c1ccnc(C)[nH]1", true},
     TautomerCase{CS_OXO_PYRIMIDINE, "O=c1ccnc(C)[nH]1", "O=c1ccnc(C)[nH]1", false},

@@ -405,6 +405,7 @@ Chemical_Standardisation::activate_all() {
   _transform_pyrazolone.activate();
   _transform_amino_thiazole.activate();
   _transform_enol_to_keto.activate();
+  _transform_to_4_pyridone.activate();
   _transform_sulfonyl_urea.activate();
   _transform_124_triazine.activate();
   _transform_enol_fused.activate();
@@ -10843,7 +10844,9 @@ Chemical_Standardisation::_processing_needed(
     return 1;
   }
 
-  if (_transform_to_4_pyridone.active()) {
+  if (_transform_to_4_pyridone.active() && current_molecule_data.nrings() > 0 &&
+      current_molecule_data.nitrogens() > 0 &&
+      (current_molecule_data.oxygens() > 0 || current_molecule_data.sulphur() > 0)) {
     return 1;
   }
 
@@ -11794,11 +11797,52 @@ Chemical_Standardisation::_identify_adjacent_keto_enol_groups(
 template resizable_array_base<Possible_Lactim_Lactam*>::~resizable_array_base();
 template resizable_array<Possible_Lactim_Lactam*>::resizable_array();
 
+// Ring bond types starting at nitrogen and proceeding towards the para OH/SH.
+static constexpr bond_type_t kFourPyridoneBonds[] = {
+    SINGLE_BOND, DOUBLE_BOND, SINGLE_BOND, SINGLE_BOND, DOUBLE_BOND, SINGLE_BOND};
+
+// Shared bonds must already have their final pyridone bond types before the
+// tautomer change. Otherwise changing a shared bond can invalidate the Kekule
+// structure of the adjoining aromatic ring. Leave the source unchanged if the
+// required shared-bond pattern cannot be obtained as a valid Kekule form.
+static int
+PrepareFourPyridoneKekule(Molecule& m, const Set_of_Atoms& ring, int n_index) {
+  bool needs_change = false;
+  for (int i = 0; i < 6; ++i) {
+    const Bond* b = m.bond_between_atoms(ring[(n_index + i) % 6],
+                                         ring[(n_index + i + 1) % 6]);
+    if (b->nrings() < 2) {
+      continue;
+    }
+    if ((kFourPyridoneBonds[i] == SINGLE_BOND && !b->is_single_bond()) ||
+        (kFourPyridoneBonds[i] == DOUBLE_BOND && !b->is_double_bond())) {
+      needs_change = true;
+      break;
+    }
+  }
+  if (!needs_change) {
+    return 1;
+  }
+
+  Toggle_Kekule_Form tkf;
+  tkf.set_display_error_messages(0);
+  for (int i = 0; i < 6; ++i) {
+    const int a1 = (n_index + i) % 6;
+    const int a2 = (n_index + i + 1) % 6;
+    if (m.bond_between_atoms(ring[a1], ring[a2])->nrings() > 1) {
+      tkf.add_bond(a1, a2, kFourPyridoneBonds[i]);
+    }
+  }
+  int changed = 0;
+  return tkf.process(m, ring, changed);
+}
+
 int
 Chemical_Standardisation::_do_transform_to_4_pyridone(
     Molecule& m, IWStandard_Current_Molecule& current_molecule_data) {
   const int nr = current_molecule_data.nrings();
-  if (nr == 0) {
+  if (nr == 0 || current_molecule_data.nitrogens() == 0 ||
+      (current_molecule_data.oxygens() == 0 && current_molecule_data.sulphur() == 0)) {
     return 0;
   }
 
@@ -11808,8 +11852,14 @@ Chemical_Standardisation::_do_transform_to_4_pyridone(
     if (r->size() != 6) {
       continue;
     }
-    if (!current_molecule_data.ring_is_aromatic()[i]) {
+    if (current_molecule_data.ring_nitrogen_count()[i] != 1 ||
+        !current_molecule_data.ring_is_aromatic()[i]) {
       continue;
+    }
+    // A previous conversion invalidates aromatic bond flags. The Kekule
+    // switch for another fused system needs the current aromaticity assigned.
+    if (rc > 0) {
+      m.compute_aromaticity_if_needed();
     }
     rc += _do_transform_to_4_pyridone(m, current_molecule_data, *r);
   }
@@ -11847,19 +11897,20 @@ Chemical_Standardisation::_do_transform_to_4_pyridone(
       if (n_index >= 0) {
         return 0;
       }
+      // The neutral pyridine nitrogen must be able to acquire the OH/SH hydrogen.
+      if (atom.ncon() != 2 || atom.formal_charge() || m.hcount(ring[i]) != 0) {
+        return 0;
+      }
       n_index = i;
       continue;
     }
 
     // No other heteroatoms allowed.
-    if (atom.atomic_number() == 6) {
-    } else if (atom.atomic_number() == 7 &&
-               current_molecule_data.ring_membership()[ring[i]] == 2) {
-    } else {
-      continue;
+    if (atom.atomic_number() != 6) {
+      return 0;
     }
 
-    if (atom.ncon() == 2) {
+    if (atom.ncon() != 3) {
       continue;
     }
 
@@ -11869,14 +11920,20 @@ Chemical_Standardisation::_do_transform_to_4_pyridone(
       if (ring.contains(o)) {
         continue;
       }
-      // Exocyclic double bond
+      // A bond into an adjoining aromatic ring is not an exocyclic substituent.
+      // Use cached aromaticity: an earlier site may have cleared the molecule's
+      // bond aromaticity flags. Ring membership is unchanged by these tautomers.
+      if (b->nrings() > 0 && current_molecule_data.atom_is_aromatic()[o]) {
+        continue;
+      }
+      // Genuine exocyclic double bond, including an existing C=O or C=S.
       if (!b->is_single_bond()) {
         return 0;
       }
       if (m.atomic_number(o) != 8 && m.atomic_number(o) != 16) {
         continue;
       }
-      if (m.ncon(o) != 1) {
+      if (m.ncon(o) != 1 || m.formal_charge(o) || m.hcount(o) != 1) {
         continue;
       }
       if (oh != kInvalidAtomNumber) {
@@ -11898,6 +11955,9 @@ Chemical_Standardisation::_do_transform_to_4_pyridone(
     return 0;
   }
 
+  if (!PrepareFourPyridoneKekule(m, ring, n_index)) {
+    return 0;
+  }
   return _do_transform_to_4_pyridone(m, ring, n_index, oh_index, oh);
 }
 
@@ -11908,17 +11968,16 @@ Chemical_Standardisation::_do_transform_to_4_pyridone(Molecule& m,
                                                       atom_number_t oh) const {
   m.set_bond_type_between_atoms(ring[oh_index], oh, DOUBLE_BOND);
 
-  static int btype[] = {SINGLE_BOND, DOUBLE_BOND, SINGLE_BOND,
-                        SINGLE_BOND, DOUBLE_BOND, SINGLE_BOND};
   int prev = ring[n_index];
   for (int i = 1; i < 7; ++i) {
     int j = (n_index + i) % 6;
-    m.set_bond_type_between_atoms(prev, ring[j], btype[i - 1]);
+    m.set_bond_type_between_atoms(prev, ring[j], kFourPyridoneBonds[i - 1]);
     prev = ring[j];
   }
 
-  m.set_implicit_hydrogens_known(oh, 0);
-  m.set_implicit_hydrogens_known(ring[n_index], 0);
+  m.unset_all_implicit_hydrogen_information(oh);
+  m.unset_all_implicit_hydrogen_information(ring[oh_index]);
+  m.unset_all_implicit_hydrogen_information(ring[n_index]);
 
   return 1;
 }

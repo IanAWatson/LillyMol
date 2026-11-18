@@ -180,9 +180,23 @@ fileconv -g keto_enol -g ENOL -S - molecules.smi
 
 For example, `CC(=S)CC` becomes `CC(S)=CC`. `-g KETO` restores the default
 preference. The named `4-pyridone` and `oxopyrimidine` transformations retain
-their own fixed canonical choices. `4-pyridone` remains opt-in and is not
-enabled by `-g all`; use `-g all -g 4-pyridone` to combine it with the default
-transformations.
+their own fixed canonical choices. `4-pyridone` is enabled by `-g all`, including
+4-hydroxyquinoline to 4-quinolone and the corresponding sulfur transformation.
+To disable this grouping while retaining the other defaults, use
+`-g all -g -4-pyridone`.
+
+For fused rings, the rule first establishes a Kekule form compatible with the
+final shared fusion bonds. This preserves the adjoining aromatic ring and makes
+the result independent of the starting Kekule representation. If no compatible
+Kekule form can be found, the molecule is left unchanged. The rule requires one
+neutral two-connected nitrogen in the six-membered aromatic ring and a single
+terminal neutral OH/SH para to it. It does not treat ethers as OH groups or
+force substituted/charged ring nitrogens into a neutral N-H form.
+
+For example, both `OC1=CC=NC2=CC=CC=C12` and `OC1=CC=NC2=C1C=CC=C2` now give the
+same 4-quinolone under `-g all`, as does the corresponding keto input
+`O=C1C=CNC2=CC=CC=C12`. This default broadens tautomeric equivalence; it can
+change unique-SMILES groupings and descriptors relative to earlier builds.
 
 Oxopyrimidine processing rejects competing C=O **or C=S** groups attached to
 the hydrogen-bearing nitrogen; converting one group must not silently favor

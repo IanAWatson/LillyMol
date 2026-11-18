@@ -929,8 +929,16 @@ Both eligible enol orientations converge to the same diketo form. This
 extends the equivalence of structures under default standardisation.
 
 The rule requires a ketone at one end and an unprotected enol at the other.
-It skips substituted acyclic central carbons, specified alkene geometry,
-and fused rings. A conversion that would modify an atom with a marked
+One carbonyl may also be outside an isolated carbocycle: both
+`CC(=O)C1=C(O)CCCC1` and `CC(O)=C1CCCCC1=O` become
+`CC(=O)C1C(=O)CCCC1` (2-acetylcyclohexanone).
+
+Specified geometry on the enol double bond is removed during conversion;
+geometry on other double bonds is retained. Thus stereospecified
+acetylacetone enols also converge to the diketo form.
+
+It skips substituted acyclic central carbons and fused rings.
+A conversion that would modify an atom with a marked
 chiral centre is skipped. Existing centres at unaffected atoms are retained.
 Newly formed stereocentres remain unspecified, with no `Chiral_Centre`
 object created. It is enabled by `-g all`, skipped with the `ENOL`

@@ -1338,7 +1338,7 @@ INSTANTIATE_TEST_SUITE_P(OxygenAndSulphur, TestOxygenAndSulphurTautomers, testin
     TautomerCase{CS_BETA_DIKETONE, "COC(=O)C=C(O)C", "COC(=O)C=C(O)C", false},
     TautomerCase{CS_BETA_DIKETONE, "CC(=O)C(O)CC", "CC(=O)C(O)CC", false},
     TautomerCase{CS_BETA_DIKETONE, "CC(=O)C(C)=C(O)C", "CC(=O)C(C)=C(O)C", false},
-    TautomerCase{CS_BETA_DIKETONE, "C/C(O)=C/C(C)=O", "C/C(O)=C/C(C)=O", false},
+    TautomerCase{CS_BETA_DIKETONE, "C/C(O)=C/C(C)=O", "CC(=O)CC(C)=O", true},
     TautomerCase{CS_BETA_DIKETONE, "CC(=O)C=C(O)C", "CC(=O)C=C(O)C", false,
                  standardisation::KetoEnol::kToEnol},
     TautomerCase{CS_ALL, "CC(=O)C=C(O)C", "CC(=O)CC(C)=O", true},
@@ -1717,6 +1717,38 @@ TEST_F(TestStandardisation, ReportedAscorbateTautomersConverge) {
   }
 }
 
+
+TEST_F(TestStandardisation, BetaDiketoneRingChainAndGeometryConverge) {
+  for (const char* directive : {CS_BETA_DIKETONE, CS_ALL}) {
+    Chemical_Standardisation standardisation;
+    ASSERT_TRUE(standardisation.Activate(directive, 0));
+    for (const auto& [input, target] : std::vector<std::pair<const char*, const char*>>{
+        {"C/C(O)=C/C(C)=O", "CC(=O)CC(C)=O"},
+        {"C/C(O)=C\\C(C)=O", "CC(=O)CC(C)=O"},
+        {"CC(=O)C1=C(O)CCCC1", "CC(=O)C1C(=O)CCCC1"},
+        {"CC(O)=C1CCCCC1=O", "CC(=O)C1C(=O)CCCC1"},
+        {"CC(=O)C1=C(O)CC[C@H](C)C1", "CC(=O)C1C(=O)CC[C@H](C)C1"},
+        {"C/C=C/C(O)=CC(C)=O", "C/C=C/C(=O)CC(C)=O"},
+        {"C/C=C/C(=O)/C=C(/O)C", "C/C=C/C(=O)CC(C)=O"}}) {
+      SCOPED_TRACE(input);
+      Molecule original, expected;
+      ASSERT_TRUE(original.build_from_smiles(input));
+      ASSERT_TRUE(expected.build_from_smiles(target));
+      const IWString key = expected.unique_smiles();
+      const IWString formula = original.molecular_formula();
+      for (int i = 0; i < 30; ++i) {
+        Molecule molecule;
+        ASSERT_TRUE(molecule.build_from_smiles(i == 0 ? IWString(input) : original.random_smiles()));
+        EXPECT_GT(standardisation.process(molecule), 0);
+        EXPECT_EQ(molecule.unique_smiles(), key);
+        EXPECT_EQ(molecule.molecular_formula(), formula);
+        EXPECT_EQ(molecule.chiral_centres(), original.chiral_centres());
+        EXPECT_TRUE(molecule.valence_ok());
+        EXPECT_EQ(standardisation.process(molecule), 0);
+      }
+    }
+  }
+}
 
 TEST_F(TestStandardisation, BetaDiketoneCanBeDisabled) {
   _chemical_standardisation.activate_all();

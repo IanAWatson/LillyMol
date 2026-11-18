@@ -12675,8 +12675,8 @@ enum class BetaCarbonyl {
 };
 
 // Convert O=C-C=C-OH to the diketo form. The central carbon can carry
-// a carbon substituent in an isolated carbocycle. Any newly formed
-// stereocentre remains unspecified.
+// a carbon substituent in an isolated carbocycle, including an external
+// acetyl group. Any newly formed stereocentre remains unspecified.
 static bool
 ConvertBetaCarbonylEnol(Molecule& m, const IWStandard_Current_Molecule& data,
                        atom_number_t o, BetaCarbonyl carbonyl_type) {
@@ -12699,7 +12699,8 @@ ConvertBetaCarbonylEnol(Molecule& m, const IWStandard_Current_Molecule& data,
     if (other == o) {
       continue;
     }
-    if (z[other] != 6 || b->part_of_cis_trans_grouping()) {
+    if (z[other] != 6 ||
+        (carbonyl_type == BetaCarbonyl::kEster && b->part_of_cis_trans_grouping())) {
       eligible = false;
       break;
     }
@@ -12729,13 +12730,12 @@ ConvertBetaCarbonylEnol(Molecule& m, const IWStandard_Current_Molecule& data,
       return false;
     }
     substituted_ring = data.ring_containing_atom(middle);
-    if (!substituted_ring || !substituted_ring->contains(enol)) {
+    if (!substituted_ring) {
       return false;
     }
   }
-  // A substituted ring atom has two other neighbours: the ketone carbon
-  // in the ring and an external carbon substituent. Identify them by ring
-  // membership, independently of the bond-list order.
+  // At a substituted ring carbon, identify the carbonyl neighbour by its
+  // chemistry. It can be inside or outside the ring (2-acetylcyclohexanone).
   const Bond* link = nullptr;
   for (const Bond* b : m[middle]) {
     const atom_number_t other = b->other(middle);
@@ -12745,8 +12745,19 @@ ConvertBetaCarbonylEnol(Molecule& m, const IWStandard_Current_Molecule& data,
     if (!b->is_single_bond() || z[other] != 6) {
       return false;
     }
-    if (substituted_ring && !substituted_ring->contains(other)) {
-      continue;
+    if (substituted_ring) {
+      bool has_carbonyl = false;
+      for (const Bond* carbonyl_bond : m[other]) {
+        const atom_number_t oxygen = carbonyl_bond->other(other);
+        if (z[oxygen] == 8 && carbonyl_bond->is_double_bond() &&
+            m.ncon(oxygen) == 1 && !m.formal_charge(oxygen)) {
+          has_carbonyl = true;
+          break;
+        }
+      }
+      if (!has_carbonyl) {
+        continue;
+      }
     }
     if (link != nullptr) {
       return false;
@@ -12804,19 +12815,25 @@ ConvertBetaCarbonylEnol(Molecule& m, const IWStandard_Current_Molecule& data,
     return false;
   }
   if (rings[enol] || rings[middle] || rings[keto]) {
-    if (rings[enol] != 1 || rings[middle] != 1 || rings[keto] != 1) {
+    if (rings[middle] != 1 || rings[enol] > 1 || rings[keto] > 1) {
       return false;
     }
     const Set_of_Atoms* ring = data.ring_containing_atom(middle);
-    if (!ring || !ring->contains(enol) || !ring->contains(keto) ||
+    // Both carbonyls can be in the ring, or one can be external. Do not
+    // generalise to two external groups, fused rings or heterocycles.
+    if (!ring || (!ring->contains(enol) && !ring->contains(keto)) ||
+        (rings[enol] && !ring->contains(enol)) ||
+        (rings[keto] && !ring->contains(keto)) ||
         std::any_of(ring->begin(), ring->end(), [&](atom_number_t a) {
           return z[a] != 6 || rings[a] != 1 || aromatic[a];
         })) {
       return false;
     }
   }
-  m.set_bond_type_between_atoms(enol, o, DOUBLE_BOND);
+  // Changing the enol double bond first removes its obsolete geometry while
+  // preserving direction flags needed by neighbouring double bonds.
   m.set_bond_type_between_atoms(enol, middle, SINGLE_BOND);
+  m.set_bond_type_between_atoms(enol, o, DOUBLE_BOND);
   m.unset_all_implicit_hydrogen_information(o);
   m.unset_all_implicit_hydrogen_information(middle);
   return true;

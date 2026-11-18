@@ -385,7 +385,8 @@ if [[ -v BUILD_INCHI ]] ; then
   tmp_build_options="${build_options} --config=inchi"
   ${bazel} ${bazel_options} build ${tmp_build_options} Molecule_Tools:fileconv
   ${bazel} ${bazel_options} build ${tmp_build_options} Molecule_Tools:unique_molecules
-  echo "Inchi BUILD of fileconv and unique molecules, executables in bazel-bin/Molecule_Tools"
+  ${bazel} ${bazel_options} build ${tmp_build_options} Molecule_Tools:common_names
+  echo "InChI build of fileconv, unique_molecules and common_names in bazel-bin/Molecule_Tools"
   echo "Copy these files and then rebuild everything else without BUILD_INCHI"
   exit 0
 fi

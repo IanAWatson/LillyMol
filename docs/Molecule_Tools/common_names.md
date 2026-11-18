@@ -89,7 +89,8 @@ selected. Add `-v` for processing statistics.
 For every input molecule, `common_names`:
 
 1. Applies the requested comparison transformations.
-2. Generates a LillyMol unique SMILES comparison key.
+2. Generates a LillyMol unique SMILES comparison key, or a Standard InChIKey
+   with `-C`.
 3. Looks up that key in an in-memory hash.
 4. Creates a new group or adds the molecule name to the existing group.
 5. Writes one representative molecule for each key after grouping is complete.
@@ -172,6 +173,45 @@ common_names -a -a -S common input.smi
 
 This distinguishes benzene from cyclohexane while retaining graph-based
 comparison.
+
+### InChI comparison
+
+`-C` uses Standard InChIKeys instead of LillyMol unique SMILES. This can group
+representations that Standard InChI considers equivalent, including some
+mobile-hydrogen tautomers. It is a broader equivalence than exact structural
+identity and does not unify every tautomer.
+
+```shell
+common_names -C -S common input.smi
+```
+
+The comparison applies in normal and single-pass (`-f`) operation and when
+loading previously collected molecules with `-p`. Largest-fragment selection,
+isotope removal, element transformations and chemical standardization are
+applied before generating the key. The first input structure remains the
+representative; only the key changes. Textproto output contains the InChIKey
+in its `key` field.
+
+By default, tetrahedral and alkene cis/trans stereochemistry distinguish groups.
+Use `-c` to ignore tetrahedral chirality, `-x` (or `-Z`) to ignore cis/trans
+stereochemistry, or both to ignore both. These comparisons preserve stereo in
+the representative written. `-C` cannot be combined with graph comparison
+(`-a`). If InChI cannot represent a molecule, processing fails with its name;
+failed conversions are never grouped under an empty key.
+
+The existing InChI input reader does not restore double-bond stereo. Use SMILES
+or SDF input when cis/trans distinctions must be preserved.
+
+InChI support is optional. Default builds reject `-C` with rebuild instructions.
+Build the [static InChI dependency](../../third_party/inchi_static/README.md),
+then from `src` run:
+
+```shell
+bazel build -c opt --config=inchi //Molecule_Tools:common_names
+```
+
+`BUILD_INCHI=1 ./build_linux.sh` also builds `common_names` along with `fileconv`
+and `unique_molecules`. No shared InChI library is required at runtime.
 
 ## Representative structures
 
@@ -348,6 +388,7 @@ For additional wrapper details, see
 
 ### Comparison controls
 
+- `-C`: compare Standard InChIKeys; requires an InChI-enabled build and excludes `-a`.
 - `-c`: ignore chirality.
 - `-x`: ignore directional cis/trans bond information.
 - `-l`: retain only the largest fragment for comparison.

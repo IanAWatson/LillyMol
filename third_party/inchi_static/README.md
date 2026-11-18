@@ -14,7 +14,7 @@ cmake -S third_party/inchi_static -B third_party/InChI/build-static \
 cmake --build third_party/InChI/build-static --target inchi_static --parallel 8
 cd src
 bazel build -c opt --config=inchi //Molecule_Tools:fileconv \
-  //Molecule_Tools:unique_molecules
+  //Molecule_Tools:unique_molecules //Molecule_Tools:common_names
 ```
 
 The archive is `third_party/InChI/build-static/lib/libinchi.a`. It contains

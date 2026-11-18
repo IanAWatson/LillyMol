@@ -1,0 +1,16 @@
+InChI=1S/C2H2F2/c3-1-2-4/h1-2H/b2-1+ trans_difluoro
+InChI=1S/C2H2F2/c3-1-2-4/h1-2H/b2-1- cis_difluoro
+InChI=1S/C2H2F2/c3-1-2-4/h1-2H/b2-1+ trans_reversed
+InChI=1S/C4H8/c1-3-4-2/h3-4H,1-2H3/b4-3+ trans_butene
+InChI=1S/C4H8/c1-3-4-2/h3-4H,1-2H3/b4-3- cis_butene
+InChI=1S/C3H3BrClF/c1-2(5)3(4)6/h1H3/b3-2- substituted_1
+InChI=1S/C3H3BrClF/c1-2(5)3(4)6/h1H3/b3-2+ substituted_2
+InChI=1S/C3H3BrClF/c1-2(5)3(4)6/h1H3/b3-2+ reordered
+InChI=1S/C6H10/c1-3-5-6-4-2/h3-6H,1-2H3/b5-3+,6-4+ diene_trans_trans
+InChI=1S/C6H10/c1-3-5-6-4-2/h3-6H,1-2H3/b5-3-,6-4- diene_cis_cis
+InChI=1S/C3H2BrClFI/c4-3(7)2(5)1-6/h1,3H/b2-1-/t3-/m1/s1 mixed_1
+InChI=1S/C3H2BrClFI/c4-3(7)2(5)1-6/h1,3H/b2-1+/t3-/m0/s1 mixed_2
+InChI=1S/C8H14/c1-2-4-6-8-7-5-3-1/h1-2H,3-8H2/b2-1+ ring_trans
+InChI=1S/C8H14/c1-2-4-6-8-7-5-3-1/h1-2H,3-8H2/b2-1- ring_cis
+InChI=1S/C2H5NO/c1-2-3-4/h2,4H,1H3/b3-2+ oxime_1
+InChI=1S/C2H5NO/c1-2-3-4/h2,4H,1H3/b3-2- oxime_2

@@ -1,0 +1,16 @@
+F/C=C/F trans_difluoro
+F/C=C\F cis_difluoro
+F\C=C\F trans_reversed
+C/C=C/C trans_butene
+C/C=C\C cis_butene
+C/C(Cl)=C(/F)Br substituted_1
+C/C(Cl)=C(\F)Br substituted_2
+Br/C(F)=C(\Cl)C reordered
+C/C=C/C=C/C diene_trans_trans
+C/C=C\C=C/C diene_cis_cis
+F/C=C(\Cl)[C@H](Br)I mixed_1
+F/C=C(/Cl)[C@@H](Br)I mixed_2
+C1CC/C=C/CCC1 ring_trans
+C1CC/C=C\CCC1 ring_cis
+C/C=N/O oxime_1
+C/C=N\O oxime_2

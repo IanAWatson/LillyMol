@@ -124,8 +124,8 @@ uint64_t molecules_read = 0;
 Report_Progress report_progress;
 
 /*
-  In order to avoid recomputing the unique smiles, we store the
-  unique smiles for each molecule
+  In order to avoid recomputing comparison keys, we store the
+  comparison key for each molecule
 */
 
 IWString* usmi = nullptr;
@@ -141,7 +141,7 @@ int append_count = 0;
 
 IWString_and_File_Descriptor stream_for_protos;
 
-// For each unique smiles, data about the duplicate molecules
+// For each comparison key, data about the duplicate molecules
 // found.
 struct Instances {
  public:
@@ -188,7 +188,7 @@ Instances::FirstNameAndCount(Molecule& m) const {
 }
 
 /*
-  The key will be the unique smiles, the value will be the molecule name
+  The key is the unique SMILES or InChIKey, the value holds molecule names
 */
 
 IW_STL_Hash_Map<IWString, Instances> usmi_hash;
@@ -206,6 +206,7 @@ usage(int rc) {
   // clang-format on
   cerr << R"(Groups identical molecules and writes groups with concatenated names.
 common_names -c -l -g all -S output -v input.smi
+ -C             compare Standard InChIKeys (requires an InChI-enabled build).
  -a             compare graph forms - add 2nd -a option to include H count, recommended.
  -c             exclude chirality information.
  -x             exclude directional bonds.
@@ -241,6 +242,8 @@ class Preprocessing {
 
     int _compare_as_graph = 0;
 
+    int _compare_as_inchi = 0;
+
     Chemical_Standardisation _chemical_standardisation;
 
   public:
@@ -248,12 +251,29 @@ class Preprocessing {
 
     int Process(Molecule& m, int& hcount);
 
-    int GenerateUniqueSmiles(Molecule& m, int hcount, IWString& usmi);
+    int GenerateComparisonKey(Molecule& m, int hcount, IWString& usmi);
 };
 
 int
 Preprocessing::Initialise(Command_Line& cl) {
   const int verbose = cl.option_present('v');
+
+  if (cl.option_present('C')) {
+#ifdef BUILD_INCHI
+    if (cl.option_present('a')) {
+      cerr << "InChI comparison (-C) and graph comparison (-a) are incompatible\n";
+      return 0;
+    }
+    _compare_as_inchi = 1;
+    if (verbose) {
+      cerr << "Structure comparisons use Standard InChIKeys\n";
+    }
+#else
+    cerr << "The -C option (InChI) is not available, this build does not include InChI\n";
+    cerr << "Rebuild with bazel --config=inchi //Molecule_Tools:common_names\n";
+    return 0;
+#endif
+  }
 
   if (cl.option_present('l')) {
     _reduce_to_largest_fragment = 1;
@@ -336,7 +356,33 @@ Preprocessing::Process(Molecule& m, int& hcount) {
 // Note that if graph comparison is in effect, the molecule will
 // already have been transformed by the time it gets here.
 int
-Preprocessing::GenerateUniqueSmiles(Molecule& m, int hcount, IWString& usmi) {
+Preprocessing::GenerateComparisonKey(Molecule& m, int hcount, IWString& usmi) {
+#ifdef BUILD_INCHI
+  if (_compare_as_inchi) {
+    // SMILES output controls do not affect InChI. Remove the requested stereo
+    // information from a copy, preserving the representative's structure.
+    Molecule* to_compare = &m;
+    std::unique_ptr<Molecule> without_stereo;
+    if (exclude_chiral_info || exclude_cis_trans_info) {
+      without_stereo = std::make_unique<Molecule>(m);
+      if (exclude_chiral_info) {
+        without_stereo->remove_all_chiral_centres();
+      }
+      if (exclude_cis_trans_info) {
+        without_stereo->revert_all_directional_bonds_to_non_directional();
+      }
+      to_compare = without_stereo.get();
+    }
+
+    IWString inchi;
+    if (!to_compare->InChI(inchi) || inchi.empty() ||
+        !InChIToInChIKey(inchi.null_terminated_chars(), usmi) || usmi.empty()) {
+      cerr << "Cannot generate InChI comparison key for '" << m.name() << "'\n";
+      return 0;
+    }
+    return 1;
+  }
+#endif
   if (_compare_as_graph == 0) {
     usmi = m.unique_smiles();
   } else {
@@ -399,7 +445,9 @@ Molecule_to_be_Written::initialise(Molecule& m) {
 
   preprocessing.Process(m, hcount);
 
-  preprocessing.GenerateUniqueSmiles(m, hcount, _unique_smiles);
+  if (!preprocessing.GenerateComparisonKey(m, hcount, _unique_smiles)) {
+    return 0;
+  }
 
   return update_global_unique_smiles_to_name_hash(_unique_smiles, _mname);
 }
@@ -620,15 +668,19 @@ AddPreviousFileUsmi(const IWString& usmi, const IWString& mname) {
 }
 
 int
-read_dash_p_file(Molecule& m, const IWString& append_to_dash_p) {
+read_dash_p_file(Molecule& m, int hcount, const IWString& append_to_dash_p) {
+  IWString key;
+  if (!preprocessing.GenerateComparisonKey(m, hcount, key)) {
+    return 0;
+  }
   if (append_to_dash_p.empty()) {
-    return AddPreviousFileUsmi(m.unique_smiles(), m.name());
+    return AddPreviousFileUsmi(key, m.name());
   }
 
   IWString tmp(m.name());
   tmp << append_to_dash_p;
 
-  return AddPreviousFileUsmi(m.unique_smiles(), tmp);
+  return AddPreviousFileUsmi(key, tmp);
 }
 
 int
@@ -641,7 +693,7 @@ read_dash_p_file(data_source_and_type<Molecule>& input,
 
     preprocessing.Process(*m, hcount);
 
-    if (!read_dash_p_file(*m, append_to_dash_p)) {
+    if (!read_dash_p_file(*m, hcount, append_to_dash_p)) {
       return 0;
     }
   }
@@ -733,7 +785,9 @@ establish_names(Molecule& m, int hcount) {
 
   IWString& usmi_ref = usmi[molecules_read];
 
-  preprocessing.GenerateUniqueSmiles(m, hcount, usmi_ref);
+  if (!preprocessing.GenerateComparisonKey(m, hcount, usmi_ref)) {
+    return 0;
+  }
 
   return update_global_unique_smiles_to_name_hash(usmi_ref, m.name());
 }
@@ -848,7 +902,7 @@ CountMoleculesInFiles(Command_Line& cl, FileType input_type) {
 
 int
 CommonNames(int argc, char** argv) {
-  Command_Line cl(argc, argv, "vi:A:E:ag:Ilo:D:s:S:zcr:T:Zxp:fyK:X:");
+  Command_Line cl(argc, argv, "vi:A:E:ag:Ilo:D:s:S:zcr:T:Zxp:fyK:X:C");
 
   if (cl.unrecognised_options_encountered()) {
     cerr << "unrecognised_options_encountered\n";

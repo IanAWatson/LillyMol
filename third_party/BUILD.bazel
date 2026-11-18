@@ -115,10 +115,9 @@ cc_library (
 
 cc_library(
     name = "inchi",
-    srcs = glob(
-               ["InChI/build/lib/*.so"],
-               allow_empty=True,
-          ),
+    srcs = ["InChI/build-static/lib/libinchi.a"],
+    linkstatic = True,
+    linkopts = ["-lm"],
     hdrs = glob (
                ["InChI/INCHI-1-SRC/INCHI_BASE/src/*.h"],
                allow_empty=True,

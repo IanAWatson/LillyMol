@@ -203,15 +203,16 @@ fi
 
 if [[ -v BUILD_INCHI ]] ; then
   if [[ ! -d 'InChI' ]] ; then
-    git clone https://github.com/IUPAC-InChI/InChI
-    (cd InChI && mkdir build)
-    (cd InChI/build && cmake -DCMAKE_INSTALL_PREFIX=${third_party} -DCMAKE_BUILD_TYPE=Release ../INCHI-1-SRC/INCHI_API/libinchi/src)
-    (cd InChI/build && cmake --build .)
-    cp InChI/build/lib/libinchi*${suffix} ${REPO_HOME}/lib
-    # The repo does not have an install target. third_party/BUILD.bazel links directly to the files.
-    # Ensure canonical form for shell variable.
-    BUILD_INCHI=1
+    git clone https://github.com/IUPAC-InChI/InChI || exit 1
   fi
+  # Reconfigure existing checkouts too, including those previously built shared.
+  # The separate build directory leaves any old upstream build untouched.
+  cmake -S "${third_party}/inchi_static" -B "${third_party}/InChI/build-static" \
+    -DCMAKE_BUILD_TYPE=Release || exit 1
+  cmake --build "${third_party}/InChI/build-static" --target inchi_static \
+    --parallel "${THREADS}" || exit 1
+  # Bazel links the archive directly; there is no runtime library to install.
+  BUILD_INCHI=1
 fi
 
 if [[ -v BUILD_NLOPT ]] ; then

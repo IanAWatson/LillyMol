@@ -178,6 +178,9 @@ INSTANTIATE_TEST_SUITE_P(TestAlogpP, TestAlogpP, testing::Values(
   SmilesExpected{"C[Si](C)(C)O trimethylsilanol", 0.814, "[27CH3][71Si]([27CH3])([27CH3])[50OH]"},
   SmilesExpected{"COO methyl hydroperoxide", 0.106, "[3CH3][51O][50OH]"},
   SmilesExpected{"On1cccc1 N-hydroxypyrrole", 0.725, "[50OH][44n]1[18cH][18cH][18cH][18cH]1"},
+  SmilesExpected{"C[N+](=O)[O-] nitromethane", -0.107, "[3CH3][46N+](=[53O])[53O-]"},
+  SmilesExpected{"C[N+](C)=CC iminium", 0.349, "[3CH3][46N+]([3CH3])=[5CH][1CH3]"},
+  SmilesExpected{"C[N+](C)(C)[O-] trimethylamine N-oxide", 0.19, "[3CH3][46N+]([3CH3])([3CH3])[53O-]"},
   SmilesExpected{"c1ccccc1O phenol", 1.392, "[18cH]1[18cH][18cH][18cH][18cH][23c]1[50OH]"},
   SmilesExpected{"c1ccccc1S benzenethiol", 1.975, "[18cH]1[18cH][18cH][18cH][18cH][24c]1[68SH]"},
   SmilesExpected{"c1ccccc1F fluoro-benzene", 1.826, "[18cH]1[18cH][18cH][18cH][18cH][14c]1[62F]"},
@@ -242,7 +245,7 @@ INSTANTIATE_TEST_SUITE_P(TestAlogpP, TestAlogpP, testing::Values(
   SmilesExpected{"O=S(=O)(N)C1=CC=C(C(=O)C2=C(N)N=C(S2)NC2=CC=C(C=C2)S(=O)(=O)N)C=C1 CHEMBL2377821", 0.995, "[54O]=[69S](=[54O])([34NH2])[24c]1[18cH][18cH][21c]([5C](=[58O])[21c]2[22c]([36NH2])[44n][22c]([70s]2)[37NH][22c]2[18cH][18cH][24c]([18cH][18cH]2)[69S](=[54O])(=[54O])[34NH2])[18cH][18cH]1"},
   SmilesExpected{"C1(=C(C(F)(F)F)C=CC(=N1)OC1=CC(=CC=C1)C(=N)N)OC1=CC=CC(=C1)C(=N)N CHEMBL50714", 4.253, "[23c]1([21c]([12C]([62F])([62F])[62F])[18cH][18cH][23c]([44n]1)[52O][23c]1[18cH][21c]([18cH][18cH][18cH]1)[5C](=[38NH])[34NH2])[52O][23c]1[18cH][18cH][18cH][21c]([18cH]1)[5C](=[38NH])[34NH2]"},
   // Aromaticity differences prevent this matching RDKit (0.977)
-  SmilesExpected{"C1(C)(C)N(=C2C=CC(=CC2=N1=O)COC1=CC=C(C=C1)C=NNC(=S)NCC=C)=O CHEMBL3347314", 1.916, "[4C]1([1CH3])([1CH3])[48N](=[5C]2[6CH]=[6CH][6C](=[6CH][5C]2=[48N]1=[53O])[3CH2][52O][23c]1[18cH][18cH][21c]([18cH][18cH]1)[5CH]=[39N][35NH][5C](=[68S])[35NH][3CH2][6CH]=[6CH2])=[53O]"},
+  SmilesExpected{"C1(C)(C)N(=C2C=CC(=CC2=N1=O)COC1=CC=C(C=C1)C=NNC(=S)NCC=C)=O CHEMBL3347314", 2.198, "[4C]1([1CH3])([1CH3])[46N](=[5C]2[6CH]=[6CH][6C](=[6CH][5C]2=[46N]1=[53O])[3CH2][52O][23c]1[18cH][18cH][21c]([18cH][18cH]1)[5CH]=[39N][35NH][5C](=[68S])[35NH][3CH2][6CH]=[6CH2])=[53O]"},
   // Aromaticity differences prevent this matching RDKit (0.689)
   SmilesExpected{"C(CCNCCCN)N1C(=O)C2=CC=C3C4=C(C=CC(=C24)C1=O)C(=O)N(CCCNCCCN)C3=O CHEMBL2079466", -0.2774, "[10CH2]([1CH2][3CH2][35NH][3CH2][1CH2][3CH2][34NH2])[44n]1[25c](=[56O])[19c]2[18cH][18cH][19c]3[19c]4[19c]([18cH][18cH][19c]([19c]24)[25c]1=[56O])[25c](=[56O])[44n]([10CH2][1CH2][3CH2][35NH][3CH2][1CH2][3CH2][34NH2])[25c]3=[56O]"},
   // Aromaticity differences prevent this matching RDKit (0.220)

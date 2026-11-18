@@ -820,6 +820,29 @@ ALogP::UnSaturatedNitrogen(PerMoleculeData& pmd, atom_number_t zatom) {
     return 1;
   }
 
+  // N13 [NH0;+](=[A])([A])[!#1;A,a] iminium, nitrone, and the same atom drawn neutral
+  // and pentavalent, as in C=N(=O)C, which RDKit sanitises to the charged form.
+  if (a.ncon() == 3 && pmd.triple_bond_count[zatom] == 0 &&
+      ((pmd.formal_charge[zatom] == 1 && pmd.double_bond_count[zatom] == 1) ||
+       (pmd.formal_charge[zatom] == 0 && pmd.double_bond_count[zatom] == 2))) {
+    pmd.assigned[zatom] = kN13;
+    return 1;
+  }
+
+  // N13 amine N-oxide drawn neutral and pentavalent, C[N](C)(C)=O
+  if (a.ncon() == 4 && pmd.formal_charge[zatom] == 0 && pmd.double_bond_count[zatom] == 1 &&
+      pmd.triple_bond_count[zatom] == 0) {
+    pmd.assigned[zatom] = kN13;
+    return 1;
+  }
+
+  // N13 [NH0;+](=[#6])=[#7] diazo and similar.
+  if (a.ncon() == 2 && pmd.formal_charge[zatom] == 1 && pmd.double_bond_count[zatom] == 2 &&
+      pmd.attached_heteroatom_count[zatom] == 1) {
+    pmd.assigned[zatom] = kN13;
+    return 1;
+  }
+
   // N5 imine
   if (a.ncon() == 1 && pmd.double_bond_count[zatom] == 1) {
     pmd.assigned[zatom] = kN5;
@@ -918,6 +941,12 @@ IsAcid(PerMoleculeData& pmd, atom_number_t zatom) {
   assert (pmd.z[zatom] == 8);
 
   const atom_number_t carbon = pmd.mol.other(zatom, 0);
+
+  // The O of a nitro group or N-oxide is O5, not an acid.
+  if (pmd.z[carbon] == 7) {
+    return 0;
+  }
+
   for (const Bond* b : pmd.mol[carbon]) {
     if (! b->is_double_bond()) {
       continue;
@@ -983,7 +1012,7 @@ ALogP::SaturatedOxygen(PerMoleculeData& pmd, atom_number_t zatom) {
   }
 
   // O2 N-Hydroxy
-  if (acon == 1 && pmd.attached_heteroatom_count[zatom] == 1 &&
+  if (acon == 1 && pmd.formal_charge[zatom] == 0 && pmd.attached_heteroatom_count[zatom] == 1 &&
      pmd.aryl_count[zatom] == 0 && IsNHydroxy(pmd, zatom)) {
     pmd.assigned[zatom] = kO2;
     return 1;

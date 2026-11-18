@@ -51,17 +51,38 @@ PYTHONPATH=/tmp/newlib LD_LIBRARY_PATH=/tmp/newlib \
 
 ## Example
 
-On 100,000 ChEMBL molecules (single thread):
+Output for 100,000 ChEMBL molecules, single threaded (RDKit 2026.09.1; RDKit failed to
+parse 2 of them, which are left out of the comparison):
 
-| | seconds |
-|---|---|
-| RDKit parse + MolLogP | 10.2 + 24.0 |
-| LillyMol python parse + logp | 0.41 + 1.69 |
-| LillyMol command line, whole run | 1.83 |
+```
+Timings (seconds, single thread)
+  RDKit        parse    10.20  logp    24.05  (2 failed to parse)
+  LillyMol py  parse     0.59  logp     1.69  (rdkit compat 1.95)
+  LillyMol CLI whole run 1.83  (rdkit compat 1.83)
+  speed up: logp only 14.2x, parse+logp python 15.0x, CLI 18.7x
 
-The logp step is about 14 times faster, and parse plus logp 16 to 18 times faster. With
-the compatibility settings the Pearson correlation with RDKit is 0.9997, the mean
-absolute difference 0.002, and 228 molecules differ by more than 0.1. Those remaining
-differences are mostly places where LillyMol's aromaticity perception differs from
-RDKit's, and quaternary aryl ammoniums, where RDKit's N13 pattern does not match and it
-assigns the catch-all N type.
+Agreement with RDKit (LillyMol - RDKit); threshold 0.1
+                           n  pearson     MAE     bias    RMSE   >thr     >1     max
+  py_default           99998  0.98074  0.1098  -0.1091  0.3742   9693   9046   6.123
+  py_rdkit_compat      99998  0.99971  0.0017  -0.0010  0.0426    228     82   3.600
+  cli_default          99998  0.98074  0.1100  -0.1091  0.3742   9693   9046   6.123
+  cli_rdkit_compat     99998  0.99971  0.0019  -0.0010  0.0426    228     82   3.600
+```
+
+The logp step is about 14 times faster than RDKit, and parse plus logp 15 to 19 times
+faster. The Python and command line values agree to the three decimals the tool
+prints. The python parse time varies from run to run (0.41 to 0.59 s in repeated runs);
+the logp time is stable to a few percent.
+
+With the compatibility settings, 228 molecules (0.2%) differ from RDKit by more than
+0.1. Most of what remains is not an ALogP issue:
+
+| difference | molecules | cause |
+|---|---|---|
+| -1.05, -0.97, -0.69, -0.60, -0.33 and similar | about 90 | LillyMol perceives more atoms as aromatic in fused ring systems that contain a ring N-C(=O)-N, so different atom types are assigned |
+| +0.14 | 22 | aryl quaternary ammonium, `Ar-N+(C)(C)C`: RDKit's N13 pattern needs aliphatic neighbours, so it uses the catch-all N type; LillyMol uses N13 |
+| +0.05 | about 200 (below the 0.1 threshold) | quinoidal tautomer drawings, where RDKit leaves the ring fusion bond non-aromatic |
+| the rest | | malformed or charge-separated drawings, and a few cationic dyes |
+
+In default mode the large count (9,693) is almost entirely carboxylic acids, where the
+paper assigns O12 and RDKit assigns O2.

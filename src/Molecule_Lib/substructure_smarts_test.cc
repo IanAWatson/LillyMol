@@ -3,6 +3,7 @@
 
 #include "aromatic.h"
 #include "substructure.h"
+#include "tokenise_atomic_smarts.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
@@ -490,6 +491,84 @@ TEST_F(TestSubstructureSmarts, EmbeddingExclusionDirectivePlacement) {
     ASSERT_EQ(query.substructure_search(m, results), 1u);
     EXPECT_THAT(*results.embedding(0), ElementsAre(0, kInvalidAtomNumber));
   }
+}
+
+TEST_F(TestSubstructureSmarts, RecursiveEmbeddingExclusionStaysAtInnerAtom) {
+  for (const char* smarts : {
+           "[C;$([C]-[/IWxO])]",
+           "[C;$(C-[O/IWx])]",
+           "[C;$([C]-[O&/IWx])]",
+           "[C;$([C]-[O;$([/IWxO]-C)])]",
+           "[C;!$([C]-[/IWxN])]",
+           "[$(C-[/IWxO]),$(C-N)]"}) {
+    SCOPED_TRACE(smarts);
+    Substructure_Query query;
+    ASSERT_TRUE(query.create_from_smarts(smarts));
+    Molecule mol;
+    ASSERT_TRUE(mol.build_from_smiles("CO"));
+    Substructure_Results results;
+    ASSERT_EQ(query.substructure_search(mol, results), 1u);
+    EXPECT_THAT(*results.embedding(0), ElementsAre(0));
+  }
+}
+
+TEST_F(TestSubstructureSmarts, OuterEmbeddingExclusionAroundRecursiveContext) {
+  for (const char* smarts : {"[/IWxC;$([C]-O)]", "[C;$([C]-O);/IWx]"}) {
+    SCOPED_TRACE(smarts);
+    Substructure_Query query;
+    ASSERT_TRUE(query.create_from_smarts(smarts));
+    Molecule mol;
+    ASSERT_TRUE(mol.build_from_smiles("CO"));
+    Substructure_Results results;
+    ASSERT_EQ(query.substructure_search(mol, results), 1u);
+    EXPECT_THAT(*results.embedding(0), ElementsAre(kInvalidAtomNumber));
+  }
+}
+
+TEST_F(TestSubstructureSmarts, InnerExclusionDoesNotExcludeOuterEmbeddingAtoms) {
+  Substructure_Query query;
+  ASSERT_TRUE(query.create_from_smarts("[C;$([C]-[/IWxO])]-O"));
+  Molecule mol;
+  ASSERT_TRUE(mol.build_from_smiles("CO"));
+  Substructure_Results results;
+  ASSERT_EQ(query.substructure_search(mol, results), 1u);
+  EXPECT_THAT(*results.embedding(0), ElementsAre(0, 1));
+}
+
+TEST_F(TestSubstructureSmarts, RecursiveGlobalIdStaysAtInnerAtom) {
+  for (const char* smarts : {"[C;R0;$([C]-[/IWgid1N])]",
+                             "[C;R0;$([C]-[N/IWgid1])]"}) {
+    SCOPED_TRACE(smarts);
+    SubstructureSearch::SubstructureQuery proto;
+    proto.add_query()->set_smarts(smarts);
+    auto* ring = proto.mutable_query(0)->add_ring_specifier();
+    ring->add_ring_size(3);
+    ring->mutable_base()->set_set_global_id(1);
+    Substructure_Query query;
+    ASSERT_TRUE(query.ConstructFromProto(proto));
+    Molecule mol;
+    ASSERT_TRUE(mol.build_from_smiles("C[N+]1(C)CC1"));
+    Substructure_Results results;
+    ASSERT_EQ(query.substructure_search(mol, results), 2u);
+    EXPECT_THAT(*results.embedding(0), ElementsAre(0));
+    EXPECT_THAT(*results.embedding(1), ElementsAre(2));
+  }
+}
+
+TEST(AtomicSmartsTokenStorage, SmallPrimitiveDoesNotRetainRecursiveSuffix) {
+  std::string expression = "C;$(N";
+  for (int i = 0; i < 5000; ++i) {
+    expression += "-C";
+  }
+  expression += ')';
+  Atomic_Smarts_Component tokens;
+  const_IWSubstring input(expression.data(), expression.size());
+  ASSERT_TRUE(tokens.parse(input));
+  EXPECT_EQ(tokens, "$(C)");
+  EXPECT_LT(tokens.capacity(), 64u);
+  ASSERT_NE(tokens.next(), nullptr);
+  EXPECT_EQ(tokens.next()->length(), static_cast<int>(expression.size()) - 2);
+  EXPECT_EQ(tokens.next()->next(), nullptr);
 }
 
 TEST(TestBadSmarts, BadSmartsShouldNotCrash) {

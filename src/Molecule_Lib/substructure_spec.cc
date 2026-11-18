@@ -1,6 +1,7 @@
 #include <cctype>
 #include <iostream>
 #include <string>
+#include <vector>
 
 #include "aromatic.h"
 #include "misc2.h"
@@ -1943,9 +1944,18 @@ Substructure_Atom::construct_from_smarts_token(const const_IWSubstring& smarts) 
   int square_bracket_level = 1;  // the square brackets must balance
   int ncolon = 0;
   int curly_brace_level = 0;
+  std::vector<int> iw_directives;
 
   // smarts[0] is the opening square bracket
   for (int i = 1; i < characters_to_process; ++i) {
+    // Record directives belonging to this atom, wherever they occur among its
+    // primitives. A directive inside recursive context belongs to an inner atom
+    // and will be handled when that atom is parsed, not applied to this one.
+    if (smarts[i] == '/' && square_bracket_level == 1 && paren_level == 0 &&
+        curly_brace_level == 0 && smarts.matches_at_position(i, "/IW")) {
+      iw_directives.push_back(i - 1);  // Relative to the contents without '['.
+    }
+
     if (kOpenSquareBracket == smarts[i]) {
       square_bracket_level++;
       continue;
@@ -2035,13 +2045,11 @@ Substructure_Atom::construct_from_smarts_token(const const_IWSubstring& smarts) 
     ncolon--;
   }
 
-  // Any further IW customisations to atomic smarts
-
-  int nchars = mysmarts.length() - 4;  // we want to look for /IW.
-
-  // Include the final possible position: /IWx is only four characters long.
-  for (int i = 0; i <= nchars; ++i) {
-    if (!mysmarts.matches_at_position(i, "/IW")) {
+  // Apply only atom-level directives recorded during the bracket scan. This
+  // also avoids rescanning the contents of potentially large recursive queries.
+  for (int i : iw_directives) {
+    // A directive needs at least one character after /IW.
+    if (i + 3 >= mysmarts.length()) {
       continue;
     }
 

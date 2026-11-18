@@ -508,13 +508,13 @@ Atomic_Smarts_Component::_parse(const_IWSubstring& smarts) {
 
   characters_processed = characters_processed + length_of_our_token;
 
-  IWString::operator=(smarts);  // copy the smarts
-
   if (0 == length_of_our_token) {
     return 0;
   }
 
-  iwtruncate(length_of_our_token);  // keep the number we used
+  // Copy only this token. Copying the remaining expression and truncating it
+  // retains a potentially very large buffer for even a one-character primitive.
+  IWString::set(smarts.rawchars(), length_of_our_token);
 
 #ifdef DEBUG_PARSE
   cerr << "Consumed " << length_of_our_token << " characters '";

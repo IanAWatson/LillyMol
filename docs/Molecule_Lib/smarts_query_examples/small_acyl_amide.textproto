@@ -1,0 +1,11 @@
+name: "Secondary amide with acetyl, glycolyl or fluoroacetyl acyl group"
+query {
+  # Atom order is N=0, carbonyl C=1, O=2, alpha carbon=3.
+  smarts: "[N;X3;v3;H1;+0]-[C](=[O])-[C;X4]"
+  matched_atom_must_be {
+    atom: 3
+    smarts: "[CH3]"
+    smarts: "[CH2]-[O;X2;H1;+0]"
+    smarts: "[CH2]-F"
+  }
+}

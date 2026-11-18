@@ -1,0 +1,14 @@
+name: "Two amine sites with one shared rooted rejection list"
+query {
+  smarts: "[N;X3;v3;+0]-[C;X4]-[C;X4]-[N;X3;v3;+0]"
+  matched_atom_must_be {
+    atom: [0, 3]
+    smarts: "!N-C=O"
+    smarts: "!N-C=S"
+    smarts: "!N-C=N"
+    smarts: "!N-S(=O)=O"
+    smarts: "!N-P=O"
+    smarts: "!N-C#N"
+    smarts: "!N-N=O"
+  }
+}

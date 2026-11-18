@@ -1,0 +1,10 @@
+CCCc1ccc(CCC)cc1 two_propyl
+CCCc1ccc(CCCCCCCC)cc1 propyl_octyl
+CC(C)c1ccc(CCC)cc1 branched
+OCCc1ccc(COC)cc1 heteroatoms
+CCc1ccc(CCC)cc1 too_short
+CCCc1ccc(CCCCCCCCC)cc1 too_long
+CCCc1cc(C)cc(CCC)c1 third_substituent
+C1CC1Cc1ccc(CCC)cc1 cyclic_sidechain
+CCCc1ccc2cc(CCC)ccc2c1 fused_ring
+CCCc1ccccc1 only_one

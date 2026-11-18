@@ -1,0 +1,8 @@
+# Groups disqualifying a nitrogen when attached through the first atom.
+smarts: "C=O"
+smarts: "C=S"
+smarts: "C=N"
+smarts: "S(=O)=O"
+smarts: "P=O"
+smarts: "C#N"
+smarts: "N=O"

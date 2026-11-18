@@ -1,0 +1,129 @@
+[
+  {
+    "name": "two_donors",
+    "input": "two_donors.smi",
+    "expected": [
+      "catechol",
+      "resorcinol",
+      "hydroquinone",
+      "dimethoxy",
+      "methoxy_dimethylamino",
+      "phenylenediamine",
+      "trihydroxy",
+      "isolated_biaryl_two_donors",
+      "heteroaromatic_two_donors"
+    ],
+    "standard": "two_donors.smt"
+  },
+  {
+    "name": "three_donors_no_ewg",
+    "input": "three_donors_no_ewg.smi",
+    "expected": [
+      "three_123",
+      "three_124",
+      "three_135",
+      "three_mixed",
+      "allowed_methyl"
+    ],
+    "standard": "three_donors_no_ewg.smt"
+  },
+  {
+    "name": "substituents",
+    "input": "substituents.smi",
+    "expected": [
+      "two_propyl",
+      "propyl_octyl",
+      "branched",
+      "heteroatoms"
+    ]
+  },
+  {
+    "name": "amine",
+    "input": "amines.smi",
+    "expected": [
+      "methylamine",
+      "dimethylamine",
+      "trimethylamine",
+      "aniline",
+      "diamine",
+      "dimethyl_diamine",
+      "one_blocked",
+      "other_blocked"
+    ],
+    "standard": "amine.smt"
+  },
+  {
+    "name": "diamine",
+    "input": "amines.smi",
+    "expected": [
+      "diamine",
+      "dimethyl_diamine"
+    ],
+    "standard": "diamine.smt"
+  },
+  {
+    "name": "largest_region",
+    "input": "largest_region.smi",
+    "expected": [
+      "different_lengths",
+      "tied_lengths",
+      "pendant_branch"
+    ],
+    "labels": {
+      "different_lengths": 4,
+      "tied_lengths": 4,
+      "pendant_branch": 2
+    }
+  },
+  {
+    "name": "cyclic_aminoether",
+    "input": "cyclic_aminoether.smi",
+    "expected": [
+      "piperidine",
+      "morpholine",
+      "piperazine",
+      "substituted_piperidine",
+      "remote_amide_allowed"
+    ],
+    "standard": "cyclic_aminoether.smt",
+    "labels": {
+      "piperidine": 5,
+      "morpholine": 5,
+      "piperazine": 5,
+      "substituted_piperidine": 5,
+      "remote_amide_allowed": 5
+    }
+  },
+  {
+    "name": "small_acyl_amide",
+    "input": "small_acyl_amide.smi",
+    "expected": [
+      "acetyl",
+      "glycolyl",
+      "fluoroacetyl",
+      "acetanilide",
+      "acetyl_with_alcohol"
+    ],
+    "standard": "small_acyl_amide.smt",
+    "labels": {
+      "acetyl": 4,
+      "glycolyl": 4,
+      "fluoroacetyl": 4,
+      "acetanilide": 4,
+      "acetyl_with_alcohol": 4
+    }
+  },
+  {
+    "name": "diamine_matched_atoms",
+    "input": "amines.smi",
+    "expected": [
+      "diamine",
+      "dimethyl_diamine"
+    ],
+    "standard": "diamine.smt",
+    "labels": {
+      "diamine": 4,
+      "dimethyl_diamine": 4
+    }
+  }
+]

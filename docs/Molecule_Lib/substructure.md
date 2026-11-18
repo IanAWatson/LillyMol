@@ -12,6 +12,7 @@ Query information can be specified via several means
 
 ## Contents
 
+* [Worked comparisons](#worked-comparisons)
 * [SMARTS](#smarts)
 * [Extensions](#extensions)
 * [Atomic SMARTS Extensions](#atomic-smarts-extensions)
@@ -26,6 +27,14 @@ Query information can be specified via several means
 * [Region](#region)
 * [MatchedAtomMatch](#matchedatommatch)
 * [Preference Values](#preference-values)
+
+## Worked comparisons
+
+[When SMARTS becomes hard to maintain](smarts_and_query_files.md) compares
+portable SMARTS with LillyMol query files for ring substituent counts, complete
+sidechains, reusable exclusions, rooted atom constraints and largest-region
+selection. It includes
+runnable examples and independent RDKit checks of the portable SMARTS.
 
 ## SMARTS
 

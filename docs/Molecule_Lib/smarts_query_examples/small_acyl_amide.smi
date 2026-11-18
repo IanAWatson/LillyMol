@@ -1,0 +1,14 @@
+CC(=O)NCC acetyl
+OCC(=O)NCC glycolyl
+FCC(=O)NCC fluoroacetyl
+CC(=O)Nc1ccccc1 acetanilide
+CCC(=O)NCC propionyl
+CC(C)C(=O)NCC branched_acyl
+FC(F)C(=O)NCC difluoroacetyl
+COCC(=O)NCC methoxyacetyl
+ClCC(=O)NCC chloroacetyl
+CC(=O)N(C)C tertiary_amide
+NC(=O)C primary_amide
+NC(=O)NCC urea
+CC(=O)NCCO acetyl_with_alcohol
+CCC(=O)NCCO propionyl_with_remote_alcohol

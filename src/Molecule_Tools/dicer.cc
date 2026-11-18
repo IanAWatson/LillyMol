@@ -8352,6 +8352,10 @@ dicer(int argc, char** argv) {
                   "default set\n";
         }
       } else if (b == "chiraldummy") {
+        if (discard_chirality) {
+          cerr << "Discarding chirality, -c, is incompatible with -B chiraldummy\n";
+          return 0;
+        }
         chiral_dummy = 1;
         if (verbose) {
           cerr << "Will replace removed chiral neighbours with terminal * atoms\n";

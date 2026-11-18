@@ -321,9 +321,16 @@ Molecule::InChI(IWString & inchi_string)      // maybe this could be a const met
     }
   }
 
+  int double_bond_stereo = 0;
+  for (const Bond* b : _bond_list) {
+    if (b->is_double_bond() && b->part_of_cis_trans_grouping()) {
+      ++double_bond_stereo;
+    }
+  }
+
   int ncc = _chiral_centres.number_elements();
-  inchi_Stereo0D  * st =new inchi_Stereo0D [ncc]; std::unique_ptr<inchi_Stereo0D[]> free_s(st);
-  memset(st,0,ncc * sizeof(inchi_Stereo0D));
+  inchi_Stereo0D  * st =new inchi_Stereo0D [ncc + double_bond_stereo]; std::unique_ptr<inchi_Stereo0D[]> free_s(st);
+  memset(st,0,(ncc + double_bond_stereo) * sizeof(inchi_Stereo0D));
   inchi_inp.stereo0D=st;
   inchi_inp.num_stereo0D=ncc;
   for(int i=0;i<ncc;++i)
@@ -365,6 +372,42 @@ Molecule::InChI(IWString & inchi_string)      // maybe this could be a const met
     if(4 == nas)
       std::swap(s.neighbor[2], s.neighbor[3]);
 
+  }
+
+  // SMILES directional single bonds describe alkene geometry. InChI needs
+  // explicit 0D records {substituent, alkene atom, alkene atom, substituent}.
+  // Opposite directions looking outwards from the two ends mean trans (EVEN).
+  for (const Bond* b : _bond_list) {
+    if (!b->is_double_bond() || !b->part_of_cis_trans_grouping()) {
+      continue;
+    }
+    const Bond* directional[2] = {nullptr, nullptr};
+    const atom_number_t ends[2] = {b->a1(), b->a2()};
+    bool up[2];
+    for (int i = 0; i < 2; ++i) {
+      for (const Bond* adjacent : *_things[ends[i]]) {
+        if (!adjacent->is_directional()) {
+          continue;
+        }
+        directional[i] = adjacent;
+        up[i] = adjacent->is_directional_up() != 0;
+        if (adjacent->a1() != ends[i]) {
+          up[i] = !up[i];
+        }
+        break;
+      }
+    }
+    if (directional[0] == nullptr || directional[1] == nullptr) {
+      continue;
+    }
+    inchi_Stereo0D& stereo = st[inchi_inp.num_stereo0D++];
+    stereo.type = INCHI_StereoType_DoubleBond;
+    stereo.central_atom = NO_ATOM;
+    stereo.neighbor[0] = directional[0]->other(ends[0]);
+    stereo.neighbor[1] = ends[0];
+    stereo.neighbor[2] = ends[1];
+    stereo.neighbor[3] = directional[1]->other(ends[1]);
+    stereo.parity = up[0] == up[1] ? INCHI_PARITY_ODD : INCHI_PARITY_EVEN;
   }
 
   inchi_inp.szOptions = NULL;

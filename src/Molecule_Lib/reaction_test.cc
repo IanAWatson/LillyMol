@@ -792,7 +792,7 @@ TEST_F(TestReaction, TestReplaceAtomSeveralScaffoldMatches)
   ASSERT_TRUE(_MoleculeFromSmiles("ClCC(Cl)C"));
 
   ASSERT_EQ(_rxn.substructure_search(&_m, _sresults), 2);
-  ASSERT_EQ(_sresults.number_embeddings(), 2);
+  ASSERT_EQ(_sresults.number_embeddings(), 2u);
 
   Molecule expected;
   ASSERT_TRUE(expected.build_from_smiles("ICC(I)C"));

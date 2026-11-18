@@ -1,0 +1,17 @@
+name: "Aminoethoxyaryl with a selected cyclic amine at the chain nitrogen"
+query {
+  # Query atom 0 is the chain nitrogen, not a nitrogen elsewhere in the molecule.
+  smarts: "[N;X3;v3;+0]-[CH2]-[CH2]-[O;X2]-[a]"
+  matched_atom_must_be {
+    atom: 0
+    # At least one positive pattern must match, rooted at that same nitrogen.
+    smarts: "N1CCCCC1"  # Piperidine skeleton.
+    smarts: "N1CCOCC1"  # Morpholine skeleton.
+    smarts: "N1CCNCC1"  # Piperazine skeleton.
+    # Any one of these rooted matches rejects the embedding.
+    smarts: "!N-C=[O,S,N]"
+    smarts: "!N-S=O"
+    smarts: "!N-P=O"
+    smarts: "!N-C#N"
+  }
+}

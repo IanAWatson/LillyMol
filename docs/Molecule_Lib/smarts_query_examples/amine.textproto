@@ -1,0 +1,8 @@
+name: "amine with reusable exclusions"
+query {
+  smarts: "[N;X3;v3;+0]"
+  environment_no_match {
+    attachment { attachment_point: 0 btype: SS_SINGLE_BOND }
+    smarts_file: "amine_exclusions.textproto"
+  }
+}

@@ -658,6 +658,10 @@ cc_binary(
         "//Molecule_Lib:substructure_cc_proto",
         "@com_google_protobuf//:protobuf",
     ],
+    defines = select({
+        "//Molecule_Lib:inchi_yes": ["BUILD_INCHI"],
+        "//conditions:default": [],
+    }),
 )
 
 cc_binary(

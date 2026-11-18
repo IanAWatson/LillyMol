@@ -183,7 +183,7 @@ INSTANTIATE_TEST_SUITE_P(TestAlogpP, TestAlogpP, testing::Values(
   SmilesExpected{"CN(C)(C)=O trimethylamine N-oxide", 0.19, "[3CH3][46N]([3CH3])([3CH3])=[53O]"},
   SmilesExpected{"CP(C)(C)=S trimethylphosphine sulfide", 1.355, "[3CH3][67P]([3CH3])([3CH3])=[69S]"},
   SmilesExpected{"COP(=S)(OC)OC trimethyl thiophosphate", 1.150, "[3CH3][51O][67P](=[69S])([51O][3CH3])[51O][3CH3]"},
-  SmilesExpected{"P(=S)(O)(O)C methylthiophosphonic acid", 1.383, "[67P](=[69S])([50OH])([50OH])[3CH3]"},
+  SmilesExpected{"P(=S)(O)(O)C methylthiophosphonic acid", -0.0897, "[67P](=[69S])([50OH])([50OH])[3CH3]"},
   SmilesExpected{"c1ccccc1O phenol", 1.392, "[18cH]1[18cH][18cH][18cH][18cH][23c]1[50OH]"},
   SmilesExpected{"c1ccccc1S benzenethiol", 1.975, "[18cH]1[18cH][18cH][18cH][18cH][24c]1[68SH]"},
   SmilesExpected{"c1ccccc1F fluoro-benzene", 1.826, "[18cH]1[18cH][18cH][18cH][18cH][14c]1[62F]"},

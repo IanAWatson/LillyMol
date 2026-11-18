@@ -1,0 +1,12 @@
+name: "Largest qualifying inter-ring region; retain ties"
+query {
+  inter_ring_region {
+    min_natoms: 2
+    ring_connections: 2
+    selection: MAX_ATOMS
+    set_global_id: 1
+  }
+  smarts: "[/IWgid1]"
+  # Put every selected atom into one embedding for isotope labelling.
+  compress_embeddings: true
+}

@@ -1,0 +1,4 @@
+# Neutral hydroxyl, alkoxy, and selected amine-like nitrogen.
+smarts: "[O;X2;+0;H1]"
+smarts: "[O;X2;+0]-[C;X4]"
+smarts: "[N;X3;v3;+0;!$(N-[C,S,P]=[O,S,N]);!$(N-C#N)]"

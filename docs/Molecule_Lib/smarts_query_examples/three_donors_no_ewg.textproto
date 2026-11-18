@@ -1,0 +1,28 @@
+name: "Exactly three donor positions and no withdrawing groups on one isolated ring"
+query {
+  ring_specifier {
+    ring_size: 6
+    aromatic: true
+    fused: 0
+    spiro_fusion_count: 0
+    base { set_global_id: 1 }
+  }
+  # Return the six ring atoms; the first must belong to a qualifying ring.
+  smarts: "[/IWgid1a]1:a:a:a:a:a:1"
+  environment {
+    attachment {
+      attachment_point: [0, 1, 2, 3, 4, 5]
+      btype: SS_SINGLE_BOND
+    }
+    smarts_file: "donors.textproto"
+    hits_needed: 3
+    max_env_matches_per_anchor: 1
+  }
+  environment_no_match {
+    attachment {
+      attachment_point: [0, 1, 2, 3, 4, 5]
+      btype: SS_SINGLE_BOND
+    }
+    smarts_file: "withdrawers.textproto"
+  }
+}

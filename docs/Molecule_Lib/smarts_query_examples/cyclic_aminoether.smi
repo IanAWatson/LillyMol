@@ -1,0 +1,15 @@
+c1ccccc1OCCN1CCCCC1 piperidine
+c1ccccc1OCCN1CCOCC1 morpholine
+c1ccccc1OCCN1CCNCC1 piperazine
+c1ccccc1OCCN1CCC(C)CC1 substituted_piperidine
+c1ccccc1OCCN1CCN(C(=O)C)CC1 remote_amide_allowed
+c1ccccc1OCCN1C(=O)CCCC1 lactam_at_anchor
+c1ccccc1OCCN1C(=O)COCC1 morpholinone_at_anchor
+c1ccccc1OCCN1C(=S)CCCC1 thiolactam_at_anchor
+c1ccccc1OCCN1C(=N)CCCC1 cyclic_amidine_at_anchor
+c1ccccc1OCCN1CCCC1 pyrrolidine
+c1ccccc1OCCN1CCCCCC1 azepane
+c1ccccc1OCCN(C)C acyclic_amine
+c1ccccc1OCC[N+]1(C)CCCCC1 charged_anchor
+c1ccccc1OCCCN1CCCCC1 chain_too_long
+c1ccccc1OCCN(C)CCN1CCOCC1 remote_morpholine_only

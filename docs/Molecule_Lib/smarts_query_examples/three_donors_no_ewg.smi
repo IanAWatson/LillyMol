@@ -1,0 +1,14 @@
+Oc1c(O)c(O)ccc1 three_123
+Oc1c(O)cc(O)cc1 three_124
+Oc1cc(O)cc(O)c1 three_135
+COc1cc(N)cc(O)c1 three_mixed
+Oc1cc(O)cc(O)c1C allowed_methyl
+Oc1ccc(O)cc1 only_two
+Oc1c(O)c(O)c(O)cc1 four_donors
+Oc1c(O)c(O)c(C#N)cc1 three_plus_nitrile
+Oc1c(O)c(O)c(N(=O)=O)cc1 three_plus_neutral_nitro
+Oc1c(O)c(O)c([N+](=O)[O-])cc1 three_plus_charged_nitro
+Oc1c(O)c(O)c(C(=O)C)cc1 three_plus_carbonyl
+Oc1c(O)c(O)c(C(F)(F)F)cc1 three_plus_cf3
+Oc1ccc(O)cc1-c1cc(O)ccc1 split_donors
+Oc1c(O)c(O)c2ccccc2c1 fused

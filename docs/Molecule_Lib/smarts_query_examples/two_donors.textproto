@@ -1,0 +1,12 @@
+name: "Isolated aromatic six-membered ring with at least two donor positions"
+query {
+  ring_specifier {
+    ring_size: 6
+    aromatic: true
+    fused: 0
+    spiro_fusion_count: 0
+    base {
+      environment: ">1a-[$([O;X2;+0;H1]),$([O;X2;+0]-[C;X4]),$([N;X3;v3;+0;!$(N-[C,S,P]=[O,S,N]);!$(N-C#N)])]"
+    }
+  }
+}

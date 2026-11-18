@@ -1,0 +1,18 @@
+name: "Isolated aromatic six-ring with exactly two acyclic 3-to-8-atom substituents"
+query {
+  ring_specifier {
+    ring_size: 6
+    aromatic: true
+    fused: 0
+    spiro_fusion_count: 0
+    base {
+      ncon: 2
+      substituent {
+        min_natoms: 3
+        max_natoms: 8
+        nrings: 0
+        hits_needed: 2
+      }
+    }
+  }
+}

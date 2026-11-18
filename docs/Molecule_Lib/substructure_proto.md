@@ -809,6 +809,12 @@ query {
 }
 ```
 
+For tested medicinal-chemistry examples using cyclic amines, small acyl groups
+and shared constraints on two nitrogen atoms, see
+[Rooted atom constraints](smarts_and_query_files.md#6-rooted-atom-constraints).
+The examples include portable recursive SMARTS equivalents and checks with
+both LillyMol and RDKit.
+
 ## Nearby Atoms
 
 `nearby_atoms` describes motifs that must, or must not, occur within a bond

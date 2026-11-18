@@ -1,0 +1,6 @@
+# Illustrative list, not a general classification of electronic effects.
+smarts: "C#N"
+smarts: "N(=O)=O"
+smarts: "[N+](=O)[O-]"
+smarts: "C(=O)[#6,O,N]"
+smarts: "C(F)(F)F"

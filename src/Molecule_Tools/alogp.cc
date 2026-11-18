@@ -836,13 +836,6 @@ ALogP::UnSaturatedNitrogen(PerMoleculeData& pmd, atom_number_t zatom) {
     return 1;
   }
 
-  // N13 [NH0;+](=[#6])=[#7] diazo and similar.
-  if (a.ncon() == 2 && pmd.formal_charge[zatom] == 1 && pmd.double_bond_count[zatom] == 2 &&
-      pmd.attached_heteroatom_count[zatom] == 1) {
-    pmd.assigned[zatom] = kN13;
-    return 1;
-  }
-
   // N5 imine
   if (a.ncon() == 1 && pmd.double_bond_count[zatom] == 1) {
     pmd.assigned[zatom] = kN5;
@@ -862,11 +855,14 @@ ALogP::UnSaturatedNitrogen(PerMoleculeData& pmd, atom_number_t zatom) {
     return 1;
   }
 
-  // N14 N#N=
+  // The central N of C=N#N (diazo) is N13 as RDKit sanitises it to [N+](=[#6])=[#7].
+  // The central N of an azide, N=N#N, and the terminal N are N14.
   if (a.ncon() == 2 && pmd.triple_bond_count[zatom] == 1 &&
       pmd.double_bond_count[zatom] == 1 &&
       pmd.attached_heteroatom_count[zatom]) {
-    pmd.assigned[zatom] = kN14;
+    // Only when the double bond is to carbon, the azide N is N14.
+    const atom_number_t dbl = DoublyBondedTo(pmd, zatom).first;
+    pmd.assigned[zatom] = (pmd.z[dbl] == 6) ? kN13 : kN14;
     return 1;
   }
 
@@ -1080,24 +1076,45 @@ ALogP::Oxygen(PerMoleculeData& pmd, atom_number_t zatom) {
 
 int
 ALogP::Fluorine(PerMoleculeData& pmd, atom_number_t zatom) {
+  if (pmd.formal_charge[zatom] < 0) {  // halide
+    pmd.assigned[zatom] = kHal;
+    return 1;
+  }
+
   pmd.assigned[zatom] = kF;
   return 1;
 }
 
 int
 ALogP::Chlorine(PerMoleculeData& pmd, atom_number_t zatom) {
+  if (pmd.formal_charge[zatom] < 0) {  // halide
+    pmd.assigned[zatom] = kHal;
+    return 1;
+  }
+
   pmd.assigned[zatom] = kCl;
   return 1;
 }
 
 int
 ALogP::Bromine(PerMoleculeData& pmd, atom_number_t zatom) {
+  if (pmd.formal_charge[zatom] < 0) {  // halide
+    pmd.assigned[zatom] = kHal;
+    return 1;
+  }
+
   pmd.assigned[zatom] = kBr;
   return 1;
 }
 
 int
 ALogP::Iodine(PerMoleculeData& pmd, atom_number_t zatom) {
+  // Halide, or the iodine of iodonium [I+], both Hal in RDKit.
+  if (pmd.formal_charge[zatom] != 0) {
+    pmd.assigned[zatom] = kHal;
+    return 1;
+  }
+
   pmd.assigned[zatom] = kI;
   return 1;
 }

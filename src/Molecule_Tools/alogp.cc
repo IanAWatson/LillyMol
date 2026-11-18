@@ -942,11 +942,6 @@ IsAcid(PerMoleculeData& pmd, atom_number_t zatom) {
 
   const atom_number_t carbon = pmd.mol.other(zatom, 0);
 
-  // The O of a nitro group or N-oxide is O5, not an acid.
-  if (pmd.z[carbon] == 7) {
-    return 0;
-  }
-
   for (const Bond* b : pmd.mol[carbon]) {
     if (! b->is_double_bond()) {
       continue;
@@ -1012,7 +1007,7 @@ ALogP::SaturatedOxygen(PerMoleculeData& pmd, atom_number_t zatom) {
   }
 
   // O2 N-Hydroxy
-  if (acon == 1 && pmd.formal_charge[zatom] == 0 && pmd.attached_heteroatom_count[zatom] == 1 &&
+  if (acon == 1 && pmd.attached_heteroatom_count[zatom] == 1 &&
      pmd.aryl_count[zatom] == 0 && IsNHydroxy(pmd, zatom)) {
     pmd.assigned[zatom] = kO2;
     return 1;

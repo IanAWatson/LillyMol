@@ -1,0 +1,639 @@
+{
+  "python": "3.12.3 (main, Aug 31 2026, 10:18:26) [GCC 13.3.0]",
+  "platform": "Linux-6.8.0-147-generic-x86_64-with-glibc2.39",
+  "records": [
+    {
+      "path": "portable_1000.smarts",
+      "mode": "portable",
+      "bytes": 1144,
+      "depth": 2,
+      "expansions": 3,
+      "engine": "lillymol",
+      "runs": [
+        {
+          "engine": "lillymol",
+          "version": "staged nanobind",
+          "parse_s": 0.00046440993901342154,
+          "first_s": 9.813299402594566e-05,
+          "warm_s": 2.7406960725784302e-05,
+          "panel_s": 0.0001428959658369422,
+          "rss_mib": 57.87890625
+        },
+        {
+          "engine": "lillymol",
+          "version": "staged nanobind",
+          "parse_s": 0.0008916830411180854,
+          "first_s": 0.000167876947671175,
+          "warm_s": 4.8724934458732605e-05,
+          "panel_s": 0.0002728719264268875,
+          "rss_mib": 57.87890625
+        },
+        {
+          "engine": "lillymol",
+          "version": "staged nanobind",
+          "parse_s": 0.0019799680449068546,
+          "first_s": 0.000506410957314074,
+          "warm_s": 0.0001295700203627348,
+          "panel_s": 0.0007551549933850765,
+          "rss_mib": 57.87890625
+        }
+      ],
+      "parse_s": 0.0008916830411180854,
+      "first_s": 0.000167876947671175,
+      "warm_s": 4.8724934458732605e-05,
+      "panel_s": 0.0002728719264268875,
+      "rss_mib": 57.87890625
+    },
+    {
+      "path": "portable_1000.smarts",
+      "mode": "portable",
+      "bytes": 1144,
+      "depth": 2,
+      "expansions": 3,
+      "engine": "rdkit",
+      "runs": [
+        {
+          "engine": "rdkit",
+          "version": "2024.09.5",
+          "parse_s": 0.0004335650010034442,
+          "first_s": 0.00012901099398732185,
+          "warm_s": 1.852808054536581e-05,
+          "panel_s": 0.00014953198842704296,
+          "rss_mib": 60.125
+        },
+        {
+          "engine": "rdkit",
+          "version": "2024.09.5",
+          "parse_s": 0.0006445550825446844,
+          "first_s": 0.00010628800373524427,
+          "warm_s": 2.932501956820488e-05,
+          "panel_s": 0.0002178068971261382,
+          "rss_mib": 60.1015625
+        },
+        {
+          "engine": "rdkit",
+          "version": "2024.09.5",
+          "parse_s": 0.00045437400694936514,
+          "first_s": 7.3686009272933e-05,
+          "warm_s": 1.9230064935982227e-05,
+          "panel_s": 0.00015541701577603817,
+          "rss_mib": 59.97265625
+        }
+      ],
+      "parse_s": 0.00045437400694936514,
+      "first_s": 0.00010628800373524427,
+      "warm_s": 1.9230064935982227e-05,
+      "panel_s": 0.00015541701577603817,
+      "rss_mib": 60.1015625
+    },
+    {
+      "path": "portable_10000.smarts",
+      "mode": "portable",
+      "bytes": 10061,
+      "depth": 6,
+      "expansions": 45,
+      "engine": "lillymol",
+      "runs": [
+        {
+          "engine": "lillymol",
+          "version": "staged nanobind",
+          "parse_s": 0.004236381035298109,
+          "first_s": 0.0006363849388435483,
+          "warm_s": 0.00023624300956726074,
+          "panel_s": 0.0007873219437897205,
+          "rss_mib": 57.87890625
+        },
+        {
+          "engine": "lillymol",
+          "version": "staged nanobind",
+          "parse_s": 0.013830048963427544,
+          "first_s": 0.0023471208987757564,
+          "warm_s": 0.0007797800935804844,
+          "panel_s": 0.002428340958431363,
+          "rss_mib": 57.87890625
+        },
+        {
+          "engine": "lillymol",
+          "version": "staged nanobind",
+          "parse_s": 0.01951060292776674,
+          "first_s": 0.0028489800170063972,
+          "warm_s": 0.0013651959598064423,
+          "panel_s": 0.003975505009293556,
+          "rss_mib": 57.87890625
+        }
+      ],
+      "parse_s": 0.013830048963427544,
+      "first_s": 0.0023471208987757564,
+      "warm_s": 0.0007797800935804844,
+      "panel_s": 0.002428340958431363,
+      "rss_mib": 57.87890625
+    },
+    {
+      "path": "portable_10000.smarts",
+      "mode": "portable",
+      "bytes": 10061,
+      "depth": 6,
+      "expansions": 45,
+      "engine": "rdkit",
+      "runs": [
+        {
+          "engine": "rdkit",
+          "version": "2024.09.5",
+          "parse_s": 0.005312173976562917,
+          "first_s": 0.00032188999466598034,
+          "warm_s": 0.0003077840665355325,
+          "panel_s": 0.0022234629141166806,
+          "rss_mib": 61.60546875
+        },
+        {
+          "engine": "rdkit",
+          "version": "2024.09.5",
+          "parse_s": 0.01250231801532209,
+          "first_s": 0.0014395910548046231,
+          "warm_s": 0.001026571961119771,
+          "panel_s": 0.003649346064776182,
+          "rss_mib": 61.48046875
+        },
+        {
+          "engine": "rdkit",
+          "version": "2024.09.5",
+          "parse_s": 0.012262703035958111,
+          "first_s": 0.0007988690631464124,
+          "warm_s": 0.00047107390128076077,
+          "panel_s": 0.0035358850145712495,
+          "rss_mib": 61.609375
+        }
+      ],
+      "parse_s": 0.012262703035958111,
+      "first_s": 0.0007988690631464124,
+      "warm_s": 0.00047107390128076077,
+      "panel_s": 0.0035358850145712495,
+      "rss_mib": 61.60546875
+    },
+    {
+      "path": "portable_100000.smarts",
+      "mode": "portable",
+      "bytes": 100086,
+      "depth": 11,
+      "expansions": 429,
+      "engine": "lillymol",
+      "runs": [
+        {
+          "engine": "lillymol",
+          "version": "staged nanobind",
+          "parse_s": 0.04232617805246264,
+          "first_s": 0.010209426982328296,
+          "warm_s": 0.004655769909732044,
+          "panel_s": 0.010387897957116365,
+          "rss_mib": 64.125
+        },
+        {
+          "engine": "lillymol",
+          "version": "staged nanobind",
+          "parse_s": 0.042041237000375986,
+          "first_s": 0.01051090401597321,
+          "warm_s": 0.005095238913781941,
+          "panel_s": 0.009993048035539687,
+          "rss_mib": 64.125
+        },
+        {
+          "engine": "lillymol",
+          "version": "staged nanobind",
+          "parse_s": 0.07738627295475453,
+          "first_s": 0.016792542999610305,
+          "warm_s": 0.007807372021488845,
+          "panel_s": 0.01618254405912012,
+          "rss_mib": 64.25
+        }
+      ],
+      "parse_s": 0.04232617805246264,
+      "first_s": 0.01051090401597321,
+      "warm_s": 0.005095238913781941,
+      "panel_s": 0.010387897957116365,
+      "rss_mib": 64.125
+    },
+    {
+      "path": "portable_100000.smarts",
+      "mode": "portable",
+      "bytes": 100086,
+      "depth": 11,
+      "expansions": 429,
+      "engine": "rdkit",
+      "runs": [
+        {
+          "engine": "rdkit",
+          "version": "2024.09.5",
+          "parse_s": 0.09252860106062144,
+          "first_s": 0.005038183997385204,
+          "warm_s": 0.005027867038734257,
+          "panel_s": 0.049259079969488084,
+          "rss_mib": 76.19921875
+        },
+        {
+          "engine": "rdkit",
+          "version": "2024.09.5",
+          "parse_s": 0.10427406604867429,
+          "first_s": 0.005596140050329268,
+          "warm_s": 0.005307325045578182,
+          "panel_s": 0.050519952084869146,
+          "rss_mib": 76.33203125
+        },
+        {
+          "engine": "rdkit",
+          "version": "2024.09.5",
+          "parse_s": 0.1268443629378453,
+          "first_s": 0.005266295047476888,
+          "warm_s": 0.004813624895177782,
+          "panel_s": 0.0440910350298509,
+          "rss_mib": 76.44140625
+        }
+      ],
+      "parse_s": 0.10427406604867429,
+      "first_s": 0.005266295047476888,
+      "warm_s": 0.005027867038734257,
+      "panel_s": 0.049259079969488084,
+      "rss_mib": 76.33203125
+    },
+    {
+      "path": "portable_1000000.smarts",
+      "mode": "portable",
+      "bytes": 1000141,
+      "depth": 15,
+      "expansions": 4378,
+      "engine": "lillymol",
+      "runs": [
+        {
+          "engine": "lillymol",
+          "version": "staged nanobind",
+          "parse_s": 0.5159002349246293,
+          "first_s": 0.09869538492057472,
+          "warm_s": 0.05146197706926614,
+          "panel_s": 0.09728482097852975,
+          "rss_mib": 430.171875
+        },
+        {
+          "engine": "lillymol",
+          "version": "staged nanobind",
+          "parse_s": 0.6283261149656028,
+          "first_s": 0.10178600007202476,
+          "warm_s": 0.05119435698725283,
+          "panel_s": 0.09752969502005726,
+          "rss_mib": 430.30078125
+        },
+        {
+          "engine": "lillymol",
+          "version": "staged nanobind",
+          "parse_s": 0.6465978510677814,
+          "first_s": 0.10023419302888215,
+          "warm_s": 0.05076310189906508,
+          "panel_s": 0.10013334802351892,
+          "rss_mib": 430.171875
+        }
+      ],
+      "parse_s": 0.6283261149656028,
+      "first_s": 0.10023419302888215,
+      "warm_s": 0.05119435698725283,
+      "panel_s": 0.09752969502005726,
+      "rss_mib": 430.171875
+    },
+    {
+      "path": "portable_1000000.smarts",
+      "mode": "portable",
+      "bytes": 1000141,
+      "depth": 15,
+      "expansions": 4378,
+      "engine": "rdkit",
+      "runs": [
+        {
+          "engine": "rdkit",
+          "version": "2024.09.5",
+          "parse_s": 2.07473003200721,
+          "first_s": 0.06304715003352612,
+          "warm_s": 0.05923534999601543,
+          "panel_s": 0.5701057160040364,
+          "rss_mib": 227.28125
+        },
+        {
+          "engine": "rdkit",
+          "version": "2024.09.5",
+          "parse_s": 1.9765845310175791,
+          "first_s": 0.06251569697633386,
+          "warm_s": 0.0601809099316597,
+          "panel_s": 0.5710989800281823,
+          "rss_mib": 227.171875
+        },
+        {
+          "engine": "rdkit",
+          "version": "2024.09.5",
+          "parse_s": 1.9915233199717477,
+          "first_s": 0.0647793950047344,
+          "warm_s": 0.060749377007596195,
+          "panel_s": 0.5907204509712756,
+          "rss_mib": 227.28125
+        }
+      ],
+      "parse_s": 1.9915233199717477,
+      "first_s": 0.06304715003352612,
+      "warm_s": 0.0601809099316597,
+      "panel_s": 0.5710989800281823,
+      "rss_mib": 227.28125
+    },
+    {
+      "path": "portable_3000000.smarts",
+      "mode": "portable",
+      "bytes": 3000360,
+      "depth": 19,
+      "expansions": 13134,
+      "engine": "lillymol",
+      "runs": [
+        {
+          "engine": "lillymol",
+          "version": "staged nanobind",
+          "parse_s": 1.9927359420107678,
+          "first_s": 0.32357512100134045,
+          "warm_s": 0.15582259895745665,
+          "panel_s": 0.31489520508330315,
+          "rss_mib": 1243.828125
+        },
+        {
+          "engine": "lillymol",
+          "version": "staged nanobind",
+          "parse_s": 1.7815173970302567,
+          "first_s": 0.2951354719698429,
+          "warm_s": 0.14126013999339193,
+          "panel_s": 0.28302370000164956,
+          "rss_mib": 1244.078125
+        },
+        {
+          "engine": "lillymol",
+          "version": "staged nanobind",
+          "parse_s": 1.710072770016268,
+          "first_s": 0.2886303369887173,
+          "warm_s": 0.1394768130267039,
+          "panel_s": 0.2778641890035942,
+          "rss_mib": 1244.078125
+        }
+      ],
+      "parse_s": 1.7815173970302567,
+      "first_s": 0.2951354719698429,
+      "warm_s": 0.14126013999339193,
+      "panel_s": 0.28302370000164956,
+      "rss_mib": 1244.078125
+    },
+    {
+      "path": "portable_3000000.smarts",
+      "mode": "portable",
+      "bytes": 3000360,
+      "depth": 19,
+      "expansions": 13134,
+      "engine": "rdkit",
+      "runs": [
+        {
+          "engine": "rdkit",
+          "version": "2024.09.5",
+          "parse_s": 7.013842063955963,
+          "first_s": 0.19676109007559717,
+          "warm_s": 0.1737411170033738,
+          "panel_s": 1.688432169961743,
+          "rss_mib": 559.0625
+        },
+        {
+          "engine": "rdkit",
+          "version": "2024.09.5",
+          "parse_s": 7.323544278042391,
+          "first_s": 0.2033754320582375,
+          "warm_s": 0.17913325200788677,
+          "panel_s": 1.718579842010513,
+          "rss_mib": 559.44140625
+        },
+        {
+          "engine": "rdkit",
+          "version": "2024.09.5",
+          "parse_s": 7.244208607007749,
+          "first_s": 0.1969697759486735,
+          "warm_s": 0.17328276205807924,
+          "panel_s": 1.6958102739881724,
+          "rss_mib": 559.3125
+        }
+      ],
+      "parse_s": 7.244208607007749,
+      "first_s": 0.1969697759486735,
+      "warm_s": 0.1737411170033738,
+      "panel_s": 1.6958102739881724,
+      "rss_mib": 559.3125
+    },
+    {
+      "path": "extensions_1000.smarts",
+      "mode": "extensions",
+      "bytes": 1098,
+      "depth": 2,
+      "expansions": 3,
+      "engine": "lillymol",
+      "runs": [
+        {
+          "engine": "lillymol",
+          "version": "staged nanobind",
+          "parse_s": 0.0003192709991708398,
+          "first_s": 7.52799678593874e-05,
+          "warm_s": 2.0705978386104107e-05,
+          "panel_s": 0.00011989392805844545,
+          "rss_mib": 57.87890625
+        },
+        {
+          "engine": "lillymol",
+          "version": "staged nanobind",
+          "parse_s": 0.00032121094409376383,
+          "first_s": 7.112696766853333e-05,
+          "warm_s": 2.0417035557329655e-05,
+          "panel_s": 0.00010046001989394426,
+          "rss_mib": 57.87890625
+        },
+        {
+          "engine": "lillymol",
+          "version": "staged nanobind",
+          "parse_s": 0.00041006295941770077,
+          "first_s": 8.790998253971338e-05,
+          "warm_s": 2.5659101083874702e-05,
+          "panel_s": 0.0001249739434570074,
+          "rss_mib": 57.87890625
+        }
+      ],
+      "parse_s": 0.00032121094409376383,
+      "first_s": 7.52799678593874e-05,
+      "warm_s": 2.0705978386104107e-05,
+      "panel_s": 0.00011989392805844545,
+      "rss_mib": 57.87890625
+    },
+    {
+      "path": "extensions_10000.smarts",
+      "mode": "extensions",
+      "bytes": 10016,
+      "depth": 8,
+      "expansions": 37,
+      "engine": "lillymol",
+      "runs": [
+        {
+          "engine": "lillymol",
+          "version": "staged nanobind",
+          "parse_s": 0.009852507966570556,
+          "first_s": 0.0011108500184491277,
+          "warm_s": 0.0005396199412643909,
+          "panel_s": 0.0012986890505999327,
+          "rss_mib": 57.87890625
+        },
+        {
+          "engine": "lillymol",
+          "version": "staged nanobind",
+          "parse_s": 0.01763907098211348,
+          "first_s": 0.00255526602268219,
+          "warm_s": 0.0016046199016273022,
+          "panel_s": 0.0025791890220716596,
+          "rss_mib": 57.87890625
+        },
+        {
+          "engine": "lillymol",
+          "version": "staged nanobind",
+          "parse_s": 0.018101184046827257,
+          "first_s": 0.0019817170687019825,
+          "warm_s": 0.0009352089837193489,
+          "panel_s": 0.0024204489309340715,
+          "rss_mib": 57.87890625
+        }
+      ],
+      "parse_s": 0.01763907098211348,
+      "first_s": 0.0019817170687019825,
+      "warm_s": 0.0009352089837193489,
+      "panel_s": 0.0024204489309340715,
+      "rss_mib": 57.87890625
+    },
+    {
+      "path": "extensions_100000.smarts",
+      "mode": "extensions",
+      "bytes": 100492,
+      "depth": 16,
+      "expansions": 350,
+      "engine": "lillymol",
+      "runs": [
+        {
+          "engine": "lillymol",
+          "version": "staged nanobind",
+          "parse_s": 0.13772359699942172,
+          "first_s": 0.008599722990766168,
+          "warm_s": 0.004311311990022659,
+          "panel_s": 0.007455728016793728,
+          "rss_mib": 59.75
+        },
+        {
+          "engine": "lillymol",
+          "version": "staged nanobind",
+          "parse_s": 0.06521480903029442,
+          "first_s": 0.012639177963137627,
+          "warm_s": 0.006000370951369405,
+          "panel_s": 0.01353190594818443,
+          "rss_mib": 59.75
+        },
+        {
+          "engine": "lillymol",
+          "version": "staged nanobind",
+          "parse_s": 0.14983114902861416,
+          "first_s": 0.00862411898560822,
+          "warm_s": 0.00394236296415329,
+          "panel_s": 0.007146034040488303,
+          "rss_mib": 59.75
+        }
+      ],
+      "parse_s": 0.13772359699942172,
+      "first_s": 0.00862411898560822,
+      "warm_s": 0.004311311990022659,
+      "panel_s": 0.007455728016793728,
+      "rss_mib": 59.75
+    },
+    {
+      "path": "extensions_1000000.smarts",
+      "mode": "extensions",
+      "bytes": 1000510,
+      "depth": 22,
+      "expansions": 3428,
+      "engine": "lillymol",
+      "runs": [
+        {
+          "engine": "lillymol",
+          "version": "staged nanobind",
+          "parse_s": 0.5214920630678535,
+          "first_s": 0.07987181004136801,
+          "warm_s": 0.04344717797357589,
+          "panel_s": 0.0866722339997068,
+          "rss_mib": 382.671875
+        },
+        {
+          "engine": "lillymol",
+          "version": "staged nanobind",
+          "parse_s": 0.6427782169776037,
+          "first_s": 0.07609353598672897,
+          "warm_s": 0.04150725493673235,
+          "panel_s": 0.08281618694309145,
+          "rss_mib": 382.921875
+        },
+        {
+          "engine": "lillymol",
+          "version": "staged nanobind",
+          "parse_s": 0.517788145923987,
+          "first_s": 0.07783787790685892,
+          "warm_s": 0.04134392202831805,
+          "panel_s": 0.08359040901996195,
+          "rss_mib": 382.91796875
+        }
+      ],
+      "parse_s": 0.5214920630678535,
+      "first_s": 0.07783787790685892,
+      "warm_s": 0.04150725493673235,
+      "panel_s": 0.08359040901996195,
+      "rss_mib": 382.91796875
+    },
+    {
+      "path": "extensions_3000000.smarts",
+      "mode": "extensions",
+      "bytes": 3000029,
+      "depth": 25,
+      "expansions": 10290,
+      "engine": "lillymol",
+      "runs": [
+        {
+          "engine": "lillymol",
+          "version": "staged nanobind",
+          "parse_s": 1.8287159550236538,
+          "first_s": 0.2764865930657834,
+          "warm_s": 0.12176348397042602,
+          "panel_s": 0.24603972805198282,
+          "rss_mib": 1101.20703125
+        },
+        {
+          "engine": "lillymol",
+          "version": "staged nanobind",
+          "parse_s": 1.8233047820394859,
+          "first_s": 0.23111185594461858,
+          "warm_s": 0.12323834199924022,
+          "panel_s": 0.24709882796742022,
+          "rss_mib": 1101.203125
+        },
+        {
+          "engine": "lillymol",
+          "version": "staged nanobind",
+          "parse_s": 1.8374869970139116,
+          "first_s": 0.23365646100137383,
+          "warm_s": 0.12607418501283973,
+          "panel_s": 0.251866516075097,
+          "rss_mib": 1101.453125
+        }
+      ],
+      "parse_s": 1.8287159550236538,
+      "first_s": 0.23365646100137383,
+      "warm_s": 0.12323834199924022,
+      "panel_s": 0.24709882796742022,
+      "rss_mib": 1101.20703125
+    }
+  ],
+  "measured_date": "2026-11-18",
+  "cpu": "Intel Core i7-8700K CPU @ 3.70GHz",
+  "generator_sha256": "59873839776ce601fc05cf6016a5a8b0283c482e773823b39ea4228671e33142"
+}

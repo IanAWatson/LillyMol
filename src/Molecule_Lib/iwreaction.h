@@ -1509,9 +1509,11 @@ class IWReaction : public Scaffold_Reaction_Site
 
     int _has_sidechain_isotope_requirement;
 
-    // We mark replaced atoms with a magic isotope. If this is set then
-    // we remove atoms with that isotope from products.
-    int _has_atom_replacements = 0;
+    // Whether any Replace_Atom directive exists, in the scaffold or in any sidechain. It cannot
+    // change once the reaction has been built, so it is worked out the first time it is needed
+    // and then reused. It is not set at the end of construction because a reaction can be built
+    // in several places (proto, msi, ISIS rxn file, smirks). -1 means not yet known.
+    mutable int _has_atom_replacements = -1;
 
 //  private functions
 
@@ -1530,6 +1532,8 @@ class IWReaction : public Scaffold_Reaction_Site
     int _perform_scaffold_transformations (Molecule & result, const Set_of_Atoms * scaffold_embedding, const Enumeration_Temporaries & etmp) const;
 
     int _do_atom_removals (Molecule & result, Enumeration_Temporaries & etmp) const;
+    // The removals the reaction asks for. _do_atom_removals also removes replaced atoms.
+    int _do_directed_atom_removals(Molecule & result, Enumeration_Temporaries & etmp) const;
 
     int _perform_reaction_recheck_scaffold_reactivity (const Molecule * scaffold,
                                                            const Substructure_Results & sresults,
@@ -1669,8 +1673,12 @@ class IWReaction : public Scaffold_Reaction_Site
     int _sidechain_with_mapped_atom(const int x) const;
 
     int _determine_has_sidechain_isotope_requirement();
-    int _determine_has_replacement_atoms();
 
+    // Atoms replaced by a Replace_Atom directive are marked with a magic isotope, and
+    // are removed from products by RemoveReplacedAtoms. HasAtomReplacements is worked out
+    // the first time it is called, so it is right however the reaction was built (msi, ISIS
+    // rxn file, smirks, proto). The reaction must be completely built before it is first used.
+    bool HasAtomReplacements() const;
     int RemoveReplacedAtoms(Molecule& m) const;
 
   public:

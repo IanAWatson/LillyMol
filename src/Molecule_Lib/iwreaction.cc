@@ -2185,8 +2185,26 @@ template int do_transformations(Molecule&, const Set_of_Atoms&, int,
 
 // #define DEBUG_DO_ATOM_REMOVALS
 
+// Called once, after all the scaffold embeddings have been processed. Atoms cannot be removed
+// earlier, because removing an atom renumbers the atoms after it, and the remaining embeddings
+// refer to the numbering of the original scaffold. That applies to the atoms replaced by a
+// Replace_Atom directive as much as to those the reaction removes.
 int
 IWReaction::_do_atom_removals(Molecule& result, Enumeration_Temporaries& etmp) const {
+  if (!_do_directed_atom_removals(result, etmp)) {
+    return 0;
+  }
+
+  if (HasAtomReplacements()) {
+    RemoveReplacedAtoms(result);
+  }
+
+  return 1;
+}
+
+int
+IWReaction::_do_directed_atom_removals(Molecule& result,
+                                       Enumeration_Temporaries& etmp) const {
   Set_of_Atoms& atoms_to_be_removed = etmp.atoms_to_be_removed();
 
 #ifdef DEBUG_DO_ATOM_REMOVALS
@@ -2504,10 +2522,6 @@ IWReaction::in_place_transformations(Molecule& m, const Substructure_Results& sr
     return 0;
   }
 
-  if (_has_atom_replacements) {
-    RemoveReplacedAtoms(m);
-  }
-
   if (_append_to_name.length() && rc) {
     m.append_to_name(_append_to_name);
   }
@@ -2515,6 +2529,27 @@ IWReaction::in_place_transformations(Molecule& m, const Substructure_Results& sr
   return rc;
 }
 
+bool
+IWReaction::HasAtomReplacements() const {
+  if (_has_atom_replacements >= 0) {
+    return _has_atom_replacements > 0;
+  }
+
+  _has_atom_replacements = number_atom_replacements() > 0;
+
+  for (const Sidechain_Reaction_Site* s : _sidechains) {
+    if (_has_atom_replacements) {
+      break;
+    }
+    _has_atom_replacements = s->number_atom_replacements() > 0;
+  }
+
+  return _has_atom_replacements > 0;
+}
+
+// Remove every atom marked as replaced. There can be more of them than there are
+// Replace_Atom directives, because a directive marks an atom for each embedding it is
+// applied to, so we cannot stop after a count.
 int
 IWReaction::RemoveReplacedAtoms(Molecule& m) const {
   int rc = 0;
@@ -2524,9 +2559,6 @@ IWReaction::RemoveReplacedAtoms(Molecule& m) const {
     }
     m.remove_atom(i);
     ++rc;
-    if (rc == _has_atom_replacements) {
-      return rc;
-    }
   }
 
   return rc;
@@ -2764,10 +2796,6 @@ IWReaction::_perform_reaction(Molecule& result, const Set_of_Atoms* scaffold_emb
 
   if (!_perform_scaffold_transformations(result, scaffold_embedding, etmp)) {
     return 0;
-  }
-
-  if (_has_atom_replacements) {
-    RemoveReplacedAtoms(result);
   }
 
 #ifdef DEBUG_PERFORM_REACTION
@@ -4172,7 +4200,6 @@ Replace_Atom::DoReplacement(Molecule& result, const Set_of_Atoms* scaffold_embed
     return 0;
   }
 
-  cerr << "Setting atom " << a2 << " result has " << result.natoms() << " atoms\n";
   result.set_isotope(a1, kReplaced);
 
   if (_invert_chirality) {

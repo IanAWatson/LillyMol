@@ -1,4 +1,5 @@
 #include <cmath>
+#include <fstream>
 #include <iostream>
 #include <string>
 
@@ -730,6 +731,82 @@ sidechain {
   ASSERT_EQ(_rxn.in_place_transformations(_m), 1);
 
   EXPECT_EQ(_m.unique_smiles(), "BrC[9C@H](OC)C") << _m.unique_smiles();
+}
+
+// Whether atoms replaced by a Replace_Atom directive are removed must not depend on how the
+// reaction was built. This reads a reaction written in msi form, which is a different way of
+// constructing the reaction from ConstructFromProto. The msi is written out here because a
+// reaction built from a proto cannot be written as msi and read back. Note that the msi
+// reader only reads a substitute directive in a sidechain, not in the scaffold.
+TEST_F(TestReaction, TestReplaceAtomSidechainFromMsi)
+{
+  const std::string fname = testing::TempDir() + "replace_atom_sidechain.rxn";
+  {
+    std::ofstream output(fname);
+    output << R"((0 Reaction
+  (0 Scaffold
+    (A C smarts "[#0]-*")
+  )
+  (1 Sidechain
+    (A C smiles "OC methoxy")
+    (A C smarts "OC")
+    (A C substitute "0.0 1.0")
+  )
+)
+)";
+  }
+
+  ASSERT_TRUE(_rxn.do_read(IWString(fname.c_str()), _smc));
+
+  ASSERT_TRUE(_MoleculeFromSmiles("BrC[9C@@H](C)* CHEMBL446288"));
+
+  ASSERT_EQ(_rxn.in_place_transformations(_m), 1);
+
+  EXPECT_EQ(_m.unique_smiles(), "BrC[9C@H](OC)C") << _m.unique_smiles();
+}
+
+// A scaffold with two matches. The atoms are replaced in each match, and the replaced atoms
+// can only be removed after both have been done, because removing one renumbers the atoms
+// that the second match refers to.
+TEST_F(TestReaction, TestReplaceAtomSeveralScaffoldMatches)
+{
+  _string_proto = R"(
+    scaffold: {
+      id: 0
+      smarts: "Cl-C"
+    }
+    sidechain {
+      id: 1
+      smarts: "I"
+      reagent: "I iodine"
+      replace_atom {
+        a1: 0
+        a2: 0
+      }
+    }
+  )";
+
+  ASSERT_TRUE(google::protobuf::TextFormat::ParseFromString(_string_proto, &_proto));
+  ASSERT_TRUE(_rxn.ConstructFromProto(_proto, _unused_fname, _smc));
+
+  ASSERT_TRUE(_MoleculeFromSmiles("ClCC(Cl)C"));
+
+  ASSERT_EQ(_rxn.substructure_search(&_m, _sresults), 2);
+  ASSERT_EQ(_sresults.number_embeddings(), 2);
+
+  Molecule expected;
+  ASSERT_TRUE(expected.build_from_smiles("ICC(I)C"));
+
+  Reaction_Iterator iterator;
+  int products = 0;
+  for (iterator.initialise(_rxn); iterator.active(); iterator++)
+  {
+    Molecule result;
+    ASSERT_EQ(_rxn.perform_reaction(&_m, _sresults, iterator, result), 1);
+    EXPECT_EQ(result.unique_smiles(), expected.unique_smiles()) << result.unique_smiles();
+    ++products;
+  }
+  EXPECT_EQ(products, 1);
 }
 
 TEST_F(TestReaction, TestInvertChirality)

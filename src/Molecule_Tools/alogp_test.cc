@@ -171,6 +171,8 @@ INSTANTIATE_TEST_SUITE_P(TestAlogpP, TestAlogpP, testing::Values(
   SmilesExpected{"CC(C)(C)C neopentane", 2.052, ""},
   SmilesExpected{"c1ccccc1 benzene", 1.687, ""},
   SmilesExpected{"CO methanol", -0.392, "[3CH3][50OH]"},
+  SmilesExpected{"CNN methylhydrazine", -0.921, "[3CH3][35NH][34NH2]"},
+  SmilesExpected{"C=C(N)C 2-aminopropene", 0.479, "[6CH2]=[6C]([34NH2])[1CH3]"},
   SmilesExpected{"c1ccccc1O phenol", 1.392, "[18cH]1[18cH][18cH][18cH][18cH][23c]1[50OH]"},
   SmilesExpected{"c1ccccc1S benzenethiol", 1.975, "[18cH]1[18cH][18cH][18cH][18cH][24c]1[68SH]"},
   SmilesExpected{"c1ccccc1F fluoro-benzene", 1.826, "[18cH]1[18cH][18cH][18cH][18cH][14c]1[62F]"},

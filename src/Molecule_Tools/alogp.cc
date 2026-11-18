@@ -567,70 +567,6 @@ ALogP::AromaticNitrogen(PerMoleculeData& pmd, atom_number_t zatom) {
   return 1;
 }
 
-// The NH2 atom in an amidine
-int
-SaturatedNitrogenIsAmidine(PerMoleculeData& pmd, atom_number_t zatom) {
-  atom_number_t carbon = pmd.mol.other(zatom, 0);
-
-  if (pmd.attached_heteroatom_count[carbon] != 2) {
-    return 0;
-  }
-  if (pmd.aromatic[carbon]) {
-    return 0;
-  }
-  if (pmd.double_bond_count[carbon] != 1) {
-    return 0;
-  }
-  if (pmd.single_bond_count[carbon] != 2) {
-    return 0;
-  }
-
-  for (const Bond* b : pmd.mol[carbon]) {
-    if (! b->is_double_bond()) {
-      continue;
-    }
-
-    atom_number_t o = b->other(carbon);
-    // Should we also check that `o` is singly bonded.
-    if (pmd.z[o] == 7) {
-      return 1;
-    }
-  }
-
-  return 0;
-}
-
-// The NH2 atom in a guanidine?
-int
-SaturatedNitrogenIsGuanidine(PerMoleculeData& pmd, atom_number_t zatom) {
-  atom_number_t carbon = pmd.mol.other(zatom, 0);
-
-  if (pmd.attached_heteroatom_count[carbon] != 3) {
-    return 0;
-  }
-  if (pmd.aromatic[carbon]) {
-    return 0;
-  }
-  if (pmd.double_bond_count[carbon] != 1) {
-    return 0;
-  }
-  if (pmd.single_bond_count[carbon] != 2) {
-    return 0;
-  }
-
-  for (const Bond* b : pmd.mol[zatom]) {
-    atom_number_t o = b->other(carbon);
-    if (o == zatom) {
-      continue;
-    }
-    if (pmd.z[o] != 7) {
-      return 0;
-    }
-  }
-
-  return 1;
-}
-
 // Return the number of adjacent unsaturations to `zatom` -
 // excludes aromatics.
 int
@@ -647,38 +583,6 @@ Vinyl(const PerMoleculeData& pmd, atom_number_t zatom) {
   }
 
   return rc;
-}
-
-// Is a terminal nitrogen part of an amide. Allow sulfonamides
-int
-TerminalNitrogenIsAmide(const PerMoleculeData& pmd, atom_number_t zatom) {
-  assert(pmd.mol.ncon(zatom) == 1);
-
-  // Allow either carbon or Sulphur
-  const atom_number_t carbon = pmd.mol.other(zatom, 0);
-  if (pmd.z[carbon] == 6) {
-  } else if (pmd.z[carbon] == 16) {
-  } else {
-    return 0;
-  }
-
-  int doubly_bonded_oxygen_count = 0;
-  for (const Bond* b : pmd.mol[carbon]) {
-    if (! b->is_double_bond()) {
-      continue;
-    }
-
-    atom_number_t o = b->other(carbon);
-    if (pmd.z[o] == 8) {
-    } else if (pmd.z[o] == 16) {
-    } else {
-      continue;
-    }
-
-    ++doubly_bonded_oxygen_count;
-  }
-
-  return doubly_bonded_oxygen_count;
 }
 
 // Is zatom the N of a sulfonamide
@@ -716,54 +620,17 @@ int
 ALogP::SinglyConnectedSaturatedNitrogen(PerMoleculeData& pmd, atom_number_t zatom) {
   assert(pmd.mol.ncon(zatom) == 1);
 
-  if (pmd.attached_heteroatom_count[zatom] == 0 &&
-      SaturatedNitrogenIsGuanidine(pmd, zatom)) {
-    pmd.assigned[zatom] = kN1;
-    return 1;
-  }
-
-  if (pmd.attached_heteroatom_count[zatom] == 0 &&
-      SaturatedNitrogenIsAmidine(pmd, zatom)) {
-    pmd.assigned[zatom] = kN1;
-    return 1;
-  }
-
-  const int vinyl = Vinyl(pmd, zatom);
-
-  // We are not using a charge assigner, so we approximate a primary amine this way.
-  if (pmd.attached_heteroatom_count[zatom] == 0 &&
-      vinyl == 0) {
-    atom_number_t o = pmd.mol.other(zatom, 0);
-    if (pmd.aromatic[o]) {  // N3
-      pmd.assigned[zatom] = kN3;
-      return 1;
-    } else {  // N1
-      pmd.assigned[zatom] = kN1;
-      return 1;
-    }
-  }
-
-  // but notice that RDKit assigns N1 to a terminal amide
-  if (pmd.attached_heteroatom_count[zatom] == 0 &&
-      vinyl && TerminalNitrogenIsAmide(pmd, zatom)) {
-    pmd.assigned[zatom] = kN1;
-    return 1;
-  }
-
-  if (pmd.attached_heteroatom_count[zatom] == 1 &&
-      vinyl && IsSulfonamide(pmd, zatom)) {
-    pmd.assigned[zatom] = kN1;
-    return 1;
-  }
-
-  // N3 maybe not charged, but still adjacent to arom. Aniline
-  if (pmd.aryl_count[zatom] == 1) {
+  // The paper defines N1 as [NH2+0][A] and N3 as [NH2+0][a], where A is any aliphatic
+  // atom, so the attached atom can be a heteroatom (hydrazine) or a vinyl carbon
+  // (enamine). RDKit does the same. Earlier versions assigned NS to those.
+  // We are not using a charge assigner, so a singly connected saturated nitrogen is
+  // treated as an uncharged NH2.
+  const atom_number_t o = pmd.mol.other(zatom, 0);
+  if (pmd.aromatic[o]) {  // N3
     pmd.assigned[zatom] = kN3;
-    return 1;
+  } else {  // N1
+    pmd.assigned[zatom] = kN1;
   }
-
-  // NS nitrogen supplemental.
-  pmd.assigned[zatom] = kNS;
   return 1;
 }
 

@@ -10,7 +10,8 @@ contrib/bin/alogp_benchmark.sh -o results molecules.smi
 ```
 
 The input is `smiles identifier` per line. `-n 10000` uses only the first 10,000
-molecules, `-t` sets the difference counted as significant (default 0.1), and `-k` how
+molecules and `-s 5000` skips the first 5,000 first (the tool is given the same range with
+`-i do=` and `-i skip=`, so no temporary file is written). `-t` sets the difference counted as significant (default 0.1), and `-k` how
 many outliers to list. It writes `results/values.tsv` (one column per method) and
 `results/results.json`.
 

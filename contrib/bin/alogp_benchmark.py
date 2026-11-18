@@ -12,6 +12,9 @@ more than a threshold, the most common difference values, and the largest outlie
 
   alogp_benchmark.py -o outdir molecules.smi
 
+Use -s and -n to work on part of a file; the same range is given to the tool with its
+-i skip= and -i do= options, so no temporary file is written.
+
 Needs rdkit and numpy, and the LillyMol python bindings (run it with run_python.sh, or
 with PYTHONPATH and LD_LIBRARY_PATH set to a directory staged by
 copy_shared_libraries.sh). To test a freshly built tool or bindings without touching
@@ -40,12 +43,16 @@ except ImportError as e:
 RDKIT_FLAGS = ["-Y", "RDKIT.N+", "-Y", "RDKIT.HP", "-Y", "alcacid"]
 
 
-def read_smiles(fname, max_molecules):
+def read_smiles(fname, skip, max_molecules):
     smiles, ids = [], []
+    seen = 0
     with open(fname) as f:
         for line in f:
             tokens = line.split()
             if not tokens:
+                continue
+            seen += 1
+            if seen <= skip:
                 continue
             smiles.append(tokens[0])
             ids.append(tokens[1] if len(tokens) > 1 else str(len(ids)))
@@ -113,7 +120,9 @@ def main():
     ap.add_argument("-o", "--outdir", required=True, help="directory for values.tsv and results.json")
     ap.add_argument("-a", "--alogp", default=os.environ.get("ALOGP"),
                     help="alogp executable (default $ALOGP, else $LILLYMOL_HOME/bin/Linux/alogp)")
-    ap.add_argument("-n", "--max_molecules", type=int, default=0, help="only use the first n molecules")
+    ap.add_argument("-s", "--skip", type=int, default=0, help="skip the first n molecules (passed to alogp as -i skip=n)")
+    ap.add_argument("-n", "--max_molecules", type=int, default=0,
+                    help="only use n molecules, after any skip (passed to alogp as -i do=n)")
     ap.add_argument("-t", "--threshold", type=float, default=0.1, help="difference counted as significant (default 0.1)")
     ap.add_argument("-k", "--top", type=int, default=15, help="number of largest outliers to list (default 15)")
     args = ap.parse_args()
@@ -127,18 +136,19 @@ def main():
     os.makedirs(args.outdir, exist_ok=True)
     RDLogger.DisableLog("rdApp.*")
 
-    smiles, ids = read_smiles(args.smiles_file, args.max_molecules)
+    smiles, ids = read_smiles(args.smiles_file, args.skip, args.max_molecules)
     fname = args.smiles_file
-    if args.max_molecules:  # the CLI needs a file with just those molecules
-        fname = os.path.join(args.outdir, "subset.smi")
-        with open(fname, "w") as f:
-            for s, i in zip(smiles, ids):
-                f.write(f"{s} {i}\n")
+    # The tool reads the same molecules via its input options, no temporary file needed.
+    subset = []
+    if args.skip:
+        subset += ["-i", f"skip={args.skip}"]
+    if args.max_molecules:
+        subset += ["-i", f"do={args.max_molecules}"]
     n = len(smiles)
     res = {"n": n, "alogp": alogp, "smiles_file": args.smiles_file}
 
-    t_cli_def, cli_def = run_cli(alogp, [], fname, ids)
-    t_cli_rd, cli_rd = run_cli(alogp, RDKIT_FLAGS, fname, ids)
+    t_cli_def, cli_def = run_cli(alogp, subset, fname, ids)
+    t_cli_rd, cli_rd = run_cli(alogp, subset + RDKIT_FLAGS, fname, ids)
     res["cli_default_s"], res["cli_rdkit_s"] = t_cli_def, t_cli_rd
 
     t = time.perf_counter()

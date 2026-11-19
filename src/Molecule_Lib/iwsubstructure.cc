@@ -137,6 +137,7 @@ Single_Substructure_Query::_default_values() {
   _unmatched_atoms_attached_specified = 0;
 
   _compress_embeddings = 0;
+  _require_neutral_matched_atoms = false;
 
   _atom_typing = nullptr;
 
@@ -1671,6 +1672,17 @@ Single_Substructure_Query::_got_embedding(Query_Atoms_Matched& matched_atoms,
   }
   cerr << '\n';
 #endif
+
+  // Inspect only atoms that would be included in this completed embedding.
+  // Do this even when embeddings are counted without being saved, and before
+  // accepting a hit or applying a maximum-match limit.
+  if (_require_neutral_matched_atoms) {
+    for (const Substructure_Atom* a : matched_atoms) {
+      if (a->include_in_embedding() && a->current_hold_atom()->formal_charge() != 0) {
+        return 0;
+      }
+    }
+  }
 
   if (!_global_query_conditions_also_matched(matched_atoms, already_matched,
                                              target_molecule)) {

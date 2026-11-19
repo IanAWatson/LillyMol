@@ -902,6 +902,7 @@ Common controls within a `query` block include:
 | `unique_embeddings_only` | Discard duplicate embeddings. |
 | `embeddings_do_not_overlap` | Discard embeddings that overlap earlier embeddings. |
 | `save_matched_atoms` | Store matched atoms in the result. Defaults to true. |
+| `require_neutral_matched_atoms` | Require formal charge zero on every atom included in an embedding. Defaults to false. |
 | `perceive_symmetric_equivalents` | Include symmetric equivalents. Defaults to true. |
 | `compress_embeddings` | Merge all embeddings into one embedding. |
 | `sort_by_preference_value` | Sort rather than discard low-preference matches. |
@@ -909,6 +910,34 @@ Common controls within a `query` block include:
 Be careful with options that discard embeddings based on discovery order,
 especially `embeddings_do_not_overlap` and distance-between-hit constraints.
 They can introduce atom-ordering dependence.
+
+### Neutral Matched Regions
+
+Use `require_neutral_matched_atoms` within a `query` block when the matched
+region must contain no individually charged atoms:
+
+```textproto
+query {
+  smarts: "[#7]~[#6]~[#8]"
+  require_neutral_matched_atoms: true
+}
+```
+
+This matches the N-C-O region in `NCO`, but rejects `[NH3+]C[O-]` even though
+its net charge is zero. It does not constrain the charge of the whole molecule:
+a query for `CC` can still match `CC[NH3+]` or `CC.[Cl-]`.
+
+The constraint is evaluated at runtime over atoms included in each candidate
+embedding. It applies to count-only searches too. Environment atoms, atoms used
+only inside recursive SMARTS, and query atoms with `include_in_embedding: false`
+are not checked. Each component query has its own setting. Explicitly charged
+query atoms are not rewritten: for example, `[N+]` with this flag enabled simply
+has no matches.
+
+Omitting the field or setting it to false preserves ordinary SMARTS charge
+behaviour. This field is independent of the whole-molecule charge constraints
+in `required_molecular_properties`; it does not specify a net charge for the
+matched region. It is retained when a query is written back as a proto.
 
 ## Distances, Paths, And Regions
 

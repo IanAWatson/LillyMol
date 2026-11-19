@@ -3247,6 +3247,9 @@ class Single_Substructure_Query
     // embedding with all atoms matched by any of the embeddings.
     int _compress_embeddings;
 
+    // Reject an embedding if any included target atom has a formal charge.
+    bool _require_neutral_matched_atoms;
+
 //  Dec 2019. If per-atom unmatched atom counts are present, store that info
 //  in a class variable.
 

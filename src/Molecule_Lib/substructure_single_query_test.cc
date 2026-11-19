@@ -2252,4 +2252,128 @@ TEST_F(TestSubstructure, SmilesMultipleComponentsAllMustMatch) {
   EXPECT_GT(_query.substructure_search(_m, _sresults), 0u);
 }
 
+TEST_F(TestSubstructure, NeutralMatchedAtomsRuntimeConstraint) {
+  struct Example {
+    const char* smarts;
+    const char* smiles;
+    int unrestricted;
+    int neutral;
+  };
+  for (const Example& example : {
+           Example{"[#7]", "N", 1, 1},
+           Example{"[#7]", "[NH4+]", 1, 0},
+           Example{"[#8]", "[O-]C", 1, 0},
+           Example{"[#7]~[#6]~[#8]", "[NH3+]C[O-]", 1, 0},
+           Example{"[#7]~[#6]~[#8]", "NCO", 1, 1},
+           Example{"CC", "CC[NH3+]", 2, 2},
+           Example{"CC", "CC.[Cl-]", 2, 2},
+           Example{"[N+]", "[NH4+]", 1, 0},
+           Example{"[N,O]", "[NH4+].[OH-]", 2, 0},
+           Example{"[#7].[#8]", "[NH4+].O", 1, 0},
+           Example{"[$(C[N+])]", "C[NH3+]", 1, 1},
+           Example{"[#7]", "[NH4+].N", 2, 1}}) {
+    SCOPED_TRACE(example.smarts);
+    SCOPED_TRACE(example.smiles);
+    // Test absent, explicit false and true, including count-only searches.
+    for (int flag : {-1, 0, 1}) {
+      for (bool save : {false, true}) {
+        SubstructureSearch::SubstructureQuery proto;
+        auto* component = proto.add_query();
+        component->set_smarts(example.smarts);
+        component->set_save_matched_atoms(save);
+        if (flag >= 0) {
+          component->set_require_neutral_matched_atoms(flag);
+        }
+        Substructure_Query query;
+        ASSERT_TRUE(query.ConstructFromProto(proto));
+        Molecule original;
+        ASSERT_TRUE(original.build_from_smiles(example.smiles));
+        const int expected = flag == 1 ? example.neutral : example.unrestricted;
+        for (int i = 0; i < _ntest; ++i) {
+          Molecule molecule;
+          ASSERT_TRUE(molecule.build_from_smiles(original.random_smiles()));
+          Substructure_Results results;
+          EXPECT_EQ(query.substructure_search(molecule, results), expected);
+        }
+      }
+    }
+  }
+}
+
+TEST_F(TestSubstructure, NeutralMatchedAtomsChecksBeforeMatchLimit) {
+  _string_proto = R"(query {
+    smarts: "[#7]"
+    require_neutral_matched_atoms: true
+    max_matches_to_find: 1
+  })";
+  ASSERT_TRUE(google::protobuf::TextFormat::ParseFromString(_string_proto, &_proto));
+  ASSERT_TRUE(_query.ConstructFromProto(_proto));
+  ASSERT_TRUE(_m.build_from_smiles("[NH4+].N"));
+  ASSERT_EQ(_query.substructure_search(_m, _sresults), 1);
+  ASSERT_EQ(_sresults.embeddings().size(), 1);
+  EXPECT_EQ(_m.formal_charge(_sresults.embeddings()[0]->front()), 0);
+}
+
+TEST_F(TestSubstructure, NeutralMatchedAtomsDoesNotConstrainEnvironment) {
+  _string_proto = R"(query {
+    smarts: "C"
+    require_neutral_matched_atoms: true
+    environment {
+      smarts: "[N+]"
+      attachment { attachment_point: 0 btype: SS_SINGLE_BOND }
+    }
+  })";
+  ASSERT_TRUE(google::protobuf::TextFormat::ParseFromString(_string_proto, &_proto));
+  ASSERT_TRUE(_query.ConstructFromProto(_proto));
+  ASSERT_TRUE(_m.build_from_smiles("C[NH3+]"));
+  EXPECT_EQ(_query.substructure_search(_m, _sresults), 1);
+  EXPECT_TRUE(_DoPerumationsTests(1));
+}
+
+TEST_F(TestSubstructure, NeutralMatchedAtomsIgnoresExcludedQueryAtoms) {
+  _string_proto = R"(query {
+    require_neutral_matched_atoms: true
+    query_atom { id: 0 atom_smarts: "[C]" }
+    query_atom {
+      id: 1 atom_smarts: "[N+]" single_bond: 0 include_in_embedding: false
+    }
+  })";
+  ASSERT_TRUE(google::protobuf::TextFormat::ParseFromString(_string_proto, &_proto));
+  ASSERT_TRUE(_query.ConstructFromProto(_proto));
+  ASSERT_TRUE(_m.build_from_smiles("C[NH3+]"));
+  EXPECT_EQ(_query.substructure_search(_m, _sresults), 1);
+  EXPECT_TRUE(_DoPerumationsTests(1));
+}
+
+TEST_F(TestSubstructure, NeutralMatchedAtomsProtoRoundTripAndComponents) {
+  _string_proto = R"(
+    query { smarts: "[#7]" require_neutral_matched_atoms: true }
+    query { smarts: "[#8]" require_neutral_matched_atoms: false }
+  )";
+  ASSERT_TRUE(google::protobuf::TextFormat::ParseFromString(_string_proto, &_proto));
+  ASSERT_TRUE(_query.ConstructFromProto(_proto));
+  auto written = _query.BuildProto();
+  ASSERT_EQ(written.query_size(), 2);
+  EXPECT_TRUE(written.query(0).require_neutral_matched_atoms());
+  EXPECT_FALSE(written.query(1).require_neutral_matched_atoms());
+  Substructure_Query restored;
+  ASSERT_TRUE(restored.ConstructFromProto(written));
+  ASSERT_TRUE(_m.build_from_smiles("[NH4+]"));
+  EXPECT_EQ(restored.substructure_search(_m, _sresults), 0);
+  ASSERT_TRUE(_m.build_from_smiles("[OH-]"));
+  EXPECT_EQ(restored.substructure_search(_m, _sresults), 1);
+}
+
+TEST_F(TestSubstructure, ProtoRoundTripPreservesSignedGlobalIdMatch) {
+  auto* atom = _proto.add_query()->add_query_atom();
+  atom->set_id(0);
+  atom->set_atom_smarts("[C]");
+  atom->set_global_id_match(7);
+  ASSERT_TRUE(_query.ConstructFromProto(_proto));
+  const auto written = _query.BuildProto();
+  ASSERT_EQ(written.query_size(), 1);
+  ASSERT_EQ(written.query(0).query_atom_size(), 1);
+  EXPECT_EQ(written.query(0).query_atom(0).global_id_match(), 7);
+}
+
 }  // namespace

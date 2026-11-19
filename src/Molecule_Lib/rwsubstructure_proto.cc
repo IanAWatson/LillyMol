@@ -1356,6 +1356,9 @@ Single_Substructure_Query::BuildProto(SubstructureSearch::SingleSubstructureQuer
   if (_compress_embeddings) {
     proto.set_compress_embeddings(_compress_embeddings);
   }
+  if (_require_neutral_matched_atoms) {
+    proto.set_require_neutral_matched_atoms(true);
+  }
 
 
   for (const auto * lnk : _link_atom) {
@@ -1518,7 +1521,6 @@ Substructure_Atom::BuildProto(SubstructureSearch::SubstructureAtom& proto) const
   SET_PROTO_IF_SET(proto, ring_id, 0);  // 9
   SET_PROTO_IF_SET(proto, fused_system_id, 0);  // 10
   SET_PROTO_IF_SET(proto, fragment_id, 0);  // 11
-  SetProtoIfSet(_global_id_match, 0, "global_id_match", proto);  // 34
 
   double nv;
   if (_numeric_value.value(nv)) {  // 12
@@ -2644,6 +2646,8 @@ Single_Substructure_Query::_construct_from_proto(
 
   if (proto.has_compress_embeddings())
     _compress_embeddings = proto.compress_embeddings();
+
+  _require_neutral_matched_atoms = proto.require_neutral_matched_atoms();
 
   extending_resizable_array<Substructure_Atom *> completed;
 

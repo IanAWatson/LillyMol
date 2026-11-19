@@ -1440,7 +1440,13 @@ message SingleSubstructureQuery {
   // two makes sense.
   repeated SetOfMatchedAtoms different_atomic_number = 85;
 
-  // Next to assign 86
+  // Require formal charge zero on each atom included in the embedding.
+  // This is not a net-charge constraint: a matched zwitterion is rejected.
+  // Environment/recursive-context atoms and atoms excluded from the embedding
+  // are not checked. Absent or false preserves existing behaviour.
+  optional bool require_neutral_matched_atoms = 86;
+
+  // Next to assign 87
 }
 
 // A SubstructureQuery is merely a collection of individual

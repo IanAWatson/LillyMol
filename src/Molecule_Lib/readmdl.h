@@ -792,9 +792,6 @@ Molecule::write_molecule_mdl(T& os, const IWString& comments) {
 
   int rc = write_connection_table_mdl(os);
 
-  // if(isis_standard_records)
-  //   os << "M  END\n";
-
   if (moleculeio::write_extra_text_info()) {
     write_extra_text_info(os);
   }
@@ -845,46 +842,51 @@ Molecule::_mdl_write_atoms_and_bonds_record(T& os, int nfc, int iat,
 
   mdlfos.write_atoms_and_bonds(_number_elements, nb, os);
 
-  if (mdlfos.isis_standard_records()) {
-    os << "  0";  // number of atoms lists
-    os << "   ";  // obsolete
-    if (write_stereo_info && _chiral_centres.number_elements()) {
-      os << "  1";
-    } else {
-      os << "  0";
-    }
-    os << "  0";  // number of stext entries
-    os << "   ";  // reaction components + 1
-    os << "   ";  // number of reactants
-    os << "   ";  // number of products
-    os << "   ";  // number of intermediates
-
-    //  Work out the number of M lines
-
-    int mmm = 0;
-
-    if (nfc) {
-      if (0 == nfc % 8) {
-        mmm = nfc / 8;
-      } else {
-        mmm = nfc / 8 + 1;
-      }
-    }
-
-    if (iat) {
-      if (0 == iat % 8) {
-        mmm += iat / 8;
-      } else {
-        mmm += iat / 8 + 1;
-      }
-    }
-
-    mmm++;  // don't forget the 'M  END' line
-
-    os << mdlfos.digits3(mmm);
-
-    os << " V2000";  // Ctab version
+  // The remaining counts-line fields (atom-list count, chiral flag, stext
+  // count, reaction/obsolete fields, M-line count, "V2000" tag) are part of
+  // every standard V2000 molfile, not just ISIS-flavoured output. Previously
+  // these were only written when isis_standard_records() was set, so
+  // default fileconv SDF output was missing the ctab version tag and had a
+  // truncated counts line - non-compliant with the MDL spec, and rejected
+  // by stricter readers such as the standalone inchi-1 executable.
+  os << "  0";  // number of atoms lists
+  os << "   ";  // obsolete
+  if (write_stereo_info && _chiral_centres.number_elements()) {
+    os << "  1";
+  } else {
+    os << "  0";
   }
+  os << "  0";  // number of stext entries
+  os << "   ";  // reaction components + 1
+  os << "   ";  // number of reactants
+  os << "   ";  // number of products
+  os << "   ";  // number of intermediates
+
+  //  Work out the number of M lines
+
+  int mmm = 0;
+
+  if (nfc) {
+    if (0 == nfc % 8) {
+      mmm = nfc / 8;
+    } else {
+      mmm = nfc / 8 + 1;
+    }
+  }
+
+  if (iat) {
+    if (0 == iat % 8) {
+      mmm += iat / 8;
+    } else {
+      mmm += iat / 8 + 1;
+    }
+  }
+
+  mmm++;  // don't forget the 'M  END' line
+
+  os << mdlfos.digits3(mmm);
+
+  os << " V2000";  // Ctab version
 
   os << moleculeio::newline_string();
 
@@ -997,27 +999,24 @@ Molecule::write_connection_table_mdl(T& os) {
 
   os.width(width);
 
-  int need_m_end = 0;
-
   if (nfc && mdlfos->write_mdl_charges_as_m_chg()) {
     _write_m_chg_records(os, nfc);
-    need_m_end = 1;
   }
 
   if (iat) {
     _write_m_iso_records(os, iat);
-    need_m_end = 1;
   }
 
   if (number_r_groups_present) {
     _write_M_RGP_records(*mdlfos, os);
   }
 
-  if (mdlfos->isis_standard_records() ||
-      (need_m_end && mdlfos->write_mdl_m_end_record()) ||
-      mdlfos->write_mdl_m_end_record() > 1) {
-    os << "M  END" << moleculeio::newline_string();
-  }
+  // 'M  END' terminates the ctab in every standard V2000 molfile, not only
+  // when M-records are present or -o mdlMEND was requested. Previously this
+  // was gated behind write_mdl_m_end_record(), so default fileconv SDF
+  // output was missing a mandatory record and stricter readers (e.g. the
+  // standalone inchi-1 executable) could not parse it.
+  os << "M  END" << moleculeio::newline_string();
 
   if (!os.good()) {
     std::cerr << "Molecule::write_connection_table_mdl: cannot write\n";

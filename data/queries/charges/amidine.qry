@@ -22,7 +22,7 @@
 
 # Don't match guanidines
 
-  (6 Environment_No_Match
+  (7 Environment_No_Match
     (A I single_bond 1)
     (A C smarts "N")
     (A C smarts "C=O")
@@ -44,13 +44,16 @@
     (A C smarts "*-S~O")
     
   )
+# Exclude an aryl substituent on the central carbon together with an aryl
+# substituent on either nitrogen. Checking both N atoms makes this invariant
+# to which nitrogen carries the double bond in the input tautomer.
   (5 Environment_No_Match
     (A I single_bond 1)
     (A C smarts "a")
     (A I and 1)
   )
   (6 Environment_No_Match
-    (A I single_bond 2)
+    (A I single_bond (0 2))
     (A C smarts "a")
     (A I and 1)
   )

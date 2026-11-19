@@ -454,11 +454,44 @@ Substructure_Ring_Specification::matches(Molecule_to_Match & target,
         std::fill_n(used_sidechain, matoms, 0);
       }
       r->set_vector(ring_flag.get(), 1);
-      for (Substituent* s : _substituent) {
-        if (! s->Matches(target, ring_flag.get(), ring_flag.get() + matoms,
-                         matched_by_global_specs, used_sidechain)) {
-          return 0;
+      // A failed substituent rejects this ring, not all the other rings.
+      // If a preceding spec labelled a sidechain, roll those labels back
+      // when a later spec fails. Ordinary unlabelled specs need no snapshot.
+      bool labels_substituents = false;
+      for (const Substituent* s : _substituent) {
+        labels_substituents |= s->set_global_id() >= 0;
+      }
+      std::unique_ptr<int[]> saved_ids;
+      const bool had_matched_ids = matched_by_global_specs != nullptr;
+      if (labels_substituents) {
+        saved_ids = std::make_unique<int[]>(2 * matoms);
+        for (int a = 0; a < matoms; ++a) {
+          saved_ids[a] = target[a].global_id();
         }
+        if (had_matched_ids) {
+          std::copy_n(matched_by_global_specs.get(), matoms, saved_ids.get() + matoms);
+        }
+      }
+      bool substituents_match = true;
+      for (Substituent* s : _substituent) {
+        if (!s->Matches(target, ring_flag.get(), ring_flag.get() + matoms,
+                        matched_by_global_specs, used_sidechain)) {
+          substituents_match = false;
+          break;
+        }
+      }
+      if (!substituents_match) {
+        if (saved_ids) {
+          for (int a = 0; a < matoms; ++a) {
+            target[a].set_global_id(saved_ids[a]);
+          }
+          if (had_matched_ids) {
+            std::copy_n(saved_ids.get() + matoms, matoms, matched_by_global_specs.get());
+          } else {
+            matched_by_global_specs.reset();
+          }
+        }
+        continue;
       }
     }
 

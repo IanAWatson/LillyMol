@@ -1,15 +1,13 @@
 query {
-  # activated_sulfonamide: aryl sulfonamide N-H where the ring bears a
-  # halogen or methoxy substituent, consistent with the N-H being acidic
-  # enough to be ionised at pH 7 (unactivated aryl sulfonamides are not -
-  # verified against ChemAxon pKa predictions).
-  comment: "activated_sulfonamide"
+  # Direct halogens are separate from the methoxy query.
+  # A length-two group merely containing F could otherwise admit fluoromethyl/CF3.
+  comment: "activated_sulfonamide_halogen"
   ring_specifier {
     base {
       set_global_id: 1
       substituent {
         length: 1
-        required_smarts: "[F,Cl,Br,I,OD2-0;!$(O-S)]"
+        required_smarts: "[F,Cl,Br,I]"
       }
     }
     aromatic: 1

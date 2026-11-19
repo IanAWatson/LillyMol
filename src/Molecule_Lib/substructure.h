@@ -1836,6 +1836,8 @@ class Substituent {
 
     int BuildProto(SubstructureSearch::Substituent& proto) const;
 
+    int set_global_id() const { return _set_global_id; }
+
     // Given a set of matched atoms (which may, or may not) describe
     // a ring, or ring system, does this specification match?
     // `storage` is an array of m.natoms() that each Substituent uses to

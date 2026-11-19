@@ -1,0 +1,188 @@
+[
+  {
+    "name": "unactivated",
+    "source": "CS(=O)(=O)Nc1ccccc1",
+    "target": "CS(=O)(=O)Nc1ccccc1"
+  },
+  {
+    "name": "fluoro",
+    "source": "CS(=O)(=O)Nc1ccc(F)cc1",
+    "target": "CS(=O)(=O)[N-]c1ccc(F)cc1"
+  },
+  {
+    "name": "chloro",
+    "source": "CS(=O)(=O)Nc1cc(Cl)ccc1",
+    "target": "CS(=O)(=O)[N-]c1cc(Cl)ccc1"
+  },
+  {
+    "name": "bromo",
+    "source": "CS(=O)(=O)Nc1ccccc1Br",
+    "target": "CS(=O)(=O)[N-]c1ccccc1Br"
+  },
+  {
+    "name": "iodo",
+    "source": "CS(=O)(=O)Nc1ccc(I)cc1",
+    "target": "CS(=O)(=O)[N-]c1ccc(I)cc1"
+  },
+  {
+    "name": "methoxy_para",
+    "source": "CS(=O)(=O)Nc1ccc(OC)cc1",
+    "target": "CS(=O)(=O)[N-]c1ccc(OC)cc1"
+  },
+  {
+    "name": "methoxy_meta",
+    "source": "CS(=O)(=O)Nc1cc(OC)ccc1",
+    "target": "CS(=O)(=O)[N-]c1cc(OC)ccc1"
+  },
+  {
+    "name": "methoxy_ortho",
+    "source": "CS(=O)(=O)Nc1ccccc1OC",
+    "target": "CS(=O)(=O)[N-]c1ccccc1OC"
+  },
+  {
+    "name": "methoxy_and_halogen",
+    "source": "CS(=O)(=O)Nc1cc(F)ccc1OC",
+    "target": "CS(=O)(=O)[N-]c1cc(F)ccc1OC"
+  },
+  {
+    "name": "ethoxy",
+    "source": "CS(=O)(=O)Nc1ccc(OCC)cc1",
+    "target": "CS(=O)(=O)Nc1ccc(OCC)cc1"
+  },
+  {
+    "name": "trifluoromethyl",
+    "source": "CS(=O)(=O)Nc1ccc(C(F)(F)F)cc1",
+    "target": "CS(=O)(=O)Nc1ccc(C(F)(F)F)cc1"
+  },
+  {
+    "name": "fluoromethyl",
+    "source": "CS(=O)(=O)Nc1ccc(CF)cc1",
+    "target": "CS(=O)(=O)Nc1ccc(CF)cc1"
+  },
+  {
+    "name": "acetoxy",
+    "source": "CS(=O)(=O)Nc1ccc(OC(=O)C)cc1",
+    "target": "CS(=O)(=O)Nc1ccc(OC(=O)C)cc1"
+  },
+  {
+    "name": "sulfonyloxy",
+    "source": "CS(=O)(=O)Nc1ccc(OS(=O)(=O)C)cc1",
+    "target": "CS(=O)(=O)Nc1ccc(OS(=O)(=O)C)cc1"
+  },
+  {
+    "name": "phenoxy",
+    "source": "CS(=O)(=O)Nc1ccc(Oc2ccccc2)cc1",
+    "target": "CS(=O)(=O)Nc1ccc(Oc2ccccc2)cc1"
+  },
+  {
+    "name": "alpha_pyridine",
+    "source": "CS(=O)(=O)Nc1ncccc1",
+    "target": "CS(=O)(=O)[N-]c1ncccc1"
+  },
+  {
+    "name": "alpha_thiophene",
+    "source": "CS(=O)(=O)Nc1cccs1",
+    "target": "CS(=O)(=O)[N-]c1cccs1"
+  },
+  {
+    "name": "alpha_furan",
+    "source": "CS(=O)(=O)Nc1ccco1",
+    "target": "CS(=O)(=O)[N-]c1ccco1"
+  },
+  {
+    "name": "nonalpha_pyridine",
+    "source": "CS(=O)(=O)Nc1ccncc1",
+    "target": "CS(=O)(=O)Nc1ccncc1"
+  },
+  {
+    "name": "alpha_pyrrole",
+    "source": "CS(=O)(=O)Nc1ccc[nH]1",
+    "target": "CS(=O)(=O)Nc1ccc[nH]1"
+  },
+  {
+    "name": "alpha_N_methylpyrrole",
+    "source": "CS(=O)(=O)Nc1cccn1C",
+    "target": "CS(=O)(=O)Nc1cccn1C"
+  },
+  {
+    "name": "thiophenol",
+    "source": "Sc1ccccc1",
+    "target": "[S-]c1ccccc1"
+  },
+  {
+    "name": "methanethiol",
+    "source": "CS",
+    "target": "CS"
+  },
+  {
+    "name": "thioacetic_acid",
+    "source": "CC(=O)S",
+    "target": "CC(=O)[S-]"
+  },
+  {
+    "name": "thioester",
+    "source": "CC(=O)SC",
+    "target": "CC(=O)SC"
+  },
+  {
+    "name": "dithiocarbamic_acid",
+    "source": "NC(=S)S",
+    "target": "NC(=S)[S-]"
+  },
+  {
+    "name": "N_phenyl_acetamidine_amino",
+    "source": "CC(=N)Nc1ccccc1",
+    "target": "CC(=[NH2+])Nc1ccccc1"
+  },
+  {
+    "name": "N_phenyl_acetamidine_imino",
+    "source": "CC(N)=Nc1ccccc1",
+    "target": "CC(N)=[NH+]c1ccccc1"
+  },
+  {
+    "name": "phosphinic",
+    "source": "CP(=O)(O)C",
+    "target": "CP(=O)([O-])C"
+  },
+  {
+    "name": "phosphonic",
+    "source": "CP(=O)(O)O",
+    "target": "CP(=O)([O-])[O-]"
+  },
+  {
+    "name": "phosphate",
+    "source": "OP(=O)(O)O",
+    "target": "OP(=O)([O-])[O-]",
+    "check_repeat": false
+  },
+  {
+    "name": "partially_ionised",
+    "source": "CP(=O)([O-])O",
+    "target": "CP(=O)([O-])[O-]"
+  },
+  {
+    "name": "benzamidine",
+    "source": "NC(=N)c1ccccc1",
+    "target": "NC(=[NH2+])c1ccccc1"
+  },
+  {
+    "name": "N_phenyl_benzamidine_amino",
+    "source": "c1ccccc1C(=N)Nc1ccccc1",
+    "target": "c1ccccc1C(=N)Nc1ccccc1"
+  },
+  {
+    "name": "N_phenyl_benzamidine_imino",
+    "source": "c1ccccc1C(N)=Nc1ccccc1",
+    "target": "c1ccccc1C(N)=Nc1ccccc1"
+  },
+  {
+    "name": "two_activated_regions",
+    "source": "CS(=O)(=O)Nc1cc(F)ccc1CCc1ccc(OC)cc1NS(=O)(=O)C",
+    "target": "CS(=O)(=O)[N-]c1cc(F)ccc1CCc1ccc(OC)cc1[N-]S(=O)(=O)C"
+  },
+  {
+    "name": "two_fragments",
+    "source": "CS(=O)(=O)Nc1ccc(F)cc1.CS(=O)(=O)Nc1ccc(OC)cc1",
+    "target": "CS(=O)(=O)[N-]c1ccc(F)cc1.CS(=O)(=O)[N-]c1ccc(OC)cc1"
+  }
+]

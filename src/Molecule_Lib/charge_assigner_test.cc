@@ -85,7 +85,7 @@ INSTANTIATE_TEST_SUITE_P(TestChargeAssigner, TestChargeAssigner, testing::Values
   MoleculeResults {
     "NCCCC",
     {
-      ChargeAndQuery(0, 1, 12)
+      ChargeAndQuery(0, 1, 17)
     }
   },
   MoleculeResults {
@@ -103,14 +103,15 @@ INSTANTIATE_TEST_SUITE_P(TestChargeAssigner, TestChargeAssigner, testing::Values
   MoleculeResults {
     "NC(C)P(O)(O)=O CHEMBL296494 (1 matches to 'phosphonate')",
     {
-      // Kind of arbitrary as to whether atom 4 or atom 5 is hit.
+      // Both acidic oxygens are charged by the two-hit phosphorus rule.
+      ChargeAndQuery(4, -1, 2),
       ChargeAndQuery(5, -1, 2)
     }
   },
   MoleculeResults {
     "C1NCC1OC1=NN=NN1 CHEMBL1165160 (1 matches to 'tetrazole')",
     {
-      ChargeAndQuery(1, 1, 12),
+      ChargeAndQuery(1, 1, 17),
       ChargeAndQuery(9, -1, 3)
     }
   },
@@ -123,57 +124,57 @@ INSTANTIATE_TEST_SUITE_P(TestChargeAssigner, TestChargeAssigner, testing::Values
   MoleculeResults {
     "S1C(=CC2=CC=CO2)C(=O)NC1=S CHEMBL2007469 (1 matches to 'thiazolidinedione')",
     {
-      ChargeAndQuery(10, -1, 5),
+      ChargeAndQuery(10, -1, 8),
     }
   },
   MoleculeResults {
     "O=C1N(NC(=O)C1(CC)CC)C(=O)C1=CC=CC=C1 CHEMBL1966387 (1 matches to 'N_acylpyrazolidinone')",
     {
-      ChargeAndQuery(3, -1, 6),
+      ChargeAndQuery(3, -1, 9),
     }
   },
   MoleculeResults {
     "C1=C(Cl)C(=CC(=C1Cl)Cl)O CHEMBL109095 (1 matches to 'phenolate')",
     {
-      ChargeAndQuery(9, -1, 7),
+      ChargeAndQuery(9, -1, 10),
     }
   },
   MoleculeResults {
     "C(N)(=N)N1CCCCC1 CHEMBL103102 (1 matches to 'guanidine')",
     {
-      ChargeAndQuery(2, 1, 8),
+      ChargeAndQuery(2, 1, 13),
     }
   },
   MoleculeResults {
     "C1(=NCCC1C)N CHEMBL359703 (1 matches to 'amidine')",
     {
-      ChargeAndQuery(1, 1, 9),
+      ChargeAndQuery(1, 1, 14),
     }
   },
   MoleculeResults {
     "C1(=C(N)C=CN=C1)C1N(C)CCC1 CHEMBL193763 (1 matches to '4_amino_pyridine')",
     {
-      ChargeAndQuery(5, 1, 10),
-      ChargeAndQuery(8, 1, 12),
+      ChargeAndQuery(5, 1, 15),
+      ChargeAndQuery(8, 1, 17),
     }
   },
   MoleculeResults {
     "NCC(=O)N1CCCC1 CHEMBL97025 (1 matches to 'amino_terminal_restricted')",
     {
-      ChargeAndQuery(0, 1, 11),
+      ChargeAndQuery(0, 1, 16),
     }
   },
   MoleculeResults {
     "C(N)C(N)CS CHEMBL3247435 (2 matches to 'aliphatic_amine_restricted')",
     {
-      ChargeAndQuery(1, 1, 12),
+      ChargeAndQuery(1, 1, 17),
     }
   },
   MoleculeResults {
     "N1C(=CN=C1N)CCCC(N)C(O)=O CHEMBL1099170 (1 matches to 'imidazole_basic')",
     {
-      ChargeAndQuery(3, 1, 13),
-      ChargeAndQuery(10, 1, 12),
+      ChargeAndQuery(3, 1, 18),
+      ChargeAndQuery(10, 1, 17),
       ChargeAndQuery(12, -1, 0),
     }
   },
@@ -181,7 +182,7 @@ INSTANTIATE_TEST_SUITE_P(TestChargeAssigner, TestChargeAssigner, testing::Values
   MoleculeResults {
     "N1(CCN(CC1)CCOC(C1=CC=CC=C1)C1=CC=CC=C1)CC=CC1=CC=CC(=C1)O CHEMBL422499",
     {
-      ChargeAndQuery(0, 1, 12),
+      ChargeAndQuery(0, 1, 17),
     }
   }
 ));
@@ -268,7 +269,7 @@ INSTANTIATE_TEST_SUITE_P(TestChargeAssignerArray, TestChargeAssignerArray, testi
   MoleculeResults {
     "N1(CCN(CC1)CCOC(C1=CC=CC=C1)C1=CC=CC=C1)CC=CC1=CC=CC(=C1)O CHEMBL422499",
     {
-      ChargeAndQuery(0, 1, 12),
+      ChargeAndQuery(0, 1, 17),
     }
   }
 ));

@@ -1,0 +1,15 @@
+query {
+  # Require methoxy itself, rather than any two-atom oxygen-containing substituent.
+  comment: "activated_sulfonamide_methoxy"
+  ring_specifier {
+    base {
+      set_global_id: 1
+      substituent {
+        length: 2
+        required_smarts: "[OD2-0]-[CD1H3]"
+      }
+    }
+    aromatic: 1
+  }
+  smarts: "[/IWgid1a]-[/IWNv{-1}ND2H1]-S(=O)(=O)"
+}

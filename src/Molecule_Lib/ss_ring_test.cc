@@ -697,5 +697,61 @@ INSTANTIATE_TEST_SUITE_P(TestRingSysOkZero, TestRingSysOkZero, testing::Values(
   Data{"C12(CC1)CC2", ring_spiro_count0, 0}
 ));
 
+TEST(RingSubstituent, UnrelatedRingDoesNotRejectMatchingRing) {
+  const std::string text = R"pb(query {
+    smarts: "F-[/IWgid1c]"
+    ring_specifier {
+      aromatic: true
+      base {
+        set_global_id: 1
+        substituent { length: 1 required_smarts: "F" }
+      }
+    }
+  })pb";
+  SubstructureSearch::SubstructureQuery proto;
+  ASSERT_TRUE(google::protobuf::TextFormat::ParseFromString(text, &proto));
+  Substructure_Query query;
+  ASSERT_TRUE(query.ConstructFromProto(proto));
+  for (const char* smiles : {"Fc1ccccc1.c1ccccc1", "Fc1ccccc1CCc1ccccc1",
+                              "c1ccccc1.C1=CC=C(F)C=C1"}) {
+    SCOPED_TRACE(smiles);
+    Molecule original;
+    ASSERT_TRUE(original.build_from_smiles(smiles));
+    for (int i = 0; i < 30; ++i) {
+      Molecule molecule;
+      ASSERT_TRUE(molecule.build_from_smiles(original.random_smiles()));
+      Substructure_Results results;
+      EXPECT_EQ(query.substructure_search(molecule, results), 1);
+    }
+  }
+}
+
+TEST(RingSubstituent, FailedRingDoesNotLeakSidechainGlobalIds) {
+  const std::string text = R"pb(query {
+    smarts: "[/IWgid2O]"
+    ring_specifier {
+      aromatic: true
+      base {
+        substituent { length: 1 required_smarts: "[OD1]" set_global_id: 2 }
+        substituent { length: 1 required_smarts: "F" }
+      }
+    }
+  })pb";
+  SubstructureSearch::SubstructureQuery proto;
+  ASSERT_TRUE(google::protobuf::TextFormat::ParseFromString(text, &proto));
+  Substructure_Query query;
+  ASSERT_TRUE(query.ConstructFromProto(proto));
+  // Only the fluorophenol has both required substituents. Phenol alone
+  // can pass the first spec and assign an O label before failing the second.
+  Molecule original;
+  ASSERT_TRUE(original.build_from_smiles("Oc1ccccc1.Oc1ccc(F)cc1"));
+  for (int i = 0; i < 50; ++i) {
+    Molecule molecule;
+    ASSERT_TRUE(molecule.build_from_smiles(original.random_smiles()));
+    Substructure_Results results;
+    EXPECT_EQ(query.substructure_search(molecule, results), 1);
+  }
+}
+
 }  // namespace
 

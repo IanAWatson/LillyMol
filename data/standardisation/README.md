@@ -122,11 +122,11 @@ loaded together; their different C2 requirements keep their scopes separate.
 Neither specification is enabled by `-g all` alone.
 
 The executable regression is `src/test/fileconv/external_hypoxanthine`.
-Validation on the raw ChEMBL hypoxanthine-family candidates found one
-pre-existing repeat-processing failure with built-in `-g all`, CHEMBL83601.
-Its C8-amino group is outside these templates, so this specification does
-not resolve that failure. A matched query does not imply that every possible
-representation of the molecule is covered by the current scope.
+The former built-in repeat-processing failure for the C8-amino derivative
+CHEMBL83601 is resolved by completing fused-enol conversion after an `indoleh`
+change. That correction belongs to the built-in rules; C8-amino groups remain
+outside these external templates. A matched query does not imply that every
+possible representation of the molecule is covered by the current scope.
 
 ## Allopurinol and oxypurinol
 

@@ -4764,8 +4764,10 @@ Chemical_Standardisation::_process(Molecule& m,
     rc += _do_transform_oxo_pyrimidine(m, current_molecule_data);
   }
 
+  int indole_hydrogen_changes = 0;
   if (_transform_indole_hydrogen.active()) {
-    rc += _do_transform_indole_hydrogen(m, current_molecule_data);
+    indole_hydrogen_changes = _do_transform_indole_hydrogen(m, current_molecule_data);
+    rc += indole_hydrogen_changes;
   }
 
   // Neutralisation runs first so eligible charged precursors do not require
@@ -4780,6 +4782,19 @@ Chemical_Standardisation::_process(Molecule& m,
   if (_transform_nitroso_to_oxime.active() && current_molecule_data.nitrogens() &&
       current_molecule_data.oxygens()) {
     rc += _do_nitroso_to_oxime(m, current_molecule_data);
+  }
+
+  // Moving N-H into a five-membered ring can enable the fused-enol rule
+  // that ran earlier (CHEMBL83601). Retry only after an actual indoleh
+  // change, once the other users of the initial snapshot have finished.
+  // Include these changes in the ring-lactim completion below.
+  if (indole_hydrogen_changes && _transform_enol_fused.active()) {
+    IWStandard_Current_Molecule refreshed;
+    if (refreshed.initialise(m)) {
+      const int changed = _do_transform_enol_fused(m, refreshed);
+      enol_fused_changes += changed;
+      rc += changed;
+    }
   }
 
   // Two OH/SH lactims sharing one N are excluded during initial perception.

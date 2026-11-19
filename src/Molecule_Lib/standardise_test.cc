@@ -2464,6 +2464,62 @@ TEST_F(TestStandardisation, FusedEnolAndLactimFinishInOnePass) {
   }
 }
 
+TEST_F(TestStandardisation, IndoleHydrogenTransferFinishesFusedEnolInOnePass) {
+  // CHEMBL83601: moving N-H into the five-membered ring enables the
+  // fused-enol conversion, which previously waited for the next pass.
+  const std::vector<std::pair<const char*, const char*>> cases = {
+      {"C12=NC(N)=NC1=C(O)N=CN2", "O=C1NC=NC2=C1NC(=N2)N"},
+      {"C12=NC(N)=NC1=C([18OH])N=CN2", "[18O]=C1NC=NC2=C1NC(=N2)N"},
+      {"C12=NC(N)=NC1=C(S)N=CN2", "S=C1NC=NC2=C1NC(=N2)N"},
+  };
+  for (bool all : {false, true}) {
+    for (const auto& [input, output] : cases) {
+      Molecule original;
+      ASSERT_TRUE(original.build_from_smiles(input));
+      Molecule expected;
+      ASSERT_TRUE(expected.build_from_smiles(output));
+      const IWString key = expected.unique_smiles();
+      for (int i = 0; i < 100; ++i) {
+        Chemical_Standardisation standardisation;
+        if (all) {
+          standardisation.activate_all();
+        } else {
+          ASSERT_TRUE(standardisation.Activate(CS_INDOLEH, 0));
+          ASSERT_TRUE(standardisation.Activate(CS_ENOL_FUSED, 0));
+        }
+        Molecule molecule;
+        ASSERT_TRUE(molecule.build_from_smiles(original.random_smiles()));
+        const IWString formula = molecule.molecular_formula();
+        EXPECT_EQ(standardisation.process(molecule), 2) << input;
+        EXPECT_EQ(molecule.unique_smiles(), key) << input;
+        EXPECT_EQ(molecule.molecular_formula(), formula) << input;
+        EXPECT_EQ(molecule.number_formally_charged_atoms(), 0);
+        EXPECT_TRUE(molecule.valence_ok()) << molecule.smiles();
+        EXPECT_EQ(standardisation.process(molecule), 0) << input;
+        EXPECT_EQ(molecule.unique_smiles(), key);
+        Molecule reparsed;
+        ASSERT_TRUE(reparsed.build_from_smiles(molecule.smiles()));
+        EXPECT_EQ(standardisation.process(reparsed), 0) << input;
+        EXPECT_EQ(reparsed.unique_smiles(), key);
+      }
+    }
+  }
+}
+
+TEST_F(TestStandardisation, IndoleFusedEnolCompletionRespectsDisabledRules) {
+  ASSERT_TRUE(_m1.build_from_smiles("C12=NC(N)=NC1=C(O)N=CN2"));
+  const IWString original = _m1.unique_smiles();
+  ASSERT_TRUE(_chemical_standardisation.Activate(CS_ENOL_FUSED, 0));
+  EXPECT_EQ(_chemical_standardisation.process(_m1), 0);
+  EXPECT_EQ(_m1.unique_smiles(), original);
+  ASSERT_TRUE(_chemical_standardisation.Activate(CS_INDOLEH, 0));
+  ASSERT_TRUE(_chemical_standardisation.Activate("-enol-fused", 0));
+  EXPECT_EQ(_chemical_standardisation.process(_m1), 1);
+  ASSERT_TRUE(_m2.build_from_smiles("C12=C(NC(=N1)N)C(O)=NC=N2"));
+  EXPECT_EQ(_m1.unique_smiles(), _m2.unique_smiles());
+  EXPECT_EQ(_chemical_standardisation.process(_m1), 0);
+}
+
 TEST_F(TestStandardisation, FusedLactimCompletionRespectsDisabledRules) {
   ASSERT_TRUE(_m1.build_from_smiles("OC1=NC(O)=CC2=NN(C(N)=C12)c1ccccc1"));
   const IWString original = _m1.unique_smiles();

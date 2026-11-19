@@ -304,6 +304,28 @@ The fused-ring enol conversion also clears bracket-specified hydrogen counts
 on atoms whose bonds change. This prevents a labelled `[18OH]` becoming an
 invalid `[18OH]=C` instead of `[18O]=C`. Heavy-atom isotope labels are retained.
 
+### Completing fused-enol conversion after an N-H move
+
+The `indoleh` rule can move N-H from a six-membered ring into a fused
+five-membered ring. This can enable `enol-fused`, which runs earlier in the
+normal sequence. CHEMBL83601, a C8-amino hypoxanthine, previously needed a
+second pass to finish this conversion:
+
+```text
+C12=NC(N)=NC1=C(O)N=CN2
+  -> C12=C(NC(=N1)N)C(O)=NC=N2
+  -> O=C1NC=NC2=C1NC(=N2)N
+```
+
+When both rules are enabled, an actual `indoleh` change triggers one final
+`enol-fused` attempt using refreshed molecular properties. Any resulting change
+also enables the ring-lactim completion described above. The ordinary rule
+ordering is retained, and the whole pipeline is not repeated. This applies to
+the existing oxygen/sulfur fused-enol rule, preserves isotope labels, and
+respects explicit disabling of either rule. No external template is required
+for this correction; the hypoxanthine EXT templates still exclude C8-amino
+substitution.
+
 ### Guanidine charge and valence handling
 
 `-g guan`, included in `-g all`, relocates eligible guanidine C=N bonds.

@@ -1078,3 +1078,20 @@ mappings are diagnosed and skipped before any part of that embedding is changed.
 The query must constrain the target sufficiently for the imposed bonds and
 charges to give chemically valid products. Test external rules with
 `tstandardise` before applying them to a large collection.
+
+#### Distributed optional rules
+
+The [external-standardisation directory](../../data/standardisation/README.md)
+contains opt-in guanine templates. For example:
+
+```shell
+fileconv -g all -g EXT:${LILLYMOL_HOME}/data/standardisation/guanine.textproto \
+  -o smi -S standardised input.smi
+```
+
+These whole-core templates select an amino/keto guanine form and consistent
+7H/9H placement for a restricted set of neutral, aromatic, two-ring purine
+systems. They are not included by `-g all`. The linked README describes the
+substitution restrictions, target selection and interaction with built-in
+imidazole processing. Loading them explicitly requests the keto target,
+regardless of the built-in `ENOL` preference.

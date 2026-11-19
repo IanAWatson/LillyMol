@@ -1,0 +1,10 @@
+# Unsubstituted or N9-substituted guanine: choose the 9H amino/keto core.
+# Atom order: amino N, C2, N3, C4, C5, N7, C8, N9, C6, O6, N1.
+# Match only neutral aromatic cores in a fused system of exactly two rings.
+# C8 must have two connections; substituted C8 and larger fused systems are excluded.
+# The exocyclic N must be terminal; N2-substituted amino groups are excluded.
+query {
+  require_neutral_matched_atoms: true
+  name: "guanine_9h"
+  smarts: "[#7D1]~[/IWfss2&cD3]1~[nD2]~[cD3]2~[cD3](~[nD2]~[cD2]~[nD>1D<4]2)~[cD3](~[#8D1])~[nD>1D<4]1"
+}

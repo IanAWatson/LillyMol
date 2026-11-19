@@ -1,0 +1,2 @@
+query_file: "guanine_9h.query.textproto" smiles: "NC1=NC2=C(N=CN2)C(=O)N1" name: "guanine-9H" comment: "Optional neutral guanine amino/keto canonicalisation; whole fused core specified."
+query_file: "guanine_7_substituted.query.textproto" smiles: "NC1=NC2=C(NC=N2)C(=O)N1" name: "guanine-7-substituted" comment: "Preserve N7 substitution; do not force an incompatible N9-H bonding pattern."

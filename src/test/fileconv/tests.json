@@ -89,6 +89,17 @@
       "shell_script": {
         "script_name": "run_test.sh"
       }
+    },
+    {
+      "name": "external_guanine",
+      "comment": [
+        "Distributed guanine templates: convergence, exclusions, relative query paths,",
+        "isotope/stereo preservation, random atom order and repeated processing."
+      ],
+      "difftool": "diff",
+      "shell_script": {
+        "script_name": "run_test.py"
+      }
     }
   ]
 }

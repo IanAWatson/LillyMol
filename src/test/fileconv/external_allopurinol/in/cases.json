@@ -1,0 +1,164 @@
+[
+  {
+    "name": "allopurinol_1H",
+    "source": "O=C1NC=NC2NN=CC1=2",
+    "target": "O=C1NC=NC2NN=CC1=2",
+    "supported": true
+  },
+  {
+    "name": "allopurinol_2H",
+    "source": "O=C1NC=NC2=NNC=C12",
+    "target": "O=C1NC=NC2NN=CC1=2",
+    "supported": true
+  },
+  {
+    "name": "allopurinol_OH",
+    "source": "OC1=NC=NC2NN=CC1=2",
+    "target": "O=C1NC=NC2NN=CC1=2",
+    "supported": true
+  },
+  {
+    "name": "allopurinol_N7H",
+    "source": "O=C1N=CNC2NN=CC1=2",
+    "target": "O=C1NC=NC2NN=CC1=2",
+    "supported": true
+  },
+  {
+    "name": "N1_substituted",
+    "source": "O=C1NC=NC2N(C)N=CC1=2",
+    "target": "O=C1NC=NC2N(C)N=CC1=2",
+    "supported": true
+  },
+  {
+    "name": "N2_substituted",
+    "source": "OC1=NC=NC2=NN(C)C=C12",
+    "target": "O=C1NC=NC2=NN(C)C=C12",
+    "supported": true
+  },
+  {
+    "name": "N5_substituted",
+    "source": "O=C1N(C)C=NC2=NNC=C12",
+    "target": "O=C1N(C)C=NC2NN=CC1=2",
+    "supported": true
+  },
+  {
+    "name": "C6_alkyl",
+    "source": "O=C1NC(C)=NC2=NNC=C12",
+    "target": "O=C1NC(C)=NC2NN=CC1=2",
+    "supported": true
+  },
+  {
+    "name": "C3_aryl",
+    "source": "O=C1NC=NC2=NNC(c3ccccc3)=C12",
+    "target": "O=C1NC=NC2NN=C(c3ccccc3)C1=2",
+    "supported": true
+  },
+  {
+    "name": "C6_amino",
+    "source": "O=C1NC(N)=NC2=NNC=C12",
+    "target": "O=C1NC(N)=NC2NN=CC1=2",
+    "supported": true
+  },
+  {
+    "name": "C6_thioether",
+    "source": "O=C1NC(SC)=NC2=NNC=C12",
+    "target": "O=C1NC(SC)=NC2NN=CC1=2",
+    "supported": true
+  },
+  {
+    "name": "oxypurinol_1H",
+    "source": "O=C1NC(=O)NC2NN=CC1=2",
+    "target": "O=C1NC(=O)NC2NN=CC1=2",
+    "supported": true
+  },
+  {
+    "name": "oxypurinol_2H",
+    "source": "O=C1NC(=O)NC2=NNC=C12",
+    "target": "O=C1NC(=O)NC2NN=CC1=2",
+    "supported": true
+  },
+  {
+    "name": "oxypurinol_diOH",
+    "source": "OC1=NC(O)=NC2NN=CC1=2",
+    "target": "O=C1NC(=O)NC2NN=CC1=2",
+    "supported": true
+  },
+  {
+    "name": "oxypurinol_N2_substituted",
+    "source": "OC1=NC(O)=NC2=NN(C)C=C12",
+    "target": "O=C1NC(=O)NC2=NN(C)C=C12",
+    "supported": true
+  },
+  {
+    "name": "oxypurinol_N5_N7_substituted",
+    "source": "O=C1N(C)C(=O)N(C)C2=NNC=C12",
+    "target": "O=C1N(C)C(=O)N(C)C2NN=CC1=2",
+    "supported": true
+  },
+  {
+    "name": "isotopes",
+    "source": "[18OH]C1=N[13CH]=NC2[15NH]N=CC1=2",
+    "target": "[18O]=C1N[13CH]=NC2[15NH]N=CC1=2",
+    "supported": true
+  },
+  {
+    "name": "known_hydrogens",
+    "source": "OC1=[NH0]C=NC2NN=CC1=2",
+    "target": "O=C1NC=NC2NN=CC1=2",
+    "supported": true
+  },
+  {
+    "name": "remote_stereo",
+    "source": "OC1=NC=NC2N([C@H](F)C)N=CC1=2",
+    "target": "O=C1NC=NC2N([C@H](F)C)N=CC1=2",
+    "supported": true
+  },
+  {
+    "name": "multiple",
+    "source": "OC1=NC=NC2NN=CC1=2.O=C1NC(=O)NC2=NNC=C12",
+    "target": "O=C1NC=NC2NN=CC1=2.O=C1NC(=O)NC2NN=CC1=2",
+    "supported": true
+  },
+  {
+    "name": "hypoxanthine",
+    "source": "O=C1NC=NC2=C1N=CN2",
+    "target": "O=C1NC=NC2=C1N=CN2",
+    "supported": false
+  },
+  {
+    "name": "guanine",
+    "source": "NC1=NC2=C(N=CN2)C(=O)N1",
+    "target": "NC1=NC2=C(N=CN2)C(=O)N1",
+    "supported": false
+  },
+  {
+    "name": "N7_substituted",
+    "source": "O=C1N=CN(C)C2=NNC=C12",
+    "target": "O=C1N=CN(C)C2=NNC=C12",
+    "supported": false
+  },
+  {
+    "name": "thio",
+    "source": "S=C1NC=NC2NN=CC1=2",
+    "target": "S=C1NC=NC2NN=CC1=2",
+    "supported": false
+  },
+  {
+    "name": "ether",
+    "source": "COC1=NC=NC2NN=CC1=2",
+    "target": "COC1=NC=NC2NN=CC1=2",
+    "supported": false
+  },
+  {
+    "name": "reduced",
+    "source": "O=C1NCCNC2NN=CC1=2",
+    "target": "O=C1NCCNC2NN=CC1=2",
+    "supported": false
+  },
+  {
+    "name": "explicit_OH",
+    "source": "O([2H])C1=NC=NC2NN=CC1=2",
+    "target": "O([2H])C1=NC=NC2NN=CC1=2",
+    "supported": false
+  }
+]

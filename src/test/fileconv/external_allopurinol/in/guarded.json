@@ -1,0 +1,14 @@
+[
+  [
+    "C6_imino",
+    "O=C1NC(=N)NC2NN=CC1=2"
+  ],
+  [
+    "C3_carbonyl",
+    "O=C1NC=NC2NNC(=O)C1=2"
+  ],
+  [
+    "C3_hydroxyl",
+    "O=C1NC=NC2=NNC(O)=C12"
+  ]
+]

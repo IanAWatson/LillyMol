@@ -9,8 +9,8 @@ standardise_all.sh -o smi -S standardised input.smi
 standardise_all.sh -o usmi -S - input.smi > standardised.smi
 ```
 
-The wrapper runs `fileconv -g all`, followed by the guanine and hypoxanthine
-`EXT:` specifications. Built-in rules run first; external targets determine
+The wrapper runs `fileconv -g all`, followed by the guanine, hypoxanthine and
+allopurinol/oxypurinol `EXT:` specifications. Built-in rules run first; external targets determine
 the final representation wherever their queries match. Their documented
 substitution restrictions still apply. All additional arguments are passed to
 `fileconv`, so options such as `-l` can be added as needed. It uses
@@ -1130,3 +1130,17 @@ with unsubstituted C2 and C8. See the
 for scope, atom correspondence, and the existing out-of-scope CHEMBL83601
 repeat-processing failure. External targets apply after built-in processing,
 including when the built-in `ENOL` preference is requested.
+
+The optional allopurinol/oxypurinol specification is also included in
+`standardise_all.sh`, or can be selected directly:
+
+```shell
+fileconv -g all -g EXT:${LILLYMOL_HOME}/data/standardisation/allopurinol.textproto \
+  -o smi -S standardised input.smi
+```
+
+It coordinates oxygen bonding and pyrazole N-H placement across the complete
+neutral aromatic two-ring core. Separate templates retain N1 or N2 substitution;
+mono-oxo and 4,6-dioxo cores have separate target patterns. External-bond guards
+protect C3/C6 from incompatible multiple bonds. See the
+[scope and ChEMBL validation results](../../data/standardisation/README.md#allopurinol-and-oxypurinol).

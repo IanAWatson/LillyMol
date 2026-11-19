@@ -1,0 +1,4 @@
+query_file: "oxypurinol_n2_substituted.query.textproto" smiles: "O=C1NC(=O)NC2=NNC=C12" name: "oxypurinol_n2_substituted" comment: "Optional full-core keto/N-H canonicalisation after built-in standardisation."
+query_file: "oxypurinol_1h.query.textproto" smiles: "O=C1NC(=O)NC2NN=CC1=2" name: "oxypurinol_1h" comment: "Optional full-core keto/N-H canonicalisation after built-in standardisation."
+query_file: "allopurinol_1h.query.textproto" smiles: "O=C1NC=NC2NN=CC1=2" name: "allopurinol_1h" comment: "Optional full-core keto/N-H canonicalisation after built-in standardisation."
+query_file: "allopurinol_n2_substituted.query.textproto" smiles: "O=C1NC=NC2=NNC=C12" name: "allopurinol_n2_substituted" comment: "Optional full-core keto/N-H canonicalisation after built-in standardisation."

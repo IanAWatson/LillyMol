@@ -9,7 +9,8 @@ standardise_all.sh -o smi -S standardised input.smi
 ```
 
 [`standardise_all.sh`](../../contrib/bin/standardise_all.sh) runs `fileconv`
-with `-g all`, then the guanine and hypoxanthine `EXT:` specifications, and
+with `-g all`, then the guanine, hypoxanthine and allopurinol/oxypurinol
+`EXT:` specifications, and
 passes through all user arguments. For example, add `-l` for largest-fragment
 processing or use `-o usmi -S -` to write unique SMILES to stdout. Its external
 targets apply after built-in processing; the scope restrictions below remain.
@@ -126,3 +127,66 @@ pre-existing repeat-processing failure with built-in `-g all`, CHEMBL83601.
 Its C8-amino group is outside these templates, so this specification does
 not resolve that failure. A matched query does not imply that every possible
 representation of the molecule is covered by the current scope.
+
+## Allopurinol and oxypurinol
+
+`allopurinol.textproto` contains four whole-core templates: two for the
+mono-oxo allopurinol family and two for the 4,6-dioxo oxypurinol family.
+It is included by `standardise_all.sh`, or can be loaded explicitly:
+
+```shell
+fileconv -g all -g EXT:${LILLYMOL_HOME}/data/standardisation/allopurinol.textproto \
+  -o smi -S standardised input.smi
+```
+
+The targets have O4 as a carbonyl (and O6 as well for oxypurinol). The
+unsubstituted pyrazole target has its hydrogen on N1, the nitrogen adjacent
+to the fusion atom C7a. N1 substitution is retained. When N2 is substituted,
+a separate template imposes the compatible N2-pyrrole bonding pattern:
+
+```text
+O=C1NC=NC2=NNC=C12      -> O=C1NC=NC2NN=CC1=2
+OC1=NC=NC2NN=CC1=2     -> O=C1NC=NC2NN=CC1=2
+O=C1NC(=O)NC2=NNC=C12  -> O=C1NC(=O)NC2NN=CC1=2
+```
+
+These are canonicalisation choices, not predictions of the sole solution
+structure. They override earlier built-in keto/enol and N-H choices wherever
+the complete-core query matches, including with the built-in `ENOL`
+preference. Intermediate transformation counts may vary with atom order;
+the tests require convergence of the final structures instead.
+
+The core must be neutral and aromatic and belong to exactly two fused rings.
+Single-bonded substituents on C3 and C6 are retained. For mono-oxo compounds,
+N7 must be unsubstituted; N5 may retain a substituent. The oxypurinol templates
+allow substitution on either or both N5 and N7, since both have amide-type
+bonding in the dioxo target. Both families exclude simultaneous N1/N2
+substitution. Sulfur in place of O4/O6, O-alkylation, reduced cores and larger
+fused systems are outside scope. Explicit hydrogen atoms are not moved.
+
+The query environments reject external double/triple bonds on C3 (and C6
+for the mono-oxo templates) that would conflict with the imposed ring bonds.
+Terminal OH at either C3 or C6 is excluded from the mono-oxo templates;
+4,6-dihydroxy/oxo cases are handled by the dedicated oxypurinol templates.
+Additional C3 carbonyl/hydroxyl patterns and C6 imino groups are not rewritten
+by these rules alone. Built-in rules may first make an input eligible.
+
+Atom maps are annotations, not atom correspondence. Maps 71 and 31 denote
+C7a and C3a; O4/O6 are 10/60. Embedding positions, including environment
+attachment points, follow the query atom order given in each file's comments.
+Keep the specification and its four query files together.
+
+On the surveyed raw ChEMBL collection, the broad family query found 2,935
+molecules, one valence-invalid. Of the 2,934 valid structures, 2,755 matched
+these guarded templates after current built-in processing. The specification
+made 147 additional canonical changes beyond `-g all`: 47 O4H-to-oxo changes
+and 100 other core tautomer changes. Of these, 146 were mono-oxo compounds
+and one was an oxypurinol derivative. The rules alone changed 415 raw forms.
+Formula, valence and chiral-centre-count checks passed for changed structures;
+100 randomized-order and repeat-processing checks passed across the valid
+candidate set. These counts describe this collection, not expected impact
+on every dataset. No claim is made for the excluded invalid input.
+
+The executable regression is `src/test/fileconv/external_allopurinol`, which
+also exercises the guards, isotope/remote-stereo preservation, ENOL override,
+atom-map annotations and the convenience wrapper.

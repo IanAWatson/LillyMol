@@ -5,8 +5,8 @@ if [[ $# -eq 1 && ( $1 == --help || $1 == -h ) ]]; then
   cat <<'HELP'
 Usage: standardise_all.sh [fileconv options] input...
 
-Runs fileconv with -g all and the distributed guanine and hypoxanthine
-EXT specifications. External rules determine the final representation
+Runs fileconv with -g all and the distributed guanine, hypoxanthine, and
+allopurinol/oxypurinol EXT specifications. External rules determine the final representation
 where they match, subject to their documented substitution restrictions.
 
 All other arguments are passed unchanged to fileconv. For example:
@@ -28,4 +28,5 @@ exec "${LILLYMOL_HOME}/bin/$(uname)/fileconv" \
   -g all \
   -g "EXT:${specifications}/guanine.textproto" \
   -g "EXT:${specifications}/hypoxanthine.textproto" \
+  -g "EXT:${specifications}/allopurinol.textproto" \
   "$@"

@@ -1,0 +1,25 @@
+# Whole aromatic pyrazolo[3,4-d]pyrimidine core, exactly two fused rings.
+# Maps annotate ring positions; 71/31 denote fusion atoms, 10 denotes O4.
+# Atom maps are ignored: template correspondence uses query atom order.
+# Embedding: O4,C4,N5,C6,N7,C7a,N1,N2,C3,C3a.
+# Protect C6/C3 from incompatible external multiple bonds. Terminal OH
+# at either site is excluded; the 4,6-dioxo case has dedicated templates.
+query {
+  name: "allopurinol_1h"
+  require_neutral_matched_atoms: true
+  environment_must_match_unmatched_atoms: true
+  smarts: "[#8D1:10]~[/IWfss2&cD3:4]1~[nD>1D<4:5]~[cD>1D<4:6]~[nD2:7]~[cD3:71]2~[nD>1D<4:1]~[nD2:2]~[cD>1D<4:3]~[cD3:31]12"
+  environment_no_match {
+    smarts: "*"
+    attachment {
+      attachment_point: 3 attachment_point: 8
+      btype: SS_DOUBLE_BOND btype: SS_TRIPLE_BOND
+    }
+  }
+  environment_no_match {
+    smarts: "[#8D1]"
+    attachment {
+      attachment_point: 3 attachment_point: 8 btype: SS_SINGLE_BOND
+    }
+  }
+}

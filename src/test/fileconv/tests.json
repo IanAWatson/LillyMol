@@ -111,6 +111,17 @@
       "shell_script": {
         "script_name": "run_test.py"
       }
+    },
+    {
+      "name": "external_allopurinol",
+      "comment": [
+        "Whole-core allopurinol/oxypurinol EXT targets, substitution patterns,",
+        "external-bond guards, ENOL override, atom maps and wrapper integration."
+      ],
+      "difftool": "diff",
+      "shell_script": {
+        "script_name": "run_test.py"
+      }
     }
   ]
 }

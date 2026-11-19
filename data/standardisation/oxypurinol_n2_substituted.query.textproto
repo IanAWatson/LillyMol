@@ -1,0 +1,18 @@
+# Whole aromatic pyrazolo[3,4-d]pyrimidine core, exactly two fused rings.
+# Maps annotate ring positions; 71/31 denote fusion atoms, 10 denotes O4.
+# Atom maps are ignored: template correspondence uses query atom order.
+# O6 is map 60. Embedding: O4,C4,N5,C6,O6,N7,C7a,N1,N2,C3,C3a.
+# The C3 guard excludes an additional exocyclic multiple bond; matched
+# ring bonds are ignored because environments use only unmatched atoms.
+query {
+  name: "oxypurinol_n2_substituted"
+  require_neutral_matched_atoms: true
+  environment_must_match_unmatched_atoms: true
+  smarts: "[#8D1:10]~[/IWfss2&cD3:4]1~[nD>1D<4:5]~[cD3:6](~[#8D1:60])~[nD>1D<4:7]~[cD3:71]2~[nD2:1]~[nD3:2]~[cD>1D<4:3]~[cD3:31]12"
+  environment_no_match {
+    smarts: "*"
+    attachment {
+      attachment_point: 9 btype: SS_DOUBLE_BOND btype: SS_TRIPLE_BOND
+    }
+  }
+}

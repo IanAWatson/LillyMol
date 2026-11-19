@@ -56,8 +56,8 @@ aromaticity.
   within 1-2% of that limit, since the precise search costs hundreds of times more per molecule
   than the filter. A more expensive second stage, such as computing and comparing a richer
   fingerprint, cannot do better. Only a more selective query can.
-* No molecule that contains the query was rejected, for any of the 11 queries, among the
-  roughly 47,000 sampled molecules that contain one.
+* No molecule that contains the query was rejected, for any of the 11 queries, among
+  about 39,000 sampled molecules that contain one.
 * Scanning the 2.7 million fingerprints takes about 75 ms, 27 ns per molecule, but asking for
   all the molecules that pass takes 0.1 to 0.6 s, because most of that time is building the list
   of results, so it grows with the number that pass.

@@ -9,11 +9,5 @@ query {
   # elsewhere on the ring, away from any heteroatom (pKa ~8-10, not acidic
   # at pH 7).
   comment: "heteroaryl_sulfonamide"
-  ring_specifier {
-    base {
-      set_global_id: 1
-    }
-    aromatic: 1
-  }
-  smarts: "[o,s,n;H0;D2]:[/IWgid1a]-[/IWNv{-1}ND2H1]-S(=O)(=O)"
+  smarts: "[o,s,n;H0;D2]:a-[/IWNv{-1}ND2H1]-S(=O)(=O)"
 }

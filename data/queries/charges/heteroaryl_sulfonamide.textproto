@@ -1,0 +1,19 @@
+query {
+  # heteroaryl_sulfonamide: aryl sulfonamide N-H where the attachment carbon
+  # is directly adjacent (alpha) to a ring O, ring S, or a pyridine-type ring
+  # N (no H, 2 ring connections only) - verified against ChemAxon pKa
+  # predictions to be consistently acidic (pKa ~6-8) regardless of which of
+  # these three heteroatom types is adjacent. Attachment alpha to a
+  # pyrrole-type N (has H or an exocyclic substituent, electron-donating) is
+  # NOT acidic (pKa can exceed 18) and must not match; nor should attachment
+  # elsewhere on the ring, away from any heteroatom (pKa ~8-10, not acidic
+  # at pH 7).
+  comment: "heteroaryl_sulfonamide"
+  ring_specifier {
+    base {
+      set_global_id: 1
+    }
+    aromatic: 1
+  }
+  smarts: "[o,s,n;H0;D2]:[/IWgid1a]-[/IWNv{-1}ND2H1]-S(=O)(=O)"
+}

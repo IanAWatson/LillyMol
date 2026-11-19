@@ -1,20 +1,12 @@
 (0 Query
   (A I Version 2)
-  (A I one_embedding_per_start_atom 1)
-  (A C Comment "phosphonate")
+  (A I max_matches_to_find 2)
+  (A C Comment "phosphonate/phosphate - deprotonate up to 2 acidic O-H per molecule. Note: molecules with more than one P atom needing ionisation (e.g. pyrophosphate) will be under-deprotonated since this cap is molecule-wide, not per-P; rare enough in practice not to warrant the added complexity of a per-atom cap.")
   (A D numeric_value 3.53)
   (0 Query_Atom
     (A I atomic_number 15)
   )
   (1 Query_Atom
-    (A I atomic_number (8 16))
-    (A I double_bond 0)
-  )
-  (2 Query_Atom
-    (A I atomic_number 8)
-    (A I single_bond 0)
-  )
-  (3 Query_Atom
     (A I atomic_number 8)
     (A I ncon 1)
     (A I single_bond 0)

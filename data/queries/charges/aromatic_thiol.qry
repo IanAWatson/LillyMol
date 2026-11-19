@@ -1,0 +1,18 @@
+(0 Query
+  (A I one_embedding_per_start_atom 1)
+  (A I Version 2)
+  (A C Comment "aromatic_thiol - thiophenol-type S-H")
+  (A D numeric_value 1.0)
+  (0 query_atom
+    (A I atomic_number 16)
+    (A I hcount 1)
+    (A I ncon 1)
+    (A I formal_charge 0)
+    (A D numeric_value -1.1)
+  )
+  (1 query_atom
+    (A I atomic_number 6)
+    (A I aromatic 1)
+    (A I single_bond 0)
+  )
+)

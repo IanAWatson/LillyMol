@@ -6,7 +6,6 @@
     (A I atomic_number 7)
     (A I unsaturation 1)
     (A I aromatic 0)
-    (A I aryl 0)
     (A D numeric_value 1.1)
   )
   (1 Query_Atom

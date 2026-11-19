@@ -652,12 +652,12 @@ Charge_Assigner::_process(Molecule_to_Match& target,
       cerr << " hit " << j << " is " << (*s) << '\n';
 #endif
 
-      // If we already know which member of the embedding carries the charge, just do it
+      // Both cache arrays are indexed by query, not by the target atom number.
       if (_which_atom && _which_atom[i] >= 0) {
         atom_number_t l = s->item(_which_atom[i]);
         if (_add_charge_to_atom(target, positive_charges_assigned,
                                 negative_charges_assigned, charges_assigned, l,
-                                _charge_to_assign[l])) {
+                                _charge_to_assign[i])) {
           rc++;
         }
         continue;

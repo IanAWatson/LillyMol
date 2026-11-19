@@ -273,4 +273,97 @@ INSTANTIATE_TEST_SUITE_P(TestChargeAssignerArray, TestChargeAssignerArray, testi
   }
 ));
 
+// These synthetic queries isolate cache indexing from the chemistry and from
+// edits to the distributed query set. Every N gets +1 and every O gets -1.
+class TestChargeAssignerCache : public testing::Test {
+ protected:
+  void Initialise(Charge_Assigner& assigner) {
+    for (const auto& [smarts, charge] :
+         std::vector<std::pair<const char*, double>>{{"[#7]", 1.1}, {"[#8]", -1.1}}) {
+      SubstructureSearch::SubstructureQuery proto;
+      auto* atom = proto.add_query()->add_query_atom();
+      atom->set_id(0);
+      atom->set_atom_smarts(smarts);
+      atom->set_numeric_value(charge);
+      auto query = std::make_unique<Substructure_Hit_Statistics>();
+      ASSERT_TRUE(query->ConstructFromProto(proto));
+      assigner.add(query.release());
+    }
+    assigner.set_min_distance_between_charges(0);
+    assigner.set_apply_charges_to_molecule(0);
+  }
+
+  void WarmCache(Charge_Assigner& assigner) {
+    for (const char* smiles : {"N", "O"}) {
+      Molecule molecule;
+      ASSERT_TRUE(molecule.build_from_smiles(smiles));
+      std::vector<ChargeAndQuery> results;
+      ASSERT_EQ(assigner.Process(molecule, results), 1);
+    }
+  }
+};
+
+TEST_F(TestChargeAssignerCache, LegacyUsesQueryIndexAfterVectorApi) {
+  Charge_Assigner assigner;
+  ASSERT_NO_FATAL_FAILURE(Initialise(assigner));
+  ASSERT_NO_FATAL_FAILURE(WarmCache(assigner));
+  Molecule molecule;
+  ASSERT_TRUE(molecule.build_from_smiles("ON"));
+  formal_charge_t charges[2] = {0, 0};
+  ASSERT_EQ(assigner.process(molecule, charges), 2);
+  // Target O is atom 0 but its charge belongs to query 1; N is the reverse.
+  EXPECT_EQ(charges[0], -1);
+  EXPECT_EQ(charges[1], 1);
+}
+
+TEST_F(TestChargeAssignerCache, LegacyCacheInitialisedWithinOneMolecule) {
+  Charge_Assigner assigner;
+  ASSERT_NO_FATAL_FAILURE(Initialise(assigner));
+  Molecule unmatched;
+  ASSERT_TRUE(unmatched.build_from_smiles("C"));
+  std::vector<ChargeAndQuery> results;
+  ASSERT_EQ(assigner.Process(unmatched, results), 0);  // Allocate, but do not fill, cache.
+  Molecule molecule;
+  ASSERT_TRUE(molecule.build_from_smiles("NN"));
+  formal_charge_t charges[2] = {0, 0};
+  ASSERT_EQ(assigner.process(molecule, charges), 2);
+  EXPECT_EQ(charges[0], 1);
+  EXPECT_EQ(charges[1], 1);
+}
+
+TEST_F(TestChargeAssignerCache, CachedLegacyMatchesUncachedAcrossAtomOrders) {
+  Charge_Assigner cached, uncached;
+  ASSERT_NO_FATAL_FAILURE(Initialise(cached));
+  ASSERT_NO_FATAL_FAILURE(Initialise(uncached));
+  ASSERT_NO_FATAL_FAILURE(WarmCache(cached));
+  for (const char* smiles : {"ON", "NO", "N", "O", "NN", "OO", "NCCO",
+                              "CCCCCCCCCCN", "CCCCCCCCCCO"}) {
+    SCOPED_TRACE(smiles);
+    Molecule original;
+    ASSERT_TRUE(original.build_from_smiles(smiles));
+    for (int i = 0; i < 20; ++i) {
+      const IWString input = i == 0 ? IWString(smiles) : original.random_smiles();
+      Molecule a, b;
+      ASSERT_TRUE(a.build_from_smiles(input));
+      ASSERT_TRUE(b.build_from_smiles(input));
+      std::vector<formal_charge_t> actual(a.natoms(), 0), expected(b.natoms(), 0);
+      EXPECT_EQ(cached.process(a, actual.data()), uncached.process(b, expected.data()));
+      EXPECT_EQ(actual, expected);
+    }
+  }
+}
+
+TEST_F(TestChargeAssignerCache, EnumerationUsesQueryIndexAfterVectorApi) {
+  Charge_Assigner assigner;
+  ASSERT_NO_FATAL_FAILURE(Initialise(assigner));
+  ASSERT_NO_FATAL_FAILURE(WarmCache(assigner));
+  Molecule molecule;
+  ASSERT_TRUE(molecule.build_from_smiles("ON"));
+  resizable_array_p<Molecule> forms;
+  ASSERT_EQ(assigner.process(molecule, forms), 1);
+  ASSERT_EQ(forms.size(), 1);
+  EXPECT_EQ(forms[0]->formal_charge(0), -1);
+  EXPECT_EQ(forms[0]->formal_charge(1), 1);
+}
+
 }  // namespace

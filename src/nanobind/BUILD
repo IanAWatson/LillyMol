@@ -230,6 +230,25 @@ py_test(
     ],
 )
 
+[
+    py_test(
+        name = "gfp_formula_prefilter_timing_example_%s_test" % stage,
+        size = "small",
+        srcs = ["examples/gfp/formula_prefilter_timing.py"],
+        args = ["--second-stage", stage],
+        main = "examples/gfp/formula_prefilter_timing.py",
+        imports = ["."],
+        data = [
+            ":lillymol",
+            "examples/gfp/molecules.formula_nh.gfp",
+        ],
+    )
+    for stage in [
+        "path",
+        "ec",
+    ]
+]
+
 py_test(
     name = "reaction_enumerate_reagents_example_test",
     size = "small",

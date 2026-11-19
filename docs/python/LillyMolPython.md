@@ -1548,6 +1548,49 @@ scanning stored path fingerprints, but building the list of the molecules that p
 more than the scan when many pass. See the
 [example README](/src/nanobind/examples/gfp/README.md) for the measurements.
 
+##### The second stage need not be a substructure search
+
+The molecules that pass can instead be examined with a better Tversky search, by making a richer
+fingerprint (`GFP.iw()`, the path fingerprint, or `GFP.ec()`, the extended connectivity
+fingerprint) from the smiles of each of them and comparing it with the same
+`Tversky(query=2, candidate=0)`:
+
+```python
+path = GFPContext.from_specs([GFP.iw()])
+path_query = path.fingerprint(MolFromSmiles(query + " query"))
+found = [hit.index for hit in hits
+         if path.distance(path_query, path.fingerprint(MolFromSmiles(gfp.smiles(hit.index))),
+                          Tversky(query=2.0, candidate=0.0)) < 1.0e-6]
+```
+
+For the 2.7 million molecules of ChEMBL, with the cost of each second stage estimated from a
+random sample of 20,000 molecules (single thread, each molecule parsed from its smiles):
+
+| Second stage | Cost per molecule | Query | On all | Filter, then second stage | Times faster |
+| --- | --- | --- | --- | --- | --- |
+| substructure search | 5 + 14 to 23 microseconds | phenol | 78 s | 66 s | 1.2 |
+| | | chlorobenzene | 54 s | 9 s | 5.7 |
+| path fingerprint | 5 + 116 microseconds | phenol | 5.5 min | 4.6 min | 1.2 |
+| | | chlorobenzene | 5.6 min | 58 s | 5.8 |
+| EC fingerprint | 5 + 46 microseconds | phenol | 2.3 min | 118 s | 1.2 |
+| | | chlorobenzene | 2.4 min | 25 s | 5.8 |
+
+* The speedup is the same whichever second stage is used, since it is set by the fraction of
+  molecules that pass the filter (84% for phenol, 17% for chlorobenzene). A more expensive
+  second stage saves more *time*, but not a larger *factor*. The time saved is what counts when
+  the second stage is costly: 4.6 minutes for chlorobenzene with the path fingerprint.
+* At distance 0 a fingerprint second stage finds only the molecules that have every feature of
+  the query fragment. The extended connectivity environments reach beyond the fragment, to atoms
+  that are substituted in a molecule that contains it, so for a fragment query no molecule has all
+  of them (0 of 20,000 here) and a tolerance is needed. The path fingerprint is much less
+  affected, and is the better choice.
+* Two fingerprints can disagree, so a molecule that the second stage finds might be rejected by
+  the filter. This is not an error as it is for a substructure search. None were rejected in
+  these runs.
+* The example script [formula_prefilter_timing.py](/src/nanobind/examples/gfp/formula_prefilter_timing.py)
+  measures all of this on a collection of your own, with `--second-stage substructure`
+  (the default), `path` or `ec`.
+
 Two complete, tested examples are in [src/nanobind/examples/gfp](/src/nanobind/examples/gfp/README.md).
 [formula_tversky.py](/src/nanobind/examples/gfp/formula_tversky.py) shows how the
 distances change with the Tversky weights, and checks the fingerprint as a filter against

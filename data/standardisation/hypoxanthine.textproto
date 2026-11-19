@@ -1,0 +1,4 @@
+query_file: "hypoxanthine_9h.query.textproto" smiles: "O=C1NC=NC2=C1N=CN2" name: "hypoxanthine-9h" comment: "Optional complete-core hypoxanthine keto/N-H canonicalisation after built-in rules."
+query_file: "hypoxanthine_7_substituted.query.textproto" smiles: "O=C1NC=NC2=C1NC=N2" name: "hypoxanthine-7-substituted" comment: "Optional complete-core hypoxanthine keto/N-H canonicalisation after built-in rules."
+query_file: "hypoxanthine_3_substituted_9h.query.textproto" smiles: "O=C1N=CNC2=C1N=CN2" name: "hypoxanthine-3-substituted-9h" comment: "Optional complete-core hypoxanthine keto/N-H canonicalisation after built-in rules."
+query_file: "hypoxanthine_3_substituted_7_substituted.query.textproto" smiles: "O=C1N=CNC2=C1NC=N2" name: "hypoxanthine-3-substituted-7-substituted" comment: "Optional complete-core hypoxanthine keto/N-H canonicalisation after built-in rules."

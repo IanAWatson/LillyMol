@@ -1,0 +1,9 @@
+# Whole-core hypoxanthine query; target depends on N3 and N7 substitution.
+# Embedding order (zero based): O6, C6, N1, C2, N3, C4, C5, N7, C8, N9.
+# Atom maps are human-readable purine positions (O6 is 10), not embedding indices.
+# Require the complete aromatic two-ring core and unsubstituted C2/C8.
+query {
+  name: "hypoxanthine_7_substituted"
+  require_neutral_matched_atoms: true
+  smarts: "[#8D1:10]~[/IWfss2&cD3:6]1~[nD>1D<4:1]~[cD2H1:2]~[nD2:3]~[cD3:4]2~[cD3:5]1~[nD3:7]~[cD2H1:8]~[nD2:9]2"
+}

@@ -1,5 +1,23 @@
 # Chemical Standardisation
 
+To apply the built-in rules and all distributed external specifications, use
+[`standardise_all.sh`](../../contrib/bin/standardise_all.sh):
+
+```shell
+standardise_all.sh -o smi -S standardised input.smi
+# Or write unique SMILES to standard output:
+standardise_all.sh -o usmi -S - input.smi > standardised.smi
+```
+
+The wrapper runs `fileconv -g all`, followed by the guanine and hypoxanthine
+`EXT:` specifications. Built-in rules run first; external targets determine
+the final representation wherever their queries match. Their documented
+substitution restrictions still apply. All additional arguments are passed to
+`fileconv`, so options such as `-l` can be added as needed. It uses
+`LILLYMOL_HOME`, inferring the installation root from its location when unset.
+Use `standardise_all.sh --help` for a short usage message. This is an opt-in
+convenience command: ordinary `fileconv -g all` keeps its existing behaviour.
+
 # Background.
 
 When processing molecules it is convenient to ensure
@@ -1095,3 +1113,20 @@ systems. They are not included by `-g all`. The linked README describes the
 substitution restrictions, target selection and interaction with built-in
 imidazole processing. Loading them explicitly requests the keto target,
 regardless of the built-in `ENOL` preference.
+
+A corresponding optional specification is available for hypoxanthines:
+
+```shell
+fileconv -g all -g EXT:${LILLYMOL_HOME}/data/standardisation/hypoxanthine.textproto \
+  -o smi -S standardised input.smi
+```
+
+It normalises supported hydroxy/oxo and keto N-H forms together, using four
+whole-core templates for N-substitution patterns. The default unsubstituted
+target is the 1H,9H keto form; N3 or N7 substitution selects a compatible
+alternative bonding pattern. It requires a neutral aromatic two-ring core
+with unsubstituted C2 and C8. See the
+[external-rule README](../../data/standardisation/README.md#hypoxanthine)
+for scope, atom correspondence, and the existing out-of-scope CHEMBL83601
+repeat-processing failure. External targets apply after built-in processing,
+including when the built-in `ENOL` preference is requested.

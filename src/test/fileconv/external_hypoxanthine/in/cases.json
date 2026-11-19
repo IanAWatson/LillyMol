@@ -1,0 +1,146 @@
+[
+  {
+    "name": "keto_1_9",
+    "source": "O=C1NC=NC2=C1N=CN2",
+    "target": "O=C1NC=NC2=C1N=CN2",
+    "supported": true
+  },
+  {
+    "name": "keto_1_7",
+    "source": "O=C1NC=NC2=C1NC=N2",
+    "target": "O=C1NC=NC2=C1N=CN2",
+    "supported": true
+  },
+  {
+    "name": "keto_3_9",
+    "source": "O=C1N=CNC2=C1N=CN2",
+    "target": "O=C1NC=NC2=C1N=CN2",
+    "supported": true
+  },
+  {
+    "name": "keto_3_7",
+    "source": "O=C1N=CNC2=C1NC=N2",
+    "target": "O=C1NC=NC2=C1N=CN2",
+    "supported": true
+  },
+  {
+    "name": "enol_9",
+    "source": "OC1=NC=NC2=C1N=CN2",
+    "target": "O=C1NC=NC2=C1N=CN2",
+    "supported": true
+  },
+  {
+    "name": "enol_7",
+    "source": "OC1=NC=NC2=C1NC=N2",
+    "target": "O=C1NC=NC2=C1N=CN2",
+    "supported": true
+  },
+  {
+    "name": "N9_methyl",
+    "source": "OC1=NC=NC2=C1N=CN2C",
+    "target": "O=C1NC=NC2=C1N=CN2C",
+    "supported": true
+  },
+  {
+    "name": "N7_methyl",
+    "source": "OC1=NC=NC2=C1N(C)C=N2",
+    "target": "O=C1NC=NC2=C1N(C)C=N2",
+    "supported": true
+  },
+  {
+    "name": "N1_methyl",
+    "source": "C12=C(O)N(C)C=NC1=NC=N2",
+    "target": "O=C1N(C)C=NC2=C1N=CN2",
+    "supported": true
+  },
+  {
+    "name": "N3_methyl",
+    "source": "N1(C2=NC=NC2=C(O)N=C1)C",
+    "target": "O=C1N=CN(C)C2=C1N=CN2",
+    "supported": true
+  },
+  {
+    "name": "N1_N7_methyl",
+    "source": "O=C1N(C)C=NC2=C1N(C)C=N2",
+    "target": "O=C1N(C)C=NC2=C1N(C)C=N2",
+    "supported": true
+  },
+  {
+    "name": "N3_N7_methyl",
+    "source": "O=C1N=CN(C)C2=C1N(C)C=N2",
+    "target": "O=C1N=CN(C)C2=C1N(C)C=N2",
+    "supported": true
+  },
+  {
+    "name": "isotopes",
+    "source": "[18OH]C1=N[13CH]=[15N]C2=C1N=CN2",
+    "target": "[18O]=C1N[13CH]=[15N]C2=C1N=CN2",
+    "supported": true
+  },
+  {
+    "name": "known_hydrogens",
+    "source": "OC1=[NH0]C=NC2=C1N=CN2",
+    "target": "O=C1NC=NC2=C1N=CN2",
+    "supported": true
+  },
+  {
+    "name": "remote_chiral",
+    "source": "OC1=NC=NC2=C1N=CN2[C@H](F)C",
+    "target": "O=C1NC=NC2=C1N=CN2[C@H](F)C",
+    "supported": true
+  },
+  {
+    "name": "remote_alkene",
+    "source": "OC1=NC=NC2=C1N=CN2CC/C=C/C",
+    "target": "O=C1NC=NC2=C1N=CN2CC/C=C/C",
+    "supported": true
+  },
+  {
+    "name": "multiple",
+    "source": "OC1=NC=NC2=C1N=CN2.OC1=NC=NC2=C1N(C)C=N2",
+    "target": "O=C1NC=NC2=C1N=CN2.O=C1NC=NC2=C1N(C)C=N2",
+    "supported": true
+  },
+  {
+    "name": "guanine",
+    "source": "NC1=NC2=C(N=CN2)C(=O)N1",
+    "target": "NC1=NC2=C(N=CN2)C(=O)N1",
+    "supported": false
+  },
+  {
+    "name": "xanthine",
+    "source": "O=C1NC(=O)C2=C(N1)NC=N2",
+    "target": "O=C1NC(=O)C2=C(N1)NC=N2",
+    "supported": false
+  },
+  {
+    "name": "C8_methyl",
+    "source": "O=C1NC=NC2=C1N=C(C)N2",
+    "target": "O=C1NC=NC2=C1N=C(C)N2",
+    "supported": false
+  },
+  {
+    "name": "ether",
+    "source": "COC1=NC=NC2=C1N=CN2",
+    "target": "COC1=NC=NC2=C1N=CN2",
+    "supported": false
+  },
+  {
+    "name": "thio",
+    "source": "S=C1NC=NC2=C1N=CN2",
+    "target": "S=C1NC=NC2=C1N=CN2",
+    "supported": false
+  },
+  {
+    "name": "explicit_hydrogen",
+    "source": "O([2H])C1=NC=NC2=C1N=CN2",
+    "target": "O([2H])C1=NC=NC2=C1N=CN2",
+    "supported": false
+  },
+  {
+    "name": "reduced",
+    "source": "O=C1NCCNC2=C1N=CN2",
+    "target": "O=C1NCCNC2=C1N=CN2",
+    "supported": false
+  }
+]

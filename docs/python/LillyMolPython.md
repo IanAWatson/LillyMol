@@ -1448,6 +1448,63 @@ neighbours within the threshold, also sorted by increasing distance. When
 result. When `query` is a standalone `GFPFingerprint`, all list entries are
 eligible neighbours.
 
+#### Row numbers only, counts, and searching some of the rows
+
+`nearest_neighbours_within_distance` makes a Python object for every result, which costs far
+more than the search itself when many molecules are within the distance. If only the row numbers
+are wanted, `indices_within_distance(query, max_distance, tversky=None, only_search=None,
+return_distances=False)` returns them as an `int32` numpy array (so numpy is needed), and
+`count_within_distance(...)` just counts them:
+
+```python
+rows = gfp.indices_within_distance(query_fp, 0.25)       # a numpy array of row numbers
+rows, distances = gfp.indices_within_distance(query_fp, 0.25, return_distances=True)
+count = gfp.count_within_distance(query_fp, 0.25)
+```
+
+The rows are in row order, not sorted by distance, so use `nearest_neighbours_within_distance` if
+the order matters. As with the other searches, when the query is a row of the list that row is
+not a result. For the 2.7 million molecules of ChEMBL, `Tversky(query=2, candidate=0)` at
+distance 0 on the formula fingerprint (`GFP.formula(hydrogens=False)`):
+
+| Query | Results | `nearest_neighbours_within_distance` | `indices_within_distance` | `count_within_distance` |
+| --- | --- | --- | --- | --- |
+| phenol | 2,299,198 | 649 ms | 73 ms | 64 ms |
+| chlorobenzene | 472,173 | 170 ms | 71 ms | 64 ms |
+| steroid core | 148,375 | 97 ms | 66 ms | 64 ms |
+
+The scan itself takes 64 ms, so the saving grows with the number of results. The 2.3 million results
+also need about 9 MB as an array, against about 300 MB as objects.
+
+All four searches (`nearest_neighbours`, `nearest_neighbours_within_distance`,
+`indices_within_distance` and `count_within_distance`) accept `only_search=`, a list, tuple or
+numpy array of row numbers, in which case only those rows are examined and the others are not
+touched. The results of `indices_within_distance` are then in the order of `only_search`. A row
+listed twice is examined twice, a row number outside the list raises `IndexError`, and anything
+that is not an integer raises `TypeError`, including a boolean mask, for which use
+`numpy.flatnonzero(mask)`. This makes it possible to filter with one fingerprint and then examine
+just the molecules that passed with another, whose list has the same molecules in the same order:
+
+```python
+rows = formula_list.indices_within_distance(formula_query, 1.0e-6, tversky=tversky)
+best = path_list.nearest_neighbours(path_query, 10, tversky=tversky, only_search=rows)
+```
+
+That only pays when the second fingerprint is costly to compare, since the filter has its own cost.
+With stored fingerprints for 500,000 ChEMBL molecules, a formula filter followed by a search of
+the survivors, against searching everything (`Tversky(2, 0)`, ten nearest wanted):
+
+| Second fingerprint | phenol (80% pass) | chlorobenzene (17%) | trifluoromethyl (6.5%) | steroid core (6.5%) |
+| --- | --- | --- | --- | --- |
+| EC, `GFP.ec()`, 193 ns per molecule | 1.0 times faster | 2.7 | 3.5 | 4.1 |
+| path, `GFP.iw()`, 48 ns per molecule | 0.7 | 1.2 | 1.6 | 1.6 |
+
+A stored path fingerprint is so cheap to scan that the filter gains little and can lose. The ten
+nearest can differ from searching everything, because a small query sets few bits of a path
+fingerprint, so many large molecules that lack the query's atoms tie with it at distance 0 (for a
+CF3 query, 16,000 of the 45,000 molecules at distance 0 have no fluorine) and which of them come
+first depends on the row order. The filter removes those.
+
 ### Tversky searching
 
 Tanimoto distance treats the two fingerprints equally. Tversky similarity does
@@ -1543,9 +1600,10 @@ The saving cannot be more than one over the fraction of molecules that pass, bec
 still have to be searched, however slow the precise method is. For the 2.7 million molecules of
 ChEMBL a phenol query passes 84%, so at best the filter makes the whole job 1.2 times faster
 (measured 1.18), whereas chlorobenzene and a sulfonamide pass 17% (5.7 times faster). Scanning
-all 2.7 million fingerprints takes about 75 ms, 27 ns per molecule, about half the cost of
-scanning stored path fingerprints, but building the list of the molecules that pass takes
-more than the scan when many pass. See the
+all 2.7 million fingerprints takes about 65 to 75 ms, 27 ns per molecule, about half the cost of
+scanning stored path fingerprints. Use `indices_within_distance` to get the row numbers of the
+molecules that pass, which takes about the same (73 ms for the 2.3 million that pass for phenol),
+rather than `nearest_neighbours_within_distance`, which makes an object for each (650 ms). See the
 [example README](/src/nanobind/examples/gfp/README.md) for the measurements.
 
 ##### The second stage need not be a substructure search
@@ -1556,10 +1614,11 @@ fingerprint) from the smiles of each of them and comparing it with the same
 `Tversky(query=2, candidate=0)`:
 
 ```python
+rows = gfp.indices_within_distance(query_fp, 1.0e-6, tversky=Tversky(query=2.0, candidate=0.0))
 path = GFPContext.from_specs([GFP.iw()])
 path_query = path.fingerprint(MolFromSmiles(query + " query"))
-found = [hit.index for hit in hits
-         if path.distance(path_query, path.fingerprint(MolFromSmiles(gfp.smiles(hit.index))),
+found = [int(row) for row in rows
+         if path.distance(path_query, path.fingerprint(MolFromSmiles(gfp.smiles(int(row)))),
                           Tversky(query=2.0, candidate=0.0)) < 1.0e-6]
 ```
 

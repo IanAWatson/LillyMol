@@ -2615,92 +2615,186 @@ GFPList::Distance(const GFPFingerprint& fp, int j, const Tversky* tversky) const
   return 1.0f - similarity;
 }
 
+namespace {
+
+// Calls `visit(i, distance(i))` for each row `i` to be examined, skipping `exclude`.
+// If `only_search` is null every row is examined, otherwise just the rows it lists, in
+// its order. There are two loops, so that the usual case of no subset has nothing
+// extra to do for each row.
+template <typename Distance, typename Visit>
+void
+ScanRows(int size, int exclude, const std::vector<int32_t>* only_search,
+         Distance&& distance, Visit&& visit) {
+  if (only_search == nullptr) {
+    for (int i = 0; i < size; ++i) {
+      if (i == exclude) {
+        continue;
+      }
+      visit(i, distance(i));
+    }
+    return;
+  }
+
+  for (const int32_t i : *only_search) {
+    if (i == exclude || i < 0 || i >= size) {
+      continue;
+    }
+    visit(i, distance(i));
+  }
+}
+
+}  // namespace
+
 std::vector<NearestNeighbour>
-GFPList::NearestNeighbours(int query, int k, const Tversky* tversky) const {
+GFPList::NearestNeighbours(int query, int k, const Tversky* tversky,
+                           const std::vector<int32_t>* only_search) const {
   if (k <= 0 || query < 0 || query >= size()) {
     return {};
   }
 
   NearestNeighbourMaxHeap heap;
-  for (int i = 0; i < size(); ++i) {
-    if (i == query) {
-      continue;
-    }
-
-    MaybeAddNearestNeighbour(heap, k, NearestNeighbour{i, Distance(query, i, tversky)});
-  }
+  ScanRows(size(), query, only_search, [&](int i) { return Distance(query, i, tversky); },
+           [&](int i, float distance) {
+             MaybeAddNearestNeighbour(heap, k, NearestNeighbour{i, distance});
+           });
 
   return SortedNearestNeighbours(heap);
 }
 
 std::vector<NearestNeighbour>
-GFPList::NearestNeighbours(const GFPFingerprint& query, int k,
-                           const Tversky* tversky) const {
+GFPList::NearestNeighbours(const GFPFingerprint& query, int k, const Tversky* tversky,
+                           const std::vector<int32_t>* only_search) const {
   if (k <= 0 || query.context_hash() != _context->context_hash()) {
     return {};
   }
 
   NearestNeighbourMaxHeap heap;
-  for (int i = 0; i < size(); ++i) {
-    MaybeAddNearestNeighbour(heap, k, NearestNeighbour{i, Distance(query, i, tversky)});
-  }
+  ScanRows(size(), -1, only_search, [&](int i) { return Distance(query, i, tversky); },
+           [&](int i, float distance) {
+             MaybeAddNearestNeighbour(heap, k, NearestNeighbour{i, distance});
+           });
 
   return SortedNearestNeighbours(heap);
 }
 
 std::vector<NearestNeighbour>
 GFPList::NearestNeighboursWithinDistance(int query, float max_distance,
-                                         const Tversky* tversky) const {
+                                         const Tversky* tversky,
+                                         const std::vector<int32_t>* only_search) const {
   std::vector<NearestNeighbour> result;
   if (query < 0 || query >= size() || max_distance < 0.0f) {
     return result;
   }
 
-  for (int i = 0; i < size(); ++i) {
-    if (i == query) {
-      continue;
-    }
+  ScanRows(size(), query, only_search, [&](int i) { return Distance(query, i, tversky); },
+           [&](int i, float distance) {
+             if (distance <= max_distance) {
+               result.push_back(NearestNeighbour{i, distance});
+             }
+           });
 
-    const float distance = Distance(query, i, tversky);
-    if (distance <= max_distance) {
-      result.push_back(NearestNeighbour{i, distance});
-    }
-  }
-
-  std::sort(result.begin(), result.end(),
-            [](const NearestNeighbour& lhs, const NearestNeighbour& rhs) {
-              if (lhs.distance != rhs.distance) {
-                return lhs.distance < rhs.distance;
-              }
-              return lhs.index < rhs.index;
-            });
+  std::sort(result.begin(), result.end(), NearestNeighbourBetter);
 
   return result;
 }
 
 std::vector<NearestNeighbour>
-GFPList::NearestNeighboursWithinDistance(const GFPFingerprint& query,
-                                         float max_distance,
-                                         const Tversky* tversky) const {
+GFPList::NearestNeighboursWithinDistance(const GFPFingerprint& query, float max_distance,
+                                         const Tversky* tversky,
+                                         const std::vector<int32_t>* only_search) const {
   std::vector<NearestNeighbour> result;
   if (query.context_hash() != _context->context_hash() || max_distance < 0.0f) {
     return result;
   }
 
-  for (int i = 0; i < size(); ++i) {
-    const float distance = Distance(query, i, tversky);
-    if (distance <= max_distance) {
-      result.push_back(NearestNeighbour{i, distance});
-    }
+  ScanRows(size(), -1, only_search, [&](int i) { return Distance(query, i, tversky); },
+           [&](int i, float distance) {
+             if (distance <= max_distance) {
+               result.push_back(NearestNeighbour{i, distance});
+             }
+           });
+
+  std::sort(result.begin(), result.end(), NearestNeighbourBetter);
+
+  return result;
+}
+
+std::vector<int32_t>
+GFPList::IndicesWithinDistance(int query, float max_distance, const Tversky* tversky,
+                               const std::vector<int32_t>* only_search,
+                               std::vector<float>* distances) const {
+  std::vector<int32_t> result;
+  if (distances != nullptr) {
+    distances->clear();
+  }
+  if (query < 0 || query >= size() || max_distance < 0.0f) {
+    return result;
   }
 
-  std::sort(result.begin(), result.end(),
-            [](const NearestNeighbour& lhs, const NearestNeighbour& rhs) {
-              if (lhs.distance != rhs.distance) {
-                return lhs.distance < rhs.distance;
-              }
-              return lhs.index < rhs.index;
-            });
+  ScanRows(size(), query, only_search, [&](int i) { return Distance(query, i, tversky); },
+           [&](int i, float distance) {
+             if (distance <= max_distance) {
+               result.push_back(i);
+               if (distances != nullptr) {
+                 distances->push_back(distance);
+               }
+             }
+           });
+
+  return result;
+}
+
+std::vector<int32_t>
+GFPList::IndicesWithinDistance(const GFPFingerprint& query, float max_distance,
+                               const Tversky* tversky,
+                               const std::vector<int32_t>* only_search,
+                               std::vector<float>* distances) const {
+  std::vector<int32_t> result;
+  if (distances != nullptr) {
+    distances->clear();
+  }
+  if (query.context_hash() != _context->context_hash() || max_distance < 0.0f) {
+    return result;
+  }
+
+  ScanRows(size(), -1, only_search, [&](int i) { return Distance(query, i, tversky); },
+           [&](int i, float distance) {
+             if (distance <= max_distance) {
+               result.push_back(i);
+               if (distances != nullptr) {
+                 distances->push_back(distance);
+               }
+             }
+           });
+
+  return result;
+}
+
+size_t
+GFPList::CountWithinDistance(int query, float max_distance, const Tversky* tversky,
+                             const std::vector<int32_t>* only_search) const {
+  size_t result = 0;
+  if (query < 0 || query >= size() || max_distance < 0.0f) {
+    return result;
+  }
+
+  ScanRows(size(), query, only_search, [&](int i) { return Distance(query, i, tversky); },
+           [&](int, float distance) { result += (distance <= max_distance); });
+
+  return result;
+}
+
+size_t
+GFPList::CountWithinDistance(const GFPFingerprint& query, float max_distance,
+                             const Tversky* tversky,
+                             const std::vector<int32_t>* only_search) const {
+  size_t result = 0;
+  if (query.context_hash() != _context->context_hash() || max_distance < 0.0f) {
+    return result;
+  }
+
+  ScanRows(size(), -1, only_search, [&](int i) { return Distance(query, i, tversky); },
+           [&](int, float distance) { result += (distance <= max_distance); });
 
   return result;
 }

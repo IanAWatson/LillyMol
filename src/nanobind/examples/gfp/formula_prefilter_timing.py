@@ -17,6 +17,10 @@ This script measures that on a collection of molecules. It
      stage finds, and
   4. estimates the time to search the whole collection with and without the filter.
 
+With numpy the filter uses gfp.indices_within_distance, which returns the row numbers as an
+array. Without it the filter uses gfp.nearest_neighbours_within_distance, which makes an object
+for each molecule that passes, and takes much longer when many pass.
+
 Usage: formula_prefilter_timing.py [FILE.gfp] [--query SMILES] [--sample N]
                                    [--second-stage substructure|path|ec]
                                    [--second-stage-distance D]
@@ -43,6 +47,11 @@ import argparse
 import random
 import time
 from pathlib import Path
+
+try:
+  import numpy as np
+except ImportError:  # The filter then makes an object for each result, which is slower.
+  np = None
 
 from lillymol import (GFP, GFPContext, GFPList, MolFromSmiles, SubstructureQuery,
                       Tversky)
@@ -130,16 +139,27 @@ def main():
   _, scan_time = timed(lambda: gfp.nearest_neighbours(query_fp, 1, tversky=contains_query),
                        repeats=3)
 
-  # The filter: everything with at least the counts of the query. The time includes
-  # making the list of results, which is most of it when many molecules pass.
-  hits, filter_time = timed(
-      lambda: gfp.nearest_neighbours_within_distance(query_fp, 1.0e-6, tversky=contains_query),
-      repeats=3)
-  passed = {hit.index for hit in hits}
+  # The filter: everything with at least the counts of the query, as an array of the row
+  # numbers. This makes no object for each molecule that passes, which would be most of the
+  # time when many pass (nearest_neighbours_within_distance does that).
+  if np is not None:
+    rows, filter_time = timed(
+        lambda: gfp.indices_within_distance(query_fp, 1.0e-6, tversky=contains_query),
+        repeats=3)
+    passed = np.zeros(n, dtype=bool)
+    passed[rows] = True
+  else:
+    hits, filter_time = timed(
+        lambda: gfp.nearest_neighbours_within_distance(query_fp, 1.0e-6, tversky=contains_query),
+        repeats=3)
+    rows = [hit.index for hit in hits]
+    passed = [False] * n
+    for row in rows:
+      passed[row] = True
   print(f"\nFilter, Tversky(query=2, candidate=0) at distance 0, query {args.query}")
   print(f"  scan only        {format_time(scan_time)}  ({scan_time / n * 1.0e9:.0f} ns per molecule)")
-  print(f"  scan and results {format_time(filter_time)}  ({filter_time / n * 1.0e9:.0f} ns per molecule)")
-  print(f"  passing          {len(passed)} of {n} molecules ({100.0 * len(passed) / n:.1f}%)")
+  print(f"  scan and rows    {format_time(filter_time)}  ({filter_time / n * 1.0e9:.0f} ns per molecule)")
+  print(f"  passing          {len(rows)} of {n} molecules ({100.0 * len(rows) / n:.1f}%)")
 
   # The second stage, timed on a sample, since it is much slower per molecule.
   description, finds, found_by_second_stage = make_second_stage(
@@ -159,25 +179,25 @@ def main():
         f"({stage_time / len(sample) * 1.0e6:.1f} us per molecule)")
   print(f"  {finds}  {len(found)} of {len(sample)}")
 
-  rejected = [i for i in found if i not in passed]
+  rejected = [i for i in found if not passed[i]]
   print(f"  rejected by the filter  {len(rejected)} of those found by the second stage")
 
   # Estimates for the whole collection. The filter time is the one that includes the
-  # list of results, which is what is needed to know which molecules to search.
+  # row numbers, which is what is needed to know which molecules to search.
   without_filter = per_molecule * n
-  with_filter = filter_time + per_molecule * len(passed)
+  with_filter = filter_time + per_molecule * len(rows)
   print(f"\nEstimated time to search all {n} molecules")
   print(f"  second stage only            {format_time(without_filter)}")
   print(f"  filter, then second stage    {format_time(with_filter)}  "
         f"({without_filter / with_filter:.1f} times faster)")
-  print(f"The filter cannot make it more than {n / max(len(passed), 1):.1f} times faster, "
+  print(f"The filter cannot make it more than {n / max(len(rows), 1):.1f} times faster, "
         f"however slow the second stage is, since the molecules that pass still have to be "
         f"processed.")
   print("These are estimates from the sample. The filter is not selective, so how much "
         "it saves depends on the query.")
 
   if bundled:
-    assert len(passed) == 21  # The same as formula_tversky.py for a phenol query.
+    assert len(rows) == 21  # The same as formula_tversky.py for a phenol query.
     if args.second_stage == "substructure":
       assert not rejected
   if rejected and args.second_stage == "substructure":

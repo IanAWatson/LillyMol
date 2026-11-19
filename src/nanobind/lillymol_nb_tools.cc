@@ -4,8 +4,10 @@
 
 #include <cmath>
 #include <memory>
+#include <optional>
 #include <vector>
 
+#include <nanobind/ndarray.h>
 #include <nanobind/stl/shared_ptr.h>
 #include <nanobind/stl/unordered_map.h>
 #include <nanobind/stl/vector.h>
@@ -330,41 +332,168 @@ GFPListDistanceFingerprint(const gfp_context::GFPList& gfp,
   return result;
 }
 
+// The `only_search` argument of the searches: None, or the numbers of the rows to examine, as
+// an array of integers or a list of int. The numbers are checked here. The result has no value
+// if `only_search` is None.
+std::optional<std::vector<int32_t>>
+RowSubset(const gfp_context::GFPList& gfp, const nb::object& only_search) {
+  if (!only_search.is_valid() || only_search.is_none()) {
+    return std::nullopt;
+  }
+
+  // A boolean mask, or floating point values, would be converted to row numbers 0 and 1, or
+  // truncated, and give the wrong answer silently.
+  if (nb::hasattr(only_search, "dtype")) {
+    const std::string kind = nb::cast<std::string>(nb::str(only_search.attr("dtype").attr("kind")));
+    if (kind != "i" && kind != "u") {
+      throw nb::type_error(
+          "only_search must contain row numbers (integers), for a boolean mask use "
+          "numpy.flatnonzero(mask)");
+    }
+  }
+
+  std::vector<int32_t> rows;
+  using Rows = nb::ndarray<const int32_t, nb::shape<-1>, nb::c_contig, nb::device::cpu>;
+  Rows array;
+  if (nb::try_cast<Rows>(only_search, array)) {
+    rows.assign(array.data(), array.data() + array.shape(0));
+  } else if (!nb::try_cast<std::vector<int32_t>>(only_search, rows)) {
+    throw nb::type_error("only_search must be None, or a list or numpy array of row numbers");
+  }
+
+  for (const int32_t row : rows) {
+    if (row < 0 || row >= gfp.size()) {
+      throw std::out_of_range("only_search contains the row " + std::to_string(row) +
+                              ", but there are " + std::to_string(gfp.size()) + " rows");
+    }
+  }
+
+  return rows;
+}
+
+const std::vector<int32_t>*
+Pointer(const std::optional<std::vector<int32_t>>& rows) {
+  return rows ? &*rows : nullptr;
+}
+
 std::vector<gfp_context::NearestNeighbour>
 GFPListNearestNeighboursIndex(const gfp_context::GFPList& gfp, int query, int k,
-                              const Tversky* tversky) {
+                              const Tversky* tversky, const nb::object& only_search) {
   CheckGFPListIndex(gfp, query, "query");
-  return gfp.NearestNeighbours(query, k, tversky);
+  const auto rows = RowSubset(gfp, only_search);
+  return gfp.NearestNeighbours(query, k, tversky, Pointer(rows));
 }
 
 std::vector<gfp_context::NearestNeighbour>
 GFPListNearestNeighboursFingerprint(const gfp_context::GFPList& gfp,
                                     const gfp_context::GFPFingerprint& query, int k,
-                                    const Tversky* tversky) {
+                                    const Tversky* tversky, const nb::object& only_search) {
   CheckCompatibleFingerprint(gfp, query);
-  return gfp.NearestNeighbours(query, k, tversky);
+  const auto rows = RowSubset(gfp, only_search);
+  return gfp.NearestNeighbours(query, k, tversky, Pointer(rows));
 }
 
 std::vector<gfp_context::NearestNeighbour>
 GFPListNearestNeighboursWithinDistanceIndex(const gfp_context::GFPList& gfp,
                                             int query, float max_distance,
-                                            const Tversky* tversky) {
+                                            const Tversky* tversky,
+                                            const nb::object& only_search) {
   CheckGFPListIndex(gfp, query, "query");
   if (max_distance < 0.0f) {
     throw std::invalid_argument("max_distance must be non-negative");
   }
-  return gfp.NearestNeighboursWithinDistance(query, max_distance, tversky);
+  const auto rows = RowSubset(gfp, only_search);
+  return gfp.NearestNeighboursWithinDistance(query, max_distance, tversky, Pointer(rows));
 }
 
 std::vector<gfp_context::NearestNeighbour>
 GFPListNearestNeighboursWithinDistanceFingerprint(
     const gfp_context::GFPList& gfp, const gfp_context::GFPFingerprint& query,
-    float max_distance, const Tversky* tversky) {
+    float max_distance, const Tversky* tversky, const nb::object& only_search) {
   CheckCompatibleFingerprint(gfp, query);
   if (max_distance < 0.0f) {
     throw std::invalid_argument("max_distance must be non-negative");
   }
-  return gfp.NearestNeighboursWithinDistance(query, max_distance, tversky);
+  const auto rows = RowSubset(gfp, only_search);
+  return gfp.NearestNeighboursWithinDistance(query, max_distance, tversky, Pointer(rows));
+}
+
+// A one dimensional numpy array that owns the contents of `values`.
+template <typename T>
+nb::ndarray<nb::numpy, T, nb::shape<-1>>
+ToNumpy(std::vector<T>&& values) {
+  auto* owned = new std::vector<T>(std::move(values));
+  if (owned->empty()) {
+    owned->reserve(1);  // So that there is a data pointer.
+  }
+  nb::capsule owner(owned, [](void* p) noexcept { delete static_cast<std::vector<T>*>(p); });
+  return nb::ndarray<nb::numpy, T, nb::shape<-1>>(owned->data(), {owned->size()}, owner);
+}
+
+// The rows within `max_distance` as an array, or as a tuple of that and an array of the
+// distances if `return_distances`.
+nb::object
+IndicesResult(std::vector<int32_t>&& indices, std::vector<float>&& distances,
+              bool return_distances) {
+  if (return_distances) {
+    return nb::make_tuple(ToNumpy(std::move(indices)), ToNumpy(std::move(distances)));
+  }
+  return nb::cast(ToNumpy(std::move(indices)));
+}
+
+nb::object
+GFPListIndicesWithinDistanceIndex(const gfp_context::GFPList& gfp, int query,
+                                  float max_distance, const Tversky* tversky,
+                                  const nb::object& only_search, bool return_distances) {
+  CheckGFPListIndex(gfp, query, "query");
+  if (max_distance < 0.0f) {
+    throw std::invalid_argument("max_distance must be non-negative");
+  }
+  const auto rows = RowSubset(gfp, only_search);
+  std::vector<float> distances;
+  std::vector<int32_t> indices = gfp.IndicesWithinDistance(
+      query, max_distance, tversky, Pointer(rows), return_distances ? &distances : nullptr);
+  return IndicesResult(std::move(indices), std::move(distances), return_distances);
+}
+
+nb::object
+GFPListIndicesWithinDistanceFingerprint(const gfp_context::GFPList& gfp,
+                                        const gfp_context::GFPFingerprint& query,
+                                        float max_distance, const Tversky* tversky,
+                                        const nb::object& only_search, bool return_distances) {
+  CheckCompatibleFingerprint(gfp, query);
+  if (max_distance < 0.0f) {
+    throw std::invalid_argument("max_distance must be non-negative");
+  }
+  const auto rows = RowSubset(gfp, only_search);
+  std::vector<float> distances;
+  std::vector<int32_t> indices = gfp.IndicesWithinDistance(
+      query, max_distance, tversky, Pointer(rows), return_distances ? &distances : nullptr);
+  return IndicesResult(std::move(indices), std::move(distances), return_distances);
+}
+
+size_t
+GFPListCountWithinDistanceIndex(const gfp_context::GFPList& gfp, int query, float max_distance,
+                                const Tversky* tversky, const nb::object& only_search) {
+  CheckGFPListIndex(gfp, query, "query");
+  if (max_distance < 0.0f) {
+    throw std::invalid_argument("max_distance must be non-negative");
+  }
+  const auto rows = RowSubset(gfp, only_search);
+  return gfp.CountWithinDistance(query, max_distance, tversky, Pointer(rows));
+}
+
+size_t
+GFPListCountWithinDistanceFingerprint(const gfp_context::GFPList& gfp,
+                                      const gfp_context::GFPFingerprint& query,
+                                      float max_distance, const Tversky* tversky,
+                                      const nb::object& only_search) {
+  CheckCompatibleFingerprint(gfp, query);
+  if (max_distance < 0.0f) {
+    throw std::invalid_argument("max_distance must be non-negative");
+  }
+  const auto rows = RowSubset(gfp, only_search);
+  return gfp.CountWithinDistance(query, max_distance, tversky, Pointer(rows));
 }
 
 void
@@ -659,17 +788,45 @@ BindTools(nb::module_& m) {
            "Distance between a fingerprint and row j. With a Tversky object, fp is "
            "the query.")
       .def("nearest_neighbours", &GFPListNearestNeighboursIndex,
-           nb::arg("query"), nb::arg("k"), nb::arg("tversky").none() = nb::none())
+           nb::arg("query"), nb::arg("k"), nb::arg("tversky").none() = nb::none(),
+           nb::arg("only_search") = nb::none(),
+           "The k nearest neighbours of row `query`, which is not itself a result. With "
+           "only_search, a list or numpy array of row numbers, only those rows are examined.")
       .def("nearest_neighbours", &GFPListNearestNeighboursFingerprint,
-           nb::arg("query"), nb::arg("k"), nb::arg("tversky").none() = nb::none())
+           nb::arg("query"), nb::arg("k"), nb::arg("tversky").none() = nb::none(),
+           nb::arg("only_search") = nb::none(),
+           "The k nearest neighbours of a fingerprint. With only_search, a list or numpy "
+           "array of row numbers, only those rows are examined.")
       .def("nearest_neighbours_within_distance",
            &GFPListNearestNeighboursWithinDistanceIndex,
            nb::arg("query"), nb::arg("max_distance"),
-           nb::arg("tversky").none() = nb::none())
+           nb::arg("tversky").none() = nb::none(), nb::arg("only_search") = nb::none())
       .def("nearest_neighbours_within_distance",
            &GFPListNearestNeighboursWithinDistanceFingerprint,
            nb::arg("query"), nb::arg("max_distance"),
-           nb::arg("tversky").none() = nb::none())
+           nb::arg("tversky").none() = nb::none(), nb::arg("only_search") = nb::none())
+      .def("indices_within_distance", &GFPListIndicesWithinDistanceIndex,
+           nb::arg("query"), nb::arg("max_distance"), nb::arg("tversky").none() = nb::none(),
+           nb::arg("only_search") = nb::none(), nb::arg("return_distances") = false,
+           "The numbers of the rows within max_distance of row `query`, which is not itself "
+           "a result, as an int32 numpy array in row order (not sorted by distance). With "
+           "return_distances, a tuple of that and a float32 array of the distances. With "
+           "only_search, only those rows are examined and the result is in its order.")
+      .def("indices_within_distance", &GFPListIndicesWithinDistanceFingerprint,
+           nb::arg("query"), nb::arg("max_distance"), nb::arg("tversky").none() = nb::none(),
+           nb::arg("only_search") = nb::none(), nb::arg("return_distances") = false,
+           "The numbers of the rows within max_distance of a fingerprint, as an int32 numpy "
+           "array in row order (not sorted by distance). With return_distances, a tuple of "
+           "that and a float32 array of the distances. With only_search, only those rows are "
+           "examined and the result is in its order.")
+      .def("count_within_distance", &GFPListCountWithinDistanceIndex,
+           nb::arg("query"), nb::arg("max_distance"), nb::arg("tversky").none() = nb::none(),
+           nb::arg("only_search") = nb::none(),
+           "How many rows are within max_distance of row `query`, without making a list.")
+      .def("count_within_distance", &GFPListCountWithinDistanceFingerprint,
+           nb::arg("query"), nb::arg("max_distance"), nb::arg("tversky").none() = nb::none(),
+           nb::arg("only_search") = nb::none(),
+           "How many rows are within max_distance of a fingerprint, without making a list.")
       .def("set_weight", &GFPListSetWeight, nb::arg("tag"), nb::arg("weight"))
       .def("use_only", &GFPListUseOnly, nb::arg("tags"))
       .def("use_all", [](gfp_context::GFPList& gfp) {

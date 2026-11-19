@@ -58,9 +58,12 @@ aromaticity.
   fingerprint, cannot do better. Only a more selective query can.
 * No molecule that contains the query was rejected, for any of the 11 queries, among
   about 39,000 sampled molecules that contain one.
-* Scanning the 2.7 million fingerprints takes about 75 ms, 27 ns per molecule, but asking for
-  all the molecules that pass takes 0.1 to 0.6 s, because most of that time is building the list
-  of results, so it grows with the number that pass.
+* Scanning the 2.7 million fingerprints takes about 65 to 75 ms, 27 ns per molecule.
+  `indices_within_distance` returns the row numbers of everything that passes, as a numpy array,
+  in about the same time (73 ms for the 2.3 million that pass for phenol). Asking for objects with
+  `nearest_neighbours_within_distance` instead takes 0.1 to 0.65 s, because making an object
+  for each result is most of the time, so it grows with the number that pass. The timing
+  script uses `indices_within_distance`.
 * Loading the 2.7 million fingerprints, from a 345 MB file, takes about 2 seconds and
   0.6 GB of memory.
 
@@ -107,3 +110,16 @@ substructure search, would have to be computed for each molecule that is examine
 
 Each script is also a Bazel test, named `//nanobind:gfp_formula_tversky_example_test`
 and `//nanobind:gfp_formula_prefilter_timing_example_test`.
+
+### Searching only some of the fingerprints
+
+`indices_within_distance`, `count_within_distance` and the nearest-neighbour searches take
+`only_search=`, a list or numpy array of row numbers, so that the molecules that pass the formula
+filter can be examined with a second fingerprint, whose list has the same molecules in the same
+order, without comparing all the others. With stored fingerprints for 500,000 ChEMBL molecules this
+is 2.7 to 4.1 times faster than searching everything with EC fingerprints for the selective queries
+(chlorobenzene, trifluoromethyl, a steroid core) but only 1.0 times faster for phenol, which passes
+80%, and with stored path fingerprints, which cost only 48 ns per molecule to scan, it is 0.7 to 1.6
+times. It pays when the second fingerprint is costly to compare. See
+[LillyMolPython.md](/docs/python/LillyMolPython.md) for the measurements and for why the ten nearest
+can differ from searching everything.

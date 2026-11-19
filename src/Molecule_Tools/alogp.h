@@ -92,7 +92,7 @@ enum AlogPAtype {
   kBr = 63,
   kI = 64,
 
-  kHal = 67,
+  kHal = 65,
   kP = 66,
 
   kS1 = 67,

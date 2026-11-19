@@ -494,15 +494,45 @@ class GFPList {
   // features that are only in the list entry.
   float Distance(int i, int j, const Tversky* tversky = nullptr) const;
   float Distance(const GFPFingerprint& fp, int j, const Tversky* tversky = nullptr) const;
-  std::vector<NearestNeighbour> NearestNeighbours(int query, int k,
-                                                  const Tversky* tversky = nullptr) const;
-  std::vector<NearestNeighbour> NearestNeighbours(const GFPFingerprint& query, int k,
-                                                  const Tversky* tversky = nullptr) const;
+
+  // The searches below can be restricted to some of the entries. If `only_search` is not
+  // null only the rows it lists are examined, and the results are in its order, otherwise
+  // every row is. A row number that is out of range is ignored (the Python binding
+  // checks them), and a row listed twice is examined twice. When the query is a row of
+  // the list, that row is never a result.
+  std::vector<NearestNeighbour> NearestNeighbours(
+      int query, int k, const Tversky* tversky = nullptr,
+      const std::vector<int32_t>* only_search = nullptr) const;
+  std::vector<NearestNeighbour> NearestNeighbours(
+      const GFPFingerprint& query, int k, const Tversky* tversky = nullptr,
+      const std::vector<int32_t>* only_search = nullptr) const;
   std::vector<NearestNeighbour> NearestNeighboursWithinDistance(
-      int query, float max_distance, const Tversky* tversky = nullptr) const;
+      int query, float max_distance, const Tversky* tversky = nullptr,
+      const std::vector<int32_t>* only_search = nullptr) const;
   std::vector<NearestNeighbour> NearestNeighboursWithinDistance(
-      const GFPFingerprint& query, float max_distance,
-      const Tversky* tversky = nullptr) const;
+      const GFPFingerprint& query, float max_distance, const Tversky* tversky = nullptr,
+      const std::vector<int32_t>* only_search = nullptr) const;
+
+  // Just the row numbers of the entries within `max_distance` of the query. Unlike
+  // NearestNeighboursWithinDistance the results are not sorted by distance, they are in
+  // row order (or the order of `only_search`), and no object is made for each, which is
+  // most of the cost of NearestNeighboursWithinDistance when many are within the distance.
+  // If `distances` is not null it receives the distance for each row returned.
+  std::vector<int32_t> IndicesWithinDistance(
+      int query, float max_distance, const Tversky* tversky = nullptr,
+      const std::vector<int32_t>* only_search = nullptr,
+      std::vector<float>* distances = nullptr) const;
+  std::vector<int32_t> IndicesWithinDistance(
+      const GFPFingerprint& query, float max_distance, const Tversky* tversky = nullptr,
+      const std::vector<int32_t>* only_search = nullptr,
+      std::vector<float>* distances = nullptr) const;
+
+  // How many entries are within `max_distance` of the query, without making a list.
+  size_t CountWithinDistance(int query, float max_distance, const Tversky* tversky = nullptr,
+                             const std::vector<int32_t>* only_search = nullptr) const;
+  size_t CountWithinDistance(const GFPFingerprint& query, float max_distance,
+                             const Tversky* tversky = nullptr,
+                             const std::vector<int32_t>* only_search = nullptr) const;
 };
 
 }  // namespace gfp_context

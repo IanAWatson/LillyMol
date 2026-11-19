@@ -337,6 +337,19 @@ ALogP::AromaticCarbon(PerMoleculeData& pmd, atom_number_t zatom) {
   return 1;
 }
 
+// RDKit's C3 and C4 types need an attached [N,O,P,S,F,Cl,Br,I]. A saturated carbon
+// attached to any other non-carbon atom (B, Si, Se...) is C27.
+int
+HasClassicHeteroatomNeighbour(const PerMoleculeData& pmd, atom_number_t zatom) {
+  for (const Bond* b : pmd.mol[zatom]) {
+    switch (pmd.z[b->other(zatom)]) {
+      case 7: case 8: case 9: case 15: case 16: case 17: case 35: case 53:
+        return 1;
+    }
+  }
+  return 0;
+}
+
 int
 ALogP::SaturatedPrimaryCarbon(PerMoleculeData& pmd, atom_number_t zatom) {
   assert(pmd.z[zatom] == 6);
@@ -359,8 +372,12 @@ ALogP::SaturatedPrimaryCarbon(PerMoleculeData& pmd, atom_number_t zatom) {
       return 1;   // kC1 is zero, so cannot return it. All these functions shuold be boolean.
     } else {  // heteroatom
       // C3 primary heteroatom
-      pmd.assigned[zatom] = kC3;
-      return kC3;
+      if (HasClassicHeteroatomNeighbour(pmd, zatom)) {
+        pmd.assigned[zatom] = kC3;
+        return kC3;
+      }
+      pmd.assigned[zatom] = kC27;
+      return kC27;
     }
   }
 }
@@ -384,7 +401,11 @@ ALogP::SaturatedSecondaryCarbom(PerMoleculeData& pmd, atom_number_t zatom) {
 
 
   // C3
-  pmd.assigned[zatom] = kC3;
+  if (HasClassicHeteroatomNeighbour(pmd, zatom)) {
+    pmd.assigned[zatom] = kC3;
+  } else {
+    pmd.assigned[zatom] = kC27;
+  }
   return 1;
 }
 
@@ -430,7 +451,11 @@ ALogP::SaturatedCarbon(PerMoleculeData& pmd, atom_number_t zatom) {
     return 1;
   }
   // C4
-  pmd.assigned[zatom] = kC4;
+  if (HasClassicHeteroatomNeighbour(pmd, zatom)) {
+    pmd.assigned[zatom] = kC4;
+  } else {
+    pmd.assigned[zatom] = kC27;
+  }
   return 1;
 }
 
@@ -567,70 +592,6 @@ ALogP::AromaticNitrogen(PerMoleculeData& pmd, atom_number_t zatom) {
   return 1;
 }
 
-// The NH2 atom in an amidine
-int
-SaturatedNitrogenIsAmidine(PerMoleculeData& pmd, atom_number_t zatom) {
-  atom_number_t carbon = pmd.mol.other(zatom, 0);
-
-  if (pmd.attached_heteroatom_count[carbon] != 2) {
-    return 0;
-  }
-  if (pmd.aromatic[carbon]) {
-    return 0;
-  }
-  if (pmd.double_bond_count[carbon] != 1) {
-    return 0;
-  }
-  if (pmd.single_bond_count[carbon] != 2) {
-    return 0;
-  }
-
-  for (const Bond* b : pmd.mol[carbon]) {
-    if (! b->is_double_bond()) {
-      continue;
-    }
-
-    atom_number_t o = b->other(carbon);
-    // Should we also check that `o` is singly bonded.
-    if (pmd.z[o] == 7) {
-      return 1;
-    }
-  }
-
-  return 0;
-}
-
-// The NH2 atom in a guanidine?
-int
-SaturatedNitrogenIsGuanidine(PerMoleculeData& pmd, atom_number_t zatom) {
-  atom_number_t carbon = pmd.mol.other(zatom, 0);
-
-  if (pmd.attached_heteroatom_count[carbon] != 3) {
-    return 0;
-  }
-  if (pmd.aromatic[carbon]) {
-    return 0;
-  }
-  if (pmd.double_bond_count[carbon] != 1) {
-    return 0;
-  }
-  if (pmd.single_bond_count[carbon] != 2) {
-    return 0;
-  }
-
-  for (const Bond* b : pmd.mol[zatom]) {
-    atom_number_t o = b->other(carbon);
-    if (o == zatom) {
-      continue;
-    }
-    if (pmd.z[o] != 7) {
-      return 0;
-    }
-  }
-
-  return 1;
-}
-
 // Return the number of adjacent unsaturations to `zatom` -
 // excludes aromatics.
 int
@@ -647,38 +608,6 @@ Vinyl(const PerMoleculeData& pmd, atom_number_t zatom) {
   }
 
   return rc;
-}
-
-// Is a terminal nitrogen part of an amide. Allow sulfonamides
-int
-TerminalNitrogenIsAmide(const PerMoleculeData& pmd, atom_number_t zatom) {
-  assert(pmd.mol.ncon(zatom) == 1);
-
-  // Allow either carbon or Sulphur
-  const atom_number_t carbon = pmd.mol.other(zatom, 0);
-  if (pmd.z[carbon] == 6) {
-  } else if (pmd.z[carbon] == 16) {
-  } else {
-    return 0;
-  }
-
-  int doubly_bonded_oxygen_count = 0;
-  for (const Bond* b : pmd.mol[carbon]) {
-    if (! b->is_double_bond()) {
-      continue;
-    }
-
-    atom_number_t o = b->other(carbon);
-    if (pmd.z[o] == 8) {
-    } else if (pmd.z[o] == 16) {
-    } else {
-      continue;
-    }
-
-    ++doubly_bonded_oxygen_count;
-  }
-
-  return doubly_bonded_oxygen_count;
 }
 
 // Is zatom the N of a sulfonamide
@@ -716,54 +645,17 @@ int
 ALogP::SinglyConnectedSaturatedNitrogen(PerMoleculeData& pmd, atom_number_t zatom) {
   assert(pmd.mol.ncon(zatom) == 1);
 
-  if (pmd.attached_heteroatom_count[zatom] == 0 &&
-      SaturatedNitrogenIsGuanidine(pmd, zatom)) {
-    pmd.assigned[zatom] = kN1;
-    return 1;
-  }
-
-  if (pmd.attached_heteroatom_count[zatom] == 0 &&
-      SaturatedNitrogenIsAmidine(pmd, zatom)) {
-    pmd.assigned[zatom] = kN1;
-    return 1;
-  }
-
-  const int vinyl = Vinyl(pmd, zatom);
-
-  // We are not using a charge assigner, so we approximate a primary amine this way.
-  if (pmd.attached_heteroatom_count[zatom] == 0 &&
-      vinyl == 0) {
-    atom_number_t o = pmd.mol.other(zatom, 0);
-    if (pmd.aromatic[o]) {  // N3
-      pmd.assigned[zatom] = kN3;
-      return 1;
-    } else {  // N1
-      pmd.assigned[zatom] = kN1;
-      return 1;
-    }
-  }
-
-  // but notice that RDKit assigns N1 to a terminal amide
-  if (pmd.attached_heteroatom_count[zatom] == 0 &&
-      vinyl && TerminalNitrogenIsAmide(pmd, zatom)) {
-    pmd.assigned[zatom] = kN1;
-    return 1;
-  }
-
-  if (pmd.attached_heteroatom_count[zatom] == 1 &&
-      vinyl && IsSulfonamide(pmd, zatom)) {
-    pmd.assigned[zatom] = kN1;
-    return 1;
-  }
-
-  // N3 maybe not charged, but still adjacent to arom. Aniline
-  if (pmd.aryl_count[zatom] == 1) {
+  // The paper defines N1 as [NH2+0][A] and N3 as [NH2+0][a], where A is any aliphatic
+  // atom, so the attached atom can be a heteroatom (hydrazine) or a vinyl carbon
+  // (enamine). RDKit does the same. Earlier versions assigned NS to those.
+  // We are not using a charge assigner, so a singly connected saturated nitrogen is
+  // treated as an uncharged NH2.
+  const atom_number_t o = pmd.mol.other(zatom, 0);
+  if (pmd.aromatic[o]) {  // N3
     pmd.assigned[zatom] = kN3;
-    return 1;
+  } else {  // N1
+    pmd.assigned[zatom] = kN1;
   }
-
-  // NS nitrogen supplemental.
-  pmd.assigned[zatom] = kNS;
   return 1;
 }
 
@@ -928,6 +820,22 @@ ALogP::UnSaturatedNitrogen(PerMoleculeData& pmd, atom_number_t zatom) {
     return 1;
   }
 
+  // N13 [NH0;+](=[A])([A])[!#1;A,a] iminium, nitrone, and the same atom drawn neutral
+  // and pentavalent, as in C=N(=O)C, which RDKit sanitises to the charged form.
+  if (a.ncon() == 3 && pmd.triple_bond_count[zatom] == 0 &&
+      ((pmd.formal_charge[zatom] == 1 && pmd.double_bond_count[zatom] == 1) ||
+       (pmd.formal_charge[zatom] == 0 && pmd.double_bond_count[zatom] == 2))) {
+    pmd.assigned[zatom] = kN13;
+    return 1;
+  }
+
+  // N13 amine N-oxide drawn neutral and pentavalent, C[N](C)(C)=O
+  if (a.ncon() == 4 && pmd.formal_charge[zatom] == 0 && pmd.double_bond_count[zatom] == 1 &&
+      pmd.triple_bond_count[zatom] == 0) {
+    pmd.assigned[zatom] = kN13;
+    return 1;
+  }
+
   // N5 imine
   if (a.ncon() == 1 && pmd.double_bond_count[zatom] == 1) {
     pmd.assigned[zatom] = kN5;
@@ -947,11 +855,14 @@ ALogP::UnSaturatedNitrogen(PerMoleculeData& pmd, atom_number_t zatom) {
     return 1;
   }
 
-  // N14 N#N=
+  // The central N of C=N#N (diazo) is N13 as RDKit sanitises it to [N+](=[#6])=[#7].
+  // The central N of an azide, N=N#N, and the terminal N are N14.
   if (a.ncon() == 2 && pmd.triple_bond_count[zatom] == 1 &&
       pmd.double_bond_count[zatom] == 1 &&
       pmd.attached_heteroatom_count[zatom]) {
-    pmd.assigned[zatom] = kN14;
+    // Only when the double bond is to carbon, the azide N is N14.
+    const atom_number_t dbl = DoublyBondedTo(pmd, zatom).first;
+    pmd.assigned[zatom] = (pmd.z[dbl] == 6) ? kN13 : kN14;
     return 1;
   }
 
@@ -1026,6 +937,7 @@ IsAcid(PerMoleculeData& pmd, atom_number_t zatom) {
   assert (pmd.z[zatom] == 8);
 
   const atom_number_t carbon = pmd.mol.other(zatom, 0);
+
   for (const Bond* b : pmd.mol[carbon]) {
     if (! b->is_double_bond()) {
       continue;
@@ -1112,6 +1024,15 @@ ALogP::SaturatedOxygen(PerMoleculeData& pmd, atom_number_t zatom) {
 
   if (acon == 1) {
     atom_number_t o = pmd.mol.other(zatom, 0);
+
+    // RDKit defines O2 as [OH,OH2] with no restriction on the attached atom, so
+    // any neutral hydroxyl that was not recognised as an acid above is O2:
+    // oxime, N-hydroxy aromatic, peroxide, boronic acid, silanol, P(=S)OH...
+    if (pmd.formal_charge[zatom] == 0) {
+      pmd.assigned[zatom] = kO2;
+      return 1;
+    }
+
     // O6 oxide
     if (pmd.z[o] == 16) {
       pmd.assigned[zatom] = kO6;
@@ -1155,24 +1076,45 @@ ALogP::Oxygen(PerMoleculeData& pmd, atom_number_t zatom) {
 
 int
 ALogP::Fluorine(PerMoleculeData& pmd, atom_number_t zatom) {
+  if (pmd.formal_charge[zatom] < 0) {  // halide
+    pmd.assigned[zatom] = kHal;
+    return 1;
+  }
+
   pmd.assigned[zatom] = kF;
   return 1;
 }
 
 int
 ALogP::Chlorine(PerMoleculeData& pmd, atom_number_t zatom) {
+  if (pmd.formal_charge[zatom] < 0) {  // halide
+    pmd.assigned[zatom] = kHal;
+    return 1;
+  }
+
   pmd.assigned[zatom] = kCl;
   return 1;
 }
 
 int
 ALogP::Bromine(PerMoleculeData& pmd, atom_number_t zatom) {
+  if (pmd.formal_charge[zatom] < 0) {  // halide
+    pmd.assigned[zatom] = kHal;
+    return 1;
+  }
+
   pmd.assigned[zatom] = kBr;
   return 1;
 }
 
 int
 ALogP::Iodine(PerMoleculeData& pmd, atom_number_t zatom) {
+  // Halide, or the iodine of iodonium [I+], both Hal in RDKit.
+  if (pmd.formal_charge[zatom] != 0) {
+    pmd.assigned[zatom] = kHal;
+    return 1;
+  }
+
   pmd.assigned[zatom] = kI;
   return 1;
 }
@@ -1183,21 +1125,19 @@ ALogP::Phosphorus(PerMoleculeData& pmd, atom_number_t zatom) {
   return 1;
 }
 
-// Or nitrogen to deal with RDKit's handling of
+// RDKit assigns S2 to a neutral sulphur doubly bonded to [N,O,P,S], see
+// [S-0]=[N,O,P,S]. The nitrogen case is needed for
 // S(=O)(=O)(N=S(C)CCCC)C1=CC=C(C)C=C1 CHEMBL1533581
 int
-DoublyBondedToOxygen(const PerMoleculeData& pmd, atom_number_t zatom) {
+DoublyBondedToNOPS(const PerMoleculeData& pmd, atom_number_t zatom) {
   for (const Bond* b : pmd.mol[zatom]) {
     if (! b->is_double_bond()) {
       continue;
     }
 
-    atom_number_t o = b->other(zatom);
-    if (pmd.z[o] == 8) {
-      return 1;
-    }
-    if (pmd.z[o] == 7) {
-      return 1;
+    switch (pmd.z[b->other(zatom)]) {
+      case 7: case 8: case 15: case 16:
+        return 1;
     }
   }
 
@@ -1212,9 +1152,9 @@ ALogP::Sulphur(PerMoleculeData& pmd, atom_number_t zatom) {
     return 1;
   }
 
-  // RDKit seems to apply S2 to S=O groups, which seems wrong
+  // RDKit seems to apply S2 to S=O (and S=N, S=P, S=S) groups, which seems wrong
   // Maybe this should be made a settable behaviour.
-  if (pmd.double_bond_count[zatom] && DoublyBondedToOxygen(pmd.mol, zatom)) {
+  if (pmd.double_bond_count[zatom] && DoublyBondedToNOPS(pmd, zatom)) {
     pmd.assigned[zatom] = kS2;
     return 1;
   }
@@ -1249,6 +1189,11 @@ ALogP::IsHydrogenAcid(PerMoleculeData& pmd, atom_number_t zatom) {
     return 0;
   }
 
+  // [#1]OC=... requires a carbon. An oxime or nitrous acid OH is H3 ([#1]O[#7]).
+  if (pmd.z[carbon] == 7 || pmd.z[carbon] == 8) {
+    return 0;
+  }
+
   // RDKit does not consider phosphoric acid H's to be acidic.
   // An argument could be made to only consider 1 of the two
   // to be acidic, but that would slow things down by breaking
@@ -1279,10 +1224,10 @@ IsPeroxide(PerMoleculeData& pmd, atom_number_t zatom) {
   }
 
   const atom_number_t os = pmd.mol.other(zatom, 0);
-  if (pmd.mol.ncon(os) != 2) {
-    return 0;
+  if (pmd.z[os] == 8) {
+    return 1;
   }
-  if (pmd.z[os] == 8 || pmd.z[os] == 16) {
+  if (pmd.z[os] == 16 && pmd.mol.ncon(os) == 2) {
     return 1;
   }
 
@@ -1367,11 +1312,12 @@ IsHydrogenAlcohol(PerMoleculeData& pmd, atom_number_t zatom) {
     return 0;
   }
 
-  if (pmd.z[zatom] == 7 || pmd.z[zatom] == 8) {
-    return 1;
+  if (pmd.z[zatom] == 7) {
+    return 0;
   }
 
-  return 0;
+  // [#1][!C;!N;!O] is H2 in RDKit, which includes H on B, Si, halogens...
+  return 1;
 }
 
 int

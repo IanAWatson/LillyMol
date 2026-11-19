@@ -15,7 +15,7 @@ LillyMol Python ABI:
 | File | Purpose |
 | --- | --- |
 | `formula_tversky.py` | How the distances change with the Tversky weights, and how well the fingerprint works as a filter, with and without the counts of atoms bearing hydrogens, checked against real substructure searching. Uses `molecules.smi`, or `--file` and `--query`. |
-| `formula_prefilter_timing.py` | Times the filter and the precise search on a large collection, checks that no molecule containing the query is rejected, and estimates the time saved. Needs a file made by `formula_fingerprint -H`. |
+| `formula_prefilter_timing.py` | Times the filter and a second stage on a large collection, checks that no molecule the second stage finds is rejected, and estimates the time saved. The second stage is a substructure search, or with `--second-stage path` or `ec` a richer fingerprint made from the smiles and compared with the same Tversky similarity. Needs a file made by `formula_fingerprint -H`. |
 | `molecules.smi` | 40 molecules, with named examples of molecules that do and do not contain a phenol. |
 | `molecules.formula_nh.gfp` | The fingerprints of those molecules, made with `formula_fingerprint -H molecules.smi`, for testing the timing script. Far too small for the times to mean anything. |
 
@@ -56,13 +56,48 @@ aromaticity.
   within 1-2% of that limit, since the precise search costs hundreds of times more per molecule
   than the filter. A more expensive second stage, such as computing and comparing a richer
   fingerprint, cannot do better. Only a more selective query can.
-* No molecule that contains the query was rejected, for any of the 11 queries, among the
-  roughly 47,000 sampled molecules that contain one.
-* Scanning the 2.7 million fingerprints takes about 75 ms, 27 ns per molecule, but asking for
-  all the molecules that pass takes 0.1 to 0.6 s, because most of that time is building the list
-  of results, so it grows with the number that pass.
+* No molecule that contains the query was rejected, for any of the 11 queries, among
+  about 39,000 sampled molecules that contain one.
+* Scanning the 2.7 million fingerprints takes about 65 to 75 ms, 27 ns per molecule.
+  `indices_within_distance` returns the row numbers of everything that passes, as a numpy array,
+  in about the same time (73 ms for the 2.3 million that pass for phenol). Asking for objects with
+  `nearest_neighbours_within_distance` instead takes 0.1 to 0.65 s, because making an object
+  for each result is most of the time, so it grows with the number that pass. The timing
+  script uses `indices_within_distance`.
 * Loading the 2.7 million fingerprints, from a 345 MB file, takes about 2 seconds and
   0.6 GB of memory.
+
+### Other second stages
+
+The second stage need not be a substructure search. With `--second-stage path` (`GFP.iw()`) or
+`--second-stage ec` (`GFP.ec()`) the script makes that fingerprint from the smiles of each
+molecule that passes the filter and compares it with the same `Tversky(2, 0)`, counting a
+molecule as found if the distance is at most `--second-stage-distance` (default 0). On the
+2.7 million ChEMBL molecules, again estimated from a sample of 20,000:
+
+| Second stage | Cost per molecule | Query | Second stage on all | Filter, then second stage | Times faster |
+| --- | --- | --- | --- | --- | --- |
+| substructure search | 5 + 14 to 23 microseconds | phenol | 78 s | 66 s | 1.2 |
+| | | chlorobenzene | 54 s | 9 s | 5.7 |
+| path fingerprint | 5 + 116 microseconds | phenol | 5.5 min | 4.6 min | 1.2 |
+| | | chlorobenzene | 5.6 min | 58 s | 5.8 |
+| EC fingerprint | 5 + 46 microseconds | phenol | 2.3 min | 118 s | 1.2 |
+| | | chlorobenzene | 2.4 min | 25 s | 5.8 |
+
+The speedup is the same whichever second stage is used, and is again the limit set by the
+fraction that passes (17% for chlorobenzene, 84% for phenol), so a more expensive second
+stage saves more *time* but not a larger *factor*. The time saved is what matters when the
+second stage is costly: 4.6 minutes for chlorobenzene with the path fingerprint.
+
+At distance 0 a fingerprint second stage finds only the molecules that have every feature of the
+query fragment. The extended connectivity environments reach beyond the fragment, to atoms
+that are substituted in a molecule that contains it, so for a fragment query no molecule has all of
+them (0 of 20,000 here), and a tolerance is needed. The path fingerprint is much less affected. When a
+fingerprint is the second stage, molecules that it finds and the filter rejects are reported, but
+are not an error as they are for a substructure search, since two fingerprints can disagree.
+None were rejected in these runs.
+
+### Cost of scanning
 
 Scanning the same 500,000 molecules, with `Tversky(2, 0)` and one result wanted, costs about 25 ns
 per molecule for the formula fingerprint without the hydrogen counts (33 ns with them),
@@ -75,3 +110,16 @@ substructure search, would have to be computed for each molecule that is examine
 
 Each script is also a Bazel test, named `//nanobind:gfp_formula_tversky_example_test`
 and `//nanobind:gfp_formula_prefilter_timing_example_test`.
+
+### Searching only some of the fingerprints
+
+`indices_within_distance`, `count_within_distance` and the nearest-neighbour searches take
+`only_search=`, a list or numpy array of row numbers, so that the molecules that pass the formula
+filter can be examined with a second fingerprint, whose list has the same molecules in the same
+order, without comparing all the others. With stored fingerprints for 500,000 ChEMBL molecules this
+is 2.7 to 4.1 times faster than searching everything with EC fingerprints for the selective queries
+(chlorobenzene, trifluoromethyl, a steroid core) but only 1.0 times faster for phenol, which passes
+80%, and with stored path fingerprints, which cost only 48 ns per molecule to scan, it is 0.7 to 1.6
+times. It pays when the second fingerprint is costly to compare. See
+[LillyMolPython.md](/docs/python/LillyMolPython.md) for the measurements and for why the ten nearest
+can differ from searching everything.

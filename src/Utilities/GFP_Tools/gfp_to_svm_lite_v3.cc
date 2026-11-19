@@ -111,7 +111,6 @@ Usage(int rc) {
  -S <stem>         output file name stem, <stem>.svml and/or <stem>.tsv
  -D <fname>        with tsv output, write a feature description file
  -p <n>            support level, only features found in at least <n> molecules are kept
- -d                write counts as floating point values - ordinal rather than categorical values
  -V                output is for LIBSVM, suppress addition of identifier
  -v                verbose output
 )";

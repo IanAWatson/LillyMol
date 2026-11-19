@@ -2729,6 +2729,218 @@ sidechain {
         with self.assertRaises(ValueError):
             gfp.distance(other, 0, tversky=contains_query)
 
+    def _indices_fixture(self):
+        context = lillymol.GFPContext.from_specs([lillymol.GFP.formula(hydrogens=False)])
+        gfp = lillymol.GFPList(context)
+        gfp.add_molecules(lillymol.MolFromSmiles([
+            "Oc1ccccc1 phenol", "Cc1ccccc1O cresol", "c1ccccc1 benzene", "OCC ethanol",
+            "CCCCO butanol", "Clc1ccccc1O chlorophenol", "NCC(=O)O glycine",
+            "CCCCCC hexane"]), store_metadata=True)
+        query = context.fingerprint(lillymol.MolFromSmiles("Oc1ccccc1 query"))
+        return context, gfp, query, lillymol.Tversky(query=2.0, candidate=0.0)
+
+    def test_gfp_indices_and_count_within_distance(self):
+        try:
+            import numpy as np
+        except ImportError:
+            self.skipTest("numpy is not available")
+        context, gfp, query, contains_query = self._indices_fixture()
+
+        indices = gfp.indices_within_distance(query, 1.0e-6, tversky=contains_query)
+        self.assertIsInstance(indices, np.ndarray)
+        self.assertEqual(indices.dtype, np.int32)
+        self.assertEqual(indices.shape, (3,))
+        self.assertEqual(indices.tolist(), [0, 1, 5])  # phenol, cresol, chlorophenol
+        self.assertEqual(gfp.count_within_distance(query, 1.0e-6, tversky=contains_query), 3)
+
+        # The same rows as nearest_neighbours_within_distance, but in row order.
+        for tversky in (None, contains_query):
+            for max_distance in (0.0, 0.3, 1.0):
+                hits = gfp.nearest_neighbours_within_distance(query, max_distance, tversky=tversky)
+                indices = gfp.indices_within_distance(query, max_distance, tversky=tversky)
+                self.assertEqual(indices.tolist(), sorted(hit.index for hit in hits))
+                self.assertEqual(gfp.count_within_distance(query, max_distance, tversky=tversky),
+                                 len(hits))
+
+        # With the distances.
+        indices, distances = gfp.indices_within_distance(
+            query, 0.5, tversky=contains_query, return_distances=True)
+        self.assertEqual(distances.dtype, np.float32)
+        self.assertEqual(distances.shape, indices.shape)
+        for row, distance in zip(indices.tolist(), distances.tolist()):
+            self.assertAlmostEqual(distance, gfp.distance(query, row, tversky=contains_query),
+                                   places=6)
+
+        # Tanimoto distance 0 is only the molecule itself, and with the weights the other
+        # way round, the molecules that have nothing the query lacks.
+        self.assertEqual(gfp.indices_within_distance(query, 1.0e-6).tolist(), [0])
+        self.assertEqual(gfp.indices_within_distance(
+            query, 1.0e-6, tversky=lillymol.Tversky(query=0.0, candidate=2.0)).tolist(),
+            [0, 2])  # phenol and benzene
+
+        # Nothing within the distance gives an empty array, not an error.
+        empty = gfp.indices_within_distance(query, 1.0e-6, tversky=contains_query,
+                                            only_search=[3, 4])
+        self.assertEqual(empty.dtype, np.int32)
+        self.assertEqual(empty.shape, (0,))
+        indices, distances = gfp.indices_within_distance(
+            query, 1.0e-6, tversky=contains_query, only_search=[3, 4], return_distances=True)
+        self.assertEqual((indices.shape, distances.shape), ((0,), (0,)))
+
+        # A row as the query is never a result.
+        self.assertEqual(
+            gfp.indices_within_distance(0, 1.0e-6, tversky=contains_query).tolist(), [1, 5])
+        self.assertEqual(gfp.count_within_distance(0, 1.0e-6, tversky=contains_query), 2)
+
+        with self.assertRaises(ValueError):
+            gfp.indices_within_distance(query, -1.0)
+        with self.assertRaises(ValueError):
+            gfp.count_within_distance(query, -1.0)
+        with self.assertRaises(IndexError):
+            gfp.indices_within_distance(100, 1.0)
+        with self.assertRaises(IndexError):
+            gfp.count_within_distance(-1, 1.0)
+
+        other = lillymol.GFPContext.from_specs([lillymol.GFP.ec()]).fingerprint(
+            lillymol.MolFromSmiles("CCO"))
+        with self.assertRaises(ValueError):
+            gfp.indices_within_distance(other, 1.0)
+        with self.assertRaises(ValueError):
+            gfp.count_within_distance(other, 1.0)
+
+    def test_gfp_only_search(self):
+        try:
+            import numpy as np
+        except ImportError:
+            self.skipTest("numpy is not available")
+        context, gfp, query, contains_query = self._indices_fixture()
+
+        # The rows can be a list, a tuple, or an array of any integer type.
+        for subset in ([5, 3, 0, 4], (5, 3, 0, 4), np.array([5, 3, 0, 4], dtype=np.int32),
+                       np.array([5, 3, 0, 4], dtype=np.int64),
+                       np.array([5, 3, 0, 4], dtype=np.uint8)):
+            # Results are in the order of the subset.
+            self.assertEqual(gfp.indices_within_distance(
+                query, 1.0e-6, tversky=contains_query, only_search=subset).tolist(), [5, 0])
+            self.assertEqual(gfp.count_within_distance(
+                query, 1.0e-6, tversky=contains_query, only_search=subset), 2)
+            hits = gfp.nearest_neighbours(query, 2, tversky=contains_query, only_search=subset)
+            self.assertEqual(sorted(hit.index for hit in hits), [0, 5])
+            self.assertEqual(
+                len(gfp.nearest_neighbours_within_distance(
+                    query, 1.0, tversky=contains_query, only_search=subset)), 4)
+
+        # None is no subset, an empty subset searches nothing.
+        self.assertEqual(
+            gfp.indices_within_distance(query, 1.0e-6, tversky=contains_query,
+                                        only_search=None).tolist(), [0, 1, 5])
+        self.assertEqual(gfp.indices_within_distance(
+            query, 1.0, only_search=[]).tolist(), [])
+        self.assertEqual(gfp.nearest_neighbours(query, 3, only_search=[]), [])
+        self.assertEqual(gfp.count_within_distance(query, 1.0, only_search=np.array([], dtype=np.int32)), 0)
+
+        # Every row, in order, is the same as no subset.
+        every = np.arange(len(gfp))
+        self.assertEqual(
+            gfp.indices_within_distance(query, 0.5, tversky=contains_query,
+                                        only_search=every).tolist(),
+            gfp.indices_within_distance(query, 0.5, tversky=contains_query).tolist())
+        with_subset = gfp.nearest_neighbours(query, 5, tversky=contains_query, only_search=every)
+        without = gfp.nearest_neighbours(query, 5, tversky=contains_query)
+        self.assertEqual([hit.index for hit in with_subset], [hit.index for hit in without])
+
+        # A row as the query is excluded, even if it is in the subset.
+        self.assertEqual(gfp.indices_within_distance(
+            0, 1.0e-6, tversky=contains_query, only_search=[5, 3, 0, 4]).tolist(), [5])
+        self.assertEqual(len(gfp.nearest_neighbours(
+            0, 100, tversky=contains_query, only_search=[5, 3, 0, 4])), 3)
+
+        # Things that are not row numbers are errors, not wrong answers.
+        for bad in (np.array([True, False, True, False, True, False, True, False]),
+                    np.array([1.0, 2.0]), "abc", 5, [1.5]):
+            with self.assertRaises(TypeError, msg=repr(bad)):
+                gfp.indices_within_distance(query, 1.0, only_search=bad)
+        with self.assertRaises(IndexError):
+            gfp.indices_within_distance(query, 1.0, only_search=[0, 8])
+        with self.assertRaises(IndexError):
+            gfp.count_within_distance(query, 1.0, only_search=[-1])
+        with self.assertRaises(IndexError):
+            gfp.nearest_neighbours(query, 3, only_search=np.array([100]))
+
+    def test_gfp_count_and_only_search_without_numpy(self):
+        # None of these need numpy, so they run where it is not available.
+        context, gfp, query, contains_query = self._indices_fixture()
+
+        self.assertEqual(gfp.count_within_distance(query, 1.0e-6, tversky=contains_query), 3)
+        self.assertEqual(gfp.count_within_distance(0, 1.0e-6, tversky=contains_query), 2)
+        self.assertEqual(
+            gfp.count_within_distance(query, 1.0e-6, tversky=contains_query,
+                                      only_search=[5, 3, 0, 4]), 2)
+        self.assertEqual(
+            gfp.count_within_distance(query, 1.0e-6, tversky=contains_query,
+                                      only_search=(0, 0)), 2)  # A row listed twice.
+        self.assertEqual(gfp.count_within_distance(query, 1.0, only_search=[]), 0)
+
+        hits = gfp.nearest_neighbours(query, 2, tversky=contains_query, only_search=[5, 3, 0, 4])
+        self.assertEqual(sorted(hit.index for hit in hits), [0, 5])
+        within = gfp.nearest_neighbours_within_distance(
+            query, 1.0e-6, tversky=contains_query, only_search=[4, 5, 1])
+        self.assertEqual(sorted(hit.index for hit in within), [1, 5])
+        self.assertEqual(gfp.nearest_neighbours(query, 3, only_search=[]), [])
+
+        # A row as the query is excluded even if it is in the subset.
+        self.assertEqual(len(gfp.nearest_neighbours(
+            0, 100, tversky=contains_query, only_search=[5, 3, 0, 4])), 3)
+
+        # Every row in order is the same as no subset.
+        every = list(range(len(gfp)))
+        self.assertEqual(
+            [hit.index for hit in gfp.nearest_neighbours(query, 5, tversky=contains_query,
+                                                         only_search=every)],
+            [hit.index for hit in gfp.nearest_neighbours(query, 5, tversky=contains_query)])
+
+        # Things that are not row numbers are errors, not wrong answers.
+        for bad in ("abc", 5, [1.5], [None]):
+            with self.assertRaises(TypeError, msg=repr(bad)):
+                gfp.count_within_distance(query, 1.0, only_search=bad)
+        with self.assertRaises(IndexError):
+            gfp.count_within_distance(query, 1.0, only_search=[0, 8])
+        with self.assertRaises(IndexError):
+            gfp.nearest_neighbours(query, 3, only_search=[-1])
+        with self.assertRaises(ValueError):
+            gfp.count_within_distance(query, -1.0)
+        with self.assertRaises(IndexError):
+            gfp.count_within_distance(100, 1.0)
+
+    def test_gfp_only_search_cascade(self):
+        # Filter with the formula fingerprint, then rank the molecules that pass with the
+        # path fingerprint, examining only those. The same as ranking everything and
+        # then keeping the ones that passed.
+        try:
+            import numpy as np
+        except ImportError:
+            self.skipTest("numpy is not available")
+        context, formula, formula_query, contains_query = self._indices_fixture()
+        passed = formula.indices_within_distance(formula_query, 1.0e-6, tversky=contains_query)
+        self.assertGreater(len(passed), 1)
+
+        path = lillymol.GFPContext.from_specs([lillymol.GFP.iw()])
+        path_list = lillymol.GFPList(path)
+        path_list.add_molecules(lillymol.MolFromSmiles([
+            "Oc1ccccc1 phenol", "Cc1ccccc1O cresol", "c1ccccc1 benzene", "OCC ethanol",
+            "CCCCO butanol", "Clc1ccccc1O chlorophenol", "NCC(=O)O glycine",
+            "CCCCCC hexane"]), store_metadata=True)
+        path_query = path.fingerprint(lillymol.MolFromSmiles("Oc1ccccc1 query"))
+
+        cascade = path_list.nearest_neighbours(path_query, 2, tversky=contains_query,
+                                               only_search=passed)
+        everything = path_list.nearest_neighbours(path_query, len(path_list),
+                                                  tversky=contains_query)
+        expected = [hit for hit in everything if hit.index in set(passed.tolist())][:2]
+        self.assertEqual([hit.index for hit in cascade], [hit.index for hit in expected])
+        for hit, other in zip(cascade, expected):
+            self.assertAlmostEqual(hit.distance, other.distance, places=6)
+
     def test_gfp_tversky_matches_command_line(self):
         # Values from the command line: gfp_make.sh -IW on the needle butanol and
         # a haystack, then gfp_lnearneighbours -p needle.gfp -V a=.. -V b=..

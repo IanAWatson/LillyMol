@@ -1,5 +1,6 @@
 #include "Utilities/GFP_Tools/gfp_context.h"
 
+#include <algorithm>
 #include <cmath>
 #include <cstdlib>
 #include <filesystem>
@@ -1018,6 +1019,153 @@ TEST(TestTversky, FormulaWithoutHydrogensFindsSubstitutedSuperset) {
   // The two forms cannot be compared with each other.
   EXPECT_TRUE(std::isnan(list_without->Distance(query_with, 0, &tv)));
   EXPECT_TRUE(std::isnan(list_with->Distance(query_without, 0, &tv)));
+}
+
+// A list of molecules with a different formula fingerprint each, and some
+// helpers for the tests of the searches that return row numbers.
+class TestIndicesWithinDistance : public testing::Test {
+ protected:
+  void
+  SetUp() override {
+    _context = std::make_shared<gfp_context::GFPContext>();
+    ASSERT_TRUE(_context->BuildFromSpecs(
+        {gfp_context::GFPGeneratorSpec::FormulaFingerprint(false)}));
+    _list = ListFromSmiles(_context, {"Oc1ccccc1 phenol", "Cc1ccccc1O cresol",
+                                      "c1ccccc1 benzene", "OCC ethanol", "CCCCO butanol",
+                                      "Clc1ccccc1O chlorophenol", "NCC(=O)O glycine",
+                                      "CCCCCC hexane"});
+    Molecule phenol;
+    ASSERT_TRUE(phenol.build_from_smiles("Oc1ccccc1 query"));
+    ASSERT_TRUE(_context->Fingerprint(phenol, _query));
+    ASSERT_TRUE(_tversky.Set(2.0f, 0.0f));
+  }
+
+  static std::vector<int32_t>
+  Indices(const std::vector<gfp_context::NearestNeighbour>& hits) {
+    std::vector<int32_t> result;
+    for (const auto& hit : hits) {
+      result.push_back(hit.index);
+    }
+    std::sort(result.begin(), result.end());
+    return result;
+  }
+
+  std::shared_ptr<gfp_context::GFPContext> _context;
+  std::shared_ptr<GFPList> _list;
+  gfp_context::GFPFingerprint _query;
+  Tversky _tversky;
+};
+
+TEST_F(TestIndicesWithinDistance, SameRowsAsNearestNeighboursWithinDistance) {
+  const std::vector<const Tversky*> settings = {nullptr, &_tversky};
+  for (const Tversky* tversky : settings) {
+    for (float max_distance : {0.0f, 0.3f, 1.0f}) {
+      const auto hits = _list->NearestNeighboursWithinDistance(_query, max_distance, tversky);
+      std::vector<float> distances;
+      const auto indices = _list->IndicesWithinDistance(_query, max_distance, tversky,
+                                                        nullptr, &distances);
+
+      // Row order, not distance order.
+      EXPECT_TRUE(std::is_sorted(indices.begin(), indices.end()));
+      EXPECT_EQ(indices, Indices(hits));
+      EXPECT_EQ(_list->CountWithinDistance(_query, max_distance, tversky), indices.size());
+
+      ASSERT_EQ(distances.size(), indices.size());
+      for (size_t i = 0; i < indices.size(); ++i) {
+        EXPECT_FLOAT_EQ(distances[i], _list->Distance(_query, indices[i], tversky));
+      }
+    }
+  }
+
+  // The substituted phenols have at least the counts of the query.
+  EXPECT_THAT(_list->IndicesWithinDistance(_query, 1.0e-6f, &_tversky),
+              testing::ElementsAre(0, 1, 5));
+}
+
+TEST_F(TestIndicesWithinDistance, RowQueryExcludesItself) {
+  const auto indices = _list->IndicesWithinDistance(0, 1.0e-6f, &_tversky);
+  EXPECT_THAT(indices, testing::ElementsAre(1, 5));
+  EXPECT_EQ(_list->CountWithinDistance(0, 1.0e-6f, &_tversky), 2u);
+  EXPECT_EQ(Indices(_list->NearestNeighboursWithinDistance(0, 1.0e-6f, &_tversky)), indices);
+
+  EXPECT_TRUE(_list->IndicesWithinDistance(-1, 1.0f).empty());
+  EXPECT_TRUE(_list->IndicesWithinDistance(100, 1.0f).empty());
+  EXPECT_EQ(_list->CountWithinDistance(100, 1.0f), 0u);
+}
+
+TEST_F(TestIndicesWithinDistance, InvalidQueryOrDistance) {
+  EXPECT_TRUE(_list->IndicesWithinDistance(_query, -1.0f).empty());
+  EXPECT_EQ(_list->CountWithinDistance(_query, -1.0f), 0u);
+
+  // A fingerprint from another context.
+  auto other = std::make_shared<gfp_context::GFPContext>();
+  ASSERT_TRUE(other->BuildFromSpecs({gfp_context::GFPGeneratorSpec::FormulaFingerprint(true)}));
+  Molecule phenol;
+  ASSERT_TRUE(phenol.build_from_smiles("Oc1ccccc1 query"));
+  gfp_context::GFPFingerprint different;
+  ASSERT_TRUE(other->Fingerprint(phenol, different));
+  EXPECT_TRUE(_list->IndicesWithinDistance(different, 1.0f).empty());
+  EXPECT_EQ(_list->CountWithinDistance(different, 1.0f), 0u);
+}
+
+TEST_F(TestIndicesWithinDistance, OnlySearchRestrictsTheRowsExamined) {
+  const std::vector<int32_t> subset = {5, 3, 0, 4};  // Not in row order.
+
+  // Results follow the order of the subset.
+  EXPECT_THAT(_list->IndicesWithinDistance(_query, 1.0e-6f, &_tversky, &subset),
+              testing::ElementsAre(5, 0));
+  EXPECT_EQ(_list->CountWithinDistance(_query, 1.0e-6f, &_tversky, &subset), 2u);
+
+  // The sorted searches only return rows of the subset.
+  const auto hits = _list->NearestNeighboursWithinDistance(_query, 1.0f, &_tversky, &subset);
+  EXPECT_EQ(hits.size(), 4u);
+  for (const auto& hit : hits) {
+    EXPECT_NE(std::find(subset.begin(), subset.end(), hit.index), subset.end());
+  }
+
+  const auto nearest = _list->NearestNeighbours(_query, 2, &_tversky, &subset);
+  ASSERT_EQ(nearest.size(), 2u);
+  EXPECT_THAT(Indices(nearest), testing::ElementsAre(0, 5));
+
+  // Results with no subset can be many more.
+  EXPECT_EQ(_list->NearestNeighbours(_query, 100, &_tversky).size(), 8u);
+  EXPECT_EQ(_list->NearestNeighbours(_query, 100, &_tversky, &subset).size(), 4u);
+
+  // The row that is the query is never a result, even if it is in the subset.
+  EXPECT_THAT(_list->IndicesWithinDistance(0, 1.0e-6f, &_tversky, &subset),
+              testing::ElementsAre(5));
+  EXPECT_EQ(_list->NearestNeighbours(0, 100, &_tversky, &subset).size(), 3u);
+}
+
+TEST_F(TestIndicesWithinDistance, OnlySearchEdgeCases) {
+  const std::vector<int32_t> empty;
+  EXPECT_TRUE(_list->IndicesWithinDistance(_query, 1.0f, &_tversky, &empty).empty());
+  EXPECT_EQ(_list->CountWithinDistance(_query, 1.0f, &_tversky, &empty), 0u);
+  EXPECT_TRUE(_list->NearestNeighbours(_query, 3, &_tversky, &empty).empty());
+
+  // Every row in order is the same as no subset, which uses the other loop.
+  std::vector<int32_t> all;
+  for (int i = 0; i < _list->size(); ++i) {
+    all.push_back(i);
+  }
+  EXPECT_EQ(_list->IndicesWithinDistance(_query, 0.5f, &_tversky, &all),
+            _list->IndicesWithinDistance(_query, 0.5f, &_tversky));
+  const auto with = _list->NearestNeighbours(_query, 5, &_tversky, &all);
+  const auto without = _list->NearestNeighbours(_query, 5, &_tversky);
+  ASSERT_EQ(with.size(), without.size());
+  for (size_t i = 0; i < with.size(); ++i) {
+    EXPECT_EQ(with[i].index, without[i].index);
+    EXPECT_FLOAT_EQ(with[i].distance, without[i].distance);
+  }
+
+  // Row numbers that are out of range are ignored.
+  const std::vector<int32_t> bad = {-1, 0, 100, 5, 8};
+  EXPECT_THAT(_list->IndicesWithinDistance(_query, 1.0e-6f, &_tversky, &bad),
+              testing::ElementsAre(0, 5));
+
+  // A row listed twice is examined twice.
+  const std::vector<int32_t> twice = {5, 5};
+  EXPECT_EQ(_list->CountWithinDistance(_query, 1.0e-6f, &_tversky, &twice), 2u);
 }
 
 }  // namespace

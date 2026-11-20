@@ -54,7 +54,7 @@ TestTopologicalTorsion::AssignAtomTypes(const char * ust) {
 
 TEST_F(TestTopologicalTorsion, EmptyMolecule) {
   Sparse_Fingerprint_Creator sfc = TopologicalTorsion(_m, nullptr, nullptr, _options);
-  EXPECT_EQ(sfc.nbits(), 0);
+  EXPECT_EQ(sfc.nbits(), 0u);
 }
 
 TEST_F(TestTopologicalTorsion, OneAtom) {

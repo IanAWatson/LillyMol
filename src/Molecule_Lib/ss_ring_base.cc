@@ -1361,8 +1361,8 @@ InterRingAtoms::RunQueries(Molecule_to_Match& target, InterRingRegionData& data,
     return 1;
   }
 
-  Molecule mcopy(*target.molecule());
-  Molecule_to_Match subset_target(&mcopy);
+  // Only the new wrapper is masked; the molecule and outer target are shared.
+  Molecule_to_Match subset_target(target.molecule());
 
   // Temporarily add the ring atoms to this subset.
   data.ring_connections.set_vector(data.region, region_number);

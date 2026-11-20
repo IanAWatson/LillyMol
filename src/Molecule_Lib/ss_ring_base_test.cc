@@ -697,6 +697,41 @@ query {
   EXPECT_THAT(*_sresults.embedding(0), UnorderedElementsAreArray({3}));
 }
 
+TEST_F(TestSubstituent, InterRingSubsetMaskDoesNotAlterOuterTargetOrMolecule) {
+  _string_proto = R"pb(
+query {
+  compress_embeddings: true
+  inter_ring_region {
+    # Count the two three-connected ring attachment carbons in this region.
+    required_smarts: "2[CD3]"
+    disqualifying_smarts: "O"
+    set_global_id: 1
+  }
+  smarts: "[/IWgid1]"
+}
+)pb";
+  ASSERT_TRUE(google::protobuf::TextFormat::ParseFromString(_string_proto, &_proto));
+  ASSERT_TRUE(_query.ConstructFromProto(_proto));
+  ASSERT_TRUE(_mol.build_from_smiles("C1CC1[13CH2]C2CC2OC3CC3[C@H](O)F"));
+  ASSERT_TRUE(_mol.valence_ok());
+  const IWString original = _mol.unique_smiles();
+  ASSERT_EQ(_mol.chiral_centres(), 1);
+  Molecule_to_Match target(&_mol);
+  Substructure_Query oxygen_query;
+  ASSERT_TRUE(oxygen_query.create_from_smarts("O"));
+  for (int i = 0; i < 10; ++i) {
+    Substructure_Results results;
+    ASSERT_EQ(_query.substructure_search(target, results), 1u);
+    // Retain the carbon linker, rejecting the separate oxygen linker.
+    EXPECT_THAT(*results.embedding(0), UnorderedElementsAre(3));
+    Substructure_Results oxygen_results;
+    EXPECT_EQ(oxygen_query.substructure_search(target, oxygen_results), 2u);
+    EXPECT_EQ(_mol.unique_smiles(), original);
+    EXPECT_EQ(_mol.chiral_centres(), 1);
+    EXPECT_EQ(_mol.isotope(3), 13u);
+  }
+}
+
 struct RegionSelectionCase {
   const char* smiles;
   const char* criteria;

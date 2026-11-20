@@ -1171,6 +1171,8 @@ Substituent::RunQueries(Molecule_to_Match& target, const int* storage, int flag,
       continue;
     }
     if (AllMatchedAtomsInStorage(sresults, storage, flag)) {
+      // MatchesInner uses this flag to reject the current substituent.
+      got_rejected_match = 1;
       return 0;
     }
   }

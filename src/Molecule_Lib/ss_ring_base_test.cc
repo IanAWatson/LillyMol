@@ -166,6 +166,54 @@ query {
   EXPECT_THAT(*_sresults.embedding(0), UnorderedElementsAreArray({0, 1, 2, 6}));
 }
 
+TEST_F(TestSubstituent, DisqualifyingSmartsRejectsOnlyTheMatchingSubstituent) {
+  struct TestCase {
+    const char* smiles;
+    std::vector<int> expected;
+  };
+  const std::vector<TestCase> cases = {
+      {"OCC1CC1", {}},          // The only substituent contains O.
+      {"NCC1CC1", {}},          // The first disqualifying query matches.
+      {"CCC1CC1", {0, 1}},      // Neither disqualifying query matches.
+      {"OCC1CC1CC", {5, 6}},    // Reject one substituent, retain the other.
+      {"C1OC1CC", {3, 4}},      // O in the ring must not reject its ethyl group.
+  };
+  for (const char* specification : {"ring_specifier", "ring_system_specifier"}) {
+    for (bool required : {false, true}) {
+      std::string text = "query { compress_embeddings: true ";
+      text += specification;
+      text += R"pb( { base { substituent {
+        disqualifying_smarts: "N"
+        disqualifying_smarts: "O"
+        set_global_id: 1
+      )pb";
+      if (required) {
+        text += "required_smarts: \"C\" ";
+      }
+      text += R"pb( } } } smarts: "[/IWgid1]" })pb";
+      for (const TestCase& test : cases) {
+        SCOPED_TRACE(test.smiles);
+        SCOPED_TRACE(specification);
+        SCOPED_TRACE(required);
+        SubstructureSearch::SubstructureQuery proto;
+        ASSERT_TRUE(google::protobuf::TextFormat::ParseFromString(text, &proto));
+        Substructure_Query query;
+        ASSERT_TRUE(query.ConstructFromProto(proto));
+        Molecule molecule;
+        ASSERT_TRUE(molecule.build_from_smiles(test.smiles));
+        ASSERT_TRUE(molecule.valence_ok());
+        Substructure_Results results;
+        EXPECT_EQ(query.substructure_search(molecule, results),
+                  test.expected.empty() ? 0u : 1u);
+        if (!test.expected.empty()) {
+          ASSERT_EQ(results.number_embeddings(), 1);
+          EXPECT_THAT(*results.embedding(0), UnorderedElementsAreArray(test.expected));
+        }
+      }
+    }
+  }
+}
+
 TEST_F(TestSubstituent, TestNrings0) {
   _string_proto = R"pb(
 query {

@@ -453,6 +453,20 @@ message Substituent {
   // This only works if the Substituent is part of a ring specification.
   optional uint32 set_global_id = 13;
 
+  // Regional SMARTS search only the substituent's atoms. Their properties
+  // (degree, hydrogens, rings, aromaticity, etc.) remain those of the ORIGINAL
+  // molecule: the substituent is not extracted as a separate molecule.
+  // Other atoms are masked, not deleted. IMPORTANT: EVERY query atom must
+  // positively specify its element(s), including atoms in recursive SMARTS.
+  // Prefer precise, positive property specifications. Do not rely on wildcards,
+  // negations, or standalone < / > property tests to exclude masked atoms.
+  // Use [C;R], [#6;v4], [13C], rather than [R], [v4], [13], or [!N].
+  // Relational qualifiers WITH a positive element constraint are safe:
+  // [CD>2] still requires carbon, so a masked atom cannot match it.
+  // Be careful with OR: EVERY alternative must positively constrain the
+  // element. [C,N] is suitable; [C,R] lets the R alternative bypass it.
+  // These requirements also apply to numeric counts such as 2[#6R]: without
+  // element constraints, masked atoms can match and corrupt the count.
   // If any of `required_smarts` match, the substituent is accepted.
   repeated string required_smarts = 14;
   // If any of `disqualifying_smarts` match, the substituent is rejected.
@@ -534,12 +548,22 @@ message InterRingAtoms {
   // atoms. Each constraint here must be matched.
   repeated BondsAcrossInterRingRegion bonds_between_ring_atoms = 14;
 
-  // If any of `required_smarts` match, the substituent is accepted.
-  // Note that the ring atoms can be searched in both the required and
-  // disqualifying smarts. So, [R]-[D2]-[R] is a valid query. But this
-  // would just be a less efficient version of 'length: 2'.
+  // Regional SMARTS search only this region PLUS its ring attachment atoms.
+  // Properties are those of the ORIGINAL molecule, not an extracted fragment.
+  // In particular, attachment atoms retain their original ring membership.
+  // As for Substituent.required_smarts/disqualifying_smarts, EVERY query atom
+  // must positively specify its element(s), including recursive SMARTS and
+  // EVERY OR alternative. Prefer precise, positive property specifications;
+  // do not rely on wildcards, negations, or standalone < / > property tests.
+  // Use [C;R], [#6;v4], [13C], rather than [R], [v4], [13], or [!N].
+  // [CD>2] is safe because it positively requires carbon. [C,N] is suitable;
+  // [C,R] is not. Masked atoms can otherwise corrupt numeric match counts.
+  // These restrictions apply to BOTH required and disqualifying SMARTS.
+  // If any required SMARTS matches, this region satisfies this requirement.
+  // For example, [#6R]-[#6D2]-[#6R] can match ring attachment carbons with
+  // a single carbon between them (less efficiently than 'length: 2').
   repeated string required_smarts = 15;
-  // If any of `disqualifying_smarts` match, the substituent is rejected.
+  // If any disqualifying SMARTS matches, the region is rejected.
   repeated string disqualifying_smarts = 16;
 
   optional uint32 set_global_id = 17;

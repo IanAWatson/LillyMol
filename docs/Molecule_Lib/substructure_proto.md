@@ -673,6 +673,48 @@ substituent atom.
 
 `substituent_no_match` is the corresponding rejection form.
 
+### Writing SMARTS for a regional search
+
+This guidance applies to **both `required_smarts` and `disqualifying_smarts`**
+in `Substituent` and `InterRingAtoms`. Only atoms in the selected subset are
+intended to match. A substituent search includes the substituent atoms;
+an inter-ring search additionally includes the ring atoms directly attached
+to the region. Atom properties remain those of the **original molecule**,
+including connectivity, hydrogen counts, ring membership and aromaticity.
+
+**Every query atom must positively specify its element or allowed elements.**
+This includes every atom inside recursive SMARTS and every alternative in an
+OR expression. Prefer precise, positive property specifications. Avoid
+wildcards, negated element specifications and standalone negated or relational
+property tests as a way of selecting atoms.
+
+| Avoid | Use instead |
+| --- | --- |
+| `[R]` | `[C;R]` or another explicitly specified ring element |
+| `[v4]` | `[#6;v4]` when carbon is intended |
+| `[13]` | `[13C]` when carbon-13 is intended |
+| `[!N]` | An explicit positive list of the intended elements |
+| `[D>2]` | `[CD>2]` when carbon is intended |
+| `[C,R]` | Specify the intended element(s) positively in every alternative |
+
+Relational qualifiers are safe **after a positive element constraint**:
+`[CD>2]` still requires carbon. An OR such as `[C,N]` also positively constrains
+both alternatives; `[C,R]` does not, since its `R` alternative stands alone.
+Bond negation such as `!@` is distinct from an atom's element specification.
+
+The implementation masks atoms outside the subset in a private search wrapper;
+it does not remove them from the molecule. Some property-only, wildcard and
+negated predicates can still match masked atoms. Numeric qualifiers can then
+count atoms outside the intended region: use `2[#6R]` to count ring carbons,
+not `2[R]`. Checking embeddings afterwards cannot repair a count already made
+across masked atoms. These are requirements on expert-authored regional SMARTS,
+not restrictions imposed on ordinary whole-molecule substructure searches.
+
+Extracting a molecule with `create_subset` would avoid masking but would change
+these semantics. Bonds to omitted atoms disappear; degree and hydrogen counts
+change, and an included ring attachment atom may no longer belong to a ring or
+be aromatic. Regional searches therefore retain the original molecular context.
+
 ## Environments
 The concept of environment was introduced in with ring and ring systems
 specifications: atoms that sprout from the atoms in the ring system.
@@ -1056,6 +1098,10 @@ between rings".
 
 It can constrain the number of atoms, ring connections, and distances between
 ring atoms, and can require or reject SMARTS within the region.
+
+For `required_smarts` and `disqualifying_smarts`, the searchable subset includes
+the region's ring attachment atoms. Follow the positive-element requirements in
+[Writing SMARTS for a regional search](#writing-smarts-for-a-regional-search).
 
 
 ### Selecting the largest or longest inter-ring region

@@ -732,6 +732,33 @@ query {
   }
 }
 
+TEST_F(TestSubstituent, InterRingPositiveElementsRestrictNumericCountsToRegion) {
+  // The whole molecule has nine ring carbons and two carbon-13 atoms.
+  // The accepted region has two ring attachment carbons and one carbon-13.
+  ASSERT_TRUE(_mol.build_from_smiles("C1CC1[13CH2]C2CC2OC3CC3[13C@H](O)F"));
+  const IWString original = _mol.unique_smiles();
+  Molecule_to_Match target(&_mol);
+  for (const char* required : {"2[#6R]", "3[#6v4]", "1[13C]", "2[CD>2]", "3[C,N]"}) {
+    SCOPED_TRACE(required);
+    std::string text = R"pb(query {
+      compress_embeddings: true
+      inter_ring_region {
+        disqualifying_smarts: "O"
+        set_global_id: 1
+        required_smarts: ")pb";
+    text += required;
+    text += R"pb(" } smarts: "[/IWgid1]" })pb";
+    SubstructureSearch::SubstructureQuery proto;
+    ASSERT_TRUE(google::protobuf::TextFormat::ParseFromString(text, &proto));
+    Substructure_Query query;
+    ASSERT_TRUE(query.ConstructFromProto(proto));
+    Substructure_Results results;
+    ASSERT_EQ(query.substructure_search(target, results), 1u);
+    EXPECT_THAT(*results.embedding(0), UnorderedElementsAre(3));
+    EXPECT_EQ(_mol.unique_smiles(), original);
+  }
+}
+
 struct RegionSelectionCase {
   const char* smiles;
   const char* criteria;

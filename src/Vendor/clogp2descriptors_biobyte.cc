@@ -496,14 +496,14 @@ clogp2descriptors(Molecule& m, float clogp, IWString_and_File_Descriptor& output
   int npos = 0;
   int nneg = 0;
   for (const ChargeAndQuery& afq : charges) {
-    cerr << "Got match " << afq << '\n';
+    // cerr << "Got match " << afq << '\n';
     if (afq.formal_charge < 0) {
       ++nneg;
     } else {
       ++npos;
     }
   }
-  cerr << "nneg " << nneg << " npos " << npos << '\n';
+  // cerr << "nneg " << nneg << " npos " << npos << '\n';
 
   if (0 == npos && 0 == nneg) {  // really should have been picked up before
     //  append_result(output, (clogp - NEUTRAL_UNCHARGED), NEUTRAL_UNCHARGED);

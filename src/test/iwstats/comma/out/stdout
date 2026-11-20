@@ -10,8 +10,8 @@ Errors between 8 and 14 ave 12.1579
  w_nrings AE75 = 13
  w_nrings AE95 = 14
  w_nrings max_error = 14
- w_nrings cMSR95_sd = 5.56087e+14
- w_nrings cMSR95_mad = 3.95159e+14
- w_nrings cMSR90_sd = 1.45089e+14
- w_nrings cMSR90_mad = 1.11359e+14
+ w_nrings cMSR95_sd = 5.55885e+14
+ w_nrings cMSR95_mad = 3.95024e+14
+ w_nrings cMSR90_sd = 1.49138e+14
+ w_nrings cMSR90_mad = 1.14286e+14
  w_nrings B2.input = -0.291297

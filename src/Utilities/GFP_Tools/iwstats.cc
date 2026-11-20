@@ -93,6 +93,9 @@ static int proper_median = 1;
 
 static int do_cMSD = 0;
 
+static int do_cmsr50 = 0;
+static int do_cmsr75 = 0;
+
 /*
   Previous R2 definition could be outside the range of 0 to 1.
 */
@@ -2060,21 +2063,41 @@ iwstats(unsigned int number_records, const IWString* chunk_title, int which_pred
 
   CMSR_Parameters cmsrp;
 
-  cmsrp._v1 = 1.645;
-  cmsrp._v2 = 0.325;
-  cmsrp._v3 = 4.134;
+  cmsrp._v1 = 1.6449;
+  cmsrp._v2 = 0.3325;
+  cmsrp._v3 = 4.1564;
   cmsrp._pct = 95;
 
   write_cmsr(cmsrp, which_predicted_set, predicted_column, e, tmp1, tmp2, tmpr, ndx,
              output);
 
-  cmsrp._v1 = 1.274;
-  cmsrp._v2 = 0.382;
-  cmsrp._v3 = 3.448;
+  cmsrp._v1 = 1.2816;
+  cmsrp._v2 = 0.3325;
+  cmsrp._v3 = 3.6895;
   cmsrp._pct = 90;
 
   write_cmsr(cmsrp, which_predicted_set, predicted_column, e, tmp1, tmp2, tmpr, ndx,
              output);
+
+  if (do_cmsr75) {
+    cmsrp._v1 = 0.6745;
+    cmsrp._v2 = 0.5113;
+    cmsrp._v3 = 2.9681;
+    cmsrp._pct = 75;
+
+    write_cmsr(cmsrp, which_predicted_set, predicted_column, e, tmp1, tmp2, tmpr, ndx,
+               output);
+  }
+
+  if (do_cmsr50) {
+    cmsrp._v1 = 0.0;
+    cmsrp._v2 = 0.7380;
+    cmsrp._v3 = 2.2723;
+    cmsrp._pct = 50;
+
+    write_cmsr(cmsrp, which_predicted_set, predicted_column, e, tmp1, tmp2, tmpr, ndx,
+               output);
+  }
 
   if (which_predicted_set >= 0 && predicted_column >= 0) {
     write_something_identifying_the_column(predicted_column, output);
@@ -2520,15 +2543,17 @@ parse_dash_p(const const_IWSubstring& p, resizable_array<int>& predicted_column)
 }
 
 static void
-DisplayDashYOptions(std::ostream& output) {
-  output << " -Y allequals      all values written will be of the form '<Measure> = <value>'\n";
+DisplayDashYOptions(int rc) {
+  cerr << " -Y allequals      all values written will be of the form '<Measure> = <value>'\n";
+  cerr << " -Y cmsr75         compute cMSR75\n";
+  cerr << " -Y cmsr50         compute cMSR50\n";
 
-  ::exit(0);
+  ::exit(rc);
 }
 
 static void
-DisplayDashCOptions(std::ostream& output) {
-  output << R"( -C <fname>        write the slope and intercept for the relationship   expt = slope * pred + intercept.
+DisplayDashCOptions(int rc) {
+  cerr << R"( -C <fname>        write the slope and intercept for the relationship   expt = slope * pred + intercept.
 For an svmfp model, score the training set to generate train.pred.
   iwstats -p 2 -E train.activity -C '>>MODEL/activity_normalisation_data' train.pred
 This will append two records to the normalisation file.
@@ -2537,7 +2562,7 @@ When gfp_svmfp_evaluate then reads the normalisation data file it detects that t
 parameters are set and will apply the inverse equation to the predicted values.
 )";
 
-  exit(0);
+  exit(rc);
 }
 
 static int
@@ -2548,6 +2573,9 @@ iwstats(int argc, char** argv) {
     cerr << "unrecognised_options_encountered\n";
     usage(3);
   }
+
+  DisplayDashHelpIfRequested(cl, 'C', DisplayDashCOptions);
+  DisplayDashHelpIfRequested(cl, 'Y', DisplayDashYOptions);
 
   verbose = cl.option_count('v');
 
@@ -2588,11 +2616,21 @@ iwstats(int argc, char** argv) {
         if (verbose) {
           cerr << "All measures reported will have an equals sign\n";
         }
+      } else if (y == "cmsr75") {
+        do_cmsr75 = 1;
+        if (verbose) {
+          cerr << "Will compute cmsr75\n";
+        }
+      } else if (y == "cmsr50") {
+        do_cmsr50 = 1;
+        if (verbose) {
+          cerr << "Will compute cmsr50\n";
+        }
       } else if (y == "help") {
-        DisplayDashYOptions(cerr);
+        DisplayDashYOptions(0);
       } else {
         cerr << "Unrecognised -Y qualifier '" << y << "'\n";
-        DisplayDashYOptions(cerr);
+        DisplayDashYOptions(1);
       }
     }
   }
@@ -3106,7 +3144,7 @@ iwstats(int argc, char** argv) {
   if (cl.option_present('C')) {
     fname_for_correction_formula = cl.string_value('C');
     if (fname_for_correction_formula == "help") {
-      DisplayDashCOptions(cerr);
+      DisplayDashCOptions(0);
     }
 
     if (verbose) {

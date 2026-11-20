@@ -7,6 +7,7 @@ cc_binary(
     ],
     deps = [
         "//Foundational/cmdline:iwcmdline",
+        "//Foundational/iwmisc",
         "//Foundational/iwmisc:sparse_fp_creator",
         "//Molecule_Lib:iwmolecule",
         "//Molecule_Lib:moleculeio",

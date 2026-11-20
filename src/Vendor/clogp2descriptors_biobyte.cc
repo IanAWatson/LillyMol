@@ -14,6 +14,7 @@
 
 #include "Foundational/cmdline/cmdline.h"
 #include "Foundational/iw_tdt/iw_tdt.h"
+#include "Foundational/iwmisc/iwdigits.h"
 #include "Foundational/iwmisc/misc.h"
 #include "Foundational/iwmisc/sparse_fp_creator.h"
 
@@ -32,6 +33,9 @@ using std::cerr;
 using std::endl;
 
 static int verbose = 0;
+
+// Input CLogP values have three decimal places; use stable output for calculations.
+static Fraction_as_String fraction_as_string;
 
 static int molecules_read = 0;
 
@@ -219,7 +223,10 @@ rejected_by_logd(Molecule& m, float clogp, float clogd) {
   stream_for_discarded_by_filter << m.smiles() << ' ' << m.name();
 
   if (append_clogp_to_rejected_output) {
-    stream_for_discarded_by_filter << ' ' << clogp << ' ' << clogd;
+    stream_for_discarded_by_filter << ' ';
+    fraction_as_string.append_number(stream_for_discarded_by_filter, clogp);
+    stream_for_discarded_by_filter << ' ';
+    fraction_as_string.append_number(stream_for_discarded_by_filter, clogd);
   }
 
   stream_for_discarded_by_filter << '\n';
@@ -359,7 +366,12 @@ logd_final_processing(Molecule& m, float clogp, float offset,
       output << m.name();
     }
 
-    output << clogp << ' ' << clogd << ' ' << offset << '\n';
+    fraction_as_string.append_number(output, clogp);
+    output << ' ';
+    fraction_as_string.append_number(output, clogd);
+    output << ' ';
+    fraction_as_string.append_number(output, offset);
+    output << '\n';
 
     if (flush_after_every_molecule) {
       output.flush();
@@ -379,7 +391,8 @@ logd_final_processing(Molecule& m, float clogp, float offset,
   output << m.smiles() << ' ' << m.name();
 
   if (append_clogp_to_filter_output) {
-    output << ' ' << clogd;
+    output << ' ';
+    fraction_as_string.append_number(output, clogd);
   }
 
   output << '\n';
@@ -992,6 +1005,10 @@ DisplayDashXOptions(std::ostream& output) {
 
 static int
 clogp2descriptors(int argc, char** argv) {
+  if (!fraction_as_string.initialise_without_lookup(3)) {
+    return 1;
+  }
+
   Command_Line cl(argc, argv, "vE:A:M:e:N:g:Y:ruc:C:B:abd:D:J:p:k:F:qUX:");
 
   if (cl.unrecognised_options_encountered()) {

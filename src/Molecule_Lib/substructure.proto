@@ -470,6 +470,7 @@ message Substituent {
   // If any of `required_smarts` match, the substituent is accepted.
   repeated string required_smarts = 14;
   // If any of `disqualifying_smarts` match, the substituent is rejected.
+  // Same rules about specific matches apply.
   repeated string disqualifying_smarts = 15;
 
   repeated uint32 heteroatom_count = 16;

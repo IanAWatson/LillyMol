@@ -142,6 +142,43 @@ query {
   EXPECT_THAT(*_sresults.embedding(0), UnorderedElementsAreArray({0, 1, 2}));
 }
 
+TEST_F(TestSubstituent, SubsetMaskDoesNotAlterOuterTargetOrMolecule) {
+  _string_proto = R"pb(
+query {
+  compress_embeddings: true
+  ring_specifier {
+    base {
+      substituent {
+        required_smarts: "2[CD1]"
+        disqualifying_smarts: "O"
+        set_global_id: 1
+      }
+    }
+  }
+  smarts: "[/IWgid1]"
+}
+)pb";
+  ASSERT_TRUE(google::protobuf::TextFormat::ParseFromString(_string_proto, &_proto));
+  ASSERT_TRUE(_query.ConstructFromProto(_proto));
+  ASSERT_TRUE(_mol.build_from_smiles("[13CH3]C(C)C1CC1C[C@H](O)F"));
+  const IWString original = _mol.unique_smiles();
+  ASSERT_EQ(_mol.chiral_centres(), 1);
+  Molecule_to_Match target(&_mol);
+  Substructure_Query oxygen_query;
+  ASSERT_TRUE(oxygen_query.create_from_smarts("O-C-F"));
+  for (int i = 0; i < 10; ++i) {
+    Substructure_Results results;
+    ASSERT_EQ(_query.substructure_search(target, results), 1u);
+    EXPECT_THAT(*results.embedding(0), UnorderedElementsAre(0, 1, 2));
+    // The atoms masked in the inner search remain visible to the outer target.
+    Substructure_Results oxygen_results;
+    EXPECT_EQ(oxygen_query.substructure_search(target, oxygen_results), 1u);
+    EXPECT_EQ(_mol.unique_smiles(), original);
+    EXPECT_EQ(_mol.chiral_centres(), 1);
+    EXPECT_EQ(_mol.isotope(0), 13u);
+  }
+}
+
 TEST_F(TestSubstituent, TestSSDisqualifying) {
   _string_proto = R"pb(
 query {

@@ -1147,8 +1147,9 @@ Substituent::RunQueries(Molecule_to_Match& target, const int* storage, int flag,
     }
   }
 #endif
-  Molecule mcopy(*target.molecule());
-  Molecule_to_Match subset_target(&mcopy);
+  // Mask only this wrapper's Target_Atom objects; keep the molecule and
+  // the outer search target intact.
+  Molecule_to_Match subset_target(target.molecule());
   InvalidateOtherAtoms(storage, flag, subset_target);
 
   if (!_required.empty()) {

@@ -5,10 +5,7 @@ query {
   ring_specifier {
     base {
       set_global_id: 1
-      substituent {
-        length: 1
-        required_smarts: "[F,Cl,Br,I]"
-      }
+      environment: "a-[F,Cl,Br,I]"
     }
     aromatic: 1
   }

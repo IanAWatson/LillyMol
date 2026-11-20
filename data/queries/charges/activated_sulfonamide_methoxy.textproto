@@ -4,10 +4,7 @@ query {
   ring_specifier {
     base {
       set_global_id: 1
-      substituent {
-        length: 2
-        required_smarts: "[OD2-0]-[CD1H3]"
-      }
+      environment: "c-[OD2-0]-[CD1H3]"
     }
     aromatic: 1
   }

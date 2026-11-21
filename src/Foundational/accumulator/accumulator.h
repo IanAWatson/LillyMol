@@ -2,10 +2,12 @@
 #define FOUNDATIONAL_ACCUMULATOR_ACCUMULATOR_H_
 
 #include <iostream>
+#include <type_traits>
 
 #include "Foundational/iwstring/iwstring.h"
 
 #include "kahan_sum.h"
+#include "running_variance.h"
 
 #ifdef BUILD_BAZEL
 #include "Foundational/accumulator/accumulator.pb.h"
@@ -13,9 +15,21 @@
 #include "accumulator.pb.h"
 #endif
 
+namespace iwaccumulator {
+template <>
+class VarianceState<KahanSum> {
+ protected:
+  RunningVariance _variance;
+};
+}  // namespace iwaccumulator
+
 template <typename T, typename SUMMER>
-class Accumulator_Base
+class Accumulator_Base : private iwaccumulator::VarianceState<SUMMER>
 {
+  static_assert(std::is_same_v<SUMMER, KahanSum> ||
+                    (std::is_integral_v<T> && std::is_integral_v<SUMMER>),
+                "Non-Kahan accumulators require integral value and summer types");
+
   protected:
     uint64_t _n;
     T _minval;
@@ -49,7 +63,7 @@ class Accumulator_Base
     T sum_of_squares () const { return _x2sum;}
 
     unsigned int extra (T);
-    unsigned int extra (T, int);       // add N copies of a value
+    unsigned int extra (T, int);       // add N copies; non-positive N is a no-op
     Accumulator_Base<T, SUMMER> & operator = (const Accumulator_Base<T, SUMMER> &);
     void operator += (const Accumulator_Base<T, SUMMER> & rhs) { extra (rhs);}
 
@@ -65,6 +79,8 @@ class Accumulator_Base
 
     double average_if_available_minval_if_not () const;
 
+    // Sample variance. Floating accumulators maintain central moments in double
+    // precision; their public sums and proto fields retain their existing form.
     double variance () const;
     int    variance (double &);
 };
@@ -98,6 +114,8 @@ class Accumulator : public Accumulator_Base<T, KahanSum>
 template <typename T>
 class Accumulator_Int : public Accumulator_Base<T, T>
 {
+  static_assert(std::is_integral_v<T>, "Accumulator_Int requires an integral type");
+
 #ifdef IW_TWO_PHASE_TEMPLATES
   protected:
     using Accumulator_Base<T, T>::_n;
@@ -152,6 +170,9 @@ Accumulator_Base<T, SUMMER>::_default_values ()
 
   _xsum = static_cast<T>(0);
   _x2sum = static_cast<T>(0);
+  if constexpr (std::is_same_v<SUMMER, KahanSum>) {
+    this->_variance = iwaccumulator::RunningVariance();
+  }
 
   return;
 }
@@ -193,9 +214,15 @@ template <typename T, typename SUMMER>
 unsigned int
 Accumulator_Base<T, SUMMER>::extra (T x)
 {
+  if constexpr (std::is_same_v<SUMMER, KahanSum>) {
+    const double value = static_cast<double>(x);
+    this->_variance.Add(value, _n);
+    _x2sum += value * value;
+  } else {
+    _x2sum += x * x;
+  }
   _n++;
   _xsum += x;
-  _x2sum += (x * x);
 
   if (1 == _n)
   {
@@ -222,6 +249,8 @@ template <typename T, typename SUMMER>
 unsigned int
 Accumulator_Base<T, SUMMER>::extra (T x, int n)
 {
+  if (n <= 0) return _n;
+
   if (0 == _n)
   {
     _minval = x;
@@ -236,9 +265,16 @@ Accumulator_Base<T, SUMMER>::extra (T x, int n)
     _maxval = x;
   }
 
+  if constexpr (std::is_same_v<SUMMER, KahanSum>) {
+    const double value = static_cast<double>(x);
+    this->_variance.AddCopies(value, n, _n);
+    _xsum += static_cast<double>(n) * value;
+    _x2sum += static_cast<double>(n) * value * value;
+  } else {
+    _xsum += n * x;
+    _x2sum += n * (x * x);
+  }
   _n += n;
-  _xsum += n * x;
-  _x2sum += n * (x * x);
 
   return _n;
 }
@@ -247,24 +283,9 @@ template <typename T, typename SUMMER>
 unsigned int
 Accumulator_Base<T, SUMMER>::extra (const T * x, int n)
 {
-  if (0 == _n)
-  {
-    _minval = x[0];
-    _maxval = x[1];
+  for (int i = 0; i < n; ++i) {
+    extra(x[i]);
   }
-
-  for (int i = 0; i < n; i++)
-  {
-    if (x[i] < _minval)
-      _minval = x[i];
-    else if (x[i] > _maxval)
-      _maxval = x[i];
-
-    _xsum += x[i];
-    _x2sum += x[i] * x[i];
-  }
-
-  _n += n;
 
   return _n;
 }
@@ -275,6 +296,10 @@ Accumulator_Base<T, SUMMER>::extra (const Accumulator_Base<T, SUMMER> & rhs)
 {
   if (0 == rhs._n)
     return _n;
+
+  if constexpr (std::is_same_v<SUMMER, KahanSum>) {
+    this->_variance.Merge(rhs._variance, _n, rhs._n);
+  }
 
   if (0 == _n)
   {
@@ -310,16 +335,24 @@ Accumulator_Base<T, SUMMER>::subtract_data (const Accumulator_Base<T, SUMMER> & 
 {
   assert (_n >= rhs._n);
 
-  zresult._n     = _n - rhs._n;
-  zresult._xsum  = _xsum - rhs._xsum;
-  zresult._x2sum = _x2sum - rhs._x2sum;
+  Accumulator_Base<T, SUMMER> result;
+  if (_n == rhs._n) {
+    zresult = result;
+    return 1;
+  }
+  if constexpr (std::is_same_v<SUMMER, KahanSum>) {
+    result._variance = this->_variance.Without(rhs._variance, _n, rhs._n);
+  }
+  result._n     = _n - rhs._n;
+  result._xsum  = _xsum - rhs._xsum;
+  result._x2sum = _x2sum - rhs._x2sum;
 
-  if (zresult._x2sum >= 0.0)    // exactly how things should be
+  if (result._x2sum >= 0.0)    // exactly how things should be
     ;
-  else if (zresult._x2sum > -1.0e-06)     // probably just roundoff errors
+  else if (result._x2sum > -1.0e-06)     // probably just roundoff errors
   {
-    std::cerr << "Accumulator::subtract_data: trimming possible roundoff error " << zresult._x2sum << '\n';
-    zresult._x2sum = 0.0;
+    std::cerr << "Accumulator::subtract_data: trimming possible roundoff error " << result._x2sum << '\n';
+    result._x2sum = 0.0;
   }
   else
   {
@@ -328,14 +361,16 @@ Accumulator_Base<T, SUMMER>::subtract_data (const Accumulator_Base<T, SUMMER> & 
   }
 
   if (_minval < rhs._minval)
-    zresult._minval = _minval;
+    result._minval = _minval;
   else
-    zresult._minval = rhs._minval;
+    result._minval = rhs._minval;
 
   if (_maxval > rhs._maxval)
-    zresult._maxval = _maxval;
+    result._maxval = _maxval;
   else
-    zresult._maxval = rhs._maxval;
+    result._maxval = rhs._maxval;
+
+  zresult = result;
 
   return 1;
 }
@@ -347,27 +382,6 @@ Accumulator_Base<T, SUMMER>::average () const
   return static_cast<double>(_xsum) / static_cast<double>(_n);
 }
 
-/*template <typename T>
-double
-Accumulator<T>::variance ()
-{       
-  assert (_n > 1);
-
-  double tave = Accumulator_Base<T, KahanSum>::average ();
-  double rc = _x2sum - _n * tave * tave;
-
-  if (rc < 0.0)   // presumably some roundoff
-  {
-//  std::cerr << "Accumulator::variance: Warning, negative variance intermediate " << tmp << '\n';
-
-    return 0.0;
-  }
-
-  rc = rc / static_cast<double>(_n - 1);
-
-  return rc;
-}*/
-
 template <typename T, typename SUMMER>
 double
 Accumulator_Base<T, SUMMER>::variance () const
@@ -376,6 +390,10 @@ Accumulator_Base<T, SUMMER>::variance () const
 
   if (_n < 2) {
     return 0;
+  }
+
+  if constexpr (std::is_same_v<SUMMER, KahanSum>) {
+    return this->_variance.Variance(_n);
   }
 
   double tave = Accumulator_Base<T, SUMMER>::average();
@@ -443,6 +461,9 @@ Accumulator_Base<T, SUMMER>::operator = (const Accumulator_Base<T, SUMMER> & rhs
   _x2sum = rhs._x2sum;
   _minval = rhs._minval;
   _maxval = rhs._maxval;
+  if constexpr (std::is_same_v<SUMMER, KahanSum>) {
+    this->_variance = rhs._variance;
+  }
 
   return *this;
 }

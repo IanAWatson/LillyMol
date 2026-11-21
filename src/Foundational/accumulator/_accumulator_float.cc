@@ -5,7 +5,6 @@
 
 template class Accumulator<float>;
 template class Accumulator_Base<float, KahanSum>;
-template class Accumulator_Base<float, float>;
 
 #ifdef __GNUG__
 

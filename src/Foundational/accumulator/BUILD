@@ -48,6 +48,7 @@ cc_library(
         "accumulator.h",
         "accumulator_v2.h",
         "kahan_sum.h",
+        "running_variance.h",
     ],
     visibility = [
         "//visibility:public",
@@ -56,5 +57,14 @@ cc_library(
         ":accumulator_cc_proto",
         "//Foundational/iwaray",
         "//Foundational/iwstring",
+    ],
+)
+
+cc_test(
+    name = "accumulator_test",
+    srcs = ["accumulator_test.cc"],
+    deps = [
+        ":accumulator",
+        "@googletest//:gtest_main",
     ],
 )

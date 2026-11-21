@@ -6,6 +6,7 @@
 #include "Foundational/iwstring/iwstring.h"
 
 #include "kahan_sum.h"
+#include "running_variance.h"
 
 template <typename COUNTER, typename T>
 class Accumulator_V2
@@ -16,6 +17,7 @@ class Accumulator_V2
 //  double _x2sum;
     KahanSum _xsum;
     KahanSum _x2sum;
+    iwaccumulator::RunningVariance _variance;
     T _minval;
     T _maxval;
 
@@ -93,6 +95,7 @@ Accumulator_V2<COUNTER, T>::_default_values ()
   _n = 0;
   _xsum = 0.0;
   _x2sum = 0.0;
+  _variance = iwaccumulator::RunningVariance();
   _minval = 0;
   _maxval = 0;
 }
@@ -125,9 +128,11 @@ template <typename COUNTER, typename T>
 COUNTER
 Accumulator_V2<COUNTER, T>::extra (T x)
 {
+  const double value = static_cast<double>(x);
+  _variance.Add(value, _n);
   _n++;
-  _xsum += x;
-  _x2sum += (x * x);
+  _xsum += value;
+  _x2sum += value * value;
 
   if (1 == _n)
   {
@@ -154,23 +159,21 @@ template <typename COUNTER, typename T>
 COUNTER
 Accumulator_V2<COUNTER, T>::extra (T x, int n)
 {
-  _n += n;
-  _xsum += n * x;
-  _x2sum += n * (x * x);
+  if (n <= 0) return _n;
+  const double value = static_cast<double>(x);
+  _variance.AddCopies(value, n, _n);
+  _xsum += static_cast<double>(n) * value;
+  _x2sum += static_cast<double>(n) * value * value;
 
-  if (1 == _n)
-  {
+  if (_n == 0) {
     _minval = x;
     _maxval = x;
-  }
-  else if (x < _minval)
-  {
+  } else if (x < _minval) {
     _minval = x;
-  }
-  else if (x > _maxval)
-  {
+  } else if (x > _maxval) {
     _maxval = x;
   }
+  _n += n;
 
   return _n;
 }
@@ -179,24 +182,9 @@ template <typename COUNTER, typename T>
 COUNTER
 Accumulator_V2<COUNTER, T>::extra (const T * x, int n)
 {
-  if (0 == _n)
-  {
-    _minval = x[0];
-    _maxval = x[1];
+  for (int i = 0; i < n; ++i) {
+    extra(x[i]);
   }
-
-  for (int i = 0; i < n; i++)
-  {
-    if (x[i] < _minval)
-      _minval = x[i];
-    else if (x[i] > _maxval)
-      _maxval = x[i];
-
-    _xsum += x[i];
-    _x2sum += x[i] * x[i];
-  }
-
-  _n += n;
 
   return _n;
 }
@@ -207,6 +195,8 @@ Accumulator_V2<COUNTER, T>::extra (const Accumulator_V2<COUNTER, T> & rhs)
 {
   if (0 == rhs._n)
     return _n;
+
+  _variance.Merge(rhs._variance, _n, rhs._n);
 
   if (0 == _n)
   {
@@ -242,16 +232,22 @@ Accumulator_V2<COUNTER, T>::subtract_data (const Accumulator_V2<COUNTER, T> & rh
 {
   assert (_n >= rhs._n);
 
-  zresult._n     = _n - rhs._n;
-  zresult._xsum  = _xsum - rhs._xsum;
-  zresult._x2sum = _x2sum - rhs._x2sum;
+  Accumulator_V2<COUNTER, T> result;
+  if (_n == rhs._n) {
+    zresult = result;
+    return 1;
+  }
+  result._variance = _variance.Without(rhs._variance, _n, rhs._n);
+  result._n     = _n - rhs._n;
+  result._xsum  = _xsum - rhs._xsum;
+  result._x2sum = _x2sum - rhs._x2sum;
 
-  if (zresult._x2sum >= 0.0)    // exactly how things should be
+  if (result._x2sum >= 0.0)    // exactly how things should be
     ;
-  else if (zresult._x2sum > -1.0e-06)     // probably just roundoff errors
+  else if (result._x2sum > -1.0e-06)     // probably just roundoff errors
   {
-    std::cerr << "Accumulator::subtract_data: trimming possible roundoff error " << zresult._x2sum << '\n';
-    zresult._x2sum = 0.0;
+    std::cerr << "Accumulator::subtract_data: trimming possible roundoff error " << result._x2sum << '\n';
+    result._x2sum = 0.0;
   }
   else
   {
@@ -260,14 +256,16 @@ Accumulator_V2<COUNTER, T>::subtract_data (const Accumulator_V2<COUNTER, T> & rh
   }
 
   if (_minval < rhs._minval)
-    zresult._minval = _minval;
+    result._minval = _minval;
   else
-    zresult._minval = rhs._minval;
+    result._minval = rhs._minval;
 
   if (_maxval > rhs._maxval)
-    zresult._maxval = _maxval;
+    result._maxval = _maxval;
   else
-    zresult._maxval = rhs._maxval;
+    result._maxval = rhs._maxval;
+
+  zresult = result;
 
   return 1;
 }
@@ -285,19 +283,7 @@ Accumulator_V2<COUNTER, T>::variance ()
 {       
   assert (_n > 1);
 
-  double tave = average ();
-  double rc = _x2sum - _n * tave * tave;
-
-  if (rc < 0.0)   // presumably some roundoff
-  {
-//  std::cerr << "Accumulator::variance: Warning, negative variance intermediate " << tmp << '\n';
-
-    return 0.0;
-  }
-
-  rc = rc / static_cast<double> (_n - 1);
-
-  return rc;
+  return _variance.Variance(_n);
 }       
 
 template <typename COUNTER, typename T>
@@ -306,19 +292,7 @@ Accumulator_V2<COUNTER, T>::variance () const
 {       
   assert (_n > 1);
 
-  double tave = average ();
-  double rc = _x2sum - _n * tave * tave;
-
-  if (rc < 0.0)   // presumably some roundoff
-  {
-//  std::cerr << "Accumulator::variance: Warning, negative variance intermediate " << tmp << '\n';
-
-    return 0.0;
-  }
-
-  rc = rc / static_cast<double> (_n - 1);
-
-  return rc;
+  return _variance.Variance(_n);
 }       
 
 template <typename COUNTER, typename T>
@@ -357,6 +331,7 @@ Accumulator_V2<COUNTER, T>::operator = (const Accumulator_V2<COUNTER, T> & rhs)
   _x2sum = rhs._x2sum;
   _minval = rhs._minval;
   _maxval = rhs._maxval;
+  _variance = rhs._variance;
 
   return *this;
 }

@@ -21,7 +21,7 @@ class Activity_Data_From_File : public IW_STL_Hash_Map<IWString, T> {
 
   // private functions
 
-  int _read_activity_data_record(const const_IWSubstring& buffer);
+  int _read_activity_data_record(const const_IWSubstring& buffer, bool first_record);
   int _read_activity_data(iwstring_data_source& input);
 
  public:
@@ -129,7 +129,7 @@ template <typename T>
 int
 Activity_Data_From_File<T>::read_activity_data(const const_IWSubstring& fname) {
   if (_input_separator_from_file_name) {
-    _input_separator_from_file_name = iwstring::SeparatorFromFileName(fname);
+    _input_separator = iwstring::SeparatorFromFileName(fname);
   }
 
   iwstring_data_source input(fname);
@@ -148,19 +148,21 @@ int
 Activity_Data_From_File<T>::_read_activity_data(iwstring_data_source& input) {
   input.set_dos(1);
 
+  bool first_record = true;
   const_IWSubstring buffer;
   while (input.next_record(buffer)) {
-    if (buffer.starts_with('#')) {
+    if (buffer.empty() || buffer.starts_with('#')) {
       continue;
     }
 
-    if (!_read_activity_data_record(buffer)) {
+    if (!_read_activity_data_record(buffer, first_record)) {
       std::cerr << "Activity_Data_From_File::_read_activity_data_record:cannot read activity "
               "data, line "
            << input.lines_read() << '\n';
       std::cerr << "'" << buffer << "'\n";
       return 0;
     }
+    first_record = false;
   }
 
   return static_cast<int>((*this).size());
@@ -168,7 +170,7 @@ Activity_Data_From_File<T>::_read_activity_data(iwstring_data_source& input) {
 
 template <typename T>
 int
-Activity_Data_From_File<T>::_read_activity_data_record(const const_IWSubstring& buffer) {
+Activity_Data_From_File<T>::_read_activity_data_record(const const_IWSubstring& buffer, bool first_record) {
   int i = 0;
   IWString id;
 
@@ -179,25 +181,24 @@ Activity_Data_From_File<T>::_read_activity_data_record(const const_IWSubstring& 
 
   IWString token;
 
-  if (!buffer.nextword(token, i)) {
-    std::cerr << "Not enough tokens on experimental data record\n";
-    return 0;
-  }
-
-  if (1 != _activity_column) {
-    if (!buffer.word(_activity_column, token)) {
-      std::cerr
-          << "Activity_Data_From_File::_read_activity_data_record:cannot extract column '"
-          << (_activity_column + 1) << " from record\n";
-      return 0;
+  if (_activity_column == 0) {
+    token = id;
+  } else {
+    for (int col = 1; col <= _activity_column; ++col) {
+      if (!buffer.NextWord(token, i, _input_separator)) {
+        std::cerr << "Activity_Data_From_File::_read_activity_data_record:cannot extract column "
+                  << (_activity_column + 1) << '\n';
+        return 0;
+      }
     }
   }
 
-  float a;
+  T a;
   if (token.numeric_value(a))
     ;
-  else if (0 == (*this).size()) {
+  else if (first_record) {
     _activity_column_header = token;
+    return 1;
   } else {
     std::cerr << "Activity_Data_From_File::_read_activity_data_record:non numeric activity "
             "value '"

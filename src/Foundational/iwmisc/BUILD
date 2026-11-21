@@ -390,3 +390,17 @@ cc_test(
         "@tomlplusplus//:toml++",
     ],
 )
+
+cc_test(
+    name = "tabular_readers_test",
+    srcs = ["tabular_readers_test.cc"],
+    deps = [
+        ":iwmisc",
+        ":activity_from_file",
+        ":iw_tabular_data",
+        "//Foundational/cmdline:iwcmdline",
+        "//Foundational/data_source:iwstring_data_source",
+        "//Foundational/iwstring",
+        "@googletest//:gtest_main",
+    ],
+)

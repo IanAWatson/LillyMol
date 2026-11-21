@@ -19,7 +19,7 @@ class Numeric_Data_From_File : public IW_STL_Hash_Map<IWString, T>
 
 // private functions
 
-    int _read_data_record (const const_IWSubstring & buffer);
+    int _read_data_record (const const_IWSubstring & buffer, bool first_record);
 
   public:
     Numeric_Data_From_File();
@@ -69,18 +69,20 @@ Numeric_Data_From_File<T>::read_data (iwstring_data_source & input)
   input.set_dos(1);
   input.set_translate_tabs(1);
 
+  bool first_record = true;
   const_IWSubstring buffer;
   while (input.next_record(buffer))
   {
-    if (buffer.starts_with('#'))
+    if (buffer.empty() || buffer.starts_with('#'))
       continue;
 
-    if (! _read_data_record(buffer))
+    if (! _read_data_record(buffer, first_record))
     {
       std::cerr << "Numeric_Data_From_File::_read_data:cannot read data, line " << input.lines_read() << '\n';
       std::cerr << "'" << buffer << "'\n";
       return 0;
     }
+    first_record = false;
   }
 
   return static_cast<int>((*this).size());
@@ -88,7 +90,7 @@ Numeric_Data_From_File<T>::read_data (iwstring_data_source & input)
 
 template <typename T>
 int
-Numeric_Data_From_File<T>::_read_data_record (const const_IWSubstring & buffer)
+Numeric_Data_From_File<T>::_read_data_record (const const_IWSubstring & buffer, bool first_record)
 {
   int i = 0;
   IWString id;
@@ -116,11 +118,13 @@ Numeric_Data_From_File<T>::_read_data_record (const const_IWSubstring & buffer)
     }
   }
 
-  float a;
+  T a;
   if (token.numeric_value(a))
     ;
-  else if (0 == (*this).size())
+  else if (first_record) {
     _header = token;
+    return 1;
+  }
   else
   {
     std::cerr << "Numeric_Data_From_File::_read_data_record:non numeric value '" << token << "', id '" << id << "'\n";

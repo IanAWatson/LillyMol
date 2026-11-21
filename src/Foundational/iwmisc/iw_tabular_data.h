@@ -14,6 +14,7 @@ class IW_Tabular_Data
 
     int _has_header;
     IWString * _header;
+    IWString _identifier_header;
 
     IWString _missing_value;
 
@@ -44,7 +45,11 @@ class IW_Tabular_Data
 
     int resize (const int nr, const int nc);
 
-    void set(const int r, const int c, T v) { _zdata[r * _ncols + c] = v;}
+    void set(const int r, const int c, T v) {
+      const int ndx = r * _ncols + c;
+      _zdata[ndx] = v;
+      _missing.set(ndx, 0);
+    }
     T value(int r, int c) {
       return _zdata[r * _ncols + c];
     }

@@ -176,3 +176,75 @@ TEST(TestMatcher, TestUPdateValues) {
 }
 
 }  // namespace
+
+TEST(MatcherOwnership, CopiesAreIndependent) {
+  iwmatcher::Matcher<int> original;
+  original.add(1);
+  original.add(2);
+  iwmatcher::Matcher<int> copy(original);
+  EXPECT_TRUE(copy == original);
+  original.reset();
+  EXPECT_TRUE(copy.matches(2));
+  EXPECT_FALSE(copy.matches(3));
+  copy = copy;
+  EXPECT_TRUE(copy.matches(2));
+}
+
+TEST(MatcherOwnership, AssignmentReplacesOldValues) {
+  iwmatcher::Matcher<int> dest;
+  dest.add(1);
+  dest.add(2);
+  iwmatcher::Matcher<int> source;
+  source.add(9);
+  dest = source;
+  EXPECT_TRUE(dest == source);
+  EXPECT_TRUE(dest.matches(9));
+  EXPECT_FALSE(dest.matches(2));
+  source.reset();
+  dest = source;
+  EXPECT_TRUE(dest.match_any());
+  EXPECT_EQ(dest.number_elements(), 0);
+}
+
+TEST(MatcherOwnership, CopiesBoundsAndEmptyMatchers) {
+  iwmatcher::Matcher<int> original;
+  iwmatcher::Matcher<int> empty(original);
+  EXPECT_TRUE(empty.match_any());
+  original.set_min(2);
+  original.set_max(5);
+  iwmatcher::Matcher<int> bounded(original);
+  EXPECT_TRUE(bounded == original);
+  EXPECT_FALSE(bounded.matches(1));
+  EXPECT_TRUE(bounded.matches(3));
+  EXPECT_FALSE(bounded.matches(6));
+}
+
+TEST(MatcherAccessors, MinimumExplicitValue) {
+  iwmatcher::Matcher<int> matcher;
+  int value = 99;
+  EXPECT_FALSE(matcher.min_explicit_value(value));
+  matcher.add(7);
+  matcher.add(0);
+  ASSERT_TRUE(matcher.min_explicit_value(value));
+  EXPECT_EQ(value, 0);
+}
+
+TEST(MatcherOwnership, AssignmentGrowsAndShrinksValueStorage) {
+  iwmatcher::Matcher<int> dest;
+  dest.add(1);
+  dest.add(2);
+  iwmatcher::Matcher<int> source;
+  source.add(4);
+  source.add(5);
+  source.add(6);
+  dest = source;
+  EXPECT_TRUE(dest == source);
+  source.resize(0);
+  source.add(8);
+  source.add(9);
+  dest = source;
+  EXPECT_TRUE(dest == source);
+  EXPECT_FALSE(dest.matches(6));
+  dest = dest;
+  EXPECT_TRUE(dest.matches(9));
+}

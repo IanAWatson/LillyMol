@@ -85,3 +85,26 @@ TEST(Combinations, Test2VaryBoth) {
 }
 
 }  // namespace
+
+TEST(Combinations, EmptyChoiceSetHasNoCombinations) {
+  Combinations<uint32_t> combinations(std::vector<uint32_t>{2, 0, 3});
+  std::vector<uint32_t> state;
+  EXPECT_FALSE(combinations.Next(state));
+  EXPECT_FALSE(combinations.Next(state));
+  combinations.Reset();
+  EXPECT_FALSE(combinations.Next(state));
+}
+
+TEST(Combinations, SizesStateAndRemainsExhaustedUntilReset) {
+  Combinations<uint32_t> combinations(std::vector<uint32_t>{2});
+  std::vector<uint32_t> state;
+  ASSERT_TRUE(combinations.Next(state));
+  EXPECT_THAT(state, ElementsAreArray({0}));
+  ASSERT_TRUE(combinations.Next(state));
+  EXPECT_THAT(state, ElementsAreArray({1}));
+  EXPECT_FALSE(combinations.Next(state));
+  EXPECT_FALSE(combinations.Next(state));
+  combinations.Reset();
+  ASSERT_TRUE(combinations.Next(state));
+  EXPECT_THAT(state, ElementsAreArray({0}));
+}

@@ -50,6 +50,7 @@ class Matcher {
 
   public:
     Matcher();
+    Matcher(const Matcher<T>& rhs);
     ~Matcher();
 
     int ok() const;
@@ -119,8 +120,14 @@ Matcher<T>::Matcher() {
   _number_other_values = 0;
 
   // These do not need to be initialised, but an abundance of caution.
+  _single_value = T{};
   _min_val = T{};
   _max_val = T{};
+}
+
+template <typename T>
+Matcher<T>::Matcher(const Matcher<T>& rhs) : Matcher() {
+  *this = rhs;
 }
 
 template <typename T>
@@ -548,6 +555,9 @@ Matcher<T>::operator = (const Matcher<T> & rhs)
 {
   assert(ok());
   assert(rhs.ok());
+  if (this == &rhs) {
+    return *this;
+  }
 
   _mask_and_int = rhs._mask_and_int;
   if (_mask_and_int._mask[kSet]) {
@@ -561,10 +571,6 @@ Matcher<T>::operator = (const Matcher<T> & rhs)
   }
 
   if (rhs._other_values == nullptr) {
-    if (rhs._other_values == nullptr) {
-      return *this;
-    }
-
     _reset_other_values();
     return *this;
   }
@@ -587,16 +593,16 @@ Matcher<T>::operator = (const Matcher<T> & rhs)
 template <typename T>
 bool
 Matcher<T>::operator==(const Matcher<T>& rhs) const {
-  if (_mask_and_int != rhs._mask_and_int) {
+  if (_mask_and_int._set != rhs._mask_and_int._set) {
     return 0;
   }
-  if (_mask_and_int._set[kSet] && _single_value != rhs._single_value) {
+  if (_mask_and_int._mask[kSet] && _single_value != rhs._single_value) {
     return 0;
   }
-  if (_mask_and_int._set[kMin] && _min_val != rhs._min_val) {
+  if (_mask_and_int._mask[kMin] && _min_val != rhs._min_val) {
     return 0;
   }
-  if (_mask_and_int._set[kMax] && _max_val != rhs._max_val) {
+  if (_mask_and_int._mask[kMax] && _max_val != rhs._max_val) {
     return 0;
   }
 
@@ -672,7 +678,8 @@ Matcher<T>::min_explicit_value(T& v) const {
       result = _other_values[i];
     }
   }
-  return result;
+  v = result;
+  return 1;
 }
 
 template <typename T>

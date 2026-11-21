@@ -648,6 +648,7 @@ Continuous errors default to mean absolute error, including with -w and -W.
  -b             with -w, balance under/over-predictions by signed error; implies -s
  -W <value>     write molecules with mean error magnitude >= <value>
  -N <fname>     nearest-neighbour NearNeighbours TFDataRecord file
+ -N indexed     read NearNeighboursIndices instead; use with -N <fname>
  -d             write a headered table (continuous: ID EXPT AVDIFF)
  -k             input files were produced by svmfp_evaluate with the -c option (dist to SV)
  -D <fname>     distance/error output (not implemented)
@@ -1564,7 +1565,11 @@ CheckOutputFiles(const Command_Line& cl) {
   }
   std::vector<IWString> inputs;
   for (char flag : {'E', 'S', 'N'}) {
-    if (cl.option_present(flag)) inputs.emplace_back(cl.string_value(flag));
+    for (int i = 0; i < cl.option_count(flag); ++i) {
+      IWString fname = cl.string_value(flag, i);
+      if (flag == 'N' && fname == "indexed") continue;
+      inputs.push_back(fname);
+    }
   }
   for (const char* arg : cl) {
     if (strncmp(arg, "F:", 2) != 0) {
@@ -1631,13 +1636,31 @@ Mispredicted(int argc, char** argv)
 
   std::unique_ptr<nearest_neighbour_data::NearestNeighbourData> neighbours;
   if (cl.option_present('N')) {
-    if (cl.option_count('N') != 1) {
-      cerr << "Specify one nearest-neighbour file with -N\n";
+    IWString fname;
+    bool indexed = false;
+    for (int i = 0; i < cl.option_count('N'); ++i) {
+      IWString value = cl.string_value('N', i);
+      if (value == "indexed") {
+        if (indexed) {
+          cerr << "Specify -N indexed only once\n";
+          return 1;
+        }
+        indexed = true;
+      } else if (!fname.empty()) {
+        cerr << "Specify one nearest-neighbour file with -N\n";
+        return 1;
+      } else {
+        fname = value;
+      }
+    }
+    if (fname.empty()) {
+      cerr << "-N indexed requires a nearest-neighbour file via -N <fname>\n";
       return 1;
     }
     neighbours = std::make_unique<nearest_neighbour_data::NearestNeighbourData>();
-    const char* fname = cl.option_value('N');
-    if (!neighbours->SetNeighboursToRetain(1) || !neighbours->Read(fname)) {
+    if (!neighbours->SetNeighboursToRetain(1) ||
+        !(indexed ? neighbours->ReadIndexed(fname.null_terminated_chars())
+                  : neighbours->Read(fname.null_terminated_chars()))) {
       cerr << "Cannot read nearest-neighbour data '" << fname << "'\n";
       return 1;
     }

@@ -19,6 +19,9 @@ class NearestNeighbourData {
   std::vector<nnbr::NearNeighbours> _neighbours;
   std::unordered_map<std::string, size_t> _id_to_index;
 
+  template <typename Proto>
+  bool ReadFile(const char* fname);
+
  public:
   // Positive counts only. Once Read succeeds, changing the count is an error,
   // including for an empty input file. Failure leaves the count unchanged.
@@ -38,6 +41,12 @@ class NearestNeighbourData {
   // Reject missing/empty query IDs, duplicate query IDs and invalid retained
   // distances. Lists are assumed sorted; no sorting or order checks are done.
   bool Read(const char* fname);
+
+  // Read NearNeighboursIndices records, resolving retained neighbour indices
+  // to names for Lookup. Indices are zero-based record positions: the file
+  // must retain the original order and all records, including empty lists.
+  // Retained out-of-range indices are errors. Read failure preserves data.
+  bool ReadIndexed(const char* fname);
 
   // Null if absent. An existing record may have no retained neighbours.
   // Pointers remain valid until the next successful Read or object destruction.

@@ -2,6 +2,7 @@
 require 'open3'
 exe, indir = ARGV
 nn = File.join(indir, 'neighbours.tfrecord')
+indexed = File.join(indir, 'neighbours.indexed.tfrecord')
 exp = File.join(indir, 'experimental.txt')
 pred = File.join(indir, 'predictions.txt')
 def run(exe, args, success = true)
@@ -43,6 +44,29 @@ class_nn.lines.drop(1).each do |line|
   row = line.split
   abort 'Wrong classification distance' unless row[-1] == expected[row[0]]
 end
+# Equivalent indexed input must preserve every output form and option order.
+indexed_table, indexed_coverage = run(exe, ['-E', exp, '-d', '-v', '-N', indexed,
+                                          '-N', 'indexed', '-Y', 'indexed_summary.txt',
+                                          '-T', 'indexed_results', pred])
+abort 'Indexed table differs' unless indexed_table == with_nn
+abort 'Indexed coverage differs' unless indexed_coverage.include?('2 prediction identifiers with distances, 1 absent IDs, 2 empty neighbour lists')
+abort 'Indexed summary differs' unless File.read('indexed_summary.txt') == File.read('summary.txt')
+abort 'Indexed proto differs' unless File.read('indexed_results.textproto') == File.read('results.textproto')
+indexed_text, = run(exe, ['-E', exp, '-N', 'indexed', '-N', indexed, pred])
+abort 'Indexed descriptive output differs' unless indexed_text == text
+for nn_options in [['-N', indexed, '-N', 'indexed'], ['-N', 'indexed', '-N', indexed]]
+  indexed_class, = run(exe, ['-C', '-E', cls, '-d', *nn_options, cpred])
+  abort 'Indexed classification differs' unless indexed_class == class_nn
+end
+run(exe, ['-E', exp, '-N', 'indexed', pred], false)
+run(exe, ['-E', exp, '-N', indexed, '-N', 'indexed', '-N', 'indexed', pred], false)
+run(exe, ['-E', exp, '-N', indexed, '-N', indexed, '-N', 'indexed', pred], false)
+indexed_before = File.binread(indexed)
+run(exe, ['-E', exp, '-N', 'indexed', '-N', indexed, '-Y', indexed, pred], false)
+abort 'Indexed input was overwritten' unless File.binread(indexed) == indexed_before
+File.binwrite('neighbours.textproto', indexed_before)
+run(exe, ['-E', exp, '-N', 'indexed', '-N', 'neighbours.textproto', '-T', 'neighbours', pred], false)
+abort 'Indexed input overwritten by proto output' unless File.binread('neighbours.textproto') == indexed_before
 run(exe, ['-E', exp, '-N', 'missing.tfrecord', pred], false)
 run(exe, ['-E', exp, '-N', nn, '-N', nn, pred], false)
 before = File.binread(nn)

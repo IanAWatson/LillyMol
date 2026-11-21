@@ -65,8 +65,24 @@ Identifiers are matched exactly. Missing query IDs and records containing no
 non-self neighbours produce `.` in text output; the proto field is absent.
 Distinct neighbours with distance zero are retained. Duplicate query IDs are an
 error. Neighbour lists are trusted to be sorted nearest first; self-neighbours
-are skipped. This option reads full `NearNeighbours` protos, not the alternative
-`NearNeighboursIndices` format.
+are skipped. By default the file contains `NearNeighbours` protos. For indexed
+`NearNeighboursIndices` input, specify the format explicitly:
+
+```shell
+gfp_nearneighbours_single_file_tbb -S dataset.indexed.tfrecord -S indexed dataset.gfp
+mispredicted -E measured.txt -N dataset.indexed.tfrecord -N indexed -d pred1.txt pred2.txt
+```
+
+The two `-N` arguments can appear in either order. Specify exactly one filename
+and at most one `indexed` qualifier. Format detection is not automatic: choose
+the format that was written to the file.
+
+Indexed neighbour IDs are zero-based record positions. Keep the original record
+order and all records, including those with no neighbours; do not filter or
+reorder an indexed file. Out-of-range retained neighbour indices are errors.
+The reader retains only the nearest non-self neighbour per molecule and resolves
+its index to a name, including forward references. All output formats behave
+the same for equivalent named and indexed input.
 
 With `-v`, report how many records were loaded and coverage among all identifiers
 with at least one valid prediction, before prediction-count and error filters:

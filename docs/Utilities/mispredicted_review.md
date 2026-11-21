@@ -29,21 +29,30 @@ Single-prediction summary and textproto records report zero standard deviation
 without calling variance. Multiple predictions use the sample standard deviation
 of the selected error metric.
 
-## Remaining findings
+## Follow-up findings addressed
 
-- Classification accepts `-w`, `-W`, `-Y`, and `-T` without implementing the
-  corresponding selection or output. `-S -d` adds a SMILES header but no SMILES
-  values in classification rows.
-- The classification textproto writer does not populate the class label.
-- `-D` is advertised and accepted but never processed. Support-vector distances
-  are stored with `-k`, but their intended output and binning are unused.
-- Equal class prevalence makes `-X` class translation depend on hash iteration
-  order; explicit tie handling is needed.
-- Duplicate prediction records are counted separately; independent-run validation
-  remains a possible follow-up.
-- Output error propagation in summary/textproto helpers remains incomplete.
-- Continuous input does not translate tabs, unlike classification input.
-- Entity and per-class accumulator ownership uses leaking raw pointers.
+- Stabilise sample variance in the shared Accumulator and Accumulator_V2:
+  promote values before squaring and maintain double-precision running central
+  moments for single, repeated, array, merge, copy/reset and subtraction paths.
+  Also fix the one-element array maximum initialisation and make zero-count
+  additions no-ops.
+- Reject unsupported classification `-w`, `-W`, `-Y`, and `-T` before opening
+  outputs. Classification `-S` now writes the SMILES values its header promises.
+  Remove the unused classification summary/proto helpers.
+- Reject unimplemented `-D`; remove unused support-vector distance/difference
+  arrays and the abandoned Binning_Data code. `-k` still validates its column.
+- Resolve equal-prevalence `-X` mappings lexically by experimental label and
+  reject duplicate requested labels.
+- Propagate summary/textproto row failures and check final output flushes.
+- Snapshot and sort regex input filenames before creating outputs, ignoring
+  directories. This prevents fresh output files being ingested by `-R`.
+- Treat missing input lists as fatal, including with `-F`.
+- Use owning pointers for entities and value-owned per-class accumulators.
+
+Remaining deliberate limitations include continuous input requiring spaces rather
+than tab translation, counting duplicate prediction records separately, and
+sorting all eligible identifiers before `-w` selection. There is no measured
+need yet for a more complicated partial-selection algorithm.
 
 Fault tolerance should retain valid records and ignore invalid records, rather
 than discard entire files. This is the intended behavior, not a requirement for

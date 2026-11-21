@@ -3,7 +3,6 @@
   that are most frequently mipredicted
 */
 
-#include <dirent.h>
 #include <stdlib.h>
 
 #include <algorithm>
@@ -12,9 +11,9 @@
 #include <iostream>
 #include <memory>
 #include <optional>
+#include <utility>
 #include <vector>
 
-#include <sys/types.h>
 
 #include "google/protobuf/text_format.h"
 
@@ -80,88 +79,16 @@ static uint32_t duplicate_experimental_values_ignored = 0;
 
 static IWString_and_File_Descriptor stream_for_textproto;
 
-class Binning_Data
-{
- private:
-  std::vector<float> _bin_start;
-  std::vector<IWString> _bin_text;
-
- public:
-  int
-  active() const
-  {
-    return _bin_start.size();
+static void
+AppendSmiles(const IWString& id, IWString_and_File_Descriptor& output) {
+  if (id_to_smiles.empty()) return;
+  const auto iter = id_to_smiles.find(id);
+  if (iter == id_to_smiles.end()) {
+    cerr << "NO smiles for '" << id << "'\n";
+    output << "* ";
+  } else {
+    output << iter->second << ' ';
   }
-
-  int
-  build(const char*);
-  int
-  build(iwstring_data_source&);
-
-  int
-  bucket(float) const;
-};
-
-int
-Binning_Data::build(const char* fname)
-{
-  iwstring_data_source input(fname);
-
-  if (!input.good()) {
-    cerr << "Binning_Data::build:cannot open '" << fname << "'\n";
-    return 0;
-  }
-
-  return build(input);
-}
-
-int
-Binning_Data::build(iwstring_data_source& input)
-{
-  const_IWSubstring buffer;
-
-  while (input.next_record(buffer)) {
-    if (buffer.starts_with('#')) {
-      continue;
-    }
-
-    if (0 == buffer.length()) {
-      continue;
-    }
-
-    const_IWSubstring token;
-    int i = 0;
-
-    float v;
-    if (!buffer.nextword(token, i) || !token.numeric_value(v) ||
-        !buffer.nextword(token, i)) {
-      cerr << "Binning_Data::build:cannot extract distance or invalid distance '"
-           << buffer << "'\n";
-      return 0;
-    }
-
-    _bin_start.push_back(v);
-    _bin_text.push_back(token);
-  }
-
-  if (0 == _bin_start.size()) {
-    cerr << "Binning_Data::build:no data\n";
-    return 0;
-  }
-
-  return 1;
-}
-
-int
-Binning_Data::bucket(float v) const
-{
-  for (unsigned int i = 0; i < _bin_start.size(); ++i) {
-    if (v <= _bin_start[i]) {
-      return i;
-    }
-  }
-
-  return _bin_start.size();
 }
 
 class Entity
@@ -245,8 +172,6 @@ class Entity_Classification : public Entity
 
   int report(IWString_and_File_Descriptor&) const;
 
-  int write_summary_data(IWString_and_File_Descriptor&) const;
-  int write_textproto_data(IWString_and_File_Descriptor&) const;
 };
 
 Entity_Classification::Entity_Classification(const IWString& s) : Entity(s)
@@ -284,6 +209,7 @@ Entity_Classification::report(IWString_and_File_Descriptor& output) const
 {
   static constexpr char kSep = ' ';
 
+  AppendSmiles(_id, output);
   output << _id << kSep;
 
   if (produce_descriptor_file) {
@@ -299,21 +225,6 @@ Entity_Classification::report(IWString_and_File_Descriptor& output) const
 
   AppendNearestDistance(output, !produce_descriptor_file);
   output << '\n';
-
-  return 1;
-}
-
-int
-Entity_Classification::write_summary_data(IWString_and_File_Descriptor& output) const
-{
-  output << _id << ' '
-         << static_cast<float>(_correct_predictions) /
-                static_cast<float>(_times_predicted)
-         << " . " << _times_predicted;
-  AppendNearestDistance(output);
-  output << '\n';
-
-  output.write_if_buffer_holds_more_than(4096);
 
   return 1;
 }
@@ -334,22 +245,9 @@ MPWriteProto(const P& proto,
 
   output << buffer << '\n';
 
-  output.write_if_buffer_holds_more_than(4096);
-
-  return 1;
+  return output.write_if_buffer_holds_more_than(4096);
 }
 
-
-int
-Entity_Classification::write_textproto_data(IWString_and_File_Descriptor& output) const {
-  mispredicted::MispredictedClassification proto;
-  proto.set_id(_id.data(), _id.size());
-  proto.set_npred(_times_predicted);
-  proto.set_times_correct(_correct_predictions);
-
-  AddNearestDistance(proto);
-  return MPWriteProto<mispredicted::MispredictedClassification>(proto, output);
-}
 
 template <typename T>
 class Entity_Continuous : public Entity
@@ -358,9 +256,6 @@ class Entity_Continuous : public Entity
   T _experimental_value;
   Accumulator<T> _predictions;
   Accumulator<T> _diffs;
-
-  std::vector<T> _diff;
-  std::vector<float> _dist;
 
  public:
   Entity_Continuous(const IWString&);
@@ -443,8 +338,6 @@ Entity_Continuous<T>::prediction_and_distance(const const_IWSubstring& sp,
   }
 
   predicted_as(p);
-  _diff.push_back(fabs(_experimental_value - p));
-  _dist.push_back(d);
 
   return 1;
 }
@@ -466,15 +359,7 @@ Entity_Continuous<T>::report(IWString_and_File_Descriptor& output) const
 {
   static constexpr char kSep = ' ';
 
-  if (! id_to_smiles.empty()) {
-    const auto iter = id_to_smiles.find(_id);
-    if (iter == id_to_smiles.end()) {
-      cerr << "NO smiles for '" << _id << "'\n";
-      output << '*' << kSep;
-    } else {
-      output << iter->second << kSep;
-    }
-  }
+  AppendSmiles(_id, output);
 
   output << _id << kSep << _experimental_value << kSep;
 
@@ -515,9 +400,7 @@ Entity_Continuous<T>::write_summary_data(IWString_and_File_Descriptor& output) c
   AppendNearestDistance(output);
   output << '\n';
 
-  output.write_if_buffer_holds_more_than(4096);
-
-  return 1;
+  return output.write_if_buffer_holds_more_than(4096);
 }
 
 template <typename T>
@@ -704,8 +587,8 @@ ReadSmiles(const char* fname, IW_STL_Hash_Map_String& id_to_smiles) {
   return ReadSmiles(input, id_to_smiles);
 }
 
-typedef IW_STL_Hash_Map<IWString, Entity_Classification*> ID_to_Classification_Data;
-typedef IW_STL_Hash_Map<IWString, Entity_Continuous<float>*> ID_to_Continuous_Data;
+typedef IW_STL_Hash_Map<IWString, std::unique_ptr<Entity_Classification>> ID_to_Classification_Data;
+typedef IW_STL_Hash_Map<IWString, std::unique_ptr<Entity_Continuous<float>>> ID_to_Continuous_Data;
 
 // Attach context without changing prediction ranking or selection. Coverage is
 // over all identifiers with predictions, before output filters are applied.
@@ -738,7 +621,7 @@ int
 do_summary(const T* ec, int n, IWString_and_File_Descriptor& output)
 {
   for (auto i = 0; i < n; ++i) {
-    ec[i]->write_summary_data(output);
+    if (!ec[i]->write_summary_data(output)) return 0;
   }
 
   return 1;
@@ -749,7 +632,7 @@ int
 do_textproto(const T* ec, int n, IWString_and_File_Descriptor& output)
 {
   for (auto i = 0; i < n; ++i) {
-    ec[i]->write_textproto_data(output);
+    if (!ec[i]->write_textproto_data(output)) return 0;
   }
 
   return 1;
@@ -761,9 +644,9 @@ int
 report_data(const T* ec, int n, IWString_and_File_Descriptor& output)
 {
   for (int i = 0; i < n; i++) {
-    ec[i]->report(output);
-
-    output.write_if_buffer_holds_more_than(32768);
+    if (!ec[i]->report(output) || !output.write_if_buffer_holds_more_than(32768)) {
+      return 0;
+    }
   }
 
   return 1;
@@ -784,8 +667,8 @@ report_classification_results(const ID_to_Classification_Data& idcd,
 
   int ndx = 0;
   bool any_predictions = false;
-  for (ID_to_Classification_Data::const_iterator i = idcd.begin(); i != idcd.end(); ++i) {
-    ec[ndx] = (*i).second;
+  for (auto i = idcd.cbegin(); i != idcd.cend(); ++i) {
+    ec[ndx] = (*i).second.get();
 
     if (0 == ec[ndx]->times_predicted()) {
       continue;
@@ -811,27 +694,22 @@ report_classification_results(const ID_to_Classification_Data& idcd,
   Classification_Data_Comparator cdc;
   iwqsort(ec, n, cdc);
 
-  IW_STL_Hash_Map<IWString, Accumulator<double>*> acc;
+  IW_STL_Hash_Map<IWString, Accumulator<double>> acc;
 
   for (unsigned int i = 0; i < n; i++) {
     const Entity_Classification* eci = ec[i];
 
     const IWString& c = eci->correct_class();
 
-    if (!acc.contains(c)) {
-      acc[c] = new Accumulator<double>;
-    }
-
-    acc[c]->extra(eci->accuracy());
+    acc[c].extra(eci->accuracy());
   }
 
   cerr << "Data on " << acc.size() << " classes\n";
 
-  for (IW_STL_Hash_Map<IWString, Accumulator<double>*>::const_iterator i = acc.begin();
-       i != acc.end(); ++i) {
+  for (auto i = acc.cbegin(); i != acc.cend(); ++i) {
     const IWString& c = (*i).first;
 
-    const Accumulator<double>* a = (*i).second;
+    const Accumulator<double>* a = &(*i).second;
 
     cerr << "Class " << c << " " << a->n() << " items, accuracy between " << a->minval()
          << " and " << a->maxval() << " ave "
@@ -912,8 +790,8 @@ report_continuous_results(const ID_to_Continuous_Data& idcd,
 
   int ndx = 0;
   bool any_predictions = false;
-  for (ID_to_Continuous_Data::const_iterator i = idcd.begin(); i != idcd.end(); ++i) {
-    ec[ndx] = (*i).second;
+  for (auto i = idcd.cbegin(); i != idcd.cend(); ++i) {
+    ec[ndx] = (*i).second.get();
 
     //  cerr << "Item '" << (*i).first << "' predicted " << ec[ndx]->times_predicted() <<
     //  " times\n";
@@ -962,11 +840,11 @@ report_continuous_results(const ID_to_Continuous_Data& idcd,
   }
 
   if (stream_for_summary.active()) {
-    do_summary(ec, n, stream_for_summary);
+    if (!do_summary(ec, n, stream_for_summary)) return 0;
   }
 
   if (stream_for_textproto.active()) {
-    do_textproto(ec, n, stream_for_textproto);
+    if (!do_textproto(ec, n, stream_for_textproto)) return 0;
   }
 
   return report_data(ec, n, output);
@@ -1013,7 +891,7 @@ parse_experimental_data_record(const const_IWSubstring& buffer,
     return 0;
   }
 
-  Entity_Continuous<float>* e = new Entity_Continuous<float>(id);
+  auto e = std::make_unique<Entity_Continuous<float>>(id);
 
   const_IWSubstring token;
 
@@ -1029,7 +907,7 @@ parse_experimental_data_record(const const_IWSubstring& buffer,
 
   e->set_experimental_value(v);
 
-  idd[id] = e;
+  idd[id] = std::move(e);
 
   return idd.size();
 }
@@ -1090,7 +968,7 @@ parse_experimental_data_record(const const_IWSubstring& buffer,
     return 0;
   }
 
-  Entity_Classification* e = new Entity_Classification(id);
+  auto e = std::make_unique<Entity_Classification>(id);
 
   const_IWSubstring token;
 
@@ -1100,7 +978,7 @@ parse_experimental_data_record(const const_IWSubstring& buffer,
 
   e->set_class(token);
 
-  idd[id] = e;
+  idd[id] = std::move(e);
 
   return idd.size();
 }
@@ -1157,7 +1035,7 @@ process_classification_prediction(const const_IWSubstring& buffer,
 
   buffer.nextword(id, i);
 
-  ID_to_Classification_Data::const_iterator f = idd.find(id);
+  const auto f = idd.find(id);
 
   if (f == idd.end()) {
     cerr << "No experimental data for '" << id << "'\n";
@@ -1170,7 +1048,7 @@ process_classification_prediction(const const_IWSubstring& buffer,
     return 0;
   }
 
-  Entity_Classification* e = (*f).second;
+  Entity_Classification* e = (*f).second.get();
 
   if (use_cutoff_to_convert_to_class) {
     float p;
@@ -1185,10 +1063,9 @@ process_classification_prediction(const const_IWSubstring& buffer,
     }
   }
 
-  predicted_values_read++;
-
   if (0 == xref.size()) {
     e->predicted_as(predicted);
+    ++predicted_values_read;
     return 1;
   }
 
@@ -1200,6 +1077,7 @@ process_classification_prediction(const const_IWSubstring& buffer,
   }
 
   e->predicted_as(g->second);
+  ++predicted_values_read;
 
   return 1;
 }
@@ -1259,7 +1137,7 @@ process_continuous_prediction(const const_IWSubstring& buffer, ID_to_Continuous_
 
   buffer.nextword(id, i);
 
-  ID_to_Continuous_Data::const_iterator f = idd.find(id);
+  const auto f = idd.find(id);
 
   if (f == idd.end()) {
     cerr << "No experimental data for '" << id << "'\n";
@@ -1272,7 +1150,7 @@ process_continuous_prediction(const const_IWSubstring& buffer, ID_to_Continuous_
     return 0;
   }
 
-  Entity_Continuous<float>* e = (*f).second;
+  Entity_Continuous<float>* e = (*f).second.get();
 
   if (!data_includes_distance_to_support_vector) {
     if (! e->predicted_as(predicted)) {
@@ -1329,7 +1207,7 @@ gather_predicted_data_continuous_from_file(const char* fname, ID_to_Continuous_D
 
   if (!input.good()) {
     cerr << "Cannot open '" << fname << "'\n";
-    return fault_tolerant_mode;
+    return 0;
   }
 
   IWString buffer;
@@ -1374,93 +1252,33 @@ gather_predicted_data_continuous(const char* fname, ID_to_Continuous_Data& idcd)
 }
 
 static int
-gather_predicted_data_classification(DIR* dir, std::unique_ptr<re2::RE2>& fname_rx,
-                                     ID_to_Classification_Data& idcd,
-                                     const IW_STL_Hash_Map_String& xref)
-{
-  struct dirent* d;
-
-  int files_processed = 0;
-
-  while (NULL != (d = readdir(dir))) {
-    const_IWSubstring fname(d->d_name);
-    if (!iwre2::RE2PartialMatch(fname, *fname_rx)) {
-      continue;
-    }
-
-    files_processed++;
-
-    if (!gather_predicted_data_classification(d->d_name, idcd, xref)) {
-      return 0;
-    }
-  }
-
-  return files_processed;
-}
-
-static int
-gather_predicted_data_classification(std::unique_ptr<re2::RE2>& fname_rx,
-                                     ID_to_Classification_Data& idcd,
-                                     const IW_STL_Hash_Map_String& xref)
-{
-  DIR* dir = opendir(".");
-
-  if (NULL == dir) {
-    cerr << "Cannot open directory\n";
+FindPredictionFiles(const const_IWSubstring& expression, std::vector<IWString>& files) {
+  std::unique_ptr<re2::RE2> regex;
+  if (!iwre2::RE2Reset(regex, expression)) {
+    cerr << "Invalid file name regular expression '" << expression << "'\n";
     return 0;
   }
-
-  int rc = gather_predicted_data_classification(dir, fname_rx, idcd, xref);
-
-  closedir(dir);
-
-  return rc;
-}
-
-static int
-gather_predicted_data_continuous(DIR* dir, std::unique_ptr<re2::RE2>& fname_rx,
-                                 ID_to_Continuous_Data& idcd)
-{
-  struct dirent* d;
-
-  int files_processed = 0;
-
-  while (NULL != (d = readdir(dir))) {
-    const_IWSubstring fname(d->d_name);
-    if (!iwre2::RE2PartialMatch(fname, *fname_rx)) {
-      continue;
-    }
-
-    files_processed++;
-
-    if (!gather_predicted_data_continuous(d->d_name, idcd)) {
-      return 0;
-    }
+  std::error_code error;
+  std::filesystem::directory_iterator iter(".", error), end;
+  for (; !error && iter != end; iter.increment(error)) {
+    IWString name(iter->path().filename().string());
+    if (!iwre2::RE2PartialMatch(name, *regex)) continue;
+    const bool regular_file = iter->is_regular_file(error);
+    if (error) break;
+    if (regular_file) files.push_back(name);
   }
-
-  if (0 == files_processed) {
-    cerr << "Warning no files matched file name regular expression\n";
-  }
-
-  return files_processed;
-}
-
-static int
-gather_predicted_data_continuous(std::unique_ptr<re2::RE2>& fname_rx,
-                                 ID_to_Continuous_Data& idcd)
-{
-  DIR* dir = opendir(".");
-
-  if (NULL == dir) {
-    cerr << "Cannot open directory\n";
+  if (error) {
+    cerr << "Cannot scan prediction files: " << error.message() << '\n';
     return 0;
   }
-
-  int rc = gather_predicted_data_continuous(dir, fname_rx, idcd);
-
-  closedir(dir);
-
-  return rc;
+  if (files.empty()) {
+    cerr << "No files matched file name regular expression\n";
+    return 0;
+  }
+  std::sort(files.begin(), files.end(), [](const IWString& lhs, const IWString& rhs) {
+    return lhs.strcmp(rhs) < 0;
+  });
+  return 1;
 }
 
 /*
@@ -1474,8 +1292,8 @@ determine_class_label_translation(ID_to_Classification_Data& idcd,
 {
   IWString l1, l2;
 
-  if (!s.split(l1, ',', l2) || 0 == l1.length() || 0 == l2.length()) {
-    cerr << "The class label translation must be of the form 'l1,l2', '" << s
+  if (!s.split(l1, ',', l2) || l1.empty() || l2.empty() || l1 == l2) {
+    cerr << "The class label translation requires distinct labels 'l1,l2', '" << s
          << "' not valid\n";
     return 0;
   }
@@ -1498,7 +1316,8 @@ determine_class_label_translation(ID_to_Classification_Data& idcd,
 
   std::sort(ccount.begin(), ccount.end(),
             [](const std::pair<IWString, int>& c1, const std::pair<IWString, int>& c2) {
-              return c1.second > c2.second;
+              if (c1.second != c2.second) return c1.second > c2.second;
+              return c1.first.strcmp(c2.first) < 0;
             });
 
   for (unsigned int i = 0; i < nc; ++i) {
@@ -1524,8 +1343,8 @@ report_coverage(const ID_to_Classification_Data& idcd, std::ostream& os)
   Accumulator_Int<int> predicted;
   int not_predicted = 0;
 
-  for (ID_to_Classification_Data::const_iterator i = idcd.begin(); i != idcd.end(); ++i) {
-    const Entity_Classification* e = (*i).second;
+  for (auto i = idcd.cbegin(); i != idcd.cend(); ++i) {
+    const Entity_Classification* e = (*i).second.get();
     predicted.extra(e->times_predicted());
     if (0 == e->times_predicted()) {
       not_predicted++;
@@ -1559,7 +1378,7 @@ SameFile(const IWString& a, const IWString& b) {
 }
 
 static int
-CheckOutputFiles(const Command_Line& cl) {
+CheckOutputFiles(const Command_Line& cl, const std::vector<IWString>& regex_inputs) {
   if (!cl.option_present('Y') && !cl.option_present('T')) {
     return 1;
   }
@@ -1584,18 +1403,7 @@ CheckOutputFiles(const Command_Line& cl) {
       if (!line.empty() && !line.starts_with('#')) inputs.push_back(line);
     }
   }
-  if (cl.option_present('R')) {
-    std::unique_ptr<re2::RE2> regex;
-    if (!iwre2::RE2Reset(regex, cl.string_value('R'))) {
-      cerr << "Invalid file name regular expression\n";
-      return 0;
-    }
-    std::error_code error;
-    for (const auto& entry : std::filesystem::directory_iterator(".", error)) {
-      IWString name(entry.path().filename().string());
-      if (iwre2::RE2PartialMatch(name, *regex)) inputs.push_back(name);
-    }
-  }
+  inputs.insert(inputs.end(), regex_inputs.begin(), regex_inputs.end());
   std::vector<IWString> outputs;
   for (char flag : {'Y', 'T'}) {
     if (!cl.option_present(flag)) continue;
@@ -1630,7 +1438,25 @@ Mispredicted(int argc, char** argv)
   }
 
   verbose = cl.option_count('v');
-  if (! CheckOutputFiles(cl)) {
+  const bool classification = cl.option_present('C') || cl.option_present('X') ||
+                              cl.option_present('c');
+  if (classification) {
+    for (char flag : {'w', 'W', 'Y', 'T'}) {
+      if (cl.option_present(flag)) {
+        cerr << "-" << flag << " is not supported for classification\n";
+        return 1;
+      }
+    }
+  }
+  if (cl.option_present('D')) {
+    cerr << "Distance/error output (-D) is not implemented\n";
+    return 1;
+  }
+  std::vector<IWString> regex_inputs;
+  if (cl.option_present('R') && !FindPredictionFiles(cl.string_value('R'), regex_inputs)) {
+    return 1;
+  }
+  if (!CheckOutputFiles(cl, regex_inputs)) {
     return 1;
   }
 
@@ -1795,12 +1621,6 @@ Mispredicted(int argc, char** argv)
     }
   }
 
-  int classification = cl.option_present('C');
-
-  if (cl.option_present('X')) {
-    classification = 1;
-  }
-
   if (cl.option_present('c')) {
     if (!cl.value('c', cutoff)) {
       cerr << "The class cutoff (-c) must be a valid number\n";
@@ -1812,7 +1632,6 @@ Mispredicted(int argc, char** argv)
     }
 
     use_cutoff_to_convert_to_class = 1;
-    classification = 1;
   }
 
   if (!cl.option_present('E')) {
@@ -1895,25 +1714,6 @@ Mispredicted(int argc, char** argv)
     }
   }
 
-  std::unique_ptr<re2::RE2> fname_rx;
-
-  bool fname_rx_active = false;
-
-  if (cl.option_present('R')) {
-    const const_IWSubstring r = cl.string_value('R');
-
-    if (!iwre2::RE2Reset(fname_rx, r)) {
-      cerr << "Invalid file name regular expression '" << r << "'\n";
-      return 1;
-    }
-    fname_rx_active = true;
-    if (verbose) {
-      cerr << "File name regular expression initialised '" << r << "'\n";
-    }
-
-    //  cerr << "match? " << std::regex_search("PREDQ", fname_rx) << '\n';
-  }
-
   int rc = 0;
 
   if (classification) {
@@ -1939,9 +1739,11 @@ Mispredicted(int argc, char** argv)
       }
     }
 
-    if (fname_rx_active) {
-      if (!gather_predicted_data_classification(fname_rx, idcd, xref)) {
-        return 1;
+    if (cl.option_present('R')) {
+      for (IWString& fname : regex_inputs) {
+        if (!gather_predicted_data_classification(fname.null_terminated_chars(), idcd, xref)) {
+          return 1;
+        }
       }
     } else {
       for (int i = 0; i < cl.number_elements(); i++) {
@@ -1975,9 +1777,11 @@ Mispredicted(int argc, char** argv)
       cerr << "Read " << idcd.size() << " experimental data values from '" << experimental_data_fname << "'\n";
     }
 
-    if (fname_rx_active) {
-      if (!gather_predicted_data_continuous(fname_rx, idcd)) {
-        return 1;
+    if (cl.option_present('R')) {
+      for (IWString& fname : regex_inputs) {
+        if (!gather_predicted_data_continuous(fname.null_terminated_chars(), idcd)) {
+          return 1;
+        }
       }
     } else {
       for (int i = 0; i < cl.number_elements(); i++) {
@@ -2000,7 +1804,15 @@ Mispredicted(int argc, char** argv)
     }
   }
 
-  if (verbose) {
+  if (rc == 0) {
+    if (stream_for_summary.active() && !stream_for_summary.flush()) {
+      cerr << "Cannot write summary output\n";
+      return 1;
+    }
+    if (stream_for_textproto.active() && !stream_for_textproto.flush()) {
+      cerr << "Cannot write textproto output\n";
+      return 1;
+    }
   }
 
   return rc;

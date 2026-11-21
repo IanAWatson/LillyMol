@@ -165,4 +165,73 @@ assert run(['-n', '2', *class_base]).stdout.splitlines() == ['ID EXPT N Correct 
 assert run(['-n', '3', *class_base]).stdout.splitlines() == ['ID EXPT N Correct Accuracy']
 for invalid in ['0', '-1', 'nonsense']:
     run(['-n', invalid, *base], success=False)
+# Accumulator precision: identical errors have zero spread, even at large offsets.
+for value in ['0.1', '7.1', '1e20']:
+    write('constant_predictions', f'ID predicted\na {value}\na {value}\n')
+    run(['-E', 'one_exp', '-Y', 'constant_summary', '-T', 'constant_proto', 'constant_predictions'])
+    assert float(Path('constant_summary').read_text().splitlines()[1].split()[-1]) == 0.0
+    assert 'std_difference: 0' in Path('constant_proto.textproto').read_text()
+import struct
+first = struct.unpack('f', struct.pack('f', 10000.1))[0]
+second = struct.unpack('f', struct.pack('f', 10000.2))[0]
+write('offset_predictions', 'ID predicted\na 10000.1\na 10000.2\n')
+run(['-E', 'one_exp', '-Y', 'offset_summary', 'offset_predictions'])
+stddev = float(Path('offset_summary').read_text().splitlines()[1].split()[-1])
+assert abs(stddev - abs(first - second) / (2.0 ** .5)) < 1e-6
+
+# Equal class populations map ties lexically, independently of input order.
+write('review_class_pred', 'ID class\na -1\nb 1\n')
+expected = ['ID EXPT N Correct Accuracy', 'a A 1 1 1', 'b B 1 1 1']
+for data in ['ID class\na A\nb B\n', 'ID class\nb B\na A\n']:
+    write('review_class_exp', data)
+    actual = run(['-E', 'review_class_exp', '-X', '-1,1', '-d', 'review_class_pred'])
+    assert actual.stdout.splitlines() == expected
+run(['-E', 'review_class_exp', '-X', '1,1', 'review_class_pred'], success=False)
+
+# Unsupported classification options fail before truncating output files.
+write('unsupported_summary', 'keep summary\n')
+write('unsupported_proto.textproto', 'keep proto\n')
+for mode in [['-C'], ['-c', '0'], ['-X', '-1,1']]:
+    for option in [['-w', '1'], ['-W', '1'], ['-Y', 'unsupported_summary'], ['-T', 'unsupported_proto']]:
+        run(['-E', 'review_class_exp', *mode, *option, 'review_class_pred'], success=False)
+assert Path('unsupported_summary').read_text() == 'keep summary\n'
+assert Path('unsupported_proto.textproto').read_text() == 'keep proto\n'
+run(['-E', 'one_exp', '-D', 'unsupported_distance', 'one_pred'], success=False)
+assert not Path('unsupported_distance').exists()
+
+# Classification -S supplies the same prefix promised by its descriptor header.
+write('review_class_pred', 'ID class\na A\nb B\n')
+write('review_smiles', 'C a\nCC b\n')
+actual = run(['-C', '-E', 'review_class_exp', '-S', 'review_smiles', '-d', 'review_class_pred'])
+assert actual.stdout.splitlines() == ['SMILES ID EXPT N Correct Accuracy', 'C a A 1 1 1', 'CC b B 1 1 1']
+
+# Snapshot regex inputs before creating outputs that also match the expression.
+write('scan_pred_1', 'ID predicted\na 1\n')
+write('scan_pred_2', 'ID predicted\na 3\n')
+actual = run(['-E', 'one_exp', '-d', '-Y', 'scan_pred_summary', '-R', '^scan_pred_'])
+assert rows(actual) == {'a': 2}
+Path('scan_pred_directory').mkdir()
+actual = run(['-E', 'one_exp', '-d', '-R', '^scan_pred_(1|2|directory)$'])
+assert rows(actual) == {'a': 2}
+for name in ['scan_class_1', 'scan_class_2']:
+    write(name, Path('review_class_pred').read_text())
+actual = run(['-C', '-E', 'review_class_exp', '-d', '-R', '^scan_class_[12]$'])
+assert actual.stdout.splitlines() == ['ID EXPT N Correct Accuracy', 'a A 2 2 1', 'b B 2 2 1']
+
+# Fault tolerance applies to records, not missing input lists.
+run(['-E', 'one_exp', '-F', 'one_pred', 'F:missing.list'], success=False)
+# -k validates the distance column without retaining unused per-record vectors.
+write('distance_pred', 'ID predicted distance\na 2 0.2\nb 1 0.5\nc 10 0.9\n')
+assert rows(run(['-E', 'exp', '-d', '-k', 'distance_pred'])) == {'a': 2, 'b': 1, 'c': 10}
+
+# /dev/full provides deterministic write failures on systems which have it.
+if Path('/dev/full').exists():
+    Path('full.textproto').symlink_to('/dev/full')
+    for option, destination in [('-Y', '/dev/full'), ('-T', 'full')]:
+        run(['-E', 'one_exp', option, destination, 'one_pred'], success=False)
+    write('many_exp', 'ID measured\n' + ''.join(f'id{i} 0\n' for i in range(400)))
+    write('many_pred', 'ID predicted\n' + ''.join(f'id{i} 1\n' for i in range(400)))
+    for option, destination in [('-Y', '/dev/full'), ('-T', 'full')]:
+        run(['-E', 'many_exp', option, destination, 'many_pred'], success=False)
+
 print('mispredicted correctness tests passed')

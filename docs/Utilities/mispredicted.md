@@ -42,7 +42,8 @@ experimental identifiers. `-g` ignores predictions with no experimental match.
 
 `-F` skips invalid prediction records and continues reading the file, retaining
 valid records before and after the error. Invalid records do not contribute to
-prediction counts. It does not relax experimental-data validation.
+prediction counts. It does not relax experimental-data validation or allow missing prediction files
+or missing `F:` file lists.
 
 ## Nearest-neighbour context
 
@@ -172,7 +173,10 @@ Pass filenames explicitly, or use `-R` to match filenames in the current directo
 mispredicted -E measured.txt -n 5 -d -R '^prediction_[0-9]+\.txt$'
 ```
 
-Matching is against the filename, not a recursive directory search. With `-R`,
+Matching is against the filename, not a recursive directory search. Only regular
+files (including symlinks to regular files) are considered. The matching filenames
+are collected and sorted before output files are created, so a newly created
+summary or proto file cannot become an input during the same run. With `-R`,
 positional prediction filenames are not used.
 
 Continuous mode also accepts a list file:
@@ -202,19 +206,28 @@ reverses that order, putting the least accurate identifiers first.
 become `-1`, and scores at or above it become `1`. `-X <label1,label2>` translates
 predicted labels to experimental classes by prevalence: the first predicted label
 maps to the more common experimental class. This requires exactly two experimental
-classes; equal class prevalence currently has ambiguous mapping.
+classes and two distinct predicted labels. Equal class populations are ordered
+lexically by their experimental label, so reordering the input cannot reverse
+the translation.
 
-Classification currently does not implement `-w`, `-W`, `-Y`, or `-T`. Do not use
-`-S` with classification descriptor output: it adds a SMILES header without the
-corresponding row values. These limitations remain tracked in
-[mispredicted_review.md](mispredicted_review.md).
+Classification does not implement `-w`, `-W`, `-Y`, or `-T`; these options are
+rejected before any output file is opened. `-S` supplies the SMILES prefix in
+both classification and continuous output, including descriptor rows. An
+identifier missing from the supplied SMILES file is written with `*` as its
+SMILES and a diagnostic on stderr.
 
 ## Support-vector distance options
 
 `-k` reads and validates an additional distance column immediately after the
 selected prediction column, in the range 0 to 1. Distances currently do not affect
-ranking or appear in output. The advertised `-D` distance/error output option is
-not implemented.
+ranking or appear in output, and are not retained after validation. The `-D`
+distance/error output option is not implemented and is rejected.
+
+Summary and textproto write failures, including final buffer flush failures,
+produce a nonzero exit status. Standard deviation is the sample standard
+deviation of the selected error metric; constant repeated errors have zero
+spread. The shared accumulator uses double-precision running central moments
+rather than subtracting nearly equal raw sums of squares.
 
 ## Build and regression tests
 

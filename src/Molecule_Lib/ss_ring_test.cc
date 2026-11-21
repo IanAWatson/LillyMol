@@ -721,7 +721,7 @@ TEST(RingSubstituent, UnrelatedRingDoesNotRejectMatchingRing) {
       Molecule molecule;
       ASSERT_TRUE(molecule.build_from_smiles(original.random_smiles()));
       Substructure_Results results;
-      EXPECT_EQ(query.substructure_search(molecule, results), 1);
+      EXPECT_EQ(query.substructure_search(molecule, results), 1u);
     }
   }
 }
@@ -749,7 +749,7 @@ TEST(RingSubstituent, FailedRingDoesNotLeakSidechainGlobalIds) {
     Molecule molecule;
     ASSERT_TRUE(molecule.build_from_smiles(original.random_smiles()));
     Substructure_Results results;
-    EXPECT_EQ(query.substructure_search(molecule, results), 1);
+    EXPECT_EQ(query.substructure_search(molecule, results), 1u);
   }
 }
 

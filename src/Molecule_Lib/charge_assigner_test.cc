@@ -362,7 +362,7 @@ TEST_F(TestChargeAssignerCache, EnumerationUsesQueryIndexAfterVectorApi) {
   ASSERT_TRUE(molecule.build_from_smiles("ON"));
   resizable_array_p<Molecule> forms;
   ASSERT_EQ(assigner.process(molecule, forms), 1);
-  ASSERT_EQ(forms.size(), 1);
+  ASSERT_EQ(forms.size(), 1u);
   EXPECT_EQ(forms[0]->formal_charge(0), -1);
   EXPECT_EQ(forms[0]->formal_charge(1), 1);
 }

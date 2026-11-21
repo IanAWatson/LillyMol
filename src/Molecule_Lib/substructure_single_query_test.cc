@@ -2288,7 +2288,7 @@ TEST_F(TestSubstructure, NeutralMatchedAtomsRuntimeConstraint) {
         ASSERT_TRUE(query.ConstructFromProto(proto));
         Molecule original;
         ASSERT_TRUE(original.build_from_smiles(example.smiles));
-        const int expected = flag == 1 ? example.neutral : example.unrestricted;
+        const uint32_t expected = flag == 1 ? example.neutral : example.unrestricted;
         for (int i = 0; i < _ntest; ++i) {
           Molecule molecule;
           ASSERT_TRUE(molecule.build_from_smiles(original.random_smiles()));
@@ -2309,8 +2309,8 @@ TEST_F(TestSubstructure, NeutralMatchedAtomsChecksBeforeMatchLimit) {
   ASSERT_TRUE(google::protobuf::TextFormat::ParseFromString(_string_proto, &_proto));
   ASSERT_TRUE(_query.ConstructFromProto(_proto));
   ASSERT_TRUE(_m.build_from_smiles("[NH4+].N"));
-  ASSERT_EQ(_query.substructure_search(_m, _sresults), 1);
-  ASSERT_EQ(_sresults.embeddings().size(), 1);
+  ASSERT_EQ(_query.substructure_search(_m, _sresults), 1u);
+  ASSERT_EQ(_sresults.embeddings().size(), 1u);
   EXPECT_EQ(_m.formal_charge(_sresults.embeddings()[0]->front()), 0);
 }
 
@@ -2326,7 +2326,7 @@ TEST_F(TestSubstructure, NeutralMatchedAtomsDoesNotConstrainEnvironment) {
   ASSERT_TRUE(google::protobuf::TextFormat::ParseFromString(_string_proto, &_proto));
   ASSERT_TRUE(_query.ConstructFromProto(_proto));
   ASSERT_TRUE(_m.build_from_smiles("C[NH3+]"));
-  EXPECT_EQ(_query.substructure_search(_m, _sresults), 1);
+  EXPECT_EQ(_query.substructure_search(_m, _sresults), 1u);
   EXPECT_TRUE(_DoPerumationsTests(1));
 }
 
@@ -2341,7 +2341,7 @@ TEST_F(TestSubstructure, NeutralMatchedAtomsIgnoresExcludedQueryAtoms) {
   ASSERT_TRUE(google::protobuf::TextFormat::ParseFromString(_string_proto, &_proto));
   ASSERT_TRUE(_query.ConstructFromProto(_proto));
   ASSERT_TRUE(_m.build_from_smiles("C[NH3+]"));
-  EXPECT_EQ(_query.substructure_search(_m, _sresults), 1);
+  EXPECT_EQ(_query.substructure_search(_m, _sresults), 1u);
   EXPECT_TRUE(_DoPerumationsTests(1));
 }
 
@@ -2359,9 +2359,9 @@ TEST_F(TestSubstructure, NeutralMatchedAtomsProtoRoundTripAndComponents) {
   Substructure_Query restored;
   ASSERT_TRUE(restored.ConstructFromProto(written));
   ASSERT_TRUE(_m.build_from_smiles("[NH4+]"));
-  EXPECT_EQ(restored.substructure_search(_m, _sresults), 0);
+  EXPECT_EQ(restored.substructure_search(_m, _sresults), 0u);
   ASSERT_TRUE(_m.build_from_smiles("[OH-]"));
-  EXPECT_EQ(restored.substructure_search(_m, _sresults), 1);
+  EXPECT_EQ(restored.substructure_search(_m, _sresults), 1u);
 }
 
 TEST_F(TestSubstructure, ProtoRoundTripPreservesSignedGlobalIdMatch) {

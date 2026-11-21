@@ -243,7 +243,7 @@ TEST_F(TestSubstituent, DisqualifyingSmartsRejectsOnlyTheMatchingSubstituent) {
         EXPECT_EQ(query.substructure_search(molecule, results),
                   test.expected.empty() ? 0u : 1u);
         if (!test.expected.empty()) {
-          ASSERT_EQ(results.number_embeddings(), 1);
+          ASSERT_EQ(results.number_embeddings(), 1u);
           EXPECT_THAT(*results.embedding(0), UnorderedElementsAreArray(test.expected));
         }
       }

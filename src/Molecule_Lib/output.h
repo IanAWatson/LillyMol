@@ -95,6 +95,7 @@ class Molecule_Output_Object : public resizable_array_p<ofstream_and_type>
     int determine_output_types (const Command_Line &, char = 'o');
     int add_output_type (FileType);
     int number_output_types () const { return _output_types.number_elements ();}
+    const resizable_array<FileType>& output_types() const { return _output_types; }
 
     int write (Molecule *);
     int write (Molecule &);

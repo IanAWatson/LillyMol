@@ -165,7 +165,8 @@ struct FileconvConfig {
 
   int convert_isotopes = 0;
 
-  int convert_all_isotopes_to = 0;
+  // Negative means inactive; zero is a valid target isotope.
+  int convert_all_isotopes_to = -1;
 
   int remove_isotopic_atoms = 0;
   int isotope_is_atom_type = 0;

@@ -136,7 +136,7 @@ FileconvConfig::DefaultValues() {
   convert_isotopes = 0;
   convert_specific_isotopes.resize(0);
   convert_specific_isotopes_new_isotope.resize(0);
-  convert_all_isotopes_to = 0;
+  convert_all_isotopes_to = -1;
 
   convert_isotopes_to_atom_map_numbers = 0;
   convert_atom_map_numbers_to_isotopes = 0;
@@ -1591,46 +1591,12 @@ FileconvConfig::SortByFragmentSize(Molecule& m) {
 
   assert(new_atom_order.number_elements() == matoms);
 
-  // Each atom knows it's starting atom number
-
-  int* tmp = new int[matoms];
-  std::unique_ptr<int[]> free_tmp(tmp);
-
-  for (int i = 0; i < matoms; i++) {
-    tmp[i] = i;
-    m.set_user_specified_atom_void_ptr(i, tmp + i);
+  // renumber_atoms takes the destination of each original atom.
+  std::unique_ptr<int[]> destination = std::make_unique<int[]>(matoms);
+  for (int i = 0; i < matoms; ++i) {
+    destination[new_atom_order[i]] = i;
   }
-
-  // This is really hairy.... Make a swap, then keep swapping atoms
-  // until the destination gets it's final atom in place
-
-  for (int i = 0; i < matoms; i++) {
-    int j = new_atom_order[i];
-
-    atom_number_t zatom = i;
-
-    while (1) {
-      const int* u = reinterpret_cast<const int*>(m.user_specified_atom_void_ptr(zatom));
-
-      //    cerr << "zatom " << zatom << " compare " << *u << " and " << j << '\n';
-      if (*u == j)
-        break;
-
-      //    cerr << "i = " << i << " swap " << zatom << " and " << j << '\n';
-
-      m.swap_atoms(zatom, j);
-
-      for (int k = i + 1; k < matoms; k++) {
-        if (new_atom_order[k] == *u) {
-          zatom = k;
-          break;
-        }
-      }
-
-      if (zatom == j)
-        break;
-    }
-  }
+  m.renumber_atoms(destination.get());
 
   return;
 }
@@ -2746,7 +2712,7 @@ FileconvConfig::ApplyAllFiltersInner(Molecule& m,
   }
 
   if (aromatise_these_rings.number_elements()) {
-    AromatiseTheseRings(m, aromatise_these_rings);
+    molecule_changed += AromatiseTheseRings(m, aromatise_these_rings);
   }
 
   if (matoms > 0) {
@@ -2897,9 +2863,9 @@ FileconvConfig::ApplyAllFiltersInner(Molecule& m,
   // After we have done all other manipulations with isotopes
 
   if (convert_isotopes_to_atom_map_numbers)
-    ConvertIsotopesToAtomMapNumbers(m);
+    molecule_changed += ConvertIsotopesToAtomMapNumbers(m);
   else if (convert_atom_map_numbers_to_isotopes)
-    ConvertAtomMapNumbersToIsotopes(m);
+    molecule_changed += ConvertAtomMapNumbersToIsotopes(m);
 
   matoms = m.natoms();  // recompute, as it may have been changed by transformations
 
@@ -3001,9 +2967,9 @@ do_convert_specific_isotopes_query(
          convert_specific_isotopes_query_new_isotope.number_elements());
   int rc = 0;
 
-  Molecule_to_Match target(&m);
-
   for (int i = 0; i < convert_specific_isotopes_query.number_elements(); ++i) {
+    // Earlier queries may have changed isotopes cached by Molecule_to_Match.
+    Molecule_to_Match target(&m);
     if (do_convert_specific_isotopes_query(m,
                                            target,
                                            *convert_specific_isotopes_query[i],
@@ -3161,28 +3127,20 @@ int
 FileconvConfig::ChangeName(Molecule& m, re2::RE2& change_name_rx) {
   const IWString& mname = m.name();
 
-  const int ncaptures = change_name_rx.NumberOfCapturingGroups();
-  assert(ncaptures > 0);
-
-  std::vector<std::string> captures(ncaptures);
-
-  RE2::Arg* args = new RE2::Arg[ncaptures];
-  for (int i = 0; i < ncaptures; ++i) {
-    args[i] = &captures[i];
-  }
-
-  re2::StringPiece tmp(mname.data(), mname.length());
-  if (RE2::PartialMatchN(tmp, change_name_rx, &args, ncaptures))
-    ;
-  else if (change_name_rx_must_match) {
+  // Only the first capture becomes the name. Other captures may be nested.
+  std::string capture;
+  if (RE2::PartialMatch(re2::StringPiece(mname.data(), mname.length()),
+                        change_name_rx, &capture)) {
+    // Matched.
+  } else if (change_name_rx_must_match) {
     cerr << "change_name:change name rx not matched '" << change_name_rx.pattern()
          << "', molecule name '" << m.name() << "'\n";
     return 0;
-  } else  // ok for no matches
+  } else {
     return 1;
+  }
 
-  const std::string x = captures[0];
-  IWString newname(x);
+  IWString newname(capture);
 
   if (0 == newname.length()) {
     cerr << "change_name:cannot set name to length zero, rx '" << change_name_rx.pattern()
@@ -3381,7 +3339,7 @@ FileconvConfig::IsotopeRelated(Molecule& m) {
       ++rc;
       molecules_containing_isotopes++;
     }
-  } else if (convert_all_isotopes_to) {
+  } else if (convert_all_isotopes_to >= 0) {
     if (do_convert_all_isotopes_to(m, convert_all_isotopes_to)) {
       ++rc;
       molecules_containing_isotopes++;
@@ -3470,14 +3428,20 @@ FileconvConfig::Process(Molecule& m) {
     molecule_changed += IsotopeRelated(m);
   }
 
-  if (reset_atom_map_numbers)
+  if (reset_atom_map_numbers) {
+    for (int i = 0; i < m.natoms(); ++i) {
+      if (m.atom_map_number(i) != 0) {
+        ++molecule_changed;
+      }
+    }
     m.reset_all_atom_map_numbers();
+  }
 
   // Jan 2004. Invalid directional bonds on guanidine C(/N)(\N)=N/N=C/c(ccc(c1Cl)O)c1
   // Need do clean those up before trying to standardise a guanidine
 
   if (remove_invalid_directional_bonds_from_input)
-    molecule_changed = m.remove_invalid_directional_bonds();
+    molecule_changed += m.remove_invalid_directional_bonds();
 
   if (chemical_standardisation.active()) {
     molecule_changed += chemical_standardisation.process(m);
@@ -3510,12 +3474,12 @@ FileconvConfig::Process(Molecule& m) {
       if (verbose > 1)
         cerr << "Removed " << nr << " invalid chiral centres\n";
 
-      molecule_changed = 1;
+      molecule_changed += nr;
     }
   } else if (remove_chiral_data_from_all_molecules)
     molecule_changed += m.remove_all_chiral_centres();
   else if (remove_chiral_centres_on.size() > 0) {
-    RemoveChiralCentresOnMatchedAtoms(m, remove_chiral_centres_on);
+    molecule_changed += RemoveChiralCentresOnMatchedAtoms(m, remove_chiral_centres_on);
   }
 
   if (find_all_chiral_centres || find_all_ring_chiral_centres)
@@ -3527,7 +3491,7 @@ FileconvConfig::Process(Molecule& m) {
   }
 
   if (remove_non_organic_chirality) {
-    RemoveNonOrganicChirality(m);
+    molecule_changed += RemoveNonOrganicChirality(m);
   }
 
   if (!ApplyAllFiltersInner(m, result.rejection_reason, molecule_changed)) {
@@ -4089,9 +4053,17 @@ FileconvConfig::ParseMiscOptions(Command_Line& cl, char flag) {
         cerr << "Will truncate molecule names to the first token\n";
     } else if (y.starts_with("tfirst=")) {
       y.remove_leading_chars(7);
+      if (y.length() != 1) {
+        cerr << "tfirst= requires one character\n";
+        return 0;
+      }
       truncate_name_at_first = y[0];
     } else if (y.starts_with("tlast=")) {
       y.remove_leading_chars(6);
+      if (y.length() != 1) {
+        cerr << "tlast= requires one character\n";
+        return 0;
+      }
       truncate_name_at_last = y[0];
     } else if (y.starts_with("chname=") || y.starts_with("CHNAME=")) {
       if ('C' == y[0])  // uppercase form
@@ -4102,13 +4074,13 @@ FileconvConfig::ParseMiscOptions(Command_Line& cl, char flag) {
       change_name_rx.reset(new RE2(tmp));
       if (!change_name_rx->ok()) {
         cerr << "Invalid change name regexp '" << y << "'\n";
-        return 3;
+        return 0;
       }
 
       if (0 == change_name_rx->NumberOfCapturingGroups()) {
         cerr << "The chname regular expression must have capturing goup(s) '"
              << change_name_rx->pattern() << "' invalid\n";
-        return 3;
+        return 0;
       }
 
       if (verbose)
@@ -4117,7 +4089,7 @@ FileconvConfig::ParseMiscOptions(Command_Line& cl, char flag) {
 
       if (change_name_rx->NumberOfCapturingGroups() > 10) {
         cerr << "Too many capturing groups in chname=" << y << "\n";
-        return 1;
+        return 0;
       }
     } else if (y.starts_with("zpad=")) {
       y.remove_leading_chars(5);
@@ -4135,7 +4107,7 @@ FileconvConfig::ParseMiscOptions(Command_Line& cl, char flag) {
       if (1 != substitute_for_whitespace_in_name.length()) {
         cerr << "Sorry, the substitute for whitespace value must be a single character only '" << y
              << "' is invalid\n";
-        return 3;
+        return 0;
       }
 
       if (verbose)
@@ -4149,7 +4121,7 @@ FileconvConfig::ParseMiscOptions(Command_Line& cl, char flag) {
       y.remove_leading_chars(7);
       if (!y.numeric_value(name_token) || name_token < 1) {
         cerr << "Invalid name token specification '" << y << "'\n";
-        return 1;
+        return 0;
       }
       if (verbose) {
         cerr << "Will use the " << name_token << " token of the input name as the output name\n";
@@ -4159,7 +4131,7 @@ FileconvConfig::ParseMiscOptions(Command_Line& cl, char flag) {
       y.remove_leading_chars(8);
       if (!y.numeric_value(max_path_length) || max_path_length < 1) {
         cerr << "The maxplen= directive must be followed by a +ve whole number\n";
-        return 5;
+        return 0;
       }
 
       if (verbose)
@@ -4211,7 +4183,7 @@ FileconvConfig::ParseMiscOptions(Command_Line& cl, char flag) {
       if (!q->create_from_smarts(y)) {
         cerr << "Invalid smarts specification of atom in ring to be fixed '" << y << "'\n";
         delete q;
-        return 1;
+        return 0;
       }
 
       aromatise_these_rings.add(q);
@@ -4248,7 +4220,7 @@ FileconvConfig::ParseMiscOptions(Command_Line& cl, char flag) {
         cerr << "FileconvConfig::cannot initialise atom typing '" << y << "'\n";
         return 0;
       }
-    } else if (y == "dbg") {
+    } else if (y == "dbg" || y.starts_with("rpt=")) {
       // handled elsewhere
     } else if ("help" == y) {
       DisplayDashYOptions(0);
@@ -4383,7 +4355,7 @@ FileconvConfig::GetChiralityInstructions(Command_Line& cl, char flag) {
 
       if (!process_cmdline_token(' ', foo, remove_chiral_centres_on, verbose)) {
         cerr << "Cannot read chiral centre removal query(s) '" << tmp << "'\n";
-        return 3;
+        return 0;
       }
     } else if ("rmctb" == tmp || "xctb" == tmp) {
       remove_directional_bonds_from_input = 1;
@@ -4408,7 +4380,7 @@ FileconvConfig::GetChiralityInstructions(Command_Line& cl, char flag) {
       tmp.remove_leading_chars(5);
       if (!tmp.numeric_value(max_chiral_centres) || max_chiral_centres < 0) {
         cerr << "The max chiral centre count (-s maxc=) directive must be a whole number\n";
-        return 1;
+        return 0;
       }
 
       if (verbose)
@@ -4746,6 +4718,7 @@ FileconvConfig::GetFragmentSpecifications(Command_Line& cl) {
     //  combination with other fragment selections
 
     int nsel =
+        (remove_fragments_this_size_or_smaller > 0) +
         (fragment_count != 0) + (reduce_to_largest_fragment) + (reduce_to_all_largest_fragments) +
         (reduce_to_largest_organic_fragment) + (reduce_to_largest_organic_fragment_carefully) +
         (keep_all_organic_fragments) + (largest_fragment_queries.number_elements() > 0) +
@@ -5092,7 +5065,7 @@ FileconvConfig::ParseRingFiltering(Command_Line& cl) {
         if (!r.numeric_value(max_rings_in_a_ring_system) || max_rings_in_a_ring_system < 1) {
           cerr << "The Max Rings in a System (MRS:) directive must be followed by a whole +ve "
                   "number\n";
-          return 3;
+          return 0;
         }
 
         if (verbose)
@@ -5118,7 +5091,7 @@ FileconvConfig::ParseRingFiltering(Command_Line& cl) {
         }
       } else if (upper_ring_count_cutoff > 0) {
         cerr << "Already specified upper ring count cutoff (-R)\n";
-        return 2;
+        return 0;
       } else if (!r.numeric_value(upper_ring_count_cutoff) || upper_ring_count_cutoff < 1) {
         cerr << "The upper ring count cutoff (-R) option must be a whole +ve number\n";
         Usage(2);

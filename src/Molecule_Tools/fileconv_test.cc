@@ -20,6 +20,10 @@ class FileconvTest : public testing::Test {
     fileconv::FileconvConfig _config;
     void SetUp();
     void TearDown();
+    int Configure(std::vector<const char*> argv) {
+      Command_Line cl(argv.size(), const_cast<char**>(argv.data()), "I:s:f:Y:r:R:");
+      return _config.Build(cl);
+    }
 };
 
 void
@@ -344,3 +348,93 @@ INSTANTIATE_TEST_SUITE_P(SaltFileTests, SaltFileTestP, testing::Values(
 ));
 
 }  // namespace
+
+TEST_F(FileconvTest, NameRewriteUsesFirstOfMultipleCaptures) {
+  ASSERT_TRUE(Configure({"fileconv", "-Y", "chname=(foo)(bar)"}));
+  ASSERT_TRUE(_m.build_from_smiles("C foobar"));
+  const auto result = _config.Process(_m);
+  EXPECT_FALSE(result.error);
+  EXPECT_EQ(_m.name(), "foo");
+}
+
+TEST_F(FileconvTest, RemoveSmallFragmentsEnablesProcessing) {
+  ASSERT_TRUE(Configure({"fileconv", "-f", "rmle=1"}));
+  ASSERT_TRUE(_m.build_from_smiles("C.CCC example"));
+  const auto result = _config.Process(_m);
+  EXPECT_FALSE(result.rejected);
+  EXPECT_GT(result.molecule_changed, 0);
+  EXPECT_EQ(_m.smiles(), "CCC");
+}
+
+TEST_F(FileconvTest, AllIsotopesCanBeConvertedToZero) {
+  ASSERT_TRUE(Configure({"fileconv", "-I", "alliso=0"}));
+  ASSERT_TRUE(_m.build_from_smiles("[13CH3]C"));
+  const auto result = _config.Process(_m);
+  EXPECT_GT(result.molecule_changed, 0);
+  EXPECT_EQ(_m.number_isotopic_atoms(), 0);
+}
+
+TEST_F(FileconvTest, IsotopeQueriesObserveEarlierChanges) {
+  ASSERT_TRUE(Configure({"fileconv", "-I", "smarts:[1C],2", "-I", "smarts:[2C],3"}));
+  ASSERT_TRUE(_m.build_from_smiles("[1CH3]C"));
+  EXPECT_FALSE(_config.Process(_m).error);
+  EXPECT_EQ(_m.isotope(0), 3u);
+}
+
+TEST_F(FileconvTest, IsotopeQueriesDoNotMatchOldLabels) {
+  ASSERT_TRUE(Configure({"fileconv", "-I", "smarts:[1C],2", "-I", "smarts:[1C],3"}));
+  ASSERT_TRUE(_m.build_from_smiles("[1CH3]C"));
+  EXPECT_FALSE(_config.Process(_m).error);
+  EXPECT_EQ(_m.isotope(0), 2u);
+}
+
+TEST_F(FileconvTest, ChiralityRemovalMarksMoleculeChanged) {
+  ASSERT_TRUE(Configure({"fileconv", "-s", "rmchiral=SMARTS:[C]", "-Y", "appchg=CHANGED"}));
+  ASSERT_TRUE(_m.build_from_smiles("C[C@H](N)F example"));
+  ASSERT_EQ(_m.chiral_centres(), 1);
+  const auto result = _config.Process(_m);
+  EXPECT_GT(result.molecule_changed, 0);
+  EXPECT_EQ(_m.chiral_centres(), 0);
+  EXPECT_EQ(_m.name(), "example CHANGED");
+}
+
+TEST_F(FileconvTest, DirectionalCleanupPreservesEarlierChangeCount) {
+  ASSERT_TRUE(Configure({"fileconv", "-I", "convert", "-s", "rmbctb", "-Y", "appchg=CHANGED"}));
+  ASSERT_TRUE(_m.build_from_smiles("[13CH3]C example"));
+  const auto result = _config.Process(_m);
+  EXPECT_GT(result.molecule_changed, 0);
+  EXPECT_EQ(_m.name(), "example CHANGED");
+}
+
+TEST_F(FileconvTest, FragmentSortingPreservesUserPointers) {
+  ASSERT_TRUE(Configure({"fileconv", "-f", "sfs"}));
+  ASSERT_TRUE(_m.build_from_smiles("[1CH4].[2CH3][3CH2][4CH3].[5CH3][6CH3]"));
+  int data[6] = {};
+  for (int i = 0; i < 6; ++i) {
+    _m.set_user_specified_atom_void_ptr(i, &data[i]);
+  }
+  EXPECT_FALSE(_config.Process(_m).rejected);
+  EXPECT_EQ(_m.isotope(0), 2u);
+  EXPECT_EQ(_m.isotope(5), 1u);
+  for (int i = 0; i < 6; ++i) {
+    EXPECT_EQ(_m.user_specified_atom_void_ptr(i), &data[_m.isotope(i) - 1]);
+  }
+}
+
+TEST(FileconvInvalidOptions, ErrorsAreNotSuccessfulBuilds) {
+  for (const std::vector<const char*>& argv : {
+           std::vector<const char*>{"fileconv", "-Y", "maxplen=bad"},
+           {"fileconv", "-Y", "chname=foo"},
+           {"fileconv", "-Y", "chname=["},
+           {"fileconv", "-Y", "ntoken=bad"},
+           {"fileconv", "-Y", "nsubw=xx"},
+           {"fileconv", "-Y", "fixarom=["},
+           {"fileconv", "-Y", "tfirst="},
+           {"fileconv", "-s", "rmchiral=SMARTS:["},
+           {"fileconv", "-s", "maxc=bad"},
+           {"fileconv", "-R", "MRS:bad"}}) {
+    Command_Line cl(argv.size(), const_cast<char**>(argv.data()), "Y:s:R:");
+    fileconv::FileconvConfig config;
+    EXPECT_FALSE(config.Build(cl)) << argv.back();
+  }
+}

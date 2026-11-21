@@ -480,11 +480,12 @@ syntax would have been to use `=` instead of `,`. TODO:ianwatson
 enable that.
 
 ### -I alliso=\<i\>
-Change any isotopic atoms to isotope \<i\>.
+Change any isotopic atoms to isotope \<i\>. Zero removes their isotopic labels.
 
 ### -I smarts:smarts,\<i\>
 Change any atoms matching \<smarts\> to isotope \<i\>, 
-e.g. `[2C],0` or `[#16],4`.
+e.g. `[2C],0` or `[#16],4`. Repeated query directives are applied in
+command-line order; each query sees isotope changes made by earlier queries.
 
 ### -I remove
 Remove any isotopically labelled atoms. May result in
@@ -655,11 +656,18 @@ Translate molecules (dx, dy, dz). Only works if the starting
 molecule has coordinates.
 
 ## -L \<fname\> 
-Write rejected molecules to \<fname\>. For historical reasons
-this will create two files, one containg just ids and the
-other a structure file of the of rejected structures. The
-file type will be as specified by the `-o` option if present,
-smiles otherwise.
+Write rejected molecules to the requested stem, using the `-o` output types
+or SMILES by default. A separate text log records the identifier and reason.
+For `-L rejects`, these are `rejects.smi` and `rejects`. If the requested name
+already has an output suffix, the log gets `.log` appended: `-L rejects.smi`
+produces `rejects.smi` and `rejects.smi.log`.
+
+`-L -` writes rejected molecules to stdout without a separate text log.
+The rejection reason is included in each rejected molecule's name.
+
+Named output destinations are checked before opening them. They must differ
+from all input files (including files supplied through `F:` lists) and from
+other named outputs. Output write failures produce a nonzero exit status.
 
 ## -B ...
 Handling for otherwise fatal problems, enter '-B help'.
@@ -831,7 +839,8 @@ Translate all whitespace in molecule names to 'c'.
 
 ### -Y chname=rx
 change name to what is matched by \<rx\> (optional match). There
-must be a single capture group in the regular expression.
+must be at least one capture group in the regular expression. The first
+capture becomes the name; additional or nested capture groups are allowed.
 
 For example, given 
 ```

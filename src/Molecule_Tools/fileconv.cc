@@ -3,7 +3,8 @@
 */
 
 #include <cstdlib>
-#include <iostream>
+#include <filesystem>
+#include <vector>
 #include <iostream>
 #include <memory>
 #include <limits>
@@ -62,6 +63,22 @@ struct LocalOptions {
 
   // functions
   private:
+    std::vector<IWString> _input_files;
+    std::vector<IWString> _molecule_files;
+    std::vector<IWString> _output_files;
+    IWString _rejection_stem;
+    IWString _rejection_log_name;
+    IWString _prefiltered_smiles_file;
+    uint64_t _main_files_created = 0;
+    uint64_t _rejection_files_created = 0;
+
+    int GatherInputFiles(const Command_Line& cl);
+    int ReserveOutputFile(const IWString& fname, bool remember = true);
+    int ReserveMoleculeOutputs(const IWString& stem,
+                              const Molecule_Output_Object& output, int keep_suffix, bool remember = true);
+    int PrepareDynamicOutput(Molecule& m, Molecule_Output_Object& output, uint64_t& count);
+    int OpenAuxiliaryOutputs();
+
     // If requested, write `smiles` to stream_for_smiles_before_filters
     int MaybeWritePostTransformSmiles(const IWString& smiles);
 
@@ -103,11 +120,186 @@ struct LocalOptions {
     int Fileconv(Molecule& m, fileconv::FileconvConfig& config);
 
     int ReportResults(const Command_Line& cl, std::ostream& output) const;
+    int FinishOutputs();
 };
+
+// Compare resolved paths and existing file identities, including hard links.
+static bool
+SameFile(const IWString& lhs, const IWString& rhs) {
+  const std::filesystem::path a(std::string(lhs.data(), lhs.length()));
+  const std::filesystem::path b(std::string(rhs.data(), rhs.length()));
+  std::error_code ec;
+  if (std::filesystem::equivalent(a, b, ec) && !ec) {
+    return true;
+  }
+  ec.clear();
+  const auto ca = std::filesystem::weakly_canonical(a, ec);
+  if (ec) {
+    return a.lexically_normal() == b.lexically_normal();
+  }
+  const auto cb = std::filesystem::weakly_canonical(b, ec);
+  return !ec && ca == cb;
+}
+
+int
+LocalOptions::GatherInputFiles(const Command_Line& cl) {
+  for (const char* fname : cl) {
+    _input_files.emplace_back(fname);
+    const_IWSubstring arg(fname);
+    if (!arg.starts_with("F:")) {
+      _molecule_files.emplace_back(fname);
+      continue;
+    }
+    arg.remove_leading_chars(2);
+    _input_files.emplace_back(arg);
+    iwstring_data_source input(arg);
+    if (!input.good()) {
+      cerr << "Cannot open input file list '" << arg << "'\n";
+      return 0;
+    }
+    input.set_strip_trailing_blanks(1);
+    input.set_strip_leading_blanks(1);
+    input.set_skip_blank_lines(1);
+    IWString line;
+    while (input.next_record(line)) {
+      if (line.starts_with('#')) {
+        continue;
+      }
+      _input_files.push_back(line);
+      _molecule_files.push_back(line);
+    }
+  }
+  return 1;
+}
+
+int
+LocalOptions::ReserveOutputFile(const IWString& fname, bool remember) {
+  if (fname == "-") {
+    return 1;
+  }
+  if (fname.empty()) {
+    cerr << "Empty output filename\n";
+    return 0;
+  }
+  for (const IWString& input : _input_files) {
+    if (input != "-" && SameFile(fname, input)) {
+      cerr << "Output '" << fname << "' would overwrite input '" << input << "'\n";
+      return 0;
+    }
+  }
+  for (const IWString& output : _output_files) {
+    if (SameFile(fname, output)) {
+      cerr << "Output destinations '" << fname << "' and '" << output << "' collide\n";
+      return 0;
+    }
+  }
+  if (remember) {
+    _output_files.push_back(fname);
+  }
+  return 1;
+}
+
+int
+LocalOptions::ReserveMoleculeOutputs(const IWString& stem,
+                                   const Molecule_Output_Object& output, int keep_suffix, bool remember) {
+  if (stem == "-") {
+    return 1;
+  }
+  for (FileType type : output.output_types()) {
+    IWString fname;
+    if (!create_file_with_appropriate_name(stem, fname, type, keep_suffix) ||
+        !ReserveOutputFile(fname, remember)) {
+      return 0;
+    }
+  }
+  return 1;
+}
+
+int
+LocalOptions::OpenAuxiliaryOutputs() {
+  if (!_rejection_stem.empty() && !rejections_output.new_stem(_rejection_stem, 1)) {
+    cerr << "Cannot open rejected molecule output '" << _rejection_stem << "'\n";
+    return 0;
+  }
+  if (!_rejection_log_name.empty() && !reject_log.open(_rejection_log_name.null_terminated_chars())) {
+    cerr << "Cannot open rejection log '" << _rejection_log_name << "'\n";
+    return 0;
+  }
+  if (!_prefiltered_smiles_file.empty() &&
+      !stream_for_smiles_before_filters.open(_prefiltered_smiles_file.null_terminated_chars())) {
+    cerr << "Cannot open pre-filtered smiles '" << _prefiltered_smiles_file << "'\n";
+    return 0;
+  }
+  return 1;
+}
+
+// Flush before streams are destroyed so failures affect the exit status.
+static int
+FlushMolecules(Molecule_Output_Object& output) {
+  int ok = 1;
+  for (auto* stream : output) {
+    stream->flush();
+    if (!stream->good()) {
+      ok = 0;
+    }
+  }
+  return ok;
+}
+
+int
+LocalOptions::PrepareDynamicOutput(Molecule& m, Molecule_Output_Object& output,
+                                   uint64_t& count) {
+  IWString stem;
+  if (output.name_token_for_file_name() >= 0) {
+    if (!m.name().word(output.name_token_for_file_name(), stem)) {
+      cerr << "Cannot obtain output filename from '" << m.name() << "'\n";
+      return 0;
+    }
+  } else {
+    if (output.molecules_written() % output.molecules_per_file() != 0) {
+      return 1;
+    }
+    stem = output.stem();
+    stem << count;
+  }
+  // Generated names are not accumulated: checking them must not become quadratic
+  // in the number of molecules. Check against inputs and named output streams.
+  if (!ReserveMoleculeOutputs(stem, output, 0, false) || !FlushMolecules(output)) {
+    return 0;
+  }
+  ++count;
+  return 1;
+}
+
+int
+LocalOptions::FinishOutputs() {
+  int ok = FlushMolecules(output);
+  if (!FlushMolecules(rejections_output)) {
+    ok = 0;
+  }
+  if (reject_log.is_open() && !reject_log.close()) {
+    ok = 0;
+  }
+  if (stream_for_smiles_before_filters.is_open() && !stream_for_smiles_before_filters.close()) {
+    ok = 0;
+  }
+  std::cout.flush();
+  if (!std::cout.good()) {
+    ok = 0;
+  }
+  if (!ok) {
+    cerr << "fileconv: error finalising output\n";
+  }
+  return ok;
+}
 
 int
 LocalOptions::Build(Command_Line& cl) {
   verbose = cl.option_count('v');
+
+  if (!GatherInputFiles(cl)) {
+    return 0;
+  }
 
   if (! SetupRejectionsFile(cl, 'L')) {
     cerr << "Cannot initialise rejection files (-L)\n";
@@ -120,7 +312,9 @@ LocalOptions::Build(Command_Line& cl) {
 
   SetDebugPrintEachMolecule(cl, 'Y');
 
-  SetupReporting(cl, 'Y');
+  if (!SetupReporting(cl, 'Y')) {
+    return 0;
+  }
 
   audit_input = cl.option_present('a');
 
@@ -128,9 +322,13 @@ LocalOptions::Build(Command_Line& cl) {
     return 0;
   }
 
+  if (!connection_table_error_file.empty() && !ReserveOutputFile(connection_table_error_file)) {
+    return 0;
+  }
+
   // If just auditing the input, no output to be set up.
   if (audit_input) {
-    return 1;
+    return OpenAuxiliaryOutputs();
   }
 
   // Setup output options.
@@ -141,6 +339,10 @@ LocalOptions::Build(Command_Line& cl) {
     }
 
     cl.value('S', output_file_stem);
+    if (output_file_stem.empty()) {
+      cerr << "The -S output stem cannot be empty\n";
+      return 0;
+    }
     if (verbose)
       cerr << "New files will be created with stem '" << output_file_stem << "'\n";
   }
@@ -161,13 +363,20 @@ LocalOptions::Build(Command_Line& cl) {
       cerr << "Each molecule written to its own file (-G option)\n";
   }
 
-  if ("-" == output_file_stem) {
-  } else if (output.would_overwrite_input_files(cl, output_file_stem)) {
-    cerr << "fileconv:cannot overwrite input file(s)\n";
-    return 4;
+  if (output.name_token_for_file_name() >= 0 || output.molecules_per_file() > 0) {
+    // Names are checked just before writing each generated file.
+  } else if (!output_file_stem.empty()) {
+    if (!ReserveMoleculeOutputs(output_file_stem, output, 0)) {
+      return 0;
+    }
+  } else if (output.name_token_for_file_name() < 0) {
+    for (const IWString& input : _molecule_files) {
+      if (!ReserveMoleculeOutputs(input, output, 0)) {
+        return 0;
+      }
+    }
   }
-
-  return 1;
+  return OpenAuxiliaryOutputs();
 }
 
 void
@@ -200,7 +409,7 @@ LocalOptions::ParseBadHandlingoptions(Command_Line& cl, char flag) {
         cerr << connection_table_errors_allowed << " connection table errors allowed\n";
     } else {
       cerr << "Invalid -B qualifier '" << b << "'\n";
-      return 6;
+      return 0;
     }
   }
 
@@ -234,25 +443,29 @@ LocalOptions::SetupRejectionsFile(Command_Line& cl, char flag) {
     return 0;
   }
 
-  IWString reject_log_file_name = cl.option_value(flag);
-
-  if (rejections_output.would_overwrite_input_files(cl, reject_log_file_name)) {
-    cerr << "Reject file '" << reject_log_file_name << "' cannot overwrite input file(s)\n";
+  _rejection_stem = cl.option_value(flag);
+  if (_rejection_stem.empty()) {
+    cerr << "The rejection output stem cannot be empty\n";
     return 0;
   }
-
-  if (!rejections_output.new_stem(reject_log_file_name, 1)) {
-    cerr << "Rejections file cannot use stem '" << reject_log_file_name << "'\n";
+  if (!ReserveMoleculeOutputs(_rejection_stem, rejections_output, 1)) {
     return 0;
   }
-
-  if (!reject_log.open(reject_log_file_name.null_terminated_chars())) {
-    cerr << "Cannot open reject file '" << reject_log_file_name << "'\n";
-    return 0;
-  }
-
-  if (cl.option_present('v')) { // verbose
-    cerr << "Rejected structures will be written to '" << reject_log_file_name << "'\n";
+  // Keep the historical log name unless it is also a molecule output filename.
+  // With -L -, only rejected molecules are written to stdout.
+  if (_rejection_stem != "-") {
+    _rejection_log_name = _rejection_stem;
+    for (FileType type : rejections_output.output_types()) {
+      IWString fname;
+      create_file_with_appropriate_name(_rejection_stem, fname, type, 1);
+      if (SameFile(fname, _rejection_log_name)) {
+        _rejection_log_name << ".log";
+        break;
+      }
+    }
+    if (!ReserveOutputFile(_rejection_log_name)) {
+      return 0;
+    }
   }
 
   return 1;
@@ -277,13 +490,11 @@ LocalOptions::OpenPreFilteredSmilesFile(Command_Line& cl, char flag) {
     else if (!fname.ends_with(".smi"))
       fname << ".smi";
 
-    if (!stream_for_smiles_before_filters.open(fname.null_terminated_chars())) {
-      cerr << "Cannot open stream for pre-filtered smiles '" << fname << "'\n";
-      return 3;
+    if (!ReserveOutputFile(fname)) {
+      return 0;
     }
+    _prefiltered_smiles_file = fname;
 
-    if (verbose)
-      cerr << "Pre-filtered smiles written to '" << fname << "'\n";
     return 1;
   }
 
@@ -299,7 +510,7 @@ LocalOptions::SetupReporting(Command_Line& cl, char flag) {
     }
     y.remove_leading_chars(4);
     uint32_t rpt;
-    if (! y.numeric_value(rpt)) {
+    if (! y.numeric_value(rpt) || rpt == 0) {
       cerr << "Invalid -Y rpt=... directive '" << y << "'\n";
       return 0;
     }
@@ -368,7 +579,7 @@ LocalOptions::MaybeOpenNewOutputFIle(const char * fname, int first_call) {
   }
 
   // New output file for this input.
-  if (!  output.new_stem(fname)) {
+  if (!FlushMolecules(output) || !output.new_stem(fname)) {
     return 0;
   }
 
@@ -386,9 +597,7 @@ LocalOptions::MaybeWritePostTransformSmiles(const IWString& smiles) {
 
   // organic subset
   stream_for_smiles_before_filters << smiles << '\n';
-  stream_for_smiles_before_filters.write_if_buffer_holds_more_than(32768);
-
-  return stream_for_smiles_before_filters.good();
+  return stream_for_smiles_before_filters.write_if_buffer_holds_more_than(32768);
 }
 
 int
@@ -396,12 +605,21 @@ LocalOptions::MaybeWriteRejection(Molecule& m,
                              const IWString& rejection_reason) {
   if (reject_log.is_open()) {
     reject_log << molecules_read << " '" << m.name() << "' REASON " << rejection_reason << '\n';
-    reject_log.write_if_buffer_holds_more_than(4096);
+    if (!reject_log.write_if_buffer_holds_more_than(4096)) {
+      return 0;
+    }
   }
 
   if (rejections_output.active()) {
     m << " REJ " << rejection_reason;
-    rejections_output.write(m);
+    if ((rejections_output.name_token_for_file_name() >= 0 ||
+         rejections_output.molecules_per_file() > 0) &&
+        !PrepareDynamicOutput(m, rejections_output, _rejection_files_created)) {
+      return 0;
+    }
+    if (!rejections_output.write(m)) {
+      return 0;
+    }
   }
 
   return 1;
@@ -446,7 +664,9 @@ LocalOptions::Fileconv(Molecule& m,
     return 0;
   }
 
-  MaybeWritePostTransformSmiles(result.smiles_before_filters);
+  if (!MaybeWritePostTransformSmiles(result.smiles_before_filters)) {
+    return 0;
+  }
 
   if (result.rejected) {
     return MaybeWriteRejection(m, result.rejection_reason);
@@ -458,6 +678,12 @@ LocalOptions::Fileconv(Molecule& m,
 
   if (audit_input) {  // Nothing more to do.
     return 1;
+  }
+
+  if (output.name_token_for_file_name() >= 0 || output.molecules_per_file() > 0) [[unlikely]] {
+    if (!PrepareDynamicOutput(m, output, _main_files_created)) {
+      return 0;
+    }
   }
 
   if (! output.write(m)) {
@@ -499,7 +725,10 @@ Fileconv(const char *fname,
 
   if (FILE_TYPE_INVALID == input_type) {
     input_type = discern_file_type_from_name(fname);
-    assert(FILE_TYPE_INVALID != input_type);
+    if (FILE_TYPE_INVALID == input_type) {
+      cerr << "Cannot determine input type for '" << fname << "'\n";
+      return 0;
+    }
   }
 
   data_source_and_type<Molecule> input(input_type, fname);
@@ -667,6 +896,10 @@ Fileconv(int argc, char ** argv) {
       rc = 1;
       break;
     }
+  }
+
+  if (!local_options.FinishOutputs()) {
+    rc = 1;
   }
 
   if (local_options.verbose) {

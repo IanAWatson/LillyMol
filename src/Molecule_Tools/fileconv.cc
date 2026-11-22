@@ -3,7 +3,6 @@
 */
 
 #include <cstdlib>
-#include <filesystem>
 #include <vector>
 #include <iostream>
 #include <memory>
@@ -123,24 +122,6 @@ struct LocalOptions {
     int FinishOutputs();
 };
 
-// Compare resolved paths and existing file identities, including hard links.
-static bool
-SameFile(const IWString& lhs, const IWString& rhs) {
-  const std::filesystem::path a(std::string(lhs.data(), lhs.length()));
-  const std::filesystem::path b(std::string(rhs.data(), rhs.length()));
-  std::error_code ec;
-  if (std::filesystem::equivalent(a, b, ec) && !ec) {
-    return true;
-  }
-  ec.clear();
-  const auto ca = std::filesystem::weakly_canonical(a, ec);
-  if (ec) {
-    return a.lexically_normal() == b.lexically_normal();
-  }
-  const auto cb = std::filesystem::weakly_canonical(b, ec);
-  return !ec && ca == cb;
-}
-
 int
 LocalOptions::GatherInputFiles(const Command_Line& cl) {
   for (const char* fname : cl) {
@@ -182,13 +163,25 @@ LocalOptions::ReserveOutputFile(const IWString& fname, bool remember) {
     return 0;
   }
   for (const IWString& input : _input_files) {
-    if (input != "-" && SameFile(fname, input)) {
-      cerr << "Output '" << fname << "' would overwrite input '" << input << "'\n";
-      return 0;
+    if (input != "-") {
+      const auto same = iwmisc::SameFile(fname, input);
+      if (!same) {
+        cerr << "Cannot compare file paths\n";
+        return 0;
+      }
+      if (*same) {
+        cerr << "Output '" << fname << "' would overwrite input '" << input << "'\n";
+        return 0;
+      }
     }
   }
   for (const IWString& output : _output_files) {
-    if (SameFile(fname, output)) {
+    const auto same = iwmisc::SameFile(fname, output);
+    if (!same) {
+      cerr << "Cannot compare file paths\n";
+      return 0;
+    }
+    if (*same) {
       cerr << "Output destinations '" << fname << "' and '" << output << "' collide\n";
       return 0;
     }
@@ -458,7 +451,12 @@ LocalOptions::SetupRejectionsFile(Command_Line& cl, char flag) {
     for (FileType type : rejections_output.output_types()) {
       IWString fname;
       create_file_with_appropriate_name(_rejection_stem, fname, type, 1);
-      if (SameFile(fname, _rejection_log_name)) {
+      const auto same = iwmisc::SameFile(fname, _rejection_log_name);
+      if (!same) {
+        cerr << "Cannot compare file paths\n";
+        return 0;
+      }
+      if (*same) {
         _rejection_log_name << ".log";
         break;
       }

@@ -5,7 +5,6 @@
 
 #include <algorithm>
 #include <deque>
-#include <filesystem>
 #include <iomanip>
 #include <limits>
 #include <map>
@@ -2475,15 +2474,13 @@ build_header (IWString & header)
 
 static bool
 WouldOverwriteInput(const Command_Line& cl, const IWString& output) {
-  namespace fs = std::filesystem;
-  const fs::path destination(output.AsString());
-  for (int i = 0; i < cl.number_elements(); ++i) {
-    const fs::path input(cl[i]);
-    std::error_code error;
-    if (fs::equivalent(input, destination, error)) {
+  for (const char* input : cl) {
+    const auto same = iwmisc::SameFile(IWString(input), output);
+    if (!same) {
+      cerr << "Cannot compare file paths\n";
       return true;
     }
-    if (fs::weakly_canonical(input) == fs::weakly_canonical(destination)) {
+    if (*same) {
       return true;
     }
   }

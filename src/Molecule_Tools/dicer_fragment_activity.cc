@@ -2,7 +2,6 @@
 
 #include <algorithm>
 #include <cmath>
-#include <filesystem>
 #include <fstream>
 #include <iomanip>
 #include <iostream>
@@ -13,6 +12,8 @@
 #include "google/protobuf/struct.pb.h"
 #include "google/protobuf/text_format.h"
 #include "google/protobuf/util/json_util.h"
+
+#include "Foundational/iwmisc/misc.h"
 
 #include "Foundational/accumulator/accumulator.h"
 #include "Foundational/cmdline_v2/cmdline_v2.h"
@@ -202,19 +203,13 @@ Analysis::OutputOverwritesInput(const Command_Line_v2& cl) const {
   if (_json_fname.empty() || _json_fname == "-") {
     return false;
   }
-  std::error_code error;
-  const auto destination = std::filesystem::weakly_canonical(_json_fname, error);
-  if (error) {
-    cerr << "Cannot resolve JSON output path: " << error.message() << '\n';
-    return true;
-  }
   auto same_file = [&](const std::string& name) {
-    std::error_code ec;
-    if (std::filesystem::equivalent(name, _json_fname, ec) && !ec) {
+    const auto same = iwmisc::SameFile(IWString(name), IWString(_json_fname));
+    if (!same) {
+      cerr << "Cannot compare file paths '" << name << "' and '" << _json_fname << "'\n";
       return true;
     }
-    ec.clear();
-    return std::filesystem::weakly_canonical(name, ec) == destination && !ec;
+    return *same;
   };
   if (same_file(_activity_fname)) {
     return true;

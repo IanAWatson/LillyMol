@@ -1,6 +1,5 @@
 // Generate pharmacophore-like queries for 2D molecules
 
-#include <filesystem>
 #include <cstdlib>
 #include <iostream>
 #include <limits>
@@ -617,8 +616,12 @@ Options::Initialise(Command_Line& cl) {
     if (fname != "-") {
       fname.EnsureEndsWith(".smi");
       for (const char* input : cl) {
-        std::error_code error;
-        if (std::filesystem::equivalent(fname.null_terminated_chars(), input, error)) {
+        const auto same = iwmisc::SameFile(fname, IWString(input));
+        if (!same) {
+          cerr << "Cannot compare file paths\n";
+          return 0;
+        }
+        if (*same) {
           cerr << "Labelled output would overwrite input '" << input << "'\n";
           return 0;
         }

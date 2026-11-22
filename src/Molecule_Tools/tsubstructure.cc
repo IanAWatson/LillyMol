@@ -4,7 +4,6 @@
 #include <cassert>
 #include <chrono>
 #include <cstdlib>
-#include <filesystem>
 #include <vector>
 #include <iostream>
 #include <limits>
@@ -423,23 +422,6 @@ static int make_implicit_hydrogens_explicit = 0;
 // All named destinations share these checks, including per-query outputs.
 static std::vector<IWString> output_filenames;
 
-static bool
-SameFile(const IWString& lhs, const IWString& rhs) {
-  const std::filesystem::path a(std::string(lhs.data(), lhs.length()));
-  const std::filesystem::path b(std::string(rhs.data(), rhs.length()));
-  std::error_code ec;
-  if (std::filesystem::equivalent(a, b, ec) && !ec) {
-    return true;
-  }
-  ec.clear();
-  const auto ca = std::filesystem::weakly_canonical(a, ec);
-  if (ec) {
-    return a.lexically_normal() == b.lexically_normal();
-  }
-  const auto cb = std::filesystem::weakly_canonical(b, ec);
-  return !ec && ca == cb;
-}
-
 static int
 RegisterOutputFile(const Command_Line& cl, const IWString& fname) {
   if (fname == "-") {
@@ -450,13 +432,25 @@ RegisterOutputFile(const Command_Line& cl, const IWString& fname) {
     return 0;
   }
   for (const char* input : cl) {
-    if (std::string_view(input) != "-" && SameFile(fname, IWString(input))) {
-      cerr << "Output '" << fname << "' would overwrite input '" << input << "'\n";
-      return 0;
+    if (std::string_view(input) != "-") {
+      const auto same = iwmisc::SameFile(fname, IWString(input));
+      if (!same) {
+        cerr << "Cannot compare file paths\n";
+        return 0;
+      }
+      if (*same) {
+        cerr << "Output '" << fname << "' would overwrite input '" << input << "'\n";
+        return 0;
+      }
     }
   }
   for (const IWString& other : output_filenames) {
-    if (SameFile(fname, other)) {
+    const auto same = iwmisc::SameFile(fname, other);
+    if (!same) {
+      cerr << "Cannot compare file paths\n";
+      return 0;
+    }
+    if (*same) {
       cerr << "Output destinations '" << fname << "' and '" << other << "' coincide\n";
       return 0;
     }

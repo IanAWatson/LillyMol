@@ -4,7 +4,6 @@
 #include <stdlib.h>
 
 #include <algorithm>
-#include <filesystem>
 #include <iostream>
 #include <limits>
 #include <memory>
@@ -16,6 +15,8 @@
 
 #define REPORT_PROGRESS_IMPLEMENTATION
 #include "re2/re2.h"
+
+#include "Foundational/iwmisc/misc.h"
 
 #include "Foundational/cmdline/cmdline.h"
 #include "Foundational/data_source/iwstring_data_source.h"
@@ -607,9 +608,12 @@ Options::WriteDistribution() {
   IWString fname;
   fname << _stem << _next_fname_index << ".csv";
   for (IWString* input : {&_reference_fname, &_query_fname}) {
-    std::error_code ec;
-    if (std::filesystem::equivalent(fname.null_terminated_chars(),
-                                    input->null_terminated_chars(), ec)) {
+    const auto same = iwmisc::SameFile(fname, *input);
+    if (!same) {
+      cerr << "Cannot compare file paths\n";
+      return 0;
+    }
+    if (*same) {
       cerr << "Output file '" << fname << "' would overwrite input '" << *input << "'\n";
       return 0;
     }

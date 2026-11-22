@@ -1362,20 +1362,6 @@ report_coverage(const ID_to_Classification_Data& idcd, std::ostream& os)
   return os.good();
 }
 
-static bool
-SameFile(const IWString& a, const IWString& b) {
-  namespace fs = std::filesystem;
-  const fs::path pa(a.AsString()), pb(b.AsString());
-  std::error_code error;
-  if (fs::equivalent(pa, pb, error)) {
-    return true;
-  }
-  error.clear();
-  const auto ca = fs::weakly_canonical(pa, error);
-  if (error) return pa.lexically_normal() == pb.lexically_normal();
-  const auto cb = fs::weakly_canonical(pb, error);
-  return !error && ca == cb;
-}
 
 static int
 CheckOutputFiles(const Command_Line& cl, const std::vector<IWString>& regex_inputs) {
@@ -1411,13 +1397,23 @@ CheckOutputFiles(const Command_Line& cl, const std::vector<IWString>& regex_inpu
     if (flag == 'T') output.EnsureEndsWith(".textproto");
     if (output == "-") continue;
     for (const IWString& input : inputs) {
-      if (SameFile(input, output)) {
+      const auto same = iwmisc::SameFile(input, output);
+      if (!same) {
+        cerr << "Cannot compare file paths\n";
+        return 0;
+      }
+      if (*same) {
         cerr << "Output '" << output << "' would overwrite input '" << input << "'\n";
         return 0;
       }
     }
     for (const IWString& previous : outputs) {
-      if (SameFile(previous, output)) {
+      const auto same = iwmisc::SameFile(previous, output);
+      if (!same) {
+        cerr << "Cannot compare file paths\n";
+        return 0;
+      }
+      if (*same) {
         cerr << "Output files must use different paths\n";
         return 0;
       }

@@ -4,7 +4,6 @@
 #include <array>
 #include <cassert>
 #include <cstdint>
-#include <filesystem>
 #include <iostream>
 #include <memory>
 #include <utility>
@@ -1734,31 +1733,6 @@ FragmentSelection::Report() const {
   return true;
 }
 
-static bool
-SameFile(const IWString& a, const IWString& b) {
-  namespace fs = std::filesystem;
-  const fs::path pa(a.AsString()), pb(b.AsString());
-  std::error_code error;
-  if (fs::equivalent(pa, pb, error)) {
-    return true;
-  }
-  error.clear();
-  const auto absolute_a = fs::absolute(pa, error);
-  if (error) {
-    return pa.lexically_normal() == pb.lexically_normal();
-  }
-  const auto absolute_b = fs::absolute(pb, error);
-  if (error) {
-    return pa.lexically_normal() == pb.lexically_normal();
-  }
-  const auto ca = fs::weakly_canonical(absolute_a, error);
-  if (error) {
-    return absolute_a.lexically_normal() == absolute_b.lexically_normal();
-  }
-  const auto cb = fs::weakly_canonical(absolute_b, error);
-  return !error && ca == cb;
-}
-
 static int
 CheckOutputFiles(const Command_Line& cl, const IWString& non_matching_fname,
                  const IWString& report_fname) {
@@ -1788,7 +1762,12 @@ CheckOutputFiles(const Command_Line& cl, const IWString& non_matching_fname,
     }
     outputs.emplace_back(flag, output);
     for (const char* input : cl) {
-      if (SameFile(output, IWString(input))) {
+      const auto same = iwmisc::SameFile(output, IWString(input));
+      if (!same) {
+        cerr << "Cannot compare file paths\n";
+        return 0;
+      }
+      if (*same) {
         cerr << "Output -" << flag << " would overwrite input '" << input << "'\n";
         return 0;
       }
@@ -1796,7 +1775,12 @@ CheckOutputFiles(const Command_Line& cl, const IWString& non_matching_fname,
   }
   for (size_t i = 0; i < outputs.size(); ++i) {
     for (size_t j = 0; j < i; ++j) {
-      if (SameFile(outputs[j].second, outputs[i].second)) {
+      const auto same = iwmisc::SameFile(outputs[j].second, outputs[i].second);
+      if (!same) {
+        cerr << "Cannot compare file paths\n";
+        return 0;
+      }
+      if (*same) {
         cerr << '-' << outputs[j].first << " and -" << outputs[i].first
              << " must name different output files\n";
         return 0;

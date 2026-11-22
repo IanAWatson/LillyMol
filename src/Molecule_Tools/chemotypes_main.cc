@@ -1,12 +1,13 @@
 #include <cctype>
 #include <cstdint>
 #include <cstdlib>
-#include <filesystem>
 #include <iostream>
 #include <memory>
 #include <limits>
 #include <string>
 #include <vector>
+
+#include "Foundational/iwmisc/misc.h"
 
 #include "Foundational/cmdline/cmdline.h"
 #include "Foundational/iwstring/absl_hash.h"
@@ -404,21 +405,6 @@ class Options {
 };
 
 static bool
-SameOutputFile(const IWString& a, const IWString& b) {
-  namespace fs = std::filesystem;
-  std::error_code error;
-  if (fs::equivalent(a.AsString(), b.AsString(), error)) {
-    return true;
-  }
-  const auto first = fs::weakly_canonical(a.AsString(), error);
-  if (error) {
-    return a == b;
-  }
-  const auto second = fs::weakly_canonical(b.AsString(), error);
-  return !error && first == second;
-}
-
-static bool
 CheckRejectionFilename(const Command_Line& cl, IWString& filename) {
   if (cl.option_count('B') != 1) {
     cerr << "Specify one rejection filename (-B)\n";
@@ -431,9 +417,16 @@ CheckRejectionFilename(const Command_Line& cl, IWString& filename) {
   }
   filename.EnsureEndsWith(".smi");
   for (const char* input : cl) {
-    if (IWString(input) != "-" && SameOutputFile(filename, IWString(input))) {
-      cerr << "Rejection output would overwrite input '" << input << "'\n";
-      return false;
+    if (IWString(input) != "-") {
+      const auto same = iwmisc::SameFile(filename, IWString(input));
+      if (!same) {
+        cerr << "Cannot compare file paths\n";
+        return 0;
+      }
+      if (*same) {
+        cerr << "Rejection output would overwrite input '" << input << "'\n";
+        return false;
+      }
     }
   }
   std::vector<FileType> types;
@@ -454,17 +447,30 @@ CheckRejectionFilename(const Command_Line& cl, IWString& filename) {
       }
       for (FileType ft : types) {
         IWString output;
-        if (create_file_with_appropriate_name(value, output, ft) &&
-            SameOutputFile(filename, output)) {
-          cerr << "Rejection output conflicts with -" << flag << '\n';
-          return false;
+        if (create_file_with_appropriate_name(value, output, ft)) {
+          const auto same = iwmisc::SameFile(filename, output);
+          if (!same) {
+            cerr << "Cannot compare file paths\n";
+            return 0;
+          }
+          if (*same) {
+            cerr << "Rejection output conflicts with -" << flag << '\n';
+            return false;
+          }
         }
       }
     }
   }
-  if (cl.option_present('F') && SameOutputFile(filename, cl.string_value('F'))) {
-    cerr << "Rejection output conflicts with summary (-F)\n";
-    return false;
+  if (cl.option_present('F')) {
+    const auto same = iwmisc::SameFile(filename, cl.string_value('F'));
+    if (!same) {
+      cerr << "Cannot compare file paths\n";
+      return 0;
+    }
+    if (*same) {
+      cerr << "Rejection output conflicts with summary (-F)\n";
+      return false;
+    }
   }
   const_IWSubstring hash;
   for (int i = 0; cl.value('H', hash, i); ++i) {
@@ -473,7 +479,12 @@ CheckRejectionFilename(const Command_Line& cl, IWString& filename) {
     }
     IWString output(hash);
     output.remove_leading_chars(5);
-    if (SameOutputFile(filename, output)) {
+    const auto same = iwmisc::SameFile(filename, output);
+    if (!same) {
+      cerr << "Cannot compare file paths\n";
+      return 0;
+    }
+    if (*same) {
       cerr << "Rejection output conflicts with hash cross-reference\n";
       return false;
     }

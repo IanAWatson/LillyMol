@@ -1,3 +1,4 @@
+load("@rules_python//python:defs.bzl", "py_test")
 load("@com_google_protobuf//bazel:py_proto_library.bzl", "py_proto_library")
 load("@rules_cc//cc:defs.bzl", "cc_binary", "cc_proto_library", "cc_library", "cc_test")
 load("@rules_proto//proto:defs.bzl", "proto_library")
@@ -1075,4 +1076,12 @@ py_proto_library(
     name = "linear_scaling_script_py_proto",
     deps = [":linear_scaling_script_proto"],
     visibility = ["//visibility:public"],
+)
+
+py_test(
+    name = "tcount_cli_test",
+    size = "small",
+    srcs = ["tcount_cli_test.py"],
+    args = ["$(location :tcount)"],
+    data = [":tcount"],
 )

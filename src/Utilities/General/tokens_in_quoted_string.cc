@@ -2,59 +2,52 @@
 
 #include "tokens_in_quoted_string.h"
 
-/*
-  NOTE THIS IS NOT ROBUST.
-  while it works for something like
-
-  ||"<img src=""/img/s.gif"" alt=""Special Protocol"" height=""20"" width=""20"" border=""0""/>"||||
-
-  it does not really check that properly...
-
-  Make sure it works for something like
-
-
-1,2,3,4,5,6,7,8,9
-1,"2,x",3,4,5,6,7,8,9
-
-  where some of the tokens are quoted
-*/
-
 int
-tokens_in_quoted_string(const const_IWSubstring & buffer,
-                        const char token_delimiter,
-                        const int line_no)
-{
-  int rc = 0;
-
-  const int n = buffer.length();
-
-  if (0 == n)
+CountDelimitedTokens(const const_IWSubstring& buffer, const DelimitedTextOptions& options,
+                     uint64_t line_number, IWString* translated, char output_separator) {
+  if (translated != nullptr) {
+    *translated = buffer;
+  }
+  if (buffer.empty()) {
     return 0;
-
-  const char dquote = '"';
-
-  int in_quote = buffer[0] == dquote;
-
-  rc = 1;
-
-  for (int i = 1; i < n; ++i)
-  {
-    if (dquote == buffer[i])
-      in_quote = ! in_quote;
-    else if (in_quote)
-      ;
-    else if (token_delimiter == buffer[i])
-    {
-//    if (dquote != buffer[i-1])
-//      cerr << "Warning '" << buffer << "' column " << i << endl;
-      rc++;
-    }
-
-//  cerr << " i = " << i << " rc " << rc << " char '" << buffer[i] << "'\n";
   }
 
-  if (in_quote)
-    std::cerr << "tokens_in_quoted_string:warning still quoted '" << buffer << "' line " << line_no << '\n';
+  const bool keep_empty = options._empty_fields || options._quoted;
+  int count = keep_empty ? 1 : 0;
+  bool in_word = false;
+  bool in_quote = false;
+  bool escaped = false;
+  for (int i = 0; i < buffer.length(); ++i) {
+    const char c = buffer[i];
+    bool separator = false;
+    if (escaped) {
+      escaped = false;
+    } else if (options._backslash_escapes && c == '\\') {
+      escaped = true;
+    } else if (options._quoted && c == '"') {
+      in_quote = !in_quote;
+    } else {
+      separator = !in_quote && c == options._separator;
+    }
 
-  return rc;
+    if (separator) {
+      if (keep_empty) {
+        ++count;
+      }
+      in_word = false;
+      if (translated != nullptr) {
+        (*translated)[i] = output_separator;
+      }
+    } else if (!in_word) {
+      if (!keep_empty) {
+        ++count;
+      }
+      in_word = true;
+    }
+  }
+  if (in_quote && line_number != 0) {
+    std::cerr << "tcount: warning unmatched quote on line " << line_number
+              << ": '" << buffer << "'\n";
+  }
+  return count;
 }

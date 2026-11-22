@@ -1,33 +1,43 @@
-#include <stdlib.h>
+#include <cstdlib>
 
 #include <fstream>
+#include <limits>
+#include <memory>
+#include <vector>
 #include <iostream>
 
-#include "assert.h"
+#include <cassert>
 
 using std::cerr;
 
 static int verbose = 0;
-const char *prog_name = nullptr;
 
 #define RESIZABLE_ARRAY_IMPLEMENTATION
 #include "Foundational/accumulator/accumulator.h"
 #include "Foundational/cmdline/cmdline.h"
 #include "Foundational/data_source/iwstring_data_source.h"
 #include "Foundational/iwstring/iwstring.h"
+#include "Foundational/iwmisc/misc.h"
 #include "Foundational/iwstring/string_with_commas.h"
 
 #include "tokens_in_quoted_string.h"
 
-extending_resizable_array<int> token_counts;
+static uint64_t records_to_process = 0;
 
-static Accumulator_Int<uint64_t> record_length;
+struct FileStatistics {
+  extending_resizable_array<uint64_t> _token_counts;
+  Accumulator_Int<uint64_t> _record_length;
+  uint64_t _records = 0;
+  int _first_token_count = -1;
+  int _previous_token_count = -1;
+  bool _rectangular = true;
+};
 
-static uint32_t records_to_process = 0;
+static DelimitedTextOptions token_options;
 
 //  Sometimes it is the end of the file which is of interest
 
-static std::streampos offset_from_eof = 0;
+static off_t offset_from_eof = 0;
 
 static int abort_on_different_token_count = 0;
 
@@ -42,6 +52,8 @@ static char output_token_delimiter = ' ';
 static int consecutive_delimiters_mean_empty_words_between = 0;
 
 static char record_delimiter = '\n';
+// Retain the historical tolerant default; an explicit -c selects the mode.
+static bool dos_record_terminators = true;
 
 /*
   When reporting a record different, do we just report the record
@@ -63,15 +75,11 @@ static std::ofstream new_fstream_reported;
 
 static int report_non_rectangular_files = 0;
 
-static int non_rectangular_files_found = 0;
+static uint64_t non_rectangular_files_found = 0;
 
 static int data_is_quoted_tokens = 0;
 
 static std::ofstream stream_for_count;
-
-static int token_length_n = 0;
-static Accumulator_Int<uint32_t> *acc_token_length = nullptr;
-static int *zero_length = nullptr;
 
 static int contains_backslashed_separators = 0;
 
@@ -89,19 +97,19 @@ static uint64_t total_lines_read = 0;
 class Stream_for_Columns : public std::ofstream {
  private:
   const int _tokens;
+  const IWString _fname;
 
  public:
   Stream_for_Columns(int, const char *);
 
-  int ok() const;
-  int debug_print(std::ostream &) const;
+  const IWString& fname() const { return _fname; }
 
   int tokens() const {
     return _tokens;
   }
 };
 
-Stream_for_Columns::Stream_for_Columns(int nc, const char *fname) : _tokens(nc) {
+Stream_for_Columns::Stream_for_Columns(int nc, const char *fname) : _tokens(nc), _fname(fname) {
   open(fname, std::ios::out);
 
   if (!good()) {
@@ -115,72 +123,45 @@ Stream_for_Columns::Stream_for_Columns(int nc, const char *fname) : _tokens(nc) 
 
 static resizable_array_p<Stream_for_Columns> cstreams;
 
-static int
-write_translate_to_output_delimiter(const const_IWSubstring &buffer,
-                                    Stream_for_Columns &s) {
-  const int n = buffer.length();
-
-  if (0 == n) {
-    s << '\n';
-    return 1;
-  }
-
-  IWString tmp(buffer);
-
-  if (!data_is_quoted_tokens) {
-    tmp.gsub(token_delimiter, output_token_delimiter);
-    s << tmp << '\n';
-
-    return 1;
-  }
-
-  // The more complex case of quoted text
-
-  const char dquote = '"';
-
-  int in_quote = tmp[0] == dquote;
-
-  for (int i = 1; i < n; ++i) {
-    if (dquote == tmp[i]) {
-      in_quote = !in_quote;
-    } else if (in_quote) {
-      ;
-    } else if (token_delimiter == tmp[i]) {
-      tmp[i] = output_token_delimiter;
+static bool
+process_to_streams(const const_IWSubstring& buffer, int ntokens) {
+  for (Stream_for_Columns* stream : cstreams) {
+    if (ntokens != stream->tokens()) {
+      continue;
+    }
+    if (token_delimiter == output_token_delimiter) {
+      *stream << buffer << '\n';
+    } else {
+      IWString translated;
+      CountDelimitedTokens(buffer, token_options, 0, &translated, output_token_delimiter);
+      *stream << translated << '\n';
+    }
+    if (!stream->good()) {
+      cerr << "Error writing '" << stream->fname() << "'\n";
+      return false;
     }
   }
-
-  s << tmp << '\n';
-
-  return s.good();
-}
-
-static int
-process_to_streams(const const_IWSubstring &buffer, int ntokens) {
-  int ns = cstreams.number_elements();
-  for (int i = 0; i < ns; i++) {
-    Stream_for_Columns *s = cstreams[i];
-    if (ntokens == s->tokens()) {
-      if (token_delimiter == output_token_delimiter) {
-        *s << buffer << '\n';
-      } else {
-        write_translate_to_output_delimiter(buffer, *s);
-      }
-      return 1;
-    }
-  }
-
-  return 0;
+  return true;  // A record need not match any requested column count.
 }
 
 template class resizable_array_p<Stream_for_Columns>;
 template class resizable_array_base<Stream_for_Columns *>;
 
 static void
-DisplayDelimiterOptions() {
-  cerr << "  -d <delim>        delimiter is any character, or a token word(e.g. "
-            "'tab'). see '-d help' for a list (default ' ')\n";
-  ::exit(0);
+DisplayDelimiterOptions(int rc) {
+  char_name_to_char_usage("-d");
+  std::exit(rc);
+}
+
+static void
+DisplayRecordDelimiterOptions(int rc) {
+  cerr << "Record delimiters: newline/linux/unix/LF for LF records,\n"
+       << "DOS/windows/CRLF for Windows records (LF separator plus CR stripping).\n"
+       << "Explicit LF mode preserves CR as data; the default accepts LF or CRLF.\n"
+       << "Use a literal character or a character name for another separator.\n"
+       << "Use ^m or CR for a literal carriage-return separator.\n";
+  char_name_to_char_usage("-c");
+  std::exit(rc);
 }
 
 static void
@@ -206,11 +187,11 @@ usage(int rc) {
   cerr << "  -C <fname>        write a descriptor file of 'line.number tcount'\n";
   cerr << "  -b                abort on different token count from previous record\n";
   cerr << "  -w                write reported records to stderr\n";
-  cerr << "  -c <delim>        record delimiter (default \\n, use ^m for DOS)\n";
+  cerr << "  -c <delim>        record delimiter: newline/linux/DOS or a character (see -c help)\n";
   cerr << "  -u                consecutive delimiters mean empty words in between\n";
   cerr << "  -g                report non rectangular files\n";
-  cerr << "  -q                data is quoted tokens\n";
-  cerr << "  -k                data may contain backslashed token separators\n";
+  cerr << "  -q                quoted fields; delimiters inside quotes are data\n";
+  cerr << "  -k                backslash escapes the next character (combines with -q/-u)\n";
   cerr << "  -h                human readable output, 1000000 written as 1,000,000\n";
   cerr << "  -v                verbose output\n";
 // clang-format on
@@ -224,7 +205,7 @@ usage(int rc) {
 
 static int
 header_record_has_only_different_token_count(
-    const extending_resizable_array<int> &token_counts,
+    const extending_resizable_array<uint64_t> &token_counts,
     const int tokens_on_first_record) {
   resizable_array<int> non_zero_token_counts;
 
@@ -255,301 +236,281 @@ header_record_has_only_different_token_count(
   return 2 == non_zero_token_counts.number_elements();
 }
 
-/*
-  No provision for quoted tokens, or consecutive delimiters meaning anything
-*/
-
 static int
-tokens_in_presence_of_backslashed_separator(const const_IWSubstring &buffer,
-                                            const char token_delimiter) {
-  int rc = 0;
-
-  const int n = buffer.length();
-
-  int previous_was_backslash = 0;
-
-  for (int i = 0; i < n; ++i) {
-    const char c = buffer[i];
-
-    if (token_delimiter == c) {
-      if (!previous_was_backslash) {
-        rc++;
-      }
-    } else if ('\\' == c && !previous_was_backslash) {
-      previous_was_backslash = true;
-    } else {
-      previous_was_backslash = false;
-    }
+CountTokens(const const_IWSubstring& buffer, uint64_t line_number) {
+  // Keep the ordinary counting paths as simple as before.
+  if (data_is_quoted_tokens || contains_backslashed_separators) {
+    return CountDelimitedTokens(buffer, token_options, line_number);
   }
-
-  return rc;
-}
-
-static void
-determine_per_token_lengths_def(const const_IWSubstring &buffer,
-                                const char token_delimiter) {
-  int col = 0;
-  const_IWSubstring token;
-
-  for (int i = 0; buffer.nextword(token, i, token_delimiter); ++col) {
-    if (col >= token_length_n) {
-      break;
-    }
-
-    acc_token_length[col].extra(token.length());
-
-    if (0 == token.length()) {
-      zero_length[col]++;
-    }
-  }
-
-  return;
-}
-
-static void
-determine_per_token_lengths_cdewb(const const_IWSubstring &buffer,
-                                  const char token_delimiter) {
-  const_IWSubstring token;
-  int col = 0;
-
-  for (int i = 0; buffer.nextword_single_delimiter(token, i, token_delimiter); ++col) {
-    if (col >= token_length_n) {
-      break;
-    }
-
-    acc_token_length[col].extra(token.length());
-
-    if (0 == token.length()) {
-      zero_length[col]++;
-    }
-  }
-
-  return;
-}
-
-static void
-determine_per_token_lengths(const const_IWSubstring &buffer, const char token_delimiter) {
   if (consecutive_delimiters_mean_empty_words_between) {
-    determine_per_token_lengths_cdewb(buffer, token_delimiter);
+    return buffer.nwords_single_delimiter(token_delimiter);
   }
-  // else if (data_is_quoted_tokens)
-  //   determine_per_token_lengths_quoted(buffer, token_delimiter);
-  else {
-    determine_per_token_lengths_def(buffer, token_delimiter);
-  }
-
-  return;
+  return buffer.nwords(token_delimiter);
 }
 
-static int
-tcount(iwstring_data_source &input) {
-  input.set_dos(1);
-  token_counts.resize_keep_storage(0);
+static bool
+ProcessInput(iwstring_data_source& input, FileStatistics& stats) {
   const_IWSubstring buffer;
-
-  int prev_token_count = -1;
-
-  int tokens_on_first_record = 0;
-
-  int rectangular = 1;
-
-  while (input.next_record(buffer)) {
-    int tokens;
-    if (consecutive_delimiters_mean_empty_words_between) {
-      tokens = buffer.nwords_single_delimiter(token_delimiter);
-    } else if (data_is_quoted_tokens) {
-      tokens = tokens_in_quoted_string(buffer, token_delimiter, input.lines_read());
-    } else if (contains_backslashed_separators) {
-      tokens = tokens_in_presence_of_backslashed_separator(buffer, token_delimiter);
-    } else {
-      tokens = buffer.nwords(token_delimiter);
+  while ((records_to_process == 0 || stats._records < records_to_process) &&
+         input.next_record(buffer)) {
+    ++stats._records;
+    const int tokens = CountTokens(buffer, stats._records);
+    ++stats._token_counts[tokens];
+    if (verbose) {
+      stats._record_length.extra(buffer.length());
     }
-
     if (verbose > 2) {
-      cerr << "Record " << input.lines_read() << " had " << tokens << " words and "
+      cerr << "Record " << stats._records << " had " << tokens << " words and "
            << buffer.length() << " characters\n";
     }
-
-    process_to_streams(buffer, tokens);
-
-    if (token_length_n > 0) {
-      determine_per_token_lengths(buffer, token_delimiter);
+    if (!process_to_streams(buffer, tokens)) {
+      return false;
     }
-
     if (stream_for_count.is_open()) {
-      stream_for_count << input.lines_read() << ' ' << tokens << '\n';
+      stream_for_count << stats._records << ' ' << tokens << '\n';
+      if (!stream_for_count.good()) {
+        cerr << "Error writing per-record token counts\n";
+        return false;
+      }
     }
-
-    token_counts[tokens]++;
-
-    if (prev_token_count < 0) {
-      tokens_on_first_record = tokens;
+    if (stats._first_token_count < 0) {
+      stats._first_token_count = tokens;
     }
-
-    int reported = 0;
-
-    if (prev_token_count >= 0 && prev_token_count != tokens) {
+    bool reported = false;
+    if (stats._previous_token_count >= 0 && stats._previous_token_count != tokens) {
+      stats._rectangular = false;
       if (abort_on_different_token_count) {
-        cerr << "Line " << input.lines_read() << " has " << tokens << " tokens\n";
-        cerr << "Previous line had " << prev_token_count << '\n';
-        non_rectangular_files_found++;
-        return 0;
+        cerr << "Line " << stats._records << " has " << tokens << " tokens\n"
+             << "Previous line had " << stats._previous_token_count << '\n';
+        break;
       }
-
-      rectangular = 0;
-
       if (report_different_token_count) {
-        cerr << "Token count mismatch line " << input.lines_read() << ". " << tokens
-             << " vs " << prev_token_count << '\n';
-
-        reported = 1;
+        cerr << "Token count mismatch line " << stats._records << ". " << tokens
+             << " vs " << stats._previous_token_count << '\n';
+        reported = true;
       }
     }
-
-    if (report_different_from_first_record && tokens != tokens_on_first_record) {
-      cerr << "Token count mismatch, line " << input.lines_read() << ". First record had "
-           << tokens_on_first_record << '\n';
-
-      reported++;
+    if (report_different_from_first_record && tokens != stats._first_token_count) {
+      cerr << "Token count mismatch, line " << stats._records << ". First record had "
+           << stats._first_token_count << '\n';
+      reported = true;
     }
-
-    prev_token_count = tokens;
-
-    record_length.extra(buffer.length());
-
+    stats._previous_token_count = tokens;
     if (reported) {
       if (write_reported_records_to_cerr) {
         cerr << buffer << '\n';
       }
-
-      if (new_fname_reported.length()) {
+      if (new_fstream_reported.is_open()) {
         new_fstream_reported << buffer << '\n';
+        if (!new_fstream_reported.good()) {
+          cerr << "Error writing reported records\n";
+          return false;
+        }
       }
-    } else if (new_fname_unreported.length()) {
+    } else if (new_fstream_unreported.is_open()) {
       new_fstream_unreported << buffer << '\n';
-    }
-
-    if (records_to_process > 0 && input.lines_read() > records_to_process) {
-      break;
+      if (!new_fstream_unreported.good()) {
+        cerr << "Error writing unreported records\n";
+        return false;
+      }
     }
   }
+  return input.good();
+}
 
-  if (!rectangular) {
-    non_rectangular_files_found++;
-  }
-
-  int rc = 0;
-
-  int nt = token_counts.number_elements();
-
-  // If the only record that has a different token count is the header record, note that.
-
-  int looks_like_R =
-      header_record_has_only_different_token_count(token_counts, tokens_on_first_record);
-
-  for (int i = 0; i < nt; i++) {
-    if (0 == token_counts[i]) {
+static void
+ReportFile(const char* fname, const FileStatistics& stats) {
+  const bool looks_like_R = header_record_has_only_different_token_count(
+      stats._token_counts, stats._first_token_count);
+  for (int i = 0; i < stats._token_counts.number_elements(); ++i) {
+    const uint64_t count = stats._token_counts[i];
+    if (count == 0) {
       continue;
     }
-
-    total_lines_read += token_counts[i];
-
     if (human_readable_output) {
-      cerr << iwstring::with_commas(token_counts[i]);
+      cerr << iwstring::with_commas(count);
     } else {
-      cerr << token_counts[i];
+      cerr << count;
     }
     cerr << " records had " << i << " tokens";
-    if (i == tokens_on_first_record && looks_like_R) {
+    if (i == stats._first_token_count && looks_like_R) {
       cerr << " HEADER";
     }
     cerr << '\n';
-    rc++;
   }
+  if (human_readable_output) {
+    cerr << iwstring::with_commas(stats._records);
+  } else {
+    cerr << stats._records;
+  }
+  cerr << " records read from '" << fname << "'";
+  if (verbose && stats._records != 0) {
+    cerr << " records between " << stats._record_length.minval() << " and "
+         << stats._record_length.maxval();
+    if (stats._record_length.n() > 1) {
+      cerr << " ave " << stats._record_length.average();
+    }
+  }
+  cerr << '\n';
+}
 
-  return rc - 1;
+// Skip a partial initial record, but retain a complete record at the offset.
+static bool
+PositionNearEnd(iwstring_data_source& input) {
+  const auto size = input.file_size();
+  if (size < 0 || offset_from_eof > size) {
+    cerr << "Requested offset from EOF " << offset_from_eof << " larger than file "
+         << size << '\n';
+    return false;
+  }
+  const off_t start = size - offset_from_eof;
+  char previous = record_delimiter;
+  if (start > 0 && (!input.seekg(start - 1) || input.read_bytes(&previous, 1) != 1)) {
+    cerr << "Cannot inspect record boundary at offset " << start << '\n';
+    return false;
+  }
+  if (!input.seekg(start)) {
+    cerr << "Cannot seek to offset " << start << '\n';
+    return false;
+  }
+  if (previous != record_delimiter) {
+    const_IWSubstring discarded;
+    input.next_record(discarded);
+  }
+  return input.good();
 }
 
 static int
-tcount(const char *fname) {
+tcount(const char* fname) {
   iwstring_data_source input(fname);
   if (!input.good()) {
     cerr << "Cannot open '" << fname << "'\n";
     return 1;
   }
-
   if (verbose) {
     cerr << fname << '\n';
   }
-
   input.set_record_delimiter(record_delimiter);
-
-  if (offset_from_eof) {
-    const auto fs = input.file_size();
-
-    if (fs < offset_from_eof) {
-      cerr << "Requested offset from EOF " << offset_from_eof << " larger than file "
-           << fs << '\n';
-      return 1;
-    }
-
-    const auto tmp = fs - offset_from_eof;
-    if (!input.seekg(tmp)) {
-      cerr << "Yipes, cannot seek to offset " << tmp << "\n";
-      return 1;
-    }
-
-    const_IWSubstring notused;
-    if (!input.next_record(notused)) {
-      cerr << "Yipes, could not read record from offset " << tmp << '\n';
-      return 1;
-    }
-  }
-
-  // Column-count differences are diagnostic, not fatal errors.
-  (void)tcount(input);
-  if (!input.good()) {
-    cerr << "Error reading '" << fname << "'\n";
+  input.set_dos(dos_record_terminators);
+  if (offset_from_eof && !PositionNearEnd(input)) {
     return 1;
   }
-
-  if (human_readable_output) {
-    cerr << iwstring::with_commas(input.lines_read());
-  } else {
-    cerr << input.lines_read();
+  FileStatistics stats;
+  const bool ok = ProcessInput(input, stats);
+  total_lines_read += stats._records;
+  if (!stats._rectangular) {
+    ++non_rectangular_files_found;
   }
+  ReportFile(fname, stats);
+  if (!ok) {
+    cerr << "Error processing '" << fname << "'\n";
+    return 1;
+  }
+  return 0;
+}
 
-  cerr << " records read from '" << fname << "'";
-  if (verbose) {
-    cerr << " records between " << record_length.minval() << " and "
-         << record_length.maxval();
-    if (record_length.n() > 1) {
-      cerr << " ave " << record_length.average();
+// Validate all destinations before opening any of them, including aliases.
+static bool
+CheckOutputNames(const Command_Line& cl) {
+  std::vector<IWString> outputs;
+  for (char flag : {'U', 'R', 'C', 'T'}) {
+    if (flag != 'T' && cl.option_count(flag) > 1) {
+      cerr << "Specify -" << flag << " only once\n";
+      return false;
+    }
+    IWString name;
+    for (int i = 0; cl.value(flag, name, i); ++i) {
+      if (name.empty()) {
+        cerr << "Empty output filename for -" << flag << '\n';
+        return false;
+      }
+      for (const char* input : cl) {
+        if (const_IWSubstring(input) == "-") {
+          continue;
+        }
+        std::error_code error;
+        const auto same = iwmisc::SameFile(name, IWString(input), error);
+        if (!same) {
+          cerr << "Cannot compare output '" << name << "' with input '" << input
+               << "': " << error.message() << '\n';
+          return false;
+        }
+        if (*same) {
+          cerr << "Output '" << name << "' would overwrite input '" << input << "'\n";
+          return false;
+        }
+      }
+      for (const IWString& previous : outputs) {
+        std::error_code error;
+        const auto same = iwmisc::SameFile(name, previous, error);
+        if (!same || *same) {
+          cerr << "Output destinations '" << name << "' and '" << previous
+               << "' conflict";
+          if (error) {
+            cerr << ": " << error.message();
+          }
+          cerr << '\n';
+          return false;
+        }
+      }
+      outputs.push_back(name);
     }
   }
-  cerr << '\n';
+  return true;
+}
 
-  return 0;
+static bool
+CloseOutput(std::ofstream& stream, const IWString& name) {
+  if (!stream.is_open()) {
+    return true;
+  }
+  stream.close();  // close also flushes buffered data; retain any failure status.
+  if (!stream.good()) {
+    cerr << "Error closing output '" << name << "'\n";
+    return false;
+  }
+  return true;
+}
+
+static bool
+FinishOutputs(const Command_Line& cl) {
+  bool ok = true;
+  if (!CloseOutput(new_fstream_reported, new_fname_reported)) {
+    ok = false;
+  }
+  if (!CloseOutput(new_fstream_unreported, new_fname_unreported)) {
+    ok = false;
+  }
+  if (stream_for_count.is_open() && !CloseOutput(stream_for_count, cl.string_value('C'))) {
+    ok = false;
+  }
+  for (Stream_for_Columns* stream : cstreams) {
+    if (!CloseOutput(*stream, stream->fname())) {
+      ok = false;
+    }
+  }
+  return ok;
 }
 
 static int
 tcount(int argc, char **argv) {
-  Command_Line cl(argc, argv, "c:d:wt:T:U:R:fbrvn:e:guqC:o:L:kh");
+  Command_Line cl(argc, argv, "c:d:wt:T:U:R:fbrvn:e:guqC:o:kh");
 
   if (cl.unrecognised_options_encountered()) {
     usage(2);
   }
 
+  DisplayDashHelpIfRequested(cl, 'd', DisplayDelimiterOptions);
+  DisplayDashHelpIfRequested(cl, 'c', DisplayRecordDelimiterOptions);
   verbose = cl.option_count('v');
 
   if (cl.option_present('d')) {
     IWString tmp;
     cl.value('d', tmp);
-    tmp.to_lowercase();
     if (tmp == "help") {
-      DisplayDelimiterOptions();
+      DisplayDelimiterOptions(0);
     }
-    if (!char_name_to_char(tmp)) {
+    if (!char_name_to_char(tmp) || tmp.length() != 1) {
       cerr << "Sorry, the delimiter character can be one character only, or one of a "
               "list of tokens.  see -d help for details\n";
       usage(13);
@@ -559,17 +520,24 @@ tcount(int argc, char **argv) {
   }
 
   if (cl.option_present('c')) {
-    const_IWSubstring c = cl.string_value('c');
-
-    if (c.length() > 1) {
-      cerr << "Sorry, the record delimiter can be 1 character at most\n";
-      usage(15);
+    IWString value = cl.string_value('c');
+    if (value.length() > 1) {
+      value.to_lowercase();
     }
-
-    record_delimiter = c[0];
-    if (verbose) {
-      cerr << "Record delimiter is '" << record_delimiter << "'\n";
+    dos_record_terminators = false;
+    if (value == "dos" || value == "windows" || value == "crlf") {
+      // The reader's Windows mode consumes CRLF as one record terminator.
+      value = '\n';
+      dos_record_terminators = true;
+    } else if (value == "newline" || value == "linux" || value == "unix" || value == "lf") {
+      value = '\n';
+    } else if (value == "^m" || value == "cr") {
+      value = '\r';
+    } else if (!char_name_to_char(value) || value.length() != 1) {
+      cerr << "Invalid record delimiter; use '-c help' for choices\n";
+      return 1;
     }
+    record_delimiter = value[0];
   }
 
   if (cl.option_present('u')) {
@@ -604,21 +572,10 @@ tcount(int argc, char **argv) {
     }
   }
 
-  if (cl.option_present('L')) {
-    if (!cl.value('L', token_length_n) || token_length_n < 1) {
-      cerr << "The number of columns for which you want length stats (-L) must be a "
-              "whole +ve number\n";
-      usage(1);
-    }
-
-    acc_token_length = new Accumulator_Int<uint32_t>[token_length_n];
-    zero_length = new int[token_length_n];
-    std::fill_n(zero_length, token_length_n, 0);
-  }
-
   if (cl.option_present('e')) {
-    unsigned long tmp;
-    if (!cl.value('e', tmp) || tmp < 3) {
+    uint64_t tmp;
+    if (!cl.value('e', tmp) || tmp == 0 ||
+        tmp > static_cast<uint64_t>(std::numeric_limits<off_t>::max())) {
       cerr << "Must specify a value offset from eof\n";
       usage(8);
     }
@@ -667,6 +624,16 @@ tcount(int argc, char **argv) {
       cerr << "Input may contain backslashed token separators\n";
     }
   }
+
+  if (cl.empty()) {
+    usage(1);
+  }
+  if (!CheckOutputNames(cl)) {
+    return 1;
+  }
+  token_options = {token_delimiter, data_is_quoted_tokens != 0,
+                   contains_backslashed_separators != 0,
+                   consecutive_delimiters_mean_empty_words_between != 0};
 
   if (cl.option_present('U')) {
     if (cl.option_present('b')) {
@@ -719,7 +686,7 @@ tcount(int argc, char **argv) {
 
   if (cl.option_present('o')) {
     IWString o = cl.string_value('o');
-    if (!char_name_to_char(o)) {
+    if (!char_name_to_char(o) || o.length() != 1) {
       cerr << "Unrecognised output token directive '" << o << "'\n";
       usage(1);
     }
@@ -735,19 +702,18 @@ tcount(int argc, char **argv) {
   for (int i = 0; i < nt; i++) {
     int t;
     if (!cl.value('t', t, i) || t < 0) {
-      cerr << "The -t option requires a whole positive number\n";
+      cerr << "The -t option requires a whole non-negative number\n";
       usage(5);
     }
 
     IWString fname;
     (void)cl.value('T', fname, i);
 
-    Stream_for_Columns *s = new Stream_for_Columns(t, fname.null_terminated_chars());
-    if (!s->good()) {
+    auto stream = std::make_unique<Stream_for_Columns>(t, fname.null_terminated_chars());
+    if (!stream->good()) {
       return 9;
     }
-
-    cstreams.add(s);
+    cstreams.add(stream.release());
   }
 
   if (cl.option_present('w')) {
@@ -755,10 +721,6 @@ tcount(int argc, char **argv) {
     if (verbose) {
       cerr << "Will echo reported records to stderr\n";
     }
-  }
-
-  if (cl.empty()) {
-    usage(1);
   }
 
   if (cl.option_present('C')) {
@@ -794,14 +756,13 @@ tcount(int argc, char **argv) {
          << cl.size() << " files\n";
   }
 
+  if (!FinishOutputs(cl)) {
+    rc = 1;
+  }
   return rc;
 }
 
 int
 main(int argc, char **argv) {
-  prog_name = argv[0];
-
-  int rc = tcount(argc, argv);
-
-  return rc;
+  return tcount(argc, argv);
 }

@@ -8,6 +8,7 @@
 #include <iostream>
 #include <optional>
 #include <random>
+#include <system_error>
 #include <type_traits>
 #include <utility>
 #include <unistd.h>
@@ -397,6 +398,16 @@ Fraction(I numerator, J denominator)
 {
   return static_cast<T>(numerator) / static_cast<T>(denominator);
 }
+
+// Compare existing files by identity (including hard links), or compare resolved
+// absolute paths when either file does not exist yet. Existing symlinked parents
+// are resolved. No filename, including "-", has special stream semantics here.
+// Empty filenames are invalid. Returns true for the same file, false for
+// different files, and nullopt on a filesystem error. The error-code overload
+// provides the reason and clears `error` for both same and different results.
+std::optional<bool> SameFile(const IWString& lhs, const IWString& rhs,
+                             std::error_code& error);
+std::optional<bool> SameFile(const IWString& lhs, const IWString& rhs);
 
 // Given that `inner_file_name` is mentioned inside the file
 // `outer_file_name`, decide if inner_file_name is an already 

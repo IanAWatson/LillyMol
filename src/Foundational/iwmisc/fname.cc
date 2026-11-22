@@ -2,11 +2,53 @@
 #include <optional>
 #include <string>
 
-#include "Foundational/iwstring/iwstring.h"
+#include "misc.h"
 
 namespace iwmisc {
 
 namespace fs = std::filesystem;
+
+std::optional<bool>
+SameFile(const IWString& lhs, const IWString& rhs, std::error_code& error) {
+  error.clear();
+  if (lhs.empty() || rhs.empty() || lhs.contains('\0') || rhs.contains('\0')) {
+    error = std::make_error_code(std::errc::invalid_argument);
+    return std::nullopt;
+  }
+  const fs::path a(std::string(lhs.data(), lhs.length()));
+  const fs::path b(std::string(rhs.data(), rhs.length()));
+  if (fs::equivalent(a, b, error)) {
+    return true;
+  }
+  // A missing file is expected when comparing proposed output names.
+  if (error && error != std::errc::no_such_file_or_directory) {
+    return std::nullopt;
+  }
+  error.clear();
+  const auto absolute_a = fs::absolute(a, error);
+  if (error) {
+    return std::nullopt;
+  }
+  const auto absolute_b = fs::absolute(b, error);
+  if (error) {
+    return std::nullopt;
+  }
+  const auto resolved_a = fs::weakly_canonical(absolute_a, error);
+  if (error) {
+    return std::nullopt;
+  }
+  const auto resolved_b = fs::weakly_canonical(absolute_b, error);
+  if (error) {
+    return std::nullopt;
+  }
+  return resolved_a == resolved_b;
+}
+
+std::optional<bool>
+SameFile(const IWString& lhs, const IWString& rhs) {
+  std::error_code error;
+  return SameFile(lhs, rhs, error);
+}
 
 std::optional<IWString>
 FileOrPath(const IWString& outer_file_name,

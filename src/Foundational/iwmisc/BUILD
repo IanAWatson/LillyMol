@@ -404,3 +404,13 @@ cc_test(
         "@googletest//:gtest_main",
     ],
 )
+
+cc_test(
+    name = "same_file_test",
+    srcs = ["same_file_test.cc"],
+    deps = [
+        ":iwmisc",
+        "//Foundational/iwstring",
+        "@googletest//:gtest_main",
+    ],
+)

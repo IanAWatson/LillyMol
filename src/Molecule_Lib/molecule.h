@@ -2872,6 +2872,9 @@ template <typename T>
 T& write_atom_map_number_labelled_smiles(Molecule&, const bool uniq, T& output);
 
 namespace lillymol_csv {
+// Separator used by both CSV headers and molecule records.
+char separator();
+void set_csv_separator(char s);
 // Set the columns in which the smiles and the identifier are found when reading
 // csv files.
 int set_smiles_column(int smi_col);

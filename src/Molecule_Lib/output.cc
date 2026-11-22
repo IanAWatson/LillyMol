@@ -2,13 +2,8 @@
 
 #include <iostream>
 
-#if (__GNUC_MINOR__ == 95)
-#include <strstream>
-#else
-#include <sstream>
-#endif
-
 #include "Foundational/cmdline/cmdline.h"
+#include "Foundational/iwmisc/misc.h"
 
 #include "mdl.h"
 #include "molecule.h"
@@ -28,6 +23,7 @@ Molecule_Output_Object::_default_values() {
   _files_created = 0;
 
   _use_stdout = 0;
+  _keep_suffix = 0;
 
   return;
 }
@@ -51,23 +47,13 @@ Molecule_Output_Object::~Molecule_Output_Object() {
 
 int
 Molecule_Output_Object::ok() const {
-  if (0 == _number_elements) {
-    return 1;
-  }
-
-  if (_molecules_per_file) {
-    ;
-  } else if (_output_types.number_elements() != _number_elements) {
+  if (_molecules_per_file < 0) {
     return 0;
   }
-
-  // For now, if we have streams, we cannot also be writing to individual files
-
-  if (_molecules_per_file) {
-    return 1;
+  if (_use_stdout) {
+    return _number_elements == 0 && _output_types.number_elements() == 1;
   }
-
-  return 1;
+  return _number_elements == 0 || _number_elements == _output_types.number_elements();
 }
 
 int
@@ -124,7 +110,8 @@ Molecule_Output_Object::good() const {
   }
 
   if (0 == _number_elements) {
-    if (1 == _molecules_per_file) {  // who knows if things are OK or not, no files open
+    if (_molecules_per_file > 0 && !_output_types.empty() &&
+        (!_stem.empty() || _name_token_for_fname >= 0)) {
       return 1;
     }
 
@@ -141,41 +128,77 @@ Molecule_Output_Object::good() const {
 }
 
 int
-Molecule_Output_Object::do_close() {
-  resizable_array_p<ofstream_and_type>::resize(0);
-  _output_types.resize(0);
+Molecule_Output_Object::_close_streams() {
+  int rc = 1;
+  for (ofstream_and_type* stream : *this) {
+    stream->close();
+    if (!stream->good()) {
+      cerr << "Molecule_Output_Object: error closing '" << stream->fname() << "'\n";
+      rc = 0;
+    }
+  }
+  resize_keep_storage(0);
+  return rc;
+}
 
-  return 1;
+int
+Molecule_Output_Object::do_close() {
+  const int flushed = do_flush();
+  const int closed = _close_streams();
+  _output_types.resize(0);
+  _stem.resize(0);
+  const int written = _molecules_written;
+  _default_values();
+  _molecules_written = written;
+  return flushed && closed;
 }
 
 int
 Molecule_Output_Object::do_flush() {
-  for (int i = 0; i < _number_elements; i++) {
-    _things[i]->flush();
+  int rc = 1;
+  if (_use_stdout) {
+    std::cout.flush();
+    if (!std::cout.good()) {
+      rc = 0;
+    }
   }
-
-  return 1;
+  for (ofstream_and_type* stream : *this) {
+    stream->flush();
+    if (!stream->good()) {
+      cerr << "Molecule_Output_Object: error flushing '" << stream->fname() << "'\n";
+      rc = 0;
+    }
+  }
+  return rc;
 }
-
-/*
-  For now, single_file_per_molecule and output to streams are mutually
-  exclusive, so if we turn on single_file_per_molecule, we destroy (close)
-  any of the streams we had.
-*/
 
 int
 Molecule_Output_Object::set_molecules_per_file(int newv) {
+  if (newv < 0 || (newv > 0 && _use_stdout)) {
+    cerr << "Molecule_Output_Object::set_molecules_per_file: invalid setting " << newv << '\n';
+    return 0;
+  }
+  if (newv == _molecules_per_file) {
+    return 1;
+  }
+  if ((_molecules_written != 0 && active()) ||
+      (_name_token_for_fname >= 0 && newv == 0)) {
+    cerr << "Molecule_Output_Object::set_molecules_per_file: configure before writing\n";
+    return 0;
+  }
+  const int flushed = do_flush();
+  const int closed = _close_streams();
+  if (!flushed || !closed) {
+    return 0;
+  }
+  _molecules_written = 0;
   _molecules_per_file = newv;
-
-  // if (newv)
-  //   return _turn_on_single_file_per_molecule();
-  // else
-  //   return _turn_off_single_file_per_molecule();
-
+  _files_created = 0;
+  if (newv == 0 && !_stem.empty()) {
+    return _open_new_stems(_stem, _keep_suffix);
+  }
   return 1;
 }
-
-// #define DEBUG_NEW_STEM
 
 /*
   A new stem has been specified. Construct all the files with the
@@ -185,48 +208,37 @@ Molecule_Output_Object::set_molecules_per_file(int newv) {
 int
 Molecule_Output_Object::new_stem(const const_IWSubstring& nstem, int keep_suffix) {
   assert(ok());
-  assert(nstem.length());
-
-  resize(0);
-
-#ifdef DEBUG_NEW_STEM
-  cerr << "Molecule_Output_Object::new_stem: setting stem to '" << nstem
-       << "' molecules per file = " << _molecules_per_file
-       << " ntypes = " << _output_types.number_elements() << endl;
-#endif
-
+  if (nstem.empty() || _output_types.empty()) {
+    cerr << "Molecule_Output_Object::new_stem: need a stem and output types\n";
+    return 0;
+  }
+  if (nstem == "-" && (_output_types.number_elements() != 1 || _molecules_per_file)) {
+    cerr << "Molecule_Output_Object::new_stem: stdout requires one type and no splitting\n";
+    return 0;
+  }
+  // nstem can refer to our current stem, so capture it before changing state.
+  const IWString requested_stem(nstem);
+  const int flushed = do_flush();
+  const int closed = _close_streams();
+  _use_stdout = 0;
+  if (!flushed || !closed) {
+    return 0;
+  }
+  _keep_suffix = keep_suffix;
+  _stem = requested_stem;
   if (_molecules_per_file) {
-    if (_name_token_for_fname >= 0) {
-      cerr << "Molecule_Output_Object::new_stem: names derived from molecule names\n";
-      return 1;  // we ignore this
-    }
-
-    _stem = nstem;
     _molecules_written = 0;
     return 1;
   }
-
-  const int nt = _output_types.number_elements();
-  if (nt == 0) {
-    cerr << "Molecule_Output_Object::new_stem: no output types defined\n";
+  if (requested_stem == "-") {
+    _use_stdout = 1;
+    if (_write_any_header_records()) {
+      return 1;
+    }
+    _use_stdout = 0;
     return 0;
   }
-
-  if ('-' == nstem) {
-    if (1 != nt) {
-      cerr << "Molecule_Output_Object::new_stem: request for stdout, but " << nt
-           << " output types\n";
-      return 0;
-    }
-
-    _use_stdout = 1;
-
-    return _write_any_header_records();
-  }
-
-  resize(nt);
-
-  return _open_new_stems(nstem, keep_suffix);
+  return _open_new_stems(requested_stem, keep_suffix);
 }
 
 int
@@ -237,15 +249,12 @@ Molecule_Output_Object::write(Molecule& m) {
   if (_use_stdout) {
     assert(1 == _output_types.number_elements());
 
-    _molecules_written++;
-
-    if (!m.write_molecule(std::cout, _output_types[0])) {
+    if (!std::cout.good() || !m.write_molecule(std::cout, _output_types[0]) ||
+        !std::cout.good()) {
       return 0;
     }
-
-    if (0 == _number_elements) {  // just stdout
-      return 1;
-    }
+    ++_molecules_written;
+    return 1;
   }
 
   if (0 == _number_elements && 0 == _molecules_per_file && _name_token_for_fname < 0) {
@@ -279,7 +288,7 @@ Molecule_Output_Object::write(Molecule& m) {
       nstem << _files_created;
     }
 
-    if (!_open_new_stems(nstem)) {
+    if (!_open_new_stems(nstem, _keep_suffix)) {
       return 0;
     }
 
@@ -291,6 +300,9 @@ Molecule_Output_Object::write(Molecule& m) {
   // cerr << "Setup to write " << _number_elements << " instances of '" << m.name() << "
   // to '" << _stem << "'\n";
 
+  if (_number_elements == 0) {
+    return 0;
+  }
   int rc = 1;
 
   for (int i = 0; i < _number_elements; i++) {
@@ -299,7 +311,9 @@ Molecule_Output_Object::write(Molecule& m) {
     }
   }
 
-  _molecules_written++;
+  if (rc) {
+    ++_molecules_written;
+  }
 
   return rc;
 }
@@ -311,11 +325,9 @@ Molecule_Output_Object::write(Molecule* m) {
 
 int
 Molecule_Output_Object::_open_new_stems(const const_IWSubstring& nstem, int keep_suffix) {
-  if (_number_elements) {
-    resize_keep_storage(0);
+  if (!_close_streams()) {
+    return 0;
   }
-
-  // cerr << "Opening stem '" << nstem << "'\n";
 
   int nt = _output_types.number_elements();
 
@@ -325,6 +337,7 @@ Molecule_Output_Object::_open_new_stems(const const_IWSubstring& nstem, int keep
 
     if (!create_file_with_appropriate_name(nstem, tmp, output_type, keep_suffix)) {
       cerr << "Cannot process file type " << output_type << endl;
+      _close_streams();
       return 0;
     }
 
@@ -332,6 +345,8 @@ Molecule_Output_Object::_open_new_stems(const const_IWSubstring& nstem, int keep
     if (!n->good()) {
       cerr << "Molecule_Output_Object::new_stem: cannot open '" << tmp << "'\n";
       delete n;
+      _close_streams();
+      return 0;
     } else {
       add(n);
     }
@@ -341,82 +356,29 @@ Molecule_Output_Object::_open_new_stems(const const_IWSubstring& nstem, int keep
 #endif
   }
 
-  _files_created++;
-
+  if (!_write_any_header_records()) {
+    _close_streams();
+    return 0;
+  }
+  ++_files_created;
   _stem = nstem;
-
-  _write_any_header_records();
-
   return _number_elements;
 }
 
-// Currently does not respect the output separator setting
-// defined in csv.cc
 int
 Molecule_Output_Object::_write_any_header_records() const {
   for (int i = 0; i < _output_types.number_elements(); ++i) {
-    if (_output_types[i] == FILE_TYPE_CSV) {
-      if (_use_stdout) {
-        std::cout << "SMILES,ID\n";
-      } else {
-        *_things[i] << "SMILES,ID\n";
-      }
+    if (_output_types[i] != FILE_TYPE_CSV) {
+      continue;
+    }
+    std::ostream& output = _use_stdout ? std::cout : *_things[i];
+    output << "SMILES" << lillymol_csv::separator() << "ID\n";
+    if (!output.good()) {
+      return 0;
     }
   }
-
   return 1;
 }
-
-/*int
-Molecule_Output_Object::_write_single_file_per_molecule (Molecule & m)
-{
-  IWString name_stem;
-
-  if (_name_token_for_fname >= 0)
-  {
-    if (! m.name().word(_name_token_for_fname, name_stem))
-    {
-      cerr << "Molecule_Output_Object::_write_single_file_per_molecule: cannot access " <<
-_name_token_for_fname << " token in '" << m.name() << "'\n"; return 0;
-    }
-  }
-  else
-  {
-    name_stem = _stem;
-    name_stem << _molecules_written;
-  }
-
-  int rc = 0;
-
-  int nt = _output_types.number_elements();
-
-  for (int i = 0; i < nt; i++)
-  {
-    IWString fname = name_stem;
-
-    int output_type = _output_types[i];
-
-    fname << '.' << suffix_for_file_type(output_type);
-
-    ofstream output(fname.null_terminated_chars(), ios::out);
-
-    if (! output.good())
-    {
-      cerr << "write_structure_to_new_file: Cannot open '" << fname << "'\n";
-      return 0;
-    }
-  }
-
-  for (int i = 0; i < _output_types.number_elements(); i++)
-  {
-    if (! m.write_molecule(output, output_type))
-      return 0;
-
-    rc++;
-  }
-
-  return rc;
-}*/
 
 /*
   We must make sure that we don't allow something like '-o smi -o usmi'
@@ -578,7 +540,9 @@ Molecule_Output_Object::determine_output_types(const Command_Line& cl, char opt)
 
     if ("ISIS" == c)
     {
-      _output_types.add_if_not_already_present(FILE_TYPE_SDF);
+      if (!_add_output_type(FILE_TYPE_SDF, c, *mdlfos)) {
+        return 0;
+      }
       mdlfos->set_write_isis_standard(1);
       mdlfos->set_write_mdl_charges_as_m_chg(1);
       continue;
@@ -593,7 +557,9 @@ Molecule_Output_Object::determine_output_types(const Command_Line& cl, char opt)
     if ("V30" == c)
     {
       mdlfos->set_write_v30_mdl_files(1);
-      _output_types.add_if_not_already_present(FILE_TYPE_SDF);
+      if (!_add_output_type(FILE_TYPE_SDF, c, *mdlfos)) {
+        return 0;
+      }
       continue;
     }
 
@@ -763,26 +729,8 @@ Molecule_Output_Object::add_output_type(FileType ot)
 */
 
 int
-Molecule_Output_Object::would_use_name(const char* name) const
-{
-  int no = _output_types.number_elements();
-
-  for (int i = 0; i < no; i++)
-  {
-    IWString tmp;
-
-    FileType output_type = _output_types[i];
-    if (! create_file_with_appropriate_name(name, tmp, output_type))
-    {
-      cerr << "Cannot process file type " << output_type << endl;
-      return 0;
-    }
-
-    if (tmp == name)
-      return 1;
-  }
-
-  return 0;
+Molecule_Output_Object::would_use_name(const char* name) const {
+  return would_use_name(const_IWSubstring(name), name);
 }
 
 /*
@@ -792,25 +740,30 @@ Molecule_Output_Object::would_use_name(const char* name) const
 
 int
 Molecule_Output_Object::would_use_name(const const_IWSubstring& proposed_stem,
-                                       const char* name_to_match) const
-{
-  int no = _output_types.number_elements();
-
-  for (int i = 0; i < no; i++)
-  {
-    IWString tmp;
-
-    FileType output_type = _output_types[i];
-    if (! create_file_with_appropriate_name(proposed_stem, tmp, output_type))
-    {
-      cerr << "Cannot process file type " << output_type << endl;
-      return 0;
-    }
-
-    if (tmp == name_to_match)
-      return 1;
+                                       const char* name_to_match) const {
+  if (proposed_stem == "-" || const_IWSubstring(name_to_match) == "-") {
+    return 0;
   }
-
+  IWString stem(proposed_stem);
+  if (_molecules_per_file > 0 && _name_token_for_fname < 0) {
+    stem << _files_created;
+  }
+  for (FileType type : _output_types) {
+    IWString fname;
+    if (!create_file_with_appropriate_name(stem, fname, type, _keep_suffix)) {
+      return 1;  // Cannot establish that this destination is safe to open.
+    }
+    std::error_code error;
+    const auto same = iwmisc::SameFile(fname, IWString(name_to_match), error);
+    if (!same) {
+      cerr << "Cannot compare '" << fname << "' and '" << name_to_match
+           << "': " << error.message() << '\n';
+      return 1;
+    }
+    if (*same) {
+      return 1;
+    }
+  }
   return 0;
 }
 
@@ -833,13 +786,17 @@ Molecule_Output_Object::would_overwrite_input_files(const Command_Line& cl,
 }
 
 std::ostream&
-Molecule_Output_Object::stream_for_type(int ftype) const
-{
-  for (int i = 0; i < _number_elements; i++) {
-    if (ftype == _output_types[i])
-      return *(_things[i]);
+Molecule_Output_Object::stream_for_type(int ftype) const {
+  if (_use_stdout && _output_types[0] == ftype) {
+    return std::cout;
   }
-
-  cerr << "Molecule_Output_Object::stream_for_type:no stream for type " << ftype << endl;
-  return std::cout;
+  for (int i = 0; i < _number_elements; ++i) {
+    if (ftype == _output_types[i]) {
+      return *_things[i];
+    }
+  }
+  cerr << "Molecule_Output_Object::stream_for_type:no stream for type " << ftype << '\n';
+  // Preserve the reference-returning API without sending unexpected data to stdout.
+  static std::ostream unavailable(nullptr);
+  return unavailable;
 }

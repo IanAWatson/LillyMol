@@ -47,10 +47,14 @@ class Molecule_Output_Object : public resizable_array_p<ofstream_and_type>
 //  We can write to stdout if required
 
     int _use_stdout;
+    int _keep_suffix;
 
 //  private functions
 
     void _default_values ();
+
+    // Close owned streams, reporting buffered write and close failures.
+    int _close_streams();
 
     int _open_new_stems (const const_IWSubstring & nstem, int = 0);
 
@@ -60,7 +64,6 @@ class Molecule_Output_Object : public resizable_array_p<ofstream_and_type>
 
     // Some file types might have header records (csv).
     int _write_any_header_records() const;
-    int _read_any_header_records() const;
 
   public:
     Molecule_Output_Object ();
@@ -76,6 +79,7 @@ class Molecule_Output_Object : public resizable_array_p<ofstream_and_type>
 
     void set_verbose (int i) { _verbose = i;}
 
+    // Configure before writing; zero disables splitting. Negative values fail.
     int set_molecules_per_file (int);
     int molecules_per_file () const { return _molecules_per_file;}
 
@@ -90,6 +94,7 @@ class Molecule_Output_Object : public resizable_array_p<ofstream_and_type>
     int would_use_name (const char *) const;
     int would_use_name (const const_IWSubstring &, const char *) const;
 
+    // Token-derived filenames must also be checked when each name is known.
     int would_overwrite_input_files (const Command_Line &, const const_IWSubstring &) const;
 
     int determine_output_types (const Command_Line &, char = 'o');
@@ -104,10 +109,12 @@ class Molecule_Output_Object : public resizable_array_p<ofstream_and_type>
 
     std::ostream & stream_for_type (int) const;
 
+    // Both return zero on write/flush/close failure. Closing also disables
+    // stdout and split-file modes; molecules_written() remains available.
     int do_close();
     int do_flush();
 
-    FileType first_output_type () const { return _output_types[0];}
+    FileType first_output_type () const { return _output_types.empty() ? FILE_TYPE_INVALID : _output_types[0];}
 };
 
 #endif  // MOLECULE_LIB_OUTPUT_H_

@@ -26,7 +26,7 @@ ofstream_and_type::ofstream_and_type() {
 }
 
 ofstream_and_type::ofstream_and_type(FileType output_type) {
-  if (_default_values()) {
+  if (!_default_values()) {
     return;
   }
 

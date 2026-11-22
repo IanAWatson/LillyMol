@@ -1412,3 +1412,14 @@ cc_shared_library(
         "//Molecule_Tools:xlogp_lib",
     ],
 )
+
+cc_test(
+    name = "output_test",
+    srcs = ["output_test.cc"],
+    deps = [
+        ":iwmolecule",
+        ":moleculeio",
+        "//Foundational/cmdline:iwcmdline",
+        "@googletest//:gtest_main",
+    ],
+)

@@ -12,6 +12,11 @@ namespace lillymol_csv {
 
 char csv_separator = ',';
 
+char
+separator() {
+  return csv_separator;
+}
+
 void
 set_csv_separator(char s) {
   csv_separator = s;

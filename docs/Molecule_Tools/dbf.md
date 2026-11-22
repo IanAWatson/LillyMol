@@ -53,7 +53,7 @@ The following options are recognised
   -z oknomatch   ignore molecules where the query doesn't match
   -b <number>    ignore atom pairs <number> bonds apart or closer
   -d             allow bonded features
-  -T <hist>      specify histogram for profiling -T min,max,nbuckets
+  -T min,max,dx  profile each enabled distance type in bins of width dx (stderr)
   -C <file>      detect all spatial distances and write to <file>
   -r             compute spatial/topological distance ratios
   -W ...         various hard-coded queries, enter '-W help' for info
@@ -78,3 +78,21 @@ number of bonds between the features.
 The `-q` and `-s` options are used to specify the features of interest. Note that
 the script `dbf.sh` has hard coded queries already included - charges and hydrogen
 bond donors and acceptors.
+
+## Distance histograms
+
+Use `-T min,max,dx` to collect dataset-wide distance histograms, where `dx` is
+spacing between bucket centers, rather than the number of buckets. Values are
+assigned to the nearest center using the existing LillyMol histogram class. For example:
+
+```shell
+dbf -s '[#6]' -p ratio -T 0,20,1 molecules.sdf > distances.txt 2> histograms.txt
+```
+
+For each pair of features, stderr contains a labeled histogram for each enabled
+distance type: topological (bond counts), spatial (coordinate units), and
+spatial/topological ratio when requested. All use the same supplied range and
+bucket width. Each accepted pair contributes one sample, so molecules with more
+matching pairs contribute more samples. Counts include the final molecule and
+are accumulated across all input files. Distances outside the histogram range
+are omitted from the histogram; descriptor calculations are unchanged.

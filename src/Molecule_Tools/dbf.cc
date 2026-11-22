@@ -11,6 +11,7 @@
 #include <cstdlib>
 #include <iostream>
 #include <memory>
+#include <type_traits>
 
 #include "google/protobuf/text_format.h"
 
@@ -177,8 +178,14 @@ static int positive_negative_acceptor_donor = 0;
 static int int_bit_count_scaling_factor = 1;
 static float bit_count_scaling_factor = 1.0f;
 
+// Bond distances remain integral; spatial distances and ratios use compensated
+// floating-point accumulation.
 template <typename T>
-class Distances : public Accumulator_Base<T, T>, private resizable_array<T> {
+using DistanceAccumulator = std::conditional_t<std::is_integral_v<T>,
+                                               Accumulator_Int<T>, Accumulator<T>>;
+
+template <typename T>
+class Distances : public DistanceAccumulator<T>, private resizable_array<T> {
 #ifdef IW_TWO_PHASE_TEMPLATES
  protected:
   using resizable_array<T>::_number_elements;
@@ -186,25 +193,19 @@ class Distances : public Accumulator_Base<T, T>, private resizable_array<T> {
   using resizable_array<T>::_elements_allocated;
 #endif
  private:
-  //  There are two histograms. _global_histogram is accumulated across the whole dataset.
-  //  _current_molecule_histogram is for the current molecule
-
-  IWHistogram* _global_histogram;
-
-  IWHistogram* _current_molecule_histogram;
+  // Dataset-wide counts are updated directly, so reset() cannot omit the
+  // final molecule or count earlier molecules more than once.
+  IWHistogram* _global_histogram = nullptr;
 
  public:
   Distances();
   ~Distances();
-
-  int activate_current_molecule_histogram();
 
   void extra(T);
 
   void reset();
 
   void append_results(IWString&) const;
-  void append_current_molecule_histogram_results(IWString&) const;
   void append_results_integer(IWString&) const;
   void append_results_float(IWString&) const;
   void write_all_results(IWString_and_File_Descriptor& buffer);
@@ -222,34 +223,14 @@ Distances<T>::Distances() {
   if (histogram_specification.length() > 0) {
     _global_histogram = new IWHistogram;
     (void)_global_histogram->initialise(histogram_specification);
-  } else {
-    _global_histogram = nullptr;
-    _current_molecule_histogram = nullptr;
   }
 
   return;
 }
 
 template <typename T>
-int
-Distances<T>::activate_current_molecule_histogram() {
-  assert(nullptr == _current_molecule_histogram);
-  assert(0 != histogram_specification.length());
-
-  _current_molecule_histogram = new IWHistogram;
-
-  return _current_molecule_histogram->initialise(histogram_specification);
-}
-
-template <typename T>
 Distances<T>::~Distances() {
-  if (nullptr != _global_histogram) {
-    delete[] _global_histogram;
-  }
-
-  if (nullptr != _current_molecule_histogram) {
-    delete[] _current_molecule_histogram;
-  }
+  delete _global_histogram;
 
   return;
 }
@@ -262,15 +243,7 @@ Distances<T>::~Distances() {
 template <typename T>
 void
 Distances<T>::reset() {
-  Accumulator_Base<T, T>::reset();
-
-  if (nullptr != _current_molecule_histogram) {
-    if (nullptr != _global_histogram) {
-      _global_histogram->add(*_current_molecule_histogram);
-    }
-
-    _current_molecule_histogram->reset();
-  }
+  DistanceAccumulator<T>::reset();
 
   this->resize_keep_storage(0);
 
@@ -280,10 +253,10 @@ Distances<T>::reset() {
 template <typename T>
 void
 Distances<T>::extra(T v) {
-  Accumulator_Base<T, T>::extra(v);
+  DistanceAccumulator<T>::extra(v);
 
-  if (nullptr != _current_molecule_histogram) {
-    _current_molecule_histogram->extra(static_cast<double>(v));
+  if (_global_histogram != nullptr) {
+    _global_histogram->extra(static_cast<double>(v));
   }
 
   if (0 == nkeep) {
@@ -320,7 +293,7 @@ Distances<T>::extra(T v) {
 template <typename T>
 void
 Distances<T>::append_results(IWString& buffer) const {
-  int number_samples = Accumulator_Base<T, T>::n();
+  int number_samples = DistanceAccumulator<T>::n();
 
   // cerr << "distribution has " << _number_elements << " items, n = " << number_samples
   // << " between " << minval() << " and " << maxval() << '\n';
@@ -400,7 +373,7 @@ Distances<T>::write_all_results(IWString_and_File_Descriptor& buffer) {
 template <typename T>
 void
 Distances<T>::append_results_integer(IWString& buffer) const {
-  int number_samples = Accumulator_Base<T, T>::n();
+  int number_samples = DistanceAccumulator<T>::n();
 
 #ifdef DEBUG_APPEND_RESULTS_INTEGER
   cerr << "distribution has " << _number_elements << " items, n = " << number_samples
@@ -447,7 +420,7 @@ Distances<T>::append_results_integer(IWString& buffer) const {
 template <typename T>
 void
 Distances<T>::append_results_float(IWString& buffer) const {
-  int number_samples = Accumulator_Base<T, T>::n();
+  int number_samples = DistanceAccumulator<T>::n();
 
 #ifdef DEBUG_APPEND_RESULTS_FLOAT
   cerr << "distribution has " << _number_elements << " items, n = " << number_samples
@@ -499,7 +472,7 @@ template <typename T> template <typename S>
 void
 Distances<T>::set_bits(int b, S bit_count_scaling_factor,
                        Sparse_Fingerprint_Creator& sfc) const {
-  const int number_samples = Accumulator_Base<T, T>::n();
+  const int number_samples = DistanceAccumulator<T>::n();
 
   if (0 == number_samples) {
     return;
@@ -508,23 +481,6 @@ Distances<T>::set_bits(int b, S bit_count_scaling_factor,
   sfc.hit_bit(b, static_cast<int>(this->minval() * bit_count_scaling_factor) + 1);
   sfc.hit_bit(b + 1, static_cast<int>(this->maxval() * bit_count_scaling_factor) + 1);
   sfc.hit_bit(b + 2, static_cast<int>(this->average() * bit_count_scaling_factor) + 1);
-
-  return;
-}
-
-template <typename T>
-void
-Distances<T>::append_current_molecule_histogram_results(IWString& buffer) const {
-  assert(nullptr != _current_molecule_histogram);
-
-  const unsigned int* c = _current_molecule_histogram->raw_counts();
-  int nbuckets = _current_molecule_histogram->nbuckets();
-
-  for (int i = 0; i < nbuckets; i++) {
-    int ci = c[i];
-
-    iwdigits.append_number(buffer, ci);
-  }
 
   return;
 }
@@ -572,7 +528,7 @@ usage(int rc) {
   cerr << "  -z oknomatch   ignore molecules where the query doesn't match\n";
   cerr << "  -b <number>    ignore atom pairs <number> bonds apart or closer\n";
   cerr << "  -d             allow bonded features\n";
-  cerr << "  -T <hist>      specify histogram for profiling -T min,max,nbuckets\n";
+  cerr << "  -T min,max,dx  profile each enabled distance type in bins of width dx (stderr)\n";
   cerr << "  -C <file>      detect all spatial distances and write to <file>\n";
   cerr << "  -S <file>      write smarts bases feature descriptions in textproto form\n";
   // deprecate the -r option in favour of the -p option
@@ -939,6 +895,24 @@ reset_distances(Distances<T>* d, const int nfeatures) {
   }
 
   return;
+}
+
+// Report only the upper triangle, as used by the distance calculations.
+template <typename T>
+void
+ReportHistograms(const char* label, const Distances<T>* distances, int nfeatures,
+                 std::ostream& output) {
+  if (distances == nullptr) {
+    return;
+  }
+  for (int i = 0; i < nfeatures; ++i) {
+    for (int j = i; j < nfeatures; ++j) {
+      const IWHistogram* histogram = distances[i * nfeatures + j].global_histogram();
+      assert(histogram != nullptr);
+      output << label << " i = " << i << " j = " << j << '\n';
+      histogram->debug_print(output);
+    }
+  }
 }
 
 template void reset_distances(Distances<int>*, int);
@@ -2282,18 +2256,11 @@ distance_between_features(int argc, char** argv) {
     }
   }
 
-  if (histogram_specification.length() && nullptr != spatial_distances) {
-    for (int i = 0; i < nfeatures; i++) {
-      for (int j = i; j < nfeatures; j++) {
-        const Distances<float>& dist = spatial_distances[i * nfeatures + j];
-
-        const IWHistogram* h = dist.global_histogram();
-
-        assert(nullptr != h);
-
-        cerr << "i = " << i << " j = " << j << '\n';
-        h->debug_print(cerr);
-      }
+  if (!histogram_specification.empty()) {
+    ReportHistograms("Topological", bond_distances, nfeatures, cerr);
+    ReportHistograms("Spatial", spatial_distances, nfeatures, cerr);
+    if (compute_spatial_topological_ratio) {
+      ReportHistograms("Spatial/topological ratio", spatial_bond_ratio, nfeatures, cerr);
     }
   }
 

@@ -4369,3 +4369,11 @@ py_test(
     args = ["$(location :numbered_smiles)"],
     data = [":numbered_smiles"],
 )
+
+py_test(
+    name = "dbf_cli_test",
+    size = "small",
+    srcs = ["dbf_cli_test.py"],
+    args = ["$(location :dbf)"],
+    data = [":dbf"],
+)

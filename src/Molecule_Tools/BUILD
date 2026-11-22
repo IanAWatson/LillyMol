@@ -4361,3 +4361,11 @@ cc_test(
         "@googletest//:gtest_main",
     ],
 )
+
+py_test(
+    name = "numbered_smiles_cli_test",
+    size = "small",
+    srcs = ["numbered_smiles_cli_test.py"],
+    args = ["$(location :numbered_smiles)"],
+    data = [":numbered_smiles"],
+)

@@ -3,7 +3,13 @@
   Produce isotopic smiles
 */
 
+#include <algorithm>
 #include <cstdlib>
+#include <cstdint>
+#include <filesystem>
+#include <limits>
+#include <numeric>
+#include <vector>
 #include <iostream>
 #include <memory>
 
@@ -12,14 +18,11 @@
 
 #include "Molecule_Lib/aromatic.h"
 #include "Molecule_Lib/atom_typing.h"
-#include "Molecule_Lib/etrans.h"
 #include "Molecule_Lib/istream_and_type.h"
 #include "Molecule_Lib/misc2.h"
 #include "Molecule_Lib/output.h"
 #include "Molecule_Lib/path.h"
 #include "Molecule_Lib/smiles.h"
-#include "Molecule_Lib/substructure.h"
-#include "Molecule_Lib/target.h"
 
 using std::cerr;
 
@@ -27,8 +30,6 @@ static int verbose = 0;
 const char* prog_name = nullptr;
 
 static IWString output_file_name;
-
-static Element_Transformations element_transformations;
 
 /*
   The -n switch governs the numbering assigned.
@@ -57,8 +58,6 @@ static int overwrite_existing_isotopic_information = 0;
 
 static int sort_molecule_by_numbering = 0;
 
-static int change_to_graph_form = 0;
-
 static int reduce_to_largest_fragment = 0;
 
 static int make_implicit_hydrogens_explicit = 0;
@@ -67,8 +66,6 @@ static int compute_bond_symmetry_small = 0;
 static int compute_bond_symmetry_large = 0;
 
 static int ring_systems_span_spiro_fusions = 0;
-
-static resizable_array_p<Substructure_Query> queries;
 
 static int apply_isotopic_labels = 1;
 
@@ -92,68 +89,25 @@ usage(int rc = 0)
   cerr << "  -n canon       number by canonical order\n";
   cerr << "  -n ring        number by ring system\n";
   cerr << "  -n z           number by atomic number\n";
-  cerr << "  -n <number>    number by atom number starting with <number>\n";
-  cerr << "  -e <step>      number step (default 1)\n";
+  cerr << "  -n <number>    number atoms starting at a non-negative <number>\n";
+  cerr << "  -e <step>      atom-number increment; multiplier for other numbering modes (default 1)\n";
   cerr << "  -I             overwrite any existing isotopic information\n";
   cerr << "  -P <atype>     number by atom typing (no -n option needed)\n";
-  cerr << "  -r             sort molecule by numbering\n";
-  cerr << "  -p             change to graph form (all bonds become single etc...)\n";
+  cerr << "  -r             stably sort atoms by their assigned labels\n";
   cerr << "  -H             make all implicit Hydrogens explicit\n";
   cerr << "  -b ...         write bond symmetry information to stderr\n";
-  cerr << "  -q <query>     only label atoms matched by the query/queries\n";
-  cerr << "  -s <smarts>    only label atoms matched by the smarts\n";
-  cerr << "  -m             apply atom map numbers instead of isotopic labels\n";
+  cerr << "  -m             overwrite atom maps with numbering; preserve isotopes\n";
   cerr << "  -c             remove all chiral centres\n";
   cerr << "  -l             reduce to the largest fragment before processing\n";
   cerr << "  -Y ...         more options, enter '-Y help' for info\n";
   cerr << "  -S <stem>      specify output file name stem\n";
   cerr << "  -K ...         standard smiles control options\n";
-  cerr << "  -t ...         element transformation options\n";
   cerr << "  -i <type>      specify input type\n";
   display_standard_aromaticity_options(cerr);
   cerr << "  -v             verbose output\n";
   // clang-format on
 
   exit(rc);
-}
-
-static int
-leave_isotopes_only_on_matched_atoms(Molecule& m)
-{
-  int matoms = m.natoms();
-
-  int* keep_isotope = new_int(matoms);
-  std::unique_ptr<int[]> free_keep_isotope(keep_isotope);
-
-  Molecule_to_Match target(&m);
-
-  int nq = queries.number_elements();
-
-  for (int i = 0; i < nq; i++) {
-    Substructure_Results sresults;
-
-    int nhits = queries[i]->substructure_search(target, sresults);
-
-    for (int j = 0; j < nhits; j++) {
-      const Set_of_Atoms* e = sresults.embedding(j);
-
-      e->set_vector(keep_isotope, 1);
-    }
-  }
-
-  for (int i = 0; i < matoms; i++) {
-    if (keep_isotope[i]) {
-      continue;
-    }
-
-    if (apply_isotopic_labels) {
-      m.set_isotope(i, 0);
-    } else {
-      m.set_atom_map_number(i, 0);
-    }
-  }
-
-  return 1;
 }
 
 static int
@@ -195,117 +149,64 @@ do_compute_bond_symmetry_large(Molecule& m, std::ostream& output)
   return write_bond_symmetries(m, bs, output);
 }
 
+// Build an old-to-new permutation from labels, without changing the labels.
+// Stable ordering retains the input order of atoms with equal labels.
 static int
-adjust_symmetry_numbers(int* isotope, int n, int* new_number)
-{
-  int next_number_to_assign = 0;
-
-  for (int i = 0; i < n; i++) {
-    assert(isotope[i] > 0 && isotope[i] <= n);
-
-    if (new_number[i] >= 0) {  // already processed
-      continue;
-    }
-
-    new_number[i] = next_number_to_assign;
-    next_number_to_assign++;
-
-    for (int j = i + 1; j < n; j++) {
-      if (isotope[i] == isotope[j])  // in same symmetry class
-      {
-        new_number[j] = next_number_to_assign;
-        next_number_to_assign++;
-      }
-    }
-  }
-
-  for (int i = 0; i < n; i++) {
-    isotope[i] = new_number[i];
-  }
-
-  return 1;
-}
-
-/*
-  We need to make sure we have a set of unique numbers to give to renumber_atoms
-*/
-
-static int
-adjust_numbers_and_do_sort(Molecule& m, int* isotope) {
-
-  if (numbering_type == NumberingType::kAtomNumber) {
-    return m.renumber_atoms(isotope);
-  }
-
+SortByNumbering(Molecule& m) {
   const int matoms = m.natoms();
-
-  // Canonical ranks need to be decremented by 1
-
-  if (numbering_type == NumberingType::kCanonicalRank) {
-    for (int i = 0; i < matoms; i++) {
-      isotope[i]--;
-      assert(isotope[i] >= 0 && isotope[i] < matoms);
-    }
-
-    return m.renumber_atoms(isotope);
+  std::vector<atom_number_t> order(matoms);
+  std::iota(order.begin(), order.end(), 0);
+  if (apply_isotopic_labels) {
+    std::stable_sort(order.begin(), order.end(), [&m](atom_number_t a, atom_number_t b) {
+      return m.isotope(a) < m.isotope(b);
+    });
+  } else {
+    std::stable_sort(order.begin(), order.end(), [&m](atom_number_t a, atom_number_t b) {
+      return m.atom_map_number(a) < m.atom_map_number(b);
+    });
   }
-
-  // Symmetry classes are more difficult, because there may be multiple atoms
-  // with the same symmetry number, but renumber_atoms needs unique numbers
-
-  int* tmp = new_int(matoms, -1);
-  std::unique_ptr<int[]> free_tmp(tmp);
-
-  adjust_symmetry_numbers(isotope, matoms, tmp);
-
-  return m.renumber_atoms(isotope);
+  auto destination = std::make_unique<int[]>(matoms);
+  for (int i = 0; i < matoms; ++i) {
+    destination[order[i]] = i;
+  }
+  return m.renumber_atoms(destination.get());
 }
 
 static int
-adjust_numbers_and_do_sort(Molecule& m, isotope_t* isotope)
-{
-  const int matoms = m.natoms();
-  std::unique_ptr<int[]> as_int = std::make_unique<int[]>(matoms);
-  std::copy_n(isotope, matoms, as_int.get());
-
-  int rc = adjust_numbers_and_do_sort(m, as_int.get());
-
-  std::copy_n(as_int.get(), matoms, isotope);
-  return rc;
-}
-
-static int
-do_apply_isotopic_labels(Molecule& m, const isotope_t* isotope)
-{
+ApplyNumbering(Molecule& m, const isotope_t* labels) {
+  // Atom maps are independent of isotopes and always replace existing maps.
+  if (!apply_isotopic_labels) {
+    for (int i = 0; i < m.natoms(); ++i) {
+      m.set_atom_map_number(i, static_cast<int>(labels[i]));
+    }
+    return 1;
+  }
   if (overwrite_existing_isotopic_information) {
-    return m.set_isotopes(isotope);
+    return m.set_isotopes(labels);
   }
-
-  const int matoms = m.natoms();
-  for (int i = 0; i < matoms; i++) {
-    if (m.isotope(i)) {
-      continue;
-    }
-
-    if (apply_isotopic_labels) {
-      m.set_isotope(i, isotope[i]);
-    } else {
-      m.set_atom_map_number(i, isotope[i]);
+  for (int i = 0; i < m.natoms(); ++i) {
+    if (m.isotope(i) == 0) {
+      m.set_isotope(i, labels[i]);
     }
   }
-
   return 1;
 }
 
+// Compute in a wider type so large starts, steps, and atom types cannot wrap.
 static int
-fetch_atom_numbers(Molecule& m, isotope_t* isotope)
-{
-  int matoms = m.natoms();
-
-  for (int i = 0; i < matoms; i++) {
-    isotope[i] = atom_number_offset + i;
+ScaleNumbering(const Molecule& m, isotope_t* labels) {
+  const uint64_t max_label = apply_isotopic_labels
+      ? std::numeric_limits<isotope_t>::max() : std::numeric_limits<int>::max();
+  for (int i = 0; i < m.natoms(); ++i) {
+    const uint64_t value = numbering_type == NumberingType::kAtomNumber
+        ? static_cast<uint64_t>(atom_number_offset) + static_cast<uint64_t>(i) * number_step
+        : static_cast<uint64_t>(labels[i]) * number_step;
+    if (value > max_label) {
+      cerr << "Numbering exceeds the supported label range for '" << m.name() << "'\n";
+      return 0;
+    }
+    labels[i] = static_cast<isotope_t>(value);
   }
-
   return 1;
 }
 
@@ -418,7 +319,7 @@ numbered_smiles(Molecule& m,
 {
   switch (numbering_type) {
     case NumberingType::kAtomNumber:
-      fetch_atom_numbers(m, isotope);
+      // ScaleNumbering constructs the arithmetic progression.
       break;
     case NumberingType::kSymmetryClass:
       fetch_symmetry_class(m, isotope);
@@ -437,35 +338,18 @@ numbered_smiles(Molecule& m,
       break;
   }
 
-  do_apply_isotopic_labels(m, isotope);
-
-  if (sort_molecule_by_numbering) {
-    adjust_numbers_and_do_sort(m, isotope);
+  if (!ScaleNumbering(m, isotope) || !ApplyNumbering(m, isotope)) {
+    return 0;
   }
-
-  if (number_step > 1) {
-    const int matoms = m.natoms();
-    for (int i = 1; i < matoms; i++) {
-      isotope_t iso = m.isotope(i);
-      if (iso > 0) {
-        if (apply_isotopic_labels) {
-          m.set_isotope(i, iso * number_step);
-        } else {
-          m.set_atom_map_number(i, iso * number_step);
-        }
-      }
-    }
-  }
-
-  if (queries.number_elements() > 0) {
-    leave_isotopes_only_on_matched_atoms(m);
+  if (sort_molecule_by_numbering && !SortByNumbering(m)) {
+    return 0;
   }
 
   if (compute_bond_symmetry_small) {
-    do_compute_bond_symmetry_small(m, std::cout);
+    do_compute_bond_symmetry_small(m, cerr);
   }
   if (compute_bond_symmetry_large) {
-    do_compute_bond_symmetry_large(m, std::cout);
+    do_compute_bond_symmetry_large(m, cerr);
   }
 
   return output.write(m);
@@ -482,10 +366,6 @@ numbered_smiles(Molecule& m, Molecule_Output_Object& output)
 
   if (remove_chiral_centres) {
     m.remove_all_chiral_centres();
-  }
-
-  if (change_to_graph_form) {
-    m.change_to_graph_form();
   }
 
   int matoms = m.natoms();
@@ -525,7 +405,85 @@ numbered_smiles(data_source_and_type<Molecule>& input, Molecule_Output_Object& o
     cerr << "Processed " << input.molecules_read() << " molecules\n";
   }
 
-  return output.good();
+  return !input.stopped_because_of_error() && output.good();
+}
+
+// Check buffered writes while failures can still affect the exit status.
+static int
+FinishOutputs(Molecule_Output_Object& output) {
+  int ok = output.empty() || output.number_elements() == output.number_output_types();
+  for (auto* stream : output) {
+    stream->flush();
+    if (!stream->good()) {
+      ok = 0;
+    }
+  }
+  std::cout.flush();
+  if (!std::cout.good()) {
+    ok = 0;
+  }
+  if (!ok) {
+    cerr << "numbered_smiles: error writing output\n";
+  }
+  return ok;
+}
+
+// Remove only the filename's final extension, retaining directory and other dots.
+static IWString
+DefaultOutputStem(const char* fname) {
+  std::filesystem::path path(fname);
+  path.replace_extension();
+  path += "_num";
+  return IWString(path.string());
+}
+
+
+// Check all ordinary output names before any output stream is opened.
+static int
+CheckOutputNames(const Command_Line& cl, const Molecule_Output_Object& output) {
+  if (output_file_name == "-") {
+    return 1;
+  }
+  std::vector<IWString> destinations;
+  for (const char* input : cl) {
+    const IWString stem = output_file_name.empty() ? DefaultOutputStem(input) : output_file_name;
+    const int keep_suffix = output_file_name.empty();
+    for (FileType type : output.output_types()) {
+      IWString fname;
+      if (!create_file_with_appropriate_name(stem, fname, type, keep_suffix)) {
+        return 0;
+      }
+      for (const char* source : cl) {
+        if (std::string_view(source) != "-") {
+          const auto same = iwmisc::SameFile(fname, IWString(source));
+          if (!same) {
+            cerr << "Cannot compare file paths\n";
+            return 0;
+          }
+          if (*same) {
+            cerr << "Output '" << fname << "' would overwrite input '" << source << "'\n";
+            return 0;
+          }
+        }
+      }
+      for (const IWString& previous : destinations) {
+        const auto same = iwmisc::SameFile(fname, previous);
+        if (!same) {
+          cerr << "Cannot compare file paths\n";
+          return 0;
+        }
+        if (*same) {
+          cerr << "Output filenames '" << fname << "' and '" << previous << "' coincide\n";
+          return 0;
+        }
+      }
+      destinations.push_back(fname);
+    }
+    if (!output_file_name.empty()) {
+      break;  // All inputs share the explicitly specified output.
+    }
+  }
+  return 1;
 }
 
 static int
@@ -533,34 +491,35 @@ numbered_smiles(const char* fname, FileType input_type, Molecule_Output_Object& 
 {
   if (input_type == FILE_TYPE_INVALID) {
     input_type = discern_file_type_from_name(fname);
-    assert(0 != input_type);
+    if (input_type == FILE_TYPE_INVALID) {
+      cerr << "Cannot determine input type for '" << fname << "'\n";
+      return 0;
+    }
   }
 
   data_source_and_type<Molecule> input(input_type, fname);
-  if (!input.ok()) {
+  if (!input.good()) {
     cerr << "Cannot open '" << fname << "'\n";
-    return 1;
+    return 0;
   }
 
   static int first_call = 1;
 
   if (output_file_name.empty()) {
-    IWString ofname = fname;
-    int i = ofname.index('.');
-    if (i > 0) {
-      ofname.iwtruncate(i);
+    // A new stem closes the preceding file; check its writes first.
+    if (!FinishOutputs(output)) {
+      return 0;
     }
-
-    ofname += "_num.smi";
-
-    if (!output.new_stem(ofname)) {
+    const IWString ofname = DefaultOutputStem(fname);
+    // The stem may contain periods which are part of the original filename.
+    if (!output.new_stem(ofname, 1)) {
       cerr << "Cannot set new stem '" << ofname << "'\n";
-      return 99;
+      return 0;
     }
   } else if (first_call) {
     if (!output.new_stem(output_file_name)) {
       cerr << "Cannot set stem for '" << output_file_name << "'\n";
-      return 13;
+      return 0;
     }
     first_call = 0;
   }
@@ -578,7 +537,7 @@ DisplayDashYOptions(int rc) {
 static int
 numbered_smiles(int argc, char** argv)
 {
-  Command_Line cl(argc, argv, "Ivq:s:q:S:i:o:n:E:A:rpHb:e:mK:P:Y:t:cl");
+  Command_Line cl(argc, argv, "IvS:i:o:n:E:A:rHb:e:mK:P:Y:cl");
 
   if (cl.unrecognised_options_encountered()) {
     cerr << "Unrecognised options encountered\n";
@@ -602,13 +561,7 @@ numbered_smiles(int argc, char** argv)
 
   if (!process_standard_smiles_options(cl, verbose, 'K')) {
     cerr << "Cannot process smiles options\n";
-  }
-
-  if (cl.option_present('t')) {
-    if (!element_transformations.construct_from_command_line(cl, verbose)) {
-      cerr << "Cannot process element transformations\n";
-      usage(2);
-    }
+    return 1;
   }
 
   if (!process_standard_aromaticity_options(cl, verbose)) {
@@ -648,7 +601,7 @@ numbered_smiles(int argc, char** argv)
         DisplayDashYOptions(0);
       } else {
         cerr << "Unrecognised -Y qualifier '" << y << "'\n";
-        DisplayDashYOptions(0);
+        DisplayDashYOptions(1);
       }
     }
   }
@@ -683,6 +636,11 @@ numbered_smiles(int argc, char** argv)
           cerr << "Atoms numbered by atomic number\n";
         }
       } else if (tmp.is_int(atom_number_offset)) {
+        if (atom_number_offset < 0) {
+          cerr << "The starting atom number (-n) must be non-negative\n";
+          return 1;
+        }
+        numbering_type = NumberingType::kAtomNumber;
         if (verbose) {
           cerr << "Atoms numbered by atom number, offset = " << atom_number_offset
                << '\n';
@@ -774,13 +732,6 @@ numbered_smiles(int argc, char** argv)
       usage(10);
     }
 
-    for (int i = 0; i < cl.number_elements(); i++) {
-      if (output.would_use_name(output_file_name.null_terminated_chars(), cl[i])) {
-        cerr << "Input and output must be distinct, '" << cl[i] << "'\n";
-        return 88;
-      }
-    }
-
     if (verbose) {
       cerr << "Stem for output is '" << output_file_name << "'\n";
     }
@@ -794,27 +745,28 @@ numbered_smiles(int argc, char** argv)
     }
   }
 
-  if (cl.option_present('p')) {
-    change_to_graph_form = 1;
-
-    if (verbose) {
-      cerr << "Will change to graph form\n";
-    }
-  }
-
   if (cl.empty()) {
     cerr << "Insufficient arguments\n";
     usage(9);
   }
 
+  if (!CheckOutputNames(cl, output)) {
+    return 1;
+  }
+
+  int rc = 0;
   for (const char* fname : cl) {
     if (!numbered_smiles(fname, input_type, output)) {
       cerr << "Fatal error processing '" << fname << "'\n";
-      return 1;
+      rc = 1;
+      break;
     }
   }
 
-  return 0;
+  if (!FinishOutputs(output)) {
+    rc = 1;
+  }
+  return rc;
 }
 
 int

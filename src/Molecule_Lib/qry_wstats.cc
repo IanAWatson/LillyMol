@@ -352,3 +352,18 @@ Substructure_Hit_Statistics::ConstructFromProto(
     const SubstructureSearch::SubstructureQuery& proto) {
   return Substructure_Query::ConstructFromProto(proto);
 }
+
+int
+Substructure_Hit_Statistics::FlushOutputs() {
+  int ok = 1;
+  for (ofstream_and_type* output : {&_stream_for_matches, &_stream_for_non_matches}) {
+    if (!output->valid()) {
+      continue;
+    }
+    output->flush();
+    if (!output->good()) {
+      ok = 0;
+    }
+  }
+  return ok;
+}

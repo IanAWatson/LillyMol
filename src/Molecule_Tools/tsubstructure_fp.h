@@ -19,8 +19,8 @@ class TSubstructure_FP
     // number of bit replicates associated with the total hits bit.
     int _extra_bit_total_hits;
 
-    // By default, we set a bit for each query that matches. If this is unset,
-    // then only the _extra_bit_total_hits bit will be set.
+    // By default, each query has its own feature. If unset, emit only
+    // replicated aggregate features (binary presence or number of queries).
     int _each_query_writes_bit;
 
     // If set, we write fixed size counted features.
@@ -43,13 +43,9 @@ class TSubstructure_FP
     void set_extra_bit_total_hits(int s) {
       _extra_bit_total_hits = s;
     }
-    // If we are turning off writing a bit for each query, make sure we turn on
-    // writing a bit for the sum of queries that match.
+    // Without individual query features, emit an aggregate feature instead.
     void set_each_query_writes_bit(int s) {
       _each_query_writes_bit = s;
-      if (s == 0 &&  _extra_bit_total_hits) {
-        _extra_bit_total_hits = 1;
-      }
     }
 
     void set_write_counted_bits(int s) {

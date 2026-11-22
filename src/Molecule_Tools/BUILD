@@ -4348,3 +4348,16 @@ py_test(
         "//Molecule_Tools:xray_structure_compare",
     ],
 )
+
+cc_test(
+    name = "tsubstructure_fp_test",
+    srcs = ["tsubstructure_fp_test.cc", "tsubstructure_fp.cc", "tsubstructure_fp.h"],
+    deps = [
+        "//Foundational/iwbits",
+        "//Foundational/iwmisc:sparse_fp_creator",
+        "//Foundational/iwstring",
+        "//Molecule_Lib:iwmolecule",
+        "//Molecule_Lib:moleculeio",
+        "@googletest//:gtest_main",
+    ],
+)

@@ -2,7 +2,10 @@
 
 #include <algorithm>
 #include <cassert>
+#include <chrono>
 #include <cstdlib>
+#include <filesystem>
+#include <vector>
 #include <iostream>
 #include <limits>
 #include <memory>
@@ -335,6 +338,9 @@ static int break_at_first_non_match = 0;
 
 static int must_match_all_queries = 0;
 
+// Only this prefix can contain results from the preceding molecule.
+static int previous_queries_searched = 0;
+
 static int reduce_to_largest_fragment = 0;
 
 static int remove_all_chiral_centres = 0;
@@ -414,6 +420,79 @@ static IWString getpsf_directory;
 
 static int make_implicit_hydrogens_explicit = 0;
 
+// All named destinations share these checks, including per-query outputs.
+static std::vector<IWString> output_filenames;
+
+static bool
+SameFile(const IWString& lhs, const IWString& rhs) {
+  const std::filesystem::path a(std::string(lhs.data(), lhs.length()));
+  const std::filesystem::path b(std::string(rhs.data(), rhs.length()));
+  std::error_code ec;
+  if (std::filesystem::equivalent(a, b, ec) && !ec) {
+    return true;
+  }
+  ec.clear();
+  const auto ca = std::filesystem::weakly_canonical(a, ec);
+  if (ec) {
+    return a.lexically_normal() == b.lexically_normal();
+  }
+  const auto cb = std::filesystem::weakly_canonical(b, ec);
+  return !ec && ca == cb;
+}
+
+static int
+RegisterOutputFile(const Command_Line& cl, const IWString& fname) {
+  if (fname == "-") {
+    return 1;
+  }
+  if (fname.empty()) {
+    cerr << "Empty output filename\n";
+    return 0;
+  }
+  for (const char* input : cl) {
+    if (std::string_view(input) != "-" && SameFile(fname, IWString(input))) {
+      cerr << "Output '" << fname << "' would overwrite input '" << input << "'\n";
+      return 0;
+    }
+  }
+  for (const IWString& other : output_filenames) {
+    if (SameFile(fname, other)) {
+      cerr << "Output destinations '" << fname << "' and '" << other << "' coincide\n";
+      return 0;
+    }
+  }
+  output_filenames.push_back(fname);
+  return 1;
+}
+
+static int
+RegisterMoleculeOutputs(const Command_Line& cl, const IWString& stem,
+                        const Molecule_Output_Object& output, int keep_suffix) {
+  if (stem == "-") {
+    return 1;
+  }
+  for (FileType type : output.output_types()) {
+    IWString fname;
+    if (!create_file_with_appropriate_name(stem, fname, type, keep_suffix) ||
+        !RegisterOutputFile(cl, fname)) {
+      return 0;
+    }
+  }
+  return 1;
+}
+
+static int
+FlushMoleculeOutputs(Molecule_Output_Object& output) {
+  int ok = output.empty() || output.number_elements() == output.number_output_types();
+  for (auto* stream : output) {
+    stream->flush();
+    if (!stream->good()) {
+      ok = 0;
+    }
+  }
+  return ok;
+}
+
 // A class to deal with all settings from the -j option.
 // WIP, not implemented yet.
 class LabelMatchedAtoms {
@@ -453,7 +532,7 @@ class LabelMatchedAtoms {
     // non-thread safe. It could be handled externally, but that would
     // involve passing arguments to functions that already have a lot
     // of options.
-    isotope_t _next_sequential_matched_atom_isotope = 0;
+    isotope_t _next_sequential_matched_atom_isotope = 1;
 
 
     // May 2022. Noticed that if we are processing molecules that
@@ -488,7 +567,7 @@ class LabelMatchedAtoms {
     int IncrementIsotopicLabelsToIndicateQueriesMatching(const Molecule& m,
                 const Set_of_Atoms& embedding, const int na,
                 isotope_t* atom_isotopic_label);
-    int transform_atoms_hit(const Substructure_Results& sresults,
+    int transform_atoms_hit(const Molecule& m, const Substructure_Results& sresults,
                     const Element** element_labels) const;
     int label_match_and_write_to_stream_for_individually_labelled_matches(
          Molecule& m, int query_number, const Substructure_Results& sresults,
@@ -504,6 +583,7 @@ class LabelMatchedAtoms {
 
   public:
     int Initialise(Command_Line& cl);
+    int FlushOutputs() { return FlushMoleculeOutputs(_stream_for_individually_labelled_matches); }
 
     int active() {
       return _any_matched_atom_labelling_active;
@@ -514,7 +594,7 @@ class LabelMatchedAtoms {
     }
 
     void reset() {
-      _next_sequential_matched_atom_isotope = 0;
+      _next_sequential_matched_atom_isotope = 1;
     }
 
     int needs_starting_isotopes() const;
@@ -557,7 +637,7 @@ LabelMatchedAtoms::OpenLabelledMultipleMatchesFile(Command_Line& cl, const const
     _stream_for_individually_labelled_matches.add_output_type(FILE_TYPE_SMI);
   }
 
-  if (_stream_for_individually_labelled_matches.would_overwrite_input_files(cl, fname)) {
+  if (!RegisterMoleculeOutputs(cl, IWString(fname), _stream_for_individually_labelled_matches, 0)) {
     cerr << "Cannot overwrite input file(s)\n";
     return 0;
   }
@@ -612,7 +692,7 @@ LabelMatchedAtoms::Initialise(Command_Line& cl) {
       if (!j.numeric_value(_label_by_query_atom_number) ||
           _label_by_query_atom_number <= 2) {
         cerr << "Invalid query label offset '" << j << "'\n";
-        return 2;
+        return 0;
       }
       if (verbose) {
         cerr << "Multiplicative offset for query number " << _label_by_query_atom_number
@@ -634,7 +714,7 @@ LabelMatchedAtoms::Initialise(Command_Line& cl) {
         cerr << "Positive isotopic offset " << _positive_j_offset << '\n';
       }
     } else if (j.starts_with('-')) {
-      if (!j.numeric_value(_negative_j_offset) || _negative_j_offset <= 0) {
+      if (!j.numeric_value(_negative_j_offset) || _negative_j_offset >= 0) {
         cerr << "With -j -nnn, the number, nnn must be non-zero\n";
         usage(44);
       }
@@ -688,7 +768,7 @@ LabelMatchedAtoms::Initialise(Command_Line& cl) {
       if (nullptr == _matched_atoms_element) {
         cerr << "Cannot retrieve element '" << j
              << "', -j option - should be a whole number\n";
-        return 9;
+        return 0;
       }
 
       if (verbose) {
@@ -743,12 +823,36 @@ LabelMatchedAtoms::DoLabelMatchedAtoms(Molecule& m, int query_number, const Subs
                           int number_queries) {
   // cerr << "Applying labels to " << m.smiles() << " with " << sresults.number_embeddings() << " matches\n";
   if (_matched_atoms_element != nullptr) {
-    return transform_atoms_hit(sresults, element_labels);
+    return transform_atoms_hit(m, sresults, element_labels);
   }
 
   if (_stream_for_individually_labelled_matches.active()) {
     return label_matches_and_write_to_stream_for_individually_labelled_matches(
         m, query_number, sresults, number_queries);
+  }
+
+  if (_increment_isotopic_labels_to_indicate_queries_matching) {
+    // Count a query once per atom, regardless of overlapping embeddings.
+    auto matched = std::make_unique<int[]>(m.natoms());
+    if (_label_matched_atoms_stop < 0) {
+      sresults.each_embedding_set_vector(matched.get(), 1);
+    } else {
+      for (const Set_of_Atoms* embedding : sresults.embeddings()) {
+        const int n = std::min(embedding->number_elements(), _label_matched_atoms_stop);
+        for (int i = 0; i < n; ++i) {
+          const atom_number_t atom = (*embedding)[i];
+          if (m.ok_atom_number(atom)) {
+            matched[atom] = 1;
+          }
+        }
+      }
+    }
+    for (int i = 0; i < m.natoms(); ++i) {
+      if (matched[i]) {
+        ++atom_isotopic_label[i];
+      }
+    }
+    return 1;
   }
 
   int ne = sresults.number_embeddings();
@@ -774,7 +878,7 @@ LabelMatchedAtoms::IncrementIsotopicLabelsToIndicateQueriesMatching(
       continue;
     }
 
-    atom_isotopic_label[j]++;
+    atom_isotopic_label[j] = 1;
   }
 
   return 1;
@@ -889,7 +993,7 @@ LabelMatchedAtoms::ApplyIsotopicLabelsEmbedding(const Molecule& m, int query_num
 
 
 int
-LabelMatchedAtoms::transform_atoms_hit(const Substructure_Results& sresults,
+LabelMatchedAtoms::transform_atoms_hit(const Molecule& m, const Substructure_Results& sresults,
                     const Element** element_labels) const {
   int ne = sresults.number_embeddings();
 
@@ -904,7 +1008,9 @@ LabelMatchedAtoms::transform_atoms_hit(const Substructure_Results& sresults,
     for (int j = 0; j < na; j++) {
       atom_number_t k = s->item(j);
 
-      element_labels[k] = _matched_atoms_element;
+      if (m.ok_atom_number(k)) {
+        element_labels[k] = _matched_atoms_element;
+      }
     }
   }
 
@@ -1346,9 +1452,7 @@ write_directcolorfile(const Molecule& m, const Substructure_Results& sresults,
 
   output << "|\n";
 
-  output.write_if_buffer_holds_more_than(32768);
-
-  return 1;
+  return output.write_if_buffer_holds_more_than(32768);
 }
 
 // Molecule `m` has matched one or more of the queries in `queries,
@@ -1379,10 +1483,8 @@ WriteAsProto(Molecule& m, const IWString& mname,
     cerr << "Cannot print proto\n";
     return 0;
   }
-  output.write(as_string.data(), as_string.size());
-  output << '\n';
-  output.write_if_buffer_holds_more_than(8192);
-  return 1;
+  output << as_string << '\n';
+  return output.write_if_buffer_holds_more_than(8192);
 }
 
 static int
@@ -1414,8 +1516,10 @@ do_single_query(Molecule_to_Match& target, int query_number,
   }
 
   if (label_matched_atoms_instance.active()) {
-    label_matched_atoms_instance.DoLabelMatchedAtoms(*target.molecule(), query_number, sresults,
-                atom_isotopic_label, element_labels, number_queries);
+    if (!label_matched_atoms_instance.DoLabelMatchedAtoms(*target.molecule(), query_number, sresults,
+                atom_isotopic_label, element_labels, number_queries)) {
+      return -1;
+    }
     return nmatches;
   }
 
@@ -1437,11 +1541,20 @@ update_atom_coverage (const Substructure_Results & sresults,
   return;
 }*/
 
+static void
+ClearRemainingResults(Substructure_Results* results, int first, int count) {
+  for (int i = first; i < count; ++i) {
+    results[i].reset();
+  }
+}
+
 static int
 do_all_queries(Molecule& m, resizable_array_p<Substructure_Hit_Statistics>& queries,
                Substructure_Results* sresults, int* hits, const Element** element_labels,
                isotope_t* atom_isotopic_label) {
   label_matched_atoms_instance.reset();
+  const int previous_count = previous_queries_searched;
+  previous_queries_searched = 0;
 
   int rc = 0;
 
@@ -1471,18 +1584,22 @@ do_all_queries(Molecule& m, resizable_array_p<Substructure_Hit_Statistics>& quer
 
   const int number_queries = queries.number_elements();
   for (int i = 0; i < number_queries; i++) {
+    previous_queries_searched = i + 1;
     if (perform_search_even_if_names_the_same)
       ;
     else if (0 == mname.length()) {
       cerr << "Molecule with no name detected, cannot determine self match, "
               "searching...\n";
     } else if (mname == queries[i]->comment()) {
+      sresults[i].reset();
       continue;
     }
 
     if (int nhits = do_single_query(target, i, queries[i], sresults[i], element_labels,
                                     atom_isotopic_label, number_queries);
-        nhits > 0) {
+        nhits < 0) {
+      return -1;
+    } else if (nhits > 0) {
       rc++;
       hits[i] = nhits;
 
@@ -1493,19 +1610,25 @@ do_all_queries(Molecule& m, resizable_array_p<Substructure_Hit_Statistics>& quer
       total_hits_across_all_queries += nhits;
 
       if (break_at_first_match) {
+        ClearRemainingResults(sresults, i + 1, previous_count);
         break;
       }
     } else if (break_at_first_non_match) {
+      ClearRemainingResults(sresults, i + 1, previous_count);
       break;
     }
   }
 
   if (bob_coner_stream.rdbuf()->is_open()) {
-    write_bob_coner_special(sresults, number_queries, m.name());
+    if (!write_bob_coner_special(sresults, number_queries, m.name())) {
+      return -1;
+    }
   }
 
   if (stream_for_directcolorfile.is_open()) {
-    write_directcolorfile(m, *sresults, stream_for_directcolorfile);
+    if (!write_directcolorfile(m, *sresults, stream_for_directcolorfile)) {
+      return -1;
+    }
   }
 
 #ifdef DO_GETPSF
@@ -1535,15 +1658,25 @@ do_all_queries(Molecule& m, resizable_array_p<Substructure_Hit_Statistics>& quer
   // TODO:ianwatson fix. We might need a structure to hold arguments...
 
   if (tsubfp.active()) {
-    tsubfp.do_fingerprint_output(m, number_queries, hits, std::cout);
+    if (!tsubfp.do_fingerprint_output(m, number_queries, hits, std::cout)) {
+      return -1;
+    }
   } else if (tag_for_nhits.length()) {
-    do_nhits_tag_output(m, number_queries, hits, std::cout);
+    if (!do_nhits_tag_output(m, number_queries, hits, std::cout)) {
+      return -1;
+    }
   } else if (tag_for_hits.length()) {
-    do_hits_tag_output(m, queries, hits, std::cout);
+    if (!do_hits_tag_output(m, queries, hits, std::cout)) {
+      return -1;
+    }
   } else if (write_as_array) {
-    do_array_output(m.name(), rc, number_queries, hits, std::cout);
+    if (!do_array_output(m.name(), rc, number_queries, hits, std::cout)) {
+      return -1;
+    }
   } else if (write_results_as_proto) {
-    do_proto_output(m, rc, queries, hits, std::cout);
+    if (!do_proto_output(m, rc, queries, hits, std::cout)) {
+      return -1;
+    }
   }
 
   if (element_labels) {
@@ -1611,6 +1744,8 @@ tsubstructure(Molecule& m, resizable_array_p<Substructure_Hit_Statistics>& queri
 
   int nmatched = 0;
   if (rx_match_only && !iwre2::RE2PartialMatch(m.name(), *rx_match_only)) {
+    ClearRemainingResults(sresults, 0, previous_queries_searched);
+    previous_queries_searched = 0;
   } else {
     nmatched =
         do_all_queries(m, queries, sresults, tmp, new_elements, atom_isotopic_label);
@@ -1624,6 +1759,9 @@ tsubstructure(Molecule& m, resizable_array_p<Substructure_Hit_Statistics>& queri
     delete[] new_elements;
   }
 
+  if (nmatched < 0) {
+    return 0;
+  }
   queries_matched[nmatched]++;
 
   if (verbose > 1 && queries.number_elements() > 1) {
@@ -1644,14 +1782,20 @@ tsubstructure(Molecule& m, resizable_array_p<Substructure_Hit_Statistics>& queri
     }
     if (write_matched_atoms_as_mdl_v30_atom_lists ||
         write_matched_atoms_as_mdl_v30_bond_lists) {
-      write_matched_atoms_as_mdl_v30_lists(
+      if (!write_matched_atoms_as_mdl_v30_lists(
           m, queries, sresults,
-          stream_for_matching_structures.stream_for_type(FILE_TYPE_SDF));
+          stream_for_matching_structures.stream_for_type(FILE_TYPE_SDF))) {
+        return 0;
+      }
     } else if (stream_for_matching_structures.good()) {
-      stream_for_matching_structures.write(m);
+      if (!stream_for_matching_structures.write(m)) {
+        return 0;
+      }
     }
     if (proto_output.active()) {
-      WriteAsProto(m, save_name, queries, tmp, proto_output);
+      if (!WriteAsProto(m, save_name, queries, tmp, proto_output)) {
+        return 0;
+      }
     }
   } else {
     if (report_non_matches) {
@@ -1661,15 +1805,19 @@ tsubstructure(Molecule& m, resizable_array_p<Substructure_Hit_Statistics>& queri
       non_matched_structures_number_assigner.process(m);
     }
     if (stream_for_non_matching_structures.good()) {
-      stream_for_non_matching_structures.write(m);
+      if (!stream_for_non_matching_structures.write(m)) {
+        return 0;
+      }
     }
 
     if (write_non_matches_to_matched_stream && stream_for_matching_structures.good()) {
-      stream_for_matching_structures.write(m);
+      if (!stream_for_matching_structures.write(m)) {
+        return 0;
+      }
     }
   }
 
-  return 0;
+  return 1;
 }
 
 static void
@@ -1729,7 +1877,9 @@ tsubstructure(data_source_and_type<Molecule>& input,
       continue;
     }
 
-    (void)tsubstructure(*m, queries, sresults, queries_matched);
+    if (!tsubstructure(*m, queries, sresults, queries_matched)) {
+      return 0;
+    }
 
     if (stop_processing_after_this_many_molecules_matching > 0 &&
         molecules_which_match >= stop_processing_after_this_many_molecules_matching) {
@@ -1742,7 +1892,7 @@ tsubstructure(data_source_and_type<Molecule>& input,
     }
   }
 
-  return 1;
+  return !input.stopped_because_of_error();
 }
 
 static IWString smiles_tag("$SMI<");
@@ -1767,7 +1917,9 @@ tsubstructure_filter(const const_IWSubstring& smi,
     return 0;
   }
 
-  (void)tsubstructure(m, queries, sresults, queries_matched);
+  if (!tsubstructure(m, queries, sresults, queries_matched)) {
+    return 0;
+  }
 
   return 1;
 }
@@ -1785,9 +1937,10 @@ tsubstructure_filter(iwstring_data_source& input,
       continue;
     }
 
-    assert(buffer.ends_with('>'));
-
-    molecules_read++;
+    if (!buffer.ends_with('>')) {
+      cerr << "Invalid SMILES TDT item at line " << input.lines_read() << '\n';
+      return 0;
+    }
 
     buffer.chop();
     buffer.remove_up_to_first('<');
@@ -1871,7 +2024,7 @@ open_match_or_non_match_stream(Command_Line& cl, const char* match_or_non_match,
     cerr << "Setting stem for " << match_or_non_match << " to " << fname << '\n';
   }
 
-  if (stream_for.would_overwrite_input_files(cl, fname)) {
+  if (!RegisterMoleculeOutputs(cl, fname, stream_for, 1)) {
     cerr << "Cannot overwrite input file(s): '" << fname << "'\n";
     return 0;
   }
@@ -1926,7 +2079,8 @@ handle_file_opening(Command_Line& cl, IWString& fname,
       tmp += '.';
       append_appropriate_suffix(tmp, output_type);
 
-      if (!q->set_stream_for_non_matches(output_type, tmp.chars())) {
+      if (!RegisterOutputFile(cl, tmp) ||
+          !q->set_stream_for_non_matches(output_type, tmp.chars())) {
         cerr << "Cannot set output stream for non matches for query " << i << '\n';
         return 0;
       }
@@ -1945,7 +2099,8 @@ handle_file_opening(Command_Line& cl, IWString& fname,
       tmp += '.';
       append_appropriate_suffix(tmp, output_type);
 
-      if (!q->set_stream_for_matches(output_type, tmp.chars())) {
+      if (!RegisterOutputFile(cl, tmp) ||
+          !q->set_stream_for_matches(output_type, tmp.chars())) {
         cerr << "Cannot set output stream for non matches for query " << i << '\n';
         return 0;
       }
@@ -1958,10 +2113,10 @@ handle_file_opening(Command_Line& cl, IWString& fname,
 }
 
 static int
-OpenProtoFile(const IWString& fname, IWString_and_File_Descriptor& output) {
+OpenProtoFile(const Command_Line& cl, const IWString& fname, IWString_and_File_Descriptor& output) {
   IWString with_stem;
   with_stem << fname << ".txtproto";
-  if (!output.open(with_stem.null_terminated_chars())) {
+  if (!RegisterOutputFile(cl, with_stem) || !output.open(with_stem.null_terminated_chars())) {
     cerr << "OpenProtoFile:cannot open proto file '" << with_stem << "'\n";
     return 0;
   }
@@ -2150,7 +2305,7 @@ parse_set_of_options(Command_Line& cl, char flag,
       cerr << "The proto output directive only works with the -m option\n";
       return 0;
     }
-    if (!OpenProtoFile(fname, proto_output)) {
+    if (!OpenProtoFile(cl, fname, proto_output)) {
       cerr << "Cannot open proto output file '" << fname << "'\n";
       return 0;
     }
@@ -2205,6 +2360,46 @@ DisplayDashROptions(int rc) {
 )";
 
   std::exit(rc);
+}
+
+// Destructors still provide cleanup, but check buffered writes here while a
+// failure can affect the program's exit status.
+static int
+FinishOutputs(const resizable_array_p<Substructure_Hit_Statistics>& queries) {
+  int output_ok = FlushMoleculeOutputs(stream_for_matching_structures);
+  if (!FlushMoleculeOutputs(stream_for_non_matching_structures) ||
+      !FlushMoleculeOutputs(stream_for_multiple_matches) ||
+      !label_matched_atoms_instance.FlushOutputs()) {
+    output_ok = 0;
+  }
+  for (auto* query : queries) {
+    if (!query->FlushOutputs()) {
+      output_ok = 0;
+    }
+  }
+  for (std::ofstream* stream : {&stream_for_report, &bob_coner_stream}) {
+    if (stream->is_open()) {
+      stream->flush();
+      if (!stream->good()) {
+        output_ok = 0;
+      }
+    }
+  }
+  if (stream_for_directcolorfile.is_open() && !stream_for_directcolorfile.close()) {
+    output_ok = 0;
+  }
+  if (proto_output.active() && !proto_output.close()) {
+    output_ok = 0;
+  }
+  std::cout.flush();
+  if (!std::cout.good()) {
+    output_ok = 0;
+  }
+  if (!output_ok) {
+    cerr << "Error writing tsubstructure output\n";
+  }
+
+  return output_ok;
 }
 
 static int
@@ -2387,7 +2582,7 @@ tsubstructure(int argc, char** argv) {
 
   int respect_initial_atom_numbering = 1;
 
-  time_t tzero = 0;
+  std::chrono::steady_clock::time_point tzero;
 
   // once upon a time, we used -z to control whether the embeddings were saved
   // or whether the matched atoms were saved. For historical reasons, the variable
@@ -2476,7 +2671,7 @@ tsubstructure(int argc, char** argv) {
           cerr << "Will report timing\n";
         }
 
-        tzero = time(NULL);
+        tzero = std::chrono::steady_clock::now();
       } else if ("organic" == m) {
         discard_hits_in_non_organic_fragments = 1;
 
@@ -2657,7 +2852,8 @@ tsubstructure(int argc, char** argv) {
         IWString dcf_fname = m;
         dcf_fname.remove_leading_chars(4);
 
-        if (!stream_for_directcolorfile.open(dcf_fname.null_terminated_chars())) {
+        if (!RegisterOutputFile(cl, dcf_fname) ||
+            !stream_for_directcolorfile.open(dcf_fname.null_terminated_chars())) {
           cerr << "Cannot open directcolorfile '" << dcf_fname << "'\n";
           return 4;
         }
@@ -2991,6 +3187,9 @@ tsubstructure(int argc, char** argv) {
       return 1;
     }
 
+    if (!RegisterOutputFile(cl, fname)) {
+      return 1;
+    }
     stream_for_report.open(fname.null_terminated_chars(), std::ios::out);
     if (!stream_for_report.good()) {
       cerr << "Cannot open report file '" << fname << "'\n";
@@ -3034,10 +3233,13 @@ tsubstructure(int argc, char** argv) {
   if (cl.option_present('G')) {
     const char* g = cl.option_value('G');
 
+    if (!RegisterOutputFile(cl, IWString(g))) {
+      return 1;
+    }
     bob_coner_stream.open(g, std::ios::out);
     if (!bob_coner_stream.good()) {
       cerr << "Cannot open matched atom stream '" << g << "'\n";
-      return 0;
+      return 1;
     }
 
     if (verbose) {
@@ -3282,10 +3484,10 @@ tsubstructure(int argc, char** argv) {
   }
 
   if (report_timing) {
-    time_t execution_time = time(NULL) - tzero;
-
-    cerr << "Took " << execution_time << " seconds, " << (molecules_read / execution_time)
-         << " molecules per second\n";
+    const double seconds = std::chrono::duration<double>(
+        std::chrono::steady_clock::now() - tzero).count();
+    const double rate = seconds > 0.0 ? molecules_read / seconds : 0.0;
+    cerr << "Took " << seconds << " seconds, " << rate << " molecules per second\n";
   }
 
   if (verbose) {
@@ -3325,6 +3527,10 @@ tsubstructure(int argc, char** argv) {
         stream_for_report << q->molecules_which_match() << ' ' << q->comment() << '\n';
       }
     }
+  }
+
+  if (!FinishOutputs(queries)) {
+    rc = 1;
   }
 
   return rc;

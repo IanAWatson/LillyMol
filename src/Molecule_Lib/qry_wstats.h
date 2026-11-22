@@ -90,6 +90,9 @@ class Substructure_Hit_Statistics : public Substructure_Query
     void set_append_non_match_details_to_molecule_name (int ii)
       {_append_non_match_details_to_molecule_name = ii;}
 
+    // Flush optional molecule outputs and report write failures.
+    int FlushOutputs();
+
     int report (std::ostream & os, int verbose) const;
 
     int ConstructFromProto(const SubstructureSearch::SubstructureQuery& proto);

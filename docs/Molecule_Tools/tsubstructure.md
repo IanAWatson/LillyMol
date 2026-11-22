@@ -173,6 +173,11 @@ added, so `-m hits.txt` writes `hits.txt.smi`, and `-m hits.smi -o sdf` writes
 `hits.smi.sdf`. Only a suffix that follows a period is recognised, so `-m out_smi` writes
 `out_smi.smi`.
 
+Named outputs, including reports and per-query files, must differ from inputs
+and from each other. Fatal input errors and output-write failures produce a
+nonzero exit status. Input-error tolerance can still be enabled with the
+usual `-i` directives.
+
 ### Output modifiers and filenames
 
 Supply the output stem and each modifier as separate `-m` arguments, in either
@@ -235,8 +240,23 @@ The counts are numbers of embeddings, see [What counts as a match](#what-counts-
 | `-J <tag>` | Daylight style fingerprints in TDT form, with `-y <nbits>` setting the size |
 | `-a` | a table of per query match counts, see [Per query results](#per-query-results) |
 
-Note that with fingerprint output, if the tag starts with 'FP', the output will be a fixed
-width, binary fingerprint. If the tag starts with 'NC' it will be a sparse, counted fingerprint.
+Fingerprint tags select the representation: `FP` produces fixed-width binary
+fingerprints, `NC` sparse counted fingerprints, and `FC` fixed-width counted
+fingerprints with one byte per feature. Counts above 255 are capped at 255.
+
+`-M bitrep=N` repeats each query feature N times. `-M nhitsbitrep=N` adds N
+distinct features containing the total number of embeddings across queries
+(or presence/absence for binary output). These replication counts are independent.
+For example:
+```
+tsubstructure -s N -s O -J FCPOLAR -M nhitsbitrep=1 input.smi
+```
+The counted fingerprint has three features: nitrogen embeddings, oxygen
+embeddings, and their sum.
+
+With `-J ... -M anmatch`, the aggregate feature replaces individual query features.
+Binary output indicates whether any query matched; counted output records the
+number of queries that matched, regardless of their embedding counts.
 
 ## What counts as a match
 
@@ -304,6 +324,12 @@ same label, is the one that is most often wanted. `-j qnum` labels by the number
 of the query, counting from one. `-j iquery` labels by the position of the atom
 in the query, counted from zero, and an atom with label zero carries no isotope, so
 the first query atom is unlabelled.
+
+`-j sequential` assigns labels starting at one. `-j -N` decreases an existing
+isotope by N, clamping negative results to zero. `-j qmatch` labels each atom
+with the number of queries that match it: overlapping or symmetric embeddings
+of the same query count once per atom. This corrects earlier behavior that
+counted embeddings instead of queries.
 
 Molecules that match nothing are not written unless `-m NONMX` is added, which
 is usually what is wanted with `-j`.

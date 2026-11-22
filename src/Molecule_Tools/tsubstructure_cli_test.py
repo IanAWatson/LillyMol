@@ -143,5 +143,132 @@ class ProtoFileQueries(unittest.TestCase):
         self.assertNotIn("no file", result.stderr)
 
 
+class Correctness(unittest.TestCase):
+    setUp = OutputModifiers.setUp
+    run_tool = OutputModifiers.run_tool
+    def test_malformed_input_returns_failure(self):
+        (self._directory / "input.smi").write_text("CN valid\ninvalid_smiles broken\n")
+        self.assertNotEqual(self.run_tool("-m", "-").returncode, 0)
+
+    def test_timing_works_for_short_runs(self):
+        result = self.run_tool("-M", "time", "-m", "-")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn("molecules per second", result.stderr)
+
+    def test_break_clears_unsearched_query_results(self):
+        (self._directory / "input.smi").write_text("CCCC first\nN second\n")
+        result = self.run_tool("-s", "CC carbon", "-b", "-G", "atoms.txt")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        lines = (self._directory / "atoms.txt").read_text().splitlines()
+        self.assertEqual(lines[1], "second (0),")
+
+    def test_break_at_first_nonmatch_clears_old_results(self):
+        (self._directory / "input.smi").write_text("NCC first\nC second\n")
+        result = self.run_tool("-s", "CC carbon", "-B", "-G", "atoms.txt")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        lines = (self._directory / "atoms.txt").read_text().splitlines()
+        self.assertEqual(lines[1], "second ,")
+
+    def test_self_match_skip_clears_old_results(self):
+        (self._directory / "input.smi").write_text("CCCC first\nN carbon\n")
+        result = self.run_tool("-s", "CC carbon", "-M", "nosm", "-G", "atoms.txt")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        lines = (self._directory / "atoms.txt").read_text().splitlines()
+        self.assertEqual(lines[1], "carbon (0),")
+
+    def test_negative_isotope_offset(self):
+        (self._directory / "input.smi").write_text("[5NH3] example\n")
+        result = self.run_tool("-j", "-2", "-m", "-")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn("[3NH3]", result.stdout)
+
+    def test_sequential_labels_start_at_one(self):
+        (self._directory / "input.smi").write_text("N example\n")
+        result = self.run_tool("-j", "sequential", "-m", "-")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn("[1NH3]", result.stdout)
+
+    def test_qmatch_counts_queries_not_overlapping_embeddings(self):
+        (self._directory / "input.smi").write_text("CCC example\n")
+        result = self.run_tool("-s", "CC", "-u", "-j", "qmatch", "-m", "-")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn("[1CH3][1CH2][1CH3]", result.stdout)
+
+    def test_qmatch_counts_distinct_queries(self):
+        (self._directory / "input.smi").write_text("CCC example\n")
+        result = self.run_tool("-s", "CC first", "-s", "CC second", "-u", "-j", "qmatch", "-m", "-")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn("[2CH3][2CH2][2CH3]", result.stdout)
+
+    def test_qmatch_respects_atom_limit(self):
+        (self._directory / "input.smi").write_text("CO example\n")
+        for limit, expected in ((1, "[1CH3]O"), (2, "[1CH3][1OH]")):
+            with self.subTest(limit=limit):
+                result = self.run_tool("-s", "CO", "-j", "qmatch", "-j", f"n={limit}", "-m", "-")
+                self.assertEqual(result.returncode, 0, result.stderr)
+                self.assertIn(expected, result.stdout)
+
+    def test_qmatch_atom_limit_with_numbering_gaps(self):
+        (self._directory / "input.smi").write_text("CO example\n")
+        query = self._directory / "limited.textproto"
+        query.write_text('query { respect_initial_atom_numbering: true '
+                         'query_atom { id: 0 atom_properties { atomic_number: 6 } } '
+                         'query_atom { id: 2 atom_properties { atomic_number: 8 } single_bond: 0 } }')
+        for limit, expected in ((2, "[1CH3]O"), (3, "[1CH3][1OH]")):
+            with self.subTest(limit=limit):
+                result = self.run_tool("-q", "PROTO:" + str(query), "-j", "qmatch", "-j", f"n={limit}", "-m", "-")
+                self.assertEqual(result.returncode, 0, result.stderr)
+                self.assertIn(expected, result.stdout)
+
+    def test_element_labels_skip_gaps_in_query_atom_numbers(self):
+        query = self._directory / "gaps.textproto"
+        query.write_text('query {\n respect_initial_atom_numbering: true\n query_atom { id: 0 atom_properties { atomic_number: 6 } }\n query_atom { id: 2 atom_properties { atomic_number: 7 } single_bond: 0 }\n}\n')
+        result = self.run_tool("-q", "PROTO:" + str(query), "-j", "O", "-m", "-")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertNotIn("AddressSanitizer", result.stderr)
+        self.assertIn("methylamine", result.stdout)
+
+    def test_invalid_label_configuration_is_an_error(self):
+        for label in ("NOT_AN_ELEMENT", "mqoffset=2"):
+            result = self.run_tool("-j", label, "-m", "-")
+            self.assertNotEqual(result.returncode, 0, result.stderr)
+
+    def test_tdt_counts_each_molecule_once(self):
+        (self._directory / "input.smi").write_text("$SMI<N>\nPCN<one>\n|\n")
+        result = self.run_tool("-M", "TDT", "-J", "FPTEST")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn("1 molecules read, 1 molecules match fraction 1", result.stderr)
+        self.assertEqual(result.stdout.count("FPTEST<"), 1)
+
+    def test_output_filenames_must_not_replace_input(self):
+        original = (self._directory / "input.smi").read_text()
+        for options in (("-R", "input.smi"), ("-G", "input.smi"),
+                        ("-M", "DCF=input.smi")):
+            result = self.run_tool(*options)
+            self.assertNotEqual(result.returncode, 0, result.stderr)
+            self.assertEqual((self._directory / "input.smi").read_text(), original)
+        # SEPA's query zero output is input0.smi.
+        (self._directory / "input0.smi").write_text(original)
+        result = subprocess.run([_EXECUTABLE, "-s", "N", "-m", "input", "-m", "SEPA", "input0.smi"],
+                                cwd=self._directory, capture_output=True, text=True, timeout=15)
+        self.assertNotEqual(result.returncode, 0, result.stderr)
+        self.assertEqual((self._directory / "input0.smi").read_text(), original)
+
+    def test_match_and_nonmatch_destinations_must_differ(self):
+        result = self.run_tool("-m", "hits", "-n", "./hits.smi")
+        self.assertNotEqual(result.returncode, 0, result.stderr)
+
+    @unittest.skipUnless(pathlib.Path("/dev/full").exists(), "requires /dev/full")
+    def test_buffered_output_failures_are_errors(self):
+        (self._directory / "full.smi").symlink_to("/dev/full")
+        for options in (("-m", "full"), ("-n", "full"), ("-R", "/dev/full"),
+                        ("-G", "/dev/full"), ("-j", "1", "-j", "writeach=full"),
+                        ("-m", "separate", "-m", "SEPA")):
+            if "SEPA" in options:
+                (self._directory / "separate0.smi").symlink_to("/dev/full")
+            result = self.run_tool(*options)
+            self.assertNotEqual(result.returncode, 0, (options, result.stderr))
+
+
 if __name__ == "__main__":
     unittest.main()

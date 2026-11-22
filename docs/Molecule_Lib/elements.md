@@ -38,6 +38,13 @@ only. No current use cases are anticipated.
 
 ### -E O:Xx
 Element Xx is considered Organic. A common use might be `-E O:Se`.
+If Xx has not been declared, this creates it subject to the usual element-name
+length restrictions. A new name longer than two characters requires
+`-E anylength` first: `-E anylength -E O:Foo`. Without that setting the command
+fails. `-E autocreate` alone does not enable long names.
+
+Auto-created elements are non-organic by default; `O:` explicitly changes that
+classification. These options are processed in command-line order.
 
 ### -E anylength
 Elements can be of arbitrary length. So things like `Ala` and `Phe`
@@ -78,6 +85,9 @@ searches over peptides.
 Element <xx> needs square brackets. Use case is unclear, almost all
 elements need square brackets. Mostly this gets used with Hydrogen.
 We have encountered explicit Hydrogens written as either `H` or `[H]`.
+As with `O:`, an unknown name can be created here. A long name requires
+`-E anylength` first, for example `-E anylength -E nsqb=Foo`.
+Both `O:` and `nsqb=` require a non-empty symbol.
 
 ### -E <symbol>
 Automatically create \<symbol\>. Generally it is easier to just use

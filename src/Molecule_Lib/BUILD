@@ -1423,3 +1423,14 @@ cc_test(
         "@googletest//:gtest_main",
     ],
 )
+
+cc_test(
+    name = "element_test",
+    srcs = ["element_test.cc"],
+    deps = [
+        ":iwmolecule",
+        ":moleculeio",
+        "//Foundational/cmdline:iwcmdline",
+        "@googletest//:gtest_main",
+    ],
+)

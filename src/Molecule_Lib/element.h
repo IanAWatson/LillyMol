@@ -25,7 +25,7 @@
 
 #define NOT_AN_ELEMENT -1
 
-#define VALENCE_NOT_DEFINED -5
+inline constexpr int kValenceNotDefined = -5;
 
 // Isotopes are restricted to 32 bit unsigned values.
 using isotope_t = uint32_t;
@@ -61,7 +61,7 @@ class Element {
 
     int _permanent_aromatic;
 
-//  June 2016. Need some quick means of uniquely identifying elements.
+// Periodic IDs are atomic number + 1; custom IDs are assigned at construction.
 
     int _unique_id;
 
@@ -221,6 +221,7 @@ extern int  atomic_symbols_can_have_arbitrary_length();
 
 extern void set_display_strange_chemistry_messages(int);
 
+// Final cleanup only: invalidates all element pointers. Not for ordinary tools.
 extern void de_allocate_periodic_table();
 
 /*

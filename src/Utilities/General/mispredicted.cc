@@ -1179,7 +1179,7 @@ gather_predicted_data_continuous(iwstring_data_source& input, ID_to_Continuous_D
 {
   const_IWSubstring buffer;
   if (!input.next_record(buffer)) {
-    cerr << "Empty prediction file\n";
+    cerr << "Empty prediction file " << input.fname() << '\n';
     return fault_tolerant_mode;
   }
 

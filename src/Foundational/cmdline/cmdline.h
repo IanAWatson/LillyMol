@@ -110,7 +110,7 @@ Option_and_Value::value (T & rc) const
 
   if constexpr (std::is_floating_point_v<T>) {
     T parsed;
-    if (!tmp.numeric_value(parsed) || !std::isfinite(parsed)) {
+    if (!tmp.numeric_value(parsed)) {
       return 0;
     }
     rc = parsed;

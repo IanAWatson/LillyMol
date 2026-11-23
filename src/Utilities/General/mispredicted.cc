@@ -331,7 +331,7 @@ Entity_Continuous<T>::prediction_and_distance(const const_IWSubstring& sp,
 {
   T p;
   float d;
-  if (!sp.numeric_value(p) || !sd.numeric_value(d) || !std::isfinite(d) || d < 0.0f || d > 1.0f) {
+  if (!sp.numeric_value(p) || !sd.numeric_value(d) || d < 0.0f || d > 1.0f) {
     cerr << "Entity_Continuous::prediction_and_distance:invalid prediction '" << sp
          << "' and/or distance '" << sd << "'\n";
     return 0;

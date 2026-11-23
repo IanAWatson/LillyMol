@@ -5,6 +5,7 @@
 #include <string.h>
 
 #include <charconv>
+#include <cmath>
 #include <cstdint>
 #include <string>
 #include <type_traits>
@@ -1175,17 +1176,18 @@ iw_parse_numeric(const char* s, int nchars, double& result) {
     zsign = 1;
   }
 
-  result = 0.0;
-
-  int rc = iw_parse_numeric_pos(s, nchars, result);
-
-  if (0 == rc) {
+  double parsed = 0.0;
+  const int rc = iw_parse_numeric_pos(s, nchars, parsed);
+  if (rc == 0) {
+    return 0;
+  }
+  // Exponent or mantissa overflow must not turn numeric input into infinity
+  // or NaN. Leave the caller's value unchanged on failure.
+  if (!std::isfinite(parsed)) [[unlikely]] {
     return 0;
   }
 
-  if (zsign < 0) {
-    result = -result;
-  }
+  result = zsign < 0 ? -parsed : parsed;
 
   return rc;
 }
@@ -1313,10 +1315,15 @@ IWString::is_double(double& result) const {
 int
 IWString::numeric_value(float& result) const {
 #ifdef USE_FAST_FLOAT
-  auto conv = fast_float::from_chars(_things, _things + _number_elements, result);
+  float parsed;
+  auto conv = fast_float::from_chars(_things, _things + _number_elements, parsed);
   if (conv.ec != std::errc()) {
     return 0;
   }
+  if (!std::isfinite(parsed)) [[unlikely]] {
+    return 0;
+  }
+  result = parsed;
   return 1;
 #endif
   double tmp;
@@ -1328,7 +1335,7 @@ IWString::numeric_value(float& result) const {
   // Check for overflow.
   static const double maxfloat = static_cast<double>(std::numeric_limits<float>::max());
 
-  if (fabs(tmp) > maxfloat) {
+  if (fabs(tmp) > maxfloat) [[unlikely]] {
     return 0;
   }
 
@@ -1340,10 +1347,15 @@ IWString::numeric_value(float& result) const {
 int
 IWString::numeric_value(double& result) const {
 #ifdef USE_FAST_FLOAT
-  auto conv = fast_float::from_chars(_things, _things + _number_elements, result);
+  double parsed;
+  auto conv = fast_float::from_chars(_things, _things + _number_elements, parsed);
   if (conv.ec != std::errc()) {
     return 0;
   }
+  if (!std::isfinite(parsed)) [[unlikely]] {
+    return 0;
+  }
+  result = parsed;
   return 1;
 #endif
   return iw_parse_numeric(_things, _number_elements, result);
@@ -2421,7 +2433,7 @@ const_IWSubstring::numeric_value(float& result) const {
 
   static const double maxfloat = static_cast<double>(std::numeric_limits<float>::max());
 
-  if (fabs(tmp) > maxfloat) {
+  if (fabs(tmp) > maxfloat) [[unlikely]] {
     return 0;
   }
 

@@ -152,6 +152,7 @@ class const_IWSubstring
     int numeric_value (int &) const;
     int numeric_value (unsigned int &) const;
     int numeric_value (long &) const;
+    // Floating conversions accept only finite values; failure leaves the output unchanged.
     int numeric_value (float &) const;
     int numeric_value (double &) const;
     int numeric_value (long long &) const;
@@ -531,6 +532,7 @@ class IWString : public resizable_array<char>
     int numeric_value (int &) const;
     int numeric_value (unsigned int &) const;
     int numeric_value (long &) const;
+    // Floating conversions accept only finite values; failure leaves the output unchanged.
     int numeric_value (float &) const;
     int numeric_value (double &) const;
     int numeric_value (long long &) const;

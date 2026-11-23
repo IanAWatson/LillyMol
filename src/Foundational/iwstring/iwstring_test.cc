@@ -2215,3 +2215,68 @@ TEST(FreeIsInt, CStringTokenBehavior) {
   EXPECT_EQ(is_int("12", nullptr), 0);
 }
 }  // namespace
+
+namespace {
+template <typename T>
+class FloatingNumericConversion : public testing::Test {};
+using FloatingNumericTypes = testing::Types<float, double>;
+TYPED_TEST_SUITE(FloatingNumericConversion, FloatingNumericTypes);
+
+TYPED_TEST(FloatingNumericConversion, RejectsNonFiniteAndPreservesOutput) {
+  for (const char* text : {"inf", "+inf", "-inf", "INF", "infinity", "-infinity",
+                           "nan", "NaN", "nan(1)", "1e999", "-1e999", "0e999",
+                           "-0e999", "1.0e999"}) {
+    const IWString owned(text);
+    const const_IWSubstring view(owned);
+    TypeParam value = 17;
+    EXPECT_EQ(owned.numeric_value(value), 0) << text;
+    EXPECT_EQ(value, static_cast<TypeParam>(17)) << text;
+    EXPECT_EQ(view.numeric_value(value), 0) << text;
+    EXPECT_EQ(value, static_cast<TypeParam>(17)) << text;
+  }
+}
+
+TYPED_TEST(FloatingNumericConversion, AcceptsFiniteValues) {
+  for (const char* text : {"0", "-0", "1.25", "-1.25", "1e20", "1e-20"}) {
+    const IWString owned(text);
+    const const_IWSubstring view(owned);
+    TypeParam a = 17, b = 17;
+    ASSERT_NE(owned.numeric_value(a), 0) << text;
+    ASSERT_NE(view.numeric_value(b), 0) << text;
+    EXPECT_EQ(a, b) << text;
+  }
+}
+
+TYPED_TEST(FloatingNumericConversion, UnderflowRetainsExistingZeroBehavior) {
+  const IWString owned("1e-999");
+  const const_IWSubstring view(owned);
+  TypeParam value = 17;
+  ASSERT_NE(owned.numeric_value(value), 0);
+  EXPECT_EQ(value, 0);
+  value = 17;
+  ASSERT_NE(view.numeric_value(value), 0);
+  EXPECT_EQ(value, 0);
+}
+
+TEST(FloatingNumericConversionBoundaries, FloatOverflowAndFiniteDouble) {
+  const IWString owned("1e39");
+  const const_IWSubstring view(owned);
+  float value = 17;
+  EXPECT_EQ(owned.numeric_value(value), 0);
+  EXPECT_EQ(value, 17);
+  EXPECT_EQ(view.numeric_value(value), 0);
+  EXPECT_EQ(value, 17);
+  double large;
+  EXPECT_NE(owned.numeric_value(large), 0);
+  EXPECT_NE(view.numeric_value(large), 0);
+}
+
+TEST(FloatingNumericConversionBoundaries, OwningStringMantissaOverflow) {
+  // Substrings have an existing 25-character limit; owning strings do not.
+  IWString text;
+  text.append(400, '9');
+  double value = 17;
+  EXPECT_EQ(text.numeric_value(value), 0);
+  EXPECT_EQ(value, 17);
+}
+}  // namespace

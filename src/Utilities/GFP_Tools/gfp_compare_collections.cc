@@ -610,7 +610,7 @@ Options::WriteDistribution() {
   for (IWString* input : {&_reference_fname, &_query_fname}) {
     const auto same = iwmisc::SameFile(fname, *input);
     if (!same) {
-      cerr << "Cannot compare file paths\n";
+      cerr << "Cannot compare file paths '" << fname << "' and '" << *input << '\n';
       return 0;
     }
     if (*same) {

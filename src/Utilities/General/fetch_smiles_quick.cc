@@ -5,10 +5,13 @@
 #include <stdlib.h>
 
 #include <fstream>
+#include <limits>
+#include <vector>
 
 #include "Foundational/cmdline/cmdline.h"
 #include "Foundational/data_source/iwstring_data_source.h"
 #include "Foundational/iwmisc/iwre2.h"
+#include "Foundational/iwmisc/misc.h"
 #include "Foundational/iwstring/iw_stl_hash_map.h"
 #include "Foundational/iwstring/iw_stl_hash_set.h"
 
@@ -55,10 +58,65 @@ static int identifier_file_is_descriptor_file = 0;
 static char identifier_file_column_separator = ' ';
 static char smiles_file_column_separator = ' ';
 
-static int flush_output = 0;
 
 // Useful for fetching things out of textproto files.
 static int tokens_are_quoted = 0;
+
+struct OutputFiles {
+  IWString _selected;  // Empty in normal mode, where selected records use stdout.
+  IWString _unrequested;
+  IWString _missing;
+};
+
+static bool
+FlushIfNeeded(IWString_and_File_Descriptor& output) {
+  const bool ok = output.write_if_buffer_holds_more_than(block_size) != 0;
+  if (!ok) {
+    cerr << "Error writing selected records\n";
+  }
+  return ok;
+}
+
+static bool
+FinishBufferedOutput(IWString_and_File_Descriptor& output, const char* name) {
+  if (!output.is_open()) {
+    return true;
+  }
+  if (!output.close()) {
+    cerr << "Error closing output '" << name << "'\n";
+    return false;
+  }
+  return true;
+}
+
+static bool
+FinishSideOutput(std::ofstream& output, const char* label) {
+  if (!output.is_open()) {
+    return true;
+  }
+  output.close();
+  if (!output.good()) {
+    cerr << "Error closing " << label << " output\n";
+    return false;
+  }
+  return true;
+}
+
+static bool
+FinishOutputs(IWString_and_File_Descriptor& output) {
+  bool ok = output.flush() != 0;  // stdout is borrowed, so do not close it here.
+  if (!ok) {
+    cerr << "Error flushing selected output\n";
+  }
+  if (!FinishSideOutput(stream_for_not_in_identifier_file, "unrequested (-X)")) {
+    ok = false;
+  }
+  if (!FinishSideOutput(stream_for_not_in_smiles_file, "missing (-Y)")) {
+    ok = false;
+  }
+  return ok;
+}
+
 
 static void
 usage(int rc) {
@@ -90,7 +148,6 @@ usage(int rc) {
   cerr << " -j             identifier file is descriptor file, skip header record\n";
   cerr << " -b             stop processing identifier file on error, but continue processing (dangerous)\n";
   cerr << " -f             do not fail if a specified column is not present in either the identifier file or smiles file\n";
-  cerr << " -h             flush output after each molecule written\n";
   cerr << " -i <char>      column separator in identifier file\n";
   cerr << " -I <char>      column separator in smiles file\n";
   cerr << " -S <stem>      first files are identifier files, last is haystack. Create many subsets\n";
@@ -229,7 +286,11 @@ read_identifiers_to_fetch(iwstring_data_source& input,
     }
   }
 
-  return identifiers_to_fetch.size();
+  if (!input.good()) {
+    cerr << "Error reading identifier file '" << input.fname() << "'\n";
+    return 0;
+  }
+  return !identifiers_to_fetch.empty();
 }
 
 // `translate_tabs` should be set when the caller has not specified a column
@@ -261,8 +322,12 @@ handle_record_not_in_identifier_file(const const_IWSubstring& buffer,
 
   not_in_identifier_file++;
 
-  if (stream_for_not_in_identifier_file.rdbuf()->is_open()) {
+  if (stream_for_not_in_identifier_file.is_open()) {
     stream_for_not_in_identifier_file << buffer << '\n';
+    if (!stream_for_not_in_identifier_file.good()) {
+      cerr << "Error writing unrequested output (-X)\n";
+      return 0;
+    }
   }
 
   return 1;
@@ -386,13 +451,19 @@ fetch_smiles_quick(iwstring_data_source& input,
       return 0;
     }
 
-    output.write_if_buffer_holds_more_than(block_size);
+    if (!FlushIfNeeded(output)) {
+      return 0;
+    }
 
     if (0 == identifiers_to_fetch.size()) {
       return 1;
     }
   }
 
+  if (!input.good()) {
+    cerr << "Error reading smiles file '" << input.fname() << "'\n";
+    return 0;
+  }
   return 1;
 }
 
@@ -422,10 +493,8 @@ fetch_smiles_quick_multiple_files(iwstring_data_source& input,
     const auto f = file_contents.find(id);
     if (f != file_contents.end()) {
       output << (*f).second;
-      if (flush_output) {
-        output.flush();
-      } else {
-        output.write_if_buffer_holds_more_than(block_size);
+      if (!FlushIfNeeded(output)) {
+        return 0;
       }
       if (fill_written_hash) {
         written.insert(id);
@@ -437,18 +506,28 @@ fetch_smiles_quick_multiple_files(iwstring_data_source& input,
 
     if (yout.is_open()) {
       yout << id << '\n';
-      yout.write_if_buffer_holds_more_than(block_size);
+      if (!yout.write_if_buffer_holds_more_than(block_size)) {
+        cerr << "Error writing subset missing output\n";
+        return 0;
+      }
     }
   }
 
+  if (!input.good()) {
+    cerr << "Error reading subset identifier file '" << input.fname() << "'\n";
+    return 0;
+  }
   if (xout.is_open()) {
-    for (auto c : file_contents) {
+    for (const auto& c : file_contents) {
       if (written.contains(c.first)) {
         continue;
       }
 
       xout << c.second;
-      xout.write_if_buffer_holds_more_than(block_size);
+      if (!xout.write_if_buffer_holds_more_than(block_size)) {
+        cerr << "Error writing subset unrequested output\n";
+        return 0;
+      }
     }
   }
 
@@ -496,7 +575,17 @@ fetch_smiles_quick_multiple_files(const char* ifile,
     return 0;
   }
 
-  return fetch_smiles_quick_multiple_files(input, file_contents, output, xout, yout);
+  bool ok = fetch_smiles_quick_multiple_files(input, file_contents, output, xout, yout);
+  if (!FinishBufferedOutput(output, ofile)) {
+    ok = false;
+  }
+  if (!FinishBufferedOutput(xout, xfile)) {
+    ok = false;
+  }
+  if (!FinishBufferedOutput(yout, yfile)) {
+    ok = false;
+  }
+  return ok;
 }
 
 static int
@@ -526,7 +615,11 @@ read_file_contents(iwstring_data_source& input, IW_STL_Hash_Map_String& file_con
     }
   }
 
-  return file_contents.size();
+  if (!input.good()) {
+    cerr << "Error reading subset haystack '" << input.fname() << "'\n";
+    return 0;
+  }
+  return !file_contents.empty();
 }
 
 static int
@@ -541,43 +634,24 @@ read_file_contents(const char* fname, IW_STL_Hash_Map_String& file_contents) {
   return read_file_contents(input, file_contents);
 }
 
-static void
-append_int_if_non_zero_length(const IWString& s, int ndx, IWString& zresult) {
-  if (s.length() > 0) {
-    zresult << s << ndx;
-  }
-
-  return;
-}
-
 static int
-fetch_smiles_quick_multiple_files(const Command_Line& cl, const IWString& stem,
-                                  int seq_begin, const IWString& suffix,
-                                  const IWString& xstem, const IWString& ystem) {
+fetch_smiles_quick_multiple_files(const Command_Line& cl,
+                                  const std::vector<OutputFiles>& outputs) {
   IW_STL_Hash_Map_String file_contents;
   if (!read_file_contents(cl.last_item(), file_contents)) {
     cerr << "fetch_smiles_quick_multiple_files:cannot read file contents '"
-         << (cl.number_elements() - 1) << "'\n";
+         << cl.last_item() << "'\n";
     return 0;
   }
-
-  for (auto i = 0; i < cl.number_elements() - 1; ++i) {
-    IWString stemi, xstemi, ystemi;
-    append_int_if_non_zero_length(stem, i + seq_begin, stemi);
-    if (suffix.length()) {
-      stemi << suffix;
-    }
-    append_int_if_non_zero_length(xstem, i + seq_begin, xstemi);
-    append_int_if_non_zero_length(ystem, i + seq_begin, ystemi);
-
-    if (!fetch_smiles_quick_multiple_files(
-            cl[i], file_contents, stemi.null_terminated_chars(),
-            xstemi.null_terminated_chars(), ystemi.null_terminated_chars())) {
+  for (int i = 0; i < cl.number_elements() - 1; ++i) {
+    const OutputFiles& files = outputs[i];
+    if (!fetch_smiles_quick_multiple_files(cl[i], file_contents,
+            files._selected.AsString().c_str(), files._unrequested.AsString().c_str(),
+            files._missing.AsString().c_str())) {
       cerr << "Cannot process fetching from '" << cl[i] << "'\n";
       return 0;
     }
   }
-
   return 1;
 }
 
@@ -618,9 +692,78 @@ determine_inter_column_separator(const Command_Line& cl, const char flag, char& 
   return 1;
 }
 
+// Check all input and output identities before opening any output. -F is an
+// input too, even though it is not one of the positional arguments.
+static bool
+CheckOutputNames(const Command_Line& cl, const std::vector<OutputFiles>& outputs) {
+  std::vector<IWString> inputs;
+  for (const char* input : cl) {
+    if (const_IWSubstring(input) != "-") {
+      inputs.emplace_back(input);
+    }
+  }
+  if (cl.option_present('F') && cl.string_value('F') != "-") {
+    inputs.push_back(cl.string_value('F'));
+  }
+  // Text readers expand environment variables; gzip readers use literal names.
+  for (IWString& input : inputs) {
+    if (!input.ends_with(".gz")) {
+      if (auto expanded = input.ExpandEnvironmentVariables()) {
+        input = *expanded;
+      }
+    }
+  }
+  std::vector<IWString> previous;
+  for (const OutputFiles& files : outputs) {
+    for (const IWString* name : {&files._selected, &files._unrequested, &files._missing}) {
+      if (name->empty()) {  // An optional output was not requested.
+        continue;
+      }
+      IWString path(*name);
+      // Match buffered text output filename handling. Gzip outputs and
+      // normal-mode ofstreams use literal names instead.
+      if (!files._selected.empty() && !path.ends_with(".gz")) {
+        if (path.length() > 2 && path.starts_with(">>")) {
+          path.remove_leading_chars(2);
+        }
+        if (auto expanded = path.ExpandEnvironmentVariables()) {
+          path = *expanded;
+        }
+      }
+      for (const IWString& input : inputs) {
+        std::error_code error;
+        const auto same = iwmisc::SameFile(path, input, error);
+        if (!same) {
+          cerr << "Cannot compare output '" << *name << "' with input '" << input
+               << "': " << error.message() << '\n';
+          return false;
+        }
+        if (*same) {
+          cerr << "Cannot overwrite input '" << input << "' with output '" << *name << "'\n";
+          return false;
+        }
+      }
+      for (const IWString& other : previous) {
+        std::error_code error;
+        const auto same = iwmisc::SameFile(path, other, error);
+        if (!same || *same) {
+          cerr << "Conflicting output files '" << *name << "' and '" << other << "'";
+          if (error) {
+            cerr << ": " << error.message();
+          }
+          cerr << '\n';
+          return false;
+        }
+      }
+      previous.push_back(path);
+    }
+  }
+  return true;
+}
+
 static int
 fetch_smiles_quick(int argc, char** argv) {
-  Command_Line cl(argc, argv, "vc:C:X:Y:wkdzB:an:xF:qbjK:S:u:g:fi:I:he");
+  Command_Line cl(argc, argv, "vc:C:X:Y:wkdzB:an:xF:qbjK:S:u:g:fi:I:e");
 
   if (cl.unrecognised_options_encountered()) {
     cerr << "Unrecognised options encountered\n";
@@ -873,91 +1016,72 @@ fetch_smiles_quick(int argc, char** argv) {
     }
   }
 
-  if (cl.option_present('h')) {
-    flush_output = 1;
-    if (verbose) {
-      cerr << "Will flush output after each molecule found\n";
+  for (char flag : {'X', 'Y', 'S'}) {
+    if (cl.option_count(flag) > 1 ||
+        (cl.option_present(flag) && cl.string_value(flag).empty())) {
+      cerr << "Specify one non-empty filename or stem for -" << flag << '\n';
+      return 1;
     }
   }
-
-  IWString stem;
   if (cl.option_present('S')) {
-    cl.value('S', stem);
-
-    if (verbose) {
-      cerr << "Files formed from stem '" << stem << "'\n";
+    if (cl.size() < 2) {
+      cerr << "Subset mode requires an identifier file and a haystack\n";
+      return 1;
     }
-
-    IWString xstem, ystem;
-    if (cl.option_present('X')) {
-      cl.value('X', xstem);
-    }
-    if (cl.option_present('Y')) {
-      cl.value('Y', ystem);
-    }
-
-    IWString suffix;
-    if (cl.option_present('u')) {
-      cl.value('u', suffix);
-    }
-
+    const IWString stem = cl.string_value('S');
+    const IWString xstem = cl.string_value('X');
+    const IWString ystem = cl.string_value('Y');
+    const IWString suffix = cl.string_value('u');
     int seq_begin = 0;
-    if (cl.option_present('g')) {
-      cl.value('g', seq_begin);
+    if (cl.option_present('g') && (!cl.value('g', seq_begin) || seq_begin < 0)) {
+      cerr << "The starting subset index (-g) must be a non-negative integer\n";
+      return 1;
     }
-
-    if (!fetch_smiles_quick_multiple_files(cl, stem, seq_begin, suffix, xstem, ystem)) {
-      return 2;
+    if (cl.number_elements() - 2 > std::numeric_limits<int>::max() - seq_begin) {
+      cerr << "Subset file indices exceed the supported range\n";
+      return 1;
     }
-
-    return 0;
+    std::vector<OutputFiles> outputs(cl.number_elements() - 1);
+    for (int i = 0; i < cl.number_elements() - 1; ++i) {
+      outputs[i]._selected << stem << (seq_begin + i) << suffix;
+      if (!xstem.empty()) {
+        outputs[i]._unrequested << xstem << (seq_begin + i);
+      }
+      if (!ystem.empty()) {
+        outputs[i]._missing << ystem << (seq_begin + i);
+      }
+    }
+    if (!CheckOutputNames(cl, outputs)) {
+      return 1;
+    }
+    return fetch_smiles_quick_multiple_files(cl, outputs) ? 0 : 2;
   }
 
+  OutputFiles files;
   if (cl.option_present('X')) {
-    IWString fname = cl.string_value('X');
-    if (write_stream_for_not_in_smiles_as_smiles && !fname.ends_with(".smi")) {
-      fname << ".smi";
-    }
-
-    if (fname == cl[0] || fname == cl[1]) {
-      cerr << "Cannot overwrite input file(s) '" << fname << "' (-X)\n";
-      return 1;
-    }
-
-    stream_for_not_in_identifier_file.open(fname.null_terminated_chars(), std::ios::out);
-
-    if (!stream_for_not_in_identifier_file.good()) {
-      cerr << "Cannot open stream for not in identifier file (-X option), '" << fname
-           << "'\n";
-      return 4;
-    }
-
-    if (verbose) {
-      cerr << "Smiles not in identifier file written to '" << fname << "'\n";
+    files._unrequested = cl.string_value('X');
+  }
+  if (cl.option_present('Y')) {
+    files._missing = cl.string_value('Y');
+    if (write_stream_for_not_in_smiles_as_smiles) {
+      files._missing.EnsureEndsWith(".smi");
     }
   }
-
-  if (cl.option_present('Y')) {
-    IWString fname = cl.string_value('Y');
-    if (write_stream_for_not_in_smiles_as_smiles && !fname.ends_with(".smi")) {
-      fname << ".smi";
-    }
-
-    if (fname == cl[0] || fname == cl[1]) {
-      cerr << "Cannot overwrite input file(s) '" << fname << "' (-Y)\n";
-      return 1;
-    }
-
-    stream_for_not_in_smiles_file.open(fname.null_terminated_chars(), std::ios::out);
-
-    if (!stream_for_not_in_smiles_file.good()) {
-      cerr << "Cannot open stream for not in smiles file (-Y option), '" << fname
-           << "'\n";
+  if (!CheckOutputNames(cl, {files})) {
+    return 1;
+  }
+  if (!files._unrequested.empty()) {
+    stream_for_not_in_identifier_file.open(files._unrequested.AsString());
+    if (!stream_for_not_in_identifier_file.good()) {
+      cerr << "Cannot open unrequested output '" << files._unrequested << "'\n";
       return 4;
     }
-
-    if (verbose) {
-      cerr << "Identifiers not in smiles file written to '" << fname << "'\n";
+  }
+  if (!files._missing.empty()) {
+    stream_for_not_in_smiles_file.open(files._missing.AsString());
+    if (!stream_for_not_in_smiles_file.good()) {
+      cerr << "Cannot open missing output '" << files._missing << "'\n";
+      return 4;
     }
   }
 
@@ -967,12 +1091,10 @@ fetch_smiles_quick(int argc, char** argv) {
   for (int i = clstart; i < cl.number_elements(); i++) {
     if (!fetch_smiles_quick(cl[i], identifiers_to_fetch, output,
                             translate_tabs_in_smiles_file)) {
-      rc = i + 1;
+      rc = 1;
       break;
     }
   }
-
-  output.flush();
 
   if (0 == items_written) {
     cerr << "Warning, nothing written!\n";
@@ -989,7 +1111,7 @@ fetch_smiles_quick(int argc, char** argv) {
     }
   }
 
-  if (stream_for_not_in_smiles_file.rdbuf()->is_open() && identifiers_to_fetch.size()) {
+  if (stream_for_not_in_smiles_file.is_open() && identifiers_to_fetch.size()) {
     if (verbose) {
       cerr << identifiers_to_fetch.size() << " identifiers not in smiles file\n";
     }
@@ -1009,9 +1131,17 @@ fetch_smiles_quick(int argc, char** argv) {
         }
       }
       stream_for_not_in_smiles_file << '\n';
+      if (!stream_for_not_in_smiles_file.good()) {
+        cerr << "Error writing missing output (-Y)\n";
+        rc = 1;
+        break;
+      }
     }
   }
 
+  if (!FinishOutputs(output)) {
+    rc = 1;
+  }
   return rc;
 }
 

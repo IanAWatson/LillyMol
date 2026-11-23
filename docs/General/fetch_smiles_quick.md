@@ -109,3 +109,16 @@ Suffix for -S files created.
 
 ## -g \<ndx\>
 Start number for files created (-g 1 for dopattern).
+
+## File handling and failures
+
+Named outputs must differ from every input and from one another. Checks include
+relative/absolute aliases, symlinks, hard links, and an identifier file supplied
+via `-F`. With `-S`, all generated subset, `-X`, and `-Y` filenames are checked
+before any output is opened. `-g` must be a non-negative integer and generated
+indices must fit in an integer.
+
+`-w` adds `.smi` to the `-Y` filename in normal mode; it does not change the
+`-X` filename. Input read errors and output write, flush, or close failures
+return a nonzero exit status. The explicit `-b` option can still allow the
+prefix of an incompletely read identifier file to be used.

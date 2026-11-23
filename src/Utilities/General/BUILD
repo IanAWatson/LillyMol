@@ -1085,3 +1085,11 @@ py_test(
     args = ["$(location :tcount)"],
     data = [":tcount"],
 )
+
+py_test(
+    name = "fetch_smiles_quick_cli_test",
+    size = "small",
+    srcs = ["fetch_smiles_quick_cli_test.py"],
+    args = ["$(location :fetch_smiles_quick)"],
+    data = [":fetch_smiles_quick"],
+)

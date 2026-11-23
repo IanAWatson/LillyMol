@@ -331,13 +331,14 @@ Entity_Continuous<T>::prediction_and_distance(const const_IWSubstring& sp,
 {
   T p;
   float d;
-  if (!sp.numeric_value(p) || !sd.numeric_value(d) || d < 0.0f || d > 1.0f) {
+  if (!sp.numeric_value(p) || !sd.numeric_value(d) || !std::isfinite(d) || d < 0.0f || d > 1.0f) {
     cerr << "Entity_Continuous::prediction_and_distance:invalid prediction '" << sp
          << "' and/or distance '" << sd << "'\n";
     return 0;
   }
 
   predicted_as(p);
+  SetNearestDistance(d);
 
   return 1;
 }
@@ -533,7 +534,7 @@ Continuous errors default to mean absolute error, including with -w and -W.
  -N <fname>     nearest-neighbour NearNeighbours TFDataRecord file
  -N indexed     read NearNeighboursIndices instead; use with -N <fname>
  -d             write a headered table (continuous: ID EXPT AVDIFF)
- -k             input files were produced by svmfp_evaluate with the -c option (dist to SV)
+ -k def         read distance to training set after prediction (also accepts default)
  -D <fname>     distance/error output (not implemented)
  -Y <fname>     continuous summary: ID Expt N minpred maxpred avepred avediff maxdiff stddiff
  -R <regex>     process all files that match <regex> in current directory
@@ -1426,7 +1427,7 @@ CheckOutputFiles(const Command_Line& cl, const std::vector<IWString>& regex_inpu
 static int
 Mispredicted(int argc, char** argv)
 {
-  Command_Line cl(argc, argv, "vgCE:e:p:c:Fsw:W:dbY:R:kX:rS:hT:D:n:N:");
+  Command_Line cl(argc, argv, "vgCE:e:p:c:Fsw:W:dbY:R:k:X:rS:hT:D:n:N:");
 
   if (cl.unrecognised_options_encountered()) {
     cerr << "Unrecognised options encountered\n";
@@ -1437,7 +1438,7 @@ Mispredicted(int argc, char** argv)
   const bool classification = cl.option_present('C') || cl.option_present('X') ||
                               cl.option_present('c');
   if (classification) {
-    for (char flag : {'w', 'W', 'Y', 'T'}) {
+    for (char flag : {'w', 'W', 'Y', 'T', 'k'}) {
       if (cl.option_present(flag)) {
         cerr << "-" << flag << " is not supported for classification\n";
         return 1;
@@ -1550,6 +1551,15 @@ Mispredicted(int argc, char** argv)
   }
 
   if (cl.option_present('k')) {
+    const IWString format = cl.string_value('k');
+    if (cl.option_count('k') != 1 || (format != "def" && format != "default")) {
+      cerr << "The -k format must be 'def' or 'default'\n";
+      return 1;
+    }
+    if (cl.option_present('N')) {
+      cerr << "Cannot combine prediction distances (-k) with neighbour data (-N)\n";
+      return 1;
+    }
     data_includes_distance_to_support_vector = 1;
 
     if (verbose) {
@@ -1669,7 +1679,7 @@ Mispredicted(int argc, char** argv)
     } else {
       output << "ID EXPT AVDIFF";
     }
-    if (neighbours) output << " NN_DIST";
+    if (neighbours || data_includes_distance_to_support_vector) output << " NN_DIST";
     output << '\n';
   }
 
@@ -1691,7 +1701,7 @@ Mispredicted(int argc, char** argv)
     }
 
     stream_for_summary << "ID Expt N minpred maxpred avepred avediff maxdiff stddiff";
-    if (neighbours) stream_for_summary << " NN_DIST";
+    if (neighbours || data_includes_distance_to_support_vector) stream_for_summary << " NN_DIST";
     stream_for_summary << '\n';
   }
 

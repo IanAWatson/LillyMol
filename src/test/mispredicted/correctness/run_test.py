@@ -220,9 +220,34 @@ assert actual.stdout.splitlines() == ['ID EXPT N Correct Accuracy', 'a A 2 2 1',
 
 # Fault tolerance applies to records, not missing input lists.
 run(['-E', 'one_exp', '-F', 'one_pred', 'F:missing.list'], success=False)
-# -k validates the distance column without retaining unused per-record vectors.
+# -k retains the distance and reports it consistently in every continuous output.
 write('distance_pred', 'ID predicted distance\na 2 0.2\nb 1 0.5\nc 10 0.9\n')
-assert rows(run(['-E', 'exp', '-d', '-k', 'distance_pred'])) == {'a': 2, 'b': 1, 'c': 10}
+for fmt in ['def', 'default']:
+    result = run(['-E', 'exp', '-d', '-k', fmt, '-Y', 'distance_summary',
+                  '-T', 'distance_proto', 'distance_pred'])
+    lines = result.stdout.splitlines()
+    assert lines[0] == 'ID EXPT AVDIFF NN_DIST', result.stdout
+    observed = {f[0]: (float(f[2]), float(f[3])) for f in map(str.split, lines[1:])}
+    assert observed == {'a': (2, .2), 'b': (1, .5), 'c': (10, .9)}, observed
+    summary = Path('distance_summary').read_text().splitlines()
+    assert summary[0].endswith(' NN_DIST'), summary
+    assert {f[0]: float(f[-1]) for f in map(str.split, summary[1:])} == {'a': .2, 'b': .5, 'c': .9}
+    proto = Path('distance_proto.textproto').read_text()
+    assert proto.count('nearest_neighbour_distance:') == 3, proto
+result = run(['-E', 'exp', '-k', 'def', 'distance_pred'])
+assert ' NN_DIST 0.2' in result.stdout, result.stdout
+write('distance_later', 'ID predicted distance\na 4 0.7\n')
+result = run(['-E', 'exp', '-d', '-k', 'def', 'distance_pred', 'distance_later'])
+assert any(line.split()[0] == 'a' and float(line.split()[-1]) == .7
+           for line in result.stdout.splitlines()[1:]), result.stdout
+for distance in ['bad', '-0.1', '1.1', 'nan', 'inf']:
+    write('invalid_distance', f'ID predicted distance\na 2 {distance}\n')
+    run(['-E', 'exp', '-k', 'def', 'invalid_distance'], success=False)
+write('missing_distance', 'ID predicted distance\na 2\n')
+run(['-E', 'exp', '-k', 'def', 'missing_distance'], success=False)
+run(['-E', 'exp', '-k', 'other', 'distance_pred'], success=False)
+run(['-E', 'exp', '-k', 'distance_pred'], success=False)
+run(['-C', '-E', 'exp', '-k', 'def', 'distance_pred'], success=False)
 
 # /dev/full provides deterministic write failures on systems which have it.
 if Path('/dev/full').exists():

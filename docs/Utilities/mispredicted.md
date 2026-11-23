@@ -218,10 +218,15 @@ SMILES and a diagnostic on stderr.
 
 ## Support-vector distance options
 
-`-k` reads and validates an additional distance column immediately after the
-selected prediction column, in the range 0 to 1. Distances currently do not affect
-ranking or appear in output, and are not retained after validation. The `-D`
-distance/error output option is not implemented and is rejected.
+`-k def` (or `-k default`) reads a distance to the training set immediately
+following the selected prediction column. The distance must be finite and in
+[0, 1]. It is retained as `NN_DIST` in descriptive, tabular and summary output,
+and as `nearest_neighbour_distance` in textproto output. It does not affect
+ranking. If an identifier occurs more than once, its last valid record supplies
+the distance. This option is only supported for continuous predictions and
+cannot be combined with `-N`. Other format names are rejected.
+
+The `-D` distance/error output option is not implemented and is rejected.
 
 Summary and textproto write failures, including final buffer flush failures,
 produce a nonzero exit status. Standard deviation is the sample standard

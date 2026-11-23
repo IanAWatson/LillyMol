@@ -25,6 +25,10 @@ class SameFileTest : public testing::Test {
     EXPECT_EQ(iwmisc::SameFile(IWString(a.string()), IWString(b.string()), error), expected);
     EXPECT_FALSE(error) << error.message();
     EXPECT_EQ(iwmisc::SameFile(IWString(a.string()), IWString(b.string())), expected);
+    error = std::make_error_code(std::errc::invalid_argument);
+    EXPECT_EQ(iwmisc::SameFile(IWString(b.string()), IWString(a.string()), error), expected);
+    EXPECT_FALSE(error) << error.message();
+    EXPECT_EQ(iwmisc::SameFile(IWString(b.string()), IWString(a.string())), expected);
   }
 };
 
@@ -53,6 +57,31 @@ TEST_F(SameFileTest, MissingBasenameAgainstAbsolutePath) {
 TEST_F(SameFileTest, ExistingAndNewFilesDiffer) {
   Check(_directory / "first", _directory / "new", false);
   Check(_directory / "new", _directory / "first", false);
+}
+
+TEST_F(SameFileTest, TwoMissingOutputs) {
+  Check(_directory / "output_one", _directory / "output_two", false);
+  Check(_directory / "output_one", _directory / "output_one", true);
+}
+
+TEST_F(SameFileTest, ExistingInputAndMissingOutputParent) {
+  Check(_directory / "first", _directory / "new_parent" / "output", false);
+}
+
+TEST_F(SameFileTest, MissingOutputsUnderMissingParents) {
+  Check(_directory / "new_parent" / "output", _directory / "new_parent" / "." / "output", true);
+  Check(_directory / "new_parent" / "one", _directory / "new_parent" / "two", false);
+}
+
+TEST_F(SameFileTest, MissingOutputDoesNotHideErrorInOtherPath) {
+  fs::create_symlink("loop", _directory / "loop");
+  const IWString missing((_directory / "missing").string());
+  const IWString invalid((_directory / "loop").string());
+  std::error_code error;
+  EXPECT_EQ(iwmisc::SameFile(missing, invalid, error), std::nullopt);
+  EXPECT_TRUE(error);
+  EXPECT_EQ(iwmisc::SameFile(invalid, missing, error), std::nullopt);
+  EXPECT_TRUE(error);
 }
 
 TEST_F(SameFileTest, HardLink) {

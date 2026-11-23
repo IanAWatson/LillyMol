@@ -17,14 +17,26 @@ SameFile(const IWString& lhs, const IWString& rhs, std::error_code& error) {
   }
   const fs::path a(std::string(lhs.data(), lhs.length()));
   const fs::path b(std::string(rhs.data(), rhs.length()));
-  if (fs::equivalent(a, b, error)) {
-    return true;
-  }
-  // A missing file is expected when comparing proposed output names.
+  // equivalent() reports missing files differently across standard libraries;
+  // libc++ can use "operation not supported" instead of ENOENT. Determine
+  // existence with status() first, retaining errors other than missing paths.
+  const fs::file_status status_a = fs::status(a, error);
   if (error && error != std::errc::no_such_file_or_directory) {
     return std::nullopt;
   }
   error.clear();
+  const fs::file_status status_b = fs::status(b, error);
+  if (error && error != std::errc::no_such_file_or_directory) {
+    return std::nullopt;
+  }
+  error.clear();
+  if (fs::exists(status_a) && fs::exists(status_b)) {
+    const bool same = fs::equivalent(a, b, error);
+    if (error) {
+      return std::nullopt;
+    }
+    return same;
+  }
   const auto absolute_a = fs::absolute(a, error);
   if (error) {
     return std::nullopt;

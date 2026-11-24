@@ -3,12 +3,16 @@
   "test": [
     {
       "name": "case_1",
-      "preamble": [
-      ],
+      "preamble": [],
       "args": [
-           "-c 3 -y space -j #{indir}/input.txt"
+        "-c 3 -y space -j #{indir}/input.txt"
       ]
+    },
+    {
+      "name": "correctness",
+      "shell_script": {
+        "script_name": "run_test.py"
+      }
     }
-
   ]
 }

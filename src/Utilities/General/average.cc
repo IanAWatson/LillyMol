@@ -7,6 +7,7 @@
 
 #include <algorithm>
 #include <iostream>
+#include <limits>
 #include <optional>
 #include <random>
 
@@ -110,11 +111,13 @@ usage(int rc) {
   cerr << " -k             ignore otherwise bad data\n";
   cerr << " -a             take absolute value of all input values\n";
   cerr << " -e <pct>       percentile values to compute\n";
-  cerr << " -r <number>    if using percentiles, only keep <number> values\n";
+  cerr << " -r <number>    if using percentiles, sample at most <number> values (not with -h)\n";
   cerr << " -h <col>       column <col> (number or id) contains prevalence values for "
           "values in -c col\n";
+  cerr << "                weighted percentiles store one value/count pair per row\n";
   cerr << " -h mult=<x>    prevalence values should be integer. If not, specify "
           "multiplier to convert to int\n";
+  cerr << "                named prevalence columns require a header (-j, -d or -s)\n";
   cerr << " -q             header record may contain quoted variable names\n";
   cerr << " -y <sting>     used delimiter in the file ie. tab, space\n";
   cerr << " -v             verbose output\n";
@@ -142,23 +145,30 @@ static int skip_first_records = 0;
 
 static int is_descriptor_file = 1;
 
+// Keep one entry per input row rather than expanding prevalence copies.
+struct PercentileValue {
+  float _value;
+  int _prevalence;
+};
+
 class AColumn : public Accumulator<double> {
  private:
   IWString _name;
 
   uint32_t _number_missing_values;
   uint32_t _non_numeric_data;
-  uint32_t _number_instances_special_value;
+  uint64_t _number_instances_special_value;
 
-  resizable_array<float> _raw_values;
+  resizable_array<PercentileValue> _raw_values;
 
   std::mt19937_64 _rng;
-  std::uniform_real_distribution<double> _uniform_01;
-  std::uniform_int_distribution<uint32_t> _uniform_nraw;
+  // Number of observations offered to the percentile reservoir.
+  uint64_t _raw_values_seen;
 
   //  private functions
 
-  void _add_to_raw_values(float f);
+  void _add_to_raw_values(float f, int prevalence);
+  float _percentile(percentile_t p, uint64_t population) const;
 
  public:
   AColumn();
@@ -186,13 +196,13 @@ class AColumn : public Accumulator<double> {
 };
 
 AColumn::AColumn()
-    : _rng(rd()), _uniform_01(0.0, 1.0), _uniform_nraw(0, value_buffer_size) {
+    : _rng(rd()), _raw_values_seen(0) {
   _number_missing_values = 0;
   _non_numeric_data = 0;
   _number_instances_special_value = 0;
 
-  if (value_buffer_size > 0) {
-    _raw_values.reserve(20000);  // hopefully cover many cases.
+  if (!percentiles.empty()) {
+    _raw_values.reserve(std::min(value_buffer_size, uint32_t{20000}));
   }
 
   return;
@@ -220,7 +230,7 @@ AColumn::extra(const_IWSubstring& token, const int prevalence) {
 #endif
   {
     if (special_number && f == *special_number) {
-      _number_instances_special_value++;
+      _number_instances_special_value += prevalence;
     }
 
     if (take_absolute_value) {
@@ -228,14 +238,17 @@ AColumn::extra(const_IWSubstring& token, const int prevalence) {
     }
 
     if (percentiles.number_elements()) {
-      _add_to_raw_values(f);
+      _add_to_raw_values(f, prevalence);
     }
 
     if (prevalence_column >= 0) {
-      return Accumulator<double>::extra(f, prevalence);
+      Accumulator<double>::extra(f, prevalence);
     } else {
-      return Accumulator<double>::extra(f);
+      Accumulator<double>::extra(f);
     }
+    // extra() returns an unsigned int count, which can wrap even though the
+    // accumulator's internal observation count is 64 bits. This is success.
+    return 1;
   }
 
   if (missing_value == token || 0 == token.length()) {
@@ -254,31 +267,46 @@ AColumn::extra(const_IWSubstring& token, const int prevalence) {
 }
 
 void
-AColumn::_add_to_raw_values(float f) {
+AColumn::_add_to_raw_values(float f, int prevalence) {
+  ++_raw_values_seen;
   if (_raw_values.size() < value_buffer_size) {
-    _raw_values.add(f);
+    _raw_values.add(PercentileValue{f, prevalence});
     return;
   }
 
-  if (_uniform_01(_rng) > 0.01) {  // don't replace an existing value
-    return;
+  // Reservoir sampling: each observation has the same probability of being
+  // retained, regardless of its position in the input.
+  std::uniform_int_distribution<uint64_t> choose(0, _raw_values_seen - 1);
+  const uint64_t ndx = choose(_rng);
+  if (ndx < static_cast<uint64_t>(_raw_values.size())) {
+    _raw_values[static_cast<int>(ndx)] = PercentileValue{f, prevalence};
   }
-
-  int r = _uniform_nraw(_rng);
-
-  _raw_values[r] = f;
-
-  return;
 }
 
-// Not const because of the random number generator.
+// The nearest order statistic in the represented population. The entries must
+// be sorted by value; prevalence locates the rank without expanding any rows.
+float
+AColumn::_percentile(percentile_t p, uint64_t population) const {
+  const uint64_t rank = static_cast<uint64_t>(
+      static_cast<long double>(p) * (population - 1) / 100.0L + 0.5L);
+  uint64_t cumulative = 0;
+  for (const PercentileValue& entry : _raw_values) {
+    cumulative += entry._prevalence;
+    if (rank < cumulative) {
+      return entry._value;
+    }
+  }
+  return _raw_values.back()._value;
+}
+
+// Sorting the percentile observations modifies this column.
 int
 AColumn::Report(std::ostream& output) {
   if (_name.length() > 0) {
     output << _name << ' ';
   }
 
-  const uint32_t n = Accumulator<double>::n();
+  const uint64_t n = Accumulator<double>::n();
 
   if (0 == n) {
     output << "AColumn::report: no data\n";
@@ -286,7 +314,7 @@ AColumn::Report(std::ostream& output) {
   }
 
   const float ave = static_cast<float>(Accumulator<double>::average());
-  const float std = static_cast<float>(sqrt(Accumulator<double>::variance()));
+  const float std = n > 1 ? static_cast<float>(sqrt(Accumulator<double>::variance())) : 0.0f;
 
   output << n << " values";
 
@@ -323,16 +351,17 @@ AColumn::Report(std::ostream& output) {
     }
   }
 
-  if (_raw_values.number_elements() > 1) {
-    float* r = const_cast<float*>(_raw_values.rawdata());
-
+  if (!_raw_values.empty()) {
+    PercentileValue* r = _raw_values.rawdata();
     const int nraw = _raw_values.number_elements();
-
-    std::shuffle(r, r + nraw, _rng);
-    std::sort(r, r + nraw);
-    for (auto i = 0; i < percentiles.number_elements(); ++i) {
-      const auto p = percentiles[i];
-      output << ' ' << p << "% " << r[static_cast<int>(p * nraw / 100 + 0.4999)];
+    std::sort(r, r + nraw, [](const PercentileValue& lhs, const PercentileValue& rhs) {
+      return lhs._value < rhs._value;
+    });
+    // Unweighted reservoirs describe the retained sample. Weighted input is
+    // never sampled, so its cumulative prevalence is the full population.
+    const uint64_t population = prevalence_column >= 0 ? n : nraw;
+    for (percentile_t p : percentiles) {
+      output << ' ' << p << "% " << _percentile(p, population);
     }
   }
 
@@ -354,6 +383,8 @@ AColumn::Reset() {
   me.reset();
 
   _raw_values.resize_keep_storage(0);
+  _raw_values_seen = 0;
+  _name.resize_keep_storage(0);
 
   _number_missing_values = 0;
   _non_numeric_data = 0;
@@ -395,13 +426,9 @@ SetOfColumns::~SetOfColumns() {
 static int number_columns = 0;
 static AColumn* acolumn = nullptr;
 
-// If multiple files are processed, some things must be reset.
+// Reset observations between files, retaining command-line prevalence settings.
 void
 ResetFileScopeStaticParams() {
-  prevalence_column = -1;
-  prevalence_column_name.resize(0);
-  prevalence_multiplier = 1.0;
-
   for (int i = 0; i < number_columns; ++i) {
     acolumn[i].Reset();
   }
@@ -430,7 +457,12 @@ fetch_prevalence_value(const const_IWSubstring& buffer, const int prevalence_col
         return 0;
       }
 
-      prevalence = static_cast<int>(tmp * prevalence_multiplier + 0.4999);
+      const double rounded = tmp * prevalence_multiplier + 0.4999;
+      if (!std::isfinite(rounded) || rounded > std::numeric_limits<int>::max()) [[unlikely]] {
+        cerr << "Scaled prevalence is too large: '" << token << "'\n";
+        return 0;
+      }
+      prevalence = static_cast<int>(rounded);
     }
 
     return 1;
@@ -455,6 +487,11 @@ average(const const_IWSubstring& buffer) {
   if (prevalence_column >= 0) {
     if (!fetch_prevalence_value(buffer, prevalence_column, prevalence)) {
       return 0;
+    }
+    // This row represents no observations, including for percentile sampling
+    // and special-value counts. Do not pass an empty update to Accumulator.
+    if (prevalence == 0) {
+      return 1;
     }
   }
 
@@ -513,6 +550,10 @@ determine_descriptors_to_process(const const_IWSubstring& buffer) {
     return 0;
   }
 
+  // Descriptor positions belong to this file, not the previous header.
+  columns_to_process.resize_keep_storage(0);
+  highest_column_number_to_check = 0;
+  delete [] acolumn;
   number_columns = nw;
   acolumn = new AColumn[nw];
 
@@ -545,10 +586,6 @@ determine_descriptors_to_process(const const_IWSubstring& buffer) {
       if (verbose) {
         cerr << "Will process column " << (col + 1) << " descriptor '" << token << "'\n";
       }
-    }
-
-    if (token == prevalence_column_name) {
-      prevalence_column = col;
     }
 
     col++;
@@ -618,16 +655,56 @@ assign_column_names(extending_resizable_array<int>& columns_to_process,
   return 1;
 }
 
+// Resolve the requested name independently for each input header. Numerical
+// column specifications and the multiplier remain unchanged between files.
+static bool
+ResolvePrevalenceColumn(const const_IWSubstring& header) {
+  IWTokeniser tokens(header);
+  tokens.set_sep(word_delimeter);
+  tokens.set_quoted_tokens(quoted_tokens);
+  const_IWSubstring token;
+  int col = 0;
+  while (tokens.next_token(token)) {
+    if (token == prevalence_column_name) {
+      if (prevalence_column >= 0) {
+        cerr << "Ambiguous prevalence column '" << prevalence_column_name << "'\n";
+        return false;
+      }
+      prevalence_column = col;
+    }
+    ++col;
+  }
+  if (prevalence_column < 0) {
+    cerr << "No prevalence column named '" << prevalence_column_name << "' in header\n";
+    return false;
+  }
+  return true;
+}
+
 static int
 average(const char* fname, iwstring_data_source& input, std::ostream& output) {
   const_IWSubstring buffer;
 
-  for (int i = 0; i < skip_first_records; i++) {
-    input.next_record(buffer);
+  if (!prevalence_column_name.empty()) {
+    prevalence_column = -1;
+    if (skip_first_records == 0) {
+      cerr << "A named prevalence column requires a header (-j, -d or -s)\n";
+      return 0;
+    }
+  }
 
-    if (0 > 0) {
-      ;
-    } else if (descriptor_rx) {
+  for (int i = 0; i < skip_first_records; i++) {
+    if (!input.next_record(buffer)) {
+      cerr << "Cannot read skipped/header record " << (i + 1) << " from '" << fname << "'\n";
+      return 0;
+    }
+
+    if (i == 0 && !prevalence_column_name.empty() && !ResolvePrevalenceColumn(buffer)) {
+      cerr << "In '" << fname << "'\n";
+      return 0;
+    }
+
+    if (descriptor_rx) {
       if (!determine_descriptors_to_process(buffer)) {
         cerr << "Invalid descriptor file header record\n";
         return 0;
@@ -704,7 +781,7 @@ average(const char* fname, iwstring_data_source& input, std::ostream& output) {
              << static_cast<float>(global_accumulator.maxval()) << " ave "
              << static_cast<float>(global_accumulator.average()) << "\n";
     }
-  } else {
+  } else if (acolumn[0].n() > 0) {
     acolumn[0].Report(output);
   }
 
@@ -909,11 +986,15 @@ average(int argc, char** argv) {
 
   if (0 == specifications) {
     columns_to_process[0] = 1;
-    number_columns = 2;
-    acolumn = new AColumn[2];
   } else if (1 != specifications) {
     cerr << "Must have just one of -c, -d or -R options\n";
     usage(5);
+  }
+
+  if (cl.option_present('r') && cl.option_present('h')) {
+    cerr << "Cannot combine bounded percentile sampling (-r) with prevalence (-h); "
+            "omit -r for exact weighted percentiles\n";
+    return 2;
   }
 
   if (cl.option_present('r'))  // must do before columns are allocated
@@ -925,7 +1006,7 @@ average(int argc, char** argv) {
     }
 
     if (verbose) {
-      cerr << "Median computed based on first " << value_buffer_size
+      cerr << "Percentiles computed from a sample of at most " << value_buffer_size
            << " values in the file\n";
     }
   }
@@ -1000,7 +1081,8 @@ average(int argc, char** argv) {
 
     skip_first_records = 1;
   } else if (0 == specifications) {
-    ;
+    number_columns = 2;
+    acolumn = new AColumn[2];
   } else {
     cerr << "Must specify either the -c or -R options\n";
     usage(6);
@@ -1008,24 +1090,41 @@ average(int argc, char** argv) {
 
   if (cl.option_present('h')) {
     const_IWSubstring h;
+    bool have_column = false;
     for (int i = 0; cl.value('h', h, i); ++i) {
       if (h.starts_with("mult=")) {
         h.remove_leading_chars(5);
         if (!h.numeric_value(prevalence_multiplier) || prevalence_multiplier < 1.0) {
-          cerr << "The prevalence column multiplier must be a number > 1.0, '" << h
+          cerr << "The prevalence column multiplier must be a number >= 1.0, '" << h
                << "' invalid\n";
           return 2;
         }
 
         if (verbose) {
           cerr << "Prevalence values multiplied by " << prevalence_multiplier
-               << " to conver to counts\n";
+               << " to convert to counts\n";
         }
-      } else if (h.numeric_value(prevalence_column) && prevalence_column > 0) {
-        prevalence_column = prevalence_column - 1;
+        continue;
+      }
+      if (have_column || h.empty()) {
+        cerr << "Specify exactly one prevalence column with -h\n";
+        return 2;
+      }
+      have_column = true;
+      int col;
+      if (h.numeric_value(col)) {
+        if (col < 1) {
+          cerr << "The prevalence column must be positive: '" << h << "'\n";
+          return 2;
+        }
+        prevalence_column = col - 1;
       } else {
         prevalence_column_name = h;
       }
+    }
+    if (!have_column) {
+      cerr << "A prevalence multiplier requires a column specified with -h\n";
+      return 2;
     }
   }
 

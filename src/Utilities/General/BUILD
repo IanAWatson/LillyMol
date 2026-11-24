@@ -419,20 +419,6 @@ cc_binary(
 )
 
 cc_binary(
-    name = "distribution",
-    srcs = [
-        "distribution.cc",
-    ],
-    deps = [
-        "//Foundational/accumulator",
-        "//Foundational/cmdline:iwcmdline",
-        "//Foundational/data_source:iwstring_data_source",
-        "//Foundational/iwmisc",
-        "//Foundational/iwqsort",
-    ],
-)
-
-cc_binary(
     name = "feature_scaling",
     srcs = [
         "feature_scaling.cc",

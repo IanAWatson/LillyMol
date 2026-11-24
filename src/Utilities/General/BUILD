@@ -514,19 +514,6 @@ cc_binary(
 )
 
 cc_binary(
-    name = "_inventory",
-    srcs = [
-        "inventory.cc",
-    ],
-    deps = [
-        "//Foundational/accumulator",
-        "//Foundational/cmdline:iwcmdline",
-        "//Foundational/data_source:iwstring_data_source",
-        "//Foundational/iwmisc",
-    ],
-)
-
-cc_binary(
     name = "exon_correlated",
     srcs = [
         "exon_correlated.cc",
@@ -875,20 +862,6 @@ cc_binary(
         "//Foundational/data_source:iwstring_data_source",
         "//Foundational/iwmisc",
         "//Foundational/iwmisc:sparse_fp_creator",
-    ],
-)
-
-cc_binary(
-    name = "svmfp_error_vs_distance",
-    srcs = [
-        "svmfp_error_vs_distance.cc",
-    ],
-    deps = [
-        "//Foundational/accumulator",
-        "//Foundational/cmdline:iwcmdline",
-        "//Foundational/data_source:iwstring_data_source",
-        "//Foundational/iwmisc",
-        "//Foundational/iwmisc:activity_from_file",
     ],
 )
 

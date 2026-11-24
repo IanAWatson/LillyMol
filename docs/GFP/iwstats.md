@@ -71,3 +71,37 @@ column of experimental data, and the column of predicted values are located.
 Within LillyMol many tools use `.` as the missing value string. That can be changed
 with the `-M` option. When missing values are present, various warnings will be
 issued, but if the `-q` option is used, most of those warnings will not be issued.
+
+## Precision and valid pairs
+
+Measured and predicted values, residuals, and working arrays use double precision.
+Correlations and correction coefficients use centered sums to avoid subtracting
+nearly equal raw sums for values with large offsets.
+
+The default missing-value token is `.`; `-M` selects another token. Rows missing a
+measured value are excluded. A missing prediction excludes that pair only from
+the corresponding prediction column. Measured-value filters (`-u` and `-U`) are
+applied before ranking and subsetting. Counts, errors, correlation, enrichment,
+and fold-error fractions use retained valid pairs. With `-T`, truncation affects
+predicted summaries and error calculations; the raw prediction ranking is
+retained. `-B 100` reports the maximum absolute error. `-W` works independently
+of `-w`.
+
+`R2` is the **signed square of Pearson correlation**, rather than the regression
+coefficient of determination. For conventional predictive R-squared, use `-h`
+and read `trQ2`, which is `1 - SSE/SST`. Without `-h`, `Q2` uses the historical
+bounded transformation when SSE exceeds SST. Constant vectors report correlation
+zero while retaining their error statistics. When measured values are constant,
+Q2 is 1 for perfect predictions and 0 otherwise. Zero residual spread is handled
+without dividing by zero in cMSR/cMSD calculations.
+
+By default, predictions tied at the same value retain input order for the input
+Bsquared calculation. `-R .` explicitly randomizes ties. Best/worst Bsquared still
+bounds the possible orderings of ties unless `-w` suppresses that calculation.
+Replacing the previous sorter can therefore change `B2.input` on tied data.
+
+`-H` coverage and `-C` correction outputs require one input file, one predicted
+column, and no subsets or marker groups. Ambiguous combinations are rejected
+rather than overwriting earlier results. Coverage requires more than 100 valid
+pairs. Read errors and detected output write/flush failures produce nonzero exit
+status. Residual output is explicitly flushed and closed at completion.

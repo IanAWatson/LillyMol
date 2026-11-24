@@ -56,6 +56,7 @@ class Enrichment
    * @param cutoff is the cutoff of experimental values for active and inactive
    */
   int buildFromSortedArray(float * activity, int n,float cutoff);
+  int buildFromSortedArray(const double* activity, int n, double cutoff);
   /**
    * Read the rank of each actives according to the format described hereafter
    */
@@ -112,6 +113,8 @@ class Enrichment
   void initialize( void );
   
  private:
+  template <typename T>
+  int BuildFromSortedArray(const T* activity, int n, T cutoff);
 
   // Copy constructor not defined and should not be used.
   Enrichment( const Enrichment& p_enrich ){};

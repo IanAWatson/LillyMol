@@ -1,27 +1,15 @@
+#include <algorithm>
+#include <functional>
 #include <stdlib.h>
 
 #include "bsquared.h"
 
 #include "Foundational/accumulator/accumulator.h"
 
-static int
-predicted_value_comparitor(const void * pe1, const void * pe2)
-{
-  float e1 = * ((const float *) pe1);
-  float e2 = * ((const float *) pe2);
-
-  if (e1 < e2)
-    return 1;
-
-  if (e1 > e2)
-    return -1;
-
-  return 0;
-}
-
+template <typename T>
 int
-compute_b_squared(const float * predicted,
-                  float * ybest,
+ComputeBSquared(const T * predicted,
+                  T * ybest,
                   int n,
                   double & Bsquared)
 {
@@ -40,7 +28,7 @@ compute_b_squared(const float * predicted,
 
   double ymean = acc.average ();
 
-  qsort (ybest, n, sizeof (float), predicted_value_comparitor);
+  std::sort(ybest, ybest + n, std::greater<T>());
 
   double predicted_csum = 0.0;
   double ybest_csum = 0.0;
@@ -95,9 +83,10 @@ compute_b_squared(const float * predicted,
   return 1;
 }
 
+template <typename T>
 int
-compute_b_squared (const float * predicted,
-                   float * ybest,
+ComputeBSquared (const T * predicted,
+                   T * ybest,
                    int n,
                    double * Bsquared_array)
 {
@@ -114,7 +103,7 @@ compute_b_squared (const float * predicted,
 
   double ymean = acc.average ();
 
-  qsort (ybest, n, sizeof (float), predicted_value_comparitor);
+  std::sort(ybest, ybest + n, std::greater<T>());
 
   double range = ybest[0] - ybest[n - 1];     // the dynamic range of the data
 
@@ -182,4 +171,17 @@ compute_b_squared (const float * predicted,
   }
 
   return 1;
+}
+
+int compute_b_squared(const float* values, float* work, int n, double& result) {
+  return ComputeBSquared(values, work, n, result);
+}
+int compute_b_squared(const float* values, float* work, int n, double* result) {
+  return ComputeBSquared(values, work, n, result);
+}
+int compute_b_squared(const double* values, double* work, int n, double& result) {
+  return ComputeBSquared(values, work, n, result);
+}
+int compute_b_squared(const double* values, double* work, int n, double* result) {
+  return ComputeBSquared(values, work, n, result);
 }

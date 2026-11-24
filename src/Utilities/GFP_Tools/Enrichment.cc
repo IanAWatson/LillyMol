@@ -215,25 +215,29 @@ void Enrichment::buildSubset( const double p_fraction, Enrichment& p_enrich ) co
   p_enrich.m_rank = result;
 }
 
-int Enrichment::buildFromSortedArray(float * activity, int n ,float cutoff)
-{
-  if(n <= 1) 
-    return 0;
+template <typename T>
+int Enrichment::BuildFromSortedArray(const T* activity, int n, T cutoff) {
   initialize();
-  setNbrCompounds( n );
-  int actives =0;
-  for(int i=0;i<n;i++)
-  {
-    if(activity[i] >= cutoff)
-    {
-      actives++;
-      m_rank.push_back( i+1 );
+  if (n <= 1) return 0;
+  setNbrCompounds(n);
+  int actives = 0;
+  for (int i = 0; i < n; ++i) {
+    if (activity[i] >= cutoff) {
+      ++actives;
+      m_rank.push_back(i + 1);
     }
   }
-  if(actives >= n || actives <=0 )
-    return 0;
-  setNbrActives( actives );
-    return 1;
+  if (actives == 0 || actives == n) return 0;
+  setNbrActives(actives);
+  return 1;
+}
+
+int Enrichment::buildFromSortedArray(float* activity, int n, float cutoff) {
+  return BuildFromSortedArray(activity, n, cutoff);
+}
+
+int Enrichment::buildFromSortedArray(const double* activity, int n, double cutoff) {
+  return BuildFromSortedArray(activity, n, cutoff);
 }
 
 void Enrichment::readFromStream( std::istream& p_istream )

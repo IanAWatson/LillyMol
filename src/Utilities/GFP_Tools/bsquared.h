@@ -10,4 +10,6 @@ extern int compute_b_squared (const float * predicted,
                    float * ybest,
                    int n,
                    double * Bsquared);
+int compute_b_squared(const double* predicted, double* ybest, int n, double& result);
+int compute_b_squared(const double* predicted, double* ybest, int n, double* result);
 #endif

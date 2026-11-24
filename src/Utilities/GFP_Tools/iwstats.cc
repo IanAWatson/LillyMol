@@ -33,7 +33,7 @@ using std::endl;
 
 static Enrichment enrichment;
 
-static IWString missing_value;
+static IWString missing_value(".");
 
 static int report_missing_values = 1;
 
@@ -56,7 +56,7 @@ static int values_higher_than_experimental_range = 0;
 
 static int traditional_q2_definition = 0;
 
-static float relative_error_threshold = static_cast<float>(0.0);
+static double relative_error_threshold = static_cast<double>(0.0);
 
 static int range_normal_relative_error = 0;
 
@@ -80,7 +80,7 @@ static int skip_items_with_no_activity_data = 0;
 
 static int items_with_no_activity_data = 0;
 
-static float active_inactive_cutoff = 0.5;
+static double active_inactive_cutoff = 0.5;
 static int calculate_enrichment_metrics = 0;
 
 static double bedroc_alpha = 20.0;
@@ -97,18 +97,12 @@ static int do_cmsr50 = 0;
 static int do_cmsr75 = 0;
 
 /*
-  Previous R2 definition could be outside the range of 0 to 1.
-*/
-
-static int wikipedia_r2_definition = 1;
-
-/*
   ADME group interested in number of predictions outside N fold difference
   from obs
 */
 
-static resizable_array<float> fold_difference_additive;
-static resizable_array<float> fold_difference_multiplicative;
+static resizable_array<double> fold_difference_additive;
+static resizable_array<double> fold_difference_multiplicative;
 
 /*
   Useful to be able to collect residuals
@@ -123,11 +117,11 @@ static IWString_and_File_Descriptor stream_for_residuals;
 // The data will be used by normalise.cc
 static IWString fname_for_correction_formula;
 
-// The percentiles for which we report errors 
+// The percentiles for which we report errors
 static resizable_array<int> ae_percentiles{50, 75, 95};
 
 // We can report the fraction of errors within a given range.
-static resizable_array<float> fraction_within;
+static resizable_array<double> fraction_within;
 
 // The default/historical output is not as regular as it should be which
 // inhibits automated processing. Some measures do not have an = sign,
@@ -137,7 +131,7 @@ static int all_outputs_have_equals_sign = 0;
 
 // May 2025. Allow specification of MSR.
 // If set, we report the fraction of predictions within 1,2,3x of the experimental.
-static float msr = 0.0f;
+static double msr = 0.0;
 
 static void
 usage(int rc) {
@@ -169,7 +163,7 @@ Can have the experimental data in a separate file, or as a column in the predict
  -c <number>    number of valid pairs needed for producing correlations (default 20)
  -w             when duplicate values present, suppress computation of best
                 and worst BSquared values
- -r <float>     max relative error allowed computations
+ -r <double>     max relative error allowed computations
  -B <pct>       the percentiles at which absolute errors are reported
  -W <value>     report the fraction of items with abs error within <value>
  -T             truncate predicted values to the experimental range
@@ -180,10 +174,10 @@ Can have the experimental data in a separate file, or as a column in the predict
  -k             just skip predicted values that have no experimental value (repeat for quiet)
  -d             compute Dave's cMSD rather than cMSR
  -G <msr>       MSR value for the assay. Will report the fraction of predictions within 1,2,3x MSR.
- -o <float>     cutoff for active/inactive (for enrichment metrics BEDROC EF ...)
- -a <float>     BEDROC alpha value (default " << bedroc_alpha << ")
- -f <float>     Enrichment Factor default fraction (default " << enrichment_factor_fraction << ")
- -u <float>     discard experimental values below <float> - useful for studying actives only 
+ -o <double>     cutoff for active/inactive (for enrichment metrics BEDROC EF ...)
+ -a <double>     BEDROC alpha value (default " << bedroc_alpha << ")
+ -f <double>     Enrichment Factor default fraction (default " << enrichment_factor_fraction << ")
+ -u <double>     discard experimental values below <double> - useful for studying actives only
  -U <fraction>  keep only the <fraction> most active experimental values
  -m <col/name>  do analysis by data in column <col> or descriptor name <name>
  -L <fname>     write residuals to <fname>
@@ -213,7 +207,7 @@ static int records_to_skip = 0;
 static int step = 0;
 static resizable_array<int> percents_to_check;
 static resizable_array<int> N_to_check;
-static resizable_array<float> activities_to_check;
+static resizable_array<double> activities_to_check;
 
 /*
   If someone asks for percents, they should have the resulting output show nn%
@@ -243,7 +237,7 @@ class CoverageData {
 
     int _n;
 
-    float* _values;
+    double* _values;
 
     // Private functions.
     int WriteCoverage();
@@ -259,7 +253,7 @@ class CoverageData {
       return _stem.length() > 0;
     }
 
-    int Process(int n, const float* residuals);
+    int Process(int n, const double* residuals);
 };
 
 CoverageData::CoverageData() {
@@ -287,20 +281,21 @@ CoverageData::Initialise(Command_Line& cl, char flag) {
 }
 
 int
-CoverageData::Process(int n, const float* residuals) {
+CoverageData::Process(int n, const double* residuals) {
   if (n <= 100) {
     cerr << "CoverageData::Process:too few points " << n << '\n';
     return 0;
   }
 
-  std::unique_ptr<float[]> tmp = std::make_unique<float[]>(n);
+  std::unique_ptr<double[]> tmp = std::make_unique<double[]>(n);
   for (int i = 0; i < n; ++i) {
     tmp[i] = std::abs(residuals[i]);
   }
   std::sort(tmp.get(), tmp.get() + n);
 
-  _values = new float[101];
-  _values[0] = 2.0f * std::abs(tmp[0]);
+  delete [] _values;
+  _values = new double[101];
+  _values[0] = 2.0 * std::abs(tmp[0]);
 
   int next_pct = 1;
   int next_i = n / 100;
@@ -310,16 +305,13 @@ CoverageData::Process(int n, const float* residuals) {
       continue;
     }
 
-    _values[next_pct] = 2.0f * std::abs(tmp[i]);
+    _values[next_pct] = 2.0 * std::abs(tmp[i]);
     ++next_pct;
-    next_i = n * iwmisc::Fraction<float>(next_pct, 100);
+    next_i = n * iwmisc::Fraction<double>(next_pct, 100);
   }
-  _values[100] = 2.0f * tmp[n - 1];
+  _values[100] = 2.0 * tmp[n - 1];
 
-  WriteCoverage();
-  WriteCoveragePlot();
-
-  return 1;
+  return WriteCoverage() && WriteCoveragePlot();
 }
 
 int
@@ -340,7 +332,7 @@ CoverageData::WriteCoverage() {
     output << i << kSep << _values[i] << '\n';
   }
 
-  return 1;
+  return output.close();
 }
 
 int
@@ -381,7 +373,7 @@ CoverageData::WriteCoveragePlot() {
 
   output << "savefig(\"" << png << "\")\n";
 
-  return 1;
+  return output.close();
 }
 
 static CoverageData coverage_data;
@@ -497,11 +489,13 @@ establish_column_titles(const const_IWSubstring& buffer, int experimental_column
   We need an object to hold the raw data.
 */
 
-typedef float experimental_value_t;
+typedef double experimental_value_t;
 
 class Predicted_Values {
  private:
   experimental_value_t _experimental;
+  int _number_predictions;
+  int _input_order;
 
   //  to account for missing values, we mark each value as valid or not
 
@@ -515,8 +509,10 @@ class Predicted_Values {
   IWString _marker;
 
  public:
-  Predicted_Values();
+  explicit Predicted_Values(int number_predictions, int input_order);
   ~Predicted_Values();
+
+  int input_order() const { return _input_order; }
 
   int debug_print(std::ostream&) const;
 
@@ -545,7 +541,7 @@ class Predicted_Values {
     _random = r;
   }
 
-  const IWString
+  const IWString&
   marker() const {
     return _marker;
   }
@@ -555,12 +551,14 @@ class Predicted_Values {
                    int& fatal);
 };
 
-Predicted_Values::Predicted_Values() {
+Predicted_Values::Predicted_Values(int number_predictions, int input_order) {
+  _input_order = input_order;
+  _number_predictions = number_predictions;
   assert(columns_in_input > 0);
 
   _experimental = 0.0;
-  _valid = new_int(columns_in_input);
-  _predicted = new experimental_value_t[columns_in_input];
+  _valid = new_int(_number_predictions);
+  _predicted = new experimental_value_t[_number_predictions]{};
 
   _random = static_cast<experimental_value_t>(0.0);
 
@@ -636,6 +634,11 @@ Predicted_Values::parse_buffer(const const_IWSubstring& buffer, int experimental
     }
 
     if (missing_value.length() && missing_value == token) {
+      if (col == experimental_column) {
+        ++missing_values_encountered;
+        fatal = 0;
+        return 0;
+      }
       if (report_missing_values) {
         cerr << "Ignoring missing value in column " << (col + 1) << '\n';
       }
@@ -675,6 +678,11 @@ Predicted_Values::parse_buffer(const const_IWSubstring& buffer, int experimental
     return 0;
   }
 
+  if (_experimental < discard_measured_values_below) {
+    fatal = 0;
+    return 0;
+  }
+
   return 1;
 }
 
@@ -683,7 +691,7 @@ Predicted_Values::debug_print(std::ostream& os) const {
   os << "expt: " << _experimental;
   if (nullptr != _predicted) {
     os << " pred:";
-    for (int i = 0; i < columns_in_input; i++) {
+    for (int i = 0; i < _number_predictions; i++) {
       if (_valid[i]) {
         os << ' ' << _predicted[i];
       } else {
@@ -707,18 +715,14 @@ template class resizable_array_base<Predicted_Values*>;
 static int
 duplicate_predicted_values(const resizable_array_p<Predicted_Values>& zdata,
                            int predicted_column) {
-  experimental_value_t predprev = zdata[0]->pred(predicted_column);
-
-  int n = zdata.number_elements();
-
-  for (int i = 1; i < n; i++) {
-    experimental_value_t pred = zdata[i]->pred(predicted_column);
-
-    if (pred == predprev) {
-      return 1;
-    }
-
+  bool have_previous = false;
+  experimental_value_t predprev = 0.0;
+  for (const Predicted_Values* item : zdata) {
+    if (!item->valid(predicted_column)) continue;
+    const experimental_value_t pred = item->pred(predicted_column);
+    if (have_previous && pred == predprev) return 1;
     predprev = pred;
+    have_previous = true;
   }
 
   return 0;
@@ -736,7 +740,7 @@ determine_numbers_to_check_by_activity(const resizable_array_p<Predicted_Values>
   int n = zdata.number_elements();
 
   for (int i = 0; i < activities_to_check.number_elements(); i++) {
-    float a = activities_to_check[i];
+    double a = activities_to_check[i];
 
     int nsample = 0;
 
@@ -779,8 +783,7 @@ determine_numbers_to_check(resizable_array<int>& numbers_to_check, int records_r
     for (int i = 0; i < percents_to_check.number_elements(); i++) {
       int p = percents_to_check[i];
 
-      // use a number < 100 to give a result just larger than the likely integer
-      int n = int(static_cast<float>(p * records_read) / 99.999);
+      const int n = static_cast<int>(static_cast<int64_t>(p) * records_read / 100);
 
       if (n > 1 && n <= records_read) {
         if (verbose > 1) {
@@ -837,6 +840,8 @@ class Predicted_Value_Comparitor {
 int
 Predicted_Value_Comparitor::operator()(const Predicted_Values* pv1,
                                        const Predicted_Values* pv2) {
+  if (!pv1->valid(_predicted_column)) return pv2->valid(_predicted_column) ? 1 : 0;
+  if (!pv2->valid(_predicted_column)) return -1;
   experimental_value_t p1 = pv1->pred(_predicted_column);
   experimental_value_t p2 = pv2->pred(_predicted_column);
 
@@ -861,7 +866,8 @@ Predicted_Value_Comparitor::operator()(const Predicted_Values* pv1,
     }
   }
 
-  return 0;
+  return pv1->input_order() < pv2->input_order() ? -1 :
+         pv1->input_order() > pv2->input_order() ? 1 : 0;
 }
 
 class Predicted_Value_Comparitor_Best : public Predicted_Value_Comparitor {
@@ -875,6 +881,8 @@ class Predicted_Value_Comparitor_Best : public Predicted_Value_Comparitor {
 int
 Predicted_Value_Comparitor_Best::operator()(const Predicted_Values* pv1,
                                             const Predicted_Values* pv2) {
+  if (!pv1->valid(_predicted_column)) return pv2->valid(_predicted_column) ? 1 : 0;
+  if (!pv2->valid(_predicted_column)) return -1;
   experimental_value_t p1 = pv1->pred(_predicted_column);
   experimental_value_t p2 = pv2->pred(_predicted_column);
 
@@ -911,6 +919,8 @@ class Predicted_Value_Comparitor_Worst : public Predicted_Value_Comparitor {
 int
 Predicted_Value_Comparitor_Worst::operator()(const Predicted_Values* pv1,
                                              const Predicted_Values* pv2) {
+  if (!pv1->valid(_predicted_column)) return pv2->valid(_predicted_column) ? 1 : 0;
+  if (!pv2->valid(_predicted_column)) return -1;
   experimental_value_t p1 = pv1->pred(_predicted_column);
   experimental_value_t p2 = pv2->pred(_predicted_column);
 
@@ -936,35 +946,20 @@ Predicted_Value_Comparitor_Worst::operator()(const Predicted_Values* pv1,
   return 0;
 }
 
-class Float_Comparator {
- private:
- public:
-  int operator()(const float& f1, const float& f2) const;
-};
-
-int
-Float_Comparator::operator()(const float& f1, const float& f2) const {
-  if (f1 < f2) {
-    return -1;
-  }
-
-  if (f1 > f2) {
+static int
+compute_distribution_function(int number_records, const double* v, const double minval,
+                              const double maxval, int* d) {
+  if (minval == maxval) {
+    d[0] = number_records;
     return 1;
   }
-
-  return 0;
-}
-
-static int
-compute_distribution_function(int number_records, const float* v, const float minval,
-                              const float maxval, int* d) {
-  if (minval >= maxval) {
+  if (minval > maxval) {
     cerr << "compute_distribution_function:unsorted or no variability: minval " << minval
          << ", maxval " << maxval << '\n';
     return 0;
   }
 
-  float delta = (maxval - minval) / static_cast<float>(number_distribution_buckets);
+  double delta = (maxval - minval) / static_cast<double>(number_distribution_buckets);
 
   for (int i = 0; i < number_records; i++) {
     int j = static_cast<int>((v[i] - minval) / delta + 0.49999);
@@ -987,7 +982,7 @@ write_distribution_function(const char* prefix, int number_records, const int* d
   output << prefix;
 
   for (int i = 0; i < number_distribution_buckets; i++) {
-    float f = d[i] / static_cast<float>(number_records);
+    double f = d[i] / static_cast<double>(number_records);
     output << ' ' << f;
   }
 
@@ -999,28 +994,30 @@ write_distribution_function(const char* prefix, int number_records, const int* d
 static int
 do_compute_distribution_functions(int number_records, int which_predicted_set,
                                   int predicted_column, int experimental_column,
-                                  float* tmp1, float* tmp2,
+                                  double* tmp1, double* tmp2,
                                   const resizable_array_p<Predicted_Values>& zdata,
                                   std::ostream& output) {
   assert(experimental_column >= 0);
   assert(number_distribution_buckets > 1);
 
-  float min_expt, max_expt, min_pred, max_pred;
+  double min_expt, max_expt, min_pred, max_pred;
 
-  max_pred = 0.0f;  // keep compiler quiet
-  min_pred = 0.0f;  // keep compiler quiet
-  min_expt = 0.0f;  // keep compiler quiet
-  max_expt = 0.0f;  // keep compiler quiet
+  max_pred = 0.0;  // keep compiler quiet
+  min_pred = 0.0;  // keep compiler quiet
+  min_expt = 0.0;  // keep compiler quiet
+  max_expt = 0.0;  // keep compiler quiet
 
-  float obs, pred;  // scope here for efficiency
+  double obs, pred;  // scope here for efficiency
 
+  int nvalid = 0;
   for (int i = 0; i < number_records; i++) {
     const Predicted_Values& pvi = *(zdata[i]);
 
+    if (!pvi.valid(which_predicted_set)) continue;
     obs = pvi.obs();
     pred = pvi.pred(which_predicted_set);
 
-    if (0 == i) {
+    if (0 == nvalid) {
       min_expt = obs;
       max_expt = obs;
 
@@ -1040,19 +1037,29 @@ do_compute_distribution_functions(int number_records, int which_predicted_set,
       }
     }
 
-    tmp2[i] = pred;
-    tmp1[i] = obs;
+    tmp2[nvalid] = pred;
+    tmp1[nvalid++] = obs;
 
     //  cerr << " i = " << i << " obs " << obs << " pred " << pred << '\n';
   }
 
+  if (truncate_predicted_values_to_experimental_range) {
+    min_pred = max_expt;
+    max_pred = min_expt;
+    for (int i = 0; i < nvalid; ++i) {
+      tmp2[i] = std::clamp(tmp2[i], min_expt, max_expt);
+      min_pred = std::min(min_pred, tmp2[i]);
+      max_pred = std::max(max_pred, tmp2[i]);
+    }
+  }
+  number_records = nvalid;
   // cerr << "min obs " << min_expt << " max obs " << max_expt << " min pred " << min_pred
   // << " max pred " << max_pred << '\n';
 
   int* d1 = new_int(number_distribution_buckets);
-  std::unique_ptr<int> free_d1(d1);
+  std::unique_ptr<int[]> free_d1(d1);
   int* d2 = new_int(number_distribution_buckets);
-  std::unique_ptr<int> free_d2(d2);
+  std::unique_ptr<int[]> free_d2(d2);
 
   // cerr << "Computing experimental distribution function\n";
   if (!compute_distribution_function(number_records, tmp1, min_expt, max_expt, d1)) {
@@ -1068,7 +1075,7 @@ do_compute_distribution_functions(int number_records, int which_predicted_set,
   write_distribution_function("Dpred:", number_records, d2, output);
 
   output << "Compare:";
-  float sum = static_cast<float>(0.0);
+  double sum = static_cast<double>(0.0);
 
   for (int i = 0; i < number_distribution_buckets; i++) {
     if (0 == d1[i]) {
@@ -1076,7 +1083,7 @@ do_compute_distribution_functions(int number_records, int which_predicted_set,
       continue;
     }
 
-    float t = static_cast<float>(d2[i]) / static_cast<float>(d1[i]);
+    double t = static_cast<double>(d2[i]) / static_cast<double>(d1[i]);
     output << ' ' << t;
     if (d1[i] < d2[i]) {
       sum += 1.0 / t;
@@ -1088,14 +1095,14 @@ do_compute_distribution_functions(int number_records, int which_predicted_set,
   output << '\n';
 
   output << "Distributional similarity "
-         << sum / static_cast<float>(number_distribution_buckets) << '\n';
+         << sum / static_cast<double>(number_distribution_buckets) << '\n';
 
   return output.good();
 }
 
 static int
 initilize_enrichment(int number_records, int experimental_column,
-                     const resizable_array_p<Predicted_Values>& zdata, float* tmp1,
+                     const resizable_array_p<Predicted_Values>& zdata, double* tmp1,
                      int which_predicted_set) {
   int n = 0;
 
@@ -1118,8 +1125,8 @@ initilize_enrichment(int number_records, int experimental_column,
 
 static int
 compute_b_squared(int number_records, int experimental_column,
-                  const resizable_array_p<Predicted_Values>& zdata, float* tmp1,
-                  float* tmp2, double& bsquared, int which_predicted_set) {
+                  const resizable_array_p<Predicted_Values>& zdata, double* tmp1,
+                  double* tmp2, double& bsquared, int which_predicted_set) {
   int n = 0;
 
   if (experimental_column >= 0) {
@@ -1138,7 +1145,7 @@ compute_b_squared(int number_records, int experimental_column,
       n++;
     }
   } else {
-    std::fill_n(tmp1, number_records, static_cast<float>(0.0));
+    std::fill_n(tmp1, number_records, static_cast<double>(0.0));
     n = number_records;
   }
 
@@ -1188,7 +1195,10 @@ read_the_data(iwstring_data_source& input, int experimental_column,
 
   const_IWSubstring buffer;
   for (int i = 0; i < records_to_skip; i++) {
-    input.next_record(buffer);
+    if (!input.next_record(buffer)) {
+      cerr << "Cannot read requested header record\n";
+      return 0;
+    }
     if (1 == input.lines_read()) {
       if (!establish_column_titles(buffer, experimental_column, predicted_column,
                                    marker_column, marker_column_name)) {
@@ -1206,7 +1216,7 @@ read_the_data(iwstring_data_source& input, int experimental_column,
       }
     }
 
-    Predicted_Values* p = new Predicted_Values();
+    Predicted_Values* p = new Predicted_Values(predicted_column.number_elements(), zdata.size());
 
     int fatal;
     if (!p->parse_buffer(buffer, experimental_column, predicted_column, marker_column,
@@ -1230,6 +1240,10 @@ read_the_data(iwstring_data_source& input, int experimental_column,
     records_read++;
   }
 
+  if (!input.good()) {
+    cerr << "Error reading prediction data\n";
+    return 0;
+  }
   if (verbose) {
     cerr << "Read " << records_read << " records\n";
   }
@@ -1255,6 +1269,7 @@ read_the_data(const char* fname, int experimental_column,
     zdata.resize_keep_storage(0);
   }
 
+  if (!marker_column_name.empty()) marker_column = -1;
   return read_the_data(input, experimental_column, predicted_column, marker_column,
                        marker_column_name, zdata);
 }
@@ -1282,7 +1297,9 @@ do_sort_by_predicted_value(resizable_array_p<Predicted_Values>& zdata,
 
   Predicted_Value_Comparitor pvc(which_predicted_set);
 
-  zdata.iwqsort(pvc);
+  std::sort(zdata.begin(), zdata.end(), [&pvc](const auto* lhs, const auto* rhs) {
+    return pvc(lhs, rhs) < 0;
+  });
 
   if (verbose > 2) {
     cerr << "After sorting on column " << predicted_column << '\n';
@@ -1294,22 +1311,23 @@ do_sort_by_predicted_value(resizable_array_p<Predicted_Values>& zdata,
 
 static void
 establish_range_of_experimental_data(int number_records, int experimental_column,
+                                     int which_predicted_set,
                                      const resizable_array_p<Predicted_Values>& zdata,
                                      experimental_value_t& lower_experimental_value,
                                      experimental_value_t& upper_experimental_value) {
   assert(experimental_column >= 0);
 
-  lower_experimental_value = upper_experimental_value = zdata[0]->obs();
-
-  for (int i = 1; i < number_records; i++) {
-    const Predicted_Values& pvi = *(zdata[i]);
-
-    experimental_value_t o = pvi.obs();
-
-    if (o < lower_experimental_value) {
-      lower_experimental_value = o;
-    } else if (o > upper_experimental_value) {
-      upper_experimental_value = o;
+  bool found = false;
+  for (int i = 0; i < number_records; ++i) {
+    const Predicted_Values& pvi = *zdata[i];
+    if (!pvi.valid(which_predicted_set)) continue;
+    const double obs = pvi.obs();
+    if (!found) {
+      lower_experimental_value = upper_experimental_value = obs;
+      found = true;
+    } else {
+      lower_experimental_value = std::min(lower_experimental_value, obs);
+      upper_experimental_value = std::max(upper_experimental_value, obs);
     }
   }
 
@@ -1331,27 +1349,17 @@ do_any_truncations_needed(experimental_value_t& pred,
   return;
 }
 
-static float
+static double
 compute_observed_range(const resizable_array_p<Predicted_Values>& zdata,
-                       int number_records) {
-  experimental_value_t minval = zdata[0]->obs();
-  experimental_value_t maxval = minval;
-
-  for (int i = 1; i < number_records; i++) {
-    experimental_value_t o = zdata[i]->obs();
-
-    if (o < minval) {
-      minval = o;
-    } else if (o > maxval) {
-      maxval = o;
-    }
-  }
-
+                       int number_records, int which_predicted_set) {
+  double minval = 0.0, maxval = 0.0;
+  establish_range_of_experimental_data(number_records, 0, which_predicted_set,
+                                      zdata, minval, maxval);
   return maxval - minval;
 }
 
 static double
-compute_relative_error(float obs, float pred) {
+compute_relative_error(double obs, double pred) {
   if (obs == pred) {  // no error
     return 0.0;
   }
@@ -1365,7 +1373,7 @@ compute_relative_error(float obs, float pred) {
     return 0.0;
   }
 
-  float rc = fabs((obs - pred) / obs);
+  double rc = fabs((obs - pred) / obs);
 
   if (rc > relative_error_threshold) {
     return relative_error_threshold;
@@ -1377,21 +1385,22 @@ compute_relative_error(float obs, float pred) {
 static double
 compute_range_normal_relative_error(experimental_value_t obs, experimental_value_t pred,
                                     double obs_range) {
+  if (obs_range == 0.0) return 0.0;
   return fabs(obs - pred) / obs_range;
 }
 
 class CMSR_Parameters {
  public:
-  float _v1;
-  float _v2;
-  float _v3;
+  double _v1;
+  double _v2;
+  double _v3;
   int _pct;
 };
 
 static int
 write_cmsr(const CMSR_Parameters& cmsrp, const int which_predicted_set,
-           const int predicted_column, const Accumulator<double>& e, const float* tmp1,
-           const float* tmp2, float* tmpr, const int ndx, std::ostream& output) {
+           const int predicted_column, const Accumulator<double>& e, const double* tmp1,
+           const double* tmp2, double* tmpr, const int ndx, std::ostream& output) {
   // Note that we are using the tmp2 array, so we need to do this computation
   // before we call compute_b_squared which zorches that array.
 
@@ -1403,20 +1412,16 @@ write_cmsr(const CMSR_Parameters& cmsrp, const int which_predicted_set,
   double bias = d.average();
   double sd = sqrt(d.variance());
 
-  if (0.0 == sd) {
-    cerr << "write_cmsr:variance is zero, cannot process\n";
-    return 0;
-  }
 
   bias = fabs(bias);
-  double k = cmsrp._v1 + cmsrp._v2 * exp(-cmsrp._v3 * bias / sd);
+  double k = cmsrp._v1 + (sd > 0.0 ? cmsrp._v2 * exp(-cmsrp._v3 * bias / sd) : 0.0);
 
 // #define DEBUG_CMSR 20
 #ifdef DEBUG_CMSR
   cerr << "Bias " << bias << " sd " << sd << ", k = " << k << '\n';
 #endif
 
-  float cmsr_sd = pow(10.0, bias + k * sd);
+  double cmsr_sd = pow(10.0, bias + k * sd);
 
   if (which_predicted_set >= 0 && predicted_column >= 0) {
     write_something_identifying_the_column(predicted_column, output);
@@ -1432,13 +1437,13 @@ write_cmsr(const CMSR_Parameters& cmsrp, const int which_predicted_set,
   }
 #endif
 
-  float median_difference;
+  double median_difference;
 
   if (proper_median && ndx == (ndx / 2 * 2)) {
     std::partial_sort(tmpr, tmpr + ndx / 2 + 1, tmpr + ndx);
     median_difference = 0.50 * (tmpr[ndx / 2 - 1] + tmpr[ndx / 2]);
   } else {
-    std::nth_element(tmpr, tmpr + ndx / 2 + 1, tmpr + ndx);
+    std::nth_element(tmpr, tmpr + ndx / 2, tmpr + ndx);
     median_difference = tmpr[ndx / 2];
   }
 #ifdef DEBUG_CMSR
@@ -1458,7 +1463,7 @@ write_cmsr(const CMSR_Parameters& cmsrp, const int which_predicted_set,
   }
 #endif
 
-  float mad;
+  double mad;
   if (proper_median && ndx == (ndx / 2 * 2)) {
     std::partial_sort(tmpr, tmpr + ndx / 2 + 1, tmpr + ndx);
     mad = 0.50 * (tmpr[ndx / 2 - 1] + tmpr[ndx / 2]);
@@ -1477,14 +1482,14 @@ write_cmsr(const CMSR_Parameters& cmsrp, const int which_predicted_set,
     write_something_identifying_the_column(predicted_column, output);
   }
 
-  k = cmsrp._v1 + cmsrp._v2 * exp(-cmsrp._v3 * bias / mad);
+  k = cmsrp._v1 + (mad > 0.0 ? cmsrp._v2 * exp(-cmsrp._v3 * bias / mad) : 0.0);
 
   if (do_cMSD) {
-    float cmsd = bias + k * mad;
+    double cmsd = bias + k * mad;
 
     output << " cMSD" << cmsrp._pct << " = " << cmsd << '\n';
   } else {
-    float cmsr_mad = pow(10.0, bias + k * mad);
+    double cmsr_mad = pow(10.0, bias + k * mad);
 
     output << " cMSR" << cmsrp._pct << "_mad = " << cmsr_mad << '\n';
   }
@@ -1492,19 +1497,16 @@ write_cmsr(const CMSR_Parameters& cmsrp, const int which_predicted_set,
   return 1;
 }
 
-// Write the equation of best fit between x and y.
-// https://www.mathsisfun.com/data/least-squares-regression.html
-// y = m * x + b
-//     m = (N * symxy - sumx * sumy) / (N * sumx2 - sumx * sumx)
-//     b = (sumy - m * sumx) / N
+// Fit predicted = slope * measured + intercept using centered sums.
 static int
-WriteLinearTransformation(int intn, const double sumx, const double sumy, double sumx2, 
-                          double sumxy,
-                          IWString& fname) {
-  double n = static_cast<double>(intn);
-
-  const double m = (n * sumxy - sumx * sumy) / (n * sumx2 - sumx * sumx);
-  const double b = (sumy - m * sumx) / n;
+WriteLinearTransformation(double measured_mean, double predicted_mean,
+                          double measured_ss, double covariance, IWString& fname) {
+  if (measured_ss == 0.0) {
+    cerr << "Cannot fit a linear transformation to constant measured values\n";
+    return 0;
+  }
+  const double m = covariance / measured_ss;
+  const double b = predicted_mean - m * measured_mean;
 
   linear_scaling::LinearScalingData proto;
   proto.set_slope(m);
@@ -1512,7 +1514,12 @@ WriteLinearTransformation(int intn, const double sumx, const double sumy, double
 
   IWString my_fname(fname);
   my_fname.EnsureEndsWith(".textproto");
-  iwmisc::WriteTextProto<linear_scaling::LinearScalingData>(proto, my_fname);
+  std::string text;
+  if (!google::protobuf::TextFormat::PrintToString(proto, &text)) return 0;
+  IWString_and_File_Descriptor text_output;
+  if (!text_output.open(my_fname)) return 0;
+  text_output.strncat(text.data(), text.size());
+  if (!text_output.close()) return 0;
 
   my_fname = fname;
   my_fname << ".dat";
@@ -1520,13 +1527,13 @@ WriteLinearTransformation(int intn, const double sumx, const double sumy, double
 }
 
 static int
-write_fold_data(const int predicted_column, const resizable_array<float>& fold_difference,
+write_fold_data(const int predicted_column, const resizable_array<double>& fold_difference,
                 const int* n_fold_difference, const int N, const char star_or_plus,
                 std::ostream& output) {
   write_something_identifying_the_column(predicted_column, output);
   output << ' ' << star_or_plus << " fold";
   for (int i = 0; i < fold_difference.number_elements(); ++i) {
-    float r = n_fold_difference[i] / static_cast<float>(N);
+    double r = n_fold_difference[i] / static_cast<double>(N);
 
     output << ' ' << fold_difference[i] << ' ' << n_fold_difference[i] << ' ' << r;
   }
@@ -1537,10 +1544,10 @@ write_fold_data(const int predicted_column, const resizable_array<float>& fold_d
 }
 
 static void
-compute_fold_difference_values_additive(const float obs, const float pred,
-                                        const resizable_array<float>& fold_difference,
+compute_fold_difference_values_additive(const double obs, const double pred,
+                                        const resizable_array<double>& fold_difference,
                                         int* n_fold_difference) {
-  float d = fabs(obs - pred);
+  double d = fabs(obs - pred);
 
   for (int i = 0; i < fold_difference.number_elements(); ++i) {
     if (d <= fold_difference[i]) {
@@ -1553,17 +1560,17 @@ compute_fold_difference_values_additive(const float obs, const float pred,
 
 static void
 compute_fold_difference_values_multiplicative(
-    const float obs, const float pred, const resizable_array<float>& fold_difference,
+    const double obs, const double pred, const resizable_array<double>& fold_difference,
     int* n_fold_difference) {
   if (fabs(obs) < 1.0e-04 || fabs(pred) < 1.0e-04) {
     return;
   }
 
-  if (obs * pred < 0.0f) {
+  if (obs * pred < 0.0) {
     return;
   }
 
-  float ratio;
+  double ratio;
   if (obs < pred) {
     ratio = pred / obs;
   } else {
@@ -1579,8 +1586,8 @@ compute_fold_difference_values_multiplicative(
   return;
 }
 
-static float
-WithinRange(uint32_t number_records, const float* expt, const float* pred, float msr) {
+static double
+WithinRange(uint32_t number_records, const double* expt, const double* pred, double msr) {
   uint32_t in_range = 0;
   for (uint32_t i = 0; i < number_records; ++i) {
     if (abs(expt[i] - pred[i]) <= msr) {
@@ -1588,23 +1595,23 @@ WithinRange(uint32_t number_records, const float* expt, const float* pred, float
     }
   }
 
-  return iwmisc::Fraction<float>(in_range, number_records);
+  return iwmisc::Fraction<double>(in_range, number_records);
 }
 
 
 static void
-ReportMSRDefaults(uint32_t number_records, const float* expt, const float* pred, float msr) {
+ReportMSRDefaults(uint32_t number_records, const double* expt, const double* pred, double msr) {
   if (! verbose) {
     return;
   }
 
-  std::unique_ptr<float[]> tmp = std::make_unique<float[]>(number_records);
+  std::unique_ptr<double[]> tmp = std::make_unique<double[]>(number_records);
 
-  float ave = std::reduce(expt, expt + number_records, 0.0f) / static_cast<float>(number_records);
+  double ave = std::reduce(expt, expt + number_records, 0.0) / static_cast<double>(number_records);
 
   std::fill_n(tmp.get(), number_records, ave);
 
-  float m = WithinRange(number_records, expt, tmp.get(), msr);
+  double m = WithinRange(number_records, expt, tmp.get(), msr);
 
   cerr << "MSR " << msr << " all predictions average " << ave << " within " << m << '\n';
 
@@ -1614,7 +1621,7 @@ ReportMSRDefaults(uint32_t number_records, const float* expt, const float* pred,
   std::copy_n(pred, number_records, tmp.get());
   for (int i = 0; i < 3; ++i) {
     std::shuffle(tmp.get(), tmp.get() + number_records, rng);
-    float m = WithinRange(number_records, expt, tmp.get(), msr);
+    double m = WithinRange(number_records, expt, tmp.get(), msr);
     cerr << " shuffled " << m << '\n';
   }
 }
@@ -1622,7 +1629,7 @@ ReportMSRDefaults(uint32_t number_records, const float* expt, const float* pred,
 // Return the number of items in `values` that are less than or equal to cutoff
 // assuming that `values` is sorted.
 static int
-CountLess(const float* values, int n, float cutoff) {
+CountLess(const double* values, int n, double cutoff) {
   for (int i = 0; i < n; ++i) {
     if (values[i] > cutoff) {
       return i;
@@ -1639,23 +1646,25 @@ CountLess(const float* values, int n, float cutoff) {
 
 static int
 iwstats(unsigned int number_records, const IWString* chunk_title, int which_predicted_set,
-        int predicted_column, int experimental_column, float* tmp1, float* tmp2,
-        float* tmpr, resizable_array_p<Predicted_Values>& zdata, std::ostream& output) {
+        int predicted_column, int experimental_column, double* tmp1, double* tmp2,
+        double* tmpr, resizable_array_p<Predicted_Values>& zdata, std::ostream& output) {
   experimental_value_t lower_experimental_value = static_cast<experimental_value_t>(0.0);
   experimental_value_t upper_experimental_value = static_cast<experimental_value_t>(0.0);
+
+  if (predicted_column >= 0) {
+    do_sort_by_predicted_value(zdata, which_predicted_set, predicted_column);
+  }
 
   if (truncate_predicted_values_to_experimental_range) {
     values_lower_than_experimental_range = 0;
     values_higher_than_experimental_range = 0;
 
-    establish_range_of_experimental_data(number_records, experimental_column, zdata,
+    establish_range_of_experimental_data(number_records, experimental_column,
+                                         which_predicted_set, zdata,
                                          lower_experimental_value,
                                          upper_experimental_value);
   }
 
-  if (predicted_column >= 0) {
-    do_sort_by_predicted_value(zdata, which_predicted_set, predicted_column);
-  }
 
 #ifdef ECHO_THE_DATA
   cerr << "Processing " << number_records << " of " << which_predicted_set
@@ -1670,7 +1679,7 @@ iwstats(unsigned int number_records, const IWString* chunk_title, int which_pred
   double obs_range;
 
   if (range_normal_relative_error) {
-    obs_range = compute_observed_range(zdata, number_records);
+    obs_range = compute_observed_range(zdata, number_records, which_predicted_set);
   } else {
     obs_range = 0.0;
   }
@@ -1682,10 +1691,6 @@ iwstats(unsigned int number_records, const IWString* chunk_title, int which_pred
   Accumulator<double> are;    // average relative error
   Accumulator<double> rnre;   // range normalised average relative error
 
-  double r = 0.0;  // sumxy
-
-  // For computing the line of best fit. sumx and sumy from the accumulators.
-  double sumx2 = 0.0;
 
   int ndx = 0;
 
@@ -1714,12 +1719,14 @@ iwstats(unsigned int number_records, const IWString* chunk_title, int which_pred
 
     experimental_value_t pred = pvi.pred(which_predicted_set);
 
-    p.extra(pred);
+
     //  cerr << " i = " << i << " processing predicted value " << pred << '\n';
 
     if (truncate_predicted_values_to_experimental_range) {
       do_any_truncations_needed(pred, lower_experimental_value, upper_experimental_value);
     }
+
+    p.extra(pred);
 
     if (experimental_column >= 0) {
       experimental_value_t obs = pvi.obs();
@@ -1730,9 +1737,6 @@ iwstats(unsigned int number_records, const IWString* chunk_title, int which_pred
 
       o.extra(obs);
 
-      sumx2 += obs * obs;
-
-      r += obs * pred;
 
       e.extra(obs - pred);
       ae.extra(fabs(obs - pred));
@@ -1753,7 +1757,7 @@ iwstats(unsigned int number_records, const IWString* chunk_title, int which_pred
             obs, pred, fold_difference_multiplicative, n_fold_difference_multiplicative);
       }
 
-      if (relative_error_threshold > static_cast<float>(0.0)) {
+      if (relative_error_threshold > static_cast<double>(0.0)) {
         are.extra(compute_relative_error(obs, pred));
       }
       if (range_normal_relative_error) {
@@ -1808,38 +1812,18 @@ iwstats(unsigned int number_records, const IWString* chunk_title, int which_pred
     double obar = o.average();
     double pbar = p.average();
 
-    if (p.minval() == p.maxval()) {
-      cerr << "All predictions constant " << p.minval() << '\n';
-      write_something_identifying_the_column(predicted_column, output);
-      output << " R2 " << 0.0 << '\n';
-      write_something_identifying_the_column(predicted_column, output);
-      output << " Q2 " << 0.0 << '\n';
-      output << " Average absolute error " << ae.average() << '\n';
-      output << " Predicted Unbiased Bsquared 0\n";
-      if (static_cast<float>(0.0) != relative_error_threshold) {
-        output << " Average Relative Error 0\n";
-      }
-      if (range_normal_relative_error) {
-        output << "Range Normal Relative Error 0\n";
-      }
-      return output.good();
+    double covariance = 0.0;
+    double observed_ss = 0.0;
+    double predicted_ss = 0.0;
+    for (int i = 0; i < ndx; ++i) {
+      const double dx = tmp1[i] - obar;
+      const double dy = tmp2[i] - pbar;
+      covariance += dx * dy;
+      observed_ss += dx * dx;
+      predicted_ss += dy * dy;
     }
-
-    double nx1bx2b = static_cast<double>(o.n()) * obar * pbar;
-
-    //  cerr << "r = " << r << " nx1bx2b = " << nx1bx2b << '\n';
-
-    double v1 = o.sum_of_squares() - o.n() * obar * obar;
-    double v2 = p.sum_of_squares() - o.n() * pbar * pbar;
-
-    if (0.0 == v1 || 0.0 == v2) {
-      cerr << "Yipes, zero qzyq term " << v1 << " and v2 = " << v2 << '\n';
-      return 0;
-    }
-
-    //  cerr << " v1 " << v1 << " v2 " << v2 << '\n';
-
-    double rho = (r - nx1bx2b) / sqrt(v1 * v2);
+    const double denominator = sqrt(observed_ss) * sqrt(predicted_ss);
+    const double rho = denominator > 0.0 ? std::clamp(covariance / denominator, -1.0, 1.0) : 0.0;
 
     if (values_lower_than_experimental_range || values_higher_than_experimental_range) {
       output << values_lower_than_experimental_range << " values lower than expt.min, "
@@ -1862,13 +1846,13 @@ iwstats(unsigned int number_records, const IWString* chunk_title, int which_pred
       output << "RMS error " << sqrt(ae.sum_of_squares() / static_cast<double>(ae.n())) << '\n';
     }
 
-    if (static_cast<float>(0.0) != relative_error_threshold) {
-      output << "Average Relative Error " << static_cast<float>(are.average()) << '\n';
+    if (static_cast<double>(0.0) != relative_error_threshold) {
+      output << "Average Relative Error " << static_cast<double>(are.average()) << '\n';
     }
 
     if (range_normal_relative_error) {
       output << "Average Range Normal Relative Error "
-             << static_cast<float>(rnre.average()) << '\n';
+             << static_cast<double>(rnre.average()) << '\n';
     }
 
     write_something_identifying_the_column(predicted_column, output);
@@ -1877,47 +1861,24 @@ iwstats(unsigned int number_records, const IWString* chunk_title, int which_pred
       output << "= ";
     }
 
-    if (wikipedia_r2_definition) {
-      double n = 0.0;    // numerator
-      double dno = 0.0;  // denominator for observed
-      double dnp = 0.0;  // denominator for predicted
-      for (int i = 0; i < ndx; ++i) {
-        n += (tmp1[i] - obar) * (tmp2[i] - pbar);
-        dno += (tmp1[i] - obar) * (tmp1[i] - obar);
-        dnp += (tmp2[i] - pbar) * (tmp2[i] - pbar);
-      }
-
-      if (n < 0.0) {
-        output << '-';
-      }
-      double r2 = n * n / (dno * dnp);
-      output << static_cast<float>(r2) << '\n';
-    } else {
-      if (rho < 0.0) {
-        output << '-';
-      }
-      output << static_cast<float>(rho * rho) << '\n';
-    }
+    if (rho < 0.0) output << '-';
+    output << rho * rho << '\n';
 
     //  Q squared
 
     double sum1 = 0.0;
     double sum2 = 0.0;
-    for (unsigned int i = 0; i < number_records; i++) {
-      const Predicted_Values& pvi = *(zdata[i]);
-
-      if (!pvi.valid(which_predicted_set)) {
-        continue;
-      }
-
-      experimental_value_t pred = pvi.pred(which_predicted_set);
-
-      sum1 += (pvi.obs() - pred) * (pvi.obs() - pred);
-      sum2 += (pvi.obs() - obar) * (pvi.obs() - obar);
+    for (int i = 0; i < ndx; ++i) {
+      const double error = tmp1[i] - tmp2[i];
+      const double centered = tmp1[i] - obar;
+      sum1 += error * error;
+      sum2 += centered * centered;
     }
 
     double q2;
-    if (traditional_q2_definition) {
+    if (sum2 == 0.0) {
+      q2 = sum1 == 0.0 ? 1.0 : 0.0;
+    } else if (traditional_q2_definition) {
       q2 = 1.0 - sum1 / sum2;
     } else if (sum1 > sum2) {
       q2 = -(1.0 - sum2 / sum1);
@@ -1935,7 +1896,7 @@ iwstats(unsigned int number_records, const IWString* chunk_title, int which_pred
     if (all_outputs_have_equals_sign) {
       output << "= ";
     }
-    output << static_cast<float>(q2) << '\n';
+    output << static_cast<double>(q2) << '\n';
 
     write_something_identifying_the_column(predicted_column, output);
     output << " Bias ";
@@ -1944,45 +1905,29 @@ iwstats(unsigned int number_records, const IWString* chunk_title, int which_pred
     }
     output << (o.average() - p.average()) << '\n';
 
-    sum1 = 0.0;
-    for (unsigned int i = 0; i < number_records; i++) {
-      const Predicted_Values& pvi = *(zdata[i]);
-
-      if (!pvi.valid(which_predicted_set)) {
-        continue;
-      }
-
-      experimental_value_t obs = pvi.obs();
-      experimental_value_t pred = pvi.pred(which_predicted_set);
-
-      sum1 += (obs - obar) * (pred - pbar);
-    }
-
-    //  write_something_identifying_the_column (predicted_column, output);
-    //  output << " R2 " << (sum1 / (p.variance() * o.variance()) / static_cast<double>
-    //  (number_records)) << '\n';
-
-    if (fname_for_correction_formula.length() > 0) {
-      WriteLinearTransformation(number_records, o.sum(), p.sum(), sumx2, r, fname_for_correction_formula);
+    if (!fname_for_correction_formula.empty() &&
+        !WriteLinearTransformation(obar, pbar, observed_ss, covariance,
+                                   fname_for_correction_formula)) {
+      return 0;
     }
   }
 
   if (fold_difference_additive.number_elements()) {
     write_fold_data(predicted_column, fold_difference_additive,
-                    n_fold_difference_additive, number_records, '+', output);
+                    n_fold_difference_additive, ndx, '+', output);
   }
 
   if (fold_difference_multiplicative.number_elements()) {
     write_fold_data(predicted_column, fold_difference_multiplicative,
-                    n_fold_difference_multiplicative, number_records, '*', output);
+                    n_fold_difference_multiplicative, ndx, '*', output);
   }
 
-  if (msr > 0.0f) {
-    ReportMSRDefaults(number_records, tmp1, tmp2, msr);
+  if (msr > 0.0) {
+    ReportMSRDefaults(ndx, tmp1, tmp2, msr);
 
     for (int i = 1; i <= 3; ++i) {
       write_something_identifying_the_column(predicted_column, output);
-      float m = WithinRange(number_records, tmp1, tmp2, msr * i);
+      double m = WithinRange(ndx, tmp1, tmp2, msr * i);
       output << " MSR" << i << ' ' << m << '\n';
     }
   }
@@ -2008,10 +1953,10 @@ iwstats(unsigned int number_records, const IWString* chunk_title, int which_pred
     output << " first " << *(chunk_title) << " (" << number_records << " records)\n";
   }
 
-  float max_diff = 0.0f;
+  double max_diff = 0.0;
   for (int i = 0; i < ndx; ++i) {
-    float o = tmp1[i];
-    float p = tmp2[i];
+    double o = tmp1[i];
+    double p = tmp2[i];
     tmp1[i] = fabs(o - p);
     tmp2[i] = (o - p);
     if (tmp1[i] > max_diff) {
@@ -2019,20 +1964,20 @@ iwstats(unsigned int number_records, const IWString* chunk_title, int which_pred
     }
   }
 
-  Float_Comparator fc;
-  iwqsort(tmp1, ndx, fc);
+  std::sort(tmp1, tmp1 + ndx);
 
   for (int pct : ae_percentiles) {
     write_something_identifying_the_column(predicted_column, output);
-    // Kind of dangerous integer divice
-    int j = pct * ndx / 100;
+    // The 100th percentile is the last valid error, not one past the array.
+    int j = static_cast<int>(static_cast<int64_t>(pct) * ndx / 100);
+    j = std::min(j, ndx - 1);
     output << " AE" << pct << " = " << tmp1[j] <<'\n';
   }
 
-  for (float diff : fraction_within) {
+  for (double diff : fraction_within) {
     write_something_identifying_the_column(predicted_column, output);
     int n = CountLess(tmp1, ndx, diff);
-    output << " WITHIN:" << diff << " = " << iwmisc::Fraction<float>(n, ndx) << "\n";
+    output << " WITHIN:" << diff << " = " << iwmisc::Fraction<double>(n, ndx) << "\n";
   }
 
   write_something_identifying_the_column(predicted_column, output);
@@ -2053,12 +1998,12 @@ iwstats(unsigned int number_records, const IWString* chunk_title, int which_pred
     stream_for_residuals << id << '\n';
     for (int i = 0; i < ndx; ++i) {
       stream_for_residuals << tmp2[i] << '\n';
-      stream_for_residuals.write_if_buffer_holds_more_than(4096);
+      if (!stream_for_residuals.write_if_buffer_holds_more_than(4096)) return 0;
     }
   }
 
   if (coverage_data.active()) {
-    coverage_data.Process(ndx, tmp2);
+    if (!coverage_data.Process(ndx, tmp2)) return 0;
   }
 
   CMSR_Parameters cmsrp;
@@ -2119,7 +2064,7 @@ iwstats(unsigned int number_records, const IWString* chunk_title, int which_pred
   compute_b_squared(number_records, experimental_column, zdata, tmp1, tmp2, Bsquared,
                     which_predicted_set);
 
-  output <<  static_cast<float>(Bsquared) << '\n';
+  output <<  static_cast<double>(Bsquared) << '\n';
 
   if (calculate_enrichment_metrics &&
       initilize_enrichment(number_records, experimental_column, zdata, tmp1,
@@ -2131,7 +2076,7 @@ iwstats(unsigned int number_records, const IWString* chunk_title, int which_pred
 
     calculateBEDROC bedroc(bedroc_alpha);
     double bedroc_value = bedroc(enrichment);
-    output << " BEDROC " << static_cast<float>(bedroc_value) << '\n';
+    output << " BEDROC " << static_cast<double>(bedroc_value) << '\n';
 
     calculateROC roc;
 
@@ -2141,7 +2086,7 @@ iwstats(unsigned int number_records, const IWString* chunk_title, int which_pred
       write_something_identifying_the_column(predicted_column, output);
     }
 
-    output << " ROC " << static_cast<float>(roc_value) << '\n';
+    output << " ROC " << static_cast<double>(roc_value) << '\n';
 
     calculateEF ef(enrichment_factor_fraction);
     double ef_value = ef(enrichment);
@@ -2150,26 +2095,20 @@ iwstats(unsigned int number_records, const IWString* chunk_title, int which_pred
       write_something_identifying_the_column(predicted_column, output);
     }
 
-    output << " EF " << static_cast<float>(ef_value) << '\n';
+    output << " EF " << static_cast<double>(ef_value) << '\n';
   }
 
-  // To avoid horrible problems with iwqsort, which really doesn't do well sorting
-  // a nearly sorted list, we sort by a random value before each sort!
-  // TODO:ianwatson switch to timsort.
-
+  // Order tied predictions by measured values to bound Bsquared.
   if (which_predicted_set >= 0 && duplicate_predicted_values_present &&
       compute_range_of_bsquared_values_when_duplicates_present) {
     output << "Contains duplicate predicted values in column " << (predicted_column + 1)
            << ", computing best and worst Bsquared\n";
 
-    static std::random_device rd;
-    static std::mt19937 rng(rd());
-
-    std::shuffle(zdata.begin(), zdata.end(), rng);  // randomise before sorting
-
     Predicted_Value_Comparitor_Best pvcb(which_predicted_set);
 
-    zdata.iwqsort(pvcb);
+    std::sort(zdata.begin(), zdata.end(), [&pvcb](const auto* lhs, const auto* rhs) {
+      return pvcb(lhs, rhs) < 0;
+    });
 
     double best_bsquared;
     compute_b_squared(number_records, experimental_column, zdata, tmp1, tmp2,
@@ -2181,10 +2120,10 @@ iwstats(unsigned int number_records, const IWString* chunk_title, int which_pred
       output << " Best Bsquared " << best_bsquared << '\n';
     }
 
-    std::shuffle(zdata.begin(), zdata.end(), rng);  // randomise before sorting
-
     Predicted_Value_Comparitor_Worst pvcw(which_predicted_set);
-    zdata.iwqsort(pvcw);
+    std::sort(zdata.begin(), zdata.end(), [&pvcw](const auto* lhs, const auto* rhs) {
+      return pvcw(lhs, rhs) < 0;
+    });
 
     double worst_bsquared;
     compute_b_squared(number_records, experimental_column, zdata, tmp1, tmp2,
@@ -2196,8 +2135,7 @@ iwstats(unsigned int number_records, const IWString* chunk_title, int which_pred
       output << " Worst Bsquared " << worst_bsquared << '\n';
     }
 
-    // write as float to avoid excess precision.
-    float b2 = static_cast<float>((best_bsquared + worst_bsquared) * 0.5);
+    const double b2 = (best_bsquared + worst_bsquared) * 0.5;
 
     write_something_identifying_the_column(predicted_column, output);
     if (all_outputs_have_equals_sign) {
@@ -2208,9 +2146,9 @@ iwstats(unsigned int number_records, const IWString* chunk_title, int which_pred
   }
 
   if (number_distribution_buckets > 0) {
-    do_compute_distribution_functions(number_records, which_predicted_set,
-                                      predicted_column, experimental_column, tmp1, tmp2,
-                                      zdata, output);
+    if (!do_compute_distribution_functions(number_records, which_predicted_set,
+                                           predicted_column, experimental_column, tmp1, tmp2,
+                                           zdata, output)) return 0;
   }
 
   return output.good();
@@ -2218,7 +2156,7 @@ iwstats(unsigned int number_records, const IWString* chunk_title, int which_pred
 
 static int
 iwstats(int which_predicted_set, int predicted_column, int experimental_column,
-        float* tmp1, float* tmp2, float* tmpr,
+        double* tmp1, double* tmp2, double* tmpr,
         const resizable_array<int>& numbers_to_check,
         resizable_array_p<Predicted_Values>& zdata, std::ostream& output) {
   if (numbers_to_check.empty()) {  // no subsetting, doing the whole file at once
@@ -2258,12 +2196,12 @@ iwstats(const resizable_array<int>& predicted_column, int experimental_column,
 
   // cerr << "Will check " << numbers_to_check.number_elements() << " items\n";
 
-  float* tmp1 = new float[records_in_file];
-  std::unique_ptr<float[]> free_tmp1(tmp1);
-  float* tmp2 = new float[records_in_file];
-  std::unique_ptr<float[]> free_tmp2(tmp2);
-  float* tmpr = new float[records_in_file];
-  std::unique_ptr<float[]> free_tmpr(tmpr);
+  double* tmp1 = new double[records_in_file];
+  std::unique_ptr<double[]> free_tmp1(tmp1);
+  double* tmp2 = new double[records_in_file];
+  std::unique_ptr<double[]> free_tmp2(tmp2);
+  double* tmpr = new double[records_in_file];
+  std::unique_ptr<double[]> free_tmpr(tmpr);
 
   if (nullptr == tmp1 || nullptr == tmp2 || nullptr == tmpr) {
     cerr << "Memory failure, cannot allocate data for " << records_in_file
@@ -2358,10 +2296,9 @@ read_id_activity_hash_record(const const_IWSubstring& buffer,
     activity_name = act;
   }
 
-  if ("." == act) {
-    cerr << "Missing value encountered in experimental file '" << buffer
-         << "', impossible\n";
-    return 0;
+  if (!missing_value.empty() && act == missing_value) {
+    id_activity_hash[id] = act;
+    return 1;
   }
 
   double notused;
@@ -2396,6 +2333,10 @@ read_id_activity_hash(iwstring_data_source& input,
     }
   }
 
+  if (!input.good()) {
+    cerr << "Error reading experimental data\n";
+    return 0;
+  }
   return id_activity_hash.size();
 }
 
@@ -2417,13 +2358,13 @@ read_id_activity_hash(const const_IWSubstring& fname,
 template <typename T>
 int
 get_comma_separated_values(Command_Line& cl, const char flag, resizable_array<T>& v,
-                           const float minval) {
+                           const double minval) {
   const_IWSubstring f;
   for (int i = 0; cl.value(flag, f, i); ++i) {
     int j = 0;
     const_IWSubstring token;
     while (f.nextword(token, j, ',')) {
-      float x;
+      double x;
       if (!token.numeric_value(x) || x <= minval) {
         cerr << "The -" << flag << " must be greater than " << minval << " '" << token
              << "' invalid\n";
@@ -2452,12 +2393,12 @@ identify_most_active_fraction(const IW_STL_Hash_Map<IWString, IWString>& activit
                               double& discard_measured_values_below) {
   const auto s = activity.size();
 
-  float* v = new float[s];
-  std::unique_ptr<float[]> free_v(v);
+  double* v = new double[s];
+  std::unique_ptr<double[]> free_v(v);
 
   int ndx = 0;
   for (auto f : activity) {
-    float a;
+    double a;
     if (!f.second.numeric_value(a)) {
       continue;
     }
@@ -2466,9 +2407,13 @@ identify_most_active_fraction(const IW_STL_Hash_Map<IWString, IWString>& activit
     ndx++;
   }
 
+  if (ndx == 0) {
+    cerr << "No numeric activities available for -U\n";
+    return 0;
+  }
   std::sort(v, v + ndx);  // ascending. Could do a partial sort if we wanted to
 
-  const int i = static_cast<int>((1.0 - fraction_to_keep) * ndx + 0.4999);
+  const int i = std::min(ndx - 1, static_cast<int>((1.0 - fraction_to_keep) * ndx + 0.4999));
 
   discard_measured_values_below = v[i];
 
@@ -2651,6 +2596,8 @@ iwstats(int argc, char** argv) {
     experimental_column--;
   }
 
+  if (cl.option_present('M')) missing_value = cl.string_value('M');
+
   if (cl.option_present('E')) {
     const_IWSubstring e = cl.string_value('E');
 
@@ -2704,15 +2651,15 @@ iwstats(int argc, char** argv) {
     }
   }
 
-  if (cl.option_present('w')) {
+  if (cl.option_present('W')) {
     fraction_within.resize_keep_storage(0);
     const_IWSubstring w;
     for (int i = 0; cl.value('W', w, i); ++i) {
       int j = 0;
       const_IWSubstring token;
       while (w.nextword(token, j, ',')) {
-        float v;
-        if (! token.numeric_value(v) || v <= 0.0f) {
+        double v;
+        if (! token.numeric_value(v) || v <= 0.0) {
           cerr << "Invalid absolute error value (-W)\n";
           return 1;
         }
@@ -2792,7 +2739,7 @@ iwstats(int argc, char** argv) {
   }
 
   if (cl.option_present('G')) {
-    if (! cl.value('G', msr) || msr <= 0.0f) {
+    if (! cl.value('G', msr) || msr <= 0.0) {
       cerr << "The MSR value (-G) must be a positive value\n";
       return 1;
     }
@@ -2825,7 +2772,7 @@ iwstats(int argc, char** argv) {
 
   if (cl.option_present('r')) {
     if (!cl.value('r', relative_error_threshold) ||
-        relative_error_threshold <= static_cast<float>(0.0)) {
+        relative_error_threshold <= static_cast<double>(0.0)) {
       cerr << "The max relative error (-r) option must be a non zero, positive floating "
               "point value\n";
       usage(2);
@@ -2874,7 +2821,7 @@ iwstats(int argc, char** argv) {
   }
 
   if (cl.option_present('K')) {
-    wikipedia_r2_definition = 0;
+    // Retained as an alias: both definitions now use stable centered sums.
 
     if (verbose) {
       cerr << "Will use R2 definition\n";
@@ -2949,7 +2896,7 @@ iwstats(int argc, char** argv) {
 
   if (cl.option_present('A')) {
     int i = 0;
-    float a;
+    double a;
     while (cl.value('A', a, i++)) {
       if (verbose) {
         cerr << "Will report activities above " << a << "\n";
@@ -3015,7 +2962,7 @@ iwstats(int argc, char** argv) {
 
   if (cl.option_present('u')) {
     if (!cl.value('u', discard_measured_values_below)) {
-      cerr << "The discard measured values below option (-u) must be a valid float\n";
+      cerr << "The discard measured values below option (-u) must be a valid double\n";
       usage(2);
     }
     if (verbose) {
@@ -3041,7 +2988,7 @@ iwstats(int argc, char** argv) {
       cerr << "Will only keep the most " << u << " active molecules\n";
     }
 
-    identify_most_active_fraction(id_activity_hash, u, discard_measured_values_below);
+    if (!identify_most_active_fraction(id_activity_hash, u, discard_measured_values_below)) return 1;
   }
 
   if (cl.option_present('R')) {
@@ -3060,14 +3007,14 @@ iwstats(int argc, char** argv) {
   }
 
   if (cl.option_present('F')) {
-    if (!get_comma_separated_values(cl, 'F', fold_difference_multiplicative, 1.0f)) {
+    if (!get_comma_separated_values(cl, 'F', fold_difference_multiplicative, 1.0)) {
       cerr << "Cannot parse multiplicative -Nfold option (-F)\n";
       return 1;
     }
   }
 
   if (cl.option_present('D')) {
-    if (!get_comma_separated_values(cl, 'D', fold_difference_additive, 0.0f)) {
+    if (!get_comma_separated_values(cl, 'D', fold_difference_additive, 0.0)) {
       cerr << "Cannot parse additive -Nfold option (-D)\n";
       return 1;
     }
@@ -3119,6 +3066,17 @@ iwstats(int argc, char** argv) {
   if (cl.empty()) {
     cerr << "INsufficient arguments\n";
     usage(1);
+  }
+
+  // These options name one output pair, not a family of per-analysis files.
+  // Reject ambiguous uses rather than silently overwriting earlier results.
+  if ((cl.option_present('H') || cl.option_present('C')) &&
+      (cl.number_elements() != 1 || predicted_column.size() != 1 || step ||
+       !percents_to_check.empty() || !N_to_check.empty() || !activities_to_check.empty() ||
+       marker_column >= 0 || !marker_column_name.empty())) {
+    cerr << "Coverage (-H) and correction (-C) outputs require one file, one prediction "
+            "column, and no subsets or marker groups\n";
+    return 1;
   }
 
   if (cl.option_present('L')) {
@@ -3221,6 +3179,15 @@ iwstats(int argc, char** argv) {
     delete[] column_titles;
   }
 
+  std::cout.flush();
+  if (!std::cout.good()) {
+    cerr << "Cannot write statistics output\n";
+    rc = 1;
+  }
+  if (stream_for_residuals.is_open() && !stream_for_residuals.close()) {
+    cerr << "Cannot write residual output\n";
+    rc = 1;
+  }
   return rc;
 }
 

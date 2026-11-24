@@ -1750,3 +1750,14 @@ cc_test(
         "@googletest//:gtest_main",
     ],
 )
+
+cc_test(
+    name = "iwstats_numeric_test",
+    size = "small",
+    srcs = ["iwstats_numeric_test.cc"],
+    deps = [
+        ":bsquared",
+        ":metric",
+        "@googletest//:gtest_main",
+    ],
+)

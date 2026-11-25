@@ -119,7 +119,7 @@ Patterns of likely hydrophobic sections of a molecule.
 
 ### jurs 3D
 Surface area related features from Peter Jurs
-[jwsa](/src/Molecule_Tools/jw_sa_db_descriptor.cc)
+[jwsa](/src/Molecule_Tools/jwsadb.cc)
 
 ### jwc
 CATS features [jwcats](/src/Molecule_Tools/jwcats.cc)
@@ -138,7 +138,7 @@ Molecular connectivity indices.
 Post process the output of cxcalc logP and logD.
 
 ### medv
-MEDV descriptors [jwmedv](/src/Molecule_Tools/jw_MEDV.cc)
+MEDV descriptors [jwmedv](/src/Molecule_Tools/jw_MEDV13.cc)
 
 ### mk
 A variant on the original MACCS keys (192 features).

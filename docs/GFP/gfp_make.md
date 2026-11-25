@@ -23,13 +23,13 @@ temperature -J MPR -E autocreate -g all -l file.smi |
         iwfp -E autocreate -J FPIW -f -
 ```
 where the default fingerprint, -MPR -IW -MK -MK2, have been turned into three
-program invocations. The tool [temperature](/docs/Molecule_Tools/temperature.md)
+program invocations. The tool [temperature](/docs/GFP/gfp.md#mpr)
 initiates processing, standardising the smiles, stripping to the largest
 fragment, and then writing the fingerprint, with molecular properties, to the output.
-The next stage of the pipeline is an invocation of [maccskeys](/docs/Molecule_Tools/maccskeys.md)
+The next stage of the pipeline is an invocation of [maccskeys](/docs/GFP/gfp.md#fpmk-fpmk2)
 which is instructed to generate two fingerprints, the normal, and the level 2 fingerprint
 which accounts for number of times set. The resulting stream is then passed to
-[iwfp](/docs/Molecule_Tools/iwfp) which adds the linear fingerprint to the
+[iwfp](/docs/GFP/gfp.md#fpiw) which adds the linear fingerprint to the
 stream. gfp_make is responsible for constructing these command pipelines, which
 can be of arbitrary complexity.
 

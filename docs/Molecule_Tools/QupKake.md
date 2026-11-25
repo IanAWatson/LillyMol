@@ -85,7 +85,7 @@ on atom 'idx'.
 
 ## Epik
 Schrodinger's Pka tool can also be used as input.
-The tool [from_epik](/contrib/bin/from_epik.py) converts Epik data to
+The helper script `from_epik.py` (not distributed in this repository) converts Epik data to
 a form used by this tool. On a recent set of 200 data files I ran
 ```
 dopattern.sh -o 200 'run_python.sh from_epik.py iwsplit%.smi epik-iwsplit%.log > from_epik%.smi'

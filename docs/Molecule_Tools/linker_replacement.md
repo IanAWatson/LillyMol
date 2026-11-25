@@ -152,9 +152,9 @@ be used.
 
 As an example of this, when using an indole as the -O file, and with a maximum
 difference of 4, we observe molecules like
-![1](Images/linker_replacement1.png)
+![1](Images/linker_replacememt1.png)
 and
-![2](Images/linker_replacement1.png)
+![2](Images/linker_replacememt2.png)
 where the heterocycle retains interesting elements of similarity to the starting
 indole.
 

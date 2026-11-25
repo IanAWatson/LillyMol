@@ -840,7 +840,7 @@ atoms. The `-B quiet` option suppresses those warnings.
 
 ### -B ranges=\<fname\>
 This was previously mentioned under fingerprinting. The file is a `w:Ranges`, defined
-in [iwdescr](src/Molecule_Tools/iwdescr.proto) and might look like
+in [iwdescr](/src/Molecule_Tools/iwdescr.proto) and might look like
 ```
 range { name:"w_natoms" min:5 max:50 }
 range { name:"w_nrings" min:0 max:10 }

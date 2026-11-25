@@ -165,7 +165,7 @@ the code really cannot scale beyond 32 threads. Parallel computing can be
 mystifying.
 
 Gaphically this looks like
-[spread_speedup](Images/spread_speedup.png)
+[spread_speedup](../Workflows/Images/spread_speedup.png)
 
 This is typical of many OMP applications where the addition of more
 threads will provide diminishing benefit as threads are added to the

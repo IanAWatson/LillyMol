@@ -8,7 +8,7 @@ wrote a special purpose tool for identifying such regions of a molecule. That
 offered several advantages, and perhaps ultimately such an approach
 will be needed here.
 
-In this case we use [dicer](/docs/Molecule_Tools/dicer) to break apart
+In this case we use [dicer](/docs/Molecule_Tools/dicer.md) to break apart
 the molecules and then as a post-processing step identify those fragments
 that meet our requirements. The previous exercise could also have been
 done this way, but making a special purpose tool avoids some of the
@@ -132,7 +132,7 @@ And the most prevalent fragments are
 ![prevalent](Images/most_prevalent.10_00007.png)
 ![prevalent](Images/most_prevalent.10_00008.png)
 ![prevalent](Images/most_prevalent.10_00009.png)
-![prevalent](Images/most_prevalent.10_000010.png)
+![prevalent](Images/most_prevalent.10_00010.png)
 
 ## Linker Functionality
 In order to better align with the intended use of these

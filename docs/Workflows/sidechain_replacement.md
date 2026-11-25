@@ -11,7 +11,7 @@ similar chemical environment, the likelihood of a viable molecule increases.
 
 ## Data
 LillyMol comes with a file of aromatic sidechains extracted from a recent Chembl.
-This [file](/data/chembl_sidechains.textproto) contains about 67k sidechains. It is
+This [file](/data/chembl_sidechains.textproto.xz) contains about 67k sidechains. It is
 sorted by prevalence, so the first few records might be
 ```
 [1OH]C iso: ATT smi: "[1OH]C" par: "CHEMBL232552" nat: 2 n: 561404 
@@ -27,7 +27,7 @@ arbitrary. The 'nat' attribute is the number of atoms in the sidechain.
 
 The maximum atom count in this file is 11, but that could be filtered via any of
 the filtering tools in LillyMol - [fileconv](/docs/Molecule_Tools/fileconv.md)
-or [molecule_filter](/docs/molecule_filter/molecule_filter.md).
+or [molecule_filter](/docs/Molecule_Tools/molecule_filter.md).
 
 ## Simple Tool
 In contrib/bin the tool [replace_sidechain](/contrib/bin/replace_sidechain.rb)

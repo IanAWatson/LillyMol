@@ -10,7 +10,7 @@ for every needle
 ```
 
 Output is a TDT file that can be processed by any of the tdt_* utilities
-or [nplotnn](nplotnn.md).
+or [nplotnn](/src/Utilities/GFP_Tools/nplotnn.cc).
 
 ## TLDR
 For each needle, find the 10 nearest neighbours in the corporate

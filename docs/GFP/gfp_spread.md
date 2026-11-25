@@ -47,7 +47,7 @@ The first molecules selected are very likely to be "wierd and strange"
 molecules. Indeed two of the very first molecules identified are
  
 ![CHEMBL158305](Images/CHEMBL158305.png)
-![CHEMBL198106](Images/CHEMBL198106.png)
+![CHEMBL198106](Images/CHEMBL1981061.png)
 
 gfp_spread has correctly identified these molecules as being
 significantly different from the first molecule selected. This is a

@@ -145,7 +145,7 @@ is one way of doing that.
 
 ## Scaffold Hopping
 Replacing the rings in a molecule is one way of doing scaffold hopping
-[scaffold hopping](/docs/molecule/ring_replacement.md).
+[scaffold hopping](/docs/Molecule_Tools/ring_replacement.md).
 
 ## Molecular Asbstractions
 Converting a molecule into abstract forms is often an interesting way of identifying

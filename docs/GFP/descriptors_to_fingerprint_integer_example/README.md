@@ -60,4 +60,4 @@ should show 'active0, active1, active2...`, not necessarily in that order,
 as the closest neighbours.
 ```
 
-That .nn file can be processed with [nplotnn](/docs/GFP/nplotnn.md).
+That .nn file can be processed with [nplotnn](/src/Utilities/GFP_Tools/nplotnn.cc).

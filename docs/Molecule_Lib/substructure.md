@@ -1201,7 +1201,8 @@ sidechain constraints.
 [OHD1]-[CD3R0](=O)-[CD3R0](-{[CD2]1;[$(O=c1nsnc1)]1;d4;m5;r5;u1;a7}*)-[ND1H2]
 ```
 
-This matches ![CHEMBL1094324](Images/CHEMBL1094324.png).
+For example, this matches the molecule
+![CHEMBL1094324](Images/CHEMBL1094324.png)
 
 The down-the-bond directive requires one `[CD2]` atom and one atom matching the
 recursive SMARTS `[$(O=c1nsnc1)]`. Those requirements are independent. The same

@@ -4,7 +4,7 @@ We often encounter cases where a transformation is to be applied to a molecule
 a limited number of times. Scenarios like this have been outlined under the
 title of Positional Analogue Scanning.
 [JMedChem](https://pubs.acs.org/doi/10.1021/acs.jmedchem.9b02092)
-[PracticalCheminformatics](https://www.bing.com/ck/a?!&&p=daab85304f982088d17513f4540dc9d30d297fa3204d1c823d77c1452dde95d7JmltdHM9MTc0NTQ1MjgwMA&ptn=3&ver=2&hsh=4&fclid=01a16e41-0a03-6ce5-25b5-7bea0bae6db3&psq=positional+analogue+scanning&u=a1aHR0cHM6Ly9wcmFjdGljYWxjaGVtaW5mb3JtYXRpY3MuYmxvZ3Nwb3QuY29tLzIwMjAvMDQvcG9zaXRpb25hbC1hbmFsb2d1ZS1zY2FubmluZy5odG1sIzp-OnRleHQ9QnklMjBnZW5lcmF0aW5nJTIwYSUyMHNldCUyMG9mJTIwcG9zaXRpb25hbCUyMGFuYWxvZ3MlMkMlMjBvbmUsd2hlcmUlMjBQQVMlMjBjYW4lMjBiZSUyMGNvbWJpbmVkJTIwd2l0aCUyMGNvbXB1dGF0aW9uYWwlMjBhbmFseXNpcy4&ntb=1)
+[PracticalCheminformatics](https://practicalcheminformatics.blogspot.com/2020/04/positional-analogue-scanning.html)
 
 For example we might be changing a Methyl group to 
 a Fluoro. The default behaviour in trxn is to generate a single product with

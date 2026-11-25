@@ -13,8 +13,8 @@ like
 ```bash
 bazelisk build --config=inchi ... Molecule_Tools:fileconv
 ```
-will work. At the time of writing only [fileconv](fileconv.md) and
-[unique_molecules](unique_molecules.md) have support for InChI.
+will work. At the time of writing only [fileconv](../Molecule_Tools/fileconv.md) and
+[unique_molecules](../Molecule_Tools/unique_molecules.md) have support for InChI.
 
 ```bash
 fileconv -o inchi ... file.smi

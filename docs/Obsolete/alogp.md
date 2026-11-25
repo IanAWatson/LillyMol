@@ -25,7 +25,7 @@ way of doing it.
 ## ALOGP Models
 The first task is to assemble the available data. If the data is experimental
 you don't have a lot of choices to make - you still need a test set. But if the data is computational
-we would suggest using [parsimonious_sample](/docs/Molecule_Tools/parsimonious_sample.md)
+we would suggest using `parsimonious_sample`
 to identify a parsimonious sample of molecules that will constitute the
 training set. Perform the expensive computation on that subset, as well as
 a test set.

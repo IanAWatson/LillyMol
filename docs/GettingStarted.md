@@ -31,7 +31,7 @@ fileconv -i sdf -i SDFID:ID -i SDFNOPREPEND -v .... file.sdf
 All LillyMol tools support a `-i ICTE` directive, which stands for Igonore
 Connection Table Errors. It will be case-by-case how to deal with molecules
 that fail - ignore them, find fileconv options that attempt to fix the
-problem. See [fileconv](docs/Molecule_Tools/fileconv.md).
+problem. See [fileconv](/docs/Molecule_Tools/fileconv.md).
 
 Once you have one or more smiles files there are many things commonly done.
 
@@ -150,10 +150,11 @@ Making changes to molecules can be done via serveral tools including
 * [minor_changes](/docs/Molecule_Tools/minor_changes.md)
 
 ## Descriptor Computation
-See [/docs/Molecule_Tools/descriptors.md]
+See [iwdescr](/docs/Molecule_Tools/iwdescr.md) and
+[make_descriptors](/docs/Molecule_Tools/make_descriptors.md).
 
 Many of these molecular descriptors are useful in QSAR model building.
 
 ## Similarity
-See [gfp](/docs/GFP/AAReadme.md).
+See [gfp](/docs/GFP/README.md).
 

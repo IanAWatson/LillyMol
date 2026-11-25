@@ -182,7 +182,7 @@ Generally useful structure processing tool [fileconv](/docs/Molecule_Tools/filec
 ## fingerprint_substructure
 Fingerprint just a subset of the atoms in a molecule. The subset is defined by
 a substructure query, and an optional radius. Useful for identifying unique
-reagents - to a given radius. [fingerprint_substructure](fingerprint_substructure.md)
+reagents - to a given radius. [fingerprint_substructure](Molecule_Tools/fingerprint_substructure.md)
 
 ## firstatom
 Re-write a smiles with a given atom as the first atom in the smiles.
@@ -195,7 +195,7 @@ For a given set of matched atoms, extract the coordinates from molecules.
 
 ## get_substituents
 For a core defined by a substructure, identify the substituents attached.
-[get_substituents](get_substituents.md)
+[get_substituents](Molecule_Tools/get_substituents.md)
 
 ## gfp_add_descriptors
 Obscure. Adds information from a descriptor file to a fingerprint file.
@@ -248,7 +248,7 @@ nn2csv needles.nn > needles.nn.csv
 
 ## gfp_mcs
 An attempt at using the gfp framework for an approximate MCS solution. Needs work,
-preferred means of tackling the approximate MCS problem is with [dicer](dicer.md).
+preferred means of tackling the approximate MCS problem is with [dicer](Molecule_Tools/dicer.md).
 
 ## gfp_naive_bayesian
 An often powerful modeling method. Make sure that more sophisticated models
@@ -553,7 +553,7 @@ Multiple individual nearest neighbour searches have been run, and those files
 need to be made into a form suitable for the -A option of gfp_spread.
 ## pharmacophore_2d
 Can generate queries for pharmacaphore type searches in 2D.
-[pharmacophore_2d](Molecule_Tools/pharmacophore_2d.md).
+[pharmacophore_2d](Molecule_Tools/pharmacophore2d.md).
 
 ## ppv
 Generates statistics for predictions for a classification model.

@@ -440,7 +440,7 @@ from the uni test, this example
       }
     }
 ```
-only changes matched atoms where the starting isotope is in the range [3-5]. See [reacation_test](src/Molecule_Lib/reaction_test.cc)
+only changes matched atoms where the starting isotope is in the range [3-5]. See [reacation_test](/src/Molecule_Lib/reaction_test.cc)
 for an example where a list of specific allowed values is used instead.
 
 

@@ -131,7 +131,7 @@ OC(=O)[1CH3] iso: ATT smi: "OC(=O)[1CH3]" par: "CHEMBL2028418" nat: 4 n: 265
 ```
 hardly surprisingly the most common substituent at the end of an amide is
 a methyl group.
-![CHEMBL11544](CHEMBL11544.png)
+![CHEMBL11544](Images/CHEMBL11544.png)
 
 If we had wanted to include the Nitrogen atom in the fragments adding
 `-X anchor` would see the anchor atom (Nitrogen) included with the

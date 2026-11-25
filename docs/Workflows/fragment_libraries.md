@@ -220,7 +220,7 @@ tar Jxvf data/dicer_fragments/dicer_fragments.tar.xz
 to decompress.
 
 Note too that a file of sidechains from Chembl extracted by get_substituents is also
-included with the LillyMol distribution [sidechains](/data/chembl_sidechains.textproto).
+included with the LillyMol distribution [sidechains](/data/chembl_sidechains.textproto.xz).
 
 ## trxn
 Writing a reaction to append an isotopically labelled sidechain to an existing molecule

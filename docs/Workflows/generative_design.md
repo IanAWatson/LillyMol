@@ -23,7 +23,7 @@ Tools like `fileconv` can be used to quickly eliminate problems such as
 * Too few, too many rings or ring systems, or too large rings.
 * Disallowed elements.
 
-That can be followed by invocation of the Lilly Medchem Rules [githug](https://...), and
+That can be followed by invocation of the Lilly Medchem Rules [GitHub repository](https://github.com/IanAWatson/Lilly-Medchem-Rules), and
 other custom filtering rules, using `tsubstructure`.
 
 One fundamental problem of precedent based rule sets, such as the Lilly Medchem Rules

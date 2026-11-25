@@ -100,7 +100,7 @@ the database: the smiles of the original molecule, smiles with fragment(s) strip
 smiles with chirality also lost.
 
 The `*.graph.bdb` database is more unusual. In order to form the key, the
-molecule is converted to graph form [mol2graph](/docs/Molecule_Tools/mol2graph.md).
+molecule is converted to graph form [mol2graph](/src/Molecule_Lib/mol2graph.cc).
 Then a variant of the original molecular formula is appended. This is an aromatic
 distinguishing molecular formula, where Toluene would have a formula `c6H5CH3`.
 In addition, the SSSR ring sizes are appended to the formula. This ensures that

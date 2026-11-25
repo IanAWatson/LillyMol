@@ -113,7 +113,7 @@ where both input and output (which defaults to smiles) are
 from stdin and to stdout.
 
 The type of file written, by default smiles, can be set with the -o option.
-See [io](docs/Molecule_Lib/io.md) for more information about I/O in LillyMol,
+See [io](/docs/Molecule_Lib/io.md) for more information about I/O in LillyMol,
 including how to produce other file types, unique smiles, multiple files and
 other capabilities.
 

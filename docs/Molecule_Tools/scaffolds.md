@@ -41,7 +41,7 @@ where there is a consecutive number appended to the name, followed by the number
 ring systems in the scaffold subset.
 
 Using the `-y` option produces output in scaffolds.ScaffoldData
-[scaffolds.proto](src/Molecule_Tools/scaffolds.proto) textproto form
+[scaffolds.proto](/src/Molecule_Tools/scaffolds.proto) textproto form
 ```
 smi: "C1=CC=CC(=C1)N=NN1CCOCC1" par: "CHEMBL3814820" ring_sys: 2
                 subset { smi: "O1CCNCC1" ring_sys: 1 }
@@ -53,7 +53,7 @@ but where output is a single line per molecule.
 ## Usage
 The tool has very few command line options, with most control being available only
 by reading a scaffolds.ScaffoldsOptions textproto file via the -C option. That
-proto definition, [scaffolds.proto](src/Molecule_Tools/scaffolds.proto) should fully
+proto definition, [scaffolds.proto](/src/Molecule_Tools/scaffolds.proto) should fully
 explain the various options.
 
 The most interesting, and potentially useful options are those related to retaining

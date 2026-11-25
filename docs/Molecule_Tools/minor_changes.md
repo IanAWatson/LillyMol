@@ -59,11 +59,11 @@ further variants involving different ring atom arrangements.
 [substituent_identification](substituent_identification.md) can perform 
 sidechain replacements of varying precision.
 
-[random_molecular_permuations](random_molecular_permuations.md) also contains
+[random_molecular_permutations](random_molecular_permutations.md) also contains
 various transformations, possibly not as well developed as in minor_changes,
 but which can often generate interesting modifications of a starting structure.
 
-[smiles_mutation](smiles_mutation.md) performs random string based transformations
+[smiles_mutation](/src/Molecule_Tools/smiles_mutation.cc) performs random string based transformations
 on smiles strings, attempting molecule interpretation on the resulting strings.
 Most strings generated are invalid.
 

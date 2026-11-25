@@ -145,7 +145,7 @@ position and each allowed substituent pattern directly. A narrow para-nitro
 example is readable:
 
 ```smarts
-[ND1H2]-c1ccc([N+](=O)[O-])cc1
+[ND1H2]-c1ccc(N(=O)=O)cc1
 ```
 
 But that only covers one substituent at one ring position. A broader SMARTS-only
@@ -169,7 +169,7 @@ query {
     aromatic: true
     fused: 0
     base {
-      environment: "a-[N+](=O)[O-]||a-C#N||a-C(=O)[#6,O,N]||a-[F,Cl,Br,I]"
+      environment: "a-N(=O)=O||a-C#N||a-C(=O)[#6,O,N]||a-[F,Cl,Br,I]"
       set_global_id: 1
     }
   }
@@ -202,14 +202,17 @@ This is useful for reactions or matched-atom reporting because the proto can use
 rich context to decide whether a molecule matches, while still returning only the
 atoms specified by the main SMARTS.
 
+These examples use LillyMol's neutral nitro representation, `N(=O)=O`, as
+produced by chemical standardisation.
+
 Test it with simple positive and negative examples:
 
 ```shell
 cat > aniline_ewg_examples.smi <<'EOF'
-Nc1ccc([N+](=O)[O-])cc1 p_nitroaniline
+Nc1ccc(N(=O)=O)cc1 p_nitroaniline
 Nc1ccccc1 aniline
 Nc1ccc(C#N)cc1 p_cyanoaniline
-Nc1ccccc1c1ccc([N+](=O)[O-])cc1 different_ring_same_molecule
+Nc1ccccc1c1ccc(N(=O)=O)cc1 different_ring_same_molecule
 CCN ethylamine
 EOF
 
@@ -796,7 +799,7 @@ query {
     }
     smarts_file: "withdrawing.textproto"
     smarts_file: "${LILLYMOL_HOME}/data/queries/other_groups.textproto"
-    smarts: "[N+](=O)[O-]"
+    smarts: "N(=O)=O"
   }
 }
 ```

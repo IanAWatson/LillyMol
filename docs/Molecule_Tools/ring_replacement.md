@@ -344,7 +344,7 @@ With `-3`, coordinates are written using LillyMol's coordinate-bearing SMILES
 syntax. A record begins like this:
 
 ```text
-O{{0.0021,-0.0041,0.002}}=[N+]{{-0.0158,1.3128,0.0093}}([O-]{{1.1157,1.9867,0.0021}})C{{-1.3076,2.0354,0.0193}}...
+O{{0.0021,-0.0041,0.002}}=N{{-0.0158,1.3128,0.0093}}(=O{{1.1157,1.9867,0.0021}})C{{-1.3076,2.0354,0.0193}}...
 ```
 
 The ellipsis deliberately truncates the example, so the text shown above is not
